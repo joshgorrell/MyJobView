@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ContactDetail } from '../Contacts/ContactDetail';
@@ -9,64 +10,11 @@ import ConnectionForm from '../Connections/ConnectionForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import PrintProspectsView from '../Leads/PrintProspectsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Calendar, Eye, EyeOff, CreditCard as Edit, ChevronRight, Filter, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
 
-interface Contact {
-  id: string;
-  company_name: string;
-  contact_name: string;
-  email: string;
-  phone: string;
-  created_at: string;
-  created_by: string;
-  is_prospect?: boolean;
-  prospect_competitor_relationships?: Array<{
-    id: string;
-    relationship_type: string;
-    relationship_strength?: string;
-    competitors: {
-      id: string;
-      name: string;
-    };
-  }>;
-  last_connection?: {
-    connection_date: string;
-    connection_type: string;
-  };
-  next_scheduled_connection?: {
-    scheduled_date: string;
-    connection_type: string;
-  };
-}
-
-interface Connection {
-  id: string;
-  contact_id: string;
-  user_id: string;
-  connection_type: string;
-  connection_date: string;
-  notes: string;
-  created_at: string;
-  contacts?: Contact;
-}
-
-interface Lead {
-  id: string;
-  company_name: string;
-  contact_name: string;
-  email: string;
-  phone: string;
-  status: string;
-  priority: string;
-  estimated_value: string;
-  created_at: string;
-  last_contact_date: string;
-  assigned_to: string;
-  assigned_to_name?: string;
-  is_fishbowl: boolean;
-}
 
 interface PipelineStage {
+  description?: string;
   id: string;
   name: string;
   color: string;
@@ -85,7 +33,7 @@ export function PipelineBoard() {
   const [timeFilter, setTimeFilter] = useState<number>(14);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
-  const [showProspects, setShowProspects] = useState(() => {
+  const [_showProspects, _setShowProspects] = useState(() => {
     const saved = localStorage.getItem('pipeline_show_prospects');
     return saved !== null ? JSON.parse(saved) : true;
   });
@@ -277,7 +225,7 @@ export function PipelineBoard() {
       setShowWidgetSettings(false);
     } catch (error) {
       console.error('Error saving widget preferences:', error);
-      alert('Failed to save widget preferences');
+      notify('Failed to save widget preferences', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -295,11 +243,6 @@ export function PipelineBoard() {
     }
   }
 
-  function toggleProspects() {
-    const newValue = !showProspects;
-    setShowProspects(newValue);
-    localStorage.setItem('pipeline_show_prospects', JSON.stringify(newValue));
-  }
 
   function getDateCutoff() {
     const cutoff = new Date();
@@ -535,7 +478,7 @@ export function PipelineBoard() {
       loadPipelineData();
     } catch (error) {
       console.error('Error claiming lead:', error);
-      alert('Failed to claim lead. Please try again.');
+      notify('Failed to claim lead. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -637,7 +580,7 @@ export function PipelineBoard() {
 
       if (!data) {
         console.error('Contact not found');
-        alert('Contact not found');
+        notify('Contact not found', { theme: 'violet', tone: 'error' });
         return;
       }
 
@@ -645,7 +588,7 @@ export function PipelineBoard() {
       setSelectedContact(data);
     } catch (error: any) {
       console.error('Error loading contact:', error);
-      alert(`Failed to load contact: ${error.message || 'Unknown error'}`);
+      notify(`Failed to load contact: ${error.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -803,7 +746,7 @@ export function PipelineBoard() {
                 </div>
               </div>
 
-              <div className="bg-gray-50 border-l-2 border-r-2 border-b-2 border-gray-200 rounded-b-lg p-2 space-y-2 min-h-[500px] max-h-[600px] overflow-y-auto">
+              <div className="bg-gray-50 border-l-2 border-r-2 border-b-2 border-gray-200 rounded-b-lg p-2 space-y-2 min-h-[500px]">
                 {stage.count === 0 ? (
                   <div className="text-center py-8 text-sm text-gray-400">
                     No items

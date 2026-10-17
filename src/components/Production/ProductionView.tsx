@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { WorkOrdersList } from './WorkOrdersList';
 import { WorkOrderDetail } from './WorkOrderDetail';
@@ -7,8 +7,7 @@ import { TechnicianWorkCenter } from './TechnicianWorkCenter';
 import { VIPProgramView } from './VIPProgramView';
 import { ProductionManagerDashboard } from './ProductionManagerDashboard';
 import { PartsRequestManagement } from './PartsRequestManagement';
-import { QuickStatsBar } from './QuickStatsBar';
-import { ClipboardList, File as FileEdit, Package, CheckSquare, Wrench, Star, LayoutDashboard, ShoppingCart, Award } from 'lucide-react';
+import { ClipboardList, File as FileEdit, Package, CheckSquare, Wrench, Star, LayoutDashboard, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ProductionViewProps {
@@ -28,10 +27,10 @@ export function ProductionView({ initialView }: ProductionViewProps) {
     myWork: 0
   });
 
-  const isTech = profile?.role === 'technician' || profile?.role === 'field_tech' || profile?.role === 'lead_technician';
-  const isManager = profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'production_manager';
-  const isDispatcher = profile?.role === 'dispatcher';
-  const isProjectManager = profile?.role === 'project_manager';
+  const isTech = profile?.role === 'tech';
+  const isManager = profile?.role === 'admin' || profile?.role === 'manager';
+  const isDispatcher = profile?.role === 'manager';
+  const isProjectManager = profile?.role === 'manager';
 
   const defaultView = isTech ? 'my_work' : isManager ? 'dashboard' : 'work_orders';
   const [activeView, setActiveView] = useState(initialView || defaultView);
@@ -150,7 +149,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
   ].filter(view => view.show);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-w-0 flex flex-col">
       {/* Navigation Tabs */}
       {!selectedWorkOrderId && (
         <div className="border-b border-subtle bg-canvas">
@@ -184,7 +183,7 @@ export function ProductionView({ initialView }: ProductionViewProps) {
       )}
 
       {/* Active View Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-w-0">
         {selectedWorkOrderId ? (
           <div className="p-6">
             <WorkOrderDetail

@@ -1,0 +1,7 @@
+/*\n  # Clean Up Footer Menu Items\n\n  ## Overview\n  Removes admin-focused features from the footer and keeps only user-facing items.\n\n  ## Changes\n  \n  ### Removed from Footer (moved to Admin department or deleted):\n  - **Settings** - This is admin-only, available in Admin department\n  - **Improvements** - Feature suggestions, should be admin-only\n  \n  ### Kept in Footer (user-facing):\n  - **My Card** - Personal business card (stays in main menu)\n  - **Preferences** - User preferences (stays in footer)\n  - **Help** - How it works guide (stays in footer)\n  - **Messages** - Cross-department messaging (stays in main menu)\n\n  ## Rationale\n  Footer should only contain personal/help items that all users need.\n  Admin features are accessed through the Admin department in the main navigation.\n*/\n\n-- Remove Settings from footer (it's already in Admin department)\nDELETE FROM menu_items WHERE key = 'settings' AND menu_section = 'footer'
+
+\n\n-- Remove Improvements from footer (feature suggestions should be admin-only)\nDELETE FROM menu_items WHERE key = 'improvements' AND menu_section = 'footer'
+
+\n\n-- Keep Preferences and Help in footer (user-facing features)\n-- Keep My Card and Messages in main menu (already there)\n\n-- Verify final footer menu items\nSELECT key, label, display_order, menu_section \nFROM menu_items \nWHERE menu_section = 'footer' \nORDER BY display_order
+
+\n

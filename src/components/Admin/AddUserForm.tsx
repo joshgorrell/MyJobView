@@ -1,3 +1,4 @@
+import { SalesCompensationFields, defaultSalesCompensation, validateSalesCompensation, type SalesCompensationValues } from './SalesCompensationFields';
 import {
   UserSetupTabs,
   UserNotifications,
@@ -66,6 +67,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       JSON.stringify({
         profile: safeProfile,
         employee: employeeForm,
+        salesCompensation,
         classification,
         offices: selectedOffices,
         notifications,
@@ -139,6 +141,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [classification, setClassification] = useState<'employee' | 'non_employee' | ''>('');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roleDeptAccess, setRoleDeptAccess] = useState<Map<string, boolean>>(new Map());
+  const [salesCompensation, setSalesCompensation] = useState<SalesCompensationValues>(defaultSalesCompensation);
   const [employeeForm, setEmployeeForm] = useState({
     hire_date: new Date().toISOString().split('T')[0],
     employment_status: 'active' as 'active' | 'inactive' | 'terminated',
@@ -168,6 +171,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           const d = JSON.parse(draft);
           setFormData((prev) => ({ ...prev, ...d.profile, password: '' }));
           setEmployeeForm((prev) => ({ ...prev, ...d.employee }));
+          if (d.salesCompensation) setSalesCompensation(d.salesCompensation);
           setClassification(d.classification || '');
           setSelectedOffices(d.offices || []);
           setNotifications(notificationDefaults(d.notifications));
@@ -308,6 +312,9 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         return;
       }
     }
+    const salesIssue = validateSalesCompensation(salesCompensation);
+    if (salesIssue) { setError(salesIssue); setActiveTab('pay'); return; }
+    if (classification !== 'employee' && salesCompensation.arrangement !== 'none') { setError('Sales compensation requires an employee.'); setActiveTab('access'); return; }
     if (reviewed.length !== setupSections.length || createdId) return;
     setLoading(true);
     setError(null);
@@ -464,6 +471,19 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         }
       }
 
+      if (classification === 'employee' && salesCompensation.arrangement !== 'none') {
+        const { data: employee, error: employeeError } = await supabase.from('employees')
+          .select('id, organization_id').eq('user_id', newUserId).single();
+        if (employeeError || !employee) throw new Error('Employee setup must finish before sales compensation can be saved.');
+        const { error: compensationError } = await supabase.rpc('save_sales_compensation_arrangement', {
+          p_employee_id: employee.id,
+          p_arrangement_type: salesCompensation.arrangement,
+          p_base_amount_cents: salesCompensation.arrangement === 'base_plus_commission' ? Math.round(Number(salesCompensation.baseAmount) * 100) : 0,
+          p_base_frequency: salesCompensation.arrangement === 'base_plus_commission' ? salesCompensation.baseFrequency : null,
+        });
+        if (compensationError) throw new Error('Sales compensation setup failed: ' + compensationError.message);
+      }
+
       const grantedDeptNames = departments.filter((d) => getEffectiveDeptAccess(d.id)).map((d) => d.display_name);
 
       await saveSetupReview(newUserId, reviewed);
@@ -501,7 +521,12 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} guided />
+        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} guided requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
+          ...(!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !formData.username.trim() ? { profile: 'Enter a name, username and valid email.' } : {}),
+          ...(!formData.role_id || !classification || formData.password.length < 6 ? { access: 'Choose a role, classification and password of at least six characters.' } : {}),
+          ...(!departments.some(d => getEffectiveDeptAccess(d.id)) ? { permissions: 'Enable at least one department.' } : {}),
+          ...(classification === 'employee' && (!employeeForm.hire_date || !employeeForm.pay_schedule_id || validateSalesCompensation(salesCompensation)) ? { pay: 'Complete required employee payroll and compensation fields.' } : {}),
+        }} />
         <form
           noValidate
           onSubmit={handleSubmit}
@@ -1099,6 +1124,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
             <div className="space-y-5">
               {classification === 'employee' && (
                 <div className="space-y-4">
+                  <SalesCompensationFields value={salesCompensation} onChange={setSalesCompensation} />
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Compensation Type</label>
                     <select

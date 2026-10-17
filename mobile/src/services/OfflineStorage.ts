@@ -41,6 +41,9 @@ class OfflineStorage {
 
     // Create tables
     await this.db.execAsync(`
+      CREATE TABLE IF NOT EXISTS pending_clock_gps (
+        id TEXT PRIMARY KEY, entry_id TEXT NOT NULL, technician_id TEXT NOT NULL, data_json TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS pending_breadcrumbs (
         id TEXT PRIMARY KEY,
         technician_id TEXT NOT NULL,
@@ -247,6 +250,23 @@ class OfflineStorage {
     return result?.count || 0;
   }
 
+  async saveClockGps(id: string, entryId: string, technicianId: string, values: Record<string, unknown>) {
+    if (!this.db) await this.initialize();
+    await this.db!.runAsync('INSERT OR REPLACE INTO pending_clock_gps(id,entry_id,technician_id,data_json) VALUES(?,?,?,?)', [id, entryId, technicianId, JSON.stringify(values)]);
+  }
+  async removeClockGps(id: string) {
+    if (this.db) await this.db.runAsync('DELETE FROM pending_clock_gps WHERE id=?', [id]);
+  }
+  private async syncClockGps() {
+    if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const rows = await this.db.getAllAsync<{id:string;entry_id:string;technician_id:string;data_json:string}>('SELECT * FROM pending_clock_gps WHERE technician_id=?', [session.user.id]);
+    for (const row of rows) {
+      const { data, error } = await supabase.from('daily_clock_entries').update(JSON.parse(row.data_json)).eq('id', row.entry_id).eq('technician_id', row.technician_id).select('id');
+      if (!error && data?.length) await this.removeClockGps(row.id);
+    }
+  }
   async syncPendingData() {
     if (this.syncInProgress) {
       console.log('Sync already in progress');
@@ -258,6 +278,7 @@ class OfflineStorage {
 
     try {
       await this.syncClockEvents();
+      await this.syncClockGps();
       await this.syncBreadcrumbs();
       await this.syncGeofenceEvents();
       console.log('Offline sync completed successfully');

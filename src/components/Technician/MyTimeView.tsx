@@ -1,7 +1,9 @@
+import { AttendanceBadge, useAttendanceResults } from '../Shared/AttendanceBadge';
+import { notify } from '../../lib/feedback';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { MyJobTimeView } from './MyJobTimeView';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Clock, Calendar, Coffee, Lock, AlertCircle, Edit2, XCircle, CheckCircle, Clock3 } from 'lucide-react';
@@ -35,6 +37,7 @@ export function MyTimeView() {
   const [timezone,setTimezone]=useState('America/Chicago');
   useEffect(()=>{void getOrganizationTimezone().then(setTimezone);},[]);
   const [entries, setEntries] = useState<ClockEntry[]>([]);
+  const attendance = useAttendanceResults(entries.map(e => e.id));
   const [requests, setRequests] = useState<Record<string, TimeRequest>>({});
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<ClockEntry | null>(null);
@@ -129,7 +132,7 @@ export function MyTimeView() {
       loadRequests();
     } catch (error) {
       console.error('Error cancelling request:', error);
-      alert('Failed to cancel request');
+      notify('Failed to cancel request', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -235,7 +238,7 @@ export function MyTimeView() {
                     <div className="flex items-center gap-3 mb-3">
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <div>
-                        <div className="font-semibold text-gray-900">
+                        <div className="flex items-center gap-2"><AttendanceBadge result={attendance[entry.id]} /><div className="font-semibold text-gray-900">
                           {new Date(entry.entry_date).toLocaleDateString('en-US', {
                             weekday: 'long',
                             month: 'long',
@@ -243,7 +246,7 @@ export function MyTimeView() {
                             year: 'numeric'
                           })}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        </div><div className="text-xs text-gray-500">
                           {daysDiff === 0 ? 'Today' :
                            daysDiff === 1 ? 'Yesterday' :
                            `${daysDiff} days ago`}

@@ -1,8 +1,9 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Upload, FileText, AlertCircle, CheckCircle, X, Download, Save,
+  Upload, AlertCircle, CheckCircle, X, Download, Save,
   ArrowRight, Edit2, Undo2, History, ChevronDown, ChevronUp, Sparkles
 } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -44,7 +45,7 @@ interface ValidationResult {
   errors: string[];
   warnings: string[];
   matchedEmployee?: { id: string; name: string };
-  matchedWorkOrder?: { id: string; number: string; title: string };
+  matchedWorkOrder?: { id: string; work_order_number: string; title: string };
   calculatedHours?: number;
   skipped?: boolean;
   suggestions?: {
@@ -91,6 +92,7 @@ export function JobTimeCSVImport() {
     const { data } = await supabase
       .from('time_entry_import_profiles')
       .select('*')
+      .or('import_type.eq.job_time,import_type.eq.legacy')
       .order('last_used_at', { ascending: false, nullsFirst: false });
 
     if (data) setProfiles(data);
@@ -111,7 +113,7 @@ export function JobTimeCSVImport() {
     if (!selectedFile) return;
 
     if (!selectedFile.name.endsWith('.csv')) {
-      alert('Please select a CSV file');
+      notify('Please select a CSV file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -129,7 +131,7 @@ export function JobTimeCSVImport() {
       setStep('mapping');
     } catch (error) {
       console.error('Error parsing CSV:', error);
-      alert('Error parsing CSV file. Please check the format.');
+      notify('Error parsing CSV file. Please check the format.', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -157,9 +159,9 @@ export function JobTimeCSVImport() {
       setShowSaveProfile(false);
       setNewProfileName('');
       loadProfiles();
-      alert('Profile saved successfully!');
+      notify('Profile saved successfully!', { theme: 'blue', tone: 'success' });
     } else {
-      alert('Error saving profile');
+      notify('Error saving profile', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -201,7 +203,7 @@ export function JobTimeCSVImport() {
 
     const validation = validateMapping(mapping);
     if (!validation.isValid) {
-      alert(`Missing required fields: ${validation.missing.join(', ')}`);
+      notify(`Missing required fields: ${validation.missing.join(', ')}`, { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -449,9 +451,9 @@ export function JobTimeCSVImport() {
     setAutoFixing(false);
 
     if (fixCount > 0) {
-      alert(`Auto-fixed ${fixCount} fields. Please review before importing.`);
+      notify(`Auto-fixed ${fixCount} fields. Please review before importing.`, { theme: 'blue', tone: 'warning' });
     } else {
-      alert('No high-confidence auto-fixes available.');
+      notify('No high-confidence auto-fixes available.', { theme: 'blue', tone: 'info' });
     }
   };
 
@@ -481,7 +483,7 @@ export function JobTimeCSVImport() {
     const validRows = results.filter(r => r.valid && !r.skipped);
 
     if (validRows.length === 0) {
-      alert('No valid rows to import');
+      notify('No valid rows to import', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -497,6 +499,7 @@ export function JobTimeCSVImport() {
         imported_by: profile?.id,
         batch_id: batchId,
         file_name: file?.name,
+        import_type: 'job_time',
         profile_id: selectedProfile || null,
         total_rows: results.length,
         status: 'processing'
@@ -605,7 +608,7 @@ export function JobTimeCSVImport() {
 
     } catch (error: any) {
       console.error('Error during import:', error);
-      alert('Import failed: ' + (error.message || String(error)));
+      notify('Import failed: ' + (error.message || String(error)), { theme: 'blue', tone: 'error' });
 
       if (historyRecord) {
         await supabase
@@ -624,12 +627,12 @@ export function JobTimeCSVImport() {
     });
 
     if (error) {
-      alert('Error rolling back import: ' + error.message);
+      notify('Error rolling back import: ' + error.message, { theme: 'blue', tone: 'error' });
     } else if (data.success) {
-      alert(`Rollback successful! Deleted ${data.deleted_count} entries.`);
+      notify(`Rollback successful! Deleted ${data.deleted_count} entries.`, { theme: 'blue', tone: 'success' });
       loadHistory();
     } else {
-      alert('Rollback failed: ' + data.error);
+      notify('Rollback failed: ' + data.error, { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -1030,7 +1033,7 @@ export function JobTimeCSVImport() {
                       {result.matchedWorkOrder && (
                         <>
                           <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-600">WO #{result.matchedWorkOrder.number}</span>
+                          <span className="text-xs text-gray-600">WO #{result.matchedWorkOrder.work_order_number}</span>
                         </>
                       )}
                     </div>

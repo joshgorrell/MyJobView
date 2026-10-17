@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User } from 'lucide-react';
@@ -142,7 +143,7 @@ function formatBillingOneLine(b: BillingAddress): string {
 }
 
 export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposalId, onClose, onSuccess }: CreateInvoiceModalProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [selectedContactId, setSelectedContactId] = useState(contactId || '');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState(projectId || '');
@@ -157,6 +158,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
   ]);
   const [billToContact, setBillToContact] = useState<Contact | null>(null);
+  const [billing, setBilling] = useState<BillingAddress>({ ...EMPTY_BILLING });
   const [billingSource, setBillingSource] = useState<'customer' | 'bill_to'>('customer');
   const [editingBilling, setEditingBilling] = useState(false);
   const [transactionLocation, setTransactionLocation] = useState<'customer' | 'dealer' | 'custom'>('customer');
@@ -287,7 +289,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load data');
+      notify('Failed to load data', { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -537,12 +539,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     e.preventDefault();
 
     if (!selectedContactId) {
-      alert('Please select a customer');
+      notify('Please select a customer', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     if (lineItems.some(item => !item.description.trim())) {
-      alert('Please fill in all line item descriptions');
+      notify('Please fill in all line item descriptions', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -558,7 +560,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           contact_id: selectedContactId,
           project_id: selectedProjectId || null,
           sales_order_id: salesOrderId || null,
@@ -632,16 +634,17 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
             await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoiceData.id } });
           } catch (sendErr) {
             console.error('Invoice submitted but email send failed:', sendErr);
-            alert('Invoice submitted successfully, but the email failed to send. You can resend it from the invoice detail view.');
+            notify('Invoice submitted successfully, but the email failed to send. You can resend it from the invoice detail view.', { theme: 'emerald', tone: 'error' });
           }
         }
       }
 
+      notify('Invoice created!', { theme: 'emerald', tone: 'success' });
       onSuccess(invoiceData.id);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.');
+      notify(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

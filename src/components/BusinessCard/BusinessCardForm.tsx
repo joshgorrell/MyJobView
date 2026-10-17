@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, Camera, Upload, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -63,7 +64,7 @@ export function BusinessCardForm({ card, profiles, onClose, onSuccess }: Busines
       return data.publicUrl;
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert('Failed to upload photo');
+      notify('Failed to upload photo', { theme: 'blue', tone: 'error' });
       return null;
     } finally {
       setUploading(false);
@@ -75,12 +76,12 @@ export function BusinessCardForm({ card, profiles, onClose, onSuccess }: Busines
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB');
+      notify('Image must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -103,7 +104,7 @@ export function BusinessCardForm({ card, profiles, onClose, onSuccess }: Busines
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
-      alert('Could not access camera. Please check permissions.');
+      notify('Could not access camera. Please check permissions.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -184,9 +185,9 @@ export function BusinessCardForm({ card, profiles, onClose, onSuccess }: Busines
     } catch (error: any) {
       console.error('Error saving card:', error);
       if (error.message?.includes('duplicate')) {
-        alert('A card with this slug already exists. Please choose a different slug.');
+        notify('A card with this slug already exists. Please choose a different slug.', { theme: 'blue', tone: 'error' });
       } else {
-        alert('Failed to save business card. Please try again.');
+        notify('Failed to save business card. Please try again.', { theme: 'blue', tone: 'error' });
       }
     } finally {
       setLoading(false);

@@ -103,17 +103,9 @@ export async function checkPtoConflict(
   technicianId: string,
   date: string
 ): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('pto_requests')
-    .select('id')
-    .eq('employee_id', technicianId)
-    .eq('status', 'approved')
-    .lte('start_date', date)
-    .gte('end_date', date)
-    .maybeSingle();
-
-  if (error) throw new Error(error.message);
-  return !!data;
+  const {data,error} = await supabase.rpc('team_time_off',{p_from:date,p_to:date});
+  if(error) throw new Error(error.message);
+  return (data || []).some((leave: {employee_id:string})=>leave.employee_id===technicianId);
 }
 
 export async function rescheduleWorkOrder(

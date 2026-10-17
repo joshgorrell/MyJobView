@@ -16,10 +16,10 @@ const { chromium } = await import(
 );
 const dir = await mkdtemp(join(tmpdir(), "mjv-flow-workspace-"));
 const fixture = `import{useState}from'react';export const useAuth=()=>({profile:{id:'rep',organization_id:'org',full_name:'Josh'},user:{id:'rep'}});export const useDepartments=()=>({hasModuleAccess:()=>true});window.calls=[];window.fail=false;
-const records=Array.from({length:50},(_,i)=>({id:i+1,created_at:new Date(Date.now()-i*60000).toISOString(),customer_name:'Customer with a long company name '+i,project_name:'Home theater project',actor_name:'Josh Gorrell',category:'sales',source_table:'connections',source_id:'interaction-'+i,summary:'Phone call: a longer note about the next steps for the customer',details:'Original notes',viewed:false}));
+const records=Array.from({length:50},(_,i)=>({id:i+1,created_at:new Date(Date.now()-i*60000).toISOString(),customer_name:'Customer with a long company name '+i,project_name:'Home theater project',actor_name:'Josh Gorrell',category:'sales',source_table:i===0?'proposals':'connections',source_id:i===0?'00000000-0000-0000-0000-000000000040':'interaction-'+i,event_type:i===0?'proposal_first_opened':'connections.insert',summary:i===0?'Customer first opened proposal PRO-100':'Phone call: a longer note about the next steps for the customer',details:'Original notes',viewed:false}));
 export function useFlow(filters){const [events,setEvents]=useState(records);return{events,loading:false,loadingMore:false,hasMore:false,error:'',pending:0,connected:true,refresh:async()=>window.calls.push({name:'refresh'}),markViewed:async(ids)=>setEvents(old=>old.map(e=>ids.includes(e.id)?{...e,viewed:true}:e))};}
 export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:[],error:null}).then(a,b);return()=>q;}});return q;},channel(){const c={on(){return c},subscribe(){return c},unsubscribe(){}};return c;},removeChannel(){},async rpc(name,input){window.calls.push({name,input});if(name==='search_flow_targets')return{data:[{kind:'contact',id:'c1',label:'Test Customer'}],error:null};if(name==='get_flow_followups')return{data:{items:[{id:'reminder1',kind:'reminder',contact_id:'c1',label:'Test Customer',type:'call',due:new Date().toISOString(),reason:'Discuss next steps'}],schedules:[{id:'schedule1',label:'Test Customer',recurrence_pattern:'weekly',is_active:true}]},error:null};return window.fail?{error:{message:'Fixture save rejected'}}:{data:'new',error:null};}};`;
-const source = `import React from'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<Flow/>);`;
+const source = `import React from'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<Flow tasksContent={<div data-testid="task-tools">Assigned tasks and comments</div>} initialTaskView={new URLSearchParams(location.search).has('task')} openThreadId={new URLSearchParams(location.search).get('thread')}/>);`;
 const server = createServer(async (req, res) => {
   const file = req.url.startsWith("/app.js")
     ? "app.js"
@@ -103,15 +103,28 @@ try {
       main: document.querySelector("main").getBoundingClientRect().toJSON(),
       scroll: document.querySelector(".flow-content").scrollHeight,
       client: document.querySelector(".flow-content").clientHeight,
+      mainScroll: document.querySelector("main").scrollHeight,
+      mainClient: document.querySelector("main").clientHeight,
+      contentOverflow: getComputedStyle(document.querySelector(".flow-content")).overflowY,
       overflow: document.documentElement.scrollWidth > innerWidth,
     }));
     assert.equal(bounds.overflow, false);
     assert.ok(
-      bounds.card.bottom <= bounds.main.bottom,
+      bounds.card.bottom > bounds.main.bottom,
       JSON.stringify({ width, bounds }),
     );
     assert.ok(bounds.client > 200, JSON.stringify({ width, bounds }));
-    assert.ok(bounds.scroll > bounds.client);
+    assert.equal(bounds.contentOverflow, "visible");
+    assert.ok(bounds.scroll <= bounds.client + 1);
+    assert.ok(bounds.mainScroll > bounds.mainClient);
+    await page.locator("main").evaluate(el => { el.scrollTop = el.scrollHeight; });
+    assert.ok(await page.locator("main").evaluate(el => el.scrollTop > 0));
+    await page.locator("main").evaluate(el => { el.scrollTop = 0; });
+    await page.locator('.flow-row').first().locator('.flow-row-main').click();
+    const activityLink = page.getByRole('link', { name: 'View Activity ↗', exact: true });
+    assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalActivity'), 'true');
+    assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalId'), '00000000-0000-0000-0000-000000000040');
+    await page.locator('.flow-row').first().locator('.flow-row-main').click();
     const plus = page.getByRole("button", {
       name: "Create in Flow",
       exact: true,
@@ -126,7 +139,7 @@ try {
       await dialog.getByRole("button", { name: /Internal chat/ }).count(),
       1,
     );
-    await page.waitForTimeout(250);
+    await dialog.evaluate(async el => { await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished)); });
     const box = await dialog.boundingBox();
     assert.ok(
       box.x >= 0 &&
@@ -235,6 +248,18 @@ try {
         ": workspace/sidebar fit, scrolling, modal/focus, retained errors, logging and follow-ups passed",
     );
   }
+  // A task notification must win over a conversation parameter retained in the URL.
+  await page.goto(url + '?task=1&thread=old-thread');
+  await page.getByTestId('task-tools').waitFor();
+  assert.equal(await page.locator('.flow-customer-inbox').count(), 0);
+  assert.equal(await page.locator('.flow-column-head').count(), 0);
+  await page.goto(url);
+  await page.getByRole('combobox', { name: 'Flow view', exact: true }).selectOption('tasks');
+  await page.getByTestId('task-tools').waitFor();
+  await page.getByRole('combobox', { name: 'Flow view', exact: true }).selectOption('all');
+  await page.locator('.flow-row').first().waitFor();
+  assert.equal(await page.getByTestId('task-tools').count(), 0);
+  console.log('Mobile Tasks tab, return to activity, and stale conversation/task notification precedence pass');
   assert.deepEqual(errors, []);
 } finally {
   await browser?.close();

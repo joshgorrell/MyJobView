@@ -1,5 +1,5 @@
 import ProductStatusNotice from '../Products/ProductStatusNotice';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Search, Package, Clock } from 'lucide-react';
@@ -33,7 +33,7 @@ export default function InvoiceCatalogBrowser({
   onClose,
   multiSelect = false
 }: InvoiceCatalogBrowserProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [recentProducts, setRecentProducts] = useState<Product[]>([]);
@@ -48,7 +48,7 @@ export default function InvoiceCatalogBrowser({
   useEffect(() => {
     loadProducts();
     loadRecentProducts();
-  }, [profile?.company_id]);
+  }, [companySettings?.id]);
 
   useEffect(() => {
     filterAndSortProducts();
@@ -61,7 +61,7 @@ export default function InvoiceCatalogBrowser({
       const { data, error } = await supabase
         .from('products')
         .select('id, is_active, is_discontinued, sku, name, description, our_price, cost, unit, is_taxable, category, vendor, manufacturer_model_number, catalog_category:product_categories!products_category_id_fkey(name), catalog_subcategory:product_subcategories!products_subcategory_id_fkey(name), default_vendor:vendors!products_default_vendor_id_fkey(vendor_name)')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .eq('is_active', true)
         .order('name');
 
@@ -79,7 +79,7 @@ export default function InvoiceCatalogBrowser({
     try {
       const { data, error } = await supabase
         .rpc('get_recently_used_products', {
-          p_company_id: profile?.company_id,
+          p_company_id: companySettings?.id,
           p_limit: 5
         });
 

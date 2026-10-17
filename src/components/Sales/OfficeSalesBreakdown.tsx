@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Building2, ChevronDown, ChevronRight, AlertTriangle, TrendingUp, FileText, DollarSign, Percent, X } from 'lucide-react';
+import { Building2, ChevronDown, ChevronRight, AlertTriangle, TrendingUp, FileText, DollarSign } from 'lucide-react';
 import { fetchSalesKpis } from '../../lib/salesKpis';
 
 interface OfficeSummary {

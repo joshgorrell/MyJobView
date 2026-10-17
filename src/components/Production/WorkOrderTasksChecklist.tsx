@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { cacheVisitPacket, readVisitPacket, queueVisitEvent, syncVisitEvents, pendingVisitEvents, discardVisitEvent, PendingVisitEvent } from '../../lib/jobOffline';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -86,14 +87,16 @@ export default function WorkOrderTasksChecklist({ workOrderId, projectId, curren
   }
   const handoff = scopeVersion==='sold'?context?.sold_handoff:scopeVersion==='retained'?context?.retained_handoff:scopeVersion==='current'?(context?.approved_scopes?.[context.approved_scopes.length-1]?.scope||context?.sold_handoff||context?.retained_handoff):context?.approved_scopes?.find(s=>s.id===scopeVersion)?.scope;
   const scopeLabel=scopeVersion==='sold'?'Original sold scope':scopeVersion==='retained'?'Earliest reviewed scope':'Approved scope';
-  return <section className="space-y-4">
+  if (!loading && !error && !assignments.length && !projectId) return null;
+  return <section aria-label="Internal Tasks" className="space-y-4">
+    <h2 className="font-semibold text-primary">{assignments.length ? 'Internal Tasks' : 'Project Reference'}</h2>
     <div className="flex flex-wrap gap-2">
       <button type="button" onClick={() => setView('today')} className={`min-h-11 px-4 rounded-lg border border-subtle ${view === 'today' ? 'bg-blue-600 text-white' : 'bg-surface text-primary'}`}>Today's Work ({assignments.length})</button>
       {projectId && <button type="button" onClick={() => setView('project')} className={`min-h-11 px-4 rounded-lg border border-subtle ${view === 'project' ? 'bg-blue-600 text-white' : 'bg-surface text-primary'}`}>Full Project</button>}
       <button type="button" onClick={load} className="min-h-11 px-3 text-info">Refresh</button>
     </div>
     {offline&&<p className="text-sm text-secondary">Viewing saved instructions offline. Progress is saved on this device until it can sync.</p>}
-    {pending.filter(p=>assignments.some(a=>a.id===p.event.p_assignment_id)).map(p=><div key={p.event.p_event_id} className="border border-subtle rounded-lg p-3 bg-surface text-sm text-primary"><strong>Update awaiting sync</strong><p>{p.event.p_disposition} · {p.event.p_notes}</p>{p.error&&<p role="alert" className="text-red-600">{p.error} Refresh and review the current task before reporting again.</p>}<button className="min-h-11 px-3 text-info" onClick={()=>{setNotes(n=>({...n,[p.event.p_assignment_id]:p.event.p_notes||''}));discardVisitEvent(currentUserId,p.event.p_event_id);load();}}>Use notes to report again</button><button className="min-h-11 px-3 text-secondary" onClick={()=>{if(window.confirm('Discard this saved update?')){discardVisitEvent(currentUserId,p.event.p_event_id);load();}}}>Discard update</button></div>)}
+    {pending.filter(p=>assignments.some(a=>a.id===p.event.p_assignment_id)).map(p=><div key={p.event.p_event_id} className="border border-subtle rounded-lg p-3 bg-surface text-sm text-primary"><strong>Update awaiting sync</strong><p>{p.event.p_disposition} · {p.event.p_notes}</p>{p.error&&<p role="alert" className="text-red-600">{p.error} Refresh and review the current task before reporting again.</p>}<button className="min-h-11 px-3 text-info" onClick={()=>{setNotes(n=>({...n,[p.event.p_assignment_id]:p.event.p_notes||''}));discardVisitEvent(currentUserId,p.event.p_event_id);load();}}>Use notes to report again</button><button className="min-h-11 px-3 text-secondary" onClick={async ()=>{if((await requestConfirmation('Discard this saved update?', { theme: 'blue' }))){discardVisitEvent(currentUserId,p.event.p_event_id);load();}}}>Discard update</button></div>)}
     {error && <p role="alert" className="text-sm text-red-600">{error} <button type="button" onClick={load} className="underline min-h-11">Retry</button></p>}
     {loading && !assignments.length && <p className="text-muted">Loading task instructions...</p>}
     {view === 'today' && <>

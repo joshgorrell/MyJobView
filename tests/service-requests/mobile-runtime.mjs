@@ -17,7 +17,14 @@ function harness(path, globals = {}, imports = {}) {
   const module = {exports: {}};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText, {
     module, exports:module.exports, console, ...globals,
-    require(name) { if (name === 'react') return react; if (name === 'react/jsx-runtime') return {jsx,jsxs:jsx,Fragment:'fragment'}; if (name === 'lucide-react') return new Proxy({}, {get:(_,key)=>key}); if (name in imports) return imports[name]; throw Error(name); },
+    require(name) {
+      if (name.endsWith('.css')) return {};
+      if (name.endsWith('/feedback')) return {
+        notify(message, options) { if (options?.tone === 'error' || options?.tone === 'warning') { if (globals.alert) globals.alert(message); else throw Error(message); } },
+        async requestConfirmation(message) { const decision = globals.confirm || globals.window?.confirm; if (!decision) throw Error('Confirmation fixture required: ' + message); return decision(message); },
+        async requestText(message, initial) { const decision = globals.prompt || globals.window?.prompt; if (!decision) throw Error('Text-entry fixture required: ' + message); return decision(message, initial); },
+      };
+      if (name === 'react') return react; if (name === 'react/jsx-runtime') return {jsx,jsxs:jsx,Fragment:'fragment'}; if (name === 'lucide-react') return new Proxy({}, {get:(_,key)=>key}); if (name in imports) return imports[name]; throw Error(name); },
   });
   return {render(props, exportName) { cursor=0; rendering=true; try { return module.exports[exportName](props); } finally {rendering=false;} }, effects};
 }
@@ -28,7 +35,7 @@ const profile={id:'manager',role:'service_manager'};
 const requests=[{id:'one',customer_name:'Customer With A Very Long Name',contact_id:'c1',created_at:'2026-10-05',status:'open',job_description:'Pool sound needs attention',source_type:'punchlist',priority:'normal',billable_type:'warranty',created_by:'manager',profiles:{full_name:'Long Staff Name'},attachments:[],requested_tech_ids:[]},{id:'two',customer_name:'Other Customer',contact_id:'c2',created_at:'2026-10-05',status:'open',job_description:'Check audio',source_type:'staff_form',priority:'normal',billable_type:'billable',created_by:'manager',attachments:[],requested_tech_ids:[]}];
 const supabase={channel:()=>({on(){return this;},subscribe(){return{unsubscribe(){}};}}),from(table){const q={select:()=>q,eq:()=>q,not:()=>q,order:()=>q,then:resolve=>Promise.resolve({data:table==='service_requests'?requests:[],error:null}).then(resolve)};return q;}};
 const h=harness('src/components/Dispatch/ServiceRequestQueue.tsx',{alert:msg=>{throw Error(msg);}}, {
- '../../lib/dispatchNotifications':{notifyTechJobAssigned(){}},'../Shared/SchedulingCalendar':{SchedulingCalendar:'Calendar'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile,loading:false})},'../Production/CreateWorkOrderModal':{CreateWorkOrderModal:'Scheduler'},'../ui/ConfirmModal':{default:'Confirm'},'../Service/ServiceRequestForm':{ServiceRequestForm:'RequestForm'},'../Shared/ContactQuickViewModal':{ContactQuickViewModal:'Contact'},
+ '../../lib/dispatchNotifications':{notifyTechJobAssigned(){}},'../Production/WorkOrderSchedulePicker':{WorkOrderSchedulePicker:'Calendar'},'../Shared/QuickActionModal':{QuickActionModal:'Modal'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile,loading:false})},'../Production/CreateWorkOrderModal':{CreateWorkOrderModal:'Scheduler'},'../ui/ConfirmModal':{default:'Confirm'},'../Service/ServiceRequestForm':{ServiceRequestForm:'RequestForm'},'../Shared/ContactQuickViewModal':{ContactQuickViewModal:'Contact'},
 });
 let tree=h.render({},'ServiceRequestQueue');for(const effect of h.effects.splice(0))effect();await new Promise(resolve=>setTimeout(resolve,0));const render=()=>{tree=h.render({},'ServiceRequestQueue');};render();
 const button=name=>nodes(tree).find(n=>n.type==='button'&&(n.props['aria-label']===name||text(n)===name));
@@ -38,4 +45,5 @@ button('Schedule Work Order').props.onClick({stopPropagation(){}});render();let 
 button('Collapse request').props.onClick({stopPropagation(){}});render();
 const checkboxes=()=>nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox');checkboxes()[0].props.onChange({stopPropagation(){}});render();assert.equal(checkboxes().length,1,'Other customer must not be selectable for a combined work order');
 button('Filters').props.onClick();render();assert.equal(nodes(tree).filter(n=>n.type==='select').length,2);
+requests[1].contact_id='c1';requests[1].billable_type=requests[0].billable_type;requests[1].job_location_address='Different location';render();assert.equal(checkboxes().length,1,'Different service locations cannot be combined');requests[1].job_location_address=requests[0].job_location_address;render();assert.equal(checkboxes().length,2,'Compatible requests can be combined');
 console.log('Queue expansion, direct scheduling handoff, filters, and single-customer selection preserved.');

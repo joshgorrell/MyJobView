@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
-import { Monitor, Smartphone, Tablet, Plus, Edit2, Trash2, Save, X, Laptop, Tv, Watch } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Edit2, Trash2, Save, X, Laptop, Tv, Watch } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatDistanceToNow } from '../../lib/utils';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -89,7 +90,7 @@ export function DeviceNicknameManager() {
       loadDeviceNicknames();
     } catch (error) {
       console.error('Error saving device nickname:', error);
-      alert('Error saving device nickname');
+      notify('Error saving device nickname', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -104,7 +105,7 @@ export function DeviceNicknameManager() {
       loadDeviceNicknames();
     } catch (error) {
       console.error('Error deleting device nickname:', error);
-      alert('Error deleting device nickname');
+      notify('Error deleting device nickname', { theme: 'blue', tone: 'error' });
     }
   }
 

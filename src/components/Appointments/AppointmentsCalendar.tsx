@@ -1,3 +1,5 @@
+import { notify } from '../../lib/feedback';
+import { TeamLeave, leaveLabel } from '../../lib/timeOff';
 import { CalendarMonthGrid } from '../Shared/Calendar/CalendarMonthGrid';
 import { CalendarGantt } from '../Shared/Calendar/CalendarGantt';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
@@ -177,6 +179,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
 
     const channel = supabase
       .channel('appointments-calendar-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pto_requests' }, debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, debouncedReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, debouncedReload)
       .subscribe();
@@ -328,7 +331,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
     // Calculate new end time (maintain duration)
     const duration = minutes(appointment.end_time) - minutes(appointment.start_time);
     const endMinutes = minutes(newTime) + duration;
-    if (duration <= 0 || endMinutes >= 1440) { alert('Choose a time that ends on the same day.'); return; }
+    if (duration <= 0 || endMinutes >= 1440) { notify('Choose a time that ends on the same day.', { theme: 'blue', tone: 'warning' }); return; }
     const newEndTime = timeKey(endMinutes);
 
     // Build confirmation message
@@ -393,7 +396,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         await loadAppointments();
       } catch (error) {
         console.error('Error rescheduling:', error);
-        alert('Failed to reschedule. Please try again.');
+        notify('Failed to reschedule. Please try again.', { theme: 'blue', tone: 'error' });
       } finally {
         setDraggedItem(null);
           setConflictWarning(null);
@@ -615,9 +618,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         ,supabase.from('internal_time_sessions').select('id,title,session_date,start_time,end_time,predetermined_hours,status,assigned_to')
           .eq('assigned_to',user.id).in('status',['scheduled','in_progress','completed'])
           .gte('session_date',calendarDateKey(startDate)).lte('session_date',calendarDateKey(endDate)),
-        supabase.from('pto_requests').select('id,employee_id,start_date,end_date,request_type')
-          .eq('employee_id',user.id).eq('status','approved')
-          .lte('start_date',calendarDateKey(endDate)).gte('end_date',calendarDateKey(startDate)),
+        supabase.rpc('team_time_off',{p_from:calendarDateKey(startDate),p_to:calendarDateKey(endDate)}),
       ]);
 
       if (appointmentsRes.error) throw appointmentsRes.error;
@@ -751,15 +752,11 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         technician_name:'',customer_name:'Approved internal session',isReminder:true,reminderType:'internal_time' as const,
       }));
       const ptoEvents: Appointment[] = [];
-      for(const pto of ptoRes.data || []) {
-        const from = pto.start_date > calendarDateKey(startDate) ? pto.start_date : calendarDateKey(startDate);
-        const to = pto.end_date < calendarDateKey(endDate) ? pto.end_date : calendarDateKey(endDate);
-        for(let day=new Date(from+'T12:00Z'); day.toISOString().slice(0,10)<=to; day.setUTCDate(day.getUTCDate()+1)) {
-          const date=day.toISOString().slice(0,10);
-          ptoEvents.push({id:pto.id+'-'+date,title:pto.request_type==='full_day'?'Approved Time Off':'Approved Partial Time Off (see request for hours)',
-            appointment_date:date,start_time:'00:00',end_time:'23:59',all_day:true,status:'approved',technician_id:pto.employee_id,
-            technician_name:'',customer_name:'Time Off',isReminder:true,reminderType:'time_off'});
-        }
+      for(const pto of (ptoRes.data || []) as TeamLeave[]) {
+        if (calendarView === 'my' && pto.employee_id !== user.id) continue;
+        ptoEvents.push({id:pto.request_id+'-'+pto.leave_date,title:pto.employee_name+' · '+leaveLabel(pto),
+          appointment_date:pto.leave_date,start_time:pto.start_time||'00:00',end_time:pto.end_time||'23:59',all_day:pto.full_day,status:'approved',technician_id:pto.employee_id,
+          technician_name:pto.employee_name,customer_name:'Time Off',isReminder:true,reminderType:'time_off'});
       }
 
       // Combine and sort by date and time
@@ -1234,7 +1231,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
       await loadAppointments();
     } catch (error) {
       console.error('Error deleting appointment:', error);
-      alert('Failed to delete appointment');
+      notify('Failed to delete appointment', { theme: 'blue', tone: 'error' });
     }
     setRecurringDeleteTarget(null);
   }
@@ -1406,7 +1403,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
         <div className="space-y-2">
           <CalendarTimeGrid columns={timeGridColumns} events={timeGridEvents} loading={loading} error={loadError} onRetry={() => { void loadAppointments(); }}
             onSlotSelect={(column, time) => openCreateModal(new Date(column.date + 'T12:00:00'), time, undefined, techTimeline ? column.key : undefined)}
-            onRangeSelect={(column, start, end) => { if (timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(end) > minutes(event.start)))) { alert('Choose an open time range.'); return; } openCreateModal(new Date(column.date + 'T12:00:00'), start, end, techTimeline ? column.key : undefined); }}
+            onRangeSelect={(column, start, end) => { if (timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(end) > minutes(event.start)))) { notify('Choose an open time range.', { theme: 'blue', tone: 'warning' }); return; } openCreateModal(new Date(column.date + 'T12:00:00'), start, end, techTimeline ? column.key : undefined); }}
             onDropDate={column => { const item = techTimeline ? draggedItem?.appointment : draggedAppointment; if (item) void handleTimeDrop(item, item.start_time.slice(0, 5), techTimeline ? column.key : undefined, column.date); }}
             onDropSlot={(column, start) => { const item = techTimeline ? draggedItem?.appointment : draggedAppointment; if (item) void handleTimeDrop(item, start, techTimeline ? column.key : undefined, column.date); }}
             slotState={(column, start) => ({ disabled: timeGridEvents.some(event => event.columnKey === column.key && (event.allDay || minutes(start) < minutes(event.end) && minutes(start) + 30 > minutes(event.start))) })} />
@@ -1564,7 +1561,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
 
           {/* Agenda List */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="max-h-[700px] overflow-y-auto">
+            <div className="min-w-0">
               {agendaAppointments.length === 0 ? (
                 <div className="text-center py-16 text-gray-500">
                   <CalendarIcon className="w-16 h-16 mx-auto mb-4 text-gray-300" />

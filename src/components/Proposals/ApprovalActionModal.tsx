@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, DollarSign, FileText, CheckCircle, Mail, Copy, AlertCircle, Clock, ChevronDown, ChevronUp, Save, Check, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { formatCurrency } from '../../lib/utils';
 import { checkTaxFinalizationGuard } from '../../lib/taxCalculations';
-import BillingConfigSummary from './BillingConfigSummary';
 
 interface ApprovalActionModalProps {
   proposal: any;
@@ -25,7 +24,7 @@ export default function ApprovalActionModal({ proposal, contact, onClose, onComp
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [customDepositAmount, setCustomDepositAmount] = useState(proposal.deposit_amount_due || 0);
   const [depositReceived, setDepositReceived] = useState(false);
-  const [proposalTotal, setProposalTotal] = useState(proposal.total || 0);
+  const [proposalTotal, _setProposalTotal] = useState(proposal.total || 0);
   const [showDepositConfig, setShowDepositConfig] = useState(false);
   const [depositType, setDepositType] = useState<'percentage' | 'parts_total' | 'custom' | 'none'>('percentage');
   const [depositPercent, setDepositPercent] = useState(50);
@@ -349,58 +348,9 @@ export default function ApprovalActionModal({ proposal, contact, onClose, onComp
   const copyPortalLink = () => {
     const portalUrl = `${window.location.origin}/portal/proposals/${proposal.id}`;
     navigator.clipboard.writeText(portalUrl);
-    alert('Portal link copied to clipboard!');
+    notify('Portal link copied to clipboard!', { theme: 'violet', tone: 'info' });
   };
 
-  const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'deposit':
-        return <DollarSign className="w-6 h-6" />;
-      case 'po':
-        return <FileText className="w-6 h-6" />;
-      case 'no_deposit':
-        return <CheckCircle className="w-6 h-6" />;
-      default:
-        return null;
-    }
-  };
-
-  const getActionDescription = (action: string) => {
-    switch (action) {
-      case 'deposit':
-        return {
-          title: 'Request Deposit Payment',
-          description: `Creates a deposit invoice for ${formatCurrency(proposal.deposit_amount_due ?? 0)} and sends it to the customer.`,
-          nextSteps: [
-            'Deposit invoice will be created',
-            'Sales order will be marked as "Pending Deposit"',
-            'Customer can view and pay invoice in portal',
-          ],
-        };
-      case 'po':
-        return {
-          title: 'Add Purchase Order',
-          description: 'Record the customer\'s PO number to finalize this sale. No deposit required for PO customers.',
-          nextSteps: [
-            'Sales order will be created as "Planning"',
-            'No invoice will be generated',
-            'Project can be scheduled immediately',
-          ],
-        };
-      case 'no_deposit':
-        return {
-          title: 'Complete Approval',
-          description: 'No deposit or PO required. Sales order will be created and ready for scheduling.',
-          nextSteps: [
-            'Sales order will be created as "Planning"',
-            'Project can be scheduled immediately',
-            'Final invoice will be created upon completion',
-          ],
-        };
-      default:
-        return { title: '', description: '', nextSteps: [] };
-    }
-  };
 
   if (result && selectedAction === 'deposit') {
     return (

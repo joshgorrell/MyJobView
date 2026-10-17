@@ -38,6 +38,7 @@ Deno.serve(async (req: Request) => {
       proposalId,
       toEmail,
       ccEmails,
+      bccEmails,
       subject: customSubject,
       message: customMessage,
       // Array of { filename, content } where content is base64-encoded HTML
@@ -88,8 +89,23 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     // Use override email if provided, otherwise fall back to contact email
-    const recipientEmail = toEmail || proposal.contacts?.email;
-    if (!recipientEmail && !skipNotification) {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizeRecipients = (value: unknown): string[] => {
+      if (Array.isArray(value)) return value.flatMap(normalizeRecipients);
+      if (typeof value !== 'string') return [];
+      return value.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    };
+    const recipientEmails = normalizeRecipients(toEmail || proposal.contacts?.email);
+    const ccRecipients = normalizeRecipients(ccEmails);
+    const bccRecipients = normalizeRecipients(bccEmails);
+    if ([...recipientEmails, ...ccRecipients, ...bccRecipients].some(email => !emailPattern.test(email)) ||
+        recipientEmails.length + ccRecipients.length + bccRecipients.length > 30) {
+      return new Response(JSON.stringify({ error: 'Invalid email recipient list' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!recipientEmails.length && !skipNotification) {
       return new Response(JSON.stringify({ error: 'Customer email not found' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -216,15 +232,20 @@ Deno.serve(async (req: Request) => {
     // Build Resend payload
     const resendPayload: Record<string, unknown> = {
       from: fromField,
-      to: recipientEmail,
+      to: recipientEmails,
       reply_to: replyTo,
       subject,
       text: emailBody,
     };
 
     // Add CC recipients if provided
-    if (Array.isArray(ccEmails) && ccEmails.length > 0) {
-      resendPayload.cc = ccEmails;
+    if (ccRecipients.length > 0) {
+      resendPayload.cc = ccRecipients;
+    }
+
+    // Bcc recipients are passed privately to the mail provider, not included in visible headers.
+    if (bccRecipients.length > 0) {
+      resendPayload.bcc = bccRecipients;
     }
 
     // Add attachments if any (Resend accepts { filename, content } where content is base64)

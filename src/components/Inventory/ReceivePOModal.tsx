@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState, useRef } from 'react';
 import { AlertCircle, CheckCircle2, Package, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -66,6 +67,7 @@ export function ReceivePOModal({ poId, poNumber, onClose, onSuccess }: ReceivePO
     try {
       const {error}=await supabase.rpc('receive_purchase_document',{p_po_id:poId,p_lines:receiving.map(i=>({id:i.id,quantity:i.receiveNow})),p_retry:retry.current});
       if(error)throw error;
+      notify('Receiving recorded!', { theme: 'amber', tone: 'success' });
       onSuccess();
     } catch (saveError) {
       console.error('Error receiving purchase order:', saveError);

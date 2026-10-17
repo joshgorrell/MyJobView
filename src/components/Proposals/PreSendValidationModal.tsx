@@ -1,28 +1,46 @@
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Send, Loader2, Wrench } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
 
 interface PreSendValidationModalProps {
   proposalId: string;
   proposalNumber: string;
   onClose: () => void;
-  onSend: (approvalWindow: number) => void;
+  onSend: (approvalWindow: number, visibleInPortal: boolean) => Promise<void>;
+  initialPortalVisibility?: boolean;
+  onEmailProposal?: () => void;
+  onPrintProposal?: () => void;
+  onCopyLink?: () => void;
+  copyingLink?: boolean;
+  canCopyLink?: boolean;
+  allowSubmission?: boolean;
+  alreadySubmitted?: boolean;
   onNavigateToSettings: (section: ValidationSection['name']) => void;
 }
 
-const APPROVAL_WINDOWS = [7, 14, 30, 45, 60, 90];
 
 export function PreSendValidationModal({
   proposalId,
   proposalNumber,
   onClose,
   onSend,
+  initialPortalVisibility = false,
+  onEmailProposal,
+  onPrintProposal,
+  onCopyLink,
+  copyingLink = false,
+  canCopyLink = false,
+  allowSubmission = true,
+  alreadySubmitted = false,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
   const [loading, setLoading] = useState(true);
   const [validationData, setValidationData] = useState<any>(null);
-  const [approvalWindow, setApprovalWindow] = useState(30);
+  const approvalWindow = 30; // Dealer policy is resolved by the submission handler.
+  const [visibleInPortal, setVisibleInPortal] = useState(initialPortalVisibility);
   const [sending, setSending] = useState(false);
+  const [linkActivated, setLinkActivated] = useState(alreadySubmitted);
+  const [submissionError, setSubmissionError] = useState('');
   const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -65,15 +83,30 @@ export function PreSendValidationModal({
     onClose();
   }
 
-  function handleSend() {
-    if (!validationData?.isReady || sending) return;
+  async function handleSend() {
+    if (!allowSubmission || !validationData?.isReady || sending) return;
     setSending(true);
-    onSend(approvalWindow);
+    try {
+      await onSend(approvalWindow, visibleInPortal);
+      setLinkActivated(true);
+      setSubmissionError('');
+    } catch (error) {
+      // The parent displays the failure; leave this dialog open so the user can retry.
+      console.error('Proposal submission failed:', error);
+      setSubmissionError('Could not activate the proposal. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleActivateLink(checked: boolean) {
+    if (!checked || linkActivated || sending || !allowSubmission || !validationData?.isReady) return;
+    await handleSend();
   }
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
         <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg p-8 flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
           <p className="text-gray-300 text-sm">Validating proposal...</p>
@@ -82,17 +115,17 @@ export function PreSendValidationModal({
     );
   }
 
-  const { sections = [], overallProgress = 0, isReady = false } = validationData || {};
+  const { sections = [], overallProgress = 0, isReady: _isReady = false } = validationData || {};
   const invalidSections = sections.filter((s: ValidationSection) => !s.isValid);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-xl flex flex-col">
+      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-xl max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60">
           <div>
-            <h2 className="text-lg font-semibold text-white">Send Proposal</h2>
+            <h2 className="text-lg font-semibold text-white">Proposal delivery</h2>
             <p className="text-gray-400 text-xs mt-0.5">#{proposalNumber}</p>
           </div>
           <button
@@ -101,6 +134,49 @@ export function PreSendValidationModal({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-700/60 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-blue-400" />
+            <div>
+              <p className="text-sm font-semibold text-white">Optional delivery actions</p>
+              <p className="text-xs text-gray-400">Submit without sending anything, or choose how to share the proposal.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button type="button" onClick={onEmailProposal} disabled={!onEmailProposal}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Mail className="h-4 w-4" /> Email
+            </button>
+            <button type="button" onClick={onCopyLink} disabled={!onCopyLink || !(canCopyLink || linkActivated) || copyingLink}
+              title={canCopyLink || linkActivated ? 'Copy the reusable customer link' : 'Activate the customer proposal link first'}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
+            </button>
+            <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
+              className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
+              <Printer className="h-4 w-4" /> Print / PDF
+            </button>
+          </div>
+          {!canCopyLink && !linkActivated && <p className="text-xs text-gray-400">Activate the customer proposal link below to enable copying.</p>}
+        </div>
+
+        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
+          <label className={`flex items-start gap-3 rounded-xl border p-4 ${linkActivated ? 'border-green-600/40 bg-green-500/10' : 'border-blue-500/40 bg-blue-500/10'}`}>
+            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-blue-500"
+              checked={linkActivated} disabled={linkActivated || sending || !allowSubmission || !validationData?.isReady}
+              onChange={e => void handleActivateLink(e.target.checked)} />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-white">{linkActivated ? 'Customer proposal link is active' : 'Activate customer proposal link'}</span>
+              <span className="mt-1 block text-xs leading-5 text-gray-300">{linkActivated
+                ? 'This proposal has been submitted. Use Copy link, Email, or Print / PDF above to share it.'
+                : 'Checking this box submits the proposal immediately, starts the dealer-wide approval window, and enables the reusable customer link. No email is sent.'}</span>
+            </span>
+          </label>
+          {!allowSubmission && !linkActivated && <p className="mt-2 text-xs text-amber-300">This proposal cannot be submitted in its current status.</p>}
+          {!validationData?.isReady && !linkActivated && <p className="mt-2 text-xs text-amber-300">Resolve the readiness issues below to activate the link.</p>}
+          {submissionError && <p role="alert" className="mt-2 text-xs text-red-300">{submissionError}</p>}
         </div>
 
         {/* Progress bar */}
@@ -192,70 +268,28 @@ export function PreSendValidationModal({
             <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-red-300">
               {invalidSections.length === 1
-                ? '1 section needs attention before sending.'
+                ? '1 section needs attention before submission.'
                 : `${invalidSections.length} sections need attention before sending.`}
             </p>
           </div>
         )}
 
-        {/* Approval window */}
         <div className="px-6 pb-4 border-b border-gray-700/60">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Approval Window</p>
-          <div className="flex items-center gap-2">
-            {APPROVAL_WINDOWS.map(days => (
-              <button
-                key={days}
-                onClick={() => setApprovalWindow(days)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                  approvalWindow === days
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white'
-                }`}
-              >
-                {days}d
-              </button>
-            ))}
-            <span className="text-xs text-gray-500 ml-1">from submission</span>
-          </div>
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Approval &amp; Viewing Window</p>
+          <p className="mt-1 text-sm text-gray-300">Uses the dealer-wide proposal setting. The deadline restarts when this proposal is resubmitted.</p>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 text-gray-300 hover:text-white hover:bg-gray-700 rounded-xl font-medium transition-colors text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!isReady || sending}
-            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-              isReady && !sending
-                ? 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30'
-                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {sending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                Send Proposal
-              </>
-            )}
-          </button>
+        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60">
+          <label className="flex items-center justify-between gap-3 text-sm text-white cursor-pointer min-h-[44px]">
+            <span><span className="block font-medium">Visible in Customer Portal</span><span className="block text-xs text-gray-400 mt-1">Choose whether to show this proposal in the customer portal when activated. No email is sent.</span></span>
+            <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-500" checked={visibleInPortal} disabled={linkActivated || sending || !allowSubmission} onChange={event => setVisibleInPortal(event.target.checked)} />
+          </label>
         </div>
 
-        {isReady && (
-          <p className="text-center text-xs text-green-400 pb-3 -mt-2 flex items-center justify-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            Ready to send
-          </p>
-        )}
+        <div className="sticky bottom-0 border-t border-gray-700 bg-gray-900 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400">{linkActivated ? 'Submitted — choose a delivery method above.' : 'No email is sent automatically.'}</p>
+          <button type="button" onClick={onClose} className="min-h-11 rounded-xl bg-gray-700 px-5 text-sm font-semibold text-white hover:bg-gray-600">Done</button>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { Award, CheckCircle2, XCircle, DollarSign, Clock, Users, TrendingUp, AlertCircle, CreditCard as Edit, Eye, Calendar, Target, Unlock, X } from 'lucide-react';
+import { Award, CheckCircle2, XCircle, Clock, Users, AlertCircle, CreditCard as Edit, Calendar, X } from 'lucide-react';
 import { UserSelector } from '../Shared/UserSelector';
 
 interface BonusCalculation {
@@ -50,7 +51,7 @@ export function BonusApprovalDashboard() {
   const [calculations, setCalculations] = useState<BonusCalculation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'pending' | 'approved' | 'denied' | 'all'>('pending');
-  const [selectedCalculation, setSelectedCalculation] = useState<BonusCalculation | null>(null);
+  const [_selectedCalculation, _setSelectedCalculation] = useState<BonusCalculation | null>(null);
   const [approvalModal, setApprovalModal] = useState<ApprovalModalState>({
     isOpen: false,
     calculationId: null,
@@ -273,7 +274,7 @@ export function BonusApprovalDashboard() {
       loadCalculations();
     } catch (error) {
       console.error('Error processing approval:', error);
-      alert('Failed to process approval. Please try again.');
+      notify('Failed to process approval. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setProcessing(false);
     }
@@ -294,7 +295,7 @@ export function BonusApprovalDashboard() {
     if (!assignmentModal.calculationId) return;
 
     if (!assignmentModal.leadTechId || !assignmentModal.projectManagerId) {
-      alert('Both Lead Technician and Project Manager must be assigned.');
+      notify('Both Lead Technician and Project Manager must be assigned.', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -334,7 +335,7 @@ export function BonusApprovalDashboard() {
       loadCalculations();
     } catch (error) {
       console.error('Error saving assignments:', error);
-      alert('Failed to save assignments. Please try again.');
+      notify('Failed to save assignments. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setProcessing(false);
     }

@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { requestConfirmation, notify } from '../../lib/feedback';
+import { proposalStatusLabel } from '../../lib/proposalPresentation';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Proposal } from '../../lib/types';
-import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Calendar, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, ChevronDown } from 'lucide-react';
+import { Plus, FileText, Eye, Send, CheckCircle, XCircle, Copy, File as FileEdit, History, MoreVertical, Search, Clock, Trash2, Maximize2, ChevronLeft, ChevronRight, MessageSquare, Bell, ThumbsUp, AlertCircle, DollarSign, RotateCcw, Globe, EyeOff, Archive, ArchiveRestore, Activity, Filter, X, ExternalLink, Receipt, BarChart2, ShoppingCart, RefreshCw, Ban, Film, ChevronDown } from 'lucide-react';
 import { ProposalActivityPanel } from './ProposalActivityPanel';
 import { DuplicateProposalModal } from './DuplicateProposalModal';
 import { CreateRevisionModal } from './CreateRevisionModal';
@@ -195,7 +197,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       // Select only the columns the list UI needs — avoids materializing 90+ columns
       // and skips the expensive message/activity aggregate subqueries the view computes.
       const listColumns = `
-          id, contact_id, lead_id, proposal_number, title, status, total, subtotal,
+          id, company_id, valid_until, notes, customer_notes, updated_at, contact_id, lead_id, proposal_number, title, status, total, subtotal,
           tax_rate, tax_amount, deposit_amount, deposit_percent,
           created_by, created_at, sent_at, viewed_at, approved_at, declined_at,
           expires_at, is_revision, is_active_revision, revision_number,
@@ -237,7 +239,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       // Apply status filter
       if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
+        query = filterStatus === 'sent' ? query.in('status', ['sent', 'portal']) : query.eq('status', filterStatus);
       }
 
       // Proposals with a linked sales order have transitioned — never show them here
@@ -281,7 +283,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           .range(from, to);
       }
 
-      const { data, error, count } = await query;
+      const { data, error, count } = await query.overrideTypes<Proposal[], { merge: false }>();
 
       if (error) {
         console.error('Error loading proposals:', error);
@@ -370,7 +372,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       ? `This proposal has been sent to the customer. Deleting it will remove it from their portal as well.\n\nAre you sure you want to delete "${proposal.title}"?`
       : `Are you sure you want to delete "${proposal.title}"?`;
 
-    if (!confirm(confirmMessage)) {
+    if (!(await requestConfirmation(confirmMessage, { theme: 'violet' }))) {
       return;
     }
 
@@ -386,7 +388,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       setOpenMenuId(null);
     } catch (error) {
       console.error('Error deleting proposal:', error);
-      alert('Failed to delete proposal. Please try again.');
+      notify('Failed to delete proposal. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -396,7 +398,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       ? 'This proposal is approved. Recalling it will remove the approval and return it to Designing status. Are you sure?'
       : 'Recall this proposal from the customer portal? It will be returned to Designing status.';
 
-    if (!confirm(message)) {
+    if (!(await requestConfirmation(message, { theme: 'violet' }))) {
       return;
     }
 
@@ -425,10 +427,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
       await loadProposals();
       setOpenMenuId(null);
-      alert('Proposal recalled successfully!');
+      notify('Proposal recalled successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error recalling proposal:', error);
-      alert('Failed to recall proposal. Please try again.');
+      notify('Failed to recall proposal. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -449,7 +451,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   async function handleArchiveProposal(proposal: Proposal) {
     const confirmMessage = `Archive proposal "${proposal.title}"? It will be hidden from the list but can be unarchived later.`;
 
-    if (!confirm(confirmMessage)) {
+    if (!(await requestConfirmation(confirmMessage, { theme: 'violet' }))) {
       return;
     }
 
@@ -470,7 +472,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       setOpenMenuId(null);
     } catch (error) {
       console.error('Error archiving proposal:', error);
-      alert('Failed to archive proposal. Please try again.');
+      notify('Failed to archive proposal. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -514,30 +516,30 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       }
     } catch (error) {
       console.error('Error fetching activity data:', error);
-      alert('Failed to load activity history');
+      notify('Failed to load activity history', { theme: 'violet', tone: 'error' });
     }
   }
 
   function getStatusIcon(status: string) {
     switch (status) {
       case 'designing':
-        return <FileEdit size={18} className="text-warning" title="Being Designed" />;
+        return <FileEdit size={18} className="text-warning"><title>{"Being Designed"}</title></FileEdit>;
       case 'ready_to_submit':
-        return <ThumbsUp size={18} className="text-info" title="Ready to Submit" />;
+        return <ThumbsUp size={18} className="text-info"><title>{"Ready to Submit"}</title></ThumbsUp>;
       case 'sent':
-        return <Send size={18} className="text-info" title="Submitted to Portal" />;
+        return <Send size={18} className="text-info"><title>{"Sent to Customer"}</title></Send>;
       case 'viewed':
         return <Eye size={18} className="text-purple-400" />;
       case 'approved':
         return <CheckCircle size={18} className="text-success" />;
       case 'approved_pending_action':
-        return <AlertCircle size={18} className="text-warning" title="Approved - Pending PO/Deposit" />;
+        return <AlertCircle size={18} className="text-warning"><title>{"Approved - Pending PO/Deposit"}</title></AlertCircle>;
       case 'declined':
         return <XCircle size={18} className="text-danger" />;
       case 'expired':
-        return <Clock size={18} className="text-attention" title="Expired" />;
+        return <Clock size={18} className="text-attention"><title>{"Expired"}</title></Clock>;
       case 'archived':
-        return <Archive size={18} className="text-muted" title="Archived" />;
+        return <Archive size={18} className="text-muted"><title>{"Archived"}</title></Archive>;
       default:
         return <FileText size={18} className="text-muted" />;
     }
@@ -571,16 +573,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   }
 
   function formatStatusText(status: string): string {
-    switch (status) {
-      case 'ready_to_submit':
-        return 'Ready to Submit';
-      case 'approved_pending_action':
-        return 'Approved - Pending Action';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status.charAt(0).toUpperCase() + status.slice(1);
-    }
+    return proposalStatusLabel(status);
   }
 
   function formatDate(dateString: string) {
@@ -662,10 +655,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
     return { label: `${days}d`, className: 'bg-warningSoft text-warning border border-warningLine', title: `${days} days old — needs follow-up` };
   }
 
-  function getLastViewedAt(proposal: any): Date | null {
-    // Use viewed_at from proposal
-    return proposal.viewed_at ? new Date(proposal.viewed_at) : null;
-  }
 
   function getUnreadCustomerMessageCount(proposal: any): number {
     // Use pre-calculated count from view
@@ -867,9 +856,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         >
                           <option value="all">All Status</option>
                           <option value="designing">Designing</option>
-                          <option value="ready_to_submit">Ready to Submit</option>
-                          <option value="sent">Sent</option>
-                          <option value="portal">Portal</option>
+                          <option value="ready_to_submit">Ready to Send</option>
+                          <option value="sent">Sent to Customer</option>
+                          <option value="viewed">Viewed by Customer</option>
                           <option value="approved">Approved</option>
                           <option value="declined">Declined</option>
                           <option value="cancelled">Cancelled</option>
@@ -1067,9 +1056,9 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                         >
                           <option value="all">All Status</option>
                           <option value="designing">Designing</option>
-                          <option value="ready_to_submit">Ready to Submit</option>
-                          <option value="sent">Sent</option>
-                          <option value="portal">Portal</option>
+                          <option value="ready_to_submit">Ready to Send</option>
+                          <option value="sent">Sent to Customer</option>
+                          <option value="viewed">Viewed by Customer</option>
                           <option value="approved">Approved</option>
                           <option value="declined">Declined</option>
                           <option value="cancelled">Cancelled</option>
@@ -1418,7 +1407,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       <p>Created: {formatDate(proposal.created_at)}</p>
                       {proposal.sent_at && <p>Sent: {formatDate(proposal.sent_at)}</p>}
                       {proposal.expires_at && <p>Expires: {formatDate(proposal.expires_at)}</p>}
-                      {proposal.revision_count > 1 && <p>Revision: {proposal.revision_count}</p>}
+                      {(proposal.revision_count ?? 0) > 1 && <p>Revision: {proposal.revision_count}</p>}
                       {proposal.bill_to_contact && <p>Billed to: {(proposal.bill_to_contact as any).company_name || (proposal.bill_to_contact as any).full_name}</p>}
                       {proposal.require_deposit && <p>Deposit: {proposal.deposit_paid ? 'Paid' : `Awaiting payment — $${(proposal.deposit_amount_due ?? proposal.deposit_amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</p>}
                     </div>
@@ -1493,7 +1482,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               className="w-full px-4 py-3 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2.5 border-b border-strong"
                             >
                               <RotateCcw className="w-4 h-4 flex-shrink-0" />
-                              Reactivate Proposal
+                              Reopen for Customer
                             </button>
                           )}
                           {isStale(proposal) && (
@@ -1636,7 +1625,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteProposal(proposal.id);
+                              handleDeleteProposal(proposal);
                               setOpenMenuId(null);
                             }}
                             className="w-full px-4 py-3 text-left text-sm text-danger hover:bg-strong/25 hover:text-danger transition-colors flex items-center gap-2.5 rounded-b-lg"
@@ -1677,7 +1666,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                       )}
                       <span className="text-muted flex-shrink-0 text-xs">—</span>
                       <h3 className="text-sm text-secondary truncate flex-1 min-w-0">{getDisplayTitle(proposal)}</h3>
-                      {(proposal.revision_count && proposal.revision_count > 1) && (
+                      {(proposal.revision_count && (proposal.revision_count ?? 0) > 1) && (
                         <span className="px-1.5 py-0.5 bg-infoSoft text-info text-[10px] font-medium rounded whitespace-nowrap flex-shrink-0">
                           R:{proposal.revision_count}
                         </span>
@@ -1797,7 +1786,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             className="w-full px-3 py-2 text-left text-sm text-attention hover:bg-strong/25 hover:text-attention transition-colors flex items-center gap-2 border-b border-strong"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
-                            Reactivate Proposal
+                            Reopen for Customer
                           </button>
                         )}
                         {isStale(proposal) && (

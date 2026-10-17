@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 // Declare google maps types
@@ -176,7 +175,7 @@ export function AddressAutocomplete({
         let state = '';
         let zip = '';
 
-        place.address_components.forEach((component) => {
+        place.address_components.forEach((component: { long_name: string; short_name: string; types: string[] }) => {
           const types = component.types;
 
           if (types.includes('street_number')) {

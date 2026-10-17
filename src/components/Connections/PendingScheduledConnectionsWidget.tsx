@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, AlertTriangle, ExternalLink, CheckCircle2, FileText, X, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -27,7 +28,7 @@ export function PendingScheduledConnectionsWidget() {
   const { profile } = useAuth();
   const [connections, setConnections] = useState<PendingConnection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [completing, setCompleting] = useState<string | null>(null);
+  const [_completing, _setCompleting] = useState<string | null>(null);
   const [selectedConnection, setSelectedConnection] = useState<PendingConnection | null>(null);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,7 +92,7 @@ export function PendingScheduledConnectionsWidget() {
         .lte('occurrence_date', today)
         .order('rollover_count', { ascending: false })
         .order('occurrence_date', { ascending: true })
-        .limit(5);
+        .limit(5).overrideTypes<PendingConnection[], { merge: false }>();
 
       if (error) throw error;
 
@@ -122,7 +123,7 @@ export function PendingScheduledConnectionsWidget() {
       setSwipedItem(null);
     } catch (error) {
       console.error('Error skipping connection:', error);
-      alert('Failed to skip connection. Please try again.');
+      notify('Failed to skip connection. Please try again.', { theme: 'cyan', tone: 'error' });
     }
   }
 

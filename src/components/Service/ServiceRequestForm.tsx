@@ -1,8 +1,10 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
 import type { CustomerLocation } from '../Contacts/CustomerLocationSelector';
+import { AIFormFill } from '../Shared/AIFormFill';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import {
   Search,
@@ -525,26 +527,26 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     e.preventDefault();
 
     if (!formData.customer_name.trim()) {
-      alert('Please enter customer name');
+      notify('Please enter customer name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (formData.earliest_date && formData.requested_date && formData.earliest_date > formData.requested_date) {
-      alert('Earliest date must be on or before Need By.');
+      notify('Earliest date must be on or before Need By.', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (showNewCustomer && !formData.customer_phone.trim()) {
-      alert('Please enter a phone number for the new customer.');
+      notify('Please enter a phone number for the new customer.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!formData.job_description.trim()) {
-      alert('Please enter job description');
+      notify('Please enter job description', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (requestType === 'project' && !selectedProjectId) {
-      alert('Please select a project');
+      notify('Please select a project', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -566,7 +568,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
     try {
       if (!profile?.id) {
-        alert('You must be logged in to submit a work order request.');
+        notify('You must be logged in to submit a work order request.', { theme: 'blue', tone: 'warning' });
         setLoading(false);
         return;
       }
@@ -649,7 +651,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       }
 
       if (!finalContactId) {
-        alert('Please select an existing customer or use "Create New Customer" option.');
+        notify('Please select an existing customer or use "Create New Customer" option.', { theme: 'blue', tone: 'warning' });
         setLoading(false);
         return;
       }
@@ -724,7 +726,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     } catch (error: any) {
       console.error('Error submitting work order request:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
-      alert(`Failed to submit work order request: ${errorMessage}`);
+      notify(`Failed to submit work order request: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -748,6 +750,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
         <div className="qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-4 sm:p-5 space-y-3">
+          {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
 
           {/* Kickback reason banner (edit mode only) */}
           {isEditMode && editingRequest?.kickback_reason && (

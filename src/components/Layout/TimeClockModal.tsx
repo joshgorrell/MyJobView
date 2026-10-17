@@ -1,6 +1,7 @@
+import { AttendanceBadge, useAttendanceResults } from '../Shared/AttendanceBadge';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   X, Clock, Play, StopCircle, Coffee, User, Pause, WifiOff,
   Wrench, GraduationCap, CheckCircle,
@@ -15,6 +16,7 @@ import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } fr
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
 
 interface TimeClockModalProps {
+  embedded?: boolean;
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (tab: string, params?: Record<string, string>) => void;
@@ -46,16 +48,19 @@ interface InternalSession {
 
 type ActivePanel = 'none' | 'shop_time' | 'training' | 'break';
 
-export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
+export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockModalProps) {
   const { profile } = useAuth();
   const timePolicy = useEmployeeTimePolicy();
   const toast = useToast();
 
+  const actionLock = useRef(false);
+  const [busy, setBusy] = useState(false);
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
+  const attendance = useAttendanceResults(todayEntry ? [todayEntry.id] : []);
   const [activeBreak, setActiveBreak] = useState<ActiveBreak | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
+  const [, setLocationPermission] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
   const [checkingPermission, setCheckingPermission] = useState(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
@@ -115,10 +120,11 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
 
       const { data: entries } = await offlineSupabaseQuery<DailyClockEntry>(
         'daily_clock_entries',
-        async () => supabase.from('daily_clock_entries').select('*').eq('technician_id', profile.id).eq('entry_date', today).order('clock_in', { ascending: false }).limit(1)
+        async () => supabase.from('daily_clock_entries').select('*').eq('technician_id', profile.id).or(`entry_date.eq.${today},clock_out.is.null`).order('clock_in', { ascending: false })
       );
 
-      const entryData = entries && entries.length > 0 ? entries[0] : null;
+      const ownEntries = (entries || []).filter((e: any) => e.technician_id === profile.id && (!e.clock_out || e.entry_date === today));
+      const entryData = ownEntries.find(e => !e.clock_out) || ownEntries[0] || null;
       setTodayEntry(entryData);
 
       if (entryData) {
@@ -126,7 +132,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
           'daily_clock_breaks',
           async () => supabase.from('daily_clock_breaks').select('*').eq('daily_clock_entry_id', entryData.id).is('break_end', null)
         );
-        setActiveBreak(breaks && breaks.length > 0 ? breaks[0] : null);
+        setActiveBreak((breaks || []).find((b: any) => b.daily_clock_entry_id === entryData.id && !b.break_end) || null);
       } else {
         setActiveBreak(null);
       }
@@ -180,8 +186,9 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
   }
 
   async function handleClockIn() {
-    if (!profile) return;
-    await performClockIn();
+    if (!profile || actionLock.current) return;
+    actionLock.current = true; setBusy(true);
+    try { await performClockIn(); } finally { actionLock.current = false; setBusy(false); }
   }
 
   async function performClockIn(): Promise<string | null> {
@@ -191,10 +198,11 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
       const orgTz = await getOrganizationTimezone();
       const today = formatDateInTimezone(now.toISOString(), orgTz, 'yyyy-MM-dd');
 
-      const { data: activeEntries, error: checkError } = await supabase
-        .from('daily_clock_entries').select('*').eq('technician_id', profile.id).eq('entry_date', today).is('clock_out', null);
+      const capture = gpsTrackingService.captureLocationForClockEvent();
+      const { data: activeEntries, error: checkError } = await offlineSupabaseQuery<DailyClockEntry>('daily_clock_entries', async () => supabase
+        .from('daily_clock_entries').select('*').eq('technician_id', profile.id).is('clock_out', null));
       if (checkError) throw checkError;
-      if (activeEntries && activeEntries.length > 0) {
+      if ((activeEntries || []).some((e: any) => e.technician_id === profile.id && !e.clock_out)) {
         toast.warning('Please clock out before clocking in again.', 'Already clocked in');
         await loadTodaysClock();
         return null;
@@ -210,10 +218,10 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
       const { error } = await offlineSupabaseInsert<any>('daily_clock_entries', clockInData);
       if (error) throw error;
 
-      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
+      void saveClockEventGps(entryId, 'daily_clock_entries', false, capture).catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
-      await checkLocationPermission();
+      toast.success('You’re clocked in. Have a great day!');
       if (!navigator.onLine) toast.info('Clock-in saved locally and will sync when you\'re back online.', 'You are offline');
       return entryId;
     } catch (error: any) {
@@ -264,6 +272,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
 
   function handleClockOut() {
     if (!todayEntry || !profile) return;
+    if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) { toast.warning('An unfinished older shift needs manager correction before you clock out.'); return; }
     if (activeBreak) { toast.warning('Please end your break before clocking out'); return; }
     setShowClockOutModal(true);
   }
@@ -274,7 +283,8 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
   }
 
   async function handleStartBreak(breakType: 'lunch' | 'personal' | 'other') {
-    if (!todayEntry) return;
+    if (!todayEntry || actionLock.current) return;
+    actionLock.current = true; setBusy(true);
     try {
       const { error } = await offlineSupabaseInsert('daily_clock_breaks', {
         id: crypto.randomUUID(), daily_clock_entry_id: todayEntry.id,
@@ -287,11 +297,12 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
     } catch (error) {
       console.error('Error starting break:', error);
       toast.error('Failed to start break');
-    }
+    } finally { actionLock.current = false; setBusy(false); }
   }
 
   async function handleEndBreak() {
-    if (!activeBreak) return;
+    if (!activeBreak || actionLock.current) return;
+    actionLock.current = true; setBusy(true);
     try {
       const { error } = await offlineSupabaseUpdate('daily_clock_breaks', { break_end: new Date().toISOString() }, activeBreak.id);
       if (error) throw error;
@@ -300,7 +311,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
     } catch (error) {
       console.error('Error ending break:', error);
       toast.error('Failed to end break');
-    }
+    } finally { actionLock.current = false; setBusy(false); }
   }
 
   const getElapsedTime = (startTime: string) => {
@@ -318,50 +329,41 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
   const isClockedIn = todayEntry && !todayEntry.clock_out;
   const isClockedOut = todayEntry && todayEntry.clock_out;
 
-  const gpsStatusColor =
-    locationPermission === 'granted' ? 'bg-green-500' :
-    locationPermission === 'denied' ? 'bg-red-400' :
-    'bg-yellow-400';
 
   if (!isOpen || !timePolicy.dailyClock) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[92vh] overflow-y-auto">
+    <div className={embedded ? "min-w-0" : "fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"}>
+      <div className={`bg-white text-gray-900 rounded-2xl border border-gray-200 w-full overflow-hidden ${embedded ? "" : "max-w-md max-h-[92vh] overflow-y-auto"}`}>
 
         {/* Header */}
         <div className={`rounded-t-2xl px-6 pt-5 pb-4 ${
           isClockedOut ? 'bg-gray-50' :
           isClockedIn ? 'bg-gradient-to-br from-green-600 to-green-700' :
-          'bg-gradient-to-br from-slate-800 to-slate-900'
+          'bg-slate-100'
         }`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Clock className={`w-5 h-5 ${isClockedIn && !isClockedOut ? 'text-white' : 'text-gray-500'}`} />
               <span className={`font-semibold text-sm ${isClockedIn && !isClockedOut ? 'text-white/80' : 'text-gray-500'}`}>
-                Time Clock
+                Daily Clock
               </span>
             </div>
             <div className="flex items-center gap-3">
-              {!checkingPermission && (
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${gpsStatusColor}`} />
-                  <span className={`text-xs ${isClockedIn && !isClockedOut ? 'text-white/60' : 'text-gray-400'}`}>Location access</span>
-                </div>
-              )}
-              <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isClockedIn && !isClockedOut ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-500'}`}>
+              <button hidden={embedded} aria-label="Close Time Clock" onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isClockedIn && !isClockedOut ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-100 text-gray-500'}`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
           <div className={`text-4xl font-bold tracking-tight ${isClockedIn && !isClockedOut ? 'text-white' : 'text-gray-900'}`}>
-            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: orgTimezone })}
           </div>
           <div className={`text-sm mt-1 ${isClockedIn && !isClockedOut ? 'text-white/70' : 'text-gray-500'}`}>
-            {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: orgTimezone })}
           </div>
 
+          {todayEntry && <AttendanceBadge result={attendance[todayEntry.id]} />}
           {isClockedIn && (
             <div className="mt-3 flex items-center gap-3">
               <div className="bg-white/20 rounded-lg px-3 py-1.5 text-white text-sm font-medium">
@@ -379,7 +381,8 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
           )}
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-4" aria-busy={busy}>
+          {todayEntry && !todayEntry.clock_out && Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000 && <p role="alert" className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 p-3 text-sm">An unfinished shift from {formatDateInTimezone(todayEntry.clock_in, orgTimezone)} needs manager correction. Contact your manager before recording a new day.</p>}
           {isOffline && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center gap-2">
               <WifiOff className="w-4 h-4 text-orange-600 flex-shrink-0" />
@@ -391,7 +394,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
           {!todayEntry && (
             <button
               onClick={handleClockIn}
-              disabled={checkingPermission}
+              disabled={checkingPermission || busy}
               className="w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl py-5 text-xl font-bold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
             >
               <Play className="w-6 h-6" />
@@ -600,7 +603,7 @@ export function TimeClockModal({ isOpen, onClose }: TimeClockModalProps) {
 
               <button
                 onClick={handleClockIn}
-                disabled={checkingPermission}
+                disabled={checkingPermission || busy}
                 className="w-full bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl py-4 text-lg font-bold transition-all shadow-lg flex items-center justify-center gap-3"
               >
                 <Play className="w-5 h-5" />

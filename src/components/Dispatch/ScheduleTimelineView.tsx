@@ -1,17 +1,12 @@
 import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
 import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
 import { dateKey } from '../../lib/workOrderScheduling';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  Calendar,
-  ZoomIn,
-  ZoomOut,
   User,
   Clock,
-  MapPin,
-  AlertCircle
-} from 'lucide-react';
+  MapPin} from 'lucide-react';
 
 interface TimelineJob {
   id: string;
@@ -187,8 +182,7 @@ export function ScheduleTimelineView() {
   function getJobPosition(job: TimelineJob, days: Date[]) {
     const startDate = new Date(job.start_date);
     const endDate = new Date(job.end_date);
-    const firstDay = days[0];
-    const lastDay = days[days.length - 1];
+
 
     const startIndex = days.findIndex(d => d.toDateString() === startDate.toDateString());
     const endIndex = days.findIndex(d => d.toDateString() === endDate.toDateString());

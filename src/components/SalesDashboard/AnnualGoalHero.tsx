@@ -1,4 +1,4 @@
-import { Target, TrendingUp, TrendingDown, Minus, Trophy } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Trophy } from 'lucide-react';
 import { computeGoalProgress } from '../../lib/salesDashboardCalculations';
 import type { SalesDashboardResult } from '../../lib/salesDashboardTypes';
 

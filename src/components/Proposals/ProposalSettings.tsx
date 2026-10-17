@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,6 +53,8 @@ interface ProposalSettingsData {
 }
 
 interface Contract {
+  content?: string | null;
+  description?: string | null;
   id: string;
   name: string;
   is_default: boolean;
@@ -70,12 +73,40 @@ interface ProposalSettingsProps {
 }
 
 export default function ProposalSettings({ proposalId, onBack, initialTab = 'details' }: ProposalSettingsProps) {
-  const { profile } = useAuth();
+  const { profile, companySettings: authCompanySettings } = useAuth();
   const [settings, setSettings] = useState<ProposalSettingsData | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [areaTemplates, setAreaTemplates] = useState<AreaTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dealerApprovalDays, setDealerApprovalDays] = useState(30);
+  const [savingDealerApprovalDays, setSavingDealerApprovalDays] = useState(false);
+  const [dealerApprovalMessage, setDealerApprovalMessage] = useState('');
+  const isDealerAdmin = profile?.role === 'admin';
+  useEffect(() => {
+    if (!profile?.organization_id) return;
+    supabase.from('organizations').select('proposal_approval_days')
+      .eq('id', profile.organization_id).single()
+      .then(({ data, error }) => {
+        if (error) setDealerApprovalMessage('Could not load the dealer approval policy.');
+        else if (data) setDealerApprovalDays(data.proposal_approval_days ?? 30);
+      });
+  }, [profile?.organization_id]);
+  const saveDealerApprovalPolicy = async () => {
+    if (!isDealerAdmin || !profile?.organization_id || savingDealerApprovalDays) return;
+    if (!Number.isInteger(dealerApprovalDays) || dealerApprovalDays < 1 || dealerApprovalDays > 365) {
+      setDealerApprovalMessage('Choose a whole number from 1 to 365 days.');
+      return;
+    }
+    setSavingDealerApprovalDays(true);
+    setDealerApprovalMessage('');
+    const { data, error } = await supabase.from('organizations')
+      .update({ proposal_approval_days: dealerApprovalDays })
+      .eq('id', profile.organization_id).select('proposal_approval_days').single();
+    setDealerApprovalMessage(error || !data ? 'Unable to save. Dealer administrator access is required.' : 'Dealer approval window saved for future submissions.');
+    setSavingDealerApprovalDays(false);
+  };
+
   const [newArea, setNewArea] = useState('');
   const [generatingScope, setGeneratingScope] = useState(false);
   const [aiCooldown, setAiCooldown] = useState(0);
@@ -113,7 +144,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   const [proposal, setProposal] = useState<any>(null);
   const [proposalLoadError, setProposalLoadError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<any[]>([]);
-  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [_loadingContacts, _setLoadingContacts] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   useEffect(()=>{if(!hasUnsavedChanges)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[hasUnsavedChanges]);
   const [initialSettings, setInitialSettings] = useState<string>('');
@@ -130,7 +161,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [validationData, setValidationData] = useState<any>(null);
-  const [loadingValidation, setLoadingValidation] = useState(false);
+  const [_loadingValidation, setLoadingValidation] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [billingPhases, setBillingPhases] = useState<BillingPhase[]>([]);
   const billingPhasesTimer = useRef<NodeJS.Timeout | null>(null);
@@ -596,7 +627,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         const { data: companySettings } = await supabase
           .from('company_settings')
           .select('default_deposit_percent, default_project_mgmt_percent, default_system_design_percent, default_cc_fee_percent, default_misc_parts_percent')
-          .eq('id', profile.company_id)
+          .eq('id', authCompanySettings?.id)
           .single();
 
         const { data: newSettings, error: insertError } = await supabase
@@ -793,7 +824,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       }
     } catch (error) {
       console.error('TaxJar calculation error:', error);
-      setTaxJarResult({ tax_calculation_status: 'review_required', tax_amount: 0, taxjar_error: error instanceof Error ? error.message : 'Unknown error' });
+      setTaxJarResult({ tax_calculation_status: 'review_required', tax_amount: 0, taxable_subtotal: 0, taxjar_error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
       setCalculatingTaxJar(false);
     }
@@ -917,10 +948,10 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       // Reload validation after save
       await loadValidation();
 
-      alert('Settings saved successfully!');
+      notify('Settings saved successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -948,7 +979,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
 
   async function handleGenerateScopeWithAI() {
     if (aiCooldown > 0) {
-      alert(`Please wait ${aiCooldown} seconds before generating again to avoid rate limits.`);
+      notify(`Please wait ${aiCooldown} seconds before generating again to avoid rate limits.`, { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -961,13 +992,14 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         .select(`
           title,
           contacts:contacts!proposals_contact_id_fkey (
+            contact_type,
             full_name,
             contact_name,
             company_name
           )
         `)
         .eq('id', proposalId)
-        .maybeSingle();
+        .maybeSingle().overrideTypes<{ title: string; contacts: { full_name: string | null; contact_name: string | null; company_name: string | null; contact_type: string } | null }, { merge: false }>();
 
       if (propError) throw propError;
 
@@ -982,7 +1014,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       const { data: lineItems, error: itemsError } = await supabase
         .from('proposal_line_items')
         .select('room_id, description, quantity, item_type, products(name)')
-        .eq('proposal_id', proposalId);
+        .eq('proposal_id', proposalId).overrideTypes<{ room_id: string | null; description: string; quantity: number; item_type: string | null; products: { name: string } | null }[], { merge: false }>();
 
       if (itemsError) throw itemsError;
 
@@ -1035,9 +1067,9 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
 
       // Handle rate limit errors specifically
       if (error.message?.includes('rate limit') || error.message?.includes('10 seconds')) {
-        alert(error.message);
+        notify(error.message, { theme: 'violet', tone: 'error' });
       } else {
-        alert(error.message || 'Failed to generate scope of work. Please try again.');
+        notify(error.message || 'Failed to generate scope of work. Please try again.', { theme: 'violet', tone: 'error' });
       }
     } finally {
       setGeneratingScope(false);
@@ -1063,7 +1095,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       const { data, error } = await supabase
         .from('proposal_area_templates')
         .insert({
-          company_id: profile.company_id,
+          company_id: authCompanySettings?.id,
           name: newArea.trim(),
           sort_order: nextSort
         })
@@ -1075,7 +1107,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       setNewArea('');
     } catch (error) {
       console.error('Error adding area:', error);
-      alert('Failed to add area template');
+      notify('Failed to add area template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1101,7 +1133,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       setAreaTemplates(areaTemplates.filter(a => a.id !== id));
     } catch (error) {
       console.error('Error deleting area:', error);
-      alert('Failed to delete area template');
+      notify('Failed to delete area template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1123,7 +1155,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       setEditingAreaName('');
     } catch (error) {
       console.error('Error updating area:', error);
-      alert('Failed to update area template');
+      notify('Failed to update area template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1182,7 +1214,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
       const areasToAdd = settings.selected_areas.filter(name => !existingNames.has(name));
 
       if (areasToAdd.length === 0) {
-        alert('All selected areas already exist in the proposal');
+        notify('All selected areas already exist in the proposal', { theme: 'violet', tone: 'warning' });
         return;
       }
 
@@ -1197,10 +1229,10 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         .insert(roomsToInsert);
 
       if (error) throw error;
-      alert(`Added ${areasToAdd.length} area(s) to proposal`);
+      notify(`Added ${areasToAdd.length} area(s) to proposal`, { theme: 'violet', tone: 'info' });
     } catch (error) {
       console.error('Error applying areas:', error);
-      alert('Failed to apply areas to proposal');
+      notify('Failed to apply areas to proposal', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -1232,7 +1264,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+    <div className="min-w-0 flex flex-col bg-gray-50">
       <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -1275,7 +1307,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-w-0">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6">
           {/* Readiness Progress Indicator */}
           {validationData && (
@@ -1945,6 +1977,27 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
 
             {/* COLUMNS/VISIBILITY TAB */}
             {activeTab === 'visibility' && (
+              <section className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+                <h2 className="text-lg font-semibold text-gray-900">Proposal Approval &amp; Viewing Window</h2>
+                <p className="mt-1 text-sm text-gray-600">One dealer-wide deadline controls both customer approval and access to the proposal's single shared link. The window restarts each time a proposal is submitted again. Existing submitted proposals keep their current deadline.</p>
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <label className="text-sm font-medium text-gray-700">Window (days)
+                    <input type="number" min={1} max={365} step={1} disabled={!isDealerAdmin}
+                      value={dealerApprovalDays}
+                      onChange={e => setDealerApprovalDays(Number(e.target.value))}
+                      className="mt-1 block w-28 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 disabled:bg-gray-100" />
+                  </label>
+                  {isDealerAdmin && <button type="button" disabled={savingDealerApprovalDays}
+                    onClick={saveDealerApprovalPolicy}
+                    className="min-h-[40px] rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                    {savingDealerApprovalDays ? 'Saving…' : 'Save Dealer Setting'}
+                  </button>}
+                </div>
+                {!isDealerAdmin && <p className="mt-2 text-xs text-gray-600">Only a dealer administrator can change this setting.</p>}
+                {dealerApprovalMessage && <p role="status" className="mt-2 text-sm text-gray-700">{dealerApprovalMessage}</p>}
+              </section>
+            )}
+            {activeTab === 'visibility' && (
               <div className="space-y-8">
                 {/* Class Visibility Settings */}
                 <div>
@@ -1987,7 +2040,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                             name="classDisplayMode"
                             value="none"
                             checked={settings?.class_display_mode === 'none'}
-                            onChange={(e) => {
+                            onChange={(_e) => {
                               setSettings({
                                 ...settings!,
                                 class_display_mode: 'none'
@@ -2008,7 +2061,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                             name="classDisplayMode"
                             value="inline"
                             checked={settings?.class_display_mode === 'inline'}
-                            onChange={(e) => {
+                            onChange={(_e) => {
                               setSettings({
                                 ...settings!,
                                 class_display_mode: 'inline'
@@ -2029,7 +2082,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                             name="classDisplayMode"
                             value="summary"
                             checked={settings?.class_display_mode === 'summary'}
-                            onChange={(e) => {
+                            onChange={(_e) => {
                               setSettings({
                                 ...settings!,
                                 class_display_mode: 'summary'
@@ -2050,7 +2103,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
                             name="classDisplayMode"
                             value="both"
                             checked={settings?.class_display_mode === 'both'}
-                            onChange={(e) => {
+                            onChange={(_e) => {
                               setSettings({
                                 ...settings!,
                                 class_display_mode: 'both'

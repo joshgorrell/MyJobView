@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Award, Plus, Edit2, Trash2, Save, X, DollarSign, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -145,11 +146,11 @@ export function PointsAndRewards() {
           .eq('id', settings.id);
       }
 
-      alert('Points configuration saved!');
+      notify('Points configuration saved!', { theme: 'blue', tone: 'success' });
       loadData();
     } catch (error) {
       console.error('Error saving points config:', error);
-      alert('Failed to save points configuration');
+      notify('Failed to save points configuration', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -179,7 +180,7 @@ export function PointsAndRewards() {
       loadData();
     } catch (error) {
       console.error('Error saving reward:', error);
-      alert('Failed to save reward');
+      notify('Failed to save reward', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -189,7 +190,7 @@ export function PointsAndRewards() {
       loadData();
     } catch (error) {
       console.error('Error deleting reward:', error);
-      alert('Failed to delete reward');
+      notify('Failed to delete reward', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -206,7 +207,7 @@ export function PointsAndRewards() {
       loadData();
     } catch (error) {
       console.error('Error updating redemption:', error);
-      alert('Failed to update redemption status');
+      notify('Failed to update redemption status', { theme: 'blue', tone: 'error' });
     }
   }
 

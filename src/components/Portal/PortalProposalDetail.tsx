@@ -1,5 +1,7 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, ChevronUp, CreditCard, Printer, RotateCcw } from 'lucide-react';
+import { useProposalEngagement } from '../../hooks/useProposalEngagement';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
@@ -29,20 +31,10 @@ function formatDuration(seconds: number | null): string {
 function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRecording; signedUrl?: string; logoUrl?: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
+  const [_playing, setPlaying] = useState(false);
 
   const videoSrc = recording.storage_path ? signedUrl : recording.video_url || undefined;
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (playing) {
-      videoRef.current.pause();
-      setPlaying(false);
-    } else {
-      videoRef.current.play();
-      setPlaying(true);
-    }
-  };
 
   if (!videoSrc) return null;
 
@@ -66,6 +58,7 @@ function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRec
             <span className="text-xs text-blue-300 font-mono">{formatDuration(recording.duration_seconds)}</span>
           )}
           <button
+            data-engagement-action={expanded ? undefined : "video_opened"}
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors"
           >
@@ -106,6 +99,8 @@ function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRec
 }
 
 interface Proposal {
+  contact_id?: string | null;
+  contact_name?: string | null;
   id: string;
   proposal_number: string;
   title: string;
@@ -231,14 +226,15 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
   const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
-  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
-  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
+  const [_messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [_unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showReactivationModal, setShowReactivationModal] = useState(false);
   const [reactivationSent, setReactivationSent] = useState(false);
 
+  const engagementRoot = useProposalEngagement(proposalId, !previewMode && !hideExpiration && !loading && proposal?.id === proposalId);
+
   useEffect(() => {
     loadProposalDetails();
-    if (!previewMode) trackProposalView();
     setTimeout(() => setAnimate(true), 100);
   }, [proposalId]);
 
@@ -295,7 +291,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           clientInfo = { ...clientInfo, ...data };
         }
       } catch {}
-      await supabase.from('proposal_activity').insert({
+      const { error } = await supabase.from('proposal_activity').insert({
         proposal_id: proposalId,
         activity_type: 'downloaded',
         user_agent: clientInfo.userAgent,
@@ -307,64 +303,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           os: clientInfo.os
         }
       });
-    } catch {}
-  }
-
-  async function trackProposalView() {
-    if (previewMode) return;
-    try {
-      // Get client IP and device information from edge function
-      let clientInfo = {
-        ip: 'Unknown',
-        userAgent: navigator.userAgent,
-        deviceType: 'desktop',
-        browser: 'Unknown',
-        os: 'Unknown'
-      };
-
-      try {
-        const { data: { supabaseUrl } } = await supabase.auth.getSession();
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-client-ip`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          clientInfo = { ...clientInfo, ...data };
-        }
-      } catch (ipError) {
-        console.error('Failed to get IP information:', ipError);
-        // Continue with default values
-      }
-
-      // Insert activity record with IP and device information
-      await supabase.from('proposal_activity').insert({
-        proposal_id: proposalId,
-        activity_type: 'viewed',
-        user_agent: clientInfo.userAgent,
-        ip_address: clientInfo.ip,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          deviceType: clientInfo.deviceType,
-          browser: clientInfo.browser,
-          os: clientInfo.os
-        }
-      });
-
-      // Update proposal status from 'sent' to 'portal' (skip in preview mode)
-      if (!previewMode) {
-        await supabase
-          .from('proposals')
-          .update({ status: 'portal' })
-          .eq('id', proposalId)
-          .eq('status', 'sent');
-      }
-    } catch (error) {
-      console.error('Error tracking view:', error);
-    }
+      if (error) console.warn('Proposal download activity could not be recorded', error);
+    } catch (error) { console.warn('Proposal download activity failed', error); }
   }
 
   async function loadProposalDetails() {
@@ -640,10 +580,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     if (previewMode) return;
     if (!proposal) return;
     if (!declineReason) {
-      alert('Please select a reason for declining this proposal.');
+      notify('Please select a reason for declining this proposal.', { theme: 'blue', tone: 'warning' });
       return;
     }
-    if (!confirm('Are you sure you want to decline this proposal?')) return;
+    if (!(await requestConfirmation('Are you sure you want to decline this proposal?', { theme: 'blue' }))) return;
 
     setSubmitting(true);
     try {
@@ -662,17 +602,18 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       if (error) throw error;
 
       // Log activity
-      await supabase.from('proposal_activity').insert({
+      const { error: activityError } = await supabase.from('proposal_activity').insert({
         proposal_id: proposalId,
         activity_type: 'declined',
         metadata: { reason: declineReason, notes: comment.trim() || null, by: 'customer' },
-      }).throwOnError().catch(() => {});
+      });
+      if (activityError) console.warn('Proposal decline activity could not be recorded', activityError);
 
-      alert('Proposal declined. We will be in touch shortly.');
+      notify('Proposal declined. We will be in touch shortly.', { theme: 'blue', tone: 'info' });
       onBack();
     } catch (error) {
       console.error('Error declining proposal:', error);
-      alert('Failed to decline proposal. Please try again.');
+      notify('Failed to decline proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -745,7 +686,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       setShowQA(true);
     } catch (error) {
       console.error('Error submitting change request:', error);
-      alert('Failed to send feedback. Please try again.');
+      notify('Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -869,10 +810,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     );
   }
 
-  const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed';
+  const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed' || proposal.status === 'portal';
 
   return (
-    <div className={previewMode ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
+    <div ref={engagementRoot} className={previewMode ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
       {/* Header — only shown in standalone mode */}
       {!previewMode && (
       <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
@@ -910,6 +851,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               </div>
             </div>
             <button
+              data-engagement-action="download_clicked"
               onClick={trackProposalDownload}
               className="flex items-center gap-2 px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px] flex-shrink-0"
             >
@@ -922,6 +864,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       )}
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
+        {!previewMode && !hideExpiration && <p className="mb-4 text-xs text-gray-500">Proposal visits, approximate active viewing time, and selected interactions are shared with your provider to help with follow-up.</p>}
         <div className="grid grid-cols-1 xl:grid-cols-3 items-start gap-6 xl:gap-8">
           {/* Main Content */}
           <div className="xl:col-span-2 min-w-0 space-y-6">
@@ -955,7 +898,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Full Proposal Video Recordings */}
             {recordings.filter(r => r.recording_scope === 'full_proposal').map(recording => (
-              <div key={recording.id} style={{ animation: animate ? 'slideInUp 0.4s ease-out both' : 'none' }}>
+              <div data-engagement-section="video" key={recording.id} style={{ animation: animate ? 'slideInUp 0.4s ease-out both' : 'none' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <Video className="w-4 h-4 text-blue-500" />
                   <span className="text-sm font-semibold text-gray-700">Proposal Walkthrough Video</span>
@@ -978,6 +921,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               return (
                 <div
                   key={room.id}
+                  data-engagement-section={`room:${room.id}`}
                   className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300"
                   style={{
                     animation: animate ? `slideInUp 0.5s ease-out ${roomIndex * 0.1}s both` : 'none'
@@ -1115,7 +1059,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               const unassignedSubtotal = unassignedItems.reduce((sum, item) => sum + (item.line_total || 0), 0);
               const showImages = template?.show_product_images !== false && unassignedItems.some(item => item.products?.image_url);
               return (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
+                <div data-engagement-section="scope" className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
                   {hasRooms && (
                     <div className="bg-gradient-to-r from-amber-700 to-amber-800 px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -1209,7 +1153,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Additional Notes */}
             {proposal.notes && (
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-4 sm:p-6 shadow-md">
+              <div data-engagement-section="notes" className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-4 sm:p-6 shadow-md">
                 <div className="flex items-start gap-3">
                   <div className="bg-blue-500/10 p-2 rounded-lg">
                     <FileText className="w-5 h-5 text-blue-600" />
@@ -1236,7 +1180,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
               {/* Total Amount */}
               {!hideCostsOverride && (
-              <div className="mb-6">
+              <div data-engagement-section="pricing" className="mb-6">
                 <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
                   <div className="text-center">
                     <div className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Total Investment</div>
@@ -1256,8 +1200,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               )}
 
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div data-engagement-section="actions" className="space-y-3">
                 <button
+                  data-engagement-action="question_clicked"
                   onClick={() => setShowQA(true)}
                   disabled={previewMode}
                   title={previewMode ? "Customer actions are disabled in preview" : undefined}
@@ -1270,6 +1215,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 {canTakeAction && (
                   <>
                     <button
+                      data-engagement-action="approval_clicked"
                       onClick={handleApprove}
                       disabled={previewMode || submitting}
                       className="w-full px-4 py-3.5 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold transition-colors shadow-sm"
@@ -1279,6 +1225,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     </button>
 
                     <button
+                      data-engagement-action="change_request_clicked"
                       onClick={() => setComment(comment ? '' : 'open')}
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
@@ -1289,6 +1236,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     </button>
 
                     <button
+                      data-engagement-action="decline_clicked"
                       onClick={() => setDeclineReason(declineReason ? '' : 'open')}
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
@@ -1444,6 +1392,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <p className="text-sm font-medium text-amber-800">Deposit Invoice Ready</p>
                       </div>
                       <button
+                        data-engagement-action="payment_clicked"
                         onClick={() => depositInvoice && handleInvoicePayment(depositInvoice)}
                         disabled={previewMode}
                         title={previewMode ? "Customer actions are disabled in preview" : undefined}
@@ -1543,6 +1492,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <div className="flex gap-2">
                           {!isPaid && (
                             <button
+                              data-engagement-action="payment_clicked"
                               onClick={() => handleInvoicePayment(inv)}
                               disabled={previewMode}
                               title={previewMode ? "Customer actions are disabled in preview" : undefined}

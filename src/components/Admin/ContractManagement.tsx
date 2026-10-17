@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FileText, Plus, Edit2, Trash2, Check, X } from 'lucide-react';
@@ -62,7 +63,7 @@ export default function ContractManagement() {
       setContracts(contracts.filter(c => c.id !== id));
     } catch (error) {
       console.error('Error deleting contract:', error);
-      alert('Failed to delete contract');
+      notify('Failed to delete contract', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -77,7 +78,7 @@ export default function ContractManagement() {
       await loadContracts();
     } catch (error) {
       console.error('Error setting default contract:', error);
-      alert('Failed to set default contract');
+      notify('Failed to set default contract', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -329,7 +330,7 @@ function ContractModal({
       onSave();
     } catch (error) {
       console.error('Error saving contract:', error);
-      alert('Failed to save contract');
+      notify('Failed to save contract', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -362,7 +363,7 @@ function ContractModal({
                   name="contract_type"
                   value="sales"
                   checked={formData.contract_type === 'sales'}
-                  onChange={(e) => setFormData({ ...formData, contract_type: 'sales' })}
+                  onChange={(_e) => setFormData({ ...formData, contract_type: 'sales' })}
                   className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Sales Contract</span>
@@ -373,7 +374,7 @@ function ContractModal({
                   name="contract_type"
                   value="security"
                   checked={formData.contract_type === 'security'}
-                  onChange={(e) => setFormData({ ...formData, contract_type: 'security' })}
+                  onChange={(_e) => setFormData({ ...formData, contract_type: 'security' })}
                   className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700">Security Contract</span>

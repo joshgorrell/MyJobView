@@ -1,18 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   Calendar,
   Clock,
   User,
   MapPin,
-  Filter,
   Download,
   Printer,
   Search,
   SortAsc,
-  SortDesc,
-  ChevronDown
-} from 'lucide-react';
+  SortDesc} from 'lucide-react';
 
 interface ScheduleItem {
   id: string;

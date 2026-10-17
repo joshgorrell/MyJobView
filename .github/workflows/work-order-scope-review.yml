@@ -24,6 +24,7 @@ on:
       - 'tests/service-requests/**'
       - 'tests/calendar/**'
       - 'supabase/migrations/*work_order_configuration*'
+      - 'supabase/migrations/*complete_work_order_scheduling*'
       - 'package*.json'
       - '.github/workflows/work-order-scope-review.yml'
   workflow_dispatch:
@@ -49,4 +50,5 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node tests/work-orders/browser.mjs
       - run: npm run test:work-orders:scheduling:browser
+      - run: node tests/work-orders/complete-scheduling-browser.mjs
       - run: node tests/service-requests/intake-browser.mjs

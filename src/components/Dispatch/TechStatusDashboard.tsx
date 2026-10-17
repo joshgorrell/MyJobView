@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { formatInTimeZone } from 'date-fns-tz';
+import { getOrganizationTimezone } from '../../lib/timezoneUtils';
+import { loadTeamLeave, minutes } from '../../lib/timeOff';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Clock, MapPin, Phone, CheckCircle, XCircle, Coffee, AlertCircle } from 'lucide-react';
+import { Calendar, User, Clock, MapPin, CheckCircle, XCircle, Coffee, AlertCircle } from 'lucide-react';
 
 interface TechStatus {
   id: string;
@@ -42,7 +45,9 @@ export function TechStatusDashboard() {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'daily_clock_entries'
+        table: 'pto_requests'
+      }, () => { loadTechStatuses(); })
+      .on('postgres_changes', {event:'*',schema:'public',table: 'daily_clock_entries'
       }, () => {
         loadTechStatuses();
       })
@@ -62,7 +67,9 @@ export function TechStatusDashboard() {
       })
       .subscribe();
 
+    const timer=window.setInterval(loadTechStatuses,60000);
     return () => {
+      clearInterval(timer);
       channel.unsubscribe();
     };
   }, []);
@@ -77,7 +84,10 @@ export function TechStatusDashboard() {
 
       if (techError) throw techError;
 
-      const today = new Date().toISOString().split('T')[0];
+      const tz = await getOrganizationTimezone();
+      const today = formatInTimeZone(new Date(),tz,'yyyy-MM-dd');
+      const nowMinutes = minutes(formatInTimeZone(new Date(),tz,'HH:mm'));
+      const approvedLeave = await loadTeamLeave(today,today);
 
       // Get today's clock entries for all techs with their clock-in location
       const { data: dailyClocks } = await supabase
@@ -94,7 +104,7 @@ export function TechStatusDashboard() {
       // Get active jobs
       const { data: activeJobs } = await supabase
         .from('time_entries')
-        .select('technician_id, work_order:work_orders(id, title)')
+        .select('technician_id, clock_in, work_order:work_orders(id, title)')
         .is('clock_out', null);
 
       // Get latest location for each tech
@@ -135,6 +145,10 @@ export function TechStatusDashboard() {
           }
         }
 
+        if (onJob && !clock) { status='on_job'; clockInTime=onJob.clock_in; }
+        const onLeave=approvedLeave.some(r=>r.employee_id===tech.id&&(r.full_day||!r.start_time||!r.end_time||nowMinutes>=minutes(r.start_time)&&nowMinutes<minutes(r.end_time)));
+        if(onLeave && !clock && !onJob) status='approved_leave';
+
         // Use GPS breadcrumb if available, otherwise fall back to clock-in location
         let location = null;
         if (gpsLocation) {
@@ -167,17 +181,17 @@ export function TechStatusDashboard() {
             role: tech.role
           },
           current_appointment: onJob?.work_order ? {
-            title: onJob.work_order.title,
+            title: (Array.isArray(onJob.work_order) ? onJob.work_order[0]?.title : (onJob.work_order as {title:string}).title),
             location: '',
             start_time: '',
             end_time: ''
           } : undefined,
-          location: location
+          location: location ?? undefined
         };
       });
 
       // Sort by status (available first, then on_job, etc.)
-      const statusOrder = ['available', 'on_job', 'break', 'unavailable', 'off_duty'];
+      const statusOrder = ['available', 'on_job', 'break', 'unavailable', 'approved_leave', 'off_duty'];
       statusesWithLocation?.sort((a, b) => {
         const aIndex = statusOrder.indexOf(a.status);
         const bIndex = statusOrder.indexOf(b.status);
@@ -192,23 +206,6 @@ export function TechStatusDashboard() {
     }
   }
 
-  async function updateTechStatus(techId: string, newStatus: string, notes?: string) {
-    try {
-      const { error } = await supabase
-        .from('technician_status')
-        .upsert({
-          technician_id: techId,
-          status: newStatus,
-          notes: notes || null,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-      loadTechStatuses();
-    } catch (error) {
-      console.error('Error updating tech status:', error);
-    }
-  }
 
   function getStatusIcon(status: string) {
     switch (status) {
@@ -220,6 +217,8 @@ export function TechStatusDashboard() {
         return <Coffee className="w-5 h-5 text-yellow-600" />;
       case 'unavailable':
         return <XCircle className="w-5 h-5 text-red-600" />;
+      case 'approved_leave':
+        return <Calendar className="w-5 h-5 text-blue-600" />;
       case 'off_duty':
         return <AlertCircle className="w-5 h-5 text-gray-600" />;
       default:
@@ -237,6 +236,8 @@ export function TechStatusDashboard() {
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'unavailable':
         return 'bg-red-100 text-red-800 border-red-300';
+      case 'approved_leave':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'off_duty':
         return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
@@ -264,6 +265,7 @@ export function TechStatusDashboard() {
     on_job: techStatuses.filter(t => t.status === 'on_job').length,
     break: techStatuses.filter(t => t.status === 'break').length,
     unavailable: techStatuses.filter(t => t.status === 'unavailable').length,
+    approved_leave: techStatuses.filter(t => t.status === 'approved_leave').length,
     off_duty: techStatuses.filter(t => t.status === 'off_duty').length
   };
 
@@ -285,6 +287,8 @@ export function TechStatusDashboard() {
         </p>
       </div>
 
+      <p className="text-sm text-muted">Scheduled workdays and future leave are shown in Dispatch Schedule. This view shows current activity.</p>
+      <button type="button" onClick={()=>setFilter('approved_leave')} className="min-h-11 rounded-lg px-4 bg-blue-100 text-blue-900">On Approved Leave ({statusCounts.approved_leave})</button>
       {/* Status Filter */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         <button
@@ -345,7 +349,7 @@ export function TechStatusDashboard() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
-          Off Duty ({statusCounts.off_duty})
+          Not Clocked In ({statusCounts.off_duty})
         </button>
       </div>
 
@@ -369,7 +373,7 @@ export function TechStatusDashboard() {
             <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${
               getStatusColor(tech.status)
             }`}>
-              {tech.status.replace('_', ' ').toUpperCase()}
+              {tech.status === 'off_duty' ? 'NOT CLOCKED IN' : tech.status.replace(/_/g, ' ').toUpperCase()}
             </div>
 
             {tech.clock_in_time && tech.status !== 'off_duty' && (

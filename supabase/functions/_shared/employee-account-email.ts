@@ -50,10 +50,15 @@ export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset'
     if (kind === 'welcome') redirect.searchParams.set('account_setup', 'welcome');
     const { data: link, error: linkError } = await db.auth.admin.generateLink({ type: 'recovery', email: target.email, options: { redirectTo: redirect.toString() } });
     if (linkError) throw linkError;
-    if (!link.properties?.action_link) throw new Error('Could not generate a password setup link.');
+    if (!link.properties?.action_link || !link.properties.hashed_token) throw new Error('Could not generate a password setup link.');
     // Auth falls back to Site URL for redirects missing from its allowlist.
     const actualRedirect = new URL(link.properties.action_link).searchParams.get('redirect_to');
     if (!actualRedirect || new URL(actualRedirect).origin !== login.origin || (kind === 'welcome' && new URL(actualRedirect).searchParams.get('account_setup') !== 'welcome')) throw new Error('Add the application URL and welcome URL to Supabase Auth redirect URLs.');
+    // The app verifies this recovery token on password submission. No GET to
+    // Auth's verification endpoint, PKCE verifier, or email-scanner consumption.
+    const accountLink = new URL('/', login.origin);
+    accountLink.searchParams.set('account_setup', kind === 'welcome' ? 'welcome' : 'reset');
+    accountLink.hash = new URLSearchParams({ account_token_hash: link.properties.hashed_token }).toString();
     const company = settings.company_name || 'Your company';
     const welcomeSupport = settings.welcome_support_email || settings.company_email || settings.reply_to_email || from;
     const supportEmail = kind === 'welcome' ? welcomeSupport : (settings.reply_to_email || settings.company_email || from);
@@ -62,7 +67,7 @@ export async function handleAccountEmail(req: Request, kind: 'welcome' | 'reset'
     const { html, text } = renderAccountEmail({
       kind, companyName: company, companyLogoUrl: settings.company_logo_url,
       fullName: target.full_name, email: target.email,
-      actionUrl: link.properties.action_link, loginUrl: login.origin,
+      actionUrl: accountLink.toString(), loginUrl: login.origin,
       supportEmail,
       mjvLogoUrl,
     });

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, FileText, CheckCircle, XCircle, Info, DollarSign, Printer, TrendingUp, Package, BarChart3 } from 'lucide-react';
 import { getTaxApplicability, TaxEnvironment, TaxProjectType } from '../../lib/taxCalculations';
@@ -185,7 +186,7 @@ export default function ProposalTaxReport({ proposalId, onClose }: ProposalTaxRe
       setLineItems(itemsWithTax);
     } catch (error: any) {
       console.error('Error loading tax report:', error);
-      alert(`Failed to load tax report: ${error.message || 'Unknown error'}`);
+      notify(`Failed to load tax report: ${error.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }

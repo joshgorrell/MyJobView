@@ -1,4 +1,6 @@
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { WeeklyProposalActivity } from './WeeklyProposalActivity';
+import { proposalActivityPath } from '../../lib/proposalActivityLinks';
+import { Fragment, ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, HelpCircle, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,7 +9,6 @@ import { useFlow } from '../../lib/flow/useFlow';
 import { dayLabel, FLOW_CATEGORIES, FlowEvent, FlowFilters, FlowScope, FlowTarget, scopeFilters, targetScope } from '../../lib/flow/types';
 import { FlowCreateModal } from './FlowCreateModal';
 import { FlowFollowUps } from './FlowFollowUps';
-import { useConversationHeight } from './useConversationHeight';
 import { FlowTargetPicker } from './FlowTargetPicker';
 import { FlowWaveIcon } from './FlowWaveIcon';
 import './flow.css';
@@ -15,7 +16,7 @@ import { CustomerConversations, CustomerConversationsProps } from './CustomerCon
 
 type Option = { id: string; name: string };
 const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
-type FlowView = 'all' | 'activity' | 'messages' | 'followups';
+type FlowView = 'all' | 'activity' | 'messages' | 'followups' | 'tasks';
 type MessageFilter = 'all' | 'customer' | 'coworkers' | 'unread';
 const FLOW_VIEWS: { id: FlowView; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'messages', label: 'Messages' }, {id:'followups',label:'Follow-ups'},
@@ -41,7 +42,7 @@ function eventKind(event: FlowEvent): string {
 }
 const ICONS = { work: Wrench, service: Wrench, sales: FileText, materials: Package, scheduling: Calendar, customer: User, financial: DollarSign, update: MessageSquare, communication: MessageSquare };
 
-export default function Flow({ contactId, projectId, workOrderId, dark = false, createRequested, onCreateOpened, ...conversationProps }: FlowScope & { dark?: boolean } & CustomerConversationsProps) {
+export default function Flow({ contactId, projectId, workOrderId, dark = false, createRequested, onCreateOpened, tasksContent, initialTaskView = false, ...conversationProps }: FlowScope & { dark?: boolean; tasksContent?: ReactNode; initialTaskView?: boolean } & CustomerConversationsProps) {
   const controlId = useId();
   const searchId = `${controlId}-search`;
   const filtersId = `${controlId}-filters`;
@@ -49,13 +50,13 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const { hasModuleAccess } = useDepartments();
   const scoped = !!(contactId || projectId || workOrderId);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
-  const [view, setView] = useState<FlowView>(conversationProps.openThreadId ? 'messages' : 'all');
+  const [view, setView] = useState<FlowView>(initialTaskView || (!hasModuleAccess('feed') && !hasModuleAccess('messages') && !!tasksContent) ? 'tasks' : conversationProps.openThreadId ? 'messages' : 'all');
   const [messageFilter, setMessageFilter] = useState<MessageFilter>('all');
   const [threadId, setThreadId] = useState<string | null>(null);
   const canMessageCustomers = hasModuleAccess('messages');
   useEffect(() => {
-    if (conversationProps.openThreadId) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
-  }, [conversationProps.openThreadId]);
+    if (!initialTaskView && conversationProps.openThreadId) { setView('messages'); setMessageFilter('customer'); setThreadId(null); }
+  }, [conversationProps.openThreadId, initialTaskView]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(false);
@@ -80,7 +81,6 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [locations, setLocations] = useState<Option[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [createMode,setCreateMode]=useState<'choose'|'chat'|null>(null);
-  const workspace=useConversationHeight(!scoped);
   const [marking, setMarking] = useState(false);
   const scope = useMemo(() => ({ contactId, projectId, workOrderId }), [contactId, projectId, workOrderId]);
   const chosenScope = target ? { ...scope, ...targetScope(target) } : scope;
@@ -100,7 +100,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
   useEffect(() => {
     if (createRequested && canPost) {
-      setCreateMode('chat');
+      setCreateMode('choose');
       onCreateOpened?.();
     }
   }, [createRequested, canPost, onCreateOpened]);
@@ -144,17 +144,21 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     if (event.contact_id && hasModuleAccess('contacts')) result.push({ label: 'Open customer', url: `?tab=contacts&contactId=${event.contact_id}` });
     if (event.project_id && hasModuleAccess('projects')) result.push({ label: 'Open project', url: `?tab=projects&projectId=${event.project_id}` });
     if (event.work_order_id && hasModuleAccess('work_orders')) result.push({ label: 'Open work order', url: `?tab=work_orders&workOrderId=${event.work_order_id}` });
-    if (event.source_table === 'proposals' && hasModuleAccess('proposals')) result.push({ label: 'Open proposal', url: `?tab=proposals&proposalId=${event.source_id}` });
+    if (event.source_table === 'proposals' && hasModuleAccess('proposals')) result.push(event.event_type === 'proposal_first_opened'
+      ? { label: 'View Activity', url: proposalActivityPath(event.source_id) }
+      : { label: 'Open proposal', url: `?tab=proposals&proposalId=${event.source_id}` });
     if (event.source_table === 'change_orders' && hasModuleAccess('change_orders')) result.push({ label: 'Open change order', url: `?tab=change_orders&coId=${event.source_id}` });
     return result;
   }
   async function markShown() {
     setMarking(true); await flow.markViewed(visibleEvents.filter(e => !e.viewed).map(e => e.id)); setMarking(false);
   }
+  const baseViews = scoped || hasModuleAccess('feed') || hasModuleAccess('messages') ? FLOW_VIEWS : [];
+  const views = tasksContent && !scoped && hasModuleAccess('tasks') ? [...baseViews, { id: 'tasks' as FlowView, label: 'Tasks' }] : baseViews;
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
-  return <div ref={workspace.ref} className={scoped?'flow-embedded':'flow-workspace'} style={scoped?undefined:{height:workspace.height}}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
+  return <div className={scoped?'flow-embedded':'flow-workspace'}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
       {canPost && <div className="flow-heading-actions">
         <button className="flow-primary flow-create-action" aria-label="Create in Flow" title="Create in Flow" aria-haspopup="dialog" aria-expanded={createMode!==null} aria-controls={`${controlId}-create-options`}
@@ -163,9 +167,9 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     </header>
     {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
     <div className="flow-toolbar">
-      <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{FLOW_VIEWS.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
-      <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => setView(e.target.value as FlowView)}>{FLOW_VIEWS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-      {view !== 'messages' && view !== 'followups' && <>
+      <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
+      <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => setView(e.target.value as FlowView)}>{views.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+      {view !== 'tasks' && view !== 'messages' && view !== 'followups' && <>
       <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
       <button className={`flow-unread ${newOnly ? 'flow-selected' : ''}`} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" /><span className="flow-desktop-label">New only</span><span className="flow-mobile-label">New</span></button>
@@ -177,9 +181,10 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     </div>
 
     <div className="flow-content">
+    {view === 'tasks' && hasModuleAccess('tasks') && tasksContent}
     {view==='followups'&&<FlowFollowUps scope={chosenScope} onChanged={()=>void flow.refresh()}/>}
     {view === 'messages' && <div className="flow-message-filters" role="group" aria-label="Message filters">{MESSAGE_FILTERS.map(item => <button key={item.id} aria-pressed={messageFilter === item.id} className={messageFilter === item.id ? 'flow-selected' : ''} onClick={() => { setMessageFilter(item.id); setThreadId(null); }}>{item.label}</button>)}</div>}
-    {view !== 'messages' && view !== 'followups' && showFilters && <div className="flow-filters" id={filtersId}>
+    {view !== 'tasks' && view !== 'messages' && view !== 'followups' && showFilters && <div className="flow-filters" id={filtersId}>
       <label>Content type<select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">All content types</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <div className="flow-filter-quick-controls">
         <button className={todayOnly ? 'flow-selected' : ''} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
@@ -194,14 +199,14 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       {!projectId && !workOrderId && <button onClick={() => setPickingTarget(!pickingTarget)} aria-expanded={pickingTarget}>Choose customer / job</button>}
       {pickingTarget && <div className="flow-picker-slot"><FlowTargetPicker contactId={contactId} onSelect={t => { setTarget(t); setPickingTarget(false); }} /></div>}
     </div>}
-    {!!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
-    {view === 'messages' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
-    {canMessageCustomers && (view === 'messages' && messageFilter !== 'coworkers') && <div className="flow-customer-inbox">
-      {threadId && view !== 'messages' && view !== 'followups' && <button onClick={() => setThreadId(null)}>Close conversation</button>}
-      <CustomerConversations unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
+    {view !== 'tasks' && !!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
+    {view === 'messages' && messageFilter === 'customer' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
+    {view === 'messages' && messageFilter === 'coworkers' && !hasModuleAccess('feed') && <p>You do not have coworker messaging access.</p>}
+    {(view === 'messages' && (canMessageCustomers || hasModuleAccess('feed'))) && <div className="flow-customer-inbox">
+      <CustomerConversations conversationType={messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'} includeCustomers={canMessageCustomers} includeCoworkers={hasModuleAccess('feed')} unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
         onThreadSelected={id => { setThreadId(id); conversationProps.onThreadSelected?.(id); }} />
     </div>}
-    {(view !== 'followups' && (view !== 'messages' || messageFilter !== 'customer')) && <>
+    {(view !== 'tasks' && view !== 'followups' && view !== 'messages') && <>
     {flow.error && <div className="flow-error" role="alert">{flow.error} <button onClick={() => void flow.refresh()}>Retry</button></div>}
     {flow.pending > 0 && <button className="flow-new-banner" onClick={() => void flow.refresh()}>{flow.pending === 50 ? '50+' : flow.pending} new {flow.pending === 1 ? 'activity' : 'activities'} — show updates</button>}
     <div className="flow-list-meta"><span>{visibleEvents.length} shown · {newShown} new</span><div className="flow-meta-actions"><button aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={14} /><span className="flow-desktop-label">{marking ? 'Saving…' : 'Mark shown viewed'}</span><span className="flow-mobile-label">{marking ? 'Saving…' : 'Viewed'}</span></button><button className="flow-help-toggle" aria-label="About Flow unread indicators" aria-expanded={showHelp} onClick={() => setShowHelp(!showHelp)}><HelpCircle size={15} /></button></div></div>
@@ -225,7 +230,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
               {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           </div>
-          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{eventKind(event)} · {event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small><div className="flow-links">{event.thread_id && canMessageCustomers && <button onClick={() => { setThreadId(event.thread_id!); setView('messages'); setMessageFilter('customer'); }}>Read full conversation</button>}{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
+          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{eventKind(event)} · {event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small>{event.event_type === 'proposal_activity_weekly' && <WeeklyProposalActivity reportId={event.source_id} />}<div className="flow-links">{event.thread_id && canMessageCustomers && <button onClick={() => { setThreadId(event.thread_id!); setView('messages'); setMessageFilter('customer'); }}>Read full conversation</button>}{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
         </Fragment>;
       })}
     </div>

@@ -1,9 +1,11 @@
+import { notify } from '../../lib/feedback';
+import ProductAccessories from './ProductAccessories';
 import { normalizeBrandName } from './catalogGrouping';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
+import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Category {
@@ -46,12 +48,14 @@ interface ProductFormProps {
   readOnly?: boolean;
   onClose: () => void;
   onSave: (productData?: any) => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 
 }
 
 interface SuggestedPhoto { url: string; description: string }
 
-export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave }: ProductFormProps) {
+export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
   const { profile } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -374,16 +378,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   };
 
   // Format currency for display
-  const formatCurrency = (value: number): string => {
-    if (!value) return '';
-    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   // Parse currency input
-  const parseCurrency = (value: string): number => {
-    const cleaned = value.replace(/[^0-9.]/g, '');
-    return parseFloat(cleaned) || 0;
-  };
+
 
   // Calculate labor cost when hours change
   useEffect(() => {
@@ -767,7 +765,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding manufacturer:', error);
-      alert(`Failed to add manufacturer: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add manufacturer: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -796,7 +794,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding vendor:', error);
-      alert(`Failed to add vendor: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add vendor: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -824,13 +822,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding color:', error);
-      alert(`Failed to add color: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add color: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
   function handleImageSearch() {
     if (!formData.manufacturer_id || !formData.manufacturer_model_number) {
-      alert('Please select a manufacturer and enter a model number first');
+      notify('Please select a manufacturer and enter a model number first', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -863,7 +861,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       setFormData(prev => ({ ...prev, image_url: publicUrl }));
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      notify('Failed to upload image', { theme: 'amber', tone: 'error' });
     } finally {
       setUploadingImage(false);
     }
@@ -941,9 +939,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     try {
       // Get category name from category_id
       const selectedCategory = categories.find(c => c.id === formData.category_id);
-      const selectedManufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
-      const selectedVendor = vendors.find(v => v.id === formData.default_vendor_id);
-      const selectedLaborPhase = laborPhases.find(lp => lp.id === formData.labor_phase_id);
+
 
       const productData = {
         is_discontinued: formData.is_discontinued,
@@ -1108,7 +1104,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     } catch (error: any) {
       console.error('Error saving product:', error);
       const errorMessage = error?.message || error?.error_description || 'Unknown error';
-      alert(`Failed to save product: ${errorMessage}`);
+      notify(`Failed to save product: ${errorMessage}`, { theme: 'amber', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1276,6 +1272,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               )}
             </div>
           </div>
+          {!readOnly && productId && <div className="flex gap-2 text-xs">{onDuplicate && <button type="button" onClick={onDuplicate} className="rounded border px-3 py-2">Duplicate</button>}{onDelete && <button type="button" onClick={onDelete} className="rounded border px-3 py-2 text-red-700">Delete</button>}</div>}
           <button onClick={handleClose} aria-label="Close product form" className="p-3 shrink-0 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5" />
           </button>
@@ -1287,7 +1284,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             <div className="lg:col-span-2 flex items-center gap-2 text-gray-500">
               <Save className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
               <p className="text-xs text-gray-500">
-                Auto-saves as you type. Safe to navigate away.
+                Product draft saves as you type. Use Save accessory for accessory changes.
               </p>
             </div>
           )}
@@ -1885,7 +1882,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           {/* INVENTORY & LABOR */}
           <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
-            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Inventory & Labor</h3>
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Inventory</h3>
 
             {/* Inventory Type and Item Type */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1976,6 +1973,9 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               )}
             </div>
 
+          </div>
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Labor</h3>
             {/* Labor Phase */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2064,7 +2064,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* Default Install Instructions */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Default Install Instructions
+                Install Instructions
               </label>
               <input
                 type="text"
@@ -2078,6 +2078,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               />
             </div>
 
+            <p className="text-xs text-gray-500">Install instructions are a general note. Default Tasks are separate work items created for this product on the project.</p>
             {/* Default Tasks */}
             <DefaultTasksSection
               productId={productId}
@@ -2188,7 +2189,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           {/* Accessories Section */}
           {productId && (
-            <AccessoriesSection productId={productId} />
+            <ProductAccessories productId={productId} readOnly={readOnly} parentQuantity={Number(formData.default_qty || 1)} baseMaterial={Number(formData.our_price || 0) * Number(formData.default_qty || 1)} baseLabor={Number(formData.default_labor_hours || 0) * Number(formData.default_qty || 1) * Number(laborPhases.find(phase => phase.id === formData.labor_phase_id)?.default_price || laborRate)} />
           )}
           {!readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">Product status</h3>
@@ -2246,270 +2247,6 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   );
 }
 
-function AccessoriesSection({ productId }: { productId: string }) {
-  const [accessories, setAccessories] = useState<any[]>([]);
-  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [usedInPackages, setUsedInPackages] = useState<any[]>([]);
-  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
-
-  const isOnline = navigator.onLine;
-
-  useEffect(() => {
-    loadAccessories();
-    loadAvailableProducts();
-    loadPackages();
-  }, [productId]);
-
-  async function loadAccessories() {
-    try {
-      const { data, error } = await supabase
-        .from('product_accessories')
-        .select(`
-          id,
-          is_default_selected,
-          sort_order,
-          accessory:products!product_accessories_accessory_product_id_fkey (
-            id,
-            manufacturer_model_number,
-            our_price,
-            sku
-          )
-        `)
-        .eq('parent_product_id', productId)
-        .order('sort_order');
-
-      if (error) throw error;
-      setAccessories(data || []);
-    } catch (error) {
-      console.error('Error loading accessories:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadAvailableProducts() {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, manufacturer_model_number, our_price, sku')
-        .eq('is_active', true)
-        .neq('id', productId)
-        .order('manufacturer_model_number');
-
-      if (error) throw error;
-      setAvailableProducts(data || []);
-    } catch (error) {
-      console.error('Error loading products:', error);
-    }
-  }
-
-  async function loadPackages() {
-    try {
-      const { data, error } = await supabase
-        .from('product_package_items')
-        .select(`
-          package:product_packages (
-            id,
-            package_name
-          )
-        `)
-        .eq('product_id', productId);
-
-      if (error) throw error;
-      setUsedInPackages(data?.map((item: any) => item.package).filter(Boolean) || []);
-    } catch (error) {
-      console.error('Error loading packages:', error);
-    }
-  }
-
-  async function addAccessory(accessoryProductId: string) {
-    try {
-      const existing = accessories.find(acc => acc.accessory.id === accessoryProductId);
-      if (existing) {
-        alert('This product is already added as an accessory');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('product_accessories')
-        .insert({
-          parent_product_id: productId,
-          accessory_product_id: accessoryProductId,
-          is_default_selected: false,
-          sort_order: accessories.length
-        });
-
-      if (error) throw error;
-
-      loadAccessories();
-      setShowSearch(false);
-      setSearchTerm('');
-    } catch (error) {
-      console.error('Error adding accessory:', error);
-      alert('Failed to add accessory');
-    }
-  }
-
-  async function removeAccessory(accessoryId: string) {
-    try {
-      const { error } = await supabase
-        .from('product_accessories')
-        .delete()
-        .eq('id', accessoryId);
-
-      if (error) throw error;
-      loadAccessories();
-    } catch (error) {
-      console.error('Error removing accessory:', error);
-      alert('Failed to remove accessory');
-    }
-  }
-
-  async function toggleDefaultSelected(accessoryId: string, currentValue: boolean) {
-    try {
-      const { error } = await supabase
-        .from('product_accessories')
-        .update({ is_default_selected: !currentValue })
-        .eq('id', accessoryId);
-
-      if (error) throw error;
-      loadAccessories();
-    } catch (error) {
-      console.error('Error updating accessory:', error);
-      alert('Failed to update accessory');
-    }
-  }
-
-  const filteredProducts = searchTerm
-    ? availableProducts.filter(p =>
-        p.manufacturer_model_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : availableProducts;
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Accessories & Packages</h3>
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Accessories for this product
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowSearch(!showSearch)}
-            disabled={!isOnline}
-            className="px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs sm:text-sm flex items-center gap-1 disabled:bg-gray-600 disabled:cursor-not-allowed touch-manipulation"
-            title={!isOnline ? 'Available when online' : 'Add accessory'}
-          >
-            <Plus size={12} className="sm:w-3.5 sm:h-3.5" />
-            <span className="hidden xs:inline">Add Accessory</span>
-          </button>
-        </div>
-
-        {showSearch && (
-          <div className="mb-3 p-3 bg-gray-50 border border-gray-300 rounded-lg">
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search products..."
-                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded text-sm"
-              />
-            </div>
-            <div className="max-h-48 overflow-y-auto space-y-1">
-              {filteredProducts.slice(0, 10).map(product => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => addAccessory(product.id)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
-                >
-                  <div className="font-medium text-gray-900">{product.manufacturer_model_number}</div>
-                  <div className="text-xs text-gray-500">
-                    ${Number(product.our_price).toFixed(2)} • {product.sku}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <p className="text-sm text-gray-500 text-center py-4">Loading...</p>
-        ) : accessories.length === 0 ? (
-          <p className="text-xs sm:text-sm text-gray-500 text-center py-3 sm:py-4">
-            No accessories added yet. Accessories are optional add-on products that customers can select.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {accessories.map(acc => (
-              <div key={acc.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 border border-gray-300 rounded-lg">
-                <input
-                  type="checkbox"
-                  checked={acc.is_default_selected}
-                  onChange={() => toggleDefaultSelected(acc.id, acc.is_default_selected)}
-                  disabled={!isOnline}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-600 disabled:bg-gray-200 disabled:cursor-not-allowed flex-shrink-0"
-                  title={!isOnline ? 'Available when online' : acc.is_default_selected ? 'Default selected' : 'Optional'}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                    {acc.accessory.manufacturer_model_number}
-                  </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    ${Number(acc.accessory.our_price).toFixed(2)} •{' '}
-                    {acc.is_default_selected ? 'Auto-selected by default' : 'Optional accessory'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setConfirmModal({ title: 'Remove Accessory', message: 'Remove this accessory?', onConfirm: () => removeAccessory(acc.id) })}
-                  disabled={!isOnline}
-                  className="text-red-600 hover:text-red-700 p-1 disabled:text-gray-400 disabled:cursor-not-allowed touch-manipulation flex-shrink-0"
-                  title={!isOnline ? 'Available when online' : 'Remove'}
-                >
-                  <X size={14} className="sm:w-4 sm:h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {usedInPackages.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Used in packages
-          </label>
-          <div className="text-sm text-gray-600 space-y-1">
-            {usedInPackages.map(pkg => (
-              <div key={pkg.id} className="flex items-center gap-2">
-                <Package size={14} className="text-gray-400" />
-                <span>{pkg.package_name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <ConfirmModal
-        isOpen={confirmModal !== null}
-        title={confirmModal?.title ?? ''}
-        message={confirmModal?.message ?? ''}
-        onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
-        onCancel={() => setConfirmModal(null)}
-      />
-    </div>
-  );
-}
-
 interface DefaultTasksSectionProps {
   productId?: string;
   readOnly: boolean;
@@ -2520,13 +2257,7 @@ interface DefaultTasksSectionProps {
     labor_phase_id: string | null;
     sort_order: number;
   }>;
-  setDefaultTasks: (tasks: Array<{
-    id: string | null;
-    title: string;
-    description: string;
-    labor_phase_id: string | null;
-    sort_order: number;
-  }>) => void;
+  setDefaultTasks: React.Dispatch<React.SetStateAction<DefaultTasksSectionProps['defaultTasks']>>;
   laborPhases: LaborPhase[];
   showAddDefaultTask: boolean;
   setShowAddDefaultTask: (v: boolean) => void;
@@ -2539,7 +2270,7 @@ interface DefaultTasksSectionProps {
 }
 
 function DefaultTasksSection({
-  productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
+  productId: _productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
   showAddDefaultTask, setShowAddDefaultTask,
   newDefaultTaskTitle, setNewDefaultTaskTitle,
   newDefaultTaskDesc, setNewDefaultTaskDesc,

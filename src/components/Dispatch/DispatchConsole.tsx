@@ -1,3 +1,5 @@
+import { DispatchCustomerComms } from './DispatchCustomerComms';
+import { WorkOrdersAttention, WorkOrdersAttentionBanner } from './WorkOrdersAttention';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import {
   LayoutDashboard,
@@ -7,9 +9,8 @@ import {
   CheckSquare,
   Award,
   BarChart3,
-  Briefcase,
-  TrendingUp,
   CalendarDays,
+  AlertTriangle,
 } from 'lucide-react';
 
 const DispatchDashboard = lazy(() => import('./DispatchDashboard').then(m => ({ default: m.DispatchDashboard })));
@@ -21,7 +22,7 @@ const TechSkillsFilter = lazy(() => import('./TechSkillsFilter').then(m => ({ de
 const TechStats = lazy(() => import('../Production/TechStats').then(m => ({ default: m.TechStats })));
 const ResourceDayView = lazy(() => import('./ResourceDayView').then(m => ({ default: m.ResourceDayView })));
 
-type TabKey = 'overview' | 'schedule' | 'map' | 'tech_status' | 'job_status' | 'job_acceptance' | 'tech_skills' | 'tech_stats';
+type TabKey = 'communications' | 'attention' | 'overview' | 'schedule' | 'map' | 'tech_status' | 'job_status' | 'job_acceptance' | 'tech_skills' | 'tech_stats';
 
 interface TabDef {
   key: TabKey;
@@ -30,7 +31,9 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  { key: 'communications', label: 'Customer Communications', icon: Users },
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'attention', label: 'Needs attention', icon: AlertTriangle },
   { key: 'schedule', label: 'Schedule', icon: CalendarDays },
   { key: 'map', label: 'Live Map', icon: MapPin },
   { key: 'tech_status', label: 'Tech Status', icon: Users },
@@ -57,11 +60,12 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab || 'overview');
 
   useEffect(() => {
+    if (initialTab) { setActiveTab(initialTab); return; }
     const stored = localStorage.getItem('dispatch_console_tab') as TabKey | null;
-    if (stored && TABS.some(t => t.key === stored)) {
+    if (!initialTab && stored && TABS.some(t => t.key === stored)) {
       setActiveTab(stored);
     }
-  }, []);
+  }, [initialTab]);
 
   useEffect(() => {
     localStorage.setItem('dispatch_console_tab', activeTab);
@@ -93,7 +97,9 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
 
       {/* Tab Content */}
       <Suspense fallback={<TabFallback />}>
-        {activeTab === 'overview' && <DispatchDashboard onNavigate={onNavigate} />}
+        {activeTab === 'communications' && <DispatchCustomerComms />}
+        {activeTab === 'overview' && <><WorkOrdersAttentionBanner onOpen={() => setActiveTab('attention')} /><DispatchDashboard onNavigate={onNavigate} /></>}
+        {activeTab === 'attention' && <WorkOrdersAttention />}
         {activeTab === 'schedule' && <ResourceDayView onNavigate={onNavigate} />}
         {activeTab === 'map' && <TechMap />}
         {activeTab === 'tech_status' && <TechStatusDashboard />}

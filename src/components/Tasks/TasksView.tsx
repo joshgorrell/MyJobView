@@ -1,9 +1,9 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus, Filter, MessageSquare, ChevronDown, ChevronUp, HelpCircle, X, Search } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus, Filter, MessageSquare, ChevronUp, HelpCircle, X, Search } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { Task, Lead } from '../../lib/types';
-import { formatDistanceToNow } from '../../lib/utils';
 import { TaskForm } from './TaskForm';
 import { TaskComments } from './TaskComments';
 import { TaskWatchers } from './TaskWatchers';
@@ -19,7 +19,7 @@ interface TasksViewProps {
 export function TasksView({ initialShowForm = false, onFormClose, openTaskId, onTaskOpened }: TasksViewProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [leads, setLeads] = useState<Record<string, Lead>>({});
+  const [leads, setLeads] = useState<Record<string, Pick<Lead, 'id' | 'company_name' | 'contact_name'>>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
@@ -231,7 +231,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           .select('id, company_name, contact_name')
           .in('id', leadIds);
 
-        const leadsMap: Record<string, Lead> = {};
+        const leadsMap: Record<string, Pick<Lead, 'id' | 'company_name' | 'contact_name'>> = {};
         leadsData?.forEach((lead) => { leadsMap[lead.id] = lead; });
         setLeads(leadsMap);
       }
@@ -318,7 +318,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task status');
+      notify('Failed to update task status', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -394,17 +394,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
     return true;
   });
 
-  const completedTasks = filteredTasks.filter(t => t.status === 'completed' && t.completed_at);
-  const avgCompletionTime = completedTasks.length > 0
-    ? completedTasks.reduce((sum, task) => {
-        const diffMs = new Date(task.completed_at!).getTime() - new Date(task.created_at).getTime();
-        return sum + diffMs;
-      }, 0) / completedTasks.length
-    : 0;
 
-  const avgDays = Math.floor(avgCompletionTime / (1000 * 60 * 60 * 24));
-  const avgHours = Math.floor((avgCompletionTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const avgMinutes = Math.floor((avgCompletionTime % (1000 * 60 * 60)) / (1000 * 60));
 
   if (authLoading || loading) {
     return (
@@ -631,7 +621,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         </button>
                         {canEdit && (
                           <button
-                            onClick={() => { setEditingTask(task); setSelectedLeadId(task.lead_id); setShowForm(true); }}
+                            onClick={() => { setEditingTask(task); setSelectedLeadId(task.lead_id ?? ''); setShowForm(true); }}
                             className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="Edit"
                           >

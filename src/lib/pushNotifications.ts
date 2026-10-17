@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
     .replace(/\-/g, '+')
@@ -14,7 +14,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   for (let i = 0; i < rawData.length; ++i) {
     outputArray[i] = rawData.charCodeAt(i);
   }
-  return outputArray;
+  return outputArray.buffer as ArrayBuffer;
 }
 
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
@@ -27,6 +27,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 export async function subscribeToPushNotifications(userId: string): Promise<boolean> {
+  let createdSubscription: PushSubscription | null = null;
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.error('Push notifications are not supported');
@@ -39,7 +40,8 @@ export async function subscribeToPushNotifications(userId: string): Promise<bool
       return false;
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration?.active) return false;
 
     let subscription = await registration.pushManager.getSubscription();
 
@@ -51,11 +53,12 @@ export async function subscribeToPushNotifications(userId: string): Promise<bool
 
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY),
       });
+      createdSubscription = subscription;
     }
 
-    await supabase
+    const { error } = await supabase
       .from('push_subscriptions')
       .upsert({
         user_id: userId,
@@ -64,9 +67,13 @@ export async function subscribeToPushNotifications(userId: string): Promise<bool
       }, {
         onConflict: 'user_id,endpoint',
       });
+    if (error) throw error;
 
     return true;
   } catch (error) {
+    // A failed persistence step must not leave a newly-created browser
+    // subscription looking enabled when the server cannot deliver to it.
+    if (createdSubscription) await createdSubscription.unsubscribe().catch(() => false);
     console.error('Error subscribing to push notifications:', error);
     return false;
   }
@@ -78,7 +85,8 @@ export async function unsubscribeFromPushNotifications(userId: string): Promise<
       return false;
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration?.active) return false;
     const subscription = await registration.pushManager.getSubscription();
 
     if (subscription) {
@@ -104,7 +112,8 @@ export async function checkPushSubscription(): Promise<boolean> {
       return false;
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration?.active) return false;
     const subscription = await registration.pushManager.getSubscription();
 
     return subscription !== null;

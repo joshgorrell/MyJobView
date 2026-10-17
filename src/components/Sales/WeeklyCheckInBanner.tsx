@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   CheckCircle,
-  AlertCircle,
   ChevronDown,
   ChevronUp,
   Clock,
-  DollarSign,
   FileText,
   ListChecks,
   X,
@@ -117,10 +115,6 @@ function ProposalCheckInCard({ proposal, onSaved, onNavigate }: ProposalCardProp
     }
   }
 
-  async function handleFreeTextSave() {
-    if (!savedStatus) return;
-    await handleStatusClick(savedStatus);
-  }
 
   if (dismissed) return null;
 

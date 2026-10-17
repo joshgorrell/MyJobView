@@ -4,7 +4,7 @@ interface VIPFeatureTeasersProps {
   showAllModules?: boolean;
 }
 
-export function VIPFeatureTeasers({ showAllModules = true }: VIPFeatureTeasersProps) {
+export function VIPFeatureTeasers({ showAllModules: _showAllModules = true }: VIPFeatureTeasersProps) {
 
   const features = [
     {
@@ -96,7 +96,7 @@ export function VIPFeatureTeasers({ showAllModules = true }: VIPFeatureTeasersPr
       demoContent: (
         <div className="bg-white rounded-lg shadow-sm p-3">
           <div className="grid grid-cols-7 gap-1 mb-2">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((_day, i) => (
               <div key={i} className="text-center h-6 bg-gray-100 rounded flex items-center justify-center">
                 <div className="h-2 w-2 bg-gray-300 rounded" />
               </div>

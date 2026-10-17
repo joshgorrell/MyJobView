@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Building2, ChevronRight, DollarSign, Columns3, AlertCircle, RotateCw } from 'lucide-react';
+import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Building2, ChevronRight, Columns3, AlertCircle, RotateCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Contact, ContactTag, Profile, CompanyOffice } from '../../lib/types';
+import { Contact } from '../../lib/types';
 import { ContactForm } from './ContactForm';
 import { ContactDetail } from './ContactDetail';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,7 +74,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
   const [temperatureFilter, setTemperatureFilter] = useState<'all' | 'on_fire' | 'hot' | 'warm' | 'cold'>('all');
   const [temperatureCounts, setTemperatureCounts] = useState({ on_fire: 0, hot: 0, warm: 0, cold: 0 });
   const [showContactTypesHelp, setShowContactTypesHelp] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
+  const [_totalCount, setTotalCount] = useState(0);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
@@ -166,7 +166,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
       setContacts(data?.contacts ?? []);
       setTotalCount(data?.total ?? 0);
 
-      void countsPromise.then(({ data: counts, error }) => {
+      void Promise.resolve(countsPromise).then(({ data: counts, error }) => {
         if (error || requestId !== currentRequestId.current || !counts) return;
         const typedCounts = counts as Record<string, number>;
         setTypeCounts({
@@ -656,7 +656,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact)}>
+                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact) ?? undefined}>
                                 {getDisplayName(contact)}
                               </span>
                               {contact.company_name && (
@@ -685,7 +685,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                               )}
                             </div>
                             {contact.business_card_photo && (
-                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" title="Business card scanned" />
+                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0"><title>{"Business card scanned"}</title></Camera>
                             )}
                           </div>
                         </td>
@@ -776,7 +776,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact)}>
+                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact) ?? undefined}>
                                 {getDisplayName(contact)}
                               </span>
                               {contact.portal_access_enabled && (
@@ -787,7 +787,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                               )}
                             </div>
                             {contact.business_card_photo && (
-                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" title="Business card scanned" />
+                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0"><title>{"Business card scanned"}</title></Camera>
                             )}
                           </div>
                         </td>

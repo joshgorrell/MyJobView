@@ -1,4 +1,3 @@
-import React from 'react';
 import { Plus } from 'lucide-react';
 
 interface ProposalsListProps {
@@ -6,7 +5,7 @@ interface ProposalsListProps {
   onCreateNew: () => void;
 }
 
-export default function ProposalsListSimple({ onSelectProposal, onCreateNew }: ProposalsListProps) {
+export default function ProposalsListSimple({ onSelectProposal: _onSelectProposal, onCreateNew }: ProposalsListProps) {
   return (
     <div className="h-full flex flex-col bg-gray-900 p-8">
       <div className="text-center">

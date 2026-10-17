@@ -9,17 +9,18 @@ const directory=await mkdtemp(join(tmpdir(),'service-intake-'));
 const fixture=`import React from 'react';window.calls=[];
 export const useAuth=()=>({profile:{id:'staff',role:'service_manager'}});
 export const AddressAutocomplete=({value,onChange,...props})=><input {...props} value={value} onChange={e=>onChange(e.target.value)}/>;
-export const supabase={from(table){let payload;const q={select:()=>q,in:()=>q,eq:()=>q,order:()=>q,limit:()=>q,or:query=>{window.calls.push(['search',query]);return q;},insert:value=>{payload=value;window.calls.push([table,value]);return q;},single:async()=>({data:{id:'saved'},error:null}),then:resolve=>Promise.resolve({data:table==='contacts'?[{id:'c1',full_name:'John Smith',phone:'5551234567',street_address:'123 Main St',city:'Topeka'}]:table==='profiles'?[{id:'tech',full_name:'JP'}]:table==='projects'?[{id:'project',name:'Project',project_number:'101',job_site_address:{street:'Wrong project address'}}]:[],error:null}).then(result=>table==='projects'?new Promise(done=>setTimeout(()=>done(result),250)):result).then(resolve)};return q;}};`;
-const source=`import React from 'react';import{createRoot}from'react-dom/client';import{ServiceRequestForm}from'./src/components/Service/ServiceRequestForm';createRoot(document.getElementById('root')).render(<ServiceRequestForm onClose={()=>{}} editingRequest={location.search.includes('edit')?{id:'edit',contact_id:'c1',customer_name:'John Smith',job_description:'Existing request',requested_tech_ids:['tech','inactive'],earliest_date:'2026-10-08',requested_date:'2026-10-10'}:undefined}/>);`;
-let browser;
+export const supabase={from(table){let payload;const q={select:()=>q,in:()=>q,eq:()=>q,order:()=>q,limit:()=>q,or:query=>{window.calls.push(['search',query]);return q;},insert:value=>{payload=value;window.calls.push([table,value]);return q;},update:value=>{payload=value;window.calls.push([table,value]);return q;},single:async()=>({data:{id:'saved'},error:null}),then:resolve=>Promise.resolve({data:table==='contacts'?[{id:'c1',full_name:'John Smith',phone:'5551234567',street_address:'123 Main St',city:'Topeka'}]:table==='profiles'?[{id:'tech',full_name:'JP'}]:table==='projects'?[{id:'project',name:'Project',project_number:'101',job_site_address:{street:'Wrong project address'}}]:[],error:null}).then(result=>table==='projects'?new Promise(done=>setTimeout(()=>done(result),250)):result).then(resolve)};return q;}};`;
+const source=`import React from 'react';import{createRoot}from'react-dom/client';import{ServiceRequestForm}from'./src/components/Service/ServiceRequestForm';import{FeedbackHost}from'./src/components/Shared/FeedbackHost';createRoot(document.getElementById('root')).render(<><ServiceRequestForm onClose={()=>{}} editingRequest={location.search.includes('edit')?{id:'edit',contact_id:'c1',customer_name:'John Smith',job_description:'Existing request',requested_tech_ids:['tech','inactive'],earliest_date:'2026-10-08',requested_date:'2026-10-10',requested_time:'10:30'}:undefined} aiPrefill={location.search.includes('prefill')?{contactId:'c1',customerName:'John Smith',jobDescription:'AI service request',requestedDate:'2026-10-20'}:undefined}/><FeedbackHost/></>);`;
+let browser;let openPage;
 const server=createServer(async(req,res)=>{const name=req.url.includes('app.js')?'app.js':req.url.includes('style.css')?'style.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,name)));});
 try{
 await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/lib\/supabase$|contexts\/AuthContext$|Shared\/AddressAutocomplete$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
 const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
 await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><div id="root"></div><script src="app.js"></script>');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));browser=await (process.env.BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.BROWSER_ENGINE==='webkit'?{}:{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})});
+const context=await browser.newContext();openPage=async viewport=>{const page=await context.newPage();await page.setViewportSize(viewport);return page;};
 for(const width of [320,375,390,430,768,1024,1280]){
- const page=await browser.newPage({viewport:{width,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}`);
+ const page=await openPage({width,height:844});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}`);
  await page.getByPlaceholder('Search name, company, phone, or email...').waitFor();
  assert.equal(await page.locator('input[type=date]').count(),0,'ASAP hides dates');
  await page.getByRole('radio',{name:'Specific date',exact:true}).check();
@@ -38,7 +39,7 @@ for(const width of [320,375,390,430,768,1024,1280]){
  if(process.env.INTAKE_SCREENSHOT && width===390) await page.screenshot({path:process.env.INTAKE_SCREENSHOT});
  await send.click();const request=await page.evaluate(()=>window.calls.find(c=>c[0]==='service_requests')?.[1]);assert.equal(request.customer_contact_instruction,'dispatch');assert.equal(request.job_description,'TV has no sound');assert.deepEqual(request.requested_tech_ids,[]);assert.equal(request.earliest_date,null);assert.deepEqual(errors,[]);await page.close();
 }
-const page=await browser.newPage({viewport:{width:390,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}`);
+const page=await openPage({width:390,height:844});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}`);
 await page.getByRole('button',{name:'New Customer',exact:true}).click();
 await page.getByPlaceholder('Customer Name *').fill('New Customer');await page.getByPlaceholder('Phone',{exact:true}).fill('5559876543');
 await page.getByPlaceholder('What needs to be done? *').fill('New alarm request');
@@ -54,15 +55,29 @@ await page.waitForFunction(()=>{const button=[...document.querySelectorAll('butt
 const send=page.getByRole('button',{name:'Send to Service',exact:true});const box=await send.boundingBox();assert.ok(box.y+box.height<=450,'Submit stays visible with reduced keyboard viewport');
 assert.equal(await page.evaluate(()=>document.querySelector('[role=dialog]').scrollWidth>document.querySelector('[role=dialog]').clientWidth),false);
 const alerts=[];page.on('dialog',async dialog=>{alerts.push(dialog.message());await dialog.accept();});
-await page.locator('input[type=date]').nth(1).fill('2026-10-07');await send.click();assert.deepEqual(alerts,['Earliest date must be on or before Need By.']);assert.equal(await page.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').length),0);
+await page.locator('input[type=date]').nth(1).fill('2026-10-07');await send.click();await page.getByText('Earliest date must be on or before Need By.',{exact:true}).waitFor();assert.deepEqual(alerts,[],'Validation uses in-app feedback, not a browser alert');assert.equal(await page.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').length),0);
 await page.locator('input[type=date]').nth(1).fill('2026-10-10');await send.click();const calls=await page.evaluate(()=>window.calls);const request=calls.find(c=>c[0]==='service_requests')[1];
 assert.equal(calls.find(c=>c[0]==='contacts')[1].phone,'5559876543');assert.equal(request.job_location_address,'');assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.earliest_date,'2026-10-08');assert.equal(request.requested_date,'2026-10-10');assert.equal(request.warranty_reference,'Service 101');assert.deepEqual(request.requested_tech_ids,['tech']);assert.equal(request.billable_by,'dispatch');assert.deepEqual(errors,[]);await page.close();
-const edit=await browser.newPage({viewport:{width:390,height:844}});await edit.goto(`http://127.0.0.1:${server.address().port}/?edit`);
+const edit=await openPage({width:390,height:844});await edit.goto(`http://127.0.0.1:${server.address().port}/?edit`);
 assert.equal(await edit.getByRole('radio',{name:'Specific date',exact:true}).isChecked(),true);
 assert.equal(await edit.getByLabel('Earliest date',{exact:true}).inputValue(),'2026-10-08');
 assert.equal(await edit.getByLabel('Preferred technician',{exact:true}).inputValue(),'existing');
+await edit.getByRole('button',{name:'Resubmit for Review',exact:true}).click();
+await edit.waitForFunction(()=>window.calls.filter(c=>c[0]==='service_requests').length===1);
+assert.deepEqual(await edit.evaluate(()=>window.calls.find(c=>c[0]==='service_requests')[1].requested_tech_ids),['tech','inactive'],'Unchanged multi-tech preferences must survive resubmission');
 await edit.getByLabel('Preferred technician',{exact:true}).selectOption('tech');
 assert.equal(await edit.getByLabel('Preferred technician',{exact:true}).inputValue(),'tech');
+await edit.getByRole('radio',{name:'ASAP',exact:true}).check();
+assert.equal(await edit.locator('input[type=date]').count(),0);
+await edit.getByRole('button',{name:'Resubmit for Review',exact:true}).click();
+await edit.waitForFunction(()=>window.calls.filter(c=>c[0]==='service_requests').length===2);
+const edited=await edit.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').at(-1)[1]);
+assert.deepEqual(edited.requested_tech_ids,['tech']);
+assert.equal(edited.earliest_date,null);assert.equal(edited.requested_date,null);assert.equal(edited.requested_time,null,'ASAP must clear a previously saved time');
 await edit.close();
+const prefill=await openPage({width:390,height:844});await prefill.goto(`http://127.0.0.1:${server.address().port}/?prefill`);
+assert.equal(await prefill.getByRole('radio',{name:'Specific date',exact:true}).isChecked(),true);
+assert.equal(await prefill.getByLabel('Need by',{exact:true}).inputValue(),'2026-10-20','AI date prefill must remain visible');
+await prefill.close();
 console.log('320/375/390/430/768/1024/1280px intake, ASAP date reset, new customer, date preferences/warranty, and keyboard viewport submission passed.');
 }finally{await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}

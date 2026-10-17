@@ -33,9 +33,10 @@ for(const width of [375,390,1280]){
  await page.setViewportSize({width,height:800});await page.goto('http://127.0.0.1:'+server.address().port);await page.getByRole('checkbox',{name:'Select Newest Beta item',exact:true}).waitFor();
  assert.deepEqual(await page.getByRole('checkbox').evaluateAll(rows=>rows.map(r=>r.getAttribute('aria-label'))),['Select Newest Beta item','Select Second Alpha item','Select Requested Alpha item','Select Older Alpha item']);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- const heights=await page.getByTestId('punchlist-toolbar').locator('button,input,select').evaluateAll(nodes=>nodes.map(n=>Math.round(n.getBoundingClientRect().top)));assert.equal(new Set(heights).size,1);
+ const bounds=await page.getByTestId('punchlist-toolbar').locator('button,input,select').evaluateAll(nodes=>nodes.filter(n=>n.getBoundingClientRect().width>0).map(n=>n.getBoundingClientRect().right));assert.ok(bounds.every(right=>right<=width));
+ if(width<640)await page.getByRole('button',{name:'Filters',exact:true}).click();
  await page.getByRole('checkbox',{name:'Select Second Alpha item',exact:true}).check();assert.equal(await page.getByRole('checkbox',{name:'Select Newest Beta item',exact:true}).isDisabled(),true);
- await page.getByRole('button',{name:'Select all visible items for this customer',exact:true}).click();assert.equal(await page.getByRole('checkbox').filter({checked:true}).count(),3);
+ await page.getByRole('button',{name:'Select all visible items for this customer',exact:true}).click();assert.equal(await page.locator('input[type=checkbox]:checked').count(),3);
  await page.getByRole('button',{name:'Clear selection',exact:true}).click();assert.equal(await page.getByRole('checkbox',{name:'Select Newest Beta item',exact:true}).isEnabled(),true);
  await page.getByRole('combobox',{name:'Punchlist order',exact:true}).selectOption('customer');assert.equal(await page.getByRole('checkbox').first().getAttribute('aria-label'),'Select Second Alpha item');
  await page.getByRole('textbox',{name:'Search punchlist items',exact:true}).fill('Beta');assert.equal(await page.getByRole('checkbox').count(),1);

@@ -20,7 +20,7 @@ interface Props {
 
 export default function ProductCatalogView(props: Props) {
   const { products, groupBy, revealMatches } = props;
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [closedMatches, setClosedMatches] = useState<Set<string>>(new Set());
   const [previousProducts, setPreviousProducts] = useState(products);
   const [previousReveal, setPreviousReveal] = useState(revealMatches);
@@ -32,9 +32,9 @@ export default function ProductCatalogView(props: Props) {
     setClosedMatches(new Set());
   }
   const groups = groupCatalogProducts(products, groupBy);
-  const isOpen = (key: string) => revealMatches ? !closedMatches.has(key) : expanded.has(key);
+  const isOpen = (key: string) => revealMatches ? !closedMatches.has(key) : !collapsed.has(key);
   const toggle = (key: string) => {
-    const setter = revealMatches ? setClosedMatches : setExpanded;
+    const setter = revealMatches ? setClosedMatches : setCollapsed;
     setter(previous => { const next = new Set(previous); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   };
   const content = (items: CatalogProduct[]) => props.viewMode === 'grid'
@@ -44,8 +44,8 @@ export default function ProductCatalogView(props: Props) {
   if (groupBy === 'none') return content(groups.flatMap(group => group.products));
   return <div className="min-w-0 space-y-2">
     <div className="flex justify-end gap-3 text-xs">
-      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set()) : setExpanded(new Set(groups.map(group => group.key)))}>Expand all</button>
-      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set(groups.map(group => group.key))) : setExpanded(new Set())}>Collapse all</button>
+      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set()) : setCollapsed(new Set())}>Expand all</button>
+      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set(groups.map(group => group.key))) : setCollapsed(new Set(groups.map(group => group.key)))}>Collapse all</button>
     </div>
     {groups.map((group, index) => {
       const open = isOpen(group.key);
@@ -84,16 +84,26 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
   const price = (product: CatalogProduct) => `$${Number(product.our_price ?? product.unit_price ?? 0).toFixed(2)}`;
   return <>
     <div className="sm:hidden divide-y divide-gray-700">
-      {products.map(product => <article key={product.id} className="min-w-0 py-2">
-        <button type="button" onClick={() => onView(product.id)} aria-label={`Open ${product.sku || product.manufacturer_model_number}`} className="flex w-full min-w-0 gap-2 text-left">
-          {image(product)}<div className="min-w-0 flex-1">{identity(product)}
-            <div className="line-clamp-2 break-words text-xs text-gray-300">{product.description || '-'}</div>{category(product)}
+      {products.map(product => <button
+        type="button"
+        key={product.id}
+        onClick={() => onView(product.id)}
+        aria-label={`Open ${product.sku || product.manufacturer_model_number}`}
+        className="flex w-full min-w-0 items-center gap-2 px-1 py-2 text-left hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+      >
+        {image(product)}
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-mono text-sm font-semibold text-white">{product.sku || product.manufacturer_model_number}</div>
+          <div className="truncate text-xs text-gray-300" title={product.description || ''}>{product.description || 'No description'}</div>
+          <div className="flex min-w-0 items-center gap-2 text-xs">
+            <span className="shrink-0 font-semibold text-white">{price(product)}</span>
+            {!hideCost && <span className="truncate text-gray-400">Cost: ${Number(product.cost ?? 0).toFixed(2)}</span>}
+            {product.is_active === false && <span className="text-amber-400">Archived</span>}
+            {product.is_discontinued && <span className="text-amber-400">Discontinued</span>}
           </div>
-        </button>
-        <div className="flex flex-wrap items-center justify-between gap-1 pt-1">
-          <div className="text-sm text-white">{price(product)}{!hideCost && <span className="ml-2 text-xs text-gray-400">Cost: ${Number(product.cost ?? 0).toFixed(2)}</span>}</div>{actions(product)}
         </div>
-      </article>)}
+        <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-gray-400" />
+      </button>)}
     </div>
     <div className="hidden sm:block overflow-x-auto">
       <table className="w-full min-w-[900px] table-fixed text-sm">

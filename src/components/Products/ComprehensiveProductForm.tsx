@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -33,7 +34,7 @@ interface ProductFormProps {
 }
 
 export default function ComprehensiveProductForm({ productId, onClose, onSave }: ProductFormProps) {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'basic' | 'pricing' | 'inventory' | 'descriptions' | 'accessories'>('basic');
   const [saving, setSaving] = useState(false);
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
@@ -150,7 +151,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
   }
 
   async function loadProduct() {
-    const { data, error } = await supabase
+    const { data, error: _error } = await supabase
       .from('products')
       .select('*')
       .eq('id', productId)
@@ -195,7 +196,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
   async function handleAddManufacturer() {
     if (!newManufacturerName.trim()) return;
 
-    const { data, error } = await supabase
+    const { data, error: _error } = await supabase
       .from('manufacturers')
       .insert({ name: newManufacturerName })
       .select()
@@ -236,7 +237,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
       setImagePreview(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      notify('Failed to upload image', { theme: 'amber', tone: 'error' });
     } finally {
       setUploadingImage(false);
     }
@@ -259,7 +260,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
     e.preventDefault();
 
     if (!formData.image_url) {
-      alert('A product image is required. Please upload an image or paste an image URL.');
+      notify('A product image is required. Please upload an image or paste an image URL.', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -293,7 +294,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
       onClose();
     } catch (error) {
       console.error('Error saving product:', error);
-      alert('Failed to save product');
+      notify('Failed to save product', { theme: 'amber', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -559,7 +560,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                             className="w-full h-full object-contain rounded"
                             onError={() => {
                               setImagePreview('');
-                              alert('Failed to load image from URL');
+                              notify('Failed to load image from URL', { theme: 'amber', tone: 'error' });
                             }}
                           />
                           <button

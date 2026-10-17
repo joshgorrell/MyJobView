@@ -8,6 +8,8 @@ Admin can authorize mailed invoices on an unsigned agreement in Finance. This ad
 
 ## Validation
 
+Product catalog checks run separately in `Product catalog review`. Product dialog and form coverage lives in `tests/catalog/product-dialog-browser.mjs`; it verifies the three-line Overview preview and full description in Details at phone, tablet and desktop widths.
+
 ```sh
 npm ci
 npm run test:security-onboarding

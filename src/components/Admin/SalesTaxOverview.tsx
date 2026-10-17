@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CheckCircle, Circle, Map, Shield, Clock, TrendingUp, ArrowRight, Settings } from 'lucide-react';
+import { History, CheckCircle, Circle, Map, Shield, Clock, TrendingUp, ArrowRight, Settings } from 'lucide-react';
 
 interface StateIndexRow {
   state_code: string;

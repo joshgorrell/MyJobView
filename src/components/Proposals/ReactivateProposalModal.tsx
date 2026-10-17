@@ -1,294 +1,126 @@
-import { useState } from 'react';
-import { RotateCcw, AlertTriangle, Calendar, Globe, FileText, X } from 'lucide-react';
+import { notify } from '../../lib/feedback';
+import { useEffect, useState } from 'react';
+import { CalendarDays, Check, Copy, Download, Globe, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface ReactivateProposalModalProps {
   proposalId: string;
   proposalNumber: string;
+  proposalTitle?: string;
+  customerName?: string;
   lastModified: string;
   totalAmount: number;
   onClose: () => void;
-  onSuccess: () => void;
-  onReview: () => void;
+  onSuccess: () => void | Promise<void>;
+  onDownloadPdf?: () => void;
 }
 
 export function ReactivateProposalModal({
-  proposalId,
-  proposalNumber,
-  lastModified,
-  totalAmount,
-  onClose,
-  onSuccess,
-  onReview
+  proposalId, proposalNumber, proposalTitle, customerName, onClose, onSuccess,
+  onDownloadPdf,
 }: ReactivateProposalModalProps) {
-  const [makePortalVisible, setMakePortalVisible] = useState(true);
-  const [expirationDays, setExpirationDays] = useState(30);
-  const [customDate, setCustomDate] = useState('');
-  const [useCustomDate, setUseCustomDate] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [portalVisible, setPortalVisible] = useState(false);
+  const [days, setDays] = useState<number | null>(null);
+  const [policyError, setPolicyError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [active, setActive] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const presetOptions = [
-    { days: 7, label: '7 Days' },
-    { days: 14, label: '14 Days' },
-    { days: 30, label: '30 Days' },
-    { days: 60, label: '60 Days' },
-    { days: 90, label: '90 Days' },
-  ];
+  useEffect(() => {
+    let mounted = true;
+    Promise.resolve(supabase.from('proposals').select('organization_id').eq('id', proposalId).single())
+      .then(async ({ data, error }) => {
+        if (error || !data?.organization_id) throw error || new Error('Organization not found');
+        const result = await supabase.from('organizations').select('proposal_approval_days').eq('id', data.organization_id).single();
+        if (result.error) throw result.error;
+        if (mounted) setDays(result.data?.proposal_approval_days ?? 30);
+      })
+      .catch(() => { if (mounted) setPolicyError('Unable to load expiration setting. Please try again.'); });
+    return () => { mounted = false; };
+  }, [proposalId]);
 
-  function calculateExpirationDate() {
-    if (useCustomDate && customDate) {
-      return customDate;
-    }
+  const expiration = days === null ? '' : (() => {
     const date = new Date();
-    date.setDate(date.getDate() + expirationDays);
-    return date.toISOString();
-  }
+    date.setDate(date.getDate() + days);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  })();
 
-  function getFormattedExpirationDate() {
-    try {
-      const date = new Date(calculateExpirationDate());
-      return date.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    } catch {
-      return 'Invalid date';
-    }
-  }
-
-  function getDaysOld() {
-    const lastModifiedDate = new Date(lastModified);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - lastModifiedDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 30) {
-      return `${diffDays} days`;
-    } else if (diffDays < 365) {
-      const months = Math.floor(diffDays / 30);
-      return `${months} ${months === 1 ? 'month' : 'months'}`;
-    } else {
-      const years = Math.floor(diffDays / 365);
-      return `${years} ${years === 1 ? 'year' : 'years'}`;
-    }
-  }
-
-  async function handleReactivate() {
+  async function activate(makeVisible: boolean, copyAfter = false) {
+    if (submitting || (days === null && !active)) return;
     setSubmitting(true);
+    setMessage('');
     try {
-      const expiresAt = calculateExpirationDate();
-
-      const { error } = await supabase
-        .from('proposals')
-        .update({
+      if (!active) {
+        const date = new Date();
+        date.setDate(date.getDate() + (days ?? 30));
+        const { error } = await supabase.from('proposals').update({
           status: 'sent',
           sent_at: new Date().toISOString(),
-          expires_at: expiresAt,
-          is_portal_visible: makePortalVisible,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', proposalId);
-
-      if (error) throw error;
-
-      // Optionally add to activity log
-      if (notes.trim()) {
-        await supabase.from('proposal_activity').insert({
-          proposal_id: proposalId,
-          activity_type: 'reactivated',
-          metadata: { notes: notes.trim() }
-        });
+          expires_at: date.toISOString(),
+          is_portal_visible: makeVisible,
+          updated_at: new Date().toISOString(),
+        }).eq('id', proposalId);
+        if (error) throw error;
+        setActive(true);
+      } else if (makeVisible !== portalVisible) {
+        const { error } = await supabase.from('proposals').update({ is_portal_visible: makeVisible }).eq('id', proposalId);
+        if (error) throw error;
       }
-
+      setPortalVisible(makeVisible);
+      await notify('Proposal reactivated!', { theme: 'violet', tone: 'success' });
       onSuccess();
+      if (copyAfter) {
+        const { data, error: linkError } = await supabase.functions.invoke('manage-proposal-share-link', {
+          body: { proposalId, action: 'create' },
+        });
+        if (linkError || !data?.token) throw linkError || new Error('Could not create the customer link');
+        const url = new URL('/shared/proposal', window.location.origin);
+        url.searchParams.set('token', data.token);
+        await navigator.clipboard.writeText(url.toString());
+      }
+      setMessage(copyAfter ? 'Customer link copied.' : 'Proposal is active.');
     } catch (error) {
-      console.error('Error reactivating proposal:', error);
-      alert('Failed to reactivate proposal. Please try again.');
+      console.error('Proposal activation failed', error);
+      setMessage(active ? 'Unable to complete that action. Please try again.' : 'Unable to complete the action. If the proposal was activated, you can retry copying its link.');
     } finally {
       setSubmitting(false);
     }
   }
 
+  const actionClass = 'flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/70 px-2 py-3 text-xs sm:text-sm font-medium text-white transition-colors hover:border-blue-400 hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50';
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <RotateCcw size={20} className="text-orange-600" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900">Reactivate Proposal {proposalNumber}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-6">
+      <div className="flex w-full max-w-xl max-h-[94dvh] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-white shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-700 px-5 py-5 sm:px-7">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-300">Proposal delivery</p>
+            <h2 className="mt-1 truncate text-xl font-semibold">{customerName || 'Customer'}</h2>
+            <p className="mt-1 break-words text-sm text-slate-300">{proposalTitle || 'Proposal'} <span className="text-slate-500">·</span> {proposalNumber}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-2 text-slate-300 hover:bg-slate-800"><X size={20} /></button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Warning Banner */}
-          <div className="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={20} className="text-orange-600 mt-0.5" />
-              <div>
-                <p className="font-semibold text-orange-900 mb-1">
-                  This proposal is {getDaysOld()} old
-                </p>
-                <p className="text-sm text-orange-800">
-                  Please review pricing and terms before reactivating to ensure they are still accurate.
-                </p>
-              </div>
-            </div>
+        <div className="overflow-y-auto px-5 py-6 sm:px-7">
+          <p className="mb-3 text-sm font-semibold text-slate-200">Choose any delivery options</p>
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" onClick={onDownloadPdf} className={actionClass}><Download size={19} className="text-blue-300" />PDF</button>
+            <button type="button" onClick={() => void activate(portalVisible, true)} disabled={submitting || days === null} className={actionClass}><Copy size={19} className="text-blue-300" />Copy link</button>
+            <button type="button" onClick={() => void activate(!portalVisible)} disabled={submitting || days === null} className={actionClass}>
+              {portalVisible ? <Check size={19} className="text-green-400" /> : <Globe size={19} className="text-blue-300" />}
+              {portalVisible ? 'Portal on' : 'Portal'}
+            </button>
           </div>
-
-          {/* Proposal Details */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Last Modified:</span>
-              <span className="text-sm font-semibold text-gray-900">
-                {new Date(lastModified).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Current Total:</span>
-              <span className="text-sm font-semibold text-gray-900">
-                ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
+          <div className="mt-5 flex items-center gap-2 rounded-xl bg-slate-800/70 px-4 py-3 text-sm text-slate-200">
+            <CalendarDays size={18} className="shrink-0 text-blue-300" />
+            <span>{policyError || (expiration ? `New expiration: ${expiration}` : 'Loading expiration…')}</span>
           </div>
-
-          {/* Portal Visibility Toggle */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Globe size={20} />
-              Customer Portal Access
-            </h3>
-            <label className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-              <input
-                type="checkbox"
-                checked={makePortalVisible}
-                onChange={(e) => setMakePortalVisible(e.target.checked)}
-                className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <div>
-                <div className="font-medium text-gray-900 mb-1">Make visible on customer portal</div>
-                <div className="text-sm text-gray-600">
-                  Customer can view and approve this proposal through their online portal
-                </div>
-              </div>
-            </label>
-          </div>
-
-          {/* New Expiration Date */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Calendar size={20} />
-              Set New Approval Window
-            </h3>
-
-            {/* Preset Options */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {presetOptions.map((option) => (
-                <button
-                  key={option.days}
-                  onClick={() => {
-                    setExpirationDays(option.days);
-                    setUseCustomDate(false);
-                  }}
-                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                    expirationDays === option.days && !useCustomDate
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-              <button
-                onClick={() => setUseCustomDate(true)}
-                className={`px-4 py-2 rounded-lg border-2 font-medium transition-all ${
-                  useCustomDate
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Custom
-              </button>
-            </div>
-
-            {/* Custom Date Picker */}
-            {useCustomDate && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Custom Expiration Date
-                </label>
-                <input
-                  type="date"
-                  value={customDate ? customDate.split('T')[0] : ''}
-                  onChange={(e) => setCustomDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            )}
-
-            {/* Expiration Preview */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-blue-700">New expiration date:</div>
-                <div className="text-sm font-semibold text-blue-900">{getFormattedExpirationDate()}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Optional Notes */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <FileText size={20} />
-              Internal Notes (Optional)
-            </h3>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any notes about this reactivation for internal tracking..."
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            />
-          </div>
+          {message && <p role="status" className="mt-3 text-sm text-blue-200">{message}</p>}
+          <p className="mt-3 text-xs text-slate-400">Copy link or send to portal activates the proposal. PDF does not change its status.</p>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-xl flex justify-between gap-3">
-          <button
-            onClick={onReview}
-            className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors flex items-center gap-2"
-          >
-            <FileText size={18} />
-            Review First
-          </button>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleReactivate}
-              disabled={submitting}
-              className="px-6 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:opacity-50 font-medium transition-all flex items-center gap-2"
-            >
-              <RotateCcw size={18} />
-              {submitting ? 'Reactivating...' : 'Reactivate Now'}
-            </button>
-          </div>
+        <div className="flex items-center justify-end gap-3 border-t border-slate-700 px-5 py-4 sm:px-7">
+          <button type="button" onClick={onClose} className="min-h-11 rounded-xl px-5 text-sm font-medium text-slate-200 hover:bg-slate-800">Done</button>
         </div>
       </div>
     </div>

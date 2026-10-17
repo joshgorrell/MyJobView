@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { notify } from '../../lib/feedback';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
-import { Settings, Share2, MoreVertical, ChevronDown, ChevronUp, Plus, GripVertical, Image, DollarSign, ArrowLeft, Calendar, Activity, Eye, FileText, Wrench } from 'lucide-react';
+import { Settings, Share2, MoreVertical, ChevronDown, ChevronUp, Plus, GripVertical, Image, ArrowLeft, Calendar, Activity, Eye, FileText, Wrench } from 'lucide-react';
 import ProposalSettings from './ProposalSettings';
 import AreaScopeEditor from './AreaScopeEditor';
 import InstallTaskEditor from './InstallTaskEditor';
@@ -86,7 +87,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       setLastSaved(new Date());
     } catch (error) {
       console.error('Error adding area:', error);
-      alert('Failed to add area');
+      notify('Failed to add area', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -129,7 +130,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       setLastSaved(new Date());
     } catch (error) {
       console.error('Error adding item:', error);
-      alert('Failed to add item');
+      notify('Failed to add item', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -177,7 +178,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
       setLastSaved(new Date());
     } catch (error) {
       console.error('Error adding item to multiple areas:', error);
-      alert('Failed to add item');
+      notify('Failed to add item', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -410,7 +411,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
                             <div className="text-sm font-medium text-primary">{item.description}</div>
-                            {item.sku && <div className="text-xs text-muted mt-0.5">{item.sku}</div>}
+                            {item.products?.sku && <div className="text-xs text-muted mt-0.5">{item.products?.sku}</div>}
                           </div>
                           <button
                             onClick={(e) => {
@@ -481,8 +482,8 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
             <div className="flex-1 overflow-auto p-6 space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-primary mb-1">{detailItem.description}</h3>
-                {detailItem.sku && (
-                  <p className="text-sm text-muted">SKU: {detailItem.sku}</p>
+                {detailItem.products?.sku && (
+                  <p className="text-sm text-muted">SKU: {detailItem.products?.sku}</p>
                 )}
               </div>
 
@@ -671,10 +672,10 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
               if (error) throw error;
               setProposal({ ...proposal, expiration_date: date });
               setShowExpirationModal(false);
-              alert('Expiration date updated successfully');
+              notify('Expiration date updated successfully', { theme: 'violet', tone: 'success' });
             } catch (error) {
               console.error('Error updating expiration date:', error);
-              alert('Failed to update expiration date');
+              notify('Failed to update expiration date', { theme: 'violet', tone: 'error' });
             }
           }}
         />
@@ -696,6 +697,7 @@ export default function ProposalBuilderLuxury({ proposalId, onBack }: ProposalBu
             roomId={room.id}
             roomName={room.name}
             currentDescription={room.description}
+            currentShowScope={room.show_scope}
             onClose={() => setEditingScopeRoomId(null)}
             onSave={(description) => {
               setRooms(rooms.map(r =>
@@ -886,8 +888,8 @@ function AddAreaModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: s
 }
 
 function AddLineItemModal({
-  proposalId,
-  roomId,
+  proposalId: _proposalId,
+  roomId: _roomId,
   onClose,
   onAdd
 }: {
@@ -1034,7 +1036,7 @@ function AddLineItemModal({
 }
 
 function AddItemToMultipleAreasModal({
-  proposalId,
+  proposalId: _proposalId,
   rooms,
   onClose,
   onAdd
@@ -1234,7 +1236,7 @@ function AddItemToMultipleAreasModal({
 }
 
 function ExpirationDateModal({
-  proposalId,
+  proposalId: _proposalId,
   currentExpirationDate,
   onClose,
   onSave

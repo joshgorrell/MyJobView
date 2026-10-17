@@ -19,7 +19,7 @@ export function allowedModules(role: string, modules: ModuleRow[], roleAccess: R
 
 const actionModules: Record<string, string[]> = {
   CREATE_PROPOSAL: ['proposals'], CREATE_CONTACT: ['contacts'], CREATE_LEAD: ['leads'],
-  CREATE_TASK: ['tasks'], CREATE_SERVICE_REQUEST: ['service_requests'],
+  CREATE_TASK: ['tasks'], CREATE_SUPPORT_REQUEST: ['tasks'], CREATE_SERVICE_REQUEST: ['service_requests'],
   CREATE_SECURITY_CONTRACT: ['security_onboarding'], CREATE_MESSAGE: ['messages'],
   OPEN_PROPOSAL: ['proposals'],
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ComposedChart,
   Line,
@@ -8,9 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
-  ResponsiveContainer,
-  Dot
-} from 'recharts';
+  ResponsiveContainer} from 'recharts';
 import {
   TrendingUp,
   TrendingDown,

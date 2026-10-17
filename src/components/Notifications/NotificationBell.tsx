@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { proposalFeedbackUrl } from '../../lib/proposalFeedbackLinks';
-import { Bell, MessageCircle, CheckSquare, AlertCircle, Info, FileText, X, ChevronDown, ChevronUp, Trash2, MessageSquareWarning } from 'lucide-react';
+import { Bell, MessageCircle, CheckSquare, Info, FileText, X, ChevronDown, ChevronUp, Trash2, MessageSquareWarning } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Notification } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
 
@@ -226,6 +225,13 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
     if (notifType === 'discussion_post_mention' && notification.related_id) {
       await markAsRead(notification);
       window.location.assign(`?tab=feed&postId=${notification.related_id}`);
+      return;
+    }
+
+    if (notifType === 'system' && (notification.title === 'New PTO request' || notification.title.startsWith('PTO request ')) && onTabChange) {
+      const { data } = await supabase.rpc('can_manage_pto');
+      onTabChange(data === true ? 'pto_management' : 'my_time_off');
+      setIsOpen(false);
       return;
     }
 

@@ -1,9 +1,15 @@
+import { notify } from './lib/feedback';
+import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
+import { PasswordSetup } from './components/Auth/PasswordSetup';
+import { canManageTimeOff } from './lib/timeOff';
+import { WorkspaceTabs } from './components/Shared/WorkspaceTabs';
+import { pageFromLocation, workspacePage, workspaceUrl, isPortalProposalRoute } from './lib/workspaceRoutes';
 import { resolveLegacyPage } from './lib/permissionCatalog';
 import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
-import { TenantProvider, useTenant } from './contexts/TenantContext';
+import { TenantProvider } from './contexts/TenantContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
 import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
@@ -17,9 +23,9 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
-import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
-import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
+import { LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
@@ -28,6 +34,7 @@ import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
+const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
@@ -50,8 +57,8 @@ const DepartmentManager = lazy(() => import('./components/Admin/DepartmentManage
 const GPSDiagnostics = lazy(() => import('./components/Admin/GPSDiagnostics').then(m => ({ default: m.GPSDiagnostics })));
 const ContactCSVImport = lazy(() => import('./components/Admin/ContactCSVImport').then(m => ({ default: m.ContactCSVImport })));
 const SecurityContractCSVImport = lazy(() => import('./components/Admin/SecurityContractCSVImport').then(m => ({ default: m.SecurityContractCSVImport })));
-const MaintenanceAgreements = lazy(() => import('./components/Finance/MaintenanceAgreements'));
-const EquipmentWarrantyAgreements = lazy(() => import('./components/Finance/EquipmentWarrantyAgreements'));
+
+
 const HistoricalSalesImport = lazy(() => import('./components/Admin/HistoricalSalesImport').then(m => ({ default: m.HistoricalSalesImport })));
 const DailySalesReportImport = lazy(() => import('./components/Admin/DailySalesReportImport').then(m => ({ default: m.DailySalesReportImport })));
 const TasksView = lazy(() => import('./components/Tasks/TasksView').then(m => ({ default: m.TasksView })));
@@ -65,7 +72,6 @@ const DispatchConsole = lazy(() => import('./components/Dispatch/DispatchConsole
 const ServiceRequestConsole = lazy(() => import('./components/Dispatch/ServiceRequestConsole').then(m => ({ default: m.ServiceRequestConsole })));
 const TravelBonusQueue = lazy(() => import('./components/Dispatch/TravelBonusQueue').then(m => ({ default: m.TravelBonusQueue })));
 const ProjectWorkOrdersQueue = lazy(() => import('./components/Dispatch/ProjectWorkOrdersQueue').then(m => ({ default: m.ProjectWorkOrdersQueue })));
-const DispatchCustomerComms = lazy(() => import('./components/Dispatch/DispatchCustomerComms').then(m => ({ default: m.DispatchCustomerComms })));
 const WorkOrdersList = lazy(() => import('./components/Production/WorkOrdersList').then(m => ({ default: m.WorkOrdersList })));
 const WorkOrderDetail = lazy(() => import('./components/Production/WorkOrderDetail').then(m => ({ default: m.WorkOrderDetail })));
 const ChangeOrdersView = lazy(() => import('./components/Production/ChangeOrdersView').then(m => ({ default: m.ChangeOrdersView })));
@@ -74,7 +80,7 @@ const TechnicianWorkCenter = lazy(() => import('./components/Production/Technici
 const ProductionManagerDashboard = lazy(() => import('./components/Production/ProductionManagerDashboard').then(m => ({ default: m.ProductionManagerDashboard })));
 const PartsRequestManagement = lazy(() => import('./components/Production/PartsRequestManagement').then(m => ({ default: m.PartsRequestManagement })));
 const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGallery').then(m => ({ default: m.JobPhotosGallery })));
-const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
+
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
 const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
@@ -83,20 +89,20 @@ const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopo
 const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
 const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
-const SalesPerformance = lazy(() => import('./components/Sales/SalesPerformance').then(m => ({ default: m.SalesPerformance })));
+
 const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').then(m => ({ default: m.SalesOrdersView })));
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
 const ReviewsView = lazy(() => import('./components/Sales/ReviewsView'));
 const SalesServiceRequestsView = lazy(() => import('./components/Sales/SalesServiceRequestsView').then(m => ({ default: m.SalesServiceRequestsView })));
 const IndividualDashboard = lazy(() => import('./components/Dashboard/IndividualDashboard').then(m => ({ default: m.IndividualDashboard })));
-const TeamLeaderboard = lazy(() => import('./components/Dashboard/TeamLeaderboard').then(m => ({ default: m.TeamLeaderboard })));
+
 const ProjectsView = lazy(() => import('./components/Projects/ProjectsView'));
 const InvoicesView = lazy(() => import('./components/Invoices/InvoicesView').then(m => ({ default: m.InvoicesView })));
 const CommissionsPage = lazy(() => import('./components/Commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
 const PunchlistAdminDashboard = lazy(() => import('./components/Production/PunchlistAdminDashboard').then(m => ({ default: m.PunchlistAdminDashboard })));
 const TestTunePerformanceDashboard = lazy(() => import('./components/Production/TestTunePerformanceDashboard').then(m => ({ default: m.TestTunePerformanceDashboard })));
 const VIPPlanManagement = lazy(() => import('./components/Finance/VIPPlanManagement').then(m => ({ default: m.VIPPlanManagement })));
-const BonusApprovalDashboard = lazy(() => import('./components/Finance/BonusApprovalDashboard').then(m => ({ default: m.BonusApprovalDashboard })));
+
 const TestTuneSettings = lazy(() => import('./components/Admin/TestTuneSettings').then(m => ({ default: m.TestTuneSettings })));
 const PortalPunchlist = lazy(() => import('./components/Portal/PortalPunchlist').then(m => ({ default: m.PortalPunchlist })));
 const PortalVIPMembership = lazy(() => import('./components/Portal/PortalVIPMembership').then(m => ({ default: m.PortalVIPMembership })));
@@ -116,10 +122,10 @@ const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m 
 const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
 const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
-const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
+
+const LaborDashboard = lazy(() => import('./components/Production/LaborDashboard/LaborDashboard'));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
-const PTOManagement = lazy(() => import('./components/Admin/PTOManagement').then(m => ({ default: m.PTOManagement })));
 const MyTimeOff = lazy(() => import('./components/Dispatch/MyTimeOff').then(m => ({ default: m.MyTimeOff })));
 const StickyNotes = lazy(() => import('./components/Sales/StickyNotes').then(m => ({ default: m.default })));
 const DesignQueue = lazy(() => import('./components/Sales/DesignQueue'));
@@ -154,11 +160,12 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
   useEffect(() => {
     let cancelled = false;
     if (!profile?.organization_id) return;
-    supabase
+    Promise.resolve(supabase
       .from('company_settings')
-      .select(`${moduleKey}`)
+      .select(moduleKey)
       .eq('organization_id', profile.organization_id)
       .maybeSingle()
+      .overrideTypes<Record<string, boolean>, { merge: false }>())
       .then(({ data }) => {
         if (cancelled) return;
         setAllowed(data?.[moduleKey] ?? false);
@@ -178,31 +185,34 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 }
 
 function AppContent() {
-  const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
+  const { user, profile, loading, isPasswordRecovery, isPortalUser, signOut } = useAuth();
   const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [aiLeadPrefill, setAiLeadPrefill] = useState<LeadPrefill | null>(null);
   const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
+  const [showServiceTypePicker, setShowServiceTypePicker] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
+  const [showSupportTaskForm, setShowSupportTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('leadId'));
+  const [openTaskId, setOpenTaskId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('taskId'));
   const [openFlowThreadId, setOpenFlowThreadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('threadId'));
-  const [openProposalId, setOpenProposalId] = useState<string | null>(null);
+  const [openProposalId, setOpenProposalId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('proposalId'));
   const [aiProposalPrefill, setAiProposalPrefill] = useState<ProposalPrefill | null>(null);
   const [aiServiceRequestPrefill, setAiServiceRequestPrefill] = useState<ServiceRequestPrefill | null>(null);
   const [showAiSecurityContractModal, setShowAiSecurityContractModal] = useState(false);
   const [aiSecurityContractPrefill, setAiSecurityContractPrefill] = useState<SecurityContractPrefill | null>(null);
-  const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(null);
+  const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('openOrderId'));
   const [invoiceContactFilter, setInvoiceContactFilter] = useState<string | null>(null);
-  const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(null);
+  const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('coId'));
   const [salesRepAIContext, setSalesRepAIContext] = useState<SalesRepAIContext | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -210,13 +220,20 @@ function AppContent() {
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<string>(() => {
-    // First check URL parameters, then localStorage, default to 'feed'
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlTab = urlParams.get('tab');
-    const savedTab = urlTab || localStorage.getItem('activeTab') || 'feed';
-    return resolveLegacyPage(savedTab);
+    return pageFromLocation(window.location, localStorage.getItem('activeTab') || 'feed');
   });
-  const setActiveTab = React.useCallback((tab: string) => setActiveTabState(resolveLegacyPage(tab)), []);
+  const setActiveTab = React.useCallback((tab: string) => {
+    const page = resolveLegacyPage(tab);
+    const current = new URL(window.location.href);
+    if (profile && !isPortalUser && (current.pathname === '/' || workspacePage(current.pathname))) {
+      const next = workspaceUrl(current, page);
+      if (next && pageFromLocation(current) !== page) {
+        window.history.pushState({}, '', next);
+        setCurrentPath(window.location.pathname);
+      }
+    }
+    setActiveTabState(page);
+  }, [profile, isPortalUser]);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('departmentSidebarOpen');
     return saved !== null ? saved === 'true' : false;
@@ -238,10 +255,7 @@ function AppContent() {
     });
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [currentHash, setCurrentHash] = useState(window.location.hash);
-  const [newPassword, setNewPassword] = useState('');
-  const [resetError, setResetError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [_currentHash, setCurrentHash] = useState(window.location.hash);
 
   const notificationCount = useNotificationCount();
 
@@ -256,11 +270,11 @@ function AppContent() {
 
     const recordPage = () => {
       const sessionId = (window as any).__currentSessionId || null;
-      supabase.rpc('update_session_activity', {
+      Promise.resolve(supabase.rpc('update_session_activity', {
         p_user_id: user.id,
         p_page: activeTab,
         p_session_id: sessionId,
-      }).then(() => {}).catch(() => {});
+      })).then(() => {}).catch(() => {});
     };
 
     recordPage();
@@ -348,7 +362,6 @@ function AppContent() {
 
       // Restore state from URL when using browser back/forward
       const urlParams = new URLSearchParams(window.location.search);
-      const urlTab = urlParams.get('tab');
       const urlProposalId = urlParams.get('proposalId');
       const urlLeadId = urlParams.get('leadId');
       const urlTaskId = urlParams.get('taskId');
@@ -357,11 +370,7 @@ function AppContent() {
       const urlSalesOrderId = urlParams.get('openOrderId');
       const urlWorkOrderId = urlParams.get('workOrderId');
 
-      if (urlTab) {
-        setActiveTab(urlTab === 'messages' ? 'feed' : urlTab);
-      } else {
-        setActiveTab('feed');
-      }
+      setActiveTabState(pageFromLocation(window.location));
 
       setOpenProposalId(urlProposalId);
       setSelectedLeadId(urlLeadId);
@@ -386,22 +395,12 @@ function AppContent() {
 
   // Save active tab to localStorage and update URL whenever state changes
   useEffect(() => {
-    if(['/proposals-fullscreen','/sales-order-fullscreen'].includes(currentPath))return;
+    if (!profile || isPortalUser || isPasswordRecovery || loading) return;
+    if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) return;
+    if (currentPath !== '/' && !workspacePage(currentPath)) return;
     localStorage.setItem('activeTab', activeTab);
-
-    // Skip URL manipulation for standalone routes that don't use tab-based navigation
-    const standaloneRoutes = ['/kiosk', '/portal', '/business-card', '/public', '/eula', '/privacy', '/auth-bridge', '/auth-callback'];
-    if (standaloneRoutes.some(r => currentPath.startsWith(r))) return;
-
-    // Update URL to persist state across refreshes
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Update tab parameter
-    if (activeTab && activeTab !== 'feed') {
-      urlParams.set('tab', activeTab);
-    } else {
-      urlParams.delete('tab');
-    }
+    urlParams.delete('tab');
 
     // Update opened item parameters
     if (openProposalId) {
@@ -447,9 +446,14 @@ function AppContent() {
     }
 
     // Update the URL without reloading the page
-    const newUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams.toString()}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
-  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath]);
+    const location = new URL(window.location.href);
+    location.search = urlParams.toString();
+    const newUrl = workspaceUrl(location, activeTab);
+    if (newUrl) {
+      window.history.replaceState({}, '', newUrl);
+      setCurrentPath(window.location.pathname);
+    }
+  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath, profile, isPortalUser, isPasswordRecovery, loading]);
 
   // Close all modals when switching tabs to prevent overlay issues
   useEffect(() => {
@@ -460,6 +464,10 @@ function AppContent() {
     setShowTaskForm(false);
     setShowJobMediaUpload(false);
   }, [activeTab]);
+
+  if (currentPath === '/shared/proposal') {
+    return <Suspense fallback={<LoadingFallback />}><SharedProposalPage /></Suspense>;
+  }
 
   if (loading) {
     return <BrandedLoading message="Loading your workspace..." />;
@@ -589,8 +597,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/proposals' || currentPath.startsWith('/proposals/') ||
-      currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
+  if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_proposals_enabled">
@@ -637,7 +644,7 @@ function AppContent() {
     return null;
   }
 
-  const publicCardSlug = getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
+  const publicCardSlug = workspacePage(currentPath) ? null : getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
   if (publicCardSlug) {
     return (
       <Suspense fallback={<LoadingFallback />}>
@@ -784,79 +791,14 @@ function AppContent() {
     // If already logged in on root domain with redirect_to, send to bridge
     const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
     if (!isPasswordRecovery && user && redirectParam && isValidReturnHost(redirectParam)) {
-      const returnPath = new URLSearchParams(window.location.search).get('return_path') || window.location.pathname;
+      const returnPath = new URLSearchParams(window.location.search).get('return_path') || (window.location.pathname + window.location.search + window.location.hash);
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectParam);
       bridgeUrl.searchParams.set('path', returnPath);
       window.location.replace(bridgeUrl.toString());
       return <LoadingFallback />;
     }
-    if (isPasswordRecovery) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-          <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-white mb-6">{new URLSearchParams(window.location.search).get('account_setup') === 'welcome' ? 'Welcome to MyJobView' : 'Reset Your Password'}</h2>
-
-            {resetSuccess ? (
-              <div className="text-center">
-                <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-sm mb-4">
-                  Password updated successfully!
-                </div>
-                <p className="text-gray-300 mb-4">You can now sign in with your new password.</p>
-                <button
-                  onClick={() => {
-                    window.location.href = '/';
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
-                >
-                  Go to Sign In
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setResetError(null);
-                try {
-                  await updatePassword(newPassword);
-                  setResetSuccess(true);
-                  window.history.replaceState(null, '', window.location.pathname);
-                } catch (error: any) {
-                  setResetError(error?.message || 'Failed to update password');
-                }
-              }}>
-                {resetError && (
-                  <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm mb-4">
-                    {resetError}
-                  </div>
-                )}
-
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter new password"
-                    minLength={6}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
-                >
-                  Update Password
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      );
-    }
+    if (isPasswordRecovery) return <PasswordSetup />;
     return <LoginForm />;
   }
 
@@ -876,6 +818,7 @@ function AppContent() {
   return (
     <div className="theme-workspace workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
+      <EmployeeWelcomeOnboarding />
       {!isStandalone && (
         <>
           <Header
@@ -883,10 +826,10 @@ function AppContent() {
             onCreateLead={() => setShowLeadForm(true)}
             onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
-            onCreateServiceRequest={() => setShowServiceRequestForm(true)}
+            onCreateServiceRequest={() => setShowServiceTypePicker(true)}
             onCreateTask={() => {
-              setShowTaskForm(true);
-              setActiveTab('tasks');
+              setAiTaskPrefill(null);
+              setShowAiTaskForm(true);
             }}
             onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
@@ -955,10 +898,11 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'leads' && checkModuleAccess('leads') && <LeadsHistory key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'feed' && (checkModuleAccess('feed') || checkModuleAccess('messages')) && (
+          {(activeTab === 'feed' || activeTab === 'tasks') && (checkModuleAccess('feed') || checkModuleAccess('messages') || checkModuleAccess('tasks')) && (
             <MasterFeed
               key={activeTab}
+              initialTaskView={activeTab === 'tasks' && checkModuleAccess('tasks')}
+              tasksContent={checkModuleAccess('tasks') ? <TasksView initialShowForm={showTaskForm} onFormClose={() => setShowTaskForm(false)} openTaskId={openTaskId} onTaskOpened={() => setOpenTaskId(null)} /> : undefined}
               onLeadClick={setSelectedLeadId}
               createRequested={createInternalChatRequested}
               onCreateOpened={() => setCreateInternalChatRequested(false)}
@@ -976,7 +920,7 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
+
           {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
             <ProposalsView
               key={activeTab}
@@ -995,8 +939,11 @@ function AppContent() {
             />
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
-          {activeTab === 'payroll' && checkModuleAccess('payroll') && <FinanceTimeWorkspace key={activeTab} onPayroll={() => setActiveTab('payroll')} />}
-          {activeTab === 'time_approval' && checkModuleAccess('time_approval') && <FinanceTimeWorkspace key={activeTab} review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} />}
+          {['payroll', 'time_approval', 'labor_dashboard'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Review', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
+            ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
+            ...(profile.role === 'admin' ? [{ key: 'labor_dashboard', label: 'Labor dashboard', content: <LaborDashboard /> }] : []),
+          ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
             <InvoicesView
@@ -1076,8 +1023,12 @@ function AppContent() {
             />
           )}
           {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'pipeline_board' && checkModuleAccess('pipeline_board') && <PipelineBoard key={activeTab} />}
-          {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}
+          {['pipeline_board', 'prospects', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
+            ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
+            ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
+            ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Fishbowl', content: <FishbowlView onLeadClick={setSelectedLeadId} /> }] : []),
+          ]} />}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
           {activeTab === 'sticky-notes' && checkModuleAccess('sticky-notes') && <StickyNotes key={activeTab} />}
@@ -1102,7 +1053,7 @@ function AppContent() {
           {activeTab === 'project_work_orders' && checkModuleAccess('work_orders') && <ProjectWorkOrdersQueue key={activeTab} />}
           {activeTab === 'job_status' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_status" />}
           {activeTab === 'job_acceptance' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_acceptance" />}
-          {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchCustomerComms key={activeTab} />}
+          {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="communications" />}
           {activeTab === 'tech_skills' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_skills" />}
           {activeTab === 'daily_clock' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'daily_clock_sessions' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} initialTab="sessions" />}
@@ -1126,21 +1077,11 @@ function AppContent() {
 
           {activeTab === 'portal_punchlist' && checkModuleAccess('punchlist') && <PortalPunchlist key={activeTab} />}
 
-          {activeTab === 'tasks' && checkModuleAccess('tasks') && (
-            <TasksView
-              key={activeTab}
-              initialShowForm={showTaskForm}
-              onFormClose={() => setShowTaskForm(false)}
-              openTaskId={openTaskId}
-              onTaskOpened={() => setOpenTaskId(null)}
-            />
-          )}
           {activeTab === 'mycard' && <MyCardView key={activeTab} />}
           {activeTab === 'help' && <HowItWorks key={activeTab} />}
           {activeTab === 'improvements' && <ImprovementsView key={activeTab} />}
 
           {activeTab === 'feature_suggestions' && <ImprovementsView key={activeTab} />}
-
 
 
           {activeTab === 'preferences' && (
@@ -1167,15 +1108,14 @@ function AppContent() {
 
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
-
+          {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
 
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}
 
           {activeTab === 'my_mileage' && <MileageEntryForm key={activeTab} />}
 
-          {activeTab === 'pto_management' && profile.role === 'admin' && <PTOManagement key={activeTab} />}
+          {activeTab === 'pto_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} initialTab="timeoff" />}
 
           {activeTab === 'bug_management' && checkModuleAccess('bug_management') && <BugManagement key={activeTab} />}
 
@@ -1256,13 +1196,27 @@ function AppContent() {
       {showLeadForm && (
         <Suspense fallback={null}>
           <LeadForm
-            onClose={() => setShowLeadForm(false)}
+            aiPrefill={aiLeadPrefill}
+            onClose={() => { setShowLeadForm(false); setAiLeadPrefill(null); }}
             onSuccess={() => {
               setShowLeadForm(false);
+              setAiLeadPrefill(null);
               setActiveTab('feed');
             }}
           />
         </Suspense>
+      )}
+
+      {showServiceTypePicker && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowServiceTypePicker(false); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="service-type-heading" className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-subtle bg-canvas p-5 text-primary shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-muted">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded-lg p-2 text-muted hover:bg-surface" aria-label="Close">✕</button></div>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Service</span><span className="text-sm text-muted">On-site work, repairs, troubleshooting, or dispatch</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setAiTaskPrefill(null); setShowSupportTaskForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Support</span><span className="text-sm text-muted">Customer assistance and remote support</span></button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showServiceRequestForm && (
@@ -1275,6 +1229,17 @@ function AppContent() {
               setActiveTab('dispatch_dashboard');
             }}
             aiPrefill={aiServiceRequestPrefill}
+          />
+        </Suspense>
+      )}
+
+      {showSupportTaskForm && (
+        <Suspense fallback={null}>
+          <TaskForm
+            supportMode
+            aiPrefill={aiTaskPrefill}
+            onClose={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
+            onSuccess={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
           />
         </Suspense>
       )}
@@ -1339,23 +1304,27 @@ function AppContent() {
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
             const actionModule: Record<string, string> = {
-              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks',
+              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks', CREATE_SUPPORT_REQUEST: 'tasks',
               CREATE_SERVICE_REQUEST: 'service_requests', CREATE_MESSAGE: 'messages',
               CREATE_PROPOSAL: 'proposals', CREATE_SECURITY_CONTRACT: 'security_onboarding',
               OPEN_PROPOSAL: 'proposals',
             };
             const requiredModule = action.type === 'NAVIGATE_TO' ? action.tab : actionModule[action.type];
             if (!requiredModule || !checkModuleAccess(requiredModule)) {
-              window.alert('That action is not available with your current permissions.');
+              notify('That action is not available with your current permissions.', { theme: 'blue', tone: 'info' });
               return;
             }
             if (action.type === 'CREATE_CONTACT') {
               setShowContactForm(true);
             } else if (action.type === 'CREATE_LEAD') {
+              setAiLeadPrefill((action.prefill as LeadPrefill | undefined) ?? null);
               setShowLeadForm(true);
             } else if (action.type === 'CREATE_TASK') {
               if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
               setShowAiTaskForm(true);
+            } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
+              setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
+              setShowSupportTaskForm(true);
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);

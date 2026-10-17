@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { X, ArrowUpRight, AlertTriangle, FileText, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -46,6 +47,7 @@ export function TransferChangeOrderModal({
 
       if (rpcError) throw rpcError;
 
+      notify('Change order transferred!', { theme: 'violet', tone: 'success' });
       onSuccess(data as string);
     } catch (err: any) {
       console.error('Transfer failed:', err);

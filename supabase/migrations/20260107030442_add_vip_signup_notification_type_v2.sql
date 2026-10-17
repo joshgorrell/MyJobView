@@ -1,0 +1,5 @@
+/*\n  # Add VIP Signup Notification Type\n\n  1. Changes\n    - Add 'vip_signup' to notification types constraint\n    - Preserves all existing notification types in the database\n    - Allows staff to receive notifications when new VIP members sign up\n*/\n\n-- Drop existing constraint\nALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check
+
+\n\n-- Add updated constraint with vip_signup type and all existing types\nALTER TABLE notifications ADD CONSTRAINT notifications_type_check\n  CHECK (type IN (\n    'lead_assigned',\n    'lead_status_change',\n    'task_assigned',\n    'task_due_soon',\n    'task_overdue',\n    'task_completed',\n    'task_comment',\n    'task_watcher',\n    'team_post',\n    'post_reply',\n    'post_mention',\n    'work_order_assigned',\n    'service_request_created',\n    'service_request_ready',\n    'late_clock_in',\n    'auto_clock_out',\n    'proposal_message',\n    'proposal_reactivated',\n    'deposit_reminder_sent',\n    'punchlist_service_request',\n    'system',\n    'task',\n    'vip_signup'\n  ))
+
+\n

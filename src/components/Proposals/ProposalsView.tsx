@@ -1,4 +1,6 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
+import { linkedProposalActivity } from '../../lib/proposalActivityLinks';
+import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProposalsList from './ProposalsList';
 import CreateProposalModal from './CreateProposalModal';
 
@@ -16,9 +18,30 @@ interface ProposalsViewProps {
 
 export default function ProposalsView({ isStandalone = false, openProposalId, onProposalOpened, onSelectSalesOrder, aiPrefill, onAiPrefillConsumed, onNavigateToSalesOrders, onNavigateToSalesStats, autoOpenQA = false, autoThreadId = null }: ProposalsViewProps) {
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(() => {
-    if (isStandalone) return new URLSearchParams(window.location.search).get('id');
+    const query = new URLSearchParams(window.location.search);
+    const linked = linkedProposalActivity(window.location.search);
+    if (linked) return linked;
+    if (isStandalone) return query.get('id');
+    if (query.get('proposalId')) return query.get('proposalId');
     return localStorage.getItem('openProposalId');
   });
+  const [activityProposalId, setActivityProposalId] = useState(() => linkedProposalActivity(window.location.search));
+  const closeActivity = useCallback(() => {
+    setActivityProposalId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('proposalActivity');
+    window.history.replaceState({}, '', url);
+  }, []);
+  useEffect(() => {
+    const readActivityLink = () => {
+      const id = linkedProposalActivity(window.location.search);
+      setActivityProposalId(id);
+      if (id) setSelectedProposalId(id);
+    };
+    window.addEventListener('popstate', readActivityLink);
+    return () => window.removeEventListener('popstate', readActivityLink);
+  }, []);
+
   const [showCreateModal, setShowCreateModal] = useState(() => sessionStorage.getItem(CREATE_PROPOSAL_DRAFT_KEY) === 'open');
   const [showVideoLibrary, setShowVideoLibrary] = useState(false);
   const [targetRoomIds, setTargetRoomIds] = useState<Set<string>>(new Set());
@@ -87,6 +110,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   if (selectedProposalId) return (
     <Suspense fallback={<div className="w-full h-full min-h-[400px] flex items-center justify-center bg-canvas text-muted">Loading proposal...</div>}>
       <div className="w-full h-full flex flex-col min-h-0 bg-canvas">
+        {activityProposalId && <ProposalActivityDialog proposalId={activityProposalId} onClose={closeActivity} />}
         <div className="min-h-0 flex-1">
           <ProposalBuilderCompact proposalId={selectedProposalId}
             onBack={() => {

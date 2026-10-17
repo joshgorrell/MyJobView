@@ -1,6 +1,7 @@
+import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
-import { Menu, ChevronDown, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
+import { Menu, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useToast } from '../Shared/Toast';
@@ -22,7 +23,7 @@ interface DepartmentSidebarProps {
 
 export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: externalIsOpen, onToggle, isPinned = false, onPinToggle, bookmarksVisible, onBookmarksToggle }: DepartmentSidebarProps) {
   const toast = useToast();
-  const { mainDepartments, footerDepartments, getUserModules, starredModules, starModule, unstarModule, loading } = useDepartments();
+  const { mainDepartments, footerDepartments, getUserModules, starredModules, starModule, unstarModule, loading, hasModuleAccess } = useDepartments();
   const taskCount = useTaskCount();
   const fishbowlCount = useFishbowlCount();
   const noContactCount = useNoContactCount();
@@ -62,7 +63,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
     const allDepts = [...mainDepartments, ...footerDepartments];
     allDepts.forEach(dept => {
       const modules = getUserModules(dept.id);
-      if (modules.some(m => m.module_key === activeModule)) {
+      if (modules.some(m => (m.module_key === activeModule || m.module_key === workspaceMenuKey(activeModule)))) {
         setExpandedDepartments(prev => new Set(prev).add(dept.id));
       }
     });
@@ -280,7 +281,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
             {filteredDepartments.map((dept) => {
               const modules = dept.modules;
               const isExpanded = expandedDepartments.has(dept.id);
-              const hasActiveModule = modules.some(m => m.module_key === activeModule);
+              const hasActiveModule = modules.some(m => (m.module_key === activeModule || m.module_key === workspaceMenuKey(activeModule)));
 
               return (
                 <div key={dept.id}>
@@ -308,7 +309,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                     <div className="ml-4 mt-1 space-y-0.5">
                       {modules.map((module) => {
                         const starred = isModuleStarred(module.id);
-                        const isActive = activeModule === module.module_key;
+                        const isActive = activeModule === module.module_key || workspaceMenuKey(activeModule) === module.module_key;
 
                         return (
                           <div
@@ -330,12 +331,12 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
                             >
                               {module.module_key === 'feed' ? <FlowWaveIcon className="w-4 h-4 text-lg" /> : renderIcon(module.icon, "w-4 h-4 flex-shrink-0")}
                               <span className="text-sm truncate flex-1">{module.display_name}</span>
-                              {module.module_key === 'tasks' && taskCount > 0 && (
+                              {(module.module_key === 'tasks' || (module.module_key === 'feed' && hasModuleAccess('tasks'))) && taskCount > 0 && (
                                 <span className="flex items-center justify-center min-w-[18px] h-4 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex-shrink-0">
                                   {taskCount > 99 ? '99+' : taskCount}
                                 </span>
                               )}
-                              {module.module_key === 'fishbowl' && fishbowlCount > 0 && (
+                              {(module.module_key === 'fishbowl' || (module.module_key === 'pipeline_board' && hasModuleAccess('fishbowl'))) && fishbowlCount > 0 && (
                                 <span className="flex items-center justify-center min-w-[18px] h-4 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex-shrink-0">
                                   {fishbowlCount > 99 ? '99+' : fishbowlCount}
                                 </span>

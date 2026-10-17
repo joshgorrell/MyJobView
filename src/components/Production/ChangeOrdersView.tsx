@@ -1,6 +1,7 @@
+import { requestText } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Search, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileText, Eye, CreditCard as Edit2, Filter, ArrowLeft, Loader2, Unlock, X, Pencil, Check } from 'lucide-react';
+import { Plus, Search, CheckCircle, XCircle, Clock, DollarSign, AlertCircle, FileText, Eye, CreditCard as Edit2, ArrowLeft, Loader2, Unlock, X, Pencil, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateChangeOrderModal } from './CreateChangeOrderModal';
 import { ChangeOrderApprovalModal } from './ChangeOrderApprovalModal';
@@ -156,7 +157,7 @@ export function ChangeOrdersView({ initialCoId, onCoOpened, onCoIdChange }: Chan
   }
 
   async function handleReject(changeOrderId: string) {
-    const reason = prompt('Reason for rejection:');
+    const reason = (await requestText('Reason for rejection:', '', { theme: 'blue' }));
     if (!reason) return;
 
     try {
@@ -306,8 +307,8 @@ export function ChangeOrdersView({ initialCoId, onCoOpened, onCoIdChange }: Chan
     rejected: changeOrders.filter(c => c.status === 'rejected').length,
   };
 
-  const canApprove = profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'project_manager';
-  const canUnlock = profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'project_manager';
+  const canApprove = profile?.role === 'admin' || profile?.role === 'manager';
+  const canUnlock = profile?.role === 'admin' || profile?.role === 'manager';
 
   if (openBuilderId && loadingBuilder) {
     return (

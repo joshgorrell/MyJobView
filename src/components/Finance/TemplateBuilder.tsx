@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ArrowLeft, Save } from 'lucide-react';
 
@@ -48,7 +49,7 @@ export default function TemplateBuilder({ template, onClose, onSave }: TemplateB
       onSave();
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'emerald', tone: 'error' });
     } finally {
       setSaving(false);
     }

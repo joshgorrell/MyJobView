@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MapPin, DollarSign, Save, Building2, Clock, User, AlertTriangle, X } from 'lucide-react';
 
@@ -129,7 +130,7 @@ export function TravelBonusSettings() {
       await loadSettings();
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(null);
     }
@@ -147,7 +148,7 @@ export function TravelBonusSettings() {
       await loadSettings();
     } catch (error) {
       console.error('Error clearing tech override:', error);
-      alert('Failed to clear override');
+      notify('Failed to clear override', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingTech(null);
     }
@@ -168,7 +169,7 @@ export function TravelBonusSettings() {
       await loadSettings();
     } catch (error) {
       console.error('Error saving tech override:', error);
-      alert('Failed to save override');
+      notify('Failed to save override', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingTech(null);
     }

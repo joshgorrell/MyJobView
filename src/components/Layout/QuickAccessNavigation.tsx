@@ -1,5 +1,7 @@
+import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
+import { useEffect, useRef } from 'react';
 import { Menu, Star } from 'lucide-react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useTaskCount } from '../../hooks/useTaskCount';
@@ -11,9 +13,20 @@ interface QuickAccessNavigationProps {
 }
 
 export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAccessNavigationProps) {
-  const { starredModules, loading } = useDepartments();
+  const { starredModules, loading, hasModuleAccess } = useDepartments();
   const taskCount = useTaskCount();
   const fishbowlCount = useFishbowlCount();
+  const navigationRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const navigation = navigationRef.current;
+    const activeButton = navigation?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!navigation || !activeButton) return;
+    const container = navigation.getBoundingClientRect();
+    const button = activeButton.getBoundingClientRect();
+    if (button.left < container.left) navigation.scrollLeft += button.left - container.left;
+    else if (button.right > container.right) navigation.scrollLeft += button.right - container.right;
+  }, [activeModule, starredModules]);
 
   const renderIcon = (iconName: string, className: string = "w-4 h-4 sm:w-5 sm:h-5") => {
     const IconComponent = getIcon(iconName);
@@ -41,19 +54,20 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
           Click the <Star className="w-3 h-3 inline mx-1" /> on any menu item to add it here
         </div>
       ) : (
-        <nav className="flex gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
+        <nav ref={navigationRef} className="flex gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
           {starredModules.map((module) => {
-          const isActive = activeModule === module.module_key;
+          const isActive = activeModule === module.module_key || workspaceMenuKey(activeModule) === module.module_key;
 
           const badgeCount =
-            module.module_key === 'tasks' ? taskCount :
-            module.module_key === 'fishbowl' ? fishbowlCount :
+            (module.module_key === 'tasks' || (module.module_key === 'feed' && hasModuleAccess('tasks'))) ? taskCount :
+            (module.module_key === 'fishbowl' || (module.module_key === 'pipeline_board' && hasModuleAccess('fishbowl'))) ? fishbowlCount :
             0;
           const showBadge = badgeCount > 0;
 
           return (
             <button
               key={module.id}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => {
                 // TV Dashboards should open in a new window for full-screen display
                 if (module.module_key === 'tv_dashboard') {

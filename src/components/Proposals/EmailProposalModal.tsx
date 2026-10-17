@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, X, FileText, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailProposalModalProps {
@@ -79,6 +79,9 @@ export function EmailProposalModal({
 }: EmailProposalModalProps) {
   const [toEmail, setToEmail] = useState(contactEmail);
   const [ccEmails, setCcEmails] = useState('');
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [bccEmails, setBccEmails] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -109,7 +112,7 @@ export function EmailProposalModal({
       .maybeSingle();
     const companyName = settings?.company_name || 'Your Company';
     setSubject(`Proposal #${proposalNumber} from ${companyName}`);
-    setMessage(`Dear ${contactName},\n\nPlease review your proposal #${proposalNumber}. We've carefully prepared this proposal to meet your needs and look forward to working with you.\n\nYou can view your proposal online using the secure link in this email.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards`);
+    setMessage(`Dear ${contactName},\n\nPlease review your proposal #${proposalNumber}. We've carefully prepared this proposal to meet your needs and look forward to working with you.\n\nYour proposal is attached when the Proposal attachment option is selected.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards`);
   }
 
   async function loadDocumentAvailability() {
@@ -138,8 +141,12 @@ export function EmailProposalModal({
   const attachmentCount = Object.values(attachments).filter(Boolean).length;
 
   const handleSend = async () => {
-    if (!toEmail) {
-      setError('Please enter a recipient email address');
+    const recipients = toEmail.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const ccRecipients = ccEmails.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    const bccRecipients = bccEmails.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    if (!recipients.length || [...recipients, ...ccRecipients, ...bccRecipients].some(email => !emailPattern.test(email))) {
+      setError('Enter valid recipient email addresses, separated by commas.');
       return;
     }
 
@@ -213,8 +220,9 @@ export function EmailProposalModal({
       const { error: emailError } = await supabase.functions.invoke('send-proposal-email', {
         body: {
           proposalId,
-          toEmail,
-          ccEmails: ccEmails.split(',').map(e => e.trim()).filter(Boolean),
+          toEmail: recipients,
+          ccEmails: ccRecipients,
+          bccEmails: bccRecipients,
           subject,
           message,
           attachments: emailAttachments,
@@ -244,7 +252,7 @@ export function EmailProposalModal({
               <Mail className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-white">Send Proposal</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-white">Email Proposal</h2>
               <p className="text-xs text-gray-400">#{proposalNumber}</p>
             </div>
           </div>
@@ -266,7 +274,7 @@ export function EmailProposalModal({
             </div>
           )}
 
-          {/* To */}
+          {/* To — supports one or multiple addresses */}
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
               To <span className="text-red-400">*</span>
@@ -274,20 +282,27 @@ export function EmailProposalModal({
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
-                type="email"
+                type="text"
+                inputMode="email"
                 value={toEmail}
                 onChange={(e) => setToEmail(e.target.value)}
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="customer@example.com"
+                placeholder="customer@example.com, manager@example.com"
                 disabled={loading}
               />
             </div>
           </div>
 
+          <p className="text-xs text-gray-400">Separate multiple To addresses with commas.</p>
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setShowCc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showCc}>Cc</button>
+            <button type="button" onClick={() => setShowBcc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showBcc}>Bcc</button>
+          </div>
+
           {/* CC */}
-          <div>
+          {showCc && <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
-              CC (optional)
+              Cc (optional)
             </label>
             <input
               type="text"
@@ -298,7 +313,12 @@ export function EmailProposalModal({
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
-          </div>
+          </div>}
+
+          {showBcc && <div>
+            <label htmlFor="proposal-bcc" className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Bcc (optional)</label>
+            <input id="proposal-bcc" type="text" value={bccEmails} onChange={event => setBccEmails(event.target.value)} disabled={loading} placeholder="email1@example.com, email2@example.com" className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500" />
+          </div>}
 
           {/* Subject */}
           <div>

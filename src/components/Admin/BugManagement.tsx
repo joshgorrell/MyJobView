@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Bug, CheckCircle2, Circle, Filter, Calendar, User, Bell, Mail, Settings, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import BugReportModal from '../Shared/BugReportModal';

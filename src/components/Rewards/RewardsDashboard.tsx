@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Award, Trophy, ShoppingCart, History, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -91,7 +92,7 @@ export function RewardsDashboard() {
     if (!profile) return;
 
     if (userPoints < reward.points_cost) {
-      alert(`You need ${reward.points_cost - userPoints} more points to redeem this reward.`);
+      notify(`You need ${reward.points_cost - userPoints} more points to redeem this reward.`, { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -126,11 +127,11 @@ export function RewardsDashboard() {
           .eq('id', reward.id);
       }
 
-      alert('Reward redeemed successfully! It will be processed by an administrator.');
+      notify('Reward redeemed successfully! It will be processed by an administrator.', { theme: 'amber', tone: 'success' });
       loadData();
     } catch (error) {
       console.error('Error redeeming reward:', error);
-      alert('Failed to redeem reward. Please try again.');
+      notify('Failed to redeem reward. Please try again.', { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -162,7 +163,7 @@ export function RewardsDashboard() {
             <Trophy className="w-5 h-5 text-yellow-500" />
             <h3 className="text-lg font-bold text-white">Top Performers</h3>
           </div>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2">
             {topPerformers.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-4">No points earned yet. Be the first!</p>
             ) : (

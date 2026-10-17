@@ -5,7 +5,8 @@ import ts from 'typescript';
 import { webcrypto } from 'node:crypto';
 let handler;
 const sent=[];
-const client={from(table){const q={select:()=>q,eq:()=>q,is:()=>q,update:()=>q,insert:()=>q,maybeSingle:async()=>({data:{id:'contact',portal_user_id:'portal-user'}}),then:resolve=>Promise.resolve({error:null}).then(resolve)};return q;}};
+let actor={organization_id:'org',role:'admin',is_active:true,contact_id:null};
+const client={auth:{getUser:async()=>({data:{user:{id:'staff'}},error:null})},from(table){const q={select:()=>q,eq:()=>q,is:()=>q,update:()=>q,insert:()=>q,maybeSingle:async()=>({data:table==='profiles'?actor:{id:'contact',portal_user_id:'portal-user',organization_id:'org'}}),then:resolve=>Promise.resolve({error:null}).then(resolve)};return q;}};
 const settings={company_name:'Electronic Life',company_email:'office@example.com',company_logo_url:'',portal_url:'https://dealer.example/portal',offices:[],from_address:'office@example.com'};
 const source=fs.readFileSync('supabase/functions/send-punchlist-invite/index.ts','utf8').replace(/^import .*;\n/gm,'');
 const context={Request,Response,crypto:webcrypto,console:{log(){},warn(){},error(){}},Uint8Array,
@@ -26,3 +27,5 @@ const result=await (await call({access_type:'test_and_tune',project_name:'Home T
 assert.match(result.subject,/Test & Tune/);
 assert.match(result.html,/Home Theater/);
 console.log('Selected-plan paid link, comped VIP welcome, and Test & Tune email checks passed.');
+
+actor={organization_id:'org',role:'portal_user',is_active:true,contact_id:'contact'};assert.equal((await call({access_type:'vip_signup'})).status,403);console.log('Portal callers cannot send invitations.');

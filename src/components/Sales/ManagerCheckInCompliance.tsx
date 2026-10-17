@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -6,10 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle,
-  AlertCircle,
-  Loader2,
-  FileText
-} from 'lucide-react';
+  Loader2} from 'lucide-react';
 
 interface RepSummary {
   id: string;

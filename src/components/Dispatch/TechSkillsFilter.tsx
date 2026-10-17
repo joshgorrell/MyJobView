@@ -6,7 +6,6 @@ import {
   Star,
   Filter,
   X,
-  CheckCircle,
   User
 } from 'lucide-react';
 
@@ -115,7 +114,7 @@ export function TechSkillsFilter({ onTechnicianSelect, onClose }: TechSkillsFilt
           )
         `)
         .eq('is_technician', true).eq('is_active', true)
-        .order('full_name');
+        .order('full_name').overrideTypes<TechnicianWithSkills[], { merge: false }>();
 
       if (error) throw error;
       setTechnicians(data || []);
@@ -152,7 +151,7 @@ export function TechSkillsFilter({ onTechnicianSelect, onClose }: TechSkillsFilt
           )
         `)
         .eq('is_technician', true).eq('is_active', true)
-        .order('full_name');
+        .order('full_name').overrideTypes<TechnicianWithSkills[], { merge: false }>();
 
       if (error) throw error;
 

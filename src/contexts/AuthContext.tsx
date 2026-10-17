@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, passwordRecoveryLink } from '../lib/supabase';
+import { verifyPasswordRecovery } from '../lib/passwordRecovery';
 import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
+import { browserInstallationId } from '../lib/sessionDevices';
 import { isValidReturnHost } from '../lib/crossDomainAuth';
 
 interface AuthContextType {
@@ -34,7 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(passwordRecoveryLink.active);
+  const recoveryVerifiedRef = useRef(false);
   const [isPortalUser, setIsPortalUser] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
@@ -49,8 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   loadingProfileRef.current = loadingProfile;
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const recoveryLink = new URLSearchParams(hash.replace(/^#/, '')).get('type') === 'recovery';
+    const recoveryLink = passwordRecoveryLink.active;
     if (recoveryLink) setIsPasswordRecovery(true);
 
     // Wrap getSession in a timeout so a hanging session fetch doesn't
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         setCompanySettings(null);
         setCurrentSessionId(null);
-        setIsPasswordRecovery(false);
+        setIsPasswordRecovery(recoveryLink);
         setIsPortalUser(false);
         setLoading(false);
         setLoadingProfile(false);
@@ -240,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
 
     if (error) throw error;
 
@@ -299,8 +301,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+    const redirect = new URL('/', window.location.origin);
+    redirect.searchParams.set('account_setup', 'reset');
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirect.toString(),
     });
 
     if (error) {
@@ -325,6 +329,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function updatePassword(newPassword: string) {
+    if (passwordRecoveryLink.active && !recoveryVerifiedRef.current) {
+      const verifiedUser = await verifyPasswordRecovery(supabase, passwordRecoveryLink);
+      recoveryVerifiedRef.current = true;
+      setUser(verifiedUser);
+      // Remove credentials from the address bar after verification succeeds.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.hash = '';
+      cleanUrl.searchParams.delete('code');
+      window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
+    }
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
     });
@@ -339,11 +353,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       cleanupSessionTracking();
 
-      const deviceInfo = parseUserAgent(navigator.userAgent);
+      const deviceInfo = parseUserAgent(navigator.userAgent, navigator.maxTouchPoints);
 
-      const { data, error } = await supabase.rpc('start_user_session', {
-        p_user_id: userId,
-        p_ip_address: null,
+      const { data, error } = await supabase.rpc('start_browser_session', {
+        p_browser_id: browserInstallationId(),
         p_user_agent: navigator.userAgent,
         p_device_type: deviceInfo.deviceType,
         p_browser_name: deviceInfo.browserName,
@@ -391,11 +404,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const handleVisibilityChange = async () => {
           if (document.visibilityState === 'visible') {
             try {
-              await supabase.rpc('update_session_activity', {
-                p_user_id: userId,
-                p_page: null,
-                p_session_id: data
-              });
+              await startSessionTracking(userId);
             } catch (err) {
               console.error('⚠️ Error updating session activity on visibility change:', err);
             }
@@ -404,36 +413,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         (window as any).__visibilityHandler = handleVisibilityChange;
 
-        // Handle visibility change to hidden — mark session inactive when tab is closed
-        // We use visibilitychange instead of beforeunload because beforeunload fires
-        // on every SPA navigation (React router), killing sessions constantly.
-        const handleHide = () => {
-          if (document.visibilityState === 'hidden') {
-            try {
-              const sessionIdToEnd = (window as any).__currentSessionId;
-              const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/end_user_session`;
-              const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-              const { data: { session } } = (supabase.auth as any)._session
-                ? { data: { session: (supabase.auth as any)._session } }
-                : { data: { session: null } };
-              const token = session?.access_token || anonKey;
-              const blob = new Blob(
-                [JSON.stringify({ p_session_id: sessionIdToEnd })],
-                { type: 'application/json' }
-              );
-              const headers = new Headers({
-                'Authorization': `Bearer ${token}`,
-                'apikey': anonKey,
-                'Content-Type': 'application/json',
-              });
-              fetch(url, { method: 'POST', headers, body: blob, keepalive: true }).catch(() => {});
-            } catch (err) {
-              // non-critical
-            }
-          }
-        };
-        document.addEventListener('visibilitychange', handleHide);
-        (window as any).__hideHandler = handleHide;
         (window as any).__currentSessionId = data;
       }
     } catch (error) {

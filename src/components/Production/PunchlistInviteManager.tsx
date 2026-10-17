@@ -25,7 +25,6 @@ import {
   PauseCircle,
   Link,
   Phone,
-  Info,
   ChevronDown,
   ChevronUp,
   Zap,
@@ -499,7 +498,7 @@ export function PunchlistInviteManager({ openInviteCount = 0, onViewCustomerTask
     contactName: string;
   } | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [infoPopoverFor, setInfoPopoverFor] = useState<string | null>(null);
+  const [_infoPopoverFor, _setInfoPopoverFor] = useState<string | null>(null);
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<any | null>(null);
   const [resendConfirm, setResendConfirm] = useState<{
     type: 'invite_email' | 'magic_link';

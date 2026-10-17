@@ -1,8 +1,8 @@
 import Flow from '../Flow/Flow';
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, FileText, Calendar, DollarSign, MessageSquare, Settings, CheckSquare, Clock, ClipboardList } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, DollarSign, MessageSquare, CheckSquare, Clock, ClipboardList } from 'lucide-react';
 import ProjectOverview from './ProjectOverview';
 import ProjectScope from './ProjectScope';
 import ProjectAppointments from './ProjectAppointments';
@@ -104,8 +104,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
 
   const canLogActivity =
     profile?.role === 'admin' ||
-    profile?.role === 'manager' ||
-    profile?.role === 'project_manager';
+    profile?.role === 'manager';
 
   const tabs = [
     { id: 'flow' as TabType, label: 'Flow', icon: Clock },
@@ -195,7 +194,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
           <div className="p-6">
             <ProjectTasksList
               projectId={projectId}
-              canEdit={profile?.role === 'admin' || profile?.role === 'project_manager' || profile?.role === 'production_manager'}
+              canEdit={profile?.role === 'admin' || profile?.role === 'manager'}
             />
           </div>
         )}

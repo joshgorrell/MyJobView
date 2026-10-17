@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { User, Mail, Phone, Linkedin, Globe, MapPin, QrCode, Download, X, Copy, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -89,7 +90,7 @@ export function LiveCardView({ cardId, onClose }: LiveCardViewProps) {
       setShowQRModal(true);
     } catch (error) {
       console.error('Error generating QR code:', error);
-      alert('Failed to generate QR code');
+      notify('Failed to generate QR code', { theme: 'blue', tone: 'error' });
     } finally {
       setLoadingQR(false);
     }
@@ -131,7 +132,7 @@ export function LiveCardView({ cardId, onClose }: LiveCardViewProps) {
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Error copying vCard:', error);
-      alert('Failed to copy contact card');
+      notify('Failed to copy contact card', { theme: 'blue', tone: 'error' });
     }
   }
 

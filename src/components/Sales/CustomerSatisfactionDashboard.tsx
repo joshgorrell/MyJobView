@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ThumbsUp, AlertCircle, Users, TrendingUp, CheckCircle, Clock, Lock, Eye, EyeOff, MessageSquare, CheckCheck, RotateCcw } from 'lucide-react';
@@ -40,20 +40,6 @@ function scoreColor(pct: number) {
   return 'text-red-400';
 }
 
-const RADIAN = Math.PI / 180;
-function renderCustomPieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: {
-  cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number; name: string;
-}) {
-  if (percent < 0.05) return null;
-  const radius = outerRadius + 28;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  return (
-    <text x={x} y={y} fill="#9ca3af" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11}>
-      {name} {(percent * 100).toFixed(0)}%
-    </text>
-  );
-}
 
 export function CustomerSatisfactionDashboard() {
   const { profile } = useAuth();
@@ -162,37 +148,6 @@ export function CustomerSatisfactionDashboard() {
 
   const overallScore = scorePercent(counts);
 
-  const pieData = [
-    { name: 'Excellent', value: counts.excellent, color: '#16a34a' },
-    { name: 'Good', value: counts.good, color: '#2563eb' },
-    { name: 'Okay', value: counts.okay, color: '#d97706' },
-    { name: 'Needs Attention', value: counts.needs_attention, color: '#dc2626' },
-  ].filter(d => d.value > 0);
-
-  const barData = [
-    { name: 'Excellent', value: counts.excellent, fill: '#16a34a' },
-    { name: 'Good', value: counts.good, fill: '#2563eb' },
-    { name: 'Okay', value: counts.okay, fill: '#d97706' },
-    { name: 'Needs Attention', value: counts.needs_attention, fill: '#dc2626' },
-  ];
-
-  function buildPersonTable(groupKey: 'sales_rep_name' | 'lead_tech_name') {
-    const map: Record<string, { excellent: number; good: number; okay: number; needs_attention: number }> = {};
-    for (const r of responded) {
-      const name = r[groupKey]?.trim() || 'Unassigned';
-      if (!map[name]) map[name] = { excellent: 0, good: 0, okay: 0, needs_attention: 0 };
-      if (r.rating === 'excellent') map[name].excellent++;
-      else if (r.rating === 'good') map[name].good++;
-      else if (r.rating === 'okay') map[name].okay++;
-      else if (r.rating === 'needs_attention') map[name].needs_attention++;
-    }
-    return Object.entries(map)
-      .map(([name, c]) => ({ name, ...c, score: scorePercent(c) }))
-      .sort((a, b) => b.score - a.score);
-  }
-
-  const salesRepTable = buildPersonTable('sales_rep_name');
-  const leadTechTable = buildPersonTable('lead_tech_name');
 
   const allNeedsAttention = responded.filter(r => r.rating === 'okay' || r.rating === 'needs_attention');
   const needsAttentionRecords = allNeedsAttention.filter(r => !r.follow_up_cleared_at);

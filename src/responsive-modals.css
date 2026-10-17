@@ -64,3 +64,13 @@ dialog[open].fixed.inset-0 {
   max-width: calc(100dvw - max(env(safe-area-inset-left), 12px) - max(env(safe-area-inset-right), 12px));
   overscroll-behavior: contain;
 }
+
+/* A gentle entrance for legacy panels without their own choreography.
+   Leave custom animated successes and QuickActionModal untouched. */
+@keyframes legacyDialogEnter { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+:where(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]):not([style*="animation"]):not([class*="animate-"]):not(.qam-sheet):not(.confirm-panel) {
+  animation: legacyDialogEnter .2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.responsive-modal-panel, .fixed.inset-0[class*="bg-black"] > [class*="rounded"][class*="bg-"]) { animation: none !important; }
+}

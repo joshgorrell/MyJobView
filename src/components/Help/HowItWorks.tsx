@@ -1,4 +1,4 @@
-import { BookOpen, Users, Briefcase, Activity, MessageSquare, CheckSquare, CreditCard, Fish, TrendingUp, Bell, Hash, AtSign, Calendar, Building2, UserPlus, Settings, Lightbulb } from 'lucide-react';
+import { BookOpen, Users, Briefcase, Activity, MessageSquare, CheckSquare, CreditCard, Fish, TrendingUp, Bell, Calendar, Building2, UserPlus, Settings, Lightbulb } from 'lucide-react';
 
 export function HowItWorks() {
   return (

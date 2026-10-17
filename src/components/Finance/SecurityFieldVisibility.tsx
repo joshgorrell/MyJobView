@@ -1,4 +1,3 @@
-import React from 'react';
 
 export function SecurityFieldVisibility({ internal = false }: { internal?: boolean }) {
   return <span className={`inline-block ml-2 px-2 py-0.5 rounded text-xs font-medium align-middle ${internal ? 'bg-gray-100 text-gray-700' : 'bg-blue-50 text-blue-800'}`}>

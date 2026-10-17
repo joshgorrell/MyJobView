@@ -29,7 +29,7 @@ export default function ProductsGridView({
   showBrand = true
 }: ProductsGridViewProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4">
       {products.map(product => {
         const cost = Number(product.cost || 0);
         const price = Number(product.our_price ?? product.unit_price ?? 0);
@@ -43,7 +43,7 @@ export default function ProductsGridView({
           >
             {/* Product Image */}
             <div
-              className="relative w-full h-48 bg-canvas cursor-pointer group"
+              className="relative w-full h-28 sm:h-48 bg-canvas cursor-pointer group"
             >
               {product.image_url ? (
                 <img
@@ -59,7 +59,7 @@ export default function ProductsGridView({
             </div>
 
             {/* Content */}
-            <div className="p-3 space-y-2">
+            <div className="p-2 sm:p-3 space-y-1 sm:space-y-2">
               {/* Vendor + SKU */}
               <div className="min-h-[40px]">
                 {showBrand && product.brandName && <div className="text-xs text-muted truncate">{product.brandName}</div>}
@@ -93,7 +93,7 @@ export default function ProductsGridView({
               <div className="pt-2 border-t border-strong space-y-1">
                 <div className="flex items-baseline justify-between">
                   <span className="text-xs text-muted">Price:</span>
-                  <span className="text-lg font-bold text-primary">
+                  <span className="text-sm sm:text-lg font-bold text-primary">
                     ${price.toFixed(2)}
                   </span>
                 </div>
@@ -106,7 +106,7 @@ export default function ProductsGridView({
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-1 pt-2 border-t border-strong" onClick={event => event.stopPropagation()}>
+              <div className="hidden sm:flex items-center gap-1 pt-2 border-t border-strong" onClick={event => event.stopPropagation()}>
                 {canEdit && (
                   <>
                     <button

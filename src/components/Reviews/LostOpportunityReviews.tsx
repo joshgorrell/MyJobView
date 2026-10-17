@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { FullEmailPreview } from "./FullEmailPreview";
 import AdminSalesReviewModal from "./AdminSalesReviewModal";
 import React, { useEffect, useState } from "react";
@@ -42,7 +43,7 @@ interface Review {
   response_created_at: string | null;
 }
 export default function LostOpportunityReviews(
-  { showCreate = false }: { showCreate?: boolean },
+  { showCreate: _showCreate = false }: { showCreate?: boolean },
 ) {
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -176,14 +177,7 @@ export default function LostOpportunityReviews(
       active = false;
     };
   }, [contact, org]);
-  async function openResponse(review: Review) {
-    if (expandedReview === review.request_id) {
-      setExpandedReview(null);
-      return;
-    }
-    setExpandedReview(review.request_id);
-    await markViewed(review);
-  }
+
   async function markViewed(review: Review) {
     if (review.reviewed_at) return;
     setBusy(true);
@@ -675,7 +669,7 @@ export default function LostOpportunityReviews(
                     aria-label="Delete lost opportunity review"
                     title="Delete review"
                     onClick={async () => {
-                      if (!window.confirm("Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.")) return;
+                      if (!(await requestConfirmation("Delete this lost opportunity review? This permanently removes the request, any customer response, and uploaded bid files. This cannot be undone.", { theme: 'blue' }))) return;
                       if (await action({ action: "delete", request_id: v.request_id })) {
                         setExpandedReview(null);
                         setNotice("Lost opportunity review deleted.");

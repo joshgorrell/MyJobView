@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Upload, FileText, AlertCircle, CheckCircle, X, Download,
+  Upload, AlertCircle, CheckCircle, Download,
   ArrowRight, ArrowLeft, Users, SkipForward, Trash2,
   ChevronDown, ChevronUp, History, RotateCcw, Search,
   RefreshCw, Eye
@@ -104,14 +104,6 @@ function normalizePhone(phone: string): string {
   return phone.trim();
 }
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function looksLikePhone(value: string): boolean {
-  const digits = value.replace(/\D/g, '');
-  return digits.length >= 7 && /^[\d\s\-().+x]+$/i.test(value.trim());
-}
 
 function extractPhoneFromEmailField(value: string): { phone: string | null; label: string | null } {
   const v = value.trim();
@@ -998,17 +990,17 @@ export function ContactCSVImport() {
               })}
             </div>
 
-            {!mapping.first_name && !mapping.last_name && !mapping.full_name && !mapping.company_name && (
+            {!mapping.first_name && !mapping.last_name && !mapping.company_name && (
               <div className="mt-4 flex items-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                At minimum, map a name field (First Name, Last Name, Full Name, or Company Name) to proceed.
+                At minimum, map a name field (First Name, Last Name, or Company Name) to proceed.
               </div>
             )}
 
             <div className="mt-6 flex justify-end">
               <button
                 onClick={runValidation}
-                disabled={!mapping.first_name && !mapping.last_name && !mapping.full_name && !mapping.company_name}
+                disabled={!mapping.first_name && !mapping.last_name && !mapping.company_name}
                 className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 Validate & Review
