@@ -17,6 +17,8 @@ interface CompanySettings {
   google_maps_api_key_updated_at?: string;
   twilio_auth_token_updated_at?: string;
   openai_api_key_updated_at?: string;
+  has_twilio_auth_token?: boolean;
+  has_openai_api_key?: boolean;
 }
 
 interface OrgPaymentSettings {
@@ -26,6 +28,8 @@ interface OrgPaymentSettings {
   bill_com_org_id: string | null;
   bill_com_api_key: string | null;
   payment_processor_updated_at: string | null;
+  has_stripe_invoice_secret_key?: boolean;
+  has_bill_com_api_key?: boolean;
 }
 
 export function IntegrationsSettings() {
@@ -75,7 +79,7 @@ export function IntegrationsSettings() {
     try {
       const { data, error } = await supabase
         .from('company_settings')
-        .select('google_maps_api_key, twilio_account_sid, twilio_auth_token, twilio_phone_number, on_my_way_sms_template, openai_api_key, ai_assistant_enabled, from_email, from_name, reply_to_email, google_maps_api_key_updated_at, twilio_auth_token_updated_at, openai_api_key_updated_at')
+        .select('google_maps_api_key, twilio_account_sid, twilio_phone_number, on_my_way_sms_template, ai_assistant_enabled, from_email, from_name, reply_to_email, google_maps_api_key_updated_at, twilio_auth_token_updated_at, openai_api_key_updated_at, has_twilio_auth_token, has_openai_api_key')
         .single();
 
       if (error) throw error;
@@ -92,7 +96,7 @@ export function IntegrationsSettings() {
     try {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, payment_processor, stripe_invoice_publishable_key, stripe_invoice_secret_key, bill_com_org_id, bill_com_api_key, payment_processor_updated_at')
+        .select('id, payment_processor, stripe_invoice_publishable_key, bill_com_org_id, payment_processor_updated_at, has_stripe_invoice_secret_key, has_bill_com_api_key')
         .maybeSingle();
 
       if (error) throw error;
@@ -101,10 +105,12 @@ export function IntegrationsSettings() {
         const ps: OrgPaymentSettings = {
           payment_processor: data.payment_processor || null,
           stripe_invoice_publishable_key: data.stripe_invoice_publishable_key || null,
-          stripe_invoice_secret_key: data.stripe_invoice_secret_key || null,
+          stripe_invoice_secret_key: null,
           bill_com_org_id: data.bill_com_org_id || null,
-          bill_com_api_key: data.bill_com_api_key || null,
+          bill_com_api_key: null,
           payment_processor_updated_at: data.payment_processor_updated_at || null,
+          has_stripe_invoice_secret_key: !!data.has_stripe_invoice_secret_key,
+          has_bill_com_api_key: !!data.has_bill_com_api_key,
         };
         setPaymentSettings(ps);
         setOriginalPaymentSettings(ps);
@@ -120,10 +126,10 @@ export function IntegrationsSettings() {
     if (originalSettings.google_maps_api_key && settings.google_maps_api_key !== originalSettings.google_maps_api_key) {
       changed.push('Google Maps API Key');
     }
-    if (originalSettings.twilio_auth_token && settings.twilio_auth_token !== originalSettings.twilio_auth_token) {
+    if (originalSettings.has_twilio_auth_token && !!settings.twilio_auth_token) {
       changed.push('Twilio Auth Token');
     }
-    if (originalSettings.openai_api_key && settings.openai_api_key !== originalSettings.openai_api_key) {
+    if (originalSettings.has_openai_api_key && !!settings.openai_api_key) {
       changed.push('OpenAI API Key');
     }
 
@@ -160,11 +166,18 @@ export function IntegrationsSettings() {
       const updateData: any = {
         payment_processor: paymentSettings.payment_processor,
         stripe_invoice_publishable_key: paymentSettings.stripe_invoice_publishable_key || null,
-        stripe_invoice_secret_key: paymentSettings.stripe_invoice_secret_key || null,
         bill_com_org_id: paymentSettings.bill_com_org_id || null,
-        bill_com_api_key: paymentSettings.bill_com_api_key || null,
         payment_processor_updated_at: new Date().toISOString(),
       };
+
+      // Secret credentials are never read back into the browser. Only write them
+      // when the administrator has typed a new value into the field.
+      if (paymentSettings.stripe_invoice_secret_key) {
+        updateData.stripe_invoice_secret_key = paymentSettings.stripe_invoice_secret_key;
+      }
+      if (paymentSettings.bill_com_api_key) {
+        updateData.bill_com_api_key = paymentSettings.bill_com_api_key;
+      }
 
       const { error } = await supabase
         .from('organizations')
@@ -197,16 +210,21 @@ export function IntegrationsSettings() {
 
       if (currentSettings?.id) {
         // Build the update object with timestamp tracking
-        const updateData: any = { ...settings };
+        // Secret credentials are never read back into the browser, so only send
+        // them when the administrator has typed a new value.
+        const { has_twilio_auth_token, has_openai_api_key, ...editable } = settings as any;
+        const updateData: any = { ...editable };
+        if (!updateData.twilio_auth_token) delete updateData.twilio_auth_token;
+        if (!updateData.openai_api_key) delete updateData.openai_api_key;
 
         // Update timestamps for changed API keys
         if (settings.google_maps_api_key !== originalSettings.google_maps_api_key) {
           updateData.google_maps_api_key_updated_at = new Date().toISOString();
         }
-        if (settings.twilio_auth_token !== originalSettings.twilio_auth_token) {
+        if (updateData.twilio_auth_token) {
           updateData.twilio_auth_token_updated_at = new Date().toISOString();
         }
-        if (settings.openai_api_key !== originalSettings.openai_api_key) {
+        if (updateData.openai_api_key) {
           updateData.openai_api_key_updated_at = new Date().toISOString();
         }
 
@@ -549,7 +567,10 @@ export function IntegrationsSettings() {
                     {showStripeSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Starts with sk_live_ or sk_test_</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Starts with sk_live_ or sk_test_
+                  {paymentSettings.has_stripe_invoice_secret_key ? ' — a secret key is already saved. Leave blank to keep it.' : ''}
+                </p>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -619,6 +640,9 @@ export function IntegrationsSettings() {
                     {showBillComKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {paymentSettings.has_bill_com_api_key && (
+                  <p className="mt-1 text-xs text-gray-500">An API key is already saved. Leave blank to keep it.</p>
+                )}
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -853,6 +877,7 @@ export function IntegrationsSettings() {
                 </button>
               </div>
               <p className="mt-2 text-xs text-gray-400">
+                {settings.has_twilio_auth_token ? 'A token is already saved. Leave blank to keep it. ' : ''}
                 Last updated: {formatTimestamp(settings.twilio_auth_token_updated_at)}
               </p>
             </div>
@@ -1124,6 +1149,7 @@ export function IntegrationsSettings() {
                 </a>
               </p>
               <span className="text-gray-400">
+                {settings.has_openai_api_key ? 'A key is already saved. Leave blank to keep it. ' : ''}
                 Last updated: {formatTimestamp(settings.openai_api_key_updated_at)}
               </span>
             </div>
@@ -1155,7 +1181,7 @@ export function IntegrationsSettings() {
                 />
               </button>
             </div>
-            {settings.ai_assistant_enabled && !settings.openai_api_key && (
+            {settings.ai_assistant_enabled && !settings.openai_api_key && !settings.has_openai_api_key && (
               <p className="mt-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
                 An OpenAI API key is required for the assistant to function.

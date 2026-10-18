@@ -26,6 +26,12 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+    const authHeader = req.headers.get('Authorization') || '';
+    const cronSecret = Deno.env.get('CRON_SECRET') || '';
+    if (!((supabaseServiceKey && authHeader === `Bearer ${supabaseServiceKey}`) || (cronSecret && authHeader === `Bearer ${cronSecret}`))) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase environment variables are not configured');
     }

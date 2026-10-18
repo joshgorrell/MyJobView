@@ -148,10 +148,10 @@ export default function DesignBriefModal({
   useEffect(() => {
     supabase
       .from('company_settings')
-      .select('openai_api_key')
+      .select('has_openai_api_key')
       .maybeSingle()
       .then(({ data }) => {
-        setOpenAIConfigured(!!(data?.openai_api_key));
+        setOpenAIConfigured(!!(data?.has_openai_api_key));
       });
   }, []);
 

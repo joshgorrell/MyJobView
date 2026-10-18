@@ -70,7 +70,7 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
     try {
       await onSubmit({ ...formData, paymentType });
     } catch (err: any) {
-      setError(err.message || 'Payment failed. Please try again.');
+      setError('Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }

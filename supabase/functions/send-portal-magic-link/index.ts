@@ -205,24 +205,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!contact) {
+    if (!contact || !contact.portal_access_enabled) {
       return new Response(
-        JSON.stringify({
-          error: 'No customer account found with this email address. Click here to sign up now!',
-          isNewCustomer: true
-        }),
+        JSON.stringify({ success: true, message: 'If a portal account exists for this email, a login link has been sent.' }),
         {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    if (!contact.portal_access_enabled) {
-      return new Response(
-        JSON.stringify({ error: 'Portal access is not enabled for your account. Please contact support.' }),
-        {
-          status: 403,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -262,12 +249,9 @@ Deno.serve(async (req: Request) => {
 
     if (!subscription && !accessGrant && !securityContract) {
       return new Response(
-        JSON.stringify({
-          error: 'You have not completed your VIP membership signup. Please complete your registration to access the portal.',
-          incompleteSignup: true
-        }),
+        JSON.stringify({ success: true, message: 'If a portal account exists for this email, a login link has been sent.' }),
         {
-          status: 403,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );

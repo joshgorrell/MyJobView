@@ -68,7 +68,7 @@ export function MyCardView() {
   async function loadCompanyInfo() {
     try {
       const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
+        supabase.from('company_settings').select('company_name, company_logo_url, website').eq('organization_id', profile?.organization_id).maybeSingle(),
         supabase.from('company_offices').select('*').order('display_order', { ascending: true })
       ]);
 

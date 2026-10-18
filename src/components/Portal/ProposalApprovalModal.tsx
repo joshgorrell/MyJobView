@@ -168,7 +168,7 @@ export function ProposalApprovalModal({
       setStep('success');
     } catch (error: any) {
       console.error('Error approving proposal:', error);
-      notify(error.message || 'Error approving proposal. Please try again.', { theme: 'blue', tone: 'error' });
+      notify('Error approving proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +193,7 @@ export function ProposalApprovalModal({
       setStep('success');
     } catch (error: any) {
       console.error('Error approving proposal:', error);
-      notify(error.message || 'Error approving proposal. Please try again.', { theme: 'blue', tone: 'error' });
+      notify('Error approving proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

@@ -104,7 +104,8 @@ Deno.serve(async (req: Request) => {
         .eq('id', proposalId);
     }
 
-    const { data: settings } = await supabaseClient
+    // Credentials are read with the service role; client roles cannot read them.
+    const { data: settings } = await supabaseAdmin
       .from('company_settings')
       .select('company_name, company_email, from_email, from_name, reply_to_email, portal_url, twilio_account_sid, twilio_auth_token, twilio_phone_number')
       .maybeSingle();

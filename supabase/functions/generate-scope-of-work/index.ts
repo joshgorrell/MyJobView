@@ -72,7 +72,14 @@ Deno.serve(async (req: Request) => {
       throw new Error("Unauthorized");
     }
 
-    const { data: settings, error: settingsError } = await supabaseClient
+    // The API key column is not readable by the signed-in user's role, so it is
+    // read with the service role after the caller has been authenticated above.
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from("company_settings")
       .select("openai_api_key")
       .single();

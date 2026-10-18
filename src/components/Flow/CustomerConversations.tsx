@@ -647,37 +647,27 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   }
 
   return (
-    <div className="customer-conversations w-full min-w-0 px-2 sm:px-4 py-4 sm:py-6">
+    <div className="customer-conversations w-full min-w-0 px-2 sm:px-4 py-2 sm:py-3">
       {loadError && <div role="alert" className="p-3 text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }}>Retry</button></div>}
       {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert">This conversation is unavailable or you do not have access.</p>}
-      {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-600">Total</p>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-            <MessageSquare className="w-6 h-6 sm:w-8 h-8 text-blue-600" />
-          </div>
+      {/* Stats bar — compact inline strip */}
+      <div className="flex items-center gap-3 sm:gap-5 mb-2 px-1">
+        <div className="flex items-center gap-1.5">
+          <MessageSquare className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+          <span className="text-sm font-bold text-gray-900">{stats.total}</span>
+          <span className="text-xs text-gray-500">total</span>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-600">Unanswered</p>
-              <p className="text-xl sm:text-2xl font-bold text-orange-600">{stats.unanswered}</p>
-            </div>
-            <AlertCircle className="w-6 h-6 sm:w-8 h-8 text-orange-600" />
-          </div>
+        <div className="w-px h-4 bg-gray-300" />
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" />
+          <span className="text-sm font-bold text-orange-600">{stats.unanswered}</span>
+          <span className="text-xs text-gray-500">unanswered</span>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-600">Unread</p>
-              <p className="text-xl sm:text-2xl font-bold text-red-600">{stats.unread}</p>
-            </div>
-            <Clock className="w-6 h-6 sm:w-8 h-8 text-red-600" />
-          </div>
+        <div className="w-px h-4 bg-gray-300" />
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+          <span className="text-sm font-bold text-red-600">{stats.unread}</span>
+          <span className="text-xs text-gray-500">unread</span>
         </div>
       </div>
 

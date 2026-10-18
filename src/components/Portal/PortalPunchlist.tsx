@@ -398,7 +398,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       if (contactId) loadTasks(contactId);
     } catch (error) {
       console.error('Error deleting task:', error);
-      notify((error as { message?: string }).message || 'This item could not be removed. Please contact your service manager.', { theme: 'blue', tone: 'error' });
+      notify('This item could not be removed. Please contact your service manager.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -435,7 +435,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
       setShowCamera(null);
     } catch (error: any) {
       console.error('Error uploading photo:', error);
-      notify(`Failed to upload photo: ${error.message}`, { theme: 'blue', tone: 'error' });
+      notify('Failed to upload photo. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setUploadingPhoto(null);
     }
@@ -517,7 +517,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error requesting service:', error);
-          notify(`Failed to request service: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
+          notify('Failed to request service. Please try again.', { theme: 'blue', tone: 'error' });
         } finally {
           setRequestingService(false);
         }
@@ -568,7 +568,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error cancelling service request:', error);
-          notify(`Failed to cancel service request: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
+          notify('Failed to cancel service request. Please try again.', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -591,7 +591,7 @@ export function PortalPunchlist({ previewContactId, isEmbedded = false }: Portal
           if (contactId) loadTasks(contactId);
         } catch (error: any) {
           console.error('Error deleting task:', error);
-          notify(`Failed to delete task: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
+          notify('Failed to delete task. Please try again.', { theme: 'blue', tone: 'error' });
         }
       }
     });

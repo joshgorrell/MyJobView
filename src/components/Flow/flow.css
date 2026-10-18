@@ -214,8 +214,8 @@
 @media(max-width:640px){.flow .flow-heading .flow-desktop-label{display:none}.flow .flow-heading .flow-mobile-label{display:inline}}
 @container (max-width:340px){.flow .flow-heading{flex-wrap:nowrap}.flow .flow-heading>div:first-child{min-width:0}.flow-heading-actions{margin-left:auto}}
 
-.flow-message-filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
-.flow-message-filters button { padding: 6px 12px; border: 1px solid var(--flow-border, #d1d5db); border-radius: 8px; }
+.flow-message-filters { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 2px; }
+.flow-message-filters button { padding: 4px 10px; border: 1px solid var(--flow-border, #d1d5db); border-radius: 6px; font-size: 12px; min-height: 28px; }
 
 .flow .flow-heading-actions .flow-create-action{width:40px;height:40px;min-height:40px;padding:0;border-radius:8px}
 @media(max-width:640px){.flow .flow-heading-actions .flow-create-action{width:44px;height:44px}}

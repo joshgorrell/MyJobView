@@ -148,10 +148,17 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const authHeader = req.headers.get('Authorization') || '';
+  const cronSecret = Deno.env.get('CRON_SECRET') || '';
+  if (!((supabaseServiceKey && authHeader === `Bearer ${supabaseServiceKey}`) || (cronSecret && authHeader === `Bearer ${cronSecret}`))) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   try {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      supabaseServiceKey
     );
 
     const { data: allSettings, error: settingsErr } = await supabaseAdmin

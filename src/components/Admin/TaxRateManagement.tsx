@@ -97,11 +97,12 @@ export default function TaxRateManagement() {
     try {
       const { data: settingsData, error: settingsError } = await supabase
         .from('company_settings')
-        .select('taxjar_api_key, taxjar_api_key_updated_at, tax_origin_method')
+        .select('has_taxjar_api_key, taxjar_api_key_updated_at, tax_origin_method')
         .maybeSingle();
 
       if (settingsError) throw settingsError;
-      setTaxjarApiKey(settingsData?.taxjar_api_key || '');
+      // The stored key is never sent to the browser; leaving the field blank keeps it.
+      setTaxjarApiKey('');
       setApiKeyUpdatedAt(settingsData?.taxjar_api_key_updated_at || null);
       if (settingsData?.tax_origin_method) setTaxOriginMethod(settingsData.tax_origin_method);
 
@@ -136,17 +137,22 @@ export default function TaxRateManagement() {
 
       if (!settingsData) throw new Error('Company settings not found');
 
+      if (!taxjarApiKey) {
+        notify('Enter a key to save, or leave this screen to keep the current one.', { theme: 'blue', tone: 'error' });
+        return;
+      }
+
       const nowIso = new Date().toISOString();
       const { error } = await supabase
         .from('company_settings')
         .update({
-          taxjar_api_key: taxjarApiKey || null,
-          taxjar_api_key_updated_at: taxjarApiKey ? nowIso : null,
+          taxjar_api_key: taxjarApiKey,
+          taxjar_api_key_updated_at: nowIso,
         })
         .eq('id', settingsData.id);
 
       if (error) throw error;
-      setApiKeyUpdatedAt(taxjarApiKey ? nowIso : null);
+      setApiKeyUpdatedAt(nowIso);
       notify('TaxJar API key saved successfully!', { theme: 'blue', tone: 'success' });
       setShowApiKeySettings(false);
     } catch (error) {
