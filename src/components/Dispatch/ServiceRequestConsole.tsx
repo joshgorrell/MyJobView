@@ -1,4 +1,4 @@
-import { useState, Suspense, lazy } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { ListTodo, BarChart3, Inbox, Plus } from 'lucide-react';
 
 const ServiceRequestQueue = lazy(() => import('./ServiceRequestQueue').then(m => ({ default: m.ServiceRequestQueue })));
@@ -27,10 +27,17 @@ interface ServiceRequestConsoleProps {
 }
 
 export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps) {
+  const [requestId, setRequestId] = useState(() => new URLSearchParams(window.location.search).get('serviceRequestId'));
+  useEffect(() => {
+    const update = () => setRequestId(new URLSearchParams(window.location.search).get('serviceRequestId'));
+    window.addEventListener('popstate', update);
+    return () => window.removeEventListener('popstate', update);
+  }, []);
   const [manualOpen, setManualOpen] = useState(false);
   const manualTestOnly = import.meta.env.VITE_SMART_INTAKE_UI_ENABLED !== 'true';
   const [queueRevision, setQueueRevision] = useState(0);
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab && TABS.some(tab => tab.key === initialTab) ? initialTab : 'queue');
+  const [activeTab, setActiveTab] = useState<TabKey>(requestId ? 'queue' : initialTab && TABS.some(tab => tab.key === initialTab) ? initialTab : 'queue');
+  useEffect(() => { if (requestId) setActiveTab('queue'); }, [requestId]);
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-2 sm:space-y-4">
@@ -58,7 +65,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
       {activeTab === 'intake' && <button type="button" onClick={() => setManualOpen(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"><Plus className="h-4 w-4" /> New Intake</button>}
       <Suspense fallback={<TabFallback />}>
         {activeTab === 'intake' && manualOpen && <ManualIntake serviceOnly={manualTestOnly} onClose={() => setManualOpen(false)} onCreated={() => { setManualOpen(false); setQueueRevision(value => value + 1); setActiveTab('queue'); }} />}
-        {activeTab === 'queue' && <ServiceRequestQueue key={queueRevision} />}
+        {activeTab === 'queue' && <ServiceRequestQueue key={`${queueRevision}:${requestId || 'queue'}`} requestId={requestId} />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
         {activeTab === 'intake' && !manualTestOnly && <SmartIntakeHistory />}
         {activeTab === 'intake' && manualTestOnly && <p className="text-sm text-gray-400">Manual Service Request testing is enabled. Automated email and SMS intake are not active.</p>}

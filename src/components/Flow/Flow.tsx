@@ -147,6 +147,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     if (event.source_table === 'proposals' && hasModuleAccess('proposals')) result.push(event.event_type === 'proposal_first_opened'
       ? { label: 'View Activity', url: proposalActivityPath(event.source_id) }
       : { label: 'Open proposal', url: `?tab=proposals&proposalId=${event.source_id}` });
+    if (event.source_table === 'service_requests' && hasModuleAccess('service_requests')) result.push({ label: 'Open service request', url: `/service-requests?serviceRequestId=${encodeURIComponent(event.source_id)}` });
     if (event.source_table === 'change_orders' && hasModuleAccess('change_orders')) result.push({ label: 'Open change order', url: `?tab=change_orders&coId=${event.source_id}` });
     return result;
   }
