@@ -65,6 +65,8 @@ export function CompanySettings() {
   const [forgotClockOutPenaltyPoints, setForgotClockOutPenaltyPoints] = useState(15);
 
   // Auto Review Follow-up Settings
+  const [autoReviewFollowupEnabled, setAutoReviewFollowupEnabled] = useState(false);
+  const [autoReviewFollowupDays, setAutoReviewFollowupDays] = useState(14);
 
   // Billing Preference Settings
   const [annualBillingEnabled, setAnnualBillingEnabled] = useState(false);
@@ -151,6 +153,8 @@ export function CompanySettings() {
         setForgotClockOutPenaltyPoints(data.forgot_clock_out_penalty_points ?? 15);
 
         // Auto review follow-up settings
+        setAutoReviewFollowupEnabled(data.auto_review_followup_enabled ?? false);
+        setAutoReviewFollowupDays(data.auto_review_followup_days ?? 14);
         setAnnualBillingEnabled(data.annual_billing_enabled ?? false);
         setDefaultBillingPreference(data.default_billing_preference ?? 'monthly');
         setAnnualDiscountType(data.annual_discount_type ?? 'none');
@@ -471,6 +475,8 @@ export function CompanySettings() {
             auto_clock_out_time: autoClockOutTime + ':00',
             forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
             default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
+            auto_review_followup_enabled: autoReviewFollowupEnabled,
+            auto_review_followup_days: autoReviewFollowupDays,
             updated_at: new Date().toISOString()
           })
           .eq('id', settings.id);
@@ -524,6 +530,8 @@ export function CompanySettings() {
             auto_clock_out_time: autoClockOutTime + ':00',
             forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
             default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
+            auto_review_followup_enabled: autoReviewFollowupEnabled,
+            auto_review_followup_days: autoReviewFollowupDays,
           });
 
         if (error) throw error;
@@ -1888,6 +1896,66 @@ export function CompanySettings() {
               <p className="text-sm text-orange-900">
                 <strong>How it works:</strong> Every night at 11:00 PM (your timezone), the system checks for anyone still clocked in past the cutoff time.
                 They are clocked out at the configured clock-out time, {forgotClockOutPenaltyPoints} points are deducted, and admins are notified for approval before payroll.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Automated Follow-Up Settings */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6">
+          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <Mail className="w-6 h-6 text-cyan-600" />
+            Automated Follow-Up Emails
+          </h2>
+          <p className="text-sm text-gray-600">
+            Automatically send one follow-up email to customers who haven't responded to review requests, satisfaction surveys, lost opportunity reviews, or proposal check emails after a set number of days.
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <input
+                type="checkbox"
+                id="auto-review-followup-enabled"
+                checked={autoReviewFollowupEnabled}
+                onChange={(e) => setAutoReviewFollowupEnabled(e.target.checked)}
+                className="w-5 h-5 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+              />
+              <div className="flex-1">
+                <label htmlFor="auto-review-followup-enabled" className="font-medium text-gray-900 cursor-pointer">
+                  Enable Automated Follow-Ups
+                </label>
+                <p className="text-sm text-gray-600">
+                  When enabled, a single follow-up email is sent after the configured delay. No further automated emails are sent after that.
+                </p>
+              </div>
+            </div>
+
+            {autoReviewFollowupEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ml-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Follow-Up Delay (days)
+                  </label>
+                  <input
+                    type="number"
+                    value={autoReviewFollowupDays}
+                    onChange={(e) => setAutoReviewFollowupDays(Math.max(1, Number(e.target.value)))}
+                    min={1}
+                    max={90}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of days after the original email before the follow-up is sent
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {autoReviewFollowupEnabled && (
+            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+              <p className="text-sm text-cyan-900">
+                <strong>How it works:</strong> The follow-up job runs daily and checks for emails sent more than {autoReviewFollowupDays} days ago that haven't received a response. Each email gets exactly one follow-up, then the system stops automatically. This covers Google Review requests, Customer Satisfaction surveys, Lost Opportunity reviews, and Proposal Check emails.
               </p>
             </div>
           )}

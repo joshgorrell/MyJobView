@@ -665,18 +665,6 @@ export default function ReviewsView() {
         throw new Error(errorData.error || `Failed to send (${response.status})`);
       }
 
-      const { error: insertError } = await supabase
-        .from('review_requests')
-        .insert({
-          contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: (isEmail) && useManualEntry ? manualEmail : null,
-          recipient_name: useManualEntry ? manualName : null,
-          sent_by: profile?.id,
-          method: sendMethod
-        });
-
-      if (insertError) throw insertError;
-
       const sentName = useManualEntry
         ? (manualName || manualEmail || manualPhone)
         : (selectedContact?.contact_name || '');
@@ -820,18 +808,6 @@ export default function ReviewsView() {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || `Failed to resend review request (${response.status})`);
         }
-
-        const { error: insertError } = await supabase
-          .from('review_requests')
-          .insert({
-            contact_id: request.contact_id,
-            recipient_email: request.recipient_email,
-            recipient_name: request.recipient_name,
-            sent_by: profile?.id,
-            method: request.method
-          });
-
-        if (insertError) throw insertError;
 
         toast.success('Review request resent successfully!');
         loadReviewRequests();
