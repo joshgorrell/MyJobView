@@ -318,7 +318,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      notify('Failed to update task status', { theme: 'cyan', tone: 'error' });
+      notify('Failed to update assignment status', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -401,7 +401,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-muted">Loading tasks...</p>
+          <p className="text-muted">Loading assignments...</p>
         </div>
       </div>
     );
@@ -421,7 +421,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                   : 'bg-elevated text-secondary hover:bg-elevated'
               }`}
             >
-              My Tasks
+              My Assignments
             </button>
             {canViewAllTasks && (
               <button
@@ -432,7 +432,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                     : 'bg-elevated text-secondary hover:bg-elevated'
                 }`}
               >
-                All Tasks
+                All Assignments
               </button>
             )}
             <button
@@ -450,7 +450,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm ml-auto"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Task</span>
+              <span className="hidden sm:inline">New Assignment</span>
               <span className="sm:hidden">New</span>
             </button>
           </div>
@@ -462,7 +462,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
             </div>
             <input
               type="text"
-              placeholder="Search tasks..."
+              placeholder="Search assignments..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-9 py-2 text-sm bg-canvas text-primary placeholder:text-muted border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -485,7 +485,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 onChange={(e) => setShowCompleted(e.target.checked)}
                 className="w-4 h-4 rounded border-subtle text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
-              Show completed tasks
+              Show completed assignments
             </label>
           </div>
         </div>
@@ -494,8 +494,8 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       {filteredTasks.length === 0 ? (
         <div className="text-center py-12 bg-surface rounded-lg border-2 border-dashed border-subtle">
           <Clock className="w-12 h-12 mx-auto mb-3 text-muted" />
-          <h3 className="text-lg font-medium text-primary mb-2">No tasks found</h3>
-          <p className="text-muted">Create your first task to get started</p>
+          <h3 className="text-lg font-medium text-primary mb-2">No assignments found</h3>
+          <p className="text-muted">Create your first assignment to get started</p>
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -615,7 +615,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         <button
                           onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
                           className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Discuss"
+                          title="Comments"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
                         </button>
@@ -716,7 +716,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <HelpCircle className="w-6 h-6 text-blue-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-primary">Tasks Help & Instructions</h2>
+                <h2 className="text-2xl font-bold text-primary">Assignments Help & Instructions</h2>
               </div>
               <button
                 onClick={() => setShowHelp(false)}
@@ -730,30 +730,30 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               <section className="space-y-3">
                 <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Plus className="w-5 h-5 text-blue-600" />
-                  Creating Tasks
+                  Creating Assignments
                 </h3>
                 <p className="text-secondary">
-                  Click the <span className="font-semibold text-blue-600">New Task</span> button to create a new task. Fill in the title, description, priority, due date, and optionally assign it to a team member or link it to a lead.
+                  Click the <span className="font-semibold text-blue-600">New Assignment</span> button to create a new assignment. Fill in the title, description, priority, due date, and optionally assign it to a team member or link it to a lead.
                 </p>
               </section>
 
               <section className="space-y-3">
                 <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Edit2 className="w-5 h-5 text-blue-600" />
-                  Editing & Updating Tasks
+                  Editing & Updating Assignments
                 </h3>
                 <p className="text-secondary">
-                  Click the <span className="font-semibold">Edit Task</span> button to modify a task. You can update any field including reassigning the task to someone else. Tasks created from Team Pulse discussions are now fully editable.
+                  Click the <span className="font-semibold">Edit</span> button to modify an assignment. You can update any field including reassigning it to someone else. Assignments created from Team Pulse discussions are now fully editable.
                 </p>
               </section>
 
               <section className="space-y-3">
                 <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-blue-600" />
-                  Task Discussions & Comments
+                  Assignment Discussions & Comments
                 </h3>
                 <p className="text-secondary">
-                  Click the <span className="font-semibold">Discuss</span> button on any task to expand the collaboration panel where you can:
+                  Click the <span className="font-semibold">Discuss</span> button on any assignment to expand the collaboration panel where you can:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li><span className="font-semibold">Add Comments:</span> Share updates, ask questions, or provide feedback</li>
@@ -781,17 +781,17 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               <section className="space-y-3">
                 <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Circle className="w-5 h-5 text-blue-600" />
-                  Watching Tasks
+                  Watching Assignments
                 </h3>
                 <p className="text-secondary">
-                  Click the <span className="font-semibold">Watch</span> button to follow a task and receive notifications about all updates and comments.
+                  Click the <span className="font-semibold">Watch</span> button to follow an assignment and receive notifications about all updates and comments.
                 </p>
                 <p className="text-secondary font-semibold">You're automatically added as a watcher when you:</p>
                 <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
-                  <li>Create a task</li>
-                  <li>Get assigned to a task</li>
-                  <li>Comment on a task</li>
-                  <li>Are mentioned in a task or comment</li>
+                  <li>Create an assignment</li>
+                  <li>Get assigned to an assignment</li>
+                  <li>Comment on an assignment</li>
+                  <li>Are mentioned in an assignment or comment</li>
                 </ul>
                 <p className="text-secondary">
                   Click <span className="font-semibold">Unwatch</span> at any time to stop receiving notifications.
@@ -804,24 +804,24 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                   Filtering & Viewing
                 </h3>
                 <p className="text-secondary">
-                  Use the filter options to find specific tasks:
+                  Use the filter options to find specific assignments:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
-                  <li><span className="font-semibold">My Tasks:</span> See only tasks you created or are assigned to</li>
-                  <li><span className="font-semibold">All Tasks:</span> View all company tasks (if you have permission)</li>
-                  <li><span className="font-semibold">Filter by Lead:</span> Show tasks linked to a specific lead</li>
-                  <li><span className="font-semibold">Filter by Status:</span> View tasks by their current status</li>
-                  <li><span className="font-semibold">Show Completed:</span> Toggle to show or hide completed tasks</li>
+                  <li><span className="font-semibold">My Assignments:</span> See only assignments you created or are assigned to</li>
+                  <li><span className="font-semibold">All Assignments:</span> View all company assignments (if you have permission)</li>
+                  <li><span className="font-semibold">Filter by Lead:</span> Show assignments linked to a specific lead</li>
+                  <li><span className="font-semibold">Filter by Status:</span> View assignments by their current status</li>
+                  <li><span className="font-semibold">Show Completed:</span> Toggle to show or hide completed assignments</li>
                 </ul>
               </section>
 
               <section className="space-y-3">
                 <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  Task Status & Completion
+                  Assignment Status & Completion
                 </h3>
                 <p className="text-secondary">
-                  Click <span className="font-semibold text-green-600">Mark as Complete</span> to finish a task, or <span className="font-semibold text-blue-600">Mark as Incomplete</span> to reopen it. Completed tasks show completion time and can be filtered out.
+                  Click <span className="font-semibold text-green-600">Mark as Complete</span> to finish an assignment, or <span className="font-semibold text-blue-600">Mark as Incomplete</span> to reopen it. Completed assignments show completion time and can be filtered out.
                 </p>
               </section>
 
@@ -831,7 +831,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                   Priority Levels
                 </h3>
                 <p className="text-secondary">
-                  Set task priority to help your team focus on what matters most:
+                  Set assignment priority to help your team focus on what matters most:
                 </p>
                 <div className="flex flex-wrap gap-2 ml-4">
                   <span className="px-3 py-1 rounded-full bg-surface text-secondary text-sm font-medium">Low</span>
@@ -847,7 +847,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                   Pro Tip: Team Pulse Integration
                 </h3>
                 <p className="text-blue-800">
-                  Tasks created from Team Pulse discussions automatically link back to the original conversation. Use this to track action items from team discussions. These tasks are now fully editable just like regular tasks!
+                  Assignments created from Team Pulse discussions automatically link back to the original conversation. Use this to track action items from team discussions. These are now fully editable just like regular assignments!
                 </p>
               </section>
             </div>
@@ -866,8 +866,8 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
       <ConfirmModal
         isOpen={confirmDelete !== null}
-        title="Delete Task"
-        message="Are you sure you want to delete this task? This cannot be undone."
+        title="Delete Assignment"
+        message="Are you sure you want to delete this assignment? This cannot be undone."
         variant="danger"
         confirmLabel="Delete"
         onConfirm={() => {

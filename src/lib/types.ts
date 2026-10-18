@@ -220,6 +220,9 @@ export interface Task {
   id: string;
   lead_id: string | null;
   contact_id: string | null;
+  project_id?: string | null;
+  work_order_id?: string | null;
+  proposal_id?: string | null;
   reminder_date?: string | null;
   assigned_to?: string | null;
   assigned_department_id?: string | null;

@@ -195,7 +195,7 @@ export function MasterFeed({ onLeadClick, ...conversationProps }: MasterFeedProp
   const { hasModuleAccess } = useDepartments();
   const focusPostId = new URLSearchParams(window.location.search).get('postId');
   if (!hasModuleAccess('feed') && !hasModuleAccess('messages')) {
-    return <WorkspaceTabs title="Flow" initial="tasks" tabs={hasModuleAccess('tasks') && conversationProps.tasksContent ? [{ key: 'tasks', label: 'Tasks', content: conversationProps.tasksContent }] : []} />;
+    return <WorkspaceTabs title="Flow" initial="tasks" tabs={hasModuleAccess('tasks') && conversationProps.tasksContent ? [{ key: 'tasks', label: 'Assignments', content: conversationProps.tasksContent }] : []} />;
   }
 
   // Flow is now the primary communication surface. Keep the legacy discussion

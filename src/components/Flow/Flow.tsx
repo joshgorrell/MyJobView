@@ -14,12 +14,13 @@ import './flow.css';
 import { CustomerConversations, CustomerConversationsProps } from './CustomerConversations';
 
 type Option = { id: string; name: string };
-const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Tasks', activity: 'Other activity' };
+const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Assignments', activity: 'Other activity' };
 type FlowView = 'all' | 'activity' | 'messages' | 'tasks';
 type MessageFilter = 'all' | 'customer' | 'coworkers' | 'unread';
 const FLOW_VIEWS: { id: FlowView; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'activity', label: 'Activity' }, { id: 'messages', label: 'Messages' },
 ];
+const TASKS_LABEL = 'Assignments';
 const MESSAGE_FILTERS: { id: MessageFilter; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'customer', label: 'Customer' },
   { id: 'coworkers', label: 'Coworkers' }, { id: 'unread', label: 'Unread' },
@@ -154,7 +155,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     setMarking(true); await flow.markViewed(visibleEvents.filter(e => !e.viewed).map(e => e.id)); setMarking(false);
   }
   const baseViews = scoped || hasModuleAccess('feed') || hasModuleAccess('messages') ? FLOW_VIEWS : [];
-  const views = tasksContent && !scoped && hasModuleAccess('tasks') ? [...baseViews, { id: 'tasks' as FlowView, label: 'Tasks' }] : baseViews;
+  const views = tasksContent && !scoped && hasModuleAccess('tasks') ? [...baseViews, { id: 'tasks' as FlowView, label: TASKS_LABEL }] : baseViews;
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);

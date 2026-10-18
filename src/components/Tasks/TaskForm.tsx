@@ -44,10 +44,16 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     reminder_date: task?.reminder_date ? new Date(task.reminder_date).toISOString().slice(0, 16) : '',
     assigned_to: task?.assigned_to || '',
     assigned_department_id: (task as any)?.assigned_department_id || '',
+    project_id: (task as any)?.project_id || '',
+    work_order_id: (task as any)?.work_order_id || '',
+    proposal_id: (task as any)?.proposal_id || '',
   });
   const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'contact_name' | 'company_name' | 'email' | 'phone'>[]>([]);
   const [users, setUsers] = useState<Pick<Profile, 'id' | 'full_name'>[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; display_name: string }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [workOrders, setWorkOrders] = useState<Array<{ id: string; wo_number: string }>>([]);
+  const [proposals, setProposals] = useState<Array<{ id: string; proposal_number: string; title: string }>>([]);
   const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -78,6 +84,9 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     loadUsers();
     loadDepartments();
     loadPriorities();
+    loadProjects();
+    loadWorkOrders();
+    loadProposals();
 
     if (!task) {
       if (aiPrefill) {
@@ -140,6 +149,48 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       setDepartments(data || []);
     } catch (error) {
       console.error('Error loading departments:', error);
+    }
+  }
+
+  async function loadProjects() {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name')
+        .limit(200);
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    }
+  }
+
+  async function loadWorkOrders() {
+    try {
+      const { data, error } = await supabase
+        .from('work_orders')
+        .select('id, work_order_number')
+        .order('work_order_number', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setWorkOrders(data || []);
+    } catch (error) {
+      console.error('Error loading work orders:', error);
+    }
+  }
+
+  async function loadProposals() {
+    try {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select('id, proposal_number, title')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setProposals(data || []);
+    } catch (error) {
+      console.error('Error loading proposals:', error);
     }
   }
 
@@ -228,6 +279,9 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
         reminder_date: formData.reminder_date ? new Date(formData.reminder_date).toISOString() : null,
         assigned_to: formData.assigned_to || null,
         assigned_department_id: formData.assigned_department_id || null,
+        project_id: formData.project_id || null,
+        work_order_id: formData.work_order_id || null,
+        proposal_id: formData.proposal_id || null,
         points: taskPoints,
       };
 
@@ -525,6 +579,55 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 </button>
               </div>
             )}
+
+            {/* Optional job links */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">
+                  Project <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.project_id}
+                  onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">
+                  Work Order <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.work_order_id}
+                  onChange={(e) => setFormData({ ...formData, work_order_id: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {workOrders.map((w) => (
+                    <option key={w.id} value={w.id}>{w.work_order_number}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">
+                  Proposal <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.proposal_id}
+                  onChange={(e) => setFormData({ ...formData, proposal_id: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {proposals.map((p) => (
+                    <option key={p.id} value={p.id}>{p.proposal_number}{p.title ? ` — ${p.title}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <button
               type="button"
