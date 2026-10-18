@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
-import { Send, ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, ChevronDown, ChevronRight, GitBranch, Target, X, Maximize2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, Download, Filter, Receipt, Copy, RefreshCw, Save, RotateCcw, Clock, MoreVertical, Bell, Layers, AlertTriangle, AlertCircle, Activity, Indent, Outdent, MessageSquare } from 'lucide-react';
+import { Send, ArrowLeft, Plus, Settings, CreditCard as Edit2, Trash2, Package, ChevronDown, ChevronRight, GitBranch, Target, X, Maximize2, Eye, EyeOff, FileText, PanelLeftClose, PanelLeft, Check, GripVertical, Wrench, ChevronUp, User, Download, Filter, Copy, RefreshCw, Save, RotateCcw, Clock, MoreVertical, Bell, Layers, AlertTriangle, AlertCircle, Activity, Indent, Outdent, MessageSquare } from 'lucide-react';
 import {
   recordCOAction,
   recordCOModifierChange,
@@ -3088,7 +3088,50 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               <span className="hidden sm:inline">Add</span>
             </button>}
 
-            {/* More Options Menu */}
+            {/* Toolbar icon buttons: Filter, Settings, Pop Out */}
+            <button
+              type="button"
+              onClick={() => setShowFilterModal(true)}
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+              title="Filter Items"
+            >
+              <Filter className="w-4 h-4" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-cyan-600 text-white text-xs rounded-full font-medium leading-none">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            {!isStandalone && (
+              <button
+                type="button"
+                onClick={() => handlePopOut()}
+                className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+                title="Pop Out"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
+            {isStandalone && (
+              <button
+                type="button"
+                onClick={() => window.close()}
+                className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:text-primary hover:bg-elevated rounded-lg transition-colors"
+                title="Close Window"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* More Options Menu -- administrative actions only */}
             <div className="relative">
               <button
                 onClick={() => setShowMoreOptionsMenu(!showMoreOptionsMenu)}
@@ -3112,7 +3155,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         Portal Version History
                       </button>
                     )}
-                    {/* Administrative actions only: delivery and status controls live in the toolbar. */}
                     {proposal?.contact_id && (
                       <button type="button" onClick={() => { setShowEditCustomerModal(true); setShowMoreOptionsMenu(false); }} className="w-full px-3 py-2 text-left text-primary hover:bg-elevated flex items-center gap-2 text-sm">
                         <Edit2 className="w-4 h-4" />Change Customer
@@ -3124,27 +3166,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       </button>
                     )}
                     <div className="border-t border-subtle my-1" />
-                                        {/* Proposal Actions */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Proposal</div>
-                    <button
-                      onClick={() => {
-                        setShowFilterModal(true);
-                        setShowMoreOptionsMenu(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                    >
-                      <Filter className="w-4 h-4" />
-                      <span>Filter Items</span>
-                      {activeFilterCount > 0 && (
-                        <span className="ml-auto px-1.5 py-0.5 bg-cyan-600 text-white text-xs rounded-full font-medium">
-                          {activeFilterCount}
-                        </span>
-                      )}
-                    </button>
 
-                    <div className="border-t border-subtle my-1" />
-
-                    {/* View Options */}
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">View</div>
                     <button
                       onClick={() => {
@@ -3175,8 +3197,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
                     <div className="border-t border-subtle my-1" />
 
-                    {/* Reports & History */}
-                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Reports</div>
+                    <div className="px-3 py-1.5 text-xs font-semibold text-muted uppercase tracking-wide">Workflow</div>
                     <button
                       onClick={() => {
                         setShowRevisionManager(true);
@@ -3191,28 +3212,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           {proposal.revision_count}
                         </span>
                       )}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowTaxReport(true);
-                        setShowMoreOptionsMenu(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                    >
-                      <Receipt className="w-4 h-4" />
-                      <span>Tax Report</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setShowLaborPhaseReport(true);
-                        setShowMoreOptionsMenu(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                    >
-                      <Layers className="w-4 h-4" />
-                      <span>Phase Report</span>
                     </button>
 
                     <button
@@ -3253,49 +3252,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                           </span>
                         )}
                       </button>
-                    )}
-
-                    <div className="border-t border-subtle my-1" />
-
-                    {/* Settings */}
-                    <button
-                      onClick={() => {
-                        setShowSettings(true);
-                        setShowMoreOptionsMenu(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                    >
-                      <Settings className="w-4 h-4" />
-                      <span>Settings</span>
-                    </button>
-
-                    {!isStandalone && (
-                      <>
-                        <div className="border-t border-subtle my-1" />
-                        <button
-                          onClick={() => {
-                            handlePopOut();
-                            setShowMoreOptionsMenu(false);
-                          }}
-                          className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                          <Maximize2 className="w-4 h-4" />
-                          <span>Pop Out</span>
-                        </button>
-                      </>
-                    )}
-
-                    {isStandalone && (
-                      <>
-                        <div className="border-t border-subtle my-1" />
-                        <button
-                          onClick={() => window.close()}
-                          className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 text-sm"
-                        >
-                          <X className="w-4 h-4" />
-                          <span>Close Window</span>
-                        </button>
-                      </>
                     )}
                   </div>
                 </>

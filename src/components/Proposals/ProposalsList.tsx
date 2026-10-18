@@ -62,7 +62,6 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(null);
-  const [showMobileTools, setShowMobileTools] = useState(false);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
   // Rep selector — visible to admin / manager / sales_manager
@@ -131,17 +130,16 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       if (!target.closest('.menu-dropdown') && !target.closest('.menu-button')) {
         setOpenMenuId(null);
       }
-      if (!target.closest('.mobile-tools')) setShowMobileTools(false);
       if (!target.closest('.filter-panel') && !target.closest('.filter-button')) {
         setShowFilterPanel(false);
       }
     }
 
-    if (openMenuId || showFilterPanel || showMobileTools) {
+    if (openMenuId || showFilterPanel) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [openMenuId, showFilterPanel, showMobileTools]);
+  }, [openMenuId, showFilterPanel]);
 
   async function loadPreferences() {
     try {
@@ -772,28 +770,34 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             <div className="flex items-center justify-between gap-2">
               <h1 className="text-lg font-bold text-primary">Proposals</h1>
               <div className="flex items-center gap-1.5">
-                <div className="relative mobile-tools">
-                  <button type="button" aria-label="Proposal tools" aria-expanded={showMobileTools}
-                    onClick={() => setShowMobileTools(!showMobileTools)}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:bg-elevated">
-                    <MoreVertical size={18} />
-                  </button>
-                  {showMobileTools && (
-                    <div className="absolute right-0 top-full w-48 bg-surface border border-subtle rounded-lg shadow-xl z-50">
-                      {[
-                        { label: 'Sales Orders', action: onNavigateToSalesOrders },
-                        { label: 'My Sales Stats', action: onNavigateToSalesStats },
-                        { label: 'Video Library', action: onOpenVideoLibrary },
-                        { label: 'Pop out proposals', action: () => window.open('/proposals-fullscreen', '_blank', 'width=1400,height=900') },
-                      ].map(tool => (
-                        <button key={tool.label} type="button" onClick={() => { setShowMobileTools(false); tool.action?.(); }}
-                          className="w-full min-h-[44px] px-4 text-left text-sm text-primary hover:bg-elevated">
-                          {tool.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <button
+                  onClick={() => onNavigateToSalesOrders?.()}
+                  aria-label="Sales Orders"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-primary transition-colors"
+                >
+                  <ShoppingCart size={18} />
+                </button>
+                <button
+                  onClick={() => onNavigateToSalesStats?.()}
+                  aria-label="My Sales Stats"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-primary transition-colors"
+                >
+                  <BarChart2 size={18} />
+                </button>
+                <button
+                  onClick={() => onOpenVideoLibrary?.()}
+                  aria-label="Video Library"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-primary transition-colors"
+                >
+                  <Film size={18} />
+                </button>
+                <button
+                  onClick={() => window.open('/proposals-fullscreen', '_blank', 'width=1400,height=900')}
+                  aria-label="Pop out proposals"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-primary transition-colors"
+                >
+                  <Maximize2 size={18} />
+                </button>
                 <button
                   onClick={onCreateNew}
                   className="px-3 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-medium flex items-center gap-1.5 transition-colors text-sm"
