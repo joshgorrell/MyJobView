@@ -117,7 +117,6 @@ export interface Contact {
   default_payment_terms: string | null;
   assigned_to: string | null;
   last_contact_date: string | null;
-  next_follow_up: string | null;
   office_id: string | null;
   created_by: string | null;
   created_at: string;

@@ -12,19 +12,12 @@ import { FlowWaveIcon } from "./FlowWaveIcon";
 export function FlowCreateModal({
   scope,
   initial = "choose",
-  followup,
   canInteract,
   onClose,
   onSaved,
 }: {
   scope: FlowScope;
   initial?: "choose" | "chat" | "update" | "interaction";
-  followup?: {
-    id: string;
-    kind: "reminder" | "schedule";
-    contactId: string;
-    label: string;
-  };
   canInteract: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -33,28 +26,26 @@ export function FlowCreateModal({
   const completion = useCompletion(onSaved);
   const { completed } = completion;
   const finish = completion.complete;
-  const title = followup
-    ? "Complete follow-up"
-    : mode === "choose"
-      ? "Create in Flow"
-      : mode === "chat"
-        ? "Message"
-        : mode === "update"
-          ? "Activity update"
-          : "Activity";
+  const title = mode === "choose"
+    ? "Create in Flow"
+    : mode === "chat"
+      ? "Message"
+      : mode === "update"
+        ? "Activity update"
+        : "Activity";
   return createPortal(
     <QuickActionModal
       title={title}
-      subtitle={mode === "chat" ? "Send a message to your team" : "Messages, customer interactions and follow-ups in one place"}
+      subtitle={mode === "chat" ? "Send a message to your team" : "Messages and customer interactions in one place"}
       icon={<FlowWaveIcon className="text-2xl" />}
       onClose={completed ? completion.finish : onClose}
       accentColor="from-cyan-600 to-blue-700"
       showSuccess={completed}
-      successMessage={mode === 'chat' ? 'Message sent!' : mode === 'update' ? 'Added to Flow' : followup ? 'Follow-up completed!' : 'Activity saved!'}
+      successMessage={mode === 'chat' ? 'Message sent!' : mode === 'update' ? 'Added to Flow' : 'Activity saved!'}
       successIcon={mode === 'chat' ? <Send className="h-20 w-20" strokeWidth={1.5} /> : <CheckCircle2 className="h-20 w-20" strokeWidth={1.5} />}
     >
       <div className="flow flow-quick-composer flow-create-modal">
-        {mode !== "choose" && !followup && (
+        {mode !== "choose" && (
           <button
             className="flow-create-back"
             onClick={() => setMode("choose")}
@@ -85,7 +76,7 @@ export function FlowCreateModal({
                 <Calendar />
                 <span>
                   <strong>Activity</strong>
-                  <small>Calls, meetings, visits and follow-ups</small>
+                  <small>Calls, meetings and visits</small>
                 </span>
               </button>
             )}
@@ -102,7 +93,6 @@ export function FlowCreateModal({
         ) : (
           <FlowInteractionForm
             scope={scope}
-            followup={followup}
             onSaved={finish}
           />
         )}

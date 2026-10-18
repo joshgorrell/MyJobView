@@ -18,7 +18,7 @@ const dir = await mkdtemp(join(tmpdir(), "mjv-flow-workspace-"));
 const fixture = `import{useState}from'react';export const useAuth=()=>({profile:{id:'rep',organization_id:'org',full_name:'Josh'},user:{id:'rep'}});export const useDepartments=()=>({hasModuleAccess:()=>true});window.calls=[];window.fail=false;
 const records=Array.from({length:50},(_,i)=>({id:i+1,created_at:new Date(Date.now()-i*60000).toISOString(),customer_name:'Customer with a long company name '+i,project_name:'Home theater project',actor_name:'Josh Gorrell',category:'sales',source_table:i===0?'proposals':'connections',source_id:i===0?'00000000-0000-0000-0000-000000000040':'interaction-'+i,event_type:i===0?'proposal_first_opened':'connections.insert',summary:i===0?'Customer first opened proposal PRO-100':'Phone call: a longer note about the next steps for the customer',details:'Original notes',viewed:false}));
 export function useFlow(filters){const [events,setEvents]=useState(records);return{events,loading:false,loadingMore:false,hasMore:false,error:'',pending:0,connected:true,refresh:async()=>window.calls.push({name:'refresh'}),markViewed:async(ids)=>setEvents(old=>old.map(e=>ids.includes(e.id)?{...e,viewed:true}:e))};}
-export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:[],error:null}).then(a,b);return()=>q;}});return q;},channel(){const c={on(){return c},subscribe(){return c},unsubscribe(){}};return c;},removeChannel(){},async rpc(name,input){window.calls.push({name,input});if(name==='search_flow_targets')return{data:[{kind:'contact',id:'c1',label:'Test Customer'}],error:null};if(name==='get_flow_followups')return{data:{items:[{id:'reminder1',kind:'reminder',contact_id:'c1',label:'Test Customer',type:'call',due:new Date().toISOString(),reason:'Discuss next steps'}],schedules:[{id:'schedule1',label:'Test Customer',recurrence_pattern:'weekly',is_active:true}]},error:null};return window.fail?{error:{message:'Fixture save rejected'}}:{data:'new',error:null};}};`;
+export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:[],error:null}).then(a,b);return()=>q;}});return q;},channel(){const c={on(){return c},subscribe(){return c},unsubscribe(){}};return c;},removeChannel(){},async rpc(name,input){window.calls.push({name,input});if(name==='search_flow_targets')return{data:[{kind:'contact',id:'c1',label:'Test Customer'}],error:null};return window.fail?{error:{message:'Fixture save rejected'}}:{data:'new',error:null};}};`;
 const source = `import React from'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<Flow tasksContent={<div data-testid="task-tools">Assigned tasks and comments</div>} initialTaskView={new URLSearchParams(location.search).has('task')} openThreadId={new URLSearchParams(location.search).get('thread')}/>);`;
 const server = createServer(async (req, res) => {
   const file = req.url.startsWith("/app.js")
@@ -162,8 +162,6 @@ try {
     await page.getByRole("button", { name: "Test Customer contact" }).click();
     const notes = page.getByRole("textbox", { name: "Interaction notes" });
     await notes.fill("Customer asked for the next steps");
-    await page.getByLabel("Follow-up date (optional)").fill("2026-10-20");
-    await page.getByLabel("Repeat", { exact: true }).selectOption("weekly");
     await page.evaluate(() => (window.fail = true));
     await page
       .getByRole("button", { name: "Save interaction", exact: true })
@@ -183,42 +181,8 @@ try {
         window.calls.some(
           (c) =>
             c.name === "save_flow_interaction" &&
-            c.input.p_repeat === "weekly" &&
             c.input.p_scope.contact_id === "c1",
         ),
-      ),
-    );
-    if (
-      await page
-        .getByRole("tab", { name: "Follow-ups", exact: true })
-        .isVisible()
-    )
-      await page.getByRole("tab", { name: "Follow-ups", exact: true }).click();
-    else
-      await page
-        .getByRole("combobox", { name: "Flow view", exact: true })
-        .selectOption("followups");
-    await page.getByRole("button", { name: "Complete", exact: true }).click();
-    await page
-      .getByRole("textbox", { name: "Interaction notes" })
-      .fill("Called customer back");
-    await page
-      .getByRole("button", { name: "Complete follow-up", exact: true })
-      .click();
-    await page.getByRole("dialog").waitFor({ state: "detached" });
-    assert.ok(
-      await page.evaluate(() =>
-        window.calls.some(
-          (c) =>
-            c.name === "complete_flow_followup" && c.input.p_id === "reminder1",
-        ),
-      ),
-    );
-    await page.getByRole("button", { name: "Pause", exact: true }).click();
-    await page.waitForFunction(() =>
-      window.calls.some(
-        (c) =>
-          c.name === "set_flow_schedule_active" && c.input.p_active === false,
       ),
     );
     if (process.env.FLOW_SCREENSHOT_DIR) {
@@ -245,7 +209,7 @@ try {
       width +
         "x" +
         height +
-        ": workspace/sidebar fit, scrolling, modal/focus, retained errors, logging and follow-ups passed",
+        ": workspace/sidebar fit, scrolling, modal/focus, retained errors and logging passed",
     );
   }
   // A task notification must win over a conversation parameter retained in the URL.

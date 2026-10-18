@@ -82,14 +82,11 @@ export async function interactionCases(
     );
     return db.query(sql, args);
   }
-  const save = (scope, type = "call", repeat = "", due = null) =>
-    as(user, "SELECT save_flow_interaction($1,$2,$3,now(),$4,$5,$6) id", [
+  const save = (scope, type = "call") =>
+    as(user, "SELECT save_flow_interaction($1,$2,$3,now(),null,null,'') id", [
       scope,
       type,
       "Useful notes",
-      due,
-      "Call back",
-      repeat,
     ]);
   assert.equal(
     (
@@ -114,8 +111,6 @@ export async function interactionCases(
     await save(
       { project_id: project },
       "site_visit",
-      "",
-      new Date().toISOString(),
     )
   ).rows[0].id;
   const context = (
@@ -134,85 +129,6 @@ export async function interactionCases(
   await assert.rejects(
     () => save({ project_id: project, contact_id: otherCustomer }),
     /Inconsistent/,
-  );
-  const before = (await as(user, "SELECT count(*)::int n FROM connections"))
-    .rows[0].n;
-  await assert.rejects(
-    () => save({ contact_id: customer }, "call", "bad"),
-    /Invalid follow-up/,
-  );
-  assert.equal(
-    (await as(user, "SELECT count(*)::int n FROM connections")).rows[0].n,
-    before,
-  );
-  const followups = (await as(user, "SELECT get_flow_followups() value"))
-    .rows[0].value;
-  assert.ok(followups.items.some((i) => i.id === saved));
-  await assert.rejects(
-    () =>
-      as(colleague, "SELECT complete_flow_followup($1,$2,$3)", [
-        saved,
-        "reminder",
-        "Foreign completion",
-      ]),
-    /unavailable/,
-  );
-  await as(user, "SELECT complete_flow_followup($1,$2,$3)", [
-    saved,
-    "reminder",
-    "Completed call",
-  ]);
-  await assert.rejects(
-    () =>
-      as(user, "SELECT complete_flow_followup($1,$2,$3)", [
-        saved,
-        "reminder",
-        "Repeat",
-      ]),
-    /already completed/,
-  );
-  await save({ work_order_id: wo }, "demo", "weekly", new Date().toISOString());
-  const scheduled = (await as(user, "SELECT get_flow_followups() value"))
-    .rows[0].value;
-  assert.equal(
-    (
-      await as(
-        user,
-        "SELECT count(*)::int n FROM notifications WHERE title='Follow-up due'",
-      )
-    ).rows[0].n,
-    1,
-    "Only due occurrences notify, using actual schedule columns",
-  );
-  assert.ok(scheduled.items.filter((i) => i.kind === "schedule").length >= 12);
-  const recurring = scheduled.items.find((i) => i.kind === "schedule");
-  const schedule = scheduled.schedules[0];
-  await as(user, "SELECT set_flow_schedule_active($1,false)", [schedule.id]);
-  assert.equal(
-    (
-      await as(user, "SELECT get_flow_followups() value")
-    ).rows[0].value.items.filter((i) => i.kind === "schedule").length,
-    0,
-  );
-  await as(user, "SELECT set_flow_schedule_active($1,true)", [schedule.id]);
-  await as(user, "SELECT complete_flow_followup($1,$2,$3)", [
-    recurring.id,
-    "schedule",
-    "Recurring call done",
-  ]);
-  await assert.rejects(
-    () =>
-      as(user, "SELECT complete_flow_followup($1,$2,$3)", [
-        recurring.id,
-        "schedule",
-        "Again",
-      ]),
-    /already completed/,
-  );
-  await assert.rejects(
-    () =>
-      as(outsider, "SELECT set_flow_schedule_active($1,false)", [schedule.id]),
-    /Flow access|unavailable/,
   );
   await assert.rejects(
     () =>
@@ -240,7 +156,7 @@ export async function interactionCases(
     `RESET ROLE;UPDATE profiles SET is_active=false WHERE id='${user}';`,
   );
   await assert.rejects(
-    () => as(user, "SELECT get_flow_followups()"),
+    () => as(user, "SELECT save_flow_interaction($1,$2,$3,now(),null,null,'')", [{ contact_id: customer }, "call", "x"]),
     /Flow access/,
   );
   await db.exec(
@@ -268,6 +184,6 @@ export async function interactionCases(
     0,
   );
   console.log(
-    "PASS: Flow interactions/history, scoped jobs, atomic reminders and recurring completion, tenant/owner/disabled-user guards, rollback, pauses and idempotent retirement.",
+    "PASS: Flow interactions/history, scoped jobs, tenant/owner/disabled-user guards, rollback and idempotent retirement.",
   );
 }
