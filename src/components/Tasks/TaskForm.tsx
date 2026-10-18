@@ -345,7 +345,6 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <>
     <QuickActionModal
       scrollBody={false}
-      stableHeight
       title={task ? 'Edit Assignment' : supportMode ? 'New Support Request' : 'New Assignment'}
       subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Assign and track a follow-up'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
@@ -364,6 +363,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </div>
             )}
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Task Title */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
@@ -419,6 +419,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               <p className="text-xs text-muted mt-1">
                 Anyone is the default. Department tasks notify that department; the first person to complete one earns the points.
               </p>
+            </div>
+
             </div>
 
             {/* Description - always visible */}

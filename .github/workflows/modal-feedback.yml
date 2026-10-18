@@ -24,3 +24,4 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:modals:feedback
       - run: node tests/modals/responsive-browser.mjs
+      - run: node tests/modals/assignment-browser.mjs
