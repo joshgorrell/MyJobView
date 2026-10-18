@@ -143,6 +143,106 @@ function buildFollowUpSatisfactionEmail(params: {
 </html>`;
 }
 
+function buildFollowUpLostReviewEmail(params: {
+  customerName: string;
+  companyName: string;
+  companyEmail: string;
+  companyLogoUrl?: string;
+  opportunityName: string;
+}): string {
+  const logoBlock = params.companyLogoUrl
+    ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${params.companyName}</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Following up on ${params.opportunityName}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+      <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #f59e0b;">
+        <div style="margin-bottom:20px;">${logoBlock}</div>
+        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:26px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">Still Interested?</h1>
+        <p style="color:#94a3b8;margin:0;font-size:15px;">We'd love another chance to earn your business</p>
+      </td></tr>
+      <tr><td style="background:#ffffff;padding:44px 44px 36px;">
+        <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName || 'there'},</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">We reached out a while back about <strong style="color:#0e7490;">${params.opportunityName}</strong> and wanted to follow up one last time. We understand that timing and priorities change, and we'd welcome the opportunity to revisit your project if the time is right.</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">If you're still considering your options, we'd love to hear from you. Even if you went another direction, your feedback helps us improve.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef9c3;border-radius:10px;border:1px solid #fde68a;"><tr><td style="padding:18px 22px;">
+          <p style="color:#92400e;font-size:13px;margin:0 0 5px 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">This is our final follow-up</p>
+          <p style="color:#78350f;font-size:14px;margin:0;line-height:1.6;">No pressure — just reply to this email if you'd like to talk. We're here when you're ready.</p>
+        </td></tr></table>
+      </td></tr>
+      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 44px;text-align:center;border-top:1px solid #334155;">
+        <p style="color:#f59e0b;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${params.companyName}</p>
+        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${params.companyEmail}</p>` : ''}
+        <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">Thank you for considering us.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
+function buildFollowUpProposalCheckEmail(params: {
+  customerName: string;
+  companyName: string;
+  companyEmail: string;
+  companyLogoUrl?: string;
+  originalSubject: string;
+  responseUrl: string;
+}): string {
+  const logoBlock = params.companyLogoUrl
+    ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${params.companyName}</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Quick check-in on your proposal</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+      <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #06b6d4;">
+        <div style="margin-bottom:20px;">${logoBlock}</div>
+        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:26px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How Did We Do?</h1>
+        <p style="color:#94a3b8;margin:0;font-size:15px;">Your thoughts on our proposal matter to us</p>
+      </td></tr>
+      <tr><td style="background:#ffffff;padding:44px 44px 36px;">
+        <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName || 'there'},</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">We sent you a proposal check email about <strong style="color:#0e7490;">${params.originalSubject}</strong> a while back and wanted to follow up. We'd really value your feedback — it takes less than a minute and helps us serve you better.</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">Click below to let us know how you felt about our proposal:</p>
+        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 32px 0;">
+          <a href="${params.responseUrl}" style="display:inline-block;background:#0e7490;color:#ffffff;text-decoration:none;padding:16px 48px;border-radius:10px;font-size:17px;font-weight:700;letter-spacing:0.01em;">Share Your Feedback</a>
+        </td></tr></table>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><tr><td style="padding:18px 22px;">
+          <p style="color:#0f172a;font-size:13px;margin:0 0 5px 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">This is our final follow-up</p>
+          <p style="color:#475569;font-size:14px;margin:0;line-height:1.6;">Just a quick click is all it takes. Your input directly helps our team grow.</p>
+        </td></tr></table>
+      </td></tr>
+      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 44px;text-align:center;border-top:1px solid #334155;">
+        <p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${params.companyName}</p>
+        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${params.companyEmail}</p>` : ''}
+        <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">Thank you for your time.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -344,6 +444,175 @@ Deno.serve(async (req: Request) => {
         } catch (err) {
           console.error('Error processing satisfaction row', row.id, err);
           totalErrors++;
+        }
+      }
+
+      // --- Lost Opportunity follow-ups ---
+      const { data: lostRows, error: lostErr } = await supabaseAdmin
+        .from('lost_review_details')
+        .select(`
+          request_id,
+          organization_id,
+          proposal_id,
+          opportunity_name,
+          title,
+          delivery_status,
+          responded_at,
+          review_requests:request_id ( sent_at, contact_id, recipient_email, recipient_name, contacts:contact_id ( contact_name, full_name, first_name, last_name, company_name, email ) )
+        `)
+        .eq('organization_id', orgId)
+        .eq('auto_followup_enabled', true)
+        .is('follow_up_sent_at', null)
+        .is('responded_at', null)
+        .eq('delivery_status', 'sent');
+
+      if (lostErr) {
+        console.error('Error fetching lost_review_details for org', orgId, lostErr);
+        totalErrors++;
+      } else {
+        for (const row of lostRows ?? []) {
+          try {
+            const req = Array.isArray(row.review_requests) ? row.review_requests[0] : row.review_requests;
+            if (req?.sent_at && new Date(req.sent_at) > new Date(cutoffDate)) continue;
+            const contact = req && Array.isArray(req.contacts) ? req.contacts[0] : req?.contacts;
+            const recipientEmail = contact?.email || req?.recipient_email;
+            if (!recipientEmail) continue;
+
+            const customerName = req?.recipient_name || contact?.contact_name || contact?.full_name || contact?.company_name || [contact?.first_name, contact?.last_name].filter(Boolean).join(' ') || '';
+
+            const subject = `Following up: ${row.title || row.opportunity_name || 'your project'}`;
+            const html = buildFollowUpLostReviewEmail({
+              customerName,
+              companyName: sharedSettings.company_name,
+              companyEmail: sharedSettings.company_email,
+              companyLogoUrl: sharedSettings.company_logo_url,
+              opportunityName: row.opportunity_name || row.title || 'your project',
+            });
+
+            if (resendApiKey) {
+              const emailResponse = await sendSystemEmail({
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${resendApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  from: sharedSettings.from_address,
+                  to: recipientEmail,
+                  reply_to: sharedSettings.reply_to_email,
+                  subject,
+                  html,
+                }),
+              });
+
+              if (!emailResponse.ok) {
+                const errText = await emailResponse.text();
+                console.error('Resend error for lost review', row.request_id, errText);
+                totalErrors++;
+                continue;
+              }
+            } else {
+              throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
+            }
+
+            await supabaseAdmin
+              .from('lost_review_details')
+              .update({ follow_up_sent_at: new Date().toISOString() })
+              .eq('request_id', row.request_id);
+
+            totalSent++;
+          } catch (err) {
+            console.error('Error processing lost review row', row.request_id, err);
+            totalErrors++;
+          }
+        }
+      }
+
+      // --- Proposal Check follow-ups ---
+      const { data: proposalRows, error: proposalErr } = await supabaseAdmin
+        .from('proposal_check_emails')
+        .select('id, organization_id, contact_id, recipient_email, recipient_name, subject, proposal_id, response_token')
+        .eq('organization_id', orgId)
+        .eq('auto_followup_enabled', true)
+        .is('follow_up_sent_at', null)
+        .eq('status', 'sent')
+        .lte('sent_at', cutoffDate)
+        .not('response_token', 'is', null);
+
+      if (proposalErr) {
+        console.error('Error fetching proposal_check_emails for org', orgId, proposalErr);
+        totalErrors++;
+      } else {
+        const emailIds = (proposalRows ?? []).map((r: any) => r.id);
+        let respondedIds = new Set<string>();
+        if (emailIds.length > 0) {
+          const { data: events } = await supabaseAdmin
+            .from('proposal_check_events')
+            .select('email_id')
+            .in('email_id', emailIds)
+            .in('kind', ['choice', 'response']);
+          if (events) {
+            respondedIds = new Set(events.map((e: any) => e.email_id));
+          }
+        }
+        for (const row of (proposalRows ?? [])) {
+          try {
+            if (respondedIds.has(row.id)) continue;
+            if (!row.recipient_email) continue;
+
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+            const responseUrl = `${supabaseUrl}/functions/v1/proposal-check-response?token=${row.response_token || ''}`;
+
+            const html = buildFollowUpProposalCheckEmail({
+              customerName: row.recipient_name || '',
+              companyName: sharedSettings.company_name,
+              companyEmail: sharedSettings.company_email,
+              companyLogoUrl: sharedSettings.company_logo_url,
+              originalSubject: row.subject || 'your proposal',
+              responseUrl,
+            });
+
+            const firstName = row.recipient_name || '';
+            const subject = firstName
+              ? `Quick check-in on your proposal, ${firstName}`
+              : 'Quick check-in on your proposal';
+
+            if (resendApiKey) {
+              const emailResponse = await sendSystemEmail({
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${resendApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  from: sharedSettings.from_address,
+                  to: row.recipient_email,
+                  reply_to: sharedSettings.reply_to_email,
+                  subject,
+                  html,
+                }),
+              });
+
+              if (!emailResponse.ok) {
+                const errText = await emailResponse.text();
+                console.error('Resend error for proposal check', row.id, errText);
+                totalErrors++;
+                continue;
+              }
+            } else {
+              throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
+            }
+
+            await supabaseAdmin
+              .from('proposal_check_emails')
+              .update({ follow_up_sent_at: new Date().toISOString() })
+              .eq('id', row.id);
+
+            totalSent++;
+          } catch (err) {
+            console.error('Error processing proposal check row', row.id, err);
+            totalErrors++;
+          }
         }
       }
     }

@@ -1,6 +1,14 @@
 [functions.session-location]
 verify_jwt = true
 
+# Public opaque-token image endpoint; no customer data is returned.
+[functions.email-open-track]
+verify_jwt = false
+
+# Public opaque-token redirect endpoint; validates destination is a Google URL.
+[functions.email-click-track]
+verify_jwt = false
+
 [functions.send-proposal-email]
 verify_jwt = true
 

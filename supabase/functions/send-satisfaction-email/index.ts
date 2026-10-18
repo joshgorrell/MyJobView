@@ -234,6 +234,7 @@ Deno.serve(async (req: Request) => {
       record = existing;
     } else {
       const responseToken = crypto.randomUUID();
+      const openToken = crypto.randomUUID() + crypto.randomUUID();
 
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('customer_satisfaction')
@@ -247,6 +248,7 @@ Deno.serve(async (req: Request) => {
           lead_tech_id: leadTechId || null,
           lead_tech_name: leadTechName || '',
           response_token: responseToken,
+          open_token: openToken,
           created_by: user?.id || null,
           survey_type: surveyType,
           project_id: projectId || null,
@@ -295,6 +297,11 @@ Deno.serve(async (req: Request) => {
 
     if (typeof customSubject === 'string' && customSubject.trim()) subject = customSubject.trim().slice(0, 200);
     if (typeof personalNote === 'string') emailHtml = injectNoteIntoHtml(emailHtml, personalNote.slice(0, 5000));
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const pixelUrl = `${supabaseUrl}/functions/v1/email-open-track?token=${record.response_token}&type=satisfaction`;
+    const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
+    emailHtml = emailHtml.includes('</body>') ? emailHtml.replace('</body>', pixel + '</body>') : emailHtml + pixel;
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 

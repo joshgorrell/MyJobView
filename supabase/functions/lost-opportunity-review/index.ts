@@ -511,11 +511,12 @@ Deno.serve(async (req) => {
           organization_id: org,
           method: "email",
           request_type: "lost_opportunity",
-          auto_followup_enabled: false,
+          auto_followup_enabled: true,
           recipient_email: contact.email,
           recipient_name: contact.contact_name,
         }).select("id").single(),
       );
+      const openToken = crypto.randomUUID() + crypto.randomUUID();
       await checked(
         await admin.from("lost_review_details").insert({
           request_id: request.id,
@@ -523,6 +524,8 @@ Deno.serve(async (req) => {
           proposal_id: b.proposal_id || null,
           opportunity_name: b.opportunity_name.trim(),
           title: b.title.trim(),
+          open_token: openToken,
+          auto_followup_enabled: true,
         }),
       );
       const token = crypto.randomUUID() + crypto.randomUUID();
@@ -541,6 +544,10 @@ Deno.serve(async (req) => {
         b.title,
         url,
       );
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const pixelUrl = `${supabaseUrl}/functions/v1/email-open-track?token=${openToken}&type=lost_review`;
+      const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
+      const trackedHtml = html.includes('</body>') ? html.replace('</body>', pixel + '</body>') : html + pixel;
       const result = await sendSystemEmail({
         method: "POST",
         headers: {
@@ -554,7 +561,7 @@ Deno.serve(async (req) => {
           to: contact.email,
           reply_to: settings?.reply_to_email || settings?.company_email,
           subject: b.title,
-          html,
+          html: trackedHtml,
         }),
       });
       await checked(
