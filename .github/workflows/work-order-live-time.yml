@@ -1,0 +1,30 @@
+name: Work Order Live Time Checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/components/Production/WorkOrderDetail.tsx'
+      - 'src/components/Production/WorkOrderTimeControl.tsx'
+      - 'tests/work-orders/live-team-time.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/work-order-live-time.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:work-orders:live-time
+      - run: npm run typecheck
+      - run: npm run build

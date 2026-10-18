@@ -1,0 +1,27 @@
+name: Themed modal feedback
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/modals/**'
+      - '.github/workflows/modal-feedback.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  feedback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:modals:feedback
+      - run: node tests/modals/responsive-browser.mjs
+      - run: node tests/modals/assignment-browser.mjs

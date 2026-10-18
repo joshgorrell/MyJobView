@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Camera, Upload, Calendar, User, MapPin, Award, Filter, Search, Download, Trash2, X, ThumbsUp, TrendingUp, Clock, UserCircle, Video, Edit, FileText, CheckCircle } from 'lucide-react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
+import { Camera, Upload, User, Award, Search, Trash2, X, ThumbsUp, TrendingUp, Clock, Video, Edit, FileText, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import PaparazziModal from './PaparazziModal';
@@ -115,7 +116,7 @@ function PaparazziRequestsView() {
       setSelectedRequest(null);
     } catch (error) {
       console.error('Error updating request status:', error);
-      alert('Failed to update request status');
+      notify('Failed to update request status', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -131,7 +132,7 @@ function PaparazziRequestsView() {
       setSelectedRequest(null);
     } catch (error) {
       console.error('Error deleting request:', error);
-      alert('Failed to delete request');
+      notify('Failed to delete request', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -154,7 +155,7 @@ function PaparazziRequestsView() {
     );
   };
 
-  if (loading && !modalOnly) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-gray-500">Loading requests...</div>
@@ -326,7 +327,7 @@ function PaparazziRequestsView() {
                 )}
               </div>
 
-              {(profile?.role === 'admin' || profile?.role === 'owner') && selectedRequest.status === 'pending' && (
+              {(profile?.role === 'admin') && selectedRequest.status === 'pending' && (
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => updateRequestStatus(selectedRequest.id, 'completed')}
@@ -343,7 +344,7 @@ function PaparazziRequestsView() {
                 </div>
               )}
 
-              {(profile?.role === 'admin' || profile?.role === 'owner' || selectedRequest.requested_by === profile?.id) && (
+              {(profile?.role === 'admin' || selectedRequest.requested_by === profile?.id) && (
                 <div className="pt-3 border-t border-gray-100">
                   <button
                     onClick={() => setConfirmDeleteRequestId(selectedRequest.id)}
@@ -363,7 +364,7 @@ function PaparazziRequestsView() {
 }
 
 export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false, onClose }: JobPhotosGalleryProps = {}) {
-  const { user, profile } = useAuth();
+  const { user: _user, profile } = useAuth();
   const [photos, setPhotos] = useState<JobPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -679,12 +680,12 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
     if (!files || files.length === 0) return;
 
     if (!profile) {
-      alert('You must be logged in to upload media');
+      notify('You must be logged in to upload media', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!photoCaption.trim()) {
-      alert('Please enter a caption for your media');
+      notify('Please enter a caption for your media', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -818,7 +819,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
       if (onClose) onClose();
     } catch (error: any) {
       console.error('Error uploading media:', error);
-      alert(`Error uploading media: ${error?.message || 'Unknown error'}`);
+      notify(`Error uploading media: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
     }
@@ -904,7 +905,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
       setProjects([]);
     } catch (error: any) {
       console.error('Error updating photo:', error);
-      alert(`Error updating photo: ${error?.message || 'Unknown error'}`);
+      notify(`Error updating photo: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     }
   };
 

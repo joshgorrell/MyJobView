@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Package, Clock, CheckCircle, XCircle, FileText, User, Search, Bell, X, RefreshCw, ShoppingCart, Wrench, ClipboardList, Building2, ExternalLink, Calendar, Flag, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -178,7 +179,7 @@ export function PartsRequestManagement() {
       if (error) throw error;
       await loadRequests();
     } catch (error: any) {
-      alert(`Failed to delete request: ${error.message || 'Unknown error'}`);
+      notify(`Failed to delete request: ${error.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -413,8 +414,8 @@ export function PartsRequestManagement() {
   };
 
   const purchasingSources = (ids: string[]) => requests.flatMap(request=>(request.items||[]).filter(item=>ids.includes(item.id)&&!item.purchase_order_id).map(item=>({id:item.id,job_reference:[getCustomerName(request),getSourceRef(request)].filter(Boolean).join(' · ')||getSourceLabel(request)})));
-  const createPurchaseOrder = (request:ProductRequest) => {const sources=purchasingSources((request.items||[]).map(i=>i.id));if(!sources.length){alert('These items are already linked to purchase orders.');return;}setPurchaseItems(sources);};
-  const createPOFromSelected = (itemsToUse?:any[]) => {const ids=itemsToUse?.map(i=>i.itemId)||[...selectedItems];if(!ids.length){alert('Select at least one request item');return;}setPurchaseItems(purchasingSources(ids));};
+  const createPurchaseOrder = (request:ProductRequest) => {const sources=purchasingSources((request.items||[]).map(i=>i.id));if(!sources.length){notify('These items are already linked to purchase orders.', { theme: 'blue', tone: 'warning' });return;}setPurchaseItems(sources);};
+  const createPOFromSelected = (itemsToUse?:any[]) => {const ids=itemsToUse?.map(i=>i.itemId)||[...selectedItems];if(!ids.length){notify('Select at least one request item', { theme: 'blue', tone: 'warning' });return;}setPurchaseItems(purchasingSources(ids));};
 
   if (loading) {
     return (
@@ -1156,7 +1157,7 @@ function ProductRequestSettingsModal({ onClose, onSuccess, settings }: {
 
   const handleAddSetting = async () => {
     if (!notificationRole && !notificationUserId) {
-      alert('Please select either a role or a specific user');
+      notify('Please select either a role or a specific user', { theme: 'blue', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -1173,7 +1174,7 @@ function ProductRequestSettingsModal({ onClose, onSuccess, settings }: {
       setNotificationUserId('');
       onSuccess();
     } catch (error: any) {
-      alert(`Error adding notification: ${error.message}`);
+      notify(`Error adding notification: ${error.message}`, { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }

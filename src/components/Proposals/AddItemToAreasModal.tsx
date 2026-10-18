@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
@@ -22,7 +23,7 @@ interface AddItemToAreasModalProps {
   onRoomsUpdate?: (rooms: ProposalRoom[]) => void;
 }
 
-interface MasterProductFull extends Product {
+interface MasterProductFull extends Omit<Product, 'category' | 'subcategory'> {
   manufacturer_model_number?: string | null;
   manufacturer?: { name: string } | null;
   vendor?: { vendor_name: string } | null;
@@ -172,7 +173,7 @@ export default function AddItemToAreasModal({
         labor_phase:labor_phases(name, default_price)
       `)
       .eq('id', productId)
-      .maybeSingle();
+      .maybeSingle().overrideTypes<MasterProductFull, { merge: false }>();
     if (data) setMasterProduct(data as MasterProductFull);
   }
 
@@ -212,7 +213,7 @@ export default function AddItemToAreasModal({
       item_type: ((product as any).item_type || 'material') as 'material' | 'labor' | 'other',
       task_notes: '',
       show_task_notes: false,
-      is_taxable: product.is_taxable !== undefined ? product.is_taxable : true,
+      is_taxable: product.is_taxable ?? true,
       is_hidden: false,
       is_customer_supplied: false,
       display_mode: 'itemized',
@@ -228,7 +229,7 @@ export default function AddItemToAreasModal({
         handleProductSelect(product);
         setShowNewProductForm(false);
       } else {
-        alert('The product was saved, but could not be loaded into this proposal. Close and reopen Add Item to try again.');
+        notify('The product was saved, but could not be loaded into this proposal. Close and reopen Add Item to try again.', { theme: 'violet', tone: 'error' });
       }
     }
   }
@@ -257,7 +258,7 @@ export default function AddItemToAreasModal({
       setSelectedRooms(new Set([data.id]));
       setNewAreaName('');
     } catch (err: any) {
-      alert('Failed to create area: ' + err.message);
+      notify('Failed to create area: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCreatingArea(false);
     }
@@ -276,13 +277,14 @@ export default function AddItemToAreasModal({
       setEditingAreaId(null);
       setEditingAreaName('');
     } catch (err: any) {
-      alert('Failed to rename area: ' + err.message);
+      notify('Failed to rename area: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCreatingArea(false);
     }
   }
 
-  function addPendingAccessory(product: Product) {
+  function addPendingAccessory(product: Product | null) {
+    if (!product) return;
     const acc: PendingAccessory = {
       tempId: `pending-${Date.now()}-${Math.random()}`,
       product,
@@ -336,13 +338,13 @@ export default function AddItemToAreasModal({
   }
 
   async function handleSave() {
-    if (!selectedProduct) { alert('Please select a product'); return; }
+    if (!selectedProduct) { notify('Please select a product', { theme: 'violet', tone: 'warning' }); return; }
     if (localRooms.length > 0 && selectedRooms.size === 0) {
-      alert('Select the room or area for this item before adding it.');
+      notify('Select the room or area for this item before adding it.', { theme: 'violet', tone: 'warning' });
       return;
     }
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before saving.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -407,7 +409,7 @@ export default function AddItemToAreasModal({
       setTimeout(() => { onItemsAdded(); }, 600);
     } catch (err: any) {
       setSaving(false);
-      alert('Failed to add items: ' + err.message);
+      notify('Failed to add items: ' + err.message, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -783,7 +785,7 @@ export default function AddItemToAreasModal({
       )}
 
       {showAccessorySelector && (
-        <ProductSelector onSelect={addPendingAccessory} onClose={() => setShowAccessorySelector(false)} />
+        <ProductSelector showCreateActions={false} onSelect={addPendingAccessory} onClose={() => setShowAccessorySelector(false)} />
       )}
 
       <ConfirmModal

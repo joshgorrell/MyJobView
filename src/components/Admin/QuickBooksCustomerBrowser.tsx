@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { X, CheckSquare, Square, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -50,7 +51,7 @@ export function QuickBooksCustomerBrowser({ onClose, onImportComplete }: QuickBo
       setCustomers(data || []);
     } catch (error) {
       console.error('Error loading staged customers:', error);
-      alert('Failed to load customers');
+      notify('Failed to load customers', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -58,7 +59,7 @@ export function QuickBooksCustomerBrowser({ onClose, onImportComplete }: QuickBo
 
   async function handleImport() {
     if (selectedIds.size === 0) {
-      alert('Please select at least one customer to import');
+      notify('Please select at least one customer to import', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -81,7 +82,7 @@ export function QuickBooksCustomerBrowser({ onClose, onImportComplete }: QuickBo
       const result = await response.json();
 
       if (result.success) {
-        alert(result.message);
+        notify(result.message, { theme: 'blue', tone: 'info' });
         setSelectedIds(new Set());
         await loadCustomers();
         onImportComplete();
@@ -90,7 +91,7 @@ export function QuickBooksCustomerBrowser({ onClose, onImportComplete }: QuickBo
       }
     } catch (error) {
       console.error('Error importing customers:', error);
-      alert('Failed to import customers: ' + (error as Error).message);
+      notify('Failed to import customers: ' + (error as Error).message, { theme: 'blue', tone: 'error' });
     } finally {
       setImporting(false);
     }

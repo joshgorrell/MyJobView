@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { createTimestampInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { canManageTime } from '../../lib/employeeTimePolicy';
 import { useState, useEffect } from 'react';
@@ -180,30 +181,30 @@ export function ManualJobTimeEntry({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canManageTime(profile?.role)) { alert('Use a time request or the Work Order to record your time.'); return; }
+    if (!canManageTime(profile?.role)) { notify('Use a time request or the Work Order to record your time.', { theme: 'blue', tone: 'info' }); return; }
 
     if (!technicianId) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (entryMode === 'work_order' && !workOrderId) {
-      alert('Please select a work order');
+      notify('Please select a work order', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (entryMode === 'project' && !projectId) {
-      alert('Please select a project');
+      notify('Please select a project', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!clockIn) {
-      alert('Please enter clock in time');
+      notify('Please enter clock in time', { theme: 'blue', tone: 'warning' });
       return;
     }
 
-    if (!timezone || entryDate !== clockIn.slice(0,10)) { alert('Use the clock-in date as the work date.'); return; }
-    if (clockOut && new Date(createTimestampInTimezone(clockOut.slice(0,10),clockOut.slice(11),timezone)) <= new Date(createTimestampInTimezone(clockIn.slice(0,10),clockIn.slice(11),timezone))) { alert('Clock out must be after clock in.'); return; }
+    if (!timezone || entryDate !== clockIn.slice(0,10)) { notify('Use the clock-in date as the work date.', { theme: 'blue', tone: 'info' }); return; }
+    if (clockOut && new Date(createTimestampInTimezone(clockOut.slice(0,10),clockOut.slice(11),timezone)) <= new Date(createTimestampInTimezone(clockIn.slice(0,10),clockIn.slice(11),timezone))) { notify('Clock out must be after clock in.', { theme: 'blue', tone: 'warning' }); return; }
     setLoading(true);
     try {
       const totalHours = calculateTotalHours();
@@ -251,21 +252,21 @@ export function ManualJobTimeEntry({
           .eq('id', entryToEdit.id);
 
         if (error) throw error;
-        alert('Time entry updated successfully');
+        notify('Time entry updated successfully', { theme: 'blue', tone: 'success' });
       } else {
         const { error } = await supabase
           .from('time_entries')
           .insert(entryData);
 
         if (error) throw error;
-        alert('Time entry created successfully');
+        notify('Time entry created successfully', { theme: 'blue', tone: 'success' });
       }
 
       onSave();
       onClose();
     } catch (error: any) {
       console.error('Error saving job time entry:', error);
-      alert(error.message || 'Failed to save job time entry');
+      notify(error.message || 'Failed to save job time entry', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

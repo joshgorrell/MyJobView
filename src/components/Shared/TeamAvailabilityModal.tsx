@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  X, ChevronLeft, ChevronRight, Calendar, Clock, User, AlertTriangle,
+  X, ChevronLeft, ChevronRight, Calendar, Clock, AlertTriangle,
   CheckCircle, Users
 } from 'lucide-react';
 
@@ -30,12 +30,6 @@ interface TeamAvailabilityModalProps {
   preSelectedTechIds?: string[];
 }
 
-const TIME_SLOTS = [
-  '06:00','06:30','07:00','07:30','08:00','08:30','09:00','09:30',
-  '10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30',
-  '14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30',
-  '18:00','18:30','19:00','19:30','20:00'
-];
 
 const HOUR_SLOTS = [
   '06:00','07:00','08:00','09:00','10:00','11:00','12:00',
@@ -485,7 +479,7 @@ function durationToPx(minutes: number): number {
 
 function DayView({
   date, visibleTechs, techColorMap, selectedSlot,
-  hoveredSlot, setHoveredSlot, onSlotClick, timePos, isToday,
+  hoveredSlot: _hoveredSlot, setHoveredSlot, onSlotClick, timePos, isToday,
   scrollRef, fmt12, scheduleItems
 }: DayViewProps & { scheduleItems: ScheduleItem[] }) {
   const dateStr = toDateStr(date);
@@ -636,7 +630,7 @@ function DayView({
 
         {/* ── Tech columns ── */}
         {visibleTechs.map((tech, colIdx) => {
-          const color = techColorMap[tech.id];
+
           const dayItems = scheduleItems.filter(i => i.technician_id === tech.id && i.date === dateStr);
 
           // Build free blocks between busy ranges for this tech

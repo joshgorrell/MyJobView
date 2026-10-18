@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ProjectTasksList from '../Projects/ProjectTasksList';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Wrench, Clock, User, AlertTriangle, ChevronDown, ChevronUp, Briefcase, ListChecks, Timer, CalendarDays, Plus, MapPin, CreditCard as Edit3, Save, X, FileText, Flag, Package, StickyNote, GitBranch, Target, TrendingUp, Info, DollarSign, ShieldOff, GitMerge, CheckSquare, AlertCircle, ChevronRight, Search } from 'lucide-react';
+import { Wrench, Clock, User, AlertTriangle, ChevronDown, ChevronUp, Briefcase, ListChecks, Timer, CalendarDays, Plus, CreditCard as Edit3, Save, X, FileText, Flag, Package, StickyNote, GitBranch, Target, TrendingUp, Info, DollarSign, ShieldOff, GitMerge, CheckSquare, AlertCircle, ChevronRight, Search } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import { CreateProjectWorkOrderModal } from '../Production/CreateProjectWorkOrderModal';
 import { AddProjectTimeModal } from '../Projects/AddProjectTimeModal';
@@ -91,7 +91,7 @@ interface SalesOrderProjectTabProps {
 }
 
 const GOAL_PCT = 0.95;
-const PM_ALLOWANCE_PCT = 0.05;
+
 
 export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabProps) {
   const {profile} = useAuth();
@@ -157,7 +157,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             labor_phase:labor_phases!work_orders_labor_phase_id_fkey(id, name)
           `)
           .eq('project_id', project.id)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false }).overrideTypes<WorkOrder[], { merge: false }>(),
 
         supabase
           .from('project_tasks')
@@ -371,7 +371,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         if (error) throw error;
       }
       await loadProjectData();
-      setShowUnassignedDrilldown(false);
     } catch (err) {
       console.error('Error assigning phase:', err);
     } finally {
@@ -620,23 +619,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   const overBudgetTime = overSold;
   const showChangeOrderPrompt = extraPartsExist || overBudgetTime;
 
-  const statusColors: Record<string, string> = {
-    planning: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    active: 'bg-green-500/20 text-green-400 border-green-500/30',
-    complete: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-    closed: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-  };
-
-  const jobSiteAddr = project.job_site_address
-    ? (typeof project.job_site_address === 'string'
-        ? project.job_site_address
-        : [
-            project.job_site_address.street_address,
-            project.job_site_address.city,
-            project.job_site_address.state,
-            project.job_site_address.zip_code
-          ].filter(Boolean).join(', '))
-    : null;
 
   return (
     <div className="space-y-6">
@@ -1530,7 +1512,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
       {selectedWorkOrderId && (
         <WorkOrderDetail
           workOrderId={selectedWorkOrderId}
-          onClose={() => {
+          onBack={() => {
             setSelectedWorkOrderId(null);
             loadProjectData();
           }}
@@ -1540,7 +1522,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   );
 }
 
-function WorkOrderCard({ wo, soldHours, onClick }: { wo: WorkOrder; soldHours: number; onClick?: () => void }) {
+function WorkOrderCard({ wo, soldHours: _soldHours, onClick }: { wo: WorkOrder; soldHours: number; onClick?: () => void }) {
   const statusStyles: Record<string, string> = {
     completed: 'bg-green-500/20 text-green-400 border border-green-500/30',
     in_progress: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',

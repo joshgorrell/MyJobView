@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { createTimestampInTimezone, formatDateInTimezone, formatTimeInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -40,7 +41,7 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
 
     if (!timezone) return;
     if (!explanation.trim()) {
-      alert('Please provide an explanation for this request');
+      notify('Please provide an explanation for this request', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -72,11 +73,11 @@ export function TimeAdjustmentRequestModal({ entry, onClose, onSubmit }: Props) 
 
       if (error) throw error;
 
-      alert('Time adjustment request submitted successfully! You will be notified when it is reviewed.');
+      notify('Time adjustment request submitted successfully! You will be notified when it is reviewed.', { theme: 'blue', tone: 'success' });
       onSubmit();
     } catch (error: any) {
       console.error('Error submitting request:', error);
-      alert(error.message || 'Failed to submit request');
+      notify(error.message || 'Failed to submit request', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

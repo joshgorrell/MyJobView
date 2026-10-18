@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CreditCard as Edit2, Save, X, DollarSign, ChevronDown, ChevronUp, Check, Loader2, Search, AlertCircle } from 'lucide-react';
+import { Users, CreditCard as Edit2, Save, ChevronUp, Loader2, Search, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmployeeConfig {
@@ -152,7 +152,7 @@ export function EmployeeCommissionConfig() {
     }
   }
 
-  function clearCustomRates(employeeId: string) {
+  function clearCustomRates(_employeeId: string) {
     const cleared: Record<string, string> = {};
     rateFields.forEach(f => { cleared[f.key] = ''; });
     setEditRates(cleared);

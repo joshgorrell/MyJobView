@@ -10,7 +10,6 @@ import {
   XCircle,
   AlertCircle,
   Banknote,
-  Target,
   Calendar,
   User,
   FileText,
@@ -240,7 +239,7 @@ export function MyBonusesTab() {
           work_order:work_orders(title)
         `)
         .eq('technician_id', profile.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).overrideTypes<TravelBonus[], { merge: false }>();
 
       if (error) throw error;
       setTravelBonuses(data || []);

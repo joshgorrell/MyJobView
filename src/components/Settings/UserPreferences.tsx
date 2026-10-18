@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { NotificationPreferenceFields } from './NotificationPreferenceFields';
 import { useState, useEffect } from 'react';
 import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
@@ -172,10 +173,10 @@ export function UserPreferences() {
         }
       }
 
-      alert('Office visibility settings saved!');
+      notify('Office visibility settings saved!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error saving visibility settings:', error);
-      alert('Failed to save visibility settings');
+      notify('Failed to save visibility settings', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -199,10 +200,10 @@ export function UserPreferences() {
         .eq('id', profile.id);
 
       if (error) throw error;
-      alert('Preferences saved successfully!');
+      notify('Preferences saved successfully!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error saving preferences:', error);
-      alert('Failed to save preferences');
+      notify('Failed to save preferences', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -240,10 +241,10 @@ export function UserPreferences() {
         if (event.data.type === 'google-auth-success') {
           window.removeEventListener('message', handleMessage);
           loadPreferences();
-          alert('Google Calendar connected successfully!');
+          notify('Google Calendar connected successfully!', { theme: 'blue', tone: 'success' });
         } else if (event.data.type === 'google-auth-error') {
           window.removeEventListener('message', handleMessage);
-          alert('Failed to connect Google Calendar');
+          notify('Failed to connect Google Calendar', { theme: 'blue', tone: 'error' });
         }
       };
 
@@ -257,12 +258,13 @@ export function UserPreferences() {
       }, 500);
     } catch (error) {
       console.error('Error connecting calendar:', error);
-      alert(`Failed to connect Google Calendar: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      notify(`Failed to connect Google Calendar: ${error instanceof Error ? error.message : 'Unknown error'}`, { theme: 'blue', tone: 'error' });
       setConnecting(false);
     }
   }
 
   async function handleDisconnectCalendar() {
+    if (!profile) return;
     setDisconnecting(true);
     try {
       const { error } = await supabase
@@ -280,10 +282,10 @@ export function UserPreferences() {
 
       setCalendarConnected(false);
       setCalendarEmail('');
-      alert('Google Calendar disconnected successfully!');
+      notify('Google Calendar disconnected successfully!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error disconnecting calendar:', error);
-      alert('Failed to disconnect Google Calendar');
+      notify('Failed to disconnect Google Calendar', { theme: 'blue', tone: 'error' });
     } finally {
       setDisconnecting(false);
     }
@@ -297,13 +299,13 @@ export function UserPreferences() {
       const success = await subscribeToPushNotifications(profile.id);
       if (success) {
         setPushEnabled(true);
-        alert('Push notifications enabled successfully!');
+        notify('Push notifications enabled successfully!', { theme: 'blue', tone: 'success' });
       } else {
-        alert('Failed to enable push notifications. Please check your browser permissions.');
+        notify('Failed to enable push notifications. Please check your browser permissions.', { theme: 'blue', tone: 'error' });
       }
     } catch (error) {
       console.error('Error enabling push notifications:', error);
-      alert('Failed to enable push notifications');
+      notify('Failed to enable push notifications', { theme: 'blue', tone: 'error' });
     } finally {
       setEnablingPush(false);
     }
@@ -317,13 +319,13 @@ export function UserPreferences() {
       const success = await unsubscribeFromPushNotifications(profile.id);
       if (success) {
         setPushEnabled(false);
-        alert('Push notifications disabled successfully!');
+        notify('Push notifications disabled successfully!', { theme: 'blue', tone: 'success' });
       } else {
-        alert('Failed to disable push notifications');
+        notify('Failed to disable push notifications', { theme: 'blue', tone: 'error' });
       }
     } catch (error) {
       console.error('Error disabling push notifications:', error);
-      alert('Failed to disable push notifications');
+      notify('Failed to disable push notifications', { theme: 'blue', tone: 'error' });
     } finally {
       setEnablingPush(false);
     }

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { X, CreditCard, FileText, Upload, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -111,7 +112,7 @@ export function ProposalApprovalModal({
       return publicUrl;
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Error uploading file');
+      notify('Error uploading file', { theme: 'blue', tone: 'error' });
       return null;
     } finally {
       setUploadingFile(false);
@@ -167,7 +168,7 @@ export function ProposalApprovalModal({
       setStep('success');
     } catch (error: any) {
       console.error('Error approving proposal:', error);
-      alert(error.message || 'Error approving proposal. Please try again.');
+      notify(error.message || 'Error approving proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -192,7 +193,7 @@ export function ProposalApprovalModal({
       setStep('success');
     } catch (error: any) {
       console.error('Error approving proposal:', error);
-      alert(error.message || 'Error approving proposal. Please try again.');
+      notify(error.message || 'Error approving proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

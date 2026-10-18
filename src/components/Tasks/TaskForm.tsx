@@ -1,3 +1,5 @@
+import { notify } from '../../lib/feedback';
+import { AIFormFill } from '../Shared/AIFormFill';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Flag, Users, Plus, UserPlus, ListTodo } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -6,7 +8,7 @@ import { Task, Contact, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { offlineSupabaseInsert, offlineSupabaseUpdate } from '../../lib/offlineSupport';
-import { generateUsername } from '../../lib/username';
+import { generateUniqueUsername } from '../../lib/username';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -17,6 +19,7 @@ interface AIPrefill {
   description?: string;
   priority?: string;
   dueDate?: string;
+  assigneeId?: string;
 }
 
 interface TaskFormProps {
@@ -26,14 +29,15 @@ interface TaskFormProps {
   onClose: () => void;
   onSuccess: () => void;
   aiPrefill?: AIPrefill | null;
+  supportMode?: boolean;
 }
 
-export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill }: TaskFormProps) {
+export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill, supportMode = false }: TaskFormProps) {
   const { profile } = useAuth();
   const [formData, setFormData] = useState({
-    title: task?.title || '',
+    title: task?.title || (supportMode ? 'Support: ' : ''),
     description: task?.description || '',
-    priority: task?.priority || 'medium',
+    priority: (task?.priority || 'medium') as string,
     due_date: task?.due_date ? task.due_date.split('T')[0] : '',
     status: task?.status || 'pending',
     contact_id: (task as any)?.contact_id || contactId || '',
@@ -41,8 +45,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     assigned_to: task?.assigned_to || '',
     assigned_department_id: (task as any)?.assigned_department_id || '',
   });
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'contact_name' | 'company_name' | 'email' | 'phone'>[]>([]);
+  const [users, setUsers] = useState<Pick<Profile, 'id' | 'full_name'>[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; display_name: string }>>([]);
   const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
@@ -52,7 +56,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
-  const autoSaveKey = task ? `task_edit_${task.id}` : 'task_new';
+  const autoSaveKey = task ? `task_edit_${task.id}` : supportMode ? 'task_new_support' : 'task_new';
   const { restoreSavedData, clearSavedData } = useAutoSave({
     key: autoSaveKey,
     data: formData,
@@ -79,16 +83,17 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       if (aiPrefill) {
         setFormData(prev => ({
           ...prev,
-          title: aiPrefill.title || prev.title,
+          title: supportMode && aiPrefill.title && !/^Support:/i.test(aiPrefill.title) ? `Support: ${aiPrefill.title}` : aiPrefill.title || prev.title,
           description: aiPrefill.description || prev.description,
           priority: aiPrefill.priority || prev.priority,
           due_date: aiPrefill.dueDate || prev.due_date,
           contact_id: aiPrefill.contactId || prev.contact_id,
+          assigned_to: aiPrefill.assigneeId || prev.assigned_to,
         }));
       } else {
         const savedData = restoreSavedData();
         if (savedData) {
-          setFormData(savedData);
+          setFormData(prev => ({ ...prev, ...savedData, title: supportMode && !String(savedData.title || '').trim() ? 'Support: ' : savedData.title }));
         }
       }
     }
@@ -155,16 +160,12 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
   async function handleCreateContact() {
     if (!newContactData.contact_name.trim()) {
-      alert('Contact name is required');
+      notify('Contact name is required', { theme: 'cyan', tone: 'warning' });
       return;
     }
 
     try {
-      const username = await generateUsername(
-        newContactData.contact_name,
-        'contacts',
-        supabase
-      );
+      const username = await generateUniqueUsername(newContactData.contact_name, supabase);
 
       const { data: newContact, error } = await supabase
         .from('contacts')
@@ -190,7 +191,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       loadContacts();
     } catch (err: any) {
       console.error('Error creating contact:', err);
-      alert('Failed to create contact: ' + err.message);
+      notify('Failed to create contact: ' + err.message, { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -198,6 +199,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     e.preventDefault();
     if (!profile) return;
 
+    if (supportMode && !formData.title.replace(/^Support:\s*/i, '').trim()) {
+      setError('Enter a short description of the support needed.');
+      return;
+    }
+    if (supportMode && !formData.contact_id) {
+      setError('Select a customer contact for this support request.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -336,28 +345,29 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <>
     <QuickActionModal
       scrollBody={false}
-      stableHeight
-      title={task ? 'Edit Task' : 'New Task'}
-      subtitle={task ? 'Update task details' : 'Assign and track a new task'}
+      title={task ? 'Edit Assignment' : supportMode ? 'New Support Request' : 'New Assignment'}
+      subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Assign and track a follow-up'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
       showSuccess={showSuccess}
-      successMessage={task ? 'Task Updated!' : 'Task Created!'}
+      successMessage={task ? 'Assignment Updated!' : supportMode ? 'Support Request Created!' : 'Assignment Created!'}
 
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-          <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 space-y-4">
+            <AIFormFill kind={supportMode ? 'support' : 'task'} onFill={prefill => setFormData(previous => ({ ...previous, title: prefill.title ? (supportMode && !/^Support:/i.test(prefill.title) ? `Support: ${prefill.title}` : prefill.title) : previous.title, description: prefill.description ?? previous.description, priority: prefill.priority ?? previous.priority, due_date: prefill.dueDate ?? previous.due_date, contact_id: prefill.contactId ?? previous.contact_id }))} />
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
               </div>
             )}
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Task Title */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Task Title <span className="text-red-400">*</span>
+                Assignment Title <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -411,8 +421,10 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </p>
             </div>
 
+            </div>
+
             {/* Description - always visible */}
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Description
               </label>
@@ -426,9 +438,9 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             </div>
 
             {/* Contact - always visible */}
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Contact <span className="text-muted font-normal">(optional)</span>
+                Contact <span className="text-muted font-normal">{supportMode ? '(required for support)' : '(optional)'}</span>
               </label>
               <div className="flex gap-2">
                 <ContactSearchSelect
@@ -455,7 +467,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             </div>
 
             {showNewContactForm && (
-              <div className="sm:col-span-2 p-4 bg-surface border border-subtle rounded-lg space-y-3">
+              <div className="p-4 bg-surface border border-subtle rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                     <UserPlus className="w-4 h-4" />
@@ -517,14 +529,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             <button
               type="button"
               onClick={() => setShowDetails(!showDetails)}
-              className="sm:col-span-2 w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
             >
               <span>{showDetails ? 'Hide details' : '+ Details'}</span>
               <span className="text-xs text-muted">priority, due date, reminder</span>
             </button>
 
             {showDetails && (
-              <div className="sm:col-span-2 space-y-4">
+              <div className="space-y-4">
             {/* Priority + Due Date side by side */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -598,7 +610,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               disabled={loading}
               className="flex-1 px-4 py-3 bg-gradient-to-r from-sky-600 to-blue-700 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm disabled:opacity-50"
             >
-              {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
+              {loading ? 'Saving...' : supportMode ? 'Create Support Request' : task ? 'Update Assignment' : 'Create Assignment'}
             </button>
           </div>
         </form>

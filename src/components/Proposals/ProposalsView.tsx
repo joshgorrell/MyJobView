@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { linkedProposalActivity } from '../../lib/proposalActivityLinks';
 import { ProposalActivityDialog } from './ProposalActivityDialog';
 import ProposalsList from './ProposalsList';

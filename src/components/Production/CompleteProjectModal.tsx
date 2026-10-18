@@ -9,13 +9,11 @@ import {
   TrendingUp,
   Mail,
   Send,
-  Clock,
   Building,
   ChevronRight,
   ExternalLink,
   Award,
   ShieldCheck,
-  Calendar,
 } from 'lucide-react';
 import { useToast } from '../Shared/Toast';
 
@@ -59,8 +57,8 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
   const [confirmed, setConfirmed] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   const [emailAddress, setEmailAddress] = useState(customer.contact_email || '');
-  const [existingAccess, setExistingAccess] = useState<ExistingAccess>({ type: 'none' });
-  const [checkingAccess, setCheckingAccess] = useState(false);
+  const [existingAccess, _setExistingAccess] = useState<ExistingAccess>({ type: 'none' });
+  const [checkingAccess, _setCheckingAccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [ttDays, setTtDays] = useState(90);
@@ -88,50 +86,6 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
     };
   }, [onClose, loading]);
 
-  async function checkExistingAccess() {
-    setCheckingAccess(true);
-    try {
-      // Check VIP subscription first
-      const { data: vipData } = await supabase
-        .from('recurring_subscriptions')
-        .select('id, status, recurring_plans(name)')
-        .eq('contact_id', customer.contact_id)
-        .in('status', ['active', 'trial'])
-        .maybeSingle();
-
-      if (vipData) {
-        setExistingAccess({
-          type: 'vip',
-          planName: (vipData as any).recurring_plans?.name || 'VIP Plan',
-        });
-        return;
-      }
-
-      // Check active T&T access grant
-      const { data: grantData } = await supabase
-        .from('punchlist_access_grants')
-        .select('id, expiration_date, access_type')
-        .eq('contact_id', customer.contact_id)
-        .in('status', ['active', 'suspended'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (grantData?.expiration_date) {
-        const days = Math.ceil(
-          (new Date(grantData.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
-        setExistingAccess({ type: 'test_and_tune', daysRemaining: Math.max(0, days) });
-      } else {
-        setExistingAccess({ type: 'none' });
-      }
-    } catch (err) {
-      console.error('Error checking access:', err);
-      setExistingAccess({ type: 'none' });
-    } finally {
-      setCheckingAccess(false);
-    }
-  }
 
   function handleConfirmNext() {
     if (!confirmed) return;

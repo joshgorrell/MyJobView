@@ -1,8 +1,10 @@
+import { gpsTrackingService } from '../../lib/gpsTracking';
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
+import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
@@ -90,7 +92,7 @@ export function DailyClock() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [profile, todayEntry, timePolicy.ready, timePolicy.dailyClock]);
+  }, [profile, timePolicy.ready, timePolicy.dailyClock]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -149,19 +151,20 @@ export function DailyClock() {
             .from('daily_clock_entries')
             .select('*')
             .eq('technician_id', profile.id)
-            .eq('entry_date', today)
+            .or(`entry_date.eq.${today},clock_out.is.null`)
             .order('clock_in', { ascending: false });
         }
       );
 
       if (error) throw error;
 
+      const ownEntries = (entries || []).filter((e: any) => e.technician_id === profile.id && (!e.clock_out || e.entry_date === today));
       // Prioritize active entry (clock_out is null) over completed entries
       let entry = null;
-      if (entries && entries.length > 0) {
+      if (ownEntries.length > 0) {
         // First, look for any active entry (clock_out is null)
-        const activeEntry = entries.find(e => !e.clock_out);
-        entry = activeEntry || entries[0]; // Fall back to most recent if all are clocked out
+        const activeEntry = ownEntries.find(e => !e.clock_out);
+        entry = activeEntry || ownEntries[0]; // Fall back to most recent if all are clocked out
       }
 
       setTodayEntry(entry);
@@ -237,7 +240,7 @@ export function DailyClock() {
 
   async function submitLeaveRequest() {
     if (!profile?.id || !selectedLeavePolicy) {
-      alert('Please select a leave type');
+      notify('Please select a leave type', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -248,9 +251,7 @@ export function DailyClock() {
     const isSameDay = true;
 
     if (isSameDay && !['bereavement', 'jury_duty', 'unpaid'].includes(policy.policy.pto_type)) {
-      const confirmed = window.confirm(
-        `You are calling in for today. This will submit a ${policy.policy.pto_type} request for manager approval.\n\nIf submitted after the cutoff time, points may be deducted from your rewards balance.\n\nDo you want to proceed?`
-      );
+      const confirmed = (await requestConfirmation(`You are calling in for today. This will submit a ${policy.policy.pto_type} request for manager approval.\n\nIf submitted after the cutoff time, points may be deducted from your rewards balance.\n\nDo you want to proceed?`, { theme: 'blue' }));
       if (!confirmed) return;
     }
 
@@ -264,14 +265,14 @@ export function DailyClock() {
 
       if (error) throw error;
 
-      alert('Leave request submitted. Your manager will review and approve it.');
+      notify('Leave request submitted. Your manager will review and approve it.', { theme: 'blue', tone: 'success' });
       setShowLeaveModal(false);
       setSelectedLeavePolicy('');
       setLeaveReason('');
       loadLeaveBalances();
     } catch (error: any) {
       console.error('Error submitting leave request:', error);
-      alert(error.message || 'Failed to submit leave request');
+      notify(error.message || 'Failed to submit leave request', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmittingLeave(false);
     }
@@ -304,13 +305,14 @@ export function DailyClock() {
 
       // If there's already an active clock-in, prevent creating a duplicate
       if (activeEntries && activeEntries.length > 0) {
-        alert('You are already clocked in. Please clock out before clocking in again.');
+        notify('You are already clocked in. Please clock out before clocking in again.', { theme: 'blue', tone: 'warning' });
         await loadTodaysClock(); // Refresh to show the current entry
         return null;
       }
 
       const entryId = crypto.randomUUID();
 
+      const capture = gpsTrackingService.captureLocationForClockEvent();
       const clockInData = {
         id: entryId,
         technician_id: profile.id,
@@ -329,22 +331,22 @@ export function DailyClock() {
 
       if (error) throw error;
 
-      void saveClockEventGps(entryId, 'daily_clock_entries').catch(error => console.error('Clock-in GPS could not be saved:', error));
+      void saveClockEventGps(entryId, 'daily_clock_entries', false, capture).catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
 
       // Show offline notification
       if (!navigator.onLine) {
-        alert('You are offline. Clock-in saved locally and will sync when you\'re back online.');
+        notify('You are offline. Clock-in saved locally and will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
 
       return entryId;
     } catch (error: any) {
       console.error('Error clocking in:', error);
       if (error.code === '23505') {
-        alert('You have already clocked in today');
+        notify('You have already clocked in today', { theme: 'blue', tone: 'error' });
       } else {
-        alert('Failed to clock in: ' + error.message);
+        notify('Failed to clock in: ' + error.message, { theme: 'blue', tone: 'error' });
       }
       return null;
     }
@@ -352,9 +354,9 @@ export function DailyClock() {
 
   function handleClockOut() {
     if (!todayEntry || !profile) return;
-
+    if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) { notify('An unfinished older shift needs manager correction.', { theme: 'amber', tone: 'warning' }); return; }
     if (activeBreak) {
-      alert('Please end your break before clocking out');
+      notify('Please end your break before clocking out', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -385,11 +387,11 @@ export function DailyClock() {
       setShowBreakMenu(false);
 
       if (!navigator.onLine) {
-        alert('Break started offline. Will sync when you\'re back online.');
+        notify('Break started offline. Will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
     } catch (error) {
       console.error('Error starting break:', error);
-      alert('Failed to start break');
+      notify('Failed to start break', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -409,11 +411,11 @@ export function DailyClock() {
       await loadBreaks(todayEntry!.id);
 
       if (!navigator.onLine) {
-        alert('Break ended offline. Will sync when you\'re back online.');
+        notify('Break ended offline. Will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
     } catch (error) {
       console.error('Error ending break:', error);
-      alert('Failed to end break');
+      notify('Failed to end break', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -451,7 +453,7 @@ export function DailyClock() {
     return `${hourStr} and ${mins} ${mins === 1 ? 'minute' : 'minutes'}`;
   }
 
-  function getRewardMessage(eventType: string, points: number, delta: number): string {
+  function getRewardMessage(eventType: string, _points: number, delta: number): string {
     if (eventType === 'early') {
       return `Great! You clocked in ${Math.abs(delta)} minutes early!`;
     } else if (eventType === 'on_time') {
@@ -552,7 +554,6 @@ export function DailyClock() {
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-
 
 
         {isOffline && (

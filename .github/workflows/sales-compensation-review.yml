@@ -1,0 +1,25 @@
+name: Sales compensation review
+on:
+  pull_request:
+    paths:
+      - 'src/components/Admin/**'
+      - 'supabase/migrations/*sales_compensation*'
+      - 'tests/user-setup/**'
+      - '.github/workflows/sales-compensation-review.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Sales compensation contract
+        run: node tests/user-setup/sales-compensation.mjs && node tests/user-setup/sales-compensation-database.mjs
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Frontend build
+        run: npm run build

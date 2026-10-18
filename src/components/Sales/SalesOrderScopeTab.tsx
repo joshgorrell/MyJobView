@@ -1,7 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { supabase } from '../../lib/supabase';
-import { Package, Wrench, Tag, FileText, ChevronDown, ChevronRight, CreditCard as Edit2, Check, X, Plus, Eye, EyeOff, Trash2, Save, Lock, Receipt, TrendingDown, TrendingUp, Percent as PercentIcon, GripVertical, Columns2 as Columns, Wifi, WifiOff, Loader2, Pencil, ListChecks } from 'lucide-react';
+import { Package, Wrench, Tag, ChevronDown, ChevronRight, CreditCard as Edit2, Check, X, Eye, EyeOff, Trash2, Save, Lock, Receipt, TrendingDown, TrendingUp, Percent as PercentIcon, GripVertical, Columns2 as Columns, Wifi, WifiOff, Loader2, Pencil, ListChecks } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import ConfirmModal from '../ui/ConfirmModal';
 import { PortalProposalDetail } from '../Portal/PortalProposalDetail';
@@ -56,6 +57,8 @@ interface CoAddedItem {
 }
 
 interface Room {
+  id: string;
+  name: string;
   description: string | null;
   sort_order: number;
   show_scope: boolean;
@@ -172,7 +175,7 @@ function computeRoomTotal(
   return { modifiersTotal, taxTotal, areaTotal: itemsSubtotal + modifiersTotal + taxTotal };
 }
 
-export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrderScopeTabProps) {
+export function SalesOrderScopeTab({ order, onRefresh: _onRefresh, changeOrders }: SalesOrderScopeTabProps) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [proposalTotals, setProposalTotals] = useState<ProposalTotals | null>(null);
@@ -183,12 +186,12 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   const [showPortalPreview, setShowPortalPreview] = useState(false);
 
   // Portal template state
-  const [portalTemplate, setPortalTemplate] = useState<PortalTemplate | null>(null);
-  const [approvedTemplate, setApprovedTemplate] = useState<PortalTemplate | null>(null);
+  const [_portalTemplate, setPortalTemplate] = useState<PortalTemplate | null>(null);
+  const [_approvedTemplate, setApprovedTemplate] = useState<PortalTemplate | null>(null);
   const [proposalTemplateId, setProposalTemplateId] = useState<string | null>(null);
   const [soTemplateOverrideId, setSoTemplateOverrideId] = useState<string | null>(null);
-  const [availableTemplates, setAvailableTemplates] = useState<PortalTemplate[]>([]);
-  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [_availableTemplates, setAvailableTemplates] = useState<PortalTemplate[]>([]);
+  const [_savingTemplate, _setSavingTemplate] = useState(false);
   // Warning state when rep selects a template different from what customer approved
 
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
@@ -460,26 +463,6 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
     }
   }
 
-  async function applyTemplateOverride(templateId: string | null) {
-    setSavingTemplate(true);
-    try {
-      const { error } = await supabase
-        .from('sales_orders')
-        .update({ portal_template_override_id: templateId })
-        .eq('id', order.id);
-      if (error) throw error;
-      setSoTemplateOverrideId(templateId);
-      // Effective template: if clearing override, fall back to proposal's template
-      const effectiveId = templateId ?? proposalTemplateId;
-      const effective = effectiveId ? availableTemplates.find(t => t.id === effectiveId) ?? null : null;
-      setPortalTemplate(effective);
-      setShowTemplatePicker(false);
-    } catch (err) {
-      console.error('Error saving template override:', err);
-    } finally {
-      setSavingTemplate(false);
-    }
-  }
 
   function getRoomsForView(): Room[] {
     return rooms;
@@ -514,7 +497,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
       setEditingRoomId(null);
     } catch (err) {
       console.error('Error saving room scope:', err);
-      alert('Failed to save scope');
+      notify('Failed to save scope', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingRoomScope(false);
     }
@@ -553,7 +536,7 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
       setEditingTaskItemId(null);
     } catch (err) {
       console.error('Error saving task notes:', err);
-      alert('Failed to save install task');
+      notify('Failed to save install task', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingTask(false);
     }
@@ -608,9 +591,6 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
   const selectedCO = changeOrders?.find(co => co.id === selectedCOId) ?? null;
   const filterableCOs = (changeOrders ?? []).filter(co => co.status !== 'draft');
 
-  function isItemInCOFilter(itemId: string): boolean {
-    return !selectedCOId || coLineItemMap.has(itemId);
-  }
 
   function getActionBadge(actionType: string) {
     const configs: Record<string, { label: string; className: string }> = {
@@ -871,6 +851,8 @@ export function SalesOrderScopeTab({ order, onRefresh, changeOrders }: SalesOrde
           onSaveRoomScope={saveRoomScope}
           onRoomScopeTextChange={setRoomScopeText}
           onRoomShowScopeChange={setRoomShowScope}
+          onViewItem={(id) => setLineItemModal({ id, mode: 'view' })}
+          onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })}
           onEditTask={startEditTask}
           onPhaseChange={handleLineItemPhaseChange}
           coLineItemMap={selectedCOId ? coLineItemMap : null}
@@ -1000,6 +982,8 @@ interface GridViewProps {
   onSaveRoomScope: (id: string) => void;
   onRoomScopeTextChange: (v: string) => void;
   onRoomShowScopeChange: (v: boolean) => void;
+  onViewItem: (id: string) => void;
+  onEditItem: (id: string) => void;
   onEditTask: (item: LineItem) => void;
   onPhaseChange: (itemId: string, phaseId: string | null) => Promise<void>;
   coLineItemMap: Map<string, string> | null;
@@ -1008,10 +992,10 @@ interface GridViewProps {
   showTasks: boolean;
 }
 
-function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
+function GridView({ rooms, proposalTotals, proposalSettings: _proposalSettings, formatCurrency,
   editingRoomId, roomScopeText, roomShowScope, roomScopeRef, savingRoomScope,
   laborPhases, onToggleRoom, onStartEditRoom, onCancelEditRoom, onSaveRoomScope,
-  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onPhaseChange, coLineItemMap, coAddedItems, getActionBadge, showTasks }: GridViewProps) {
+  onRoomScopeTextChange, onRoomShowScopeChange, onEditTask, onViewItem, onEditItem, onPhaseChange, coLineItemMap, coAddedItems, getActionBadge, showTasks }: GridViewProps) {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(DEFAULT_VISIBLE_COLUMNS));
   const [showColumnMenu, setShowColumnMenu] = useState(false);
 
@@ -1146,7 +1130,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                             <tr>
                               {/* Lock / drag handle — always visible, read-only indicator */}
                               <th className="py-2 px-2 w-7 text-center">
-                                <Lock className="w-3 h-3 text-gray-600 mx-auto" title="Scope locked — edit via change order" />
+                                <Lock className="w-3 h-3 text-gray-600 mx-auto"><title>{"Scope locked — edit via change order"}</title></Lock>
                               </th>
                               {visibleColumns.has('manufacturer') && <th className="text-left py-2 px-2 truncate font-medium">Manufacturer</th>}
                               {visibleColumns.has('sku') && <th className="text-left py-2 px-2 truncate font-medium">SKU</th>}
@@ -1168,7 +1152,7 @@ function GridView({ rooms, proposalTotals, proposalSettings, formatCurrency,
                           </thead>
                           <tbody>
                             {filteredItems.map(item => (
-                              <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={(id) => setLineItemModal({ id, mode: 'view' })} onEditItem={(id) => setLineItemModal({ id, mode: 'edit' })} actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null} showTasks={showTasks} />
+                              <GridLineItemRow key={item.id} item={item} formatCurrency={formatCurrency} onEditTask={() => onEditTask(item)} visibleColumns={visibleColumns} laborPhases={laborPhases} onPhaseChange={onPhaseChange} onViewItem={onViewItem} onEditItem={onEditItem} actionBadge={coLineItemMap ? getActionBadge(coLineItemMap.get(item.id) ?? '') : null} showTasks={showTasks} />
                             ))}
                             {roomAddedItems.map(item => {
                               const isLabor = item.item_type === 'labor';
@@ -1749,85 +1733,6 @@ function GridLineItemRow({ item, formatCurrency, onEditTask, visibleColumns, lab
   );
 }
 
-function PricingPanel({ totals, settings, formatCurrency }: { totals: ProposalTotals; settings: ProposalSettings | null; formatCurrency: (v: number) => string }) {
-  const mod1Label = settings?.custom_modifier_1_label || 'Custom Modifier 1';
-  const mod2Label = settings?.custom_modifier_2_label || 'Custom Modifier 2';
-  const hasDiscount = (totals.discount_amount || 0) > 0;
-  const hasProjMgmt = (totals.project_management_amount || 0) > 0;
-  const hasProjDesign = (totals.project_design_amount || 0) > 0;
-  const hasSysDesign = (totals.system_design_amount || 0) > 0;
-  const hasCCFee = (totals.credit_card_fee_amount || 0) > 0;
-  const hasMiscParts = (totals.misc_parts_amount || 0) > 0;
-  const hasMod1 = (totals.custom_modifier_1_amount || 0) !== 0;
-  const hasMod2 = (totals.custom_modifier_2_amount || 0) !== 0;
-  const hasTax = (totals.tax_amount || 0) > 0;
-  const hasDeposit = (totals.deposit_amount || 0) > 0;
-  const hasAnyModifier = hasDiscount || hasProjMgmt || hasProjDesign || hasSysDesign || hasCCFee || hasMiscParts || hasMod1 || hasMod2;
-  const modifierCount = [hasDiscount, hasProjMgmt, hasProjDesign, hasSysDesign, hasCCFee, hasMiscParts, hasMod1, hasMod2].filter(Boolean).length;
-  const hasPartsLabor = (totals.parts_total ?? 0) > 0 || (totals.labor_total ?? 0) > 0;
-
-  return (
-    <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-lg">
-      <div className="px-4 py-3 bg-gray-800/80 border-b border-gray-700/50">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">Contract Totals</h3>
-          {modifierCount > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-900/50 text-blue-300 border border-blue-700/40">{modifierCount} adj.</span>}
-          {hasDiscount && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-700/40">Discount</span>}
-        </div>
-      </div>
-
-      {hasPartsLabor && (
-        <div className="px-4 py-3 bg-gray-800/30 border-b border-gray-700/40 space-y-1.5 text-sm">
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Breakdown</div>
-          {(totals.parts_total ?? 0) > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 flex items-center gap-1.5"><Package className="w-3 h-3" />Materials</span>
-              <span className="text-gray-300 font-medium tabular-nums">{formatCurrency(totals.parts_total ?? 0)}</span>
-            </div>
-          )}
-          {(totals.labor_total ?? 0) > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-cyan-500/80 flex items-center gap-1.5"><Wrench className="w-3 h-3" />Labor</span>
-              <span className="text-cyan-400 font-medium tabular-nums">{formatCurrency(totals.labor_total ?? 0)}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="p-4 space-y-1.5 text-sm">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-400">Items Subtotal</span>
-          <span className="text-white font-semibold tabular-nums">{formatCurrency(totals.subtotal || 0)}</span>
-        </div>
-        {hasDiscount && <div className="flex justify-between items-center pl-3 border-l-2 border-red-700/50"><span className="text-red-400 text-xs">Discount{(totals.discount_percent || 0) > 0 && <span className="opacity-70 ml-1">({totals.discount_percent}%)</span>}</span><span className="text-red-400 font-medium tabular-nums">-{formatCurrency(totals.discount_amount)}</span></div>}
-        {hasProjMgmt && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">Proj. Mgmt{(totals.project_management_percent || 0) > 0 && <span className="opacity-70 ml-1">({totals.project_management_percent}%)</span>}</span><span className="text-blue-400 font-medium tabular-nums">+{formatCurrency(totals.project_management_amount)}</span></div>}
-        {hasProjDesign && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">Proj. Design{(totals.project_design_percent || 0) > 0 && <span className="opacity-70 ml-1">({totals.project_design_percent}%)</span>}</span><span className="text-blue-400 font-medium tabular-nums">+{formatCurrency(totals.project_design_amount)}</span></div>}
-        {hasSysDesign && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">Sys. Design{(totals.system_design_percent || 0) > 0 && <span className="opacity-70 ml-1">({totals.system_design_percent}%)</span>}</span><span className="text-blue-400 font-medium tabular-nums">+{formatCurrency(totals.system_design_amount)}</span></div>}
-        {hasCCFee && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">CC Fee{(totals.credit_card_fee_percent || 0) > 0 && <span className="opacity-70 ml-1">({totals.credit_card_fee_percent}%)</span>}</span><span className="text-blue-400 font-medium tabular-nums">+{formatCurrency(totals.credit_card_fee_amount)}</span></div>}
-        {hasMiscParts && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">Misc Parts{(totals.misc_parts_percent || 0) > 0 && <span className="opacity-70 ml-1">({totals.misc_parts_percent}%)</span>}</span><span className="text-blue-400 font-medium tabular-nums">+{formatCurrency(totals.misc_parts_amount)}</span></div>}
-        {hasMod1 && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">{mod1Label}{(totals.custom_modifier_1_percent || 0) !== 0 && <span className="opacity-70 ml-1">({totals.custom_modifier_1_percent}%)</span>}</span><span className={`font-medium tabular-nums ${(totals.custom_modifier_1_amount || 0) < 0 ? 'text-red-400' : 'text-blue-400'}`}>{(totals.custom_modifier_1_amount || 0) < 0 ? '-' : '+'}{formatCurrency(Math.abs(totals.custom_modifier_1_amount))}</span></div>}
-        {hasMod2 && <div className="flex justify-between items-center pl-3 border-l-2 border-blue-700/50"><span className="text-blue-400 text-xs">{mod2Label}{(totals.custom_modifier_2_percent || 0) !== 0 && <span className="opacity-70 ml-1">({totals.custom_modifier_2_percent}%)</span>}</span><span className={`font-medium tabular-nums ${(totals.custom_modifier_2_amount || 0) < 0 ? 'text-red-400' : 'text-blue-400'}`}>{(totals.custom_modifier_2_amount || 0) < 0 ? '-' : '+'}{formatCurrency(Math.abs(totals.custom_modifier_2_amount))}</span></div>}
-        {hasAnyModifier && <div className="pt-1 border-t border-gray-700/50" />}
-        {hasTax && (
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 text-xs">Sales Tax{(totals.tax_rate || 0) > 0 && <span className="ml-1 opacity-60">({(totals.tax_rate * 100).toFixed(3)}%)</span>}</span>
-            <span className="text-gray-300 tabular-nums">{formatCurrency(totals.tax_amount || 0)}</span>
-          </div>
-        )}
-        <div className="pt-2 border-t border-gray-600 flex justify-between items-center">
-          <span className="font-bold text-white">Contract Total</span>
-          <span className="font-bold text-white text-lg tabular-nums">{formatCurrency(totals.total || 0)}</span>
-        </div>
-        {hasDeposit && (
-          <div className="flex justify-between items-center pt-1 border-t border-gray-700/40">
-            <span className="text-gray-400 text-xs">Deposit Req.{(totals.deposit_percent || 0) > 0 && <span className="ml-1 opacity-60">({totals.deposit_percent}%)</span>}</span>
-            <span className="text-green-400 font-semibold tabular-nums">{formatCurrency(totals.deposit_amount)}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function TotalsFooter({ totals, settings, formatCurrency }: { totals: ProposalTotals; settings: ProposalSettings | null; formatCurrency: (v: number) => string }) {
   const mod1Label = settings?.custom_modifier_1_label || 'Custom Modifier 1';

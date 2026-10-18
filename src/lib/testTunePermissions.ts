@@ -135,7 +135,7 @@ export async function getTestTuneStatsForUser(userId: string): Promise<TestTuneS
  */
 export function canViewProject(
   project: TestTuneProject,
-  userId: string,
+  _userId: string,
   userRole: string
 ): boolean {
   // Admins and finance can view all

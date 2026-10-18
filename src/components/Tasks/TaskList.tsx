@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -112,7 +113,7 @@ export function TaskList({ leadId }: TaskListProps) {
       loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task status');
+      notify('Failed to update task status', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -138,7 +139,7 @@ export function TaskList({ leadId }: TaskListProps) {
       loadTasks();
     } catch (error) {
       console.error('Error deleting task:', error);
-      alert('Failed to delete task');
+      notify('Failed to delete task', { theme: 'cyan', tone: 'error' });
     }
   }
 

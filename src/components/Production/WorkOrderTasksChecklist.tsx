@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { cacheVisitPacket, readVisitPacket, queueVisitEvent, syncVisitEvents, pendingVisitEvents, discardVisitEvent, PendingVisitEvent } from '../../lib/jobOffline';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -95,7 +96,7 @@ export default function WorkOrderTasksChecklist({ workOrderId, projectId, curren
       <button type="button" onClick={load} className="min-h-11 px-3 text-info">Refresh</button>
     </div>
     {offline&&<p className="text-sm text-secondary">Viewing saved instructions offline. Progress is saved on this device until it can sync.</p>}
-    {pending.filter(p=>assignments.some(a=>a.id===p.event.p_assignment_id)).map(p=><div key={p.event.p_event_id} className="border border-subtle rounded-lg p-3 bg-surface text-sm text-primary"><strong>Update awaiting sync</strong><p>{p.event.p_disposition} · {p.event.p_notes}</p>{p.error&&<p role="alert" className="text-red-600">{p.error} Refresh and review the current task before reporting again.</p>}<button className="min-h-11 px-3 text-info" onClick={()=>{setNotes(n=>({...n,[p.event.p_assignment_id]:p.event.p_notes||''}));discardVisitEvent(currentUserId,p.event.p_event_id);load();}}>Use notes to report again</button><button className="min-h-11 px-3 text-secondary" onClick={()=>{if(window.confirm('Discard this saved update?')){discardVisitEvent(currentUserId,p.event.p_event_id);load();}}}>Discard update</button></div>)}
+    {pending.filter(p=>assignments.some(a=>a.id===p.event.p_assignment_id)).map(p=><div key={p.event.p_event_id} className="border border-subtle rounded-lg p-3 bg-surface text-sm text-primary"><strong>Update awaiting sync</strong><p>{p.event.p_disposition} · {p.event.p_notes}</p>{p.error&&<p role="alert" className="text-red-600">{p.error} Refresh and review the current task before reporting again.</p>}<button className="min-h-11 px-3 text-info" onClick={()=>{setNotes(n=>({...n,[p.event.p_assignment_id]:p.event.p_notes||''}));discardVisitEvent(currentUserId,p.event.p_event_id);load();}}>Use notes to report again</button><button className="min-h-11 px-3 text-secondary" onClick={async ()=>{if((await requestConfirmation('Discard this saved update?', { theme: 'blue' }))){discardVisitEvent(currentUserId,p.event.p_event_id);load();}}}>Discard update</button></div>)}
     {error && <p role="alert" className="text-sm text-red-600">{error} <button type="button" onClick={load} className="underline min-h-11">Retry</button></p>}
     {loading && !assignments.length && <p className="text-muted">Loading task instructions...</p>}
     {view === 'today' && <>

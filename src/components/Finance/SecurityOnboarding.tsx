@@ -65,7 +65,7 @@ function SendAgreementDialog({
 }) {
   if (state.type === 'none') return null;
 
-  const isVisible = state.type !== 'none';
+  const isVisible = true;
 
   return (
     <div
@@ -475,14 +475,6 @@ export default function SecurityOnboarding({ onNavigateToContracts, canAccessCon
     });
   }
 
-  function formatDate(dateString: string) {
-    if (!dateString) return 'Not set';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  }
 
   function formatDateTime(dateString: string) {
     if (!dateString) return 'Not set';

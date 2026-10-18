@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Plus, Search, Building2, Phone, Globe, Edit, Users, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -68,7 +69,7 @@ export function CompetitorsList() {
       }
     } catch (error) {
       console.error('Error loading competitors:', error);
-      alert('Failed to load competitors');
+      notify('Failed to load competitors', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export function CompetitorsList() {
       await loadCompetitors();
     } catch (error) {
       console.error('Error deleting competitor:', error);
-      alert('Failed to delete competitor');
+      notify('Failed to delete competitor', { theme: 'violet', tone: 'error' });
     }
   }
 

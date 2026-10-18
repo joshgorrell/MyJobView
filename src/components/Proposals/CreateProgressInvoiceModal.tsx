@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, AlertCircle, DollarSign, Calendar, Package, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -25,13 +26,6 @@ const CLASSIFICATION_OPTIONS = [
   { code: 'freight_delivery', label: 'Freight/Delivery' },
 ];
 
-const CLASSIFICATION_LABELS: Record<string, string> = {
-  material: 'Material',
-  labor: 'Labor',
-  design_fee: 'Design Fee',
-  project_management: 'Project Management',
-  freight_delivery: 'Freight/Delivery',
-};
 
 const CLASSIFICATION_ITEM_TYPE: Record<string, string> = {
   material: 'material',
@@ -86,7 +80,7 @@ export default function CreateProgressInvoiceModal({
   onClose,
   onSuccess
 }: CreateProgressInvoiceModalProps) {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -121,7 +115,7 @@ export default function CreateProgressInvoiceModal({
   const [taxRate, setTaxRate] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
 
-  const [taxInclusiveMode, setTaxInclusiveMode] = useState(false);
+  const [taxInclusiveMode, _setTaxInclusiveMode] = useState(false);
   const [targetTotalInput, setTargetTotalInput] = useState('');
   const targetTotalRef = useRef<HTMLInputElement>(null);
 
@@ -185,7 +179,7 @@ export default function CreateProgressInvoiceModal({
   }
 
   function calculateTotals() {
-    const lineItemsSubtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+
     const changeOrdersSubtotal = Object.values(selectedChangeOrders).reduce((sum, a) => sum + a, 0);
     const taxableAmount = lineItems
       .filter(i => i.is_taxable)
@@ -300,11 +294,11 @@ export default function CreateProgressInvoiceModal({
   }
 
   async function handleSubmit() {
-    if (!invoiceTitle.trim()) { alert('Please enter an invoice title'); return; }
+    if (!invoiceTitle.trim()) { notify('Please enter an invoice title', { theme: 'violet', tone: 'warning' }); return; }
     const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0) +
       Object.values(selectedChangeOrders).reduce((sum, a) => sum + a, 0);
     const total = subtotal + taxAmount;
-    if (subtotal === 0) { alert('Please add at least one line item'); return; }
+    if (subtotal === 0) { notify('Please add at least one line item', { theme: 'violet', tone: 'warning' }); return; }
 
     if (validationResult && !validationResult.valid) {
       setConfirmModal({
@@ -327,7 +321,7 @@ export default function CreateProgressInvoiceModal({
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           sales_order_id: salesOrderId,
           proposal_id: proposalId,
           contact_id: contactId,
@@ -376,7 +370,7 @@ export default function CreateProgressInvoiceModal({
 
       if (Object.keys(selectedChangeOrders).length > 0) {
         const coLinks = Object.entries(selectedChangeOrders).map(([coId, amount]) => ({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           invoice_id: invoice.id,
           change_order_id: coId,
           amount_billed: parseFloat(amount.toFixed(2)),
@@ -386,11 +380,12 @@ export default function CreateProgressInvoiceModal({
         if (coErr) throw coErr;
       }
 
+      notify('Progress invoice created!', { theme: 'violet', tone: 'success' });
       onSuccess(invoice.id);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Failed to create invoice. Please try again.');
+      notify('Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

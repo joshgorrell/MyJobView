@@ -44,7 +44,7 @@ export interface ProductDetailPanelData {
 export interface LaborPhaseOption {
   id: string;
   name: string;
-  default_price?: number;
+  default_price?: number | null;
 }
 
 export interface ClassOption {
@@ -64,6 +64,7 @@ interface ProductDetailPanelProps {
   onRequestImage?: () => void;
   showIdentity?: boolean;
   compactDescription?: boolean;
+  showClassField?: boolean;
   onChange?: (field: keyof ProductDetailPanelData, value: any) => void;
 }
 
@@ -92,6 +93,7 @@ export default function ProductDetailPanel({
   onRequestImage,
   showIdentity = true,
   compactDescription = false,
+  showClassField = true,
   onChange,
 }: ProductDetailPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -488,7 +490,7 @@ export default function ProductDetailPanel({
         {/* Edit-only options */}
         {isEdit && (
           <div className="flex flex-col gap-2 flex-1 lg:flex-none">
-            <div>
+            {showClassField && <div>
               <label className="block text-xs text-gray-500 mb-0.5">Class</label>
               <select
                 value={data.classId || ''}
@@ -500,7 +502,7 @@ export default function ProductDetailPanel({
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-            </div>
+            </div>}
 
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 cursor-pointer select-none">

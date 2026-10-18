@@ -1,9 +1,10 @@
+import { notify } from '../../lib/feedback';
 import LaborRemovalChoice, { itemHasLabor, RemovalScope } from './LaborRemovalChoice';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalRoom, ProposalLineItem, Product } from '../../lib/types';
-import { Plus, GripVertical, Settings, Grid3x3, Calculator, X, RotateCcw, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Settings, Grid3x3, Calculator, RotateCcw, XCircle, AlertTriangle } from 'lucide-react';
 import ProposalGridRow from './ProposalGridRow';
 import ProposalDetailCard from './ProposalDetailCard';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -277,7 +278,7 @@ export default function ProposalBuilderPro({ proposalId, onSave, changeOrderId, 
           await refreshCOLineItems();
           await recalculateProposal();
         }
-        if(await itemHasLabor(item))setLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){alert(result.error.message);return;}await updateCOTotals(changeOrderId!,onCORefresh);await refreshCOLineItems();await loadProposalData();}else await doRemoveCOAddedItem();});
+        if(await itemHasLabor(item))setLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){notify(result.error.message, { theme: 'violet', tone: 'error' });return;}await updateCOTotals(changeOrderId!,onCORefresh);await refreshCOLineItems();await loadProposalData();}else await doRemoveCOAddedItem();});
         else setConfirmModal({ title: 'Remove Item', message: 'Remove this newly-added item from the change order?', onConfirm: doRemoveCOAddedItem });
         return;
       }

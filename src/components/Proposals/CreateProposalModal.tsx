@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Contact, Lead } from '../../lib/types';
@@ -305,7 +306,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
 
   async function updateContactZipCode() {
     if (!selectedResult || selectedResult.source !== 'contact' || !zipCode.trim()) {
-      alert('Please enter a ZIP code');
+      notify('Please enter a ZIP code', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -320,7 +321,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
       lookupTaxRate(zipCode.trim());
     } catch (error) {
       console.error('Error updating ZIP code:', error);
-      alert('Failed to update ZIP code');
+      notify('Failed to update ZIP code', { theme: 'violet', tone: 'error' });
     } finally {
       setUpdatingZip(false);
     }
@@ -328,21 +329,21 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
 
   async function handleCreate() {
     if (!selectedResult) {
-      alert('Please select a contact or lead');
+      notify('Please select a contact or lead', { theme: 'violet', tone: 'warning' });
       return;
     }
     if (!title) {
-      alert('Please enter a title');
+      notify('Please enter a title', { theme: 'violet', tone: 'warning' });
       return;
     }
     if (!taxProjectType) {
-      alert('Please select a project type');
+      notify('Please select a project type', { theme: 'violet', tone: 'warning' });
       return;
     }
 
     const effectiveZip = selectedLocation?.zip_code || selectedResult.zip_code || zipCode;
     if (!effectiveZip || !effectiveZip.trim()) {
-      alert('ZIP code is required for sales tax calculation. Please enter a ZIP code on the selected location or customer.');
+      notify('ZIP code is required for sales tax calculation. Please enter a ZIP code on the selected location or customer.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -370,6 +371,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   }
 
   async function doCreate(finalTaxRate: number) {
+    if (!selectedResult) return;
     try {
       setCreating(true);
 
@@ -458,11 +460,12 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
         throw proposalError;
       }
 
+      notify('Proposal created!', { theme: 'violet', tone: 'success' });
       onCreated(proposal.id, prefill?.rooms);
     } catch (error: any) {
       console.error('Error creating proposal:', error);
       const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      alert(`Failed to create proposal: ${errorMessage}`);
+      notify(`Failed to create proposal: ${errorMessage}`, { theme: 'violet', tone: 'error' });
     } finally {
       setCreating(false);
     }

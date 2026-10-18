@@ -1,3 +1,4 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -190,7 +191,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      notify('Failed to upload image', { theme: 'violet', tone: 'error' });
       return null;
     } finally {
       setUploadingImage(false);
@@ -249,21 +250,21 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       setAccessoryProducts([]);
     } catch (error) {
       console.error('Error adding accessory:', error);
-      alert('Failed to add accessory');
+      notify('Failed to add accessory', { theme: 'violet', tone: 'error' });
     } finally {
       setAddingAccessory(false);
     }
   }
 
   async function removeAccessory(accessoryId: string) {
-    if (!confirm('Remove this accessory from the line item?')) return;
+    if (!(await requestConfirmation('Remove this accessory from the line item?', { theme: 'violet' }))) return;
     try {
       const { error } = await supabase.from('proposal_line_items').delete().eq('id', accessoryId);
       if (error) throw error;
       setAccessories(prev => prev.filter(a => a.id !== accessoryId));
     } catch (error) {
       console.error('Error removing accessory:', error);
-      alert('Failed to remove accessory');
+      notify('Failed to remove accessory', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -279,7 +280,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
     const changes = pendingChanges();
     if (!Object.keys(changes).length && !newImage) { onSaved(); return; }
     if ('room_id' in changes && !rooms.some(room => room.id === roomId)) {
-      alert('Select a valid proposal room before saving');
+      notify('Select a valid proposal room before saving', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -299,7 +300,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       await handleSave([lineItem]);
     } catch (error) {
       console.error('Error checking matching items:', error);
-      alert('Unable to check matching items. Please try saving again.');
+      notify('Unable to check matching items. Please try saving again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -333,7 +334,7 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
       onSaved();
     } catch (error) {
       console.error('Error saving line item:', error);
-      alert('Failed to save all changes. Please retry.');
+      notify('Failed to save all changes. Please retry.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -362,12 +363,12 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div role="dialog" aria-modal="true" aria-label="Edit Item Details" className="bg-white rounded-xl shadow-2xl w-full max-w-5xl min-w-0 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[92dvh]">
+      <div role="dialog" aria-modal="true" aria-label="Edit Item Details" className="bg-white rounded-xl shadow-2xl w-full max-w-4xl min-w-0 flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[92dvh]">
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between shrink-0">
           <div className="min-w-0">
-            <h2 className="text-base font-bold text-gray-900">Edit Item Details</h2>
-            {panelData.sku && <p className="text-xs text-gray-500 mt-0.5">{panelData.sku}</p>}
+            <h2 className="text-base font-bold text-gray-900">Edit Product</h2>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{[panelData.manufacturerName, panelData.modelNumber || panelData.sku].filter(Boolean).join(" · ") || panelData.productName}</p>
           </div>
           <button
             onClick={onClose}
@@ -379,7 +380,8 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
 
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4">
-          <div className="mb-4">
+          <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="min-w-0">
             <label htmlFor="proposal-item-room" className="block text-sm font-medium text-gray-700 mb-1">Room / Area</label>
             <select id="proposal-item-room" value={roomId} onChange={e => setRoomId(e.target.value)} disabled={roomError || saving}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base text-gray-900 bg-white">
@@ -387,11 +389,20 @@ export default function ProductDetailModal({ lineItemId, onClose, onSaved }: Pro
               {rooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
             </select>
             {roomError && <p className="text-xs text-red-600 mt-1">Unable to load rooms. Close and reopen the item to retry.</p>}
-            <p className="text-xs text-gray-500 mt-1">Room changes apply to this item and its accessories only.</p>
+            <p className="text-xs text-gray-500 mt-1">Also moves accessories.</p>
+            </div>
+            <div className="min-w-0">
+              <label htmlFor="proposal-item-class" className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+              <select id="proposal-item-class" value={panelData.classId || ""} onChange={e => handlePanelChange("classId", e.target.value || null)} disabled={saving} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base text-gray-900 bg-white">
+                <option value="">None</option>
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
           <ProductDetailPanel
             mode="edit"
             compactDescription
+            showClassField={false}
             data={panelData}
             laborPhases={laborPhases}
             classes={classes}

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, CreditCard as Edit2, Trash2, Save, X, DollarSign, Wrench, AlertCircle } from 'lucide-react';
@@ -49,12 +50,12 @@ export function LaborPhaseManagement() {
 
   async function handleSave() {
     if (!formData.name.trim()) {
-      alert('Please enter a phase name');
+      notify('Please enter a phase name', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (formData.default_cost > formData.default_price) {
-      alert('Cost cannot be greater than price');
+      notify('Cost cannot be greater than price', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -97,9 +98,9 @@ export function LaborPhaseManagement() {
     } catch (error: any) {
       console.error('Error saving labor phase:', error);
       if (error.code === '23505') {
-        alert('A labor phase with this name already exists');
+        notify('A labor phase with this name already exists', { theme: 'blue', tone: 'error' });
       } else {
-        alert('Failed to save labor phase');
+        notify('Failed to save labor phase', { theme: 'blue', tone: 'error' });
       }
     }
   }
@@ -132,7 +133,7 @@ export function LaborPhaseManagement() {
       loadPhases();
     } catch (error) {
       console.error('Error toggling phase status:', error);
-      alert('Failed to update phase status');
+      notify('Failed to update phase status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -147,7 +148,7 @@ export function LaborPhaseManagement() {
       loadPhases();
     } catch (error) {
       console.error('Error deleting labor phase:', error);
-      alert('Failed to delete labor phase. It may be in use by products.');
+      notify('Failed to delete labor phase. It may be in use by products.', { theme: 'blue', tone: 'error' });
     }
   }
 

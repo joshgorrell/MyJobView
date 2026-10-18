@@ -1,3 +1,4 @@
+import { notify, requestText } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,9 +6,7 @@ import { WorkOrderDetail } from './WorkOrderDetail';
 import {
   Activity,
   CheckCircle,
-  Clock,
   AlertTriangle,
-  Wrench,
   Award,
   Users,
   TrendingUp,
@@ -15,9 +14,7 @@ import {
   Package,
   Camera,
   PlayCircle,
-  PauseCircle,
   CheckSquare,
-  XCircle,
   BarChart2,
   Star
 } from 'lucide-react';
@@ -185,7 +182,7 @@ export function ProductionManagerDashboard() {
           .in('status', ['assigned', 'in_progress', 'pending'])
           .eq('is_archived', false)
           .order('target_completion_date', { ascending: true, nullsFirst: false })
-          .limit(20),
+          .limit(20).overrideTypes<WorkOrder[], { merge: false }>(),
         supabase
           .from('product_requests')
           .select(`
@@ -200,7 +197,7 @@ export function ProductionManagerDashboard() {
           `)
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(10).overrideTypes<ProductRequest[], { merge: false }>(),
         supabase
           .from('work_orders')
           .select('id', { count: 'exact', head: true })
@@ -221,7 +218,7 @@ export function ProductionManagerDashboard() {
             quality_score,
             technician:profiles!technician_id(id, full_name)
           `)
-          .gte('completed_at', weekAgo),
+          .gte('completed_at', weekAgo).overrideTypes<{technician_id: string; quality_score: number; technician: {id: string; full_name: string} | null}[], { merge: false }>(),
         supabase
           .from('job_photos')
           .select('technician_id')
@@ -342,12 +339,12 @@ export function ProductionManagerDashboard() {
       loadDashboardData();
     } catch (error) {
       console.error('Error approving part request:', error);
-      alert('Failed to approve request');
+      notify('Failed to approve request', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleRejectPart(partId: string) {
-    const reason = prompt('Rejection reason (optional):');
+    const reason = (await requestText('Rejection reason (optional):', '', { theme: 'blue' }));
     try {
       const { error } = await supabase
         .from('product_requests')
@@ -363,7 +360,7 @@ export function ProductionManagerDashboard() {
       loadDashboardData();
     } catch (error) {
       console.error('Error rejecting part request:', error);
-      alert('Failed to reject request');
+      notify('Failed to reject request', { theme: 'blue', tone: 'error' });
     }
   }
 

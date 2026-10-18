@@ -129,7 +129,7 @@ export function LineItemGrid({
   onSkuClick,
   collapsedSections,
   onToggleSection,
-  showCollapseAll = false,
+  showCollapseAll: _showCollapseAll = false,
   selectedIds: controlledSelectedIds,
   onToggleSelect: controlledToggleSelect,
   onToggleSelectSection,

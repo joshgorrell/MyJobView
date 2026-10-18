@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { DispatchScheduler } from './DispatchScheduler';
 import { ScheduleListView } from './ScheduleListView';
 import { ScheduleTimelineView } from './ScheduleTimelineView';

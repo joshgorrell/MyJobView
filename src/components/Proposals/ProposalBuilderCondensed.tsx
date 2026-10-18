@@ -1,4 +1,3 @@
-import React from 'react';
 import { ProposalRoom, ProposalLineItem } from '../../lib/types';
 import { Plus, ChevronDown, ChevronRight, GripVertical, Trash2 } from 'lucide-react';
 

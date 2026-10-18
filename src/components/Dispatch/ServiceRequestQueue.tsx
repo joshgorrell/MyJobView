@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -225,7 +226,7 @@ export function ServiceRequestQueue() {
       await loadData();
     } catch (error) {
       console.error('Error updating request status:', error);
-      alert('Failed to update request status');
+      notify('Failed to update request status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -1015,7 +1016,7 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
 
   async function handleSubmit() {
     if (!reason.trim()) {
-      alert('Please describe what information is missing.');
+      notify('Please describe what information is missing.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -1036,7 +1037,7 @@ function KickbackModal({ serviceRequest, onClose, onSuccess }: KickbackModalProp
       onSuccess();
     } catch (error) {
       console.error('Error kicking back request:', error);
-      alert('Failed to send request back. Please try again.');
+      notify('Failed to send request back. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

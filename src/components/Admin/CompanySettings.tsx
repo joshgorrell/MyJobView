@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Building2, Building, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw, Check, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -209,12 +210,12 @@ export function CompanySettings() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notify('File size must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -246,10 +247,10 @@ export function CompanySettings() {
         .getPublicUrl(fileName);
 
       setLogoUrl(publicUrl);
-      alert('Logo uploaded successfully! Click "Save Company Info" to apply changes.');
+      notify('Logo uploaded successfully! Click "Save Company Info" to apply changes.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error uploading logo:', error);
-      alert('Failed to upload logo');
+      notify('Failed to upload logo', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -273,10 +274,10 @@ export function CompanySettings() {
               .remove([fileName]);
           }
           setLogoUrl('');
-          alert('Logo removed! Click "Save Company Info" to apply changes.');
+          notify('Logo removed! Click "Save Company Info" to apply changes.', { theme: 'blue', tone: 'info' });
         } catch (error) {
           console.error('Error removing logo:', error);
-          alert('Failed to remove logo');
+          notify('Failed to remove logo', { theme: 'blue', tone: 'error' });
         }
       },
     });
@@ -291,11 +292,11 @@ export function CompanySettings() {
     inputRef: React.RefObject<HTMLInputElement>
   ) {
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notify('File size must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -328,10 +329,10 @@ export function CompanySettings() {
       }
 
       setUrl(publicUrl);
-      alert('Logo uploaded and saved successfully!');
+      notify('Logo uploaded and saved successfully!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error uploading branding logo:', error);
-      alert('Failed to upload logo');
+      notify('Failed to upload logo', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -363,10 +364,10 @@ export function CompanySettings() {
           }
 
           setUrl('');
-          alert('Logo removed successfully!');
+          notify('Logo removed successfully!', { theme: 'blue', tone: 'success' });
         } catch (error) {
           console.error('Error removing branding logo:', error);
-          alert('Failed to remove logo');
+          notify('Failed to remove logo', { theme: 'blue', tone: 'error' });
         }
       },
     });
@@ -535,11 +536,11 @@ export function CompanySettings() {
 
       clearTimezoneCache();
 
-      alert('Company settings saved successfully');
+      notify('Company settings saved successfully', { theme: 'blue', tone: 'success' });
       loadSettings();
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -606,11 +607,11 @@ export function CompanySettings() {
         .eq('id', office.id);
 
       if (error) throw error;
-      alert('Office updated successfully');
+      notify('Office updated successfully', { theme: 'blue', tone: 'success' });
       loadOffices();
     } catch (error) {
       console.error('Error updating office:', error);
-      alert('Failed to update office');
+      notify('Failed to update office', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -643,7 +644,7 @@ export function CompanySettings() {
       loadOffices();
     } catch (error) {
       console.error('Error adding office:', error);
-      alert('Failed to add office');
+      notify('Failed to add office', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -663,7 +664,7 @@ export function CompanySettings() {
           loadOffices();
         } catch (error) {
           console.error('Error deleting office:', error);
-          alert('Failed to delete office');
+          notify('Failed to delete office', { theme: 'blue', tone: 'error' });
         }
       },
     });

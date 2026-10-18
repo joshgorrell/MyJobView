@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MapPin, Navigation, Battery, Clock, Activity, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,7 +25,7 @@ export function RealTimeLocationDashboard() {
   const [technicianLocations, setTechnicianLocations] = useState<TechnicianLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTech, setSelectedTech] = useState<TechnicianLocation | null>(null);
-  const [mapCenter, setMapCenter] = useState({ lat: 39.0, lng: -95.7 }); // Default to Kansas
+  const [_mapCenter, setMapCenter] = useState({ lat: 39.0, lng: -95.7 }); // Default to Kansas
 
   useEffect(() => {
     loadActiveTechnicians();

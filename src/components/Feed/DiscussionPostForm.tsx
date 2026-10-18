@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Send, ListTodo, HelpCircle, MessageCircle, Calendar, ChevronDown, ChevronUp, Users, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -28,7 +29,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [route, setRoute] = useState<FlowTarget | null>(null);
   const [routeToken, setRouteToken] = useState('');
   const [highlight, setHighlight] = useState(0);
-  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id);
+  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id ?? undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -210,21 +211,21 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
+      notify('Failed to create post. Please try again.', { theme: 'cyan', tone: 'error' });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 relative">
+    <form onSubmit={handleSubmit} className="relative space-y-5 rounded-2xl bg-transparent p-1 sm:p-2">
       <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Post Type *</label>
-        <div className="flex gap-2">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Message type *</label>
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => setPostType('task')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-xl border transition-all font-medium ${
               postType === 'task'
                 ? 'border-blue-600 bg-blue-50 text-blue-700'
                 : 'border-gray-300 hover:border-gray-400 text-gray-700'
@@ -236,7 +237,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
           <button
             type="button"
             onClick={() => setPostType('question')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-xl border transition-all font-medium ${
               postType === 'question'
                 ? 'border-blue-600 bg-blue-50 text-blue-700'
                 : 'border-gray-300 hover:border-gray-400 text-gray-700'
@@ -248,7 +249,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
           <button
             type="button"
             onClick={() => setPostType('general')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-xl border transition-all font-medium ${
               postType === 'general'
                 ? 'border-blue-600 bg-blue-50 text-blue-700'
                 : 'border-gray-300 hover:border-gray-400 text-gray-700'
@@ -281,7 +282,9 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         </div>
       )}
 
+      <label htmlFor="flow-message-content" className="block text-sm font-semibold text-slate-800">Your message *</label>
       <textarea
+        id="flow-message-content"
         ref={textareaRef}
         value={content}
         onChange={(e) => { setContent(e.target.value); setCursorPosition(e.target.selectionStart); if (routeToken && !e.target.value.includes(routeToken)) { setRoute(null); setRouteToken(''); } setHighlight(0); }}
@@ -289,16 +292,16 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         onSelect={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         onClick={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         onKeyUp={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
-        placeholder="Start a discussion... Use @ to mention users/leads, # for hashtags"
-        rows={3}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+        placeholder="Write your message… Use @ to mention someone or # to link a job."
+        rows={4}
+        className="w-full min-h-36 resize-y rounded-2xl border border-slate-200 bg-white px-4 py-4 text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
       />
 
       {tag?.symbol === '#' && <div className="flow flow-tag-results" role="listbox" aria-label="Matching customers and jobs">{choices.filter(c => c.kind !== 'person').map((choice, index) => <button type="button" role="option" aria-selected={index === highlight} key={`${choice.kind}:${choice.id}`} onClick={() => chooseRoute(choice as FlowTarget)}>{choice.label} · {choice.kind.replace('_', ' ')}</button>)}</div>}
       {route && <p className="text-sm text-blue-700 my-2">Posting to {route.label} <button type="button" onClick={() => { setRoute(null); setRouteToken(''); }}>Remove</button></p>}
       <div className="mt-3 space-y-2">
-        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><Lock className="w-4 h-4" /> Send to</label>
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><Lock className="w-4 h-4" /> Recipients</label>
           <div className="flex gap-2 flex-wrap">
             <button type="button" onClick={() => setAudience('company')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'company' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@everyone</button>
             <button type="button" onClick={() => setAudience('direct')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'direct' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@user(s)</button>
@@ -353,14 +356,14 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         </div>
       )}
 
-      <div className="flex justify-end mt-2">
+      <div className="flex justify-end border-t border-slate-200 pt-4">
         <button
           type="submit"
           disabled={loading || !content.trim() || !postType || (audience === 'department' && !departmentId)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Send className="w-4 h-4" />
-          {loading ? 'Posting...' : 'Post'}
+          {loading ? 'Sending…' : 'Send'}
         </button>
       </div>
     </form>

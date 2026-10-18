@@ -1,9 +1,9 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { loadTeamLeave, minutes } from '../../lib/timeOff';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Calendar, User, Clock, MapPin, Phone, CheckCircle, XCircle, Coffee, AlertCircle } from 'lucide-react';
+import { Calendar, User, Clock, MapPin, CheckCircle, XCircle, Coffee, AlertCircle } from 'lucide-react';
 
 interface TechStatus {
   id: string;
@@ -186,7 +186,7 @@ export function TechStatusDashboard() {
             start_time: '',
             end_time: ''
           } : undefined,
-          location: location
+          location: location ?? undefined
         };
       });
 
@@ -206,23 +206,6 @@ export function TechStatusDashboard() {
     }
   }
 
-  async function updateTechStatus(techId: string, newStatus: string, notes?: string) {
-    try {
-      const { error } = await supabase
-        .from('technician_status')
-        .upsert({
-          technician_id: techId,
-          status: newStatus,
-          notes: notes || null,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-      loadTechStatuses();
-    } catch (error) {
-      console.error('Error updating tech status:', error);
-    }
-  }
 
   function getStatusIcon(status: string) {
     switch (status) {

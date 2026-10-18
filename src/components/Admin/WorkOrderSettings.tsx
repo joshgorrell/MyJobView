@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -95,9 +96,7 @@ export function WorkOrderSettings() {
   }
   async function remove(option: WorkOrderOption) {
     if (
-      !confirm(
-        `Delete unused ${option.label}? Used options must be deactivated instead.`,
-      )
+      !(await requestConfirmation(`Delete unused ${option.label}? Used options must be deactivated instead.`, { theme: 'blue' }))
     )
       return;
     setBusy(true);

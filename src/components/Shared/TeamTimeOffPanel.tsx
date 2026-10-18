@@ -1,3 +1,4 @@
+import { supabase } from "../../lib/supabase";
 import { useEffect, useState } from "react";
 import { dateKey } from "../../lib/workOrderScheduling";
 import { getOrganizationTimezone } from "../../lib/timezoneUtils";
@@ -76,10 +77,12 @@ export function TeamTimeOffPanel({ from, to }: { from?: string; to?: string }) {
     };
   }, [first, last, refresh]);
   useEffect(() => {
+    const channel = supabase.channel("team-availability").on("postgres_changes", { event: "*", schema: "public", table: "pto_requests" }, () => setRefresh(v => v + 1)).subscribe();
     const timer = window.setInterval(() => setRefresh((v) => v + 1), 60000);
     const onFocus = () => setRefresh((v) => v + 1);
     window.addEventListener("focus", onFocus);
     return () => {
+      void channel.unsubscribe();
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
@@ -184,7 +187,9 @@ export function TeamTimeOffPanel({ from, to }: { from?: string; to?: string }) {
             )}
           </div>
         ) : (
-          <div className="overflow-auto max-h-[520px]">
+          <div>
+            <div className="sm:hidden space-y-2">{leaves.length ? leaves.map(row => <div key={row.request_id + row.leave_date} className="rounded-xl border border-subtle p-3"><p className="font-semibold">{row.employee_name}</p><p className="text-sm text-secondary">{displayDate(row.leave_date)} · {leaveLabel(row)}</p></div>) : <p className="text-muted">No approved time off in this date range.</p>}</div>
+          <div className="hidden sm:block overflow-auto max-h-[520px]">
             <table className="min-w-full text-sm">
               <thead>
                 <tr>
@@ -248,7 +253,7 @@ export function TeamTimeOffPanel({ from, to }: { from?: string; to?: string }) {
             {!people.length && (
               <p className="p-3 text-muted">No active employees found.</p>
             )}
-          </div>
+          </div></div>
         ))}
     </section>
   );

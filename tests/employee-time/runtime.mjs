@@ -15,7 +15,7 @@ function harness(path,imports={},globals={}) {
   const jsx=(type,props)=>({type,props});const module={exports:{}};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText.replaceAll('import.meta.env','__testEnv'),{
     __testEnv:{},console,module,exports:module.exports,Date,URLSearchParams,...globals,
-    require(name){if(name==='react')return {...React,default:React};if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};if(name==='lucide-react')return new Proxy({},{get:(_,key)=>key});if(name in imports)return imports[name];throw Error(name);},
+    require(name){if(name==='react-dom')return {createPortal:x=>x};if(name==='../../lib/feedback')return {notify(value){globals.alert?.(value);},requestConfirmation:async()=>true,requestText:async()=>null};if(name==='react')return {...React,default:React};if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};if(name==='lucide-react')return new Proxy({},{get:(_,key)=>key});if(name in imports)return imports[name];throw Error(name);},
   });
   return {exports:module.exports,render(name,props={}){cursor=0;return module.exports[name](props);},effects};
 }
@@ -27,11 +27,14 @@ const policy={useEmployeeTimePolicy:()=>({ready:true,loading:false,basis:'work_a
 const nav=[];const writes=[];
 function query(table){const q=new Proxy({}, {get(_,key){if(key==='then')return(resolve)=>resolve({error:null,data:table==='work_orders'?[{id:'wo-1',work_order_number:'WO-100',title:'Install Speakers',status:'assigned',scheduled_start_time:'08:00',project:{name:'Home'}}]:table==='company_settings'?{shop_time_request_enabled:true,training_time_request_enabled:true}:[]});return(...args)=>{if(['insert','update','delete','upsert'].includes(key))writes.push([table,key,args]);return q;};}});return q;}
 const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
-  '../../lib/supabase':{supabase:{from:query}},'../../contexts/AuthContext':auth,'../../hooks/useEmployeeTimePolicy':policy,
+  '../../lib/supabase':{supabase:{from:query,channel:()=>({on(){return this;},subscribe(){return this;},unsubscribe(){}})}},'../../contexts/AuthContext':auth,'../../hooks/useEmployeeTimePolicy':policy,
   '../../lib/timezoneUtils':{getOrganizationTimezone:async()=> 'America/Chicago',formatDateInTimezone:()=> '2026-10-02'},
   '../Technician/ManualJobTimeRequestModal':{ManualJobTimeRequestModal:'ManualJobTimeRequestModal'},
   '../Technician/RequestInternalTimeModal':{RequestInternalTimeModal:'RequestInternalTimeModal'},
+  '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},
   '../Technician/MyTimeView':{MyTimeView:'MyTimeView'},
+  '../Dispatch/MyTimeOff':{MyTimeOff:'MyTimeOff'},'../Shared/TeamTimeOffPanel':{TeamTimeOffPanel:'TeamTimeOffPanel'},
+  '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},
 },{window:{location:{search:''},addEventListener(){},removeEventListener(){}},document:{activeElement:null,body:{style:{overflow:""}}}});
 let closed=0;const props={onClose(){closed++;},onNavigate:(...args)=>nav.push(args)};
 launch.render('DailyLaunchpad',props);launch.effects.splice(0).forEach(fn=>fn());
@@ -40,13 +43,14 @@ let tree=launch.render('DailyLaunchpad',props);
 assert.ok(text(tree).includes('Install Speakers'));
 const card=nodes(tree).find(n=>n.type==='button'&&text(n).includes('Install Speakers'));
 card.props.onClick();assert.equal(nav[0][0],'work_orders');assert.equal(nav[0][1].workOrderId,'wo-1');assert.equal(closed,1);assert.equal(writes.length,0);
-assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Request Manual Job Time'));
-nodes(tree).find(n=>n.type==='button'&&text(n)==='Daily Calendar').props.onClick();tree=launch.render('DailyLaunchpad',props);
+assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Record Manual Job Time'));
+nodes(tree).find(n=>n.type==='button'&&text(n)==='Calendar').props.onClick();tree=launch.render('DailyLaunchpad',props);
 const calendar=nodes(tree).find(n=>n.type==='Calendar');assert.ok(calendar);assert.equal(calendar.props.personalOnly,true);
 calendar.props.onWorkOrderSelect('wo-2');assert.equal(nav[1][1].workOrderId,'wo-2');assert.equal(writes.length,0);
 const dash=harness('src/components/Technician/TechDashboard.tsx',{'../../hooks/useEmployeeTimePolicy':policy,'./DailyClock':{DailyClock:'DailyClock'},'../Production/TechnicianWorkCenter':{TechnicianWorkCenter:'TechnicianWorkCenter'},'./MyTimeView':{MyTimeView:'MyTimeView'},'../../contexts/AuthContext':auth});
 tree=dash.render('TechDashboard');assert.ok(!text(tree).includes('Daily Clock'));assert.ok(nodes(tree).some(n=>n.type==='TechnicianWorkCenter'));
 const mytime=harness('src/components/Technician/MyTimeView.tsx',{
+  '../Shared/AttendanceBadge':{AttendanceBadge:'AttendanceBadge',useAttendanceResults:()=>({})},
   '../../hooks/useEmployeeTimePolicy':policy,'./MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},'../../lib/timezoneUtils':{},'../../lib/supabase':{supabase:{}},'../../contexts/AuthContext':auth,
   './TimeAdjustmentRequestModal':{TimeAdjustmentRequestModal:'TimeAdjustmentRequestModal'},'../ui/ConfirmModal':{default:'ConfirmModal'},
 });
@@ -132,6 +136,7 @@ timerNav.onLine=true;timerQueue=[];timerEntry=null;timerRefresh();for(let i=0;i<
 console.log('Work Order timer separates completion and retains pending offline stops without restarting locally.');
 const completionWrites=[],completionAlerts=[];
 const completion=harness('src/components/Production/JobCompletionWizard.tsx',{
+ '../Shared/NotesPolishButton':{NotesPolishButton:'NotesPolishButton'},'./WorkOrderTasksChecklist':{default:'WorkOrderTasksChecklist'},
  '../../lib/timezoneUtils':tz,'../../contexts/AuthContext':auth,'./SignaturePad':{SignaturePad:'SignaturePad'},
  '../../lib/supabase':{supabase:{from(table){const q=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({error:null,data:table==='work_orders'?{id:'wo',title:'Visit',type:'General',work_order_number:'WO-1'}:table==='job_completion_templates'?{id:'template',template_name:'General',checklist_items:[],required_photos:[],requires_signature:false}:table==='time_entries'?{id:'running'}:[]});return(...args)=>{if(['insert','update','delete'].includes(key))completionWrites.push([table,key,args]);return q;};}});return q;}}},
 },{alert:value=>completionAlerts.push(value),console:{error(){}}});

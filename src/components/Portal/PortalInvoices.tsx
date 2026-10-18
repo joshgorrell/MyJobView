@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { DollarSign, ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
+import { ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
@@ -160,7 +161,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             )
           `)
           .eq('contact_id', profile.contact_id)
-          .in('status', ['active', 'paused'])
+          .in('status', ['active', 'paused']).overrideTypes<RecurringSubscription[], { merge: false }>()
       ]);
 
       if (invoicesRes.error) throw invoicesRes.error;
@@ -230,7 +231,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       setPaymentWindowsOpened(true);
     } catch (error) {
       console.error('Error initiating batch payment:', error);
-      alert('Failed to process payments. Please try again or contact support.');
+      notify('Failed to process payments. Please try again or contact support.', { theme: 'blue', tone: 'error' });
     } finally {
       setPayingAll(false);
     }
@@ -243,7 +244,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     const unsyncedInvoices = selectedInvoices.filter(inv => !inv.qbo_payment_url);
 
     if (unsyncedInvoices.length > 0) {
-      alert(`${unsyncedInvoices.length} invoice(s) are not yet synced with QuickBooks. Please contact support.`);
+      notify(`${unsyncedInvoices.length} invoice(s) are not yet synced with QuickBooks. Please contact support.`, { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -303,6 +304,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
       const printable = {
         ...invoice,
+        tax: invoice.tax_amount,
         invoice_title: extra?.invoice_title || null,
         billing_name: extra?.billing_name || contactName || null,
         billing_address_line1: extra?.billing_address_line1 || contact?.street_address || null,
@@ -341,7 +343,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
   async function handleCancelSubscription() {
     if (!selectedSubscription || !cancelReason) {
-      alert('Please select a reason for cancellation.');
+      notify('Please select a reason for cancellation.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -358,22 +360,20 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       const result = data as { success: boolean; error?: string; effective_date?: string; will_continue_billing?: boolean };
 
       if (!result.success) {
-        alert(result.error || 'Failed to cancel subscription');
+        notify(result.error || 'Failed to cancel subscription', { theme: 'blue', tone: 'error' });
         return;
       }
 
-      alert(
-        result.will_continue_billing
+      notify(result.will_continue_billing
           ? `Your subscription has been scheduled for cancellation. Billing will continue until ${new Date(result.effective_date!).toLocaleDateString()}.`
-          : `Your subscription will be cancelled after the next billing cycle on ${new Date(result.effective_date!).toLocaleDateString()}.`
-      );
+          : `Your subscription will be cancelled after the next billing cycle on ${new Date(result.effective_date!).toLocaleDateString()}.`, { theme: 'blue', tone: 'info' });
 
       setCancelModalOpen(false);
       setSelectedSubscription(null);
       loadInvoices();
     } catch (error) {
       console.error('Error cancelling subscription:', error);
-      alert('Failed to cancel subscription. Please try again or contact support.');
+      notify('Failed to cancel subscription. Please try again or contact support.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

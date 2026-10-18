@@ -14,8 +14,8 @@ export function QuickFlowUpdateModal({ onClose }: { onClose: () => void }) {
   }, [posted, onClose]);
 
   return <QuickActionModal
-    title="Flow Update"
-    subtitle="Share a quick note without leaving this page"
+    title="Activity update"
+    subtitle="Share customer or job progress without leaving this page"
     icon={<FlowWaveIcon className="text-2xl" />}
     accentColor="from-cyan-600 to-blue-700"
     onClose={onClose}

@@ -1,3 +1,4 @@
+import { notify } from './lib/feedback';
 import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
 import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
@@ -8,7 +9,7 @@ import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
-import { TenantProvider, useTenant } from './contexts/TenantContext';
+import { TenantProvider } from './contexts/TenantContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
 import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
@@ -22,9 +23,9 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
-import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
-import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
+import { LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
@@ -56,8 +57,8 @@ const DepartmentManager = lazy(() => import('./components/Admin/DepartmentManage
 const GPSDiagnostics = lazy(() => import('./components/Admin/GPSDiagnostics').then(m => ({ default: m.GPSDiagnostics })));
 const ContactCSVImport = lazy(() => import('./components/Admin/ContactCSVImport').then(m => ({ default: m.ContactCSVImport })));
 const SecurityContractCSVImport = lazy(() => import('./components/Admin/SecurityContractCSVImport').then(m => ({ default: m.SecurityContractCSVImport })));
-const MaintenanceAgreements = lazy(() => import('./components/Finance/MaintenanceAgreements'));
-const EquipmentWarrantyAgreements = lazy(() => import('./components/Finance/EquipmentWarrantyAgreements'));
+
+
 const HistoricalSalesImport = lazy(() => import('./components/Admin/HistoricalSalesImport').then(m => ({ default: m.HistoricalSalesImport })));
 const DailySalesReportImport = lazy(() => import('./components/Admin/DailySalesReportImport').then(m => ({ default: m.DailySalesReportImport })));
 const TasksView = lazy(() => import('./components/Tasks/TasksView').then(m => ({ default: m.TasksView })));
@@ -79,7 +80,7 @@ const TechnicianWorkCenter = lazy(() => import('./components/Production/Technici
 const ProductionManagerDashboard = lazy(() => import('./components/Production/ProductionManagerDashboard').then(m => ({ default: m.ProductionManagerDashboard })));
 const PartsRequestManagement = lazy(() => import('./components/Production/PartsRequestManagement').then(m => ({ default: m.PartsRequestManagement })));
 const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGallery').then(m => ({ default: m.JobPhotosGallery })));
-const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
+
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
 const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
@@ -88,20 +89,20 @@ const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopo
 const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
 const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
-const SalesPerformance = lazy(() => import('./components/Sales/SalesPerformance').then(m => ({ default: m.SalesPerformance })));
+
 const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').then(m => ({ default: m.SalesOrdersView })));
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
 const ReviewsView = lazy(() => import('./components/Sales/ReviewsView'));
 const SalesServiceRequestsView = lazy(() => import('./components/Sales/SalesServiceRequestsView').then(m => ({ default: m.SalesServiceRequestsView })));
 const IndividualDashboard = lazy(() => import('./components/Dashboard/IndividualDashboard').then(m => ({ default: m.IndividualDashboard })));
-const TeamLeaderboard = lazy(() => import('./components/Dashboard/TeamLeaderboard').then(m => ({ default: m.TeamLeaderboard })));
+
 const ProjectsView = lazy(() => import('./components/Projects/ProjectsView'));
 const InvoicesView = lazy(() => import('./components/Invoices/InvoicesView').then(m => ({ default: m.InvoicesView })));
 const CommissionsPage = lazy(() => import('./components/Commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
 const PunchlistAdminDashboard = lazy(() => import('./components/Production/PunchlistAdminDashboard').then(m => ({ default: m.PunchlistAdminDashboard })));
 const TestTunePerformanceDashboard = lazy(() => import('./components/Production/TestTunePerformanceDashboard').then(m => ({ default: m.TestTunePerformanceDashboard })));
 const VIPPlanManagement = lazy(() => import('./components/Finance/VIPPlanManagement').then(m => ({ default: m.VIPPlanManagement })));
-const BonusApprovalDashboard = lazy(() => import('./components/Finance/BonusApprovalDashboard').then(m => ({ default: m.BonusApprovalDashboard })));
+
 const TestTuneSettings = lazy(() => import('./components/Admin/TestTuneSettings').then(m => ({ default: m.TestTuneSettings })));
 const PortalPunchlist = lazy(() => import('./components/Portal/PortalPunchlist').then(m => ({ default: m.PortalPunchlist })));
 const PortalVIPMembership = lazy(() => import('./components/Portal/PortalVIPMembership').then(m => ({ default: m.PortalVIPMembership })));
@@ -121,7 +122,7 @@ const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m 
 const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
 const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
-const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
+
 const LaborDashboard = lazy(() => import('./components/Production/LaborDashboard/LaborDashboard'));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
@@ -159,11 +160,12 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
   useEffect(() => {
     let cancelled = false;
     if (!profile?.organization_id) return;
-    supabase
+    Promise.resolve(supabase
       .from('company_settings')
-      .select(`${moduleKey}`)
+      .select(moduleKey)
       .eq('organization_id', profile.organization_id)
       .maybeSingle()
+      .overrideTypes<Record<string, boolean>, { merge: false }>())
       .then(({ data }) => {
         if (cancelled) return;
         setAllowed(data?.[moduleKey] ?? false);
@@ -188,12 +190,15 @@ function AppContent() {
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [aiLeadPrefill, setAiLeadPrefill] = useState<LeadPrefill | null>(null);
   const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
+  const [showServiceTypePicker, setShowServiceTypePicker] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
+  const [showSupportTaskForm, setShowSupportTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
@@ -250,7 +255,7 @@ function AppContent() {
     });
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const [_currentHash, setCurrentHash] = useState(window.location.hash);
 
   const notificationCount = useNotificationCount();
 
@@ -265,11 +270,11 @@ function AppContent() {
 
     const recordPage = () => {
       const sessionId = (window as any).__currentSessionId || null;
-      supabase.rpc('update_session_activity', {
+      Promise.resolve(supabase.rpc('update_session_activity', {
         p_user_id: user.id,
         p_page: activeTab,
         p_session_id: sessionId,
-      }).then(() => {}).catch(() => {});
+      })).then(() => {}).catch(() => {});
     };
 
     recordPage();
@@ -821,7 +826,7 @@ function AppContent() {
             onCreateLead={() => setShowLeadForm(true)}
             onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
-            onCreateServiceRequest={() => setShowServiceRequestForm(true)}
+            onCreateServiceRequest={() => setShowServiceTypePicker(true)}
             onCreateTask={() => {
               setAiTaskPrefill(null);
               setShowAiTaskForm(true);
@@ -1079,7 +1084,6 @@ function AppContent() {
           {activeTab === 'feature_suggestions' && <ImprovementsView key={activeTab} />}
 
 
-
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
               <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
@@ -1105,7 +1109,6 @@ function AppContent() {
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
           {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
-
 
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}
@@ -1193,13 +1196,27 @@ function AppContent() {
       {showLeadForm && (
         <Suspense fallback={null}>
           <LeadForm
-            onClose={() => setShowLeadForm(false)}
+            aiPrefill={aiLeadPrefill}
+            onClose={() => { setShowLeadForm(false); setAiLeadPrefill(null); }}
             onSuccess={() => {
               setShowLeadForm(false);
+              setAiLeadPrefill(null);
               setActiveTab('feed');
             }}
           />
         </Suspense>
+      )}
+
+      {showServiceTypePicker && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowServiceTypePicker(false); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="service-type-heading" className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-subtle bg-canvas p-5 text-primary shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-muted">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded-lg p-2 text-muted hover:bg-surface" aria-label="Close">✕</button></div>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Service</span><span className="text-sm text-muted">On-site work, repairs, troubleshooting, or dispatch</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setAiTaskPrefill(null); setShowSupportTaskForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Support</span><span className="text-sm text-muted">Customer assistance and remote support</span></button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showServiceRequestForm && (
@@ -1212,6 +1229,17 @@ function AppContent() {
               setActiveTab('dispatch_dashboard');
             }}
             aiPrefill={aiServiceRequestPrefill}
+          />
+        </Suspense>
+      )}
+
+      {showSupportTaskForm && (
+        <Suspense fallback={null}>
+          <TaskForm
+            supportMode
+            aiPrefill={aiTaskPrefill}
+            onClose={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
+            onSuccess={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
           />
         </Suspense>
       )}
@@ -1276,23 +1304,27 @@ function AppContent() {
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
             const actionModule: Record<string, string> = {
-              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks',
+              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks', CREATE_SUPPORT_REQUEST: 'tasks',
               CREATE_SERVICE_REQUEST: 'service_requests', CREATE_MESSAGE: 'messages',
               CREATE_PROPOSAL: 'proposals', CREATE_SECURITY_CONTRACT: 'security_onboarding',
               OPEN_PROPOSAL: 'proposals',
             };
             const requiredModule = action.type === 'NAVIGATE_TO' ? action.tab : actionModule[action.type];
             if (!requiredModule || !checkModuleAccess(requiredModule)) {
-              window.alert('That action is not available with your current permissions.');
+              notify('That action is not available with your current permissions.', { theme: 'blue', tone: 'info' });
               return;
             }
             if (action.type === 'CREATE_CONTACT') {
               setShowContactForm(true);
             } else if (action.type === 'CREATE_LEAD') {
+              setAiLeadPrefill((action.prefill as LeadPrefill | undefined) ?? null);
               setShowLeadForm(true);
             } else if (action.type === 'CREATE_TASK') {
               if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
               setShowAiTaskForm(true);
+            } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
+              setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
+              setShowSupportTaskForm(true);
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);

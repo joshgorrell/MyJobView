@@ -32,13 +32,13 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
-  const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
+  const { mainDepartments: _mainDepartments, footerDepartments: _footerDepartments, getUserModules: _getUserModules, starredModules, loading: deptLoading } = useDepartments();
   const [commandCenterOpen,setCommandCenterOpen] = useState(()=>new URLSearchParams(window.location.search).get('commandCenter')==='1');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [expandedMobileItems, setExpandedMobileItems] = useState<Set<string>>(new Set());
+  const [_expandedMobileItems, _setExpandedMobileItems] = useState<Set<string>>(new Set());
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
       {(profile?.avatar_url || businessCardPhoto) && (
         <img
           key={profile?.avatar_url || businessCardPhoto}
-          src={profile.avatar_url || businessCardPhoto || ''}
+          src={profile?.avatar_url || businessCardPhoto || ''}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
           onError={event => { event.currentTarget.style.display = 'none'; }}
@@ -130,15 +130,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
     return IconComponent ? <IconComponent className={className} /> : <Menu className={className} />;
   };
 
-  const toggleMobileExpand = (itemKey: string) => {
-    const newExpanded = new Set(expandedMobileItems);
-    if (newExpanded.has(itemKey)) {
-      newExpanded.delete(itemKey);
-    } else {
-      newExpanded.add(itemKey);
-    }
-    setExpandedMobileItems(newExpanded);
-  };
 
   const handleMenuClick = (key: string) => {
     onTabChange(key);
@@ -234,25 +225,11 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   </button>
 
                   {onCreateInternalChat && <button
-                    onClick={() => {
-                      onCreateInternalChat?.();
-                      setShowCreateMenu(false);
-                    }}
-                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
-                  >
-                    <MessageSquare className="w-4 h-4 text-purple-400" />
-                    <div>
-                      <div className="font-medium">Internal chat</div>
-                      <div className="text-xs text-muted">Teammates, departments or everyone</div>
-                    </div>
-                  </button>}
-
-                  {onCreateFlowUpdate && <button
-                    onClick={() => { onCreateFlowUpdate(); setShowCreateMenu(false); }}
+                    onClick={() => { onCreateInternalChat(); setShowCreateMenu(false); setMobileMenuOpen(false); }}
                     className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
                   >
                     <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="font-medium">Activity update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                    <div><div className="font-medium">Flow</div><div className="text-xs text-muted">Messages, activities and updates</div></div>
                   </button>}
 
                   <button
@@ -264,7 +241,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <Wrench className="w-4 h-4 text-orange-400" />
                     <div>
-                      <div className="font-medium">Work Order Request</div>
+                      <div className="font-medium">Service Request</div>
                       <div className="text-xs text-muted">Request service or project work</div>
                     </div>
                   </button>
@@ -278,8 +255,8 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <CheckSquare className="w-4 h-4 text-cyan-400" />
                     <div>
-                      <div className="font-medium">New Task</div>
-                      <div className="text-xs text-muted">Create a task or reminder</div>
+                      <div className="font-medium">New Assignment</div>
+                      <div className="text-xs text-muted">Assign a follow-up or reminder</div>
                     </div>
                   </button>
 
@@ -461,22 +438,11 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   </button>
 
                   {onCreateInternalChat && <button
-                    onClick={() => { onCreateInternalChat?.(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
-                  >
-                    <MessageSquare className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm font-medium">Internal chat</div>
-                      <div className="text-xs text-muted">Teammates, departments or everyone</div>
-                    </div>
-                  </button>}
-
-                  {onCreateFlowUpdate && <button
-                    onClick={() => { onCreateFlowUpdate(); setMobileMenuOpen(false); }}
+                    onClick={() => { onCreateInternalChat(); setShowCreateMenu(false); setMobileMenuOpen(false); }}
                     className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
                   >
                     <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="text-sm font-medium">Activity update</div><div className="text-xs text-muted">Share a customer or job update</div></div>
+                    <div><div className="text-sm font-medium">Flow</div><div className="text-xs text-muted">Messages, activities and updates</div></div>
                   </button>}
 
                   <button
@@ -485,7 +451,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <Wrench className="w-4 h-4 text-orange-400 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium">Work Order Request</div>
+                      <div className="text-sm font-medium">Service Request</div>
                       <div className="text-xs text-muted">Request service or project work</div>
                     </div>
                   </button>
@@ -496,8 +462,8 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                   >
                     <CheckSquare className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                     <div>
-                      <div className="text-sm font-medium">New Task</div>
-                      <div className="text-xs text-muted">Create a task or reminder</div>
+                      <div className="text-sm font-medium">New Assignment</div>
+                      <div className="text-xs text-muted">Assign a follow-up or reminder</div>
                     </div>
                   </button>
 

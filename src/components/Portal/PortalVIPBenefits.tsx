@@ -7,7 +7,6 @@ import {
   Shield,
   Calendar,
   ClipboardList,
-  Wrench,
   Headphones,
   Zap,
   ChevronRight,

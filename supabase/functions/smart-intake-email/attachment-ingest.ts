@@ -1,0 +1,119 @@
+import { getReceivedAttachmentDownload } from "./attachment-download.ts";
+import { downloadSignedAttachment } from "./signed-download.ts";
+import { quarantineObjectKey } from "./quarantine-key.ts";
+import { attachmentSha256 } from "./attachment-checksum.ts";
+import { uploadQuarantinedAttachment } from "./attachment-quarantine.ts";
+import type { AttachmentManifest } from "./attachment-manifest.ts";
+
+/**
+ * Preserve all attachment bytes in private quarantine before acknowledging
+ * the inbound provider event. This intentionally does NOT clear malware scans,
+ * expose downloads to staff, or promote files into permanent media.
+ */
+export async function quarantineReceivedAttachments(
+  db: Parameters<typeof uploadQuarantinedAttachment>[0] & {
+    storage: { from: (bucket: string) => {
+      upload: (path: string, body: Uint8Array, options: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }>;
+      info: (path: string) => Promise<{ data: { size?: number; metadata?: { size?: number } } | null; error: { statusCode?: string | number; status?: number; message?: string; error?: string } | null }>;
+      download: (path: string) => Promise<{ data: Blob | null; error: unknown }>;
+    } };
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          eq: (column: string, value: string) => {
+            maybeSingle: () => Promise<{ data: { id: string; sha256: string | null; byte_size: number | null } | null; error: { code?: string } | null }>;
+          };
+        };
+      };
+      insert: (record: Record<string, unknown>) => Promise<{ error: { code?: string } | null }>;
+    };
+  },
+  input: {
+    organizationId: string;
+    intakeId: string;
+    messageId: string;
+    providerEmailId: string;
+    apiKey: string;
+    attachments: AttachmentManifest[];
+    allowedDownloadHosts: readonly string[];
+  },
+): Promise<void> {
+  if (!input.allowedDownloadHosts.length) throw new Error("Attachment host allowlist is not configured");
+  if (input.attachments.length > 20) throw new Error("Too many attachments");
+  for (const attachment of input.attachments) {
+    const storageKey = quarantineObjectKey(input.organizationId, input.intakeId, attachment.id);
+    const existing = await db.from("intake_attachments").select("id,sha256,byte_size")
+      .eq("intake_message_id", input.messageId).eq("storage_key", storageKey).maybeSingle();
+    if (existing.error) throw new Error("Unable to check quarantined attachment");
+    if (existing.data) {
+      if (!existing.data.sha256) throw new Error("Incomplete quarantine record");
+      // A database row alone does not prove the object survived a failed upload
+      // or an out-of-band deletion. Verify its presence before skipping retries.
+      const { data: object, error: objectError } = await db.storage.from("smart-intake-quarantine")
+        .info(storageKey);
+      if (objectError || !object) throw new Error("Quarantined object missing");
+      const objectSize = object.metadata?.size ?? object.size;
+      if (!Number.isSafeInteger(objectSize) || objectSize < 0) {
+        throw new Error("Quarantine object size unavailable");
+      }
+      if (objectSize !== existing.data.byte_size || objectSize > 15 * 1024 * 1024) {
+        throw new Error("Quarantine object size does not match database record");
+      }
+      // A matching byte count is insufficient: verify the stored binary itself.
+      const { data: stored, error: downloadError } = await db.storage.from("smart-intake-quarantine")
+        .download(storageKey);
+      if (downloadError || !stored || stored.size !== objectSize) {
+        throw new Error("Unable to verify quarantined content");
+      }
+      const storedDigest = await attachmentSha256(new Uint8Array(await stored.arrayBuffer()));
+      if (storedDigest !== existing.data.sha256) throw new Error("Quarantine checksum mismatch");
+      continue;
+    }
+
+    const metadata = await getReceivedAttachmentDownload(input.providerEmailId, attachment.id, input.apiKey);
+    if (metadata.size > 15 * 1024 * 1024) throw new Error("Attachment too large");
+    const bytes = await downloadSignedAttachment(metadata.downloadUrl, input.allowedDownloadHosts, Math.max(1, metadata.size));
+    if (bytes.byteLength !== metadata.size) throw new Error("Attachment size mismatch");
+    const sha256 = await attachmentSha256(bytes);
+    // Recover from a previous attempt that uploaded bytes but failed before
+    // recording the database row. Never overwrite an unknown existing object.
+    const bucket = db.storage.from("smart-intake-quarantine");
+    const { data: orphan, error: orphanError } = await bucket.info(storageKey);
+    const notFound = orphanError && (orphanError.statusCode === "404" || orphanError.statusCode === 404 || orphanError.status === 404);
+    if (orphanError && !notFound) {
+      throw new Error("Unable to inspect quarantine object");
+    }
+    if (!orphan && !notFound) throw new Error("Quarantine object lookup returned no result");
+    if (orphan) {
+      const { data: stored, error: readError } = await bucket.download(storageKey);
+      if (readError || !stored || stored.size !== bytes.byteLength) {
+        throw new Error("Orphan quarantine object mismatch");
+      }
+      const digest = await attachmentSha256(new Uint8Array(await stored.arrayBuffer()));
+      if (digest !== sha256) throw new Error("Orphan quarantine checksum mismatch");
+    } else {
+      try {
+        await uploadQuarantinedAttachment(db, storageKey, bytes, attachment.contentType);
+      } catch {
+        // Another concurrent delivery may have uploaded the object. A retry
+        // will inspect its checksum; never overwrite or claim success here.
+        throw new Error("Quarantine upload requires reconciliation");
+      }
+    }
+    const { error } = await db.from("intake_attachments").insert({
+      intake_message_id: input.messageId,
+      storage_key: storageKey,
+      original_filename: attachment.filename,
+      mime_type: attachment.contentType,
+      byte_size: bytes.byteLength,
+      sha256,
+      scan_status: "pending",
+      disposition: "pending",
+    });
+    if (error) {
+      // A retry may have inserted the same attachment concurrently; the
+      // storage object must remain quarantined until reconciliation.
+      throw new Error("Unable to record quarantined attachment");
+    }
+  }
+}

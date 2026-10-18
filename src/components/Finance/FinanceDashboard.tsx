@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, FileText, CreditCard, Users, Calendar, AlertCircle } from 'lucide-react';
+import { DollarSign, TrendingUp, FileText, CreditCard, Users, Calendar, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 

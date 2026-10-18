@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import {
   Target, TrendingUp, DollarSign, Calendar, Users, Save, AlertCircle,
@@ -175,7 +176,7 @@ export function SalesTargetManagement() {
       await loadSalesReps();
     } catch (e) {
       console.error(e);
-      alert('Failed to save goal model.');
+      notify('Failed to save goal model.', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingOrg(false);
     }

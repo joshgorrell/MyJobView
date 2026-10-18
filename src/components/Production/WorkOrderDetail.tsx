@@ -1,3 +1,4 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { ScheduleWorkOrderModal } from './ScheduleWorkOrderModal';
 import { NotesPolishButton } from '../Shared/NotesPolishButton';
 import {CreateInvoiceFromWorkOrderModal} from '../Invoices/CreateInvoiceFromWorkOrderModal';
@@ -5,10 +6,10 @@ import {InvoiceDetailModal} from '../Invoices/InvoiceDetailModal';
 import { WorkOrderTimeControl } from './WorkOrderTimeControl';
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
 import Flow from '../Flow/Flow';
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, AlertCircle, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Tag, Archive, ArchiveRestore, Link, Unlink, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit2, Save, X, Plus, Clock, Calendar, User, Package, CheckSquare, FileText, Camera, Wrench, Award, UserPlus, Archive, ArchiveRestore, Link, Copy, History, Phone, PhoneOff, MapPin, Navigation, Repeat } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { PartRequestForm } from './PartRequestForm';
@@ -59,6 +60,9 @@ interface WorkOrder {
   contact_id: string;
   customer_sales_rep_id: string | null;
   created_at: string;
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
   is_billable: boolean;
   is_archived: boolean;
   work_order_group_id: string | null;
@@ -193,6 +197,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [timeNow, setTimeNow] = useState(Date.now());
   const [partRequests, setPartRequests] = useState<PartRequest[]>([]);
   const [jobPhotos, setJobPhotos] = useState<any[]>([]);
   const [jobCompletion, setJobCompletion] = useState<JobCompletion | null>(null);
@@ -225,6 +230,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [availableWorkOrders, setAvailableWorkOrders] = useState<any[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [customerHistory, setCustomerHistory] = useState<any[]>([]);
+  const [auditNames, setAuditNames] = useState<Record<string, string>>({});
   const [showContactLogModal, setShowContactLogModal] = useState(false);
   const [contactLogRefreshKey, setContactLogRefreshKey] = useState(0);
   const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
@@ -409,7 +415,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             product_request_items(id, product_name, quantity_requested, estimated_cost)
           `)
           .eq('work_order_id', workOrderId)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false }).overrideTypes<PartRequest[], { merge: false }>(),
         supabase
           .from('job_photos')
           .select('*')
@@ -425,6 +431,15 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       if (woResult.error) throw woResult.error;
       if (woResult.data) {
         setWorkOrder(woResult.data);
+        // Resolve available creator/editor names without inventing a historical actor.
+        const actorIds = [...new Set([woResult.data.created_by, woResult.data.updated_by].filter((id): id is string => Boolean(id)))];
+        if (actorIds.length) {
+          void supabase.from('profiles').select('id, full_name').in('id', actorIds).then(({ data }) => {
+            if (data) setAuditNames(Object.fromEntries(data.map(actor => [actor.id, actor.full_name || 'Unknown user'])));
+          });
+        } else {
+          setAuditNames({});
+        }
         loadLinkedWorkOrders(woResult.data?.work_order_group_id || null);
         loadCustomerHistory(woResult.data.contact_id);
         setEditedWorkOrder(woResult.data);
@@ -451,6 +466,59 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   }
 
+
+  // Keep the whole crew's time visible without reloading notes or the work-order editor.
+  useEffect(() => {
+    if (!workOrder) return;
+    let disposed = false;
+    let requestId = 0;
+    const refresh = async () => {
+      const current = ++requestId;
+      let ids = [workOrderId];
+      if (workOrder.work_order_group_id) {
+        const { data: visits, error: visitsError } = await supabase.from('work_orders')
+          .select('id').eq('work_order_group_id', workOrder.work_order_group_id);
+        if (visitsError) {
+          console.error('Could not resolve linked work-order time:', visitsError);
+          return;
+        }
+        ids = [...new Set([workOrderId, ...(visits || []).map(visit => visit.id)])];
+      }
+      if (disposed || current !== requestId) return;
+      const { data, error } = await supabase.from('time_entries')
+        .select('*, technician:profiles!technician_id(full_name)')
+        .in('work_order_id', ids)
+        .order('entry_date', { ascending: false });
+      if (!disposed && current === requestId && !error) setTimeEntries(data || []);
+      if (error) console.error('Could not refresh work-order time:', error);
+    };
+    const tick = window.setInterval(() => setTimeNow(Date.now()), 1000);
+    const poll = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 15000);
+    const channel = supabase.channel(`work-order-team-time-${workOrderId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, payload => {
+        const changed = (payload.new || payload.old) as { work_order_id?: string };
+        // A visit can be linked or unlinked while this screen is open; re-check group membership.
+        if (!changed.work_order_id || changed.work_order_id === workOrderId || workOrder.work_order_group_id) void refresh();
+      }).subscribe();
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeNow(Date.now());
+        void refresh();
+      }
+    };
+    const onOnline = () => void refresh();
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+    void refresh();
+    return () => {
+      disposed = true; window.clearInterval(tick); window.clearInterval(poll);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onOnline);
+      void supabase.removeChannel(channel);
+    };
+  }, [workOrderId, workOrder?.work_order_group_id]);
 
   async function saveNotesDraft() {
     if (!notesDirtyRef.current) return;
@@ -512,46 +580,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   }
 
-  async function handleConfirmCustomerContact() {
-    if (!profile || !workOrder) return;
-    if (workOrder.customer_contact_confirmed_at) {
-      setConfirmModal({
-        title: 'Update Contact Timestamp',
-        message: 'Customer contact has already been recorded. Do you want to update the timestamp to now?',
-        onConfirm: async () => {
-          try {
-            const { error } = await supabase
-              .from('work_orders')
-              .update({
-                customer_contact_confirmed_at: new Date().toISOString(),
-                customer_contact_confirmed_by: profile.id,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', workOrderId);
-            if (error) throw error;
-            loadWorkOrderData();
-          } catch (error) {
-            console.error('Error confirming customer contact:', error);
-          }
-        }
-      });
-      return;
-    }
-    try {
-      const { error } = await supabase
-        .from('work_orders')
-        .update({
-          customer_contact_confirmed_at: new Date().toISOString(),
-          customer_contact_confirmed_by: profile.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', workOrderId);
-      if (error) throw error;
-      loadWorkOrderData();
-    } catch (error) {
-      console.error('Error confirming customer contact:', error);
-    }
-  }
 
   async function handleArchive() {
     if (!profile || !workOrder) return;
@@ -579,10 +607,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           }
 
           loadWorkOrderData();
-          alert(workOrder.is_archived ? 'Work order unarchived successfully!' : 'Work order archived successfully!');
+          notify(workOrder.is_archived ? 'Work order unarchived successfully!' : 'Work order archived successfully!', { theme: 'blue', tone: 'success' });
         } catch (error) {
           console.error('Error archiving work order:', error);
-          alert('Failed to archive work order. Please try again.');
+          notify('Failed to archive work order. Please try again.', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -590,7 +618,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   async function handleLinkWorkOrders() {
     if (selectedLinkIds.length === 0) {
-      alert('Please select at least one work order to link');
+      notify('Please select at least one work order to link', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -605,10 +633,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       setShowLinkModal(false);
       setSelectedLinkIds([]);
       loadWorkOrderData();
-      alert(`Successfully linked ${allIds.length} work orders together!`);
+      notify(`Successfully linked ${allIds.length} work orders together!`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error linking work orders:', error);
-      alert('Failed to link work orders. Please try again.');
+      notify('Failed to link work orders. Please try again.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -625,10 +653,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           if (error) throw error;
 
           loadWorkOrderData();
-          alert('Work order unlinked successfully!');
+          notify('Work order unlinked successfully!', { theme: 'blue', tone: 'success' });
         } catch (error) {
           console.error('Error unlinking work order:', error);
-          alert('Failed to unlink work order. Please try again.');
+          notify('Failed to unlink work order. Please try again.', { theme: 'blue', tone: 'error' });
         }
       }
     });
@@ -668,7 +696,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
   useEffect(() => {
     if (workOrder && activeTab === 'vip' && !isVipMaintenance) {
-      setActiveTab('overview');
+      setActiveTab('tasks');
       const url = new URL(window.location.href);
       url.searchParams.delete('subtab');
       window.history.replaceState({}, '', url.toString());
@@ -696,36 +724,37 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   }
 
   const canEdit = profile?.role === 'admin' ||
-    profile?.role === 'office_manager' ||
-    profile?.role === 'project_manager';
+    profile?.role === 'manager';
 
-  const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'office_manager';
+  const canArchive = profile?.role === 'admin' || profile?.role === 'finance' || profile?.role === 'manager';
 
   const canManageParts = ['admin','office_manager','project_manager','service_manager','manager','finance'].includes(profile?.role || '') || workOrder.assigned_to===profile?.id;
   const isAssignedTech = workOrder.assigned_to === profile?.id;
 
-  const totalTimeHours = timeEntries.filter(t=>t.clock_out && !['rejected','cancelled'].includes(t.status)).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const validTimeEntries = timeEntries.filter(t => !['rejected', 'cancelled'].includes(t.status));
+  const activeTimeEntries = validTimeEntries.filter(t => !t.clock_out && Number.isFinite(Date.parse(t.clock_in)));
+  const elapsedHours = (entry: TimeEntry) => Math.max(0, (timeNow - Date.parse(entry.clock_in)) / 3600000 - Number(entry.break_minutes || 0) / 60);
+  const completedTimeHours = validTimeEntries.filter(t => t.clock_out).reduce((sum, t) => sum + Number(t.total_hours || 0), 0);
+  const activeTimeHours = activeTimeEntries.reduce((sum, entry) => sum + elapsedHours(entry), 0);
+  const totalTimeHours = completedTimeHours + activeTimeHours;
   const pendingParts = partRequests.filter(p => p.status === 'pending').length;
   const canComplete = workOrder.status !== 'completed' && isAssignedTech && !jobCompletion;
 
 
   const tabs = [
-    { id: 'flow', label: 'Flow', icon: History },
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
-    { id: 'overview', label: 'Overview', icon: FileText },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
     { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'tasks', label: "Today's Work", icon: CheckSquare },
-    { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length, badge: pendingParts },
-    { id: 'photos', label: 'Photos', icon: Camera, count: jobPhotos.length },
-    { id: 'materials', label: 'Materials', icon: Package, count: materials.length + partsUsed.length },
+    { id: 'parts', label: 'Parts', icon: Wrench, count: partRequests.length + partsUsed.length + materials.length, badge: pendingParts },
+    { id: 'photos', label: 'Media', icon: Camera, count: jobPhotos.length },
     { id: 'time', label: 'Time', icon: Clock, count: timeEntries.length },
     { id: 'completion', label: 'Completion', icon: Award, badge: jobCompletion ? 1 : 0 },
-    { id: 'history', label: 'History', icon: History, count: customerHistory.length }
+    { id: 'history', label: 'Past Work', icon: History, count: customerHistory.length },
+    { id: 'flow', label: 'Activity', icon: History }
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
@@ -744,10 +773,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 className="text-xl font-bold text-gray-900 px-2 py-1 border border-gray-300 rounded-lg w-full"
               />
             ) : (
-              <h1 className="text-xl font-bold text-gray-900 leading-tight">{workOrder.title}</h1>
+              <div className="min-w-0"><h1 className="text-xl font-bold text-gray-900 leading-tight">{workOrder.contact?.company_name || workOrder.contact?.full_name || workOrder.title}</h1><p className="text-sm text-gray-600 truncate">{workOrder.title}</p></div>
             )}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className="text-sm font-mono text-gray-500">{workOrder.work_order_number}</span>
+              <span className="text-xs font-mono text-gray-400">{workOrder.work_order_number}</span>
               {workOrder.project && (
                 <>
                   <span className="text-gray-300">•</span>
@@ -802,7 +831,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           {workOrder.type==='service' && workOrder.status!=='cancelled' && ['admin','manager','service_manager','finance'].includes(profile?.role || '') && <button onClick={async()=>{
             const {data:link,error}=await supabase.from('work_order_invoice_links').select('invoice_id').eq('work_order_id',workOrderId).maybeSingle();
-            if(error){alert(error.message);return;}
+            if(error){notify(error.message, { theme: 'blue', tone: 'error' });return;}
             if(link){const {data:inv}=await supabase.from('invoices').select('status').eq('id',link.invoice_id).single();if(inv?.status!=='draft'){setBillingInvoiceId(link.invoice_id);return;}}
             setShowBillingReview(true);
           }} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">Review & Invoice</button>}
@@ -917,110 +946,102 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       )}
 
-      {/* Linked Work Orders Banner */}
-      {workOrder.work_order_group_id && linkedWorkOrders.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Link className="w-4 h-4 text-blue-600" />
-              <span className="font-semibold text-gray-900 text-sm">
-                Linked Work Orders — {linkedWorkOrders.length + 1} total (billed together)
-              </span>
-            </div>
-            {canEdit && (
-              <button
-                onClick={handleUnlinkWorkOrder}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50"
-              >
-                <Unlink className="w-3 h-3" />
-                Unlink
-              </button>
-            )}
+      {/* Work instructions and the actual visit checklist are the primary work-order content. */}
+      <section className="bg-white rounded-t-xl border border-gray-200 p-3 sm:p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-900">Work Requested</h2>
+        {editing ? (
+          <textarea
+            value={editedWorkOrder.description || ''}
+            onChange={(event) => setEditedWorkOrder({ ...editedWorkOrder, description: event.target.value })}
+            rows={4}
+            className="w-full rounded-lg border border-gray-300 p-2 text-sm"
+          />
+        ) : (
+          <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
+        )}
+        <div id="work-order-tasks" className="border-t border-gray-100 pt-3 space-y-3 scroll-mt-24">
+          <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
+          <WorkOrderTasksChecklist
+            workOrderId={workOrderId}
+            projectId={workOrder.project_id ?? undefined}
+            laborPhaseId={workOrder.labor_phase_id}
+            workOrderGroupId={workOrder.work_order_group_id}
+            isGroupWorkOrder={workOrder.is_group_work_order}
+            currentUserId={profile?.id || ''}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white px-3 py-2 sm:px-4" aria-label="Work order team">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-gray-800">Working on this job</span>
+            <span className="text-gray-600">{[workOrder.technician?.full_name, ...linkedWorkOrders.map(order => order.technician?.full_name)].filter(Boolean).filter((name, index, all) => all.indexOf(name) === index).join(', ') || 'Unassigned'}</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg text-sm">
-              <span className="font-medium text-blue-900">{workOrder.work_order_number}</span>
-              <span className="text-blue-600 text-xs">(this)</span>
-            </div>
-            {linkedWorkOrders.map(wo => (
-              <div key={wo.id} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 rounded-lg text-sm">
-                <span className="font-medium text-gray-900">{wo.work_order_number}</span>
-                {wo.technician?.full_name && (
-                  <span className="text-gray-500 text-xs">{wo.technician.full_name}</span>
-                )}
-              </div>
+          <span className="text-xs text-gray-500">{activeTimeEntries.length} clocked in now</span>
+        </div>
+        {activeTimeEntries.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2 text-xs" aria-live="off">
+            {activeTimeEntries.map(entry => (
+              <span key={entry.id} className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-green-900">
+                <span className="font-semibold">● {entry.technician?.full_name || 'Technician'} · Clocked in {new Date(entry.clock_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                <span className="ml-2 tabular-nums">{Math.floor(elapsedHours(entry))}h {Math.floor(elapsedHours(entry) * 60) % 60}m elapsed</span>
+              </span>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-        {[
-          ...(tasks.length ? [{ icon: CheckSquare, label: 'Internal Tasks', value: `${completedTasks}/${tasks.length}`, color: 'text-blue-600' }] : []),
-          { icon: Clock, label: 'Hours', value: `${totalTimeHours.toFixed(2)}h`, color: 'text-slate-600' },
-          { icon: Package, label: 'Parts Used', value: partsUsed.length, color: 'text-green-600' },
-          { icon: Wrench, label: 'Part Requests', value: partRequests.length, sub: pendingParts > 0 ? `${pendingParts} pending` : undefined, color: 'text-orange-600' },
-          { icon: Camera, label: 'Photos', value: jobPhotos.length, color: 'text-purple-600' },
-          { icon: Calendar, label: 'Due', value: workOrder.target_completion_date ? new Date(workOrder.target_completion_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD', color: 'text-gray-600' },
-        ].map(({ icon: Icon, label, value, sub, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-200 p-3">
-            <div className={`flex items-center gap-1.5 text-xs text-gray-500 mb-1`}>
-              <Icon className={`w-3.5 h-3.5 ${color}`} />
-              {label}
-            </div>
-            <div className="text-lg font-bold text-gray-900">{value}</div>
-            {sub && <div className="text-xs text-orange-500 mt-0.5">{sub}</div>}
+        )}
+        {linkedWorkOrders.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-gray-500">Linked visits:</span>
+            {linkedWorkOrders.map(order => (
+              <a key={order.id} href={`/work-orders?workOrderId=${encodeURIComponent(order.id)}`} className="rounded-md border border-blue-200 px-2 py-1 text-blue-700 hover:bg-blue-50">
+                {order.work_order_number}{order.technician?.full_name ? ` · ${order.technician.full_name}` : ''}
+              </a>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+        {workOrder.work_order_group_id && canEdit && (
+          <button type="button" onClick={handleUnlinkWorkOrder} className="mt-2 text-xs text-red-600 hover:underline">Unlink this work order from the group</button>
+        )}
+      </section>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 overflow-x-auto">
-        <nav className="flex gap-1 min-w-max">
+      {/* Integrated work-order section navigation; Tasks remains inline beneath Work Requested. */}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <nav aria-label="Work order sections" className="flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 py-1.5 sm:px-3">
           {tabs.map(tab => {
             const Icon = tab.icon;
+            const selected = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                type="button"
+                aria-current={selected ? 'page' : undefined}
                 onClick={() => {
-                  const nextTab = tab.id as WorkOrderTab;
                   if (activeTab === 'notes' && notesDirtyRef.current) void saveNotesDraft();
-                  setActiveTab(nextTab);
+                  setActiveTab(tab.id as WorkOrderTab);
                   const url = new URL(window.location.href);
-                  if (nextTab === 'overview') url.searchParams.delete('subtab'); else url.searchParams.set('subtab', nextTab);
+                  if (tab.id === 'tasks') url.searchParams.delete('subtab'); else url.searchParams.set('subtab', tab.id);
                   window.history.replaceState({}, '', url.toString());
+                  if (tab.id === 'tasks') document.getElementById('work-order-tasks')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }}
-                className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200'
-                }`}
+                className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${selected ? 'bg-white text-blue-700 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="h-4 w-4" />
                 {tab.label}
-                {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                    activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {tab.count}
-                  </span>
-                )}
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded-full text-xs font-medium">
-                    {tab.badge}
-                  </span>
-                )}
+                {tab.count !== undefined && tab.count > 0 && <span className="rounded-full bg-gray-100 px-1.5 text-xs text-gray-600">{tab.count}</span>}
+                {tab.badge !== undefined && tab.badge > 0 && <span className="rounded-full bg-orange-100 px-1.5 text-xs text-orange-700">{tab.badge}</span>}
               </button>
             );
           })}
         </nav>
-      </div>
-
-      <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="p-3 sm:p-4 space-y-3">
+          {activeTab === 'tasks' && !workOrder.project_id && canEdit && (
+            <ServiceWorkOrderTaskManager workOrderId={workOrderId} workOrderGroupId={workOrder.work_order_group_id || undefined} isGroupWorkOrder={workOrder.is_group_work_order} onTasksChange={loadWorkOrderData} />
+          )}
+          {activeTab === 'time' && (
+            <WorkOrderTimeControl workOrderId={workOrderId} assignedTo={workOrder.assigned_to} onChanged={loadWorkOrderData} />
+          )}
+          {/* Section content shares the same panel as its navigation. */}
 
         {activeTab === 'flow' && <Flow workOrderId={workOrderId} />}
         {activeTab === 'vip' && isVipMaintenance && <VipMaintenanceChecklist key={`${workOrderId}-${vipRefreshKey}`} workOrderId={workOrderId} onChange={loadWorkOrderData} onAddPart={() => setShowAddPartsModal(true)} onAddSalesLeadPhoto={() => { setPhotoContext('vip_sales_lead'); setShowPhotoCapture(true); }} onCreateFollowUpTask={(finding) => { setVipFollowUpFinding({id:finding.id,description:finding.description}); setShowCreateTaskModal(true); }} />}
@@ -1353,49 +1374,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           </div>
         )}
 
-        {/* Tasks */}
-        {activeTab === 'tasks' && (
-          <div className="space-y-6">
-            <section aria-label="Visit location" className="border border-subtle bg-surface rounded-xl p-4 space-y-2">
-              <h2 className="font-semibold text-primary">Where am I going?</h2>
-              <p className="font-medium text-primary break-words">{workOrder.contact?.full_name || workOrder.contact?.company_name || 'Customer'}</p>
-              {(() => {
-                const address = [workOrder.service_location_address || workOrder.address || workOrder.contact?.street_address,
-                  workOrder.service_location_city || workOrder.contact?.city, workOrder.service_location_state || workOrder.contact?.state,
-                  workOrder.service_location_zip || workOrder.contact?.zip_code].filter(Boolean).join(', ');
-                return address ? <><p className="text-sm text-secondary break-words">{address}</p><a className="inline-flex items-center gap-2 min-h-11 text-blue-600" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer"><Navigation className="w-4 h-4" />Directions</a></> : <p className="text-sm text-amber-700">No visit address recorded.</p>;
-              })()}
-              <p className="text-sm text-secondary">{(workOrder.scheduled_date || workOrder.start_date)?.split('T')[0] || 'Date not set'} · {workOrder.scheduled_start_time?.slice(0, 5) || 'Time not set'}{workOrder.scheduled_end_time ? `–${workOrder.scheduled_end_time.slice(0, 5)}` : ''}</p>
-              <p className="text-sm text-secondary break-words">Technician: {workOrder.technician?.full_name || 'Unassigned'}{linkedWorkOrders.length > 0 ? ` · Also assigned: ${linkedWorkOrders.map(order => order.technician?.full_name).filter(Boolean).join(', ')}` : ''}</p>
-            </section>
-            <section className="border border-blue-200 bg-blue-50 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Scope / Description</h3>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
-            </section>
-            <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
-            <WorkOrderTasksChecklist
-              workOrderId={workOrderId}
-              projectId={workOrder.project_id}
-              laborPhaseId={workOrder.labor_phase_id}
-              workOrderGroupId={workOrder.work_order_group_id}
-              isGroupWorkOrder={workOrder.is_group_work_order}
-              currentUserId={profile?.id || ''}
-            />
-
-            {!workOrder.project_id && canEdit && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Manage Internal Tasks</h3>
-                <ServiceWorkOrderTaskManager
-                  workOrderId={workOrderId}
-                  workOrderGroupId={workOrder.work_order_group_id || undefined}
-                  isGroupWorkOrder={workOrder.is_group_work_order}
-                  onTasksChange={loadWorkOrderData}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Parts Requests */}
         {activeTab === 'parts' && (
           <div className="space-y-4">
@@ -1461,12 +1439,12 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                 Add Photos
               </button>
             )}
-            <JobPhotoGallery workOrderId={workOrderId} photos={jobPhotos} onUpdate={loadWorkOrderData} />
+            <JobPhotoGallery workOrderId={workOrderId} />
           </div>
         )}
 
         {/* Materials */}
-        {activeTab === 'materials' && (
+        {activeTab === 'parts' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Parts {workOrder.work_order_group_id ? '— all linked work orders' : ''}</h3>
@@ -1518,15 +1496,15 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                           const quantity=Number(e.target.value);if(!Number.isFinite(quantity) || quantity<=0){e.target.value=String(part.quantity);return;}
                           if(quantity===Number(part.quantity))return;
                           const {error}=await supabase.from('service_parts_used').update({quantity}).eq('id',part.id);
-                          if(error){alert(error.message);e.target.value=String(part.quantity);}else loadWorkOrderData();
+                          if(error){notify(error.message, { theme: 'blue', tone: 'error' });e.target.value=String(part.quantity);}else loadWorkOrderData();
                         }}/> : part.quantity}</td>
                         <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_cost)}</td>
                         <td className="py-2.5 text-gray-700 text-right">{formatCurrency(part.unit_price)}</td>
                         <td className="py-2.5 font-semibold text-gray-900 text-right">{formatCurrency(part.total_price)}</td>
                         <td className="py-2.5 text-center">
                           {canManageParts && <button aria-label={`Remove ${part.part_name}`} className="block mx-auto mb-1 text-xs text-red-700 underline" onClick={async()=>{
-                            if(!window.confirm(`Remove ${part.part_name} from this visit's parts list?`))return;
-                            const {error}=await supabase.from('service_parts_used').delete().eq('id',part.id);if(error)alert(error.message);else loadWorkOrderData();
+                            if(!(await requestConfirmation(`Remove ${part.part_name} from this visit's parts list?`, { theme: 'blue' })))return;
+                            const {error}=await supabase.from('service_parts_used').delete().eq('id',part.id);if(error)notify(error.message, { theme: 'blue', tone: 'error' });else loadWorkOrderData();
                           }}>Remove</button>}
                           {part.warranty_item ? (
                             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Warranty</span>
@@ -1594,14 +1572,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
               <>
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                   <span className="text-sm font-semibold text-gray-700">All Entries</span>
-                  <span className="text-sm font-bold text-gray-900">{totalTimeHours.toFixed(2)}h total{workOrder.work_order_group_id ? ' across linked work orders' : ''}</span>
+                  <span className="text-sm font-bold text-gray-900">{totalTimeHours.toFixed(2)}h total ({completedTimeHours.toFixed(2)}h completed + {activeTimeHours.toFixed(2)}h running){workOrder.work_order_group_id ? ' across linked work orders' : ''}</span>
                 </div>
                 {timeEntries.map(entry => (
                   <div key={entry.id} className="border border-gray-200 rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-gray-900 text-sm">{entry.technician.full_name}</span>
+                          <span className="font-semibold text-gray-900 text-sm">{entry.technician?.full_name || 'Unknown technician'}</span>
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
                             entry.status === 'approved' ? 'bg-green-100 text-green-700' :
                             entry.status === 'submitted' ? 'bg-amber-100 text-amber-700' :
@@ -1609,7 +1587,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                           }`}>
                             {entry.status}
                           </span>
-                          <span className="text-sm font-bold text-gray-900 ml-auto">{entry.total_hours.toFixed(2)}h</span>
+                          <span className="text-sm font-bold text-gray-900 ml-auto">{entry.clock_out ? Number(entry.total_hours || 0).toFixed(2) : elapsedHours(entry).toFixed(2)}h{!entry.clock_out ? ' running' : ''}</span>
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-2">
                           <span>{new Date(entry.entry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
@@ -1798,6 +1776,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* Modals */}
@@ -1806,7 +1785,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="bg-white rounded-xl w-full max-w-lg">
             <PartRequestForm
               workOrderId={workOrderId}
-              projectId={workOrder.project_id}
+              projectId={workOrder.project_id ?? undefined}
               onSuccess={() => { setShowPartRequestForm(false); loadWorkOrderData(); }}
               onCancel={() => setShowPartRequestForm(false)}
             />
@@ -1838,7 +1817,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       {showAddPartsModal && (
         <AddPartsModal
           workOrderId={workOrderId}
-          projectId={workOrder.project_id}
+          projectId={workOrder.project_id ?? undefined}
           onClose={() => setShowAddPartsModal(false)}
           onSuccess={() => { setShowAddPartsModal(false); loadWorkOrderData(); }}
         />
@@ -1861,7 +1840,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             if (findingId && taskId) {
               const { error } = await supabase.rpc('link_vip_follow_up_task', { p_finding_id: findingId, p_task_id: taskId });
               if (error) {
-                alert(`Task was created, but the VIP Finding could not be linked: ${error.message}`);
+                notify(`Task was created, but the VIP Finding could not be linked: ${error.message}`, { theme: 'blue', tone: 'error' });
                 return;
               }
             }
@@ -1957,6 +1936,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           if (error) throw new Error(error.message);
           await loadWorkOrderData();
         }} />}
+      <footer className="border-t border-gray-200 pt-2 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>Created{workOrder.created_by ? ` by ${auditNames[workOrder.created_by] || 'Unknown user'}` : ''} · {new Date(workOrder.created_at).toLocaleString()}</span>
+        {workOrder.updated_at && <span>Last changed{workOrder.updated_by ? ` by ${auditNames[workOrder.updated_by] || 'Unknown user'}` : ''} · {new Date(workOrder.updated_at).toLocaleString()}</span>}
+        <span className="font-mono text-gray-400">{workOrder.work_order_number}</span>
+        <button type="button" onClick={() => setActiveTab('history')} className="text-blue-600 hover:underline">
+          View previous customer work orders
+        </button>
+      </footer>
       <ConfirmModal
         isOpen={!!confirmModal}
         title={confirmModal?.title || ''}

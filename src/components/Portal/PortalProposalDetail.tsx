@@ -1,5 +1,6 @@
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, ChevronUp, CreditCard, Printer, RotateCcw } from 'lucide-react';
 import { useProposalEngagement } from '../../hooks/useProposalEngagement';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -30,20 +31,10 @@ function formatDuration(seconds: number | null): string {
 function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRecording; signedUrl?: string; logoUrl?: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
+  const [_playing, setPlaying] = useState(false);
 
   const videoSrc = recording.storage_path ? signedUrl : recording.video_url || undefined;
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (playing) {
-      videoRef.current.pause();
-      setPlaying(false);
-    } else {
-      videoRef.current.play();
-      setPlaying(true);
-    }
-  };
 
   if (!videoSrc) return null;
 
@@ -108,6 +99,8 @@ function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRec
 }
 
 interface Proposal {
+  contact_id?: string | null;
+  contact_name?: string | null;
   id: string;
   proposal_number: string;
   title: string;
@@ -233,8 +226,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
   const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
-  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
-  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
+  const [_messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [_unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showReactivationModal, setShowReactivationModal] = useState(false);
   const [reactivationSent, setReactivationSent] = useState(false);
 
@@ -587,10 +580,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     if (previewMode) return;
     if (!proposal) return;
     if (!declineReason) {
-      alert('Please select a reason for declining this proposal.');
+      notify('Please select a reason for declining this proposal.', { theme: 'blue', tone: 'warning' });
       return;
     }
-    if (!confirm('Are you sure you want to decline this proposal?')) return;
+    if (!(await requestConfirmation('Are you sure you want to decline this proposal?', { theme: 'blue' }))) return;
 
     setSubmitting(true);
     try {
@@ -616,11 +609,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       });
       if (activityError) console.warn('Proposal decline activity could not be recorded', activityError);
 
-      alert('Proposal declined. We will be in touch shortly.');
+      notify('Proposal declined. We will be in touch shortly.', { theme: 'blue', tone: 'info' });
       onBack();
     } catch (error) {
       console.error('Error declining proposal:', error);
-      alert('Failed to decline proposal. Please try again.');
+      notify('Failed to decline proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -693,7 +686,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       setShowQA(true);
     } catch (error) {
       console.error('Error submitting change request:', error);
-      alert('Failed to send feedback. Please try again.');
+      notify('Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }

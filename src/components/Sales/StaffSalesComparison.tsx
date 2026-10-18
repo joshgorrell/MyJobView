@@ -822,7 +822,7 @@ export function StaffSalesComparison({ filteredRepIds }: StaffSalesComparisonPro
                   )}
                 </div>
                 <div className="space-y-2">
-                  {visibleLeaderboard.map(({ uid, total }, idx) => {
+                  {visibleLeaderboard.map(({ uid, total }, _idx) => {
                     const globalRank = leaderboard.findIndex(l => l.uid === uid);
                     const color = STAFF_COLORS[staffIds.indexOf(uid) % STAFF_COLORS.length];
                     const maxTotal = visibleLeaderboard[0]?.total || 1;

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -204,7 +205,7 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
       await loadAll();
     } catch (error) {
       console.error('Error resetting dealer rule:', error);
-      alert('Failed to reset override.');
+      notify('Failed to reset override.', { theme: 'blue', tone: 'error' });
     } finally {
       setResettingId(null);
     }
@@ -371,7 +372,7 @@ export default function StateDetailPanel({ stateCode, stateName, libraryStatus, 
                   await loadAll();
                 } catch (error) {
                   console.error('Error saving override:', error);
-                  alert('Failed to save override.');
+                  notify('Failed to save override.', { theme: 'blue', tone: 'error' });
                 } finally {
                   setSaving(false);
                 }
@@ -586,7 +587,7 @@ function AddOverrideForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!classification) {
-      alert('Please select a classification.');
+      notify('Please select a classification.', { theme: 'blue', tone: 'warning' });
       return;
     }
     onSubmit({ classification, environment, projectType, taxability, explanation });

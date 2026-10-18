@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const source = fs.readFileSync('src/lib/smart-intake/history-labels.ts','utf8');
+const exports = {};
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+assert.match(exports.intakeAuditExplanation('failed_retryable','unknown',false),/processing failed/);
+assert.match(exports.intakeAuditExplanation('received','unknown',false),/awaiting processing/);
+assert.match(exports.intakeAuditExplanation('processed','service',true),/service request was created/);
+console.log('Intake explanation checks passed');
