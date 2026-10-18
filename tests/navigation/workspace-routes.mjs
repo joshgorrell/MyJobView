@@ -11,4 +11,8 @@ assert.equal(workspaceUrl(new URL('https://elife.myjobview.com/?tab=proposals&pr
 for(const path of ['/portal','/calendar','/punchlist','/card/josh','/auth-callback','/unknown'])assert.equal(workspacePage(path),null);
 assert.equal(isPortalProposalRoute('/proposals','',false,false),false);
 for(const [path,search,portal,impersonating] of [['/proposals','',true,false],['/proposals','?portal_token=abc',false,false],['/proposals','',false,true],['/proposals/123','',false,false],['/portal/proposals','',false,false]])assert.equal(isPortalProposalRoute(path,search,portal,impersonating),true);
+const requestLink=new URL('https://elife.myjobview.com/service-requests?serviceRequestId=request&keep=1');
+assert.equal(workspaceUrl(requestLink,'service_requests'),'/service-requests?serviceRequestId=request&keep=1');
+assert.equal(workspaceUrl(requestLink,'service_request_analytics'),'/service-request-analytics?serviceRequestId=request&keep=1');
+assert.equal(workspaceUrl(requestLink,'feed'),'/flow?keep=1','Leaving Service Requests clears only the selected request');
 console.log('Workspace route resolution, legacy links, record/hash retention, and portal separation pass');

@@ -102,12 +102,13 @@ interface Technician {
   role: string;
 }
 
-export function ServiceRequestQueue() {
+export function ServiceRequestQueue({ requestId }: { requestId?: string | null }) {
   const { profile, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [expandedRequest, setExpandedRequest] = useState<string | null>(requestId || null);
   const [activeTab, setActiveTab] = useState<'queue' | 'needs_info'>('queue');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterSourceType, setFilterSourceType] = useState<string>('all');
@@ -146,9 +147,10 @@ export function ServiceRequestQueue() {
     return () => {
       channel.unsubscribe();
     };
-  }, [profile, authLoading, filterPriority, filterSourceType]);
+  }, [profile, authLoading, filterPriority, filterSourceType, requestId]);
 
   async function loadData() {
+    setLoadError('');
     try {
       let query = supabase
         .from('service_requests')
@@ -179,22 +181,28 @@ export function ServiceRequestQueue() {
         `)
         .order('created_at', { ascending: false });
 
-      if (filterPriority !== 'all') {
+      if (requestId) {
+        query = query.eq('id', requestId);
+      }
+
+      if (!requestId && filterPriority !== 'all') {
         query = query.eq('priority', filterPriority);
       }
 
-      if (filterSourceType !== 'all') {
+      if (!requestId && filterSourceType !== 'all') {
         query = query.eq('source_type', filterSourceType);
       }
 
-      query = query.not('status', 'in', '("cancelled","closed")');
+      if (!requestId) query = query.not('status', 'in', '("cancelled","closed")');
 
       const { data, error } = await query;
 
       if (error) throw error;
       setRequests(data || []);
+      if (requestId && data?.length) setExpandedRequest(requestId);
     } catch (error) {
       console.error('Error loading service requests:', error);
+      setLoadError('Unable to load the service request. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -381,7 +389,7 @@ export function ServiceRequestQueue() {
 
   const queueRequests = requests.filter(r => r.status !== 'needs_more_info');
   const needsInfoRequests = requests.filter(r => r.status === 'needs_more_info');
-  const filteredRequests = activeTab === 'needs_info' ? needsInfoRequests : queueRequests;
+  const filteredRequests = requestId ? requests : activeTab === 'needs_info' ? needsInfoRequests : queueRequests;
 
   if (loading) {
     return (
@@ -395,27 +403,28 @@ export function ServiceRequestQueue() {
     <div className="space-y-3 sm:space-y-4 w-full max-w-full min-w-0">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base sm:text-2xl font-bold text-primary">Work Order Request Queue</h2>
-          <p className="text-muted text-sm mt-1">
+          <h2 className="text-base sm:text-2xl font-bold text-primary">{requestId ? 'Service Request' : 'Work Order Request Queue'}</h2>
+          {!requestId && <p className="text-muted text-sm mt-1">
             {queueRequests.length} active {queueRequests.length === 1 ? 'request' : 'requests'}
             {needsInfoRequests.length > 0 && (
               <span className="text-amber-400 ml-2">· {needsInfoRequests.length} awaiting more info</span>
             )}
-          </p>
+          </p>}
         </div>
 
-        <button
+        {!requestId && <button
           onClick={() => setShowFilters(!showFilters)}
           className="shrink-0 min-h-11 flex items-center gap-1.5 px-2 sm:px-4 py-2 text-xs sm:text-sm bg-canvas text-primary rounded-lg hover:bg-elevated transition-colors"
         >
           <Filter className="w-4 h-4" />
           Filters
           {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
+        </button>}
       </div>
+      {requestId && <a href="/service-requests" className="inline-flex min-h-11 items-center text-sm text-blue-500 underline">Back to service request queue</a>}
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-canvas rounded-lg w-full max-w-full min-w-0 sm:w-fit">
+      {!requestId && <div className="flex gap-1 p-1 bg-canvas rounded-lg w-full max-w-full min-w-0 sm:w-fit">
         <button
           onClick={() => setActiveTab('queue')}
           className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
@@ -452,9 +461,9 @@ export function ServiceRequestQueue() {
             </span>
           )}
         </button>
-      </div>
+      </div>}
 
-      {showFilters && (
+      {!requestId && showFilters && (
         <div className="bg-canvas rounded-lg p-4 space-y-3">
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div>
@@ -524,7 +533,7 @@ export function ServiceRequestQueue() {
         </div>
       )}
 
-      {filteredRequests.length === 0 ? (
+      {loadError ? <div role="alert" className="rounded-lg border border-red-500/40 p-4 text-primary">{loadError} <button type="button" onClick={() => void loadData()} className="underline">Retry</button></div> : requestId && !requests.length ? <div role="alert" className="rounded-lg border border-subtle p-4 text-primary">Service request not found or you do not have access.</div> : filteredRequests.length === 0 ? (
         <div className="bg-canvas rounded-lg p-12 text-center">
           {activeTab === 'needs_info' ? (
             <>
@@ -643,7 +652,7 @@ export function ServiceRequestQueue() {
                           </span>
                         </div>
                         {/* Convert button — only on desktop (sm+), only when collapsed */}
-                        {expandedRequest !== request.id && (
+                        {expandedRequest !== request.id && !['closed', 'cancelled'].includes(request.status) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
                             className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap"
@@ -709,7 +718,7 @@ export function ServiceRequestQueue() {
                         )}
                       </div>
                       {/* Convert button — only on mobile (hidden sm+), only when collapsed */}
-                      {expandedRequest !== request.id && (
+                      {expandedRequest !== request.id && !['closed', 'cancelled'].includes(request.status) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
                           className="sm:hidden flex items-center gap-1 min-h-11 px-3 py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
@@ -846,7 +855,7 @@ export function ServiceRequestQueue() {
                         </div>
 
                         {/* Action buttons — full-width row at bottom of expanded section */}
-                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
+                        {!['closed', 'cancelled'].includes(request.status) && <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
                           <button
                             onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
                             className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
@@ -888,7 +897,7 @@ export function ServiceRequestQueue() {
                               Cancel
                             </button>
                           )}
-                        </div>
+                        </div>}
                       </div>
                     )}
                   </div>

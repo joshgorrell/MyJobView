@@ -20,6 +20,9 @@ on:
       - 'src/components/Shared/SchedulingCalendar.tsx'
       - 'src/components/Appointments/**'
       - 'src/components/Dispatch/**'
+      - 'src/components/Flow/Flow.tsx'
+      - 'src/lib/workspaceRoutes.ts'
+      - 'tests/navigation/workspace-routes.mjs'
       - 'src/components/Service/ServiceRequestForm.tsx'
       - 'tests/service-requests/**'
       - 'tests/calendar/**'
@@ -52,3 +55,5 @@ jobs:
       - run: npm run test:work-orders:scheduling:browser
       - run: node tests/work-orders/complete-scheduling-browser.mjs
       - run: node tests/service-requests/intake-browser.mjs
+      - run: node tests/service-requests/flow-link-browser.mjs
+      - run: node tests/navigation/workspace-routes.mjs
