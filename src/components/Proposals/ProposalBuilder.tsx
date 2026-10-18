@@ -66,7 +66,6 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
     instanceCount: number;
   } | null>(null);
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
-  const [collapsedParentIds, setCollapsedParentIds] = useState<Set<string>>(new Set());
   const [showCOSummary, setShowCOSummary] = useState(false);
   const [restoringItemId, setRestoringItemId] = useState<string | null>(null);
   const [laborChoice,setLaborChoice]=useState<((scope:RemovalScope)=>void)|null>(null);
@@ -75,16 +74,6 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
   function getDisplayTitle(title: string) {
     // Remove "Proposal for" prefix for internal display
     return title.replace(/^Proposal for\s+/i, '');
-  }
-
-  function toggleParentCollapse(itemId: string) {
-    const newSet = new Set(collapsedParentIds);
-    if (newSet.has(itemId)) {
-      newSet.delete(itemId);
-    } else {
-      newSet.add(itemId);
-    }
-    setCollapsedParentIds(newSet);
   }
 
   function organizeItemsWithAccessories(items: ProposalLineItem[]): ProposalLineItem[] {
@@ -1237,10 +1226,9 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
   function renderLineItemRow(item: ProposalLineItem, depth: number = 0) {
     const hasAccessories = item.accessories && item.accessories.length > 0;
-    const isCollapsed = collapsedParentIds.has(item.id);
     const displayMode = item.display_mode || 'itemized';
 
-    const shouldShowAccessories = hasAccessories && displayMode === 'itemized' && !isCollapsed;
+    const shouldShowAccessories = hasAccessories && displayMode === 'itemized';
 
     const bundleTotal = hasAccessories && displayMode === 'bundle'
       ? (item.line_total || 0) + (item.accessories ?? []).reduce((sum, acc) => sum + (acc.line_total || 0), 0)
@@ -1306,15 +1294,6 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
               {isCoMode && (isAddedInCO || isModifiedInCO) && (
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAddedInCO ? 'bg-emerald-400' : 'bg-amber-400'}`} title={isAddedInCO ? 'Added in this change order' : 'Modified in this change order'} />
               )}
-              {hasAccessories && (
-                <button
-                  onClick={() => toggleParentCollapse(item.id)}
-                  className="text-gray-400 hover:text-white flex-shrink-0 mr-1"
-                  title={isCollapsed ? 'Expand accessories' : 'Collapse accessories'}
-                >
-                  {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                </button>
-              )}
               <input
                 type="checkbox"
                 checked={selectedItemIds.has(item.id)}
@@ -1371,7 +1350,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
                   {isAddedInCO && <span className="ml-2 text-xs text-emerald-400 font-normal">+New</span>}
                   {isModifiedInCO && <span className="ml-2 text-xs text-amber-400 font-normal">Edited</span>}
                 </button>
-                {hasAccessories && displayMode === 'collapsed' && isCollapsed && (
+                {hasAccessories && displayMode === 'collapsed' && (
                   <div className="text-xs text-gray-500 mt-1 px-2">
                     Includes: {(item.accessories ?? []).map(acc => acc.description).join(', ')}
                   </div>
