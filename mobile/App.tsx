@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { OfflineProvider } from './src/contexts/OfflineContext';
@@ -48,10 +49,11 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <OfflineProvider>
-        <LocationProvider>
-          <NavigationContainer>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <OfflineProvider>
+          <LocationProvider>
+            <NavigationContainer>
             <StatusBar style="auto" />
             <Stack.Navigator
               screenOptions={{
@@ -110,9 +112,10 @@ export default function App() {
                 </>
               )}
             </Stack.Navigator>
-          </NavigationContainer>
-        </LocationProvider>
-      </OfflineProvider>
-    </AuthProvider>
+            </NavigationContainer>
+          </LocationProvider>
+        </OfflineProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

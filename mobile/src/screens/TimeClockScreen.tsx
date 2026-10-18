@@ -23,6 +23,7 @@ import { useLocation } from '../contexts/LocationContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Card } from '../components/UI';
+import { ScreenContainer } from '../components/ScreenContainer';
 
 interface DailyClockEntry {
   id: string;
@@ -227,15 +228,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <ScreenContainer center>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
-      </View>
+      </ScreenContainer>
     );
   }
 
   if (!timeContext?.dailyClock) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>My Work & Time</Text>
           <Text style={styles.infoText}>
@@ -250,7 +251,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
             <Text style={styles.primaryButtonText}>Open My Work Orders</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScreenContainer>
     );
   }
 
@@ -263,7 +264,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     : [Colors.primary[500], Colors.primary[600]];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScreenContainer scroll>
       {/* GPS Status Banner */}
       <View style={[styles.statusBanner, isTracking ? styles.trackingActive : styles.trackingInactive]}>
         <View style={styles.bannerContent}>
@@ -395,7 +396,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         <Text style={styles.historyLinkText}>View My Time History</Text>
         <View style={styles.chevronRight} />
       </TouchableOpacity>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

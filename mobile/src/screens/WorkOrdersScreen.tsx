@@ -16,6 +16,7 @@ import { NotificationService } from '../services/NotificationService';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Badge, EmptyState } from '../components/UI';
+import { ScreenContainer } from '../components/ScreenContainer';
 
 interface WorkOrder {
   id: string;
@@ -172,15 +173,15 @@ export default function WorkOrdersScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <ScreenContainer center>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
         <Text style={styles.loadingText}>Loading work orders...</Text>
-      </View>
+      </ScreenContainer>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       {!isConnected && (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineText}>Viewing cached work orders</Text>
@@ -197,7 +198,7 @@ export default function WorkOrdersScreen({ navigation }: any) {
           <EmptyState title="No Work Orders" message="You don't have any assigned work orders at the moment." />
         }
       />
-    </View>
+    </ScreenContainer>
   );
 }
 

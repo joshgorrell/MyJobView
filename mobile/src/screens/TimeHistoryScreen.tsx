@@ -14,6 +14,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Card, EmptyState, Badge } from '../components/UI';
+import { ScreenContainer } from '../components/ScreenContainer';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
 interface ClockEntry {
@@ -122,32 +123,32 @@ export default function TimeHistoryScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <ScreenContainer center>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
-      </View>
+      </ScreenContainer>
     );
   }
 
   if (!isConnected && entries.length === 0) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <EmptyState title="Offline" message="Time history is not available while offline. Connect to the internet to view your clock history." />
-      </View>
+      </ScreenContainer>
     );
   }
 
   if (entries.length === 0) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <EmptyState title="No Time History" message="Your clock history will appear here after your first shift." />
-      </View>
+      </ScreenContainer>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary[600]]} />}
+    <ScreenContainer
+      scroll
+      contentStyle={{ paddingTop: 0 }}
     >
       {/* Summary Card */}
       <Card style={styles.summaryCard}>
@@ -255,7 +256,7 @@ export default function TimeHistoryScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>Showing last {entries.length} shifts</Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

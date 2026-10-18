@@ -16,6 +16,7 @@ import * as Application from 'expo-application';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Card, InfoRow } from '../components/UI';
+import { ScreenContainer } from '../components/ScreenContainer';
 
 export default function SettingsScreen() {
   const { profile, signOut } = useAuth();
@@ -65,7 +66,7 @@ export default function SettingsScreen() {
   const initials = (profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || '?').toUpperCase();
 
   return (
-    <ScrollView style={styles.container}>
+    <ScreenContainer scroll>
       {/* Profile Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Profile</Text>
@@ -155,7 +156,7 @@ export default function SettingsScreen() {
         <Text style={styles.footerText}>Field Ops Pro</Text>
         <Text style={styles.footerSubtext}>© 2025 Field Ops Pro</Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

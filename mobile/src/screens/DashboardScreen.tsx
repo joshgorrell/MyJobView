@@ -14,6 +14,7 @@ import { useLocation } from '../contexts/LocationContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
+import { ScreenContainer, SafeHeader } from '../components/ScreenContainer';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
@@ -133,9 +134,9 @@ export default function DashboardScreen({ navigation }: any) {
   ];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScreenContainer scroll>
       {/* Status Bar */}
-      <View style={styles.statusBar}>
+      <SafeHeader style={styles.statusBar}>
         <View style={styles.statusItem}>
           <View style={[styles.statusDot, isConnected ? styles.online : styles.offline]} />
           <Text style={styles.statusText}>{isConnected ? 'Online' : 'Offline'}</Text>
@@ -151,7 +152,7 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.statusText}>GPS Active</Text>
           </View>
         )}
-      </View>
+      </SafeHeader>
 
       {/* Header with Logo */}
       <View style={styles.header}>
@@ -251,7 +252,7 @@ export default function DashboardScreen({ navigation }: any) {
         <Text style={styles.footerText}>Field Ops Pro</Text>
         <Text style={styles.footerSubtext}>Version 1.0.0</Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

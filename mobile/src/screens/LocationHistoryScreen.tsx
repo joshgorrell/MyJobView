@@ -14,6 +14,7 @@ import { useOffline } from '../contexts/OfflineContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Card, EmptyState, Badge } from '../components/UI';
+import { ScreenContainer } from '../components/ScreenContainer';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
 interface GpsPoint {
@@ -105,34 +106,34 @@ export default function LocationHistoryScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <ScreenContainer center>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
-      </View>
+      </ScreenContainer>
     );
   }
 
   if (!isConnected && dayGroups.length === 0) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <EmptyState title="Offline" message="Location history is not available while offline. Connect to the internet to view your GPS trail." />
-      </View>
+      </ScreenContainer>
     );
   }
 
   if (dayGroups.length === 0) {
     return (
-      <View style={styles.container}>
+      <ScreenContainer>
         <EmptyState title="No Location Data" message="Your GPS breadcrumbs will appear here after you clock in and work a shift." />
-      </View>
+      </ScreenContainer>
     );
   }
 
   const totalPoints = dayGroups.reduce((sum, g) => sum + g.points.length, 0);
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary[600]]} />}
+    <ScreenContainer
+      scroll
+      contentStyle={{ paddingTop: 0 }}
     >
       {/* Summary Card */}
       <Card style={styles.summaryCard}>
@@ -206,7 +207,7 @@ export default function LocationHistoryScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>Location data is retained for 90 days</Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

@@ -14,6 +14,7 @@ import { supabase } from '../services/supabase';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Badge, Card, InfoRow, Divider } from '../components/UI';
+import { ScreenContainer } from '../components/ScreenContainer';
 
 export default function WorkOrderDetailScreen({ route, navigation }: any) {
   const { profile } = useAuth();
@@ -98,17 +99,17 @@ export default function WorkOrderDetailScreen({ route, navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <ScreenContainer center>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
-      </View>
+      </ScreenContainer>
     );
   }
 
   if (!workOrder) {
     return (
-      <View style={styles.centerContainer}>
+      <ScreenContainer center>
         <Text style={styles.notFoundText}>Work order not found</Text>
-      </View>
+      </ScreenContainer>
     );
   }
 
@@ -116,7 +117,7 @@ export default function WorkOrderDetailScreen({ route, navigation }: any) {
   const statusLabel = wo.status ? wo.status.replace(/_/g, ' ') : 'Unknown';
 
   return (
-    <ScrollView style={styles.container}>
+    <ScreenContainer scroll>
       {/* Header Card */}
       <View style={styles.headerCard}>
         <View style={styles.headerTop}>
@@ -176,7 +177,7 @@ export default function WorkOrderDetailScreen({ route, navigation }: any) {
           Opens the complete work order in your browser for job time, parts, notes, photos, and completion.
         </Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 

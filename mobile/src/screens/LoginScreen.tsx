@@ -16,9 +16,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,7 +53,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
@@ -143,7 +145,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl, maxWidth: 600, alignSelf: 'center', width: '100%' },
   header: { alignItems: 'center', marginTop: 60, gap: Spacing.md },
   title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
   subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
