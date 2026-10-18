@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2563eb"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -17,12 +17,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.fieldops.mobile",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
         "NSLocationWhenInUseUsageDescription": "Field Ops Pro needs your location while you're working to track your position and calculate travel time.",
         "NSLocationAlwaysUsageDescription": "Field Ops Pro needs background location access to continuously track your position during work hours, even when the app is in the background.",
         "NSCameraUsageDescription": "Field Ops Pro needs camera access to capture job site photos and completion documentation.",
         "NSPhotoLibraryUsageDescription": "Field Ops Pro needs photo library access to save and retrieve job site photos.",
+        "NSFaceIDUsageDescription": "Field Ops Pro uses Face ID to securely authenticate you when clocking in and out.",
         "UIBackgroundModes": [
           "location",
           "fetch",
@@ -33,9 +35,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2563eb"
       },
       "package": "com.fieldops.mobile",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -71,9 +74,14 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#ffffff"
+          "color": "#2563eb"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "field-ops-mobile"
+      }
+    }
   }
 }

@@ -6,10 +6,8 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import { offlineStorage } from './OfflineStorage';
 
-const LOCATION_TASK_NAME = 'background-location-task';
-const GEOFENCE_TASK_NAME = 'geofence-task';
+const LOCATION_TASK_NAME = 'field-ops-background-location';
 
-// Adaptive tracking settings based on battery and movement
 interface TrackingConfig {
   accuracy: Location.Accuracy;
   timeInterval: number;
@@ -22,10 +20,9 @@ class LocationTrackingService {
   private currentTechnicianId: string | null = null;
   private batteryLevel: number = 1.0;
   private lastKnownLocation: Location.LocationObject | null = null;
-  private geofences: Map<string, Location.LocationRegion> = new Map();
+  private taskDefined = false;
 
   async initialize() {
-    // Request permissions
     const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
     if (foregroundStatus !== 'granted') {
       throw new Error('Foreground location permission not granted');
@@ -36,42 +33,63 @@ class LocationTrackingService {
       console.warn('Background location permission not granted - limited functionality');
     }
 
-    // Monitor battery level
     this.batteryLevel = await Battery.getBatteryLevelAsync();
     Battery.addBatteryLevelListener(({ batteryLevel }) => {
       this.batteryLevel = batteryLevel;
       this.adjustTrackingConfig();
     });
 
-    // Define background location task
+    this.defineBackgroundTask();
+  }
+
+  private defineBackgroundTask() {
+    if (this.taskDefined) return;
+
     TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
       if (error) {
         console.error('Background location error:', error);
         return;
       }
-
       if (data) {
         const { locations } = data as { locations: Location.LocationObject[] };
         await this.handleLocationUpdate(locations);
       }
     });
 
-    // Define geofence task
-    TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }) => {
-      if (error) {
-        console.error('Geofence error:', error);
-        return;
-      }
-
-      if (data) {
-        const { eventType, region } = data as any;
-        await this.handleGeofenceEvent(eventType, region);
-      }
-    });
+    this.taskDefined = true;
   }
 
-  async startTracking(_technicianId: string, _clockEntryId: string) {
-    // Retired: capture locations only for explicit clock actions.
+  async startTracking(technicianId: string, clockEntryId: string) {
+    if (this.isTracking) {
+      // Already tracking — just update the IDs in case of a new clock entry
+      this.currentTechnicianId = technicianId;
+      this.currentClockEntryId = clockEntryId;
+      return;
+    }
+
+    this.defineBackgroundTask();
+
+    const config = this.getTrackingConfig();
+
+    try {
+      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+        accuracy: config.accuracy,
+        timeInterval: config.timeInterval,
+        distanceInterval: config.distanceInterval,
+        foregroundService: Platform.OS === 'android' ? {
+          notificationTitle: 'Field Ops Pro',
+          notificationBody: 'Location services active',
+          notificationColor: '#2563eb',
+        } : undefined,
+        showsBackgroundLocationIndicator: false,
+      });
+
+      this.isTracking = true;
+      this.currentTechnicianId = technicianId;
+      this.currentClockEntryId = clockEntryId;
+    } catch (error) {
+      console.error('Failed to start background tracking:', error);
+    }
   }
 
   async stopTracking() {
@@ -80,7 +98,6 @@ class LocationTrackingService {
     }
 
     try {
-      // Capture final location
       if (this.currentClockEntryId) {
         const finalLocation = await this.captureHighAccuracyLocation();
         if (finalLocation) {
@@ -88,17 +105,14 @@ class LocationTrackingService {
         }
       }
 
-      // Stop background tracking
-      const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-      if (isTracking) {
+      const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+      if (isRunning) {
         await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
       }
 
       this.isTracking = false;
       this.currentClockEntryId = null;
       this.currentTechnicianId = null;
-
-      console.log('Location tracking stopped');
     } catch (error) {
       console.error('Failed to stop location tracking:', error);
     }
@@ -115,7 +129,6 @@ class LocationTrackingService {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
         maximumAge: 1000,
-        timeout: 15000,
       });
 
       const duration = Date.now() - startTime;
@@ -125,7 +138,6 @@ class LocationTrackingService {
         ...location,
         coords: {
           ...location.coords,
-          // Add custom metadata
           duration_ms: duration,
           method: 'high_accuracy_request',
         } as any,
@@ -136,18 +148,16 @@ class LocationTrackingService {
       const permission = await Location.getForegroundPermissionsAsync();
       if (permission.status !== 'granted') return null;
 
-      // Fallback only to a recent reading with permission still granted
       if (this.lastKnownLocation && Date.now() - this.lastKnownLocation.timestamp <= 30000) {
-        return {...this.lastKnownLocation,coords:{...this.lastKnownLocation.coords,method:'cached',duration_ms:Date.now()-startTime} as any};
+        return { ...this.lastKnownLocation, coords: { ...this.lastKnownLocation.coords, method: 'cached', duration_ms: Date.now() - startTime } as any };
       }
 
-      // Try balanced accuracy as last resort
       try {
         const location = await Location.getLastKnownPositionAsync({
-          maxAge: 30000, // Clock events must not use stale locations
+          maxAge: 30000,
           requiredAccuracy: 100,
         });
-        return location ? {...location,coords:{...location.coords,method:'cached',duration_ms:Date.now()-startTime} as any} : null;
+        return location ? { ...location, coords: { ...location.coords, method: 'cached', duration_ms: Date.now() - startTime } as any } : null;
       } catch (fallbackError) {
         console.error('All location capture methods failed:', fallbackError);
         return null;
@@ -164,9 +174,6 @@ class LocationTrackingService {
       try {
         await this.saveLocationBreadcrumb(location, 'background_update');
         this.lastKnownLocation = location;
-
-        // Check if we've entered/exited any geofences
-        await this.checkGeofences(location);
       } catch (error) {
         console.error('Failed to handle location update:', error);
       }
@@ -202,41 +209,34 @@ class LocationTrackingService {
     };
 
     try {
-      // Try to save to Supabase
       const { error } = await supabase
         .from('enhanced_gps_breadcrumbs')
         .insert(breadcrumb);
 
       if (error) throw error;
     } catch (error) {
-      console.log('Saving breadcrumb offline:', error);
-      // Save to offline storage
-      await offlineStorage.saveBreadcrumb(breadcrumb);
+      await offlineStorage.saveBreadcrumb(breadcrumb as any);
     }
   }
 
   private getTrackingConfig(): TrackingConfig {
-    // Adjust accuracy and frequency based on battery level
     if (this.batteryLevel < 0.15) {
-      // Low battery - conserve power
       return {
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 120000, // 2 minutes
-        distanceInterval: 100, // 100 meters
+        timeInterval: 120000,
+        distanceInterval: 100,
       };
     } else if (this.batteryLevel < 0.30) {
-      // Medium battery
       return {
         accuracy: Location.Accuracy.High,
-        timeInterval: 60000, // 1 minute
-        distanceInterval: 50, // 50 meters
+        timeInterval: 60000,
+        distanceInterval: 50,
       };
     } else {
-      // Good battery - maximum accuracy
       return {
         accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 30000, // 30 seconds
-        distanceInterval: 25, // 25 meters
+        timeInterval: 30000,
+        distanceInterval: 25,
       };
     }
   }
@@ -244,9 +244,8 @@ class LocationTrackingService {
   private async adjustTrackingConfig() {
     if (!this.isTracking) return;
 
-    // Restart with new config
-    const isTracking = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-    if (isTracking) {
+    const isRunning = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (isRunning) {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
 
       const config = this.getTrackingConfig();
@@ -255,105 +254,13 @@ class LocationTrackingService {
         timeInterval: config.timeInterval,
         distanceInterval: config.distanceInterval,
         foregroundService: Platform.OS === 'android' ? {
-          notificationTitle: 'Field Ops Pro - Tracking Active',
-          notificationBody: `Recording location (Battery: ${Math.round(this.batteryLevel * 100)}%)`,
+          notificationTitle: 'Field Ops Pro',
+          notificationBody: 'Location services active',
           notificationColor: '#2563eb',
         } : undefined,
+        showsBackgroundLocationIndicator: false,
       });
     }
-  }
-
-  async registerGeofence(jobSiteId: string, latitude: number, longitude: number, radius: number = 100) {
-    const region: Location.LocationRegion = {
-      identifier: jobSiteId,
-      latitude,
-      longitude,
-      radius,
-      notifyOnEnter: true,
-      notifyOnExit: true,
-    };
-
-    this.geofences.set(jobSiteId, region);
-
-    try {
-      await Location.startGeofencingAsync(GEOFENCE_TASK_NAME, [region]);
-      console.log(`Geofence registered for job site ${jobSiteId}`);
-    } catch (error) {
-      console.error('Failed to register geofence:', error);
-    }
-  }
-
-  async unregisterGeofence(jobSiteId: string) {
-    this.geofences.delete(jobSiteId);
-
-    if (this.geofences.size === 0) {
-      await Location.stopGeofencingAsync(GEOFENCE_TASK_NAME);
-    } else {
-      // Re-register remaining geofences
-      const regions = Array.from(this.geofences.values());
-      await Location.startGeofencingAsync(GEOFENCE_TASK_NAME, regions);
-    }
-  }
-
-  private async handleGeofenceEvent(eventType: Location.GeofencingEventType, region: Location.LocationRegion) {
-    console.log(`Geofence event: ${eventType} for ${region.identifier}`);
-
-    const event = {
-      job_site_id: region.identifier,
-      technician_id: this.currentTechnicianId,
-      event_type: eventType === Location.GeofencingEventType.Enter ? 'enter' : 'exit',
-      timestamp: new Date().toISOString(),
-      latitude: region.latitude,
-      longitude: region.longitude,
-    };
-
-    try {
-      const { error } = await supabase
-        .from('geofence_events')
-        .insert(event);
-
-      if (error) throw error;
-
-      // Trigger notification
-      if (eventType === Location.GeofencingEventType.Enter) {
-        // Technician arrived at job site
-        console.log('Technician arrived at job site');
-      }
-    } catch (error) {
-      console.error('Failed to save geofence event:', error);
-      await offlineStorage.saveGeofenceEvent(event);
-    }
-  }
-
-  private async checkGeofences(location: Location.LocationObject) {
-    // Manual geofence checking for additional precision
-    for (const [jobSiteId, region] of this.geofences.entries()) {
-      const distance = this.calculateDistance(
-        location.coords.latitude,
-        location.coords.longitude,
-        region.latitude,
-        region.longitude
-      );
-
-      if (distance <= region.radius) {
-        console.log(`Inside geofence: ${jobSiteId} (${distance}m)`);
-      }
-    }
-  }
-
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
   }
 
   getCurrentLocation(): Location.LocationObject | null {
@@ -363,6 +270,10 @@ class LocationTrackingService {
   isCurrentlyTracking(): boolean {
     return this.isTracking;
   }
+
+  getCurrentClockEntryId(): string | null {
+    return this.currentClockEntryId;
+  }
 }
 
 export const locationTrackingService = new LocationTrackingService();
@@ -370,7 +281,6 @@ export const locationTrackingService = new LocationTrackingService();
 export async function initializeLocationTracking() {
   try {
     await locationTrackingService.initialize();
-    console.log('Location tracking service initialized');
   } catch (error) {
     console.error('Failed to initialize location tracking:', error);
   }

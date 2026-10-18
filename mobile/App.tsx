@@ -6,6 +6,8 @@ import * as SecureStore from 'expo-secure-store';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { OfflineProvider } from './src/contexts/OfflineContext';
+import { initializeLocationTracking } from './src/services/LocationTrackingService';
+import { NotificationService } from './src/services/NotificationService';
 
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -14,6 +16,7 @@ import WorkOrdersScreen from './src/screens/WorkOrdersScreen';
 import WorkOrderDetailScreen from './src/screens/WorkOrderDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import LocationHistoryScreen from './src/screens/LocationHistoryScreen';
+import TimeHistoryScreen from './src/screens/TimeHistoryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -24,7 +27,8 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Check for existing session
+        initializeLocationTracking();
+        await NotificationService.initialize();
         const session = await SecureStore.getItemAsync('session');
         if (session) {
           setIsAuthenticated(true);
@@ -92,6 +96,11 @@ export default function App() {
                     name="LocationHistory"
                     component={LocationHistoryScreen}
                     options={{ title: 'Location History' }}
+                  />
+                  <Stack.Screen
+                    name="TimeHistory"
+                    component={TimeHistoryScreen}
+                    options={{ title: 'My Time History' }}
                   />
                   <Stack.Screen
                     name="Settings"

@@ -9,10 +9,13 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Image,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { Colors } from '../theme/colors';
+import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Logo } from '../components/Logo';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -40,33 +43,39 @@ export default function LoginScreen() {
     }
   }
 
+  const features = [
+    { title: 'High-Precision GPS', subtitle: '3-10 meter accuracy' },
+    { title: 'Offline Support', subtitle: 'Works without connection' },
+    { title: 'Biometric Security', subtitle: 'Face ID & fingerprint' },
+  ];
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={['#3b82f6', '#2563eb', '#1e40af']}
+        colors={[Colors.primary[600], Colors.primary[700], Colors.primary[900]]}
         style={styles.gradient}
       >
-        <View style={styles.content}>
-          {/* Logo/Title */}
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Logo / Title */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>📍</Text>
-            </View>
+            <Logo size={88} variant="light" />
             <Text style={styles.title}>Field Ops Pro</Text>
             <Text style={styles.subtitle}>Mobile Time Clock</Text>
           </View>
 
           {/* Login Form */}
           <View style={styles.formContainer}>
+            <Text style={styles.formTitle}>Sign In</Text>
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
                 placeholder="your.email@company.com"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={Colors.gray[400]}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -81,7 +90,7 @@ export default function LoginScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={Colors.gray[400]}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -96,155 +105,103 @@ export default function LoginScreen() {
               style={[styles.loginButton, loading && styles.loginButtonDisabled]}
               onPress={handleLogin}
               disabled={loading}
+              activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color="#2563eb" />
+                <ActivityIndicator color={Colors.white} />
               ) : (
                 <Text style={styles.loginButtonText}>Sign In</Text>
               )}
             </TouchableOpacity>
 
-            <View style={styles.features}>
-              <View style={styles.feature}>
-                <Text style={styles.featureIcon}>🛰️</Text>
-                <Text style={styles.featureText}>High-Precision GPS</Text>
-              </View>
-              <View style={styles.feature}>
-                <Text style={styles.featureIcon}>📱</Text>
-                <Text style={styles.featureText}>Works Offline</Text>
-              </View>
-              <View style={styles.feature}>
-                <Text style={styles.featureIcon}>🔒</Text>
-                <Text style={styles.featureText}>Biometric Security</Text>
-              </View>
+            {/* Features */}
+            <View style={styles.featuresContainer}>
+              {features.map((feature, index) => (
+                <View key={index} style={styles.featureRow}>
+                  <View style={styles.featureCheck}>
+                    <View style={styles.featureCheckInner} />
+                  </View>
+                  <View>
+                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Accurate · Reliable · Secure
-            </Text>
+            <Text style={styles.footerText}>Accurate. Reliable. Secure.</Text>
           </View>
-        </View>
+        </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'space-between',
-    padding: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: 60,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  logoText: {
-    fontSize: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#e0e7ff',
-  },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl },
+  header: { alignItems: 'center', marginTop: 60, gap: Spacing.md },
+  title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
+  subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
   formContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xxl,
+    padding: Spacing.xxl,
+    ...Shadows.large,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
+  formTitle: { fontSize: 22, fontWeight: '700', color: Colors.gray[900], marginBottom: Spacing.xl },
+  inputContainer: { marginBottom: Spacing.xl },
+  label: { fontSize: 14, fontWeight: '600', color: Colors.gray[700], marginBottom: Spacing.sm },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: Colors.gray[50],
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 16,
+    borderColor: Colors.gray[200],
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg + 2,
     fontSize: 16,
-    color: '#111827',
+    color: Colors.gray[900],
   },
   loginButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    padding: 18,
+    backgroundColor: Colors.primary[600],
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.lg + 4,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  features: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 24,
-    paddingTop: 24,
+  loginButtonDisabled: { opacity: 0.6 },
+  loginButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  featuresContainer: {
+    marginTop: Spacing.xxl,
+    paddingTop: Spacing.xl,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: Colors.gray[200],
+    gap: Spacing.lg,
   },
-  feature: {
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  featureCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.green[100],
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  featureIcon: {
-    fontSize: 24,
-    marginBottom: 4,
+  featureCheckInner: {
+    width: 10,
+    height: 6,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: Colors.green[600],
+    transform: [{ rotate: '-45deg' }],
+    marginTop: 2,
   },
-  featureText: {
-    fontSize: 11,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  footer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  footerText: {
-    color: '#e0e7ff',
-    fontSize: 14,
-  },
+  featureTitle: { fontSize: 14, fontWeight: '600', color: Colors.gray[800] },
+  featureSubtitle: { fontSize: 12, color: Colors.gray[400], marginTop: 1 },
+  footer: { alignItems: 'center', marginBottom: 20 },
+  footerText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '500', letterSpacing: 1 },
 });

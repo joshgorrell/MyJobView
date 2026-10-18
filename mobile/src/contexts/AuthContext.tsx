@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { NotificationService } from '../services/NotificationService';
 import * as SecureStore from 'expo-secure-store';
 
 interface Profile {
@@ -10,6 +11,7 @@ interface Profile {
   requires_daily_clock: boolean;
   primary_office_id: string | null;
   employment_type: string | null;
+  organization_id: string | null;
 }
 
 interface AuthContextType {
@@ -62,6 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
       setProfile(data);
+
+      // Register push token now that we have the profile
+      void NotificationService.registerTokenWithServer(userId, data.organization_id).catch(e =>
+        console.error('Push token registration failed:', e)
+      );
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
@@ -82,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    await NotificationService.unregisterToken().catch(() => {});
     await supabase.auth.signOut();
     await SecureStore.deleteItemAsync('session');
     setProfile(null);

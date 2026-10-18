@@ -208,7 +208,7 @@ class OfflineStorage {
           wo.work_order_number,
           wo.work_order_type,
           wo.status,
-          wo.assigned_technician_id,
+          wo.assigned_to,
           wo.scheduled_date,
           wo.address,
           wo.customer_name,

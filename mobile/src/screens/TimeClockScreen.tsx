@@ -20,6 +20,9 @@ import { offlineStorage } from '../services/OfflineStorage';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../contexts/LocationContext';
+import { Colors } from '../theme/colors';
+import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Card } from '../components/UI';
 
 interface DailyClockEntry {
   id: string;
@@ -41,7 +44,7 @@ interface Break {
 
 export default function TimeClockScreen({ navigation }: { navigation: any }) {
   const { profile } = useAuth();
-  const [timeContext,setTimeContext] = useState<{timezone:string;basis:string;dailyClock:boolean}|null>(null);
+  const [timeContext, setTimeContext] = useState<{ timezone: string; basis: string; dailyClock: boolean } | null>(null);
   const { currentLocation, isTracking } = useLocation();
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
   const [breaks, setBreaks] = useState<Break[]>([]);
@@ -53,57 +56,33 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   useEffect(() => {
     loadTodaysClock();
     loadPendingSync();
-
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, [profile?.id]);
 
   useEffect(() => {
     if (!todayEntry) return;
-
     const subscription = supabase
       .channel(`daily-clock-${todayEntry.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'daily_clock_entries',
-        filter: `id=eq.${todayEntry.id}`,
-      }, () => {
-        loadTodaysClock();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_clock_entries', filter: `id=eq.${todayEntry.id}` }, () => loadTodaysClock())
       .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, [todayEntry?.id]);
 
   async function loadTodaysClock() {
     if (!profile) return;
-
     try {
       const context = await getEmployeeTimeContext(profile.id);
       setTimeContext(context);
-      if(!context.dailyClock) return;
-      const today = workDate(new Date(),context.timezone);
-
+      if (!context.dailyClock) return;
       const { data, error } = await supabase
         .from('daily_clock_entries')
         .select('*')
         .eq('technician_id', profile.id)
-        .is('clock_out', null).order('clock_in', { ascending: false }).limit(1)
-        .maybeSingle();
-
+        .is('clock_out', null).order('clock_in', { ascending: false }).limit(1).maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
-
       setTodayEntry(data);
-
-      if (data) {
-        await loadBreaks(data.id);
-      }
+      if (data) await loadBreaks(data.id);
     } catch (error) {
       console.error('Error loading daily clock:', error);
       Alert.alert('Error', 'Failed to load clock data');
@@ -119,70 +98,43 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         .select('*')
         .eq('daily_clock_entry_id', entryId)
         .order('break_start', { ascending: false });
-
       if (error) throw error;
-
       setBreaks(data || []);
-      const active = data?.find(b => !b.break_end);
-      setActiveBreak(active || null);
+      setActiveBreak(data?.find(b => !b.break_end) || null);
     } catch (error) {
       console.error('Error loading breaks:', error);
     }
   }
 
   async function loadPendingSync() {
-    const count = await offlineStorage.getPendingBreadcrumbsCount() +
-                  await offlineStorage.getPendingClockEventsCount();
+    const count = await offlineStorage.getPendingBreadcrumbsCount() + await offlineStorage.getPendingClockEventsCount();
     setPendingSync(count);
   }
 
   async function handleClockIn() {
     if (!profile) return;
-
-    // Biometric authentication
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
     if (hasHardware && isEnrolled) {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to clock in',
-        fallbackLabel: 'Use passcode',
-      });
-
-      if (!result.success) {
-        Alert.alert('Authentication Failed', 'Please try again');
-        return;
-      }
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: 'Authenticate to clock in', fallbackLabel: 'Use passcode' });
+      if (!result.success) { Alert.alert('Authentication Failed', 'Please try again'); return; }
     }
-
     try {
       const now = new Date();
       const context = await getEmployeeTimeContext(profile.id);
-      if(!context.dailyClock) return;
-      const today = workDate(now,context.timezone);
+      if (!context.dailyClock) return;
+      const today = workDate(now, context.timezone);
       const entryId = Crypto.randomUUID();
-
-      const clockInData = {
-        id: entryId,
-        technician_id: profile.id,
-        entry_date: today,
-        clock_in: now.toISOString(),
-        status: 'clocked_in',
-        office_id: profile.primary_office_id,
-        offline_entry: false,
+      const clockInData: Record<string, unknown> = {
+        id: entryId, technician_id: profile.id, entry_date: today, clock_in: now.toISOString(),
+        status: 'clocked_in', office_id: profile.primary_office_id, offline_entry: false,
+        clock_in_gps_attempted_at: now.toISOString(), clock_in_gps_capture_method: 'none',
       };
-
       const capture = locationTrackingService.captureHighAccuracyLocation();
-      Object.assign(clockInData, { clock_in_gps_attempted_at: now.toISOString(), clock_in_gps_capture_method: 'none' });
-
-      const { error } = await supabase
-        .from('daily_clock_entries')
-        .insert(clockInData);
-
+      const { error } = await supabase.from('daily_clock_entries').insert(clockInData);
       if (error) throw error;
-      void saveNativeClockGps(entryId, profile.id, false, capture, now.toISOString()).catch(error => console.error('Clock-in GPS save pending:', error));
-
-
+      void saveNativeClockGps(entryId, profile.id, false, capture, now.toISOString()).catch(e => console.error('Clock-in GPS save pending:', e));
+      void locationTrackingService.startTracking(profile.id, entryId).catch(e => console.error('Failed to start background tracking:', e));
       await loadTodaysClock();
       Alert.alert('Success', 'Clocked in successfully!');
     } catch (error: any) {
@@ -193,12 +145,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   async function handleClockOut() {
     if (!todayEntry || !profile) return;
-
-    if (activeBreak) {
-      Alert.alert('Active Break', 'Please end your break before clocking out');
-      return;
-    }
-
+    if (activeBreak) { Alert.alert('Active Break', 'Please end your break before clocking out'); return; }
     if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) {
       Alert.alert('Unfinished shift', 'Ask your manager to correct this older shift before recording another day.');
       return;
@@ -207,54 +154,34 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       if (Platform.OS === 'ios') Alert.prompt(title, message, callback, type);
       else Alert.alert(title, 'Clock out for the day?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clock Out', onPress: () => { void callback(''); } }]);
     };
-    promptForNotes(
-      'Clock Out',
-      'Add notes about your day (optional):',
-      async (notes) => {
-        try {
-          const now = new Date();
-
-          const capture = locationTrackingService.captureHighAccuracyLocation();
-          const updates = {
-            clock_out: now.toISOString(), status: 'clocked_out', notes: notes || null,
-            clock_out_gps_attempted_at: now.toISOString(), clock_out_gps_capture_method: 'none',
-          };
-
-          const { error } = await supabase
-            .from('daily_clock_entries')
-            .update(updates)
-            .eq('id', todayEntry.id);
-
-          if (error) throw error;
-          void saveNativeClockGps(todayEntry.id, profile.id, true, capture, now.toISOString()).catch(error => console.error('Clock-out GPS save pending:', error));
-
-
-          await loadTodaysClock();
-          Alert.alert('Success', 'Clocked out successfully!');
-        } catch (error: any) {
-          console.error('Error clocking out:', error);
-          Alert.alert('Error', error.message || 'Failed to clock out');
-        }
-      },
-      'plain-text'
-    );
+    promptForNotes('Clock Out', 'Add notes about your day (optional):', async (notes) => {
+      try {
+        const now = new Date();
+        const capture = locationTrackingService.captureHighAccuracyLocation();
+        const updates = {
+          clock_out: now.toISOString(), status: 'clocked_out', notes: notes || null,
+          clock_out_gps_attempted_at: now.toISOString(), clock_out_gps_capture_method: 'none',
+        };
+        const { error } = await supabase.from('daily_clock_entries').update(updates).eq('id', todayEntry.id);
+        if (error) throw error;
+        void saveNativeClockGps(todayEntry.id, profile.id, true, capture, now.toISOString()).catch(e => console.error('Clock-out GPS save pending:', e));
+        void locationTrackingService.stopTracking().catch(e => console.error('Failed to stop background tracking:', e));
+        await loadTodaysClock();
+        Alert.alert('Success', 'Clocked out successfully!');
+      } catch (error: any) {
+        console.error('Error clocking out:', error);
+        Alert.alert('Error', error.message || 'Failed to clock out');
+      }
+    }, 'plain-text');
   }
 
   async function handleStartBreak(breakType: 'lunch' | 'personal' | 'other') {
     if (!todayEntry) return;
-
     try {
-      const { error } = await supabase
-        .from('daily_clock_breaks')
-        .insert({
-          id: Crypto.randomUUID(),
-          daily_clock_entry_id: todayEntry.id,
-          break_start: new Date().toISOString(),
-          break_type: breakType,
-        });
-
+      const { error } = await supabase.from('daily_clock_breaks').insert({
+        id: Crypto.randomUUID(), daily_clock_entry_id: todayEntry.id, break_start: new Date().toISOString(), break_type: breakType,
+      });
       if (error) throw error;
-
       await loadBreaks(todayEntry.id);
     } catch (error) {
       console.error('Error starting break:', error);
@@ -264,15 +191,9 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   async function handleEndBreak() {
     if (!activeBreak || !todayEntry) return;
-
     try {
-      const { error } = await supabase
-        .from('daily_clock_breaks')
-        .update({ break_end: new Date().toISOString() })
-        .eq('id', activeBreak.id);
-
+      const { error } = await supabase.from('daily_clock_breaks').update({ break_end: new Date().toISOString() }).eq('id', activeBreak.id);
       if (error) throw error;
-
       await loadBreaks(todayEntry.id);
     } catch (error) {
       console.error('Error ending break:', error);
@@ -281,9 +202,9 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
 
   async function openCommandCenter() {
-    if(!profile) return;
-    try { await openMJV(profile.id,{commandCenter:'1'}); }
-    catch(error:any) { Alert.alert('Unable to open Command Center',error.message); }
+    if (!profile) return;
+    try { await openMJV(profile.id, { commandCenter: '1' }); }
+    catch (error: any) { Alert.alert('Unable to open Command Center', error.message); }
   }
 
   function getTimeSince(timestamp: string): string {
@@ -296,22 +217,18 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
 
   function showBreakOptions() {
-    Alert.alert(
-      'Start Break',
-      'Select break type:',
-      [
-        { text: 'Lunch', onPress: () => handleStartBreak('lunch') },
-        { text: 'Personal', onPress: () => handleStartBreak('personal') },
-        { text: 'Other', onPress: () => handleStartBreak('other') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Start Break', 'Select break type:', [
+      { text: 'Lunch', onPress: () => handleStartBreak('lunch') },
+      { text: 'Personal', onPress: () => handleStartBreak('personal') },
+      { text: 'Other', onPress: () => handleStartBreak('other') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={Colors.primary[600]} />
       </View>
     );
   }
@@ -322,10 +239,16 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>My Work & Time</Text>
           <Text style={styles.infoText}>
-            {timeContext?.basis === 'work_allocation' ? 'Your approved Work Order time determines pay. Manual Job Time and Shop/Training Time require manager approval.' : 'Your recorded job time is used for job costing. Your configuration does not require a Daily Clock.'}
+            {timeContext?.basis === 'work_allocation'
+              ? 'Your approved Work Order time determines pay. Manual Job Time and Shop/Training Time require manager approval.'
+              : 'Your recorded job time is used for job costing. Your configuration does not require a Daily Clock.'}
           </Text>
-          <TouchableOpacity onPress={openCommandCenter} style={{padding:12,marginTop:8}}><Text style={{color:'#2563eb',textAlign:'center'}}>Daily Calendar, My Time & Requests</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} style={{padding:12,backgroundColor:'#2563eb',borderRadius:8,marginTop:12}}><Text style={{color:'white',textAlign:'center'}}>Open My Work Orders</Text></TouchableOpacity>
+          <TouchableOpacity onPress={openCommandCenter} style={styles.linkButton}>
+            <Text style={styles.linkText}>Daily Calendar, My Time & Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Open My Work Orders</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -333,16 +256,24 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   const isClockedIn = todayEntry && !todayEntry.clock_out;
   const isClockedOut = todayEntry && todayEntry.clock_out;
+  const gradientColors: [string, string] = isClockedOut
+    ? [Colors.gray[600], Colors.gray[700]]
+    : isClockedIn
+    ? [Colors.green[500], Colors.green[600]]
+    : [Colors.primary[500], Colors.primary[600]];
 
   return (
     <ScrollView style={styles.container}>
       {/* GPS Status Banner */}
       <View style={[styles.statusBanner, isTracking ? styles.trackingActive : styles.trackingInactive]}>
-        <Text style={styles.statusText}>
-          {isTracking ? '🛰️ GPS Tracking Active' : '📍 GPS Tracking Inactive'}
-        </Text>
+        <View style={styles.bannerContent}>
+          <View style={[styles.bannerDot, { backgroundColor: Colors.white }]} />
+          <Text style={styles.bannerText}>
+            {isTracking ? 'GPS Tracking Active' : 'GPS Tracking Inactive'}
+          </Text>
+        </View>
         {currentLocation && (
-          <Text style={styles.statusSubtext}>
+          <Text style={styles.bannerSubtext}>
             Accuracy: {currentLocation.coords.accuracy?.toFixed(0)}m
           </Text>
         )}
@@ -358,16 +289,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       )}
 
       {/* Main Clock Card */}
-      <LinearGradient
-        colors={
-          isClockedOut
-            ? ['#6b7280', '#4b5563']
-            : isClockedIn
-            ? ['#10b981', '#059669']
-            : ['#3b82f6', '#2563eb']
-        }
-        style={styles.clockCard}
-      >
+      <LinearGradient colors={gradientColors} style={styles.clockCard}>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>
             {isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
@@ -375,53 +297,36 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </View>
 
         <Text style={styles.currentTime}>
-          {currentTime.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          })}
+          {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </Text>
 
         <Text style={styles.currentDate}>
-          {currentTime.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric'
-          })}
+          {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn}>
-            <Text style={styles.clockButtonText}>▶ CLOCK IN</Text>
+          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} activeOpacity={0.85}>
+            <Text style={styles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
 
-        {isClockedIn && (
+        {isClockedIn && todayEntry && (
           <View style={styles.activeClockSection}>
             <View style={styles.elapsedTimeCard}>
               <Text style={styles.elapsedTimeLabel}>Time Elapsed</Text>
               <Text style={styles.elapsedTime}>{getTimeSince(todayEntry.clock_in)}</Text>
               <Text style={styles.clockInTime}>
-                Started at {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                Started at {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
 
             <View style={styles.actionButtons}>
               {!activeBreak ? (
-                <TouchableOpacity
-                  style={styles.breakButton}
-                  onPress={showBreakOptions}
-                >
-                  <Text style={styles.breakButtonText}>☕ Start Break</Text>
+                <TouchableOpacity style={styles.breakButton} onPress={showBreakOptions} activeOpacity={0.8}>
+                  <Text style={styles.breakButtonText}>Start Break</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
-                  style={styles.endBreakButton}
-                  onPress={handleEndBreak}
-                >
+                <TouchableOpacity style={styles.endBreakButton} onPress={handleEndBreak} activeOpacity={0.8}>
                   <Text style={styles.endBreakButtonText}>End Break</Text>
                   <Text style={styles.breakElapsed}>
                     {Math.floor((currentTime.getTime() - new Date(activeBreak.break_start).getTime()) / 60000)}m elapsed
@@ -430,31 +335,28 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               )}
 
               <TouchableOpacity
-                style={[styles.clockOutButton, activeBreak && styles.disabledButton]}
+                style={[styles.clockOutButton, !!activeBreak && styles.disabledButton]}
                 onPress={handleClockOut}
                 disabled={!!activeBreak}
+                activeOpacity={0.8}
               >
-                <Text style={styles.clockOutButtonText}>⏹ Clock Out</Text>
+                <Text style={styles.clockOutButtonText}>Clock Out</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {isClockedOut && (
+        {isClockedOut && todayEntry && (
           <View style={styles.completedCard}>
-            <Text style={styles.completedIcon}>✓</Text>
+            <View style={styles.completedCheckmark}>
+              <View style={styles.completedCheckInner} />
+            </View>
             <Text style={styles.completedTitle}>Clocked Out</Text>
-            <Text style={styles.completedHours}>
-              Total Hours: {todayEntry.total_hours.toFixed(2)}
-            </Text>
+            <Text style={styles.completedHours}>Total Hours: {todayEntry.total_hours.toFixed(2)}</Text>
             <Text style={styles.completedTime}>
-              {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })} - {new Date(todayEntry.clock_out!).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+              {' - '}
+              {new Date(todayEntry.clock_out!).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
         )}
@@ -462,21 +364,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
       {/* Breaks History */}
       {breaks.length > 0 && (
-        <View style={styles.breaksCard}>
-          <Text style={styles.breaksTitle}>☕ Today's Breaks</Text>
+        <Card style={styles.breaksCard}>
+          <Text style={styles.breaksTitle}>Today's Breaks</Text>
           {breaks.map(brk => (
             <View key={brk.id} style={styles.breakItem}>
               <View>
                 <Text style={styles.breakType}>{brk.break_type}</Text>
                 <Text style={styles.breakTime}>
-                  {new Date(brk.break_start).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                  {brk.break_end && ` - ${new Date(brk.break_end).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}`}
+                  {new Date(brk.break_start).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  {brk.break_end && ` - ${new Date(brk.break_end).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
                 </Text>
               </View>
               {brk.break_end ? (
@@ -484,287 +380,118 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
                   {Math.floor((new Date(brk.break_end).getTime() - new Date(brk.break_start).getTime()) / 60000)}m
                 </Text>
               ) : (
-                <Text style={styles.breakActive}>Active</Text>
+                <View style={styles.breakActiveBadge}>
+                  <View style={styles.breakActiveDot} />
+                  <Text style={styles.breakActiveText}>Active</Text>
+                </View>
               )}
             </View>
           ))}
-        </View>
+        </Card>
       )}
+
+      {/* View History Link */}
+      <TouchableOpacity style={styles.historyLink} onPress={() => navigation.navigate('TimeHistory')} activeOpacity={0.7}>
+        <Text style={styles.historyLinkText}>View My Time History</Text>
+        <View style={styles.chevronRight} />
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusBanner: {
-    padding: 12,
-    alignItems: 'center',
-  },
-  trackingActive: {
-    backgroundColor: '#10b981',
-  },
-  trackingInactive: {
-    backgroundColor: '#6b7280',
-  },
-  statusText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  statusSubtext: {
-    color: '#fff',
-    fontSize: 12,
-    opacity: 0.9,
-  },
-  syncBanner: {
-    backgroundColor: '#fbbf24',
-    padding: 8,
-    alignItems: 'center',
-  },
-  syncText: {
-    color: '#78350f',
-    fontWeight: '600',
-    fontSize: 12,
-  },
+  container: { flex: 1, backgroundColor: Colors.gray[100] },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[100] },
+  statusBanner: { padding: Spacing.md + 2, alignItems: 'center' },
+  trackingActive: { backgroundColor: Colors.green[500] },
+  trackingInactive: { backgroundColor: Colors.gray[600] },
+  bannerContent: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  bannerDot: { width: 8, height: 8, borderRadius: 4 },
+  bannerText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+  bannerSubtext: { color: Colors.white, fontSize: 12, opacity: 0.85, marginTop: 4 },
+  syncBanner: { backgroundColor: Colors.amber[400], padding: Spacing.sm + 2, alignItems: 'center' },
+  syncText: { color: Colors.amber[700], fontWeight: '600', fontSize: 12 },
   clockCard: {
-    margin: 16,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    margin: Spacing.lg, borderRadius: Radius.xxl, padding: Spacing.xxl, alignItems: 'center', ...Shadows.large,
   },
   statusBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill, marginBottom: Spacing.lg,
   },
-  statusBadgeText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  currentTime: {
-    fontSize: 56,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  currentDate: {
-    fontSize: 18,
-    color: '#fff',
-    opacity: 0.9,
-    marginBottom: 24,
-  },
+  statusBadgeText: { color: Colors.white, fontWeight: '700', fontSize: 12, letterSpacing: 0.5 },
+  currentTime: { fontSize: 52, fontWeight: '700', color: Colors.white, marginBottom: Spacing.sm, fontVariant: ['tabular-nums'] },
+  currentDate: { fontSize: 18, color: Colors.white, opacity: 0.9, marginBottom: Spacing.xxl },
   clockButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 20,
-    paddingHorizontal: 48,
-    borderRadius: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+    backgroundColor: Colors.white, paddingVertical: Spacing.xl, paddingHorizontal: Spacing.xxxl + Spacing.xl,
+    borderRadius: Radius.lg, ...Shadows.medium,
   },
-  clockButtonText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#3b82f6',
-  },
-  activeClockSection: {
-    width: '100%',
-  },
+  clockButtonText: { fontSize: 22, fontWeight: '700', color: Colors.primary[600], letterSpacing: 1 },
+  activeClockSection: { width: '100%' },
   elapsedTimeCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: Radius.lg, padding: Spacing.lg + 2,
+    alignItems: 'center', marginBottom: Spacing.lg,
   },
-  elapsedTimeLabel: {
-    color: '#fff',
-    fontSize: 12,
-    opacity: 0.9,
-    marginBottom: 4,
-  },
-  elapsedTime: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  clockInTime: {
-    color: '#fff',
-    fontSize: 12,
-    opacity: 0.75,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  elapsedTimeLabel: { color: Colors.white, fontSize: 12, opacity: 0.85, marginBottom: Spacing.xs },
+  elapsedTime: { fontSize: 40, fontWeight: '700', color: Colors.white, marginBottom: Spacing.xs, fontVariant: ['tabular-nums'] },
+  clockInTime: { color: Colors.white, fontSize: 12, opacity: 0.7 },
+  actionButtons: { flexDirection: 'row', gap: Spacing.md },
   breakButton: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: Radius.md,
+    paddingVertical: Spacing.lg, alignItems: 'center',
   },
-  breakButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+  breakButtonText: { color: Colors.white, fontWeight: '600', fontSize: 15 },
   endBreakButton: {
-    flex: 1,
-    backgroundColor: '#fbbf24',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    flex: 1, backgroundColor: Colors.amber[400], borderRadius: Radius.md, paddingVertical: Spacing.lg, alignItems: 'center',
   },
-  endBreakButtonText: {
-    color: '#78350f',
-    fontWeight: 'bold',
-  },
-  breakElapsed: {
-    color: '#78350f',
-    fontSize: 10,
-    marginTop: 4,
-  },
+  endBreakButtonText: { color: Colors.amber[700], fontWeight: '700', fontSize: 15 },
+  breakElapsed: { color: Colors.amber[700], fontSize: 11, marginTop: Spacing.xs },
   clockOutButton: {
-    flex: 1,
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    flex: 1, backgroundColor: Colors.red[500], borderRadius: Radius.md, paddingVertical: Spacing.lg, alignItems: 'center',
   },
-  disabledButton: {
-    opacity: 0.5,
+  disabledButton: { opacity: 0.5 },
+  clockOutButtonText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
+  completedCard: { alignItems: 'center', paddingVertical: Spacing.lg },
+  completedCheckmark: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md,
   },
-  clockOutButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  completedCheckInner: {
+    width: 16, height: 9, borderLeftWidth: 3, borderBottomWidth: 3, borderColor: Colors.white,
+    transform: [{ rotate: '-45deg' }], marginTop: 3,
   },
-  completedCard: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  completedIcon: {
-    fontSize: 48,
-    color: '#d1fae5',
-    marginBottom: 8,
-  },
-  completedTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  completedHours: {
-    fontSize: 18,
-    color: '#fff',
-    marginBottom: 4,
-  },
-  completedTime: {
-    fontSize: 12,
-    color: '#fff',
-    opacity: 0.75,
-  },
-  breaksCard: {
-    margin: 16,
-    marginTop: 0,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  breaksTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 12,
-  },
+  completedTitle: { fontSize: 22, fontWeight: '700', color: Colors.white, marginBottom: Spacing.sm },
+  completedHours: { fontSize: 18, color: Colors.white, marginBottom: Spacing.xs },
+  completedTime: { fontSize: 12, color: Colors.white, opacity: 0.7 },
+  breaksCard: { marginTop: 0 },
+  breaksTitle: { ...Typography.heading, marginBottom: Spacing.md },
   breakItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    marginBottom: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: Spacing.md, paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.gray[50], borderRadius: Radius.sm, marginBottom: Spacing.sm,
   },
-  breakType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    textTransform: 'capitalize',
+  breakType: { fontSize: 14, fontWeight: '600', color: Colors.gray[900], textTransform: 'capitalize' },
+  breakTime: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  breakDuration: { fontSize: 14, fontWeight: '600', color: Colors.gray[600] },
+  breakActiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  breakActiveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.amber[500] },
+  breakActiveText: { fontSize: 12, fontWeight: '700', color: Colors.amber[600] },
+  historyLink: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    margin: Spacing.lg, padding: Spacing.lg, gap: Spacing.sm,
   },
-  breakTime: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 2,
-  },
-  breakDuration: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  breakActive: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fbbf24',
+  historyLinkText: { ...Typography.body, color: Colors.primary[600], fontWeight: '600' },
+  chevronRight: {
+    width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: Colors.primary[400],
+    transform: [{ rotate: '45deg' }],
   },
   infoCard: {
-    margin: 16,
-    padding: 24,
-    backgroundColor: '#dbeafe',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#93c5fd',
+    margin: Spacing.lg, padding: Spacing.xxl, backgroundColor: Colors.primary[50],
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.primary[200],
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#4b5563',
-  },
+  infoTitle: { ...Typography.title, marginBottom: Spacing.sm },
+  infoText: { ...Typography.body, color: Colors.gray[600], lineHeight: 22 },
+  linkButton: { padding: Spacing.md, marginTop: Spacing.md },
+  linkText: { color: Colors.primary[600], textAlign: 'center', fontWeight: '600', fontSize: 14 },
+  primaryButton: { padding: Spacing.lg + 2, backgroundColor: Colors.primary[600], borderRadius: Radius.md, marginTop: Spacing.sm },
+  primaryButtonText: { color: Colors.white, textAlign: 'center', fontWeight: '700', fontSize: 15 },
 });

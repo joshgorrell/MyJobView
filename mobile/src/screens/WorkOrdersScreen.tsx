@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,10 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { offlineStorage } from '../services/OfflineStorage';
+import { NotificationService } from '../services/NotificationService';
+import { Colors } from '../theme/colors';
+import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Badge, EmptyState } from '../components/UI';
 
 interface WorkOrder {
   id: string;
@@ -30,33 +34,23 @@ export default function WorkOrdersScreen({ navigation }: any) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    loadWorkOrders();
-  }, []);
-
-  async function loadWorkOrders() {
+  const loadWorkOrders = useCallback(async () => {
     if (!profile) return;
-
     try {
       if (isConnected) {
-        // Load from server
         const { data, error } = await supabase
           .from('work_orders')
           .select('*')
-          .eq('assigned_technician_id', profile.id)
+          .eq('assigned_to', profile.id)
           .in('status', ['pending', 'in_progress', 'scheduled'])
           .order('scheduled_date', { ascending: true })
           .limit(50);
-
         if (error) throw error;
-
         setWorkOrders(data || []);
-
-        // Cache for offline use
         await offlineStorage.cacheWorkOrders(data || []);
       } else {
-        // Load from cache
         const cached = await offlineStorage.getCachedWorkOrders(profile.id);
         setWorkOrders(cached);
       }
@@ -66,91 +60,111 @@ export default function WorkOrdersScreen({ navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [profile, isConnected]);
 
-  async function onRefresh() {
+  useEffect(() => {
+    loadWorkOrders();
+    if (profile) {
+      NotificationService.getUnreadCount(profile.id).then(setUnreadCount);
+    }
+  }, [loadWorkOrders, profile]);
+
+  // Realtime subscription: refresh work orders when any change is made by admin
+  useEffect(() => {
+    if (!profile || !isConnected) return;
+
+    const channel = supabase
+      .channel('work-orders-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'work_orders', filter: `assigned_to=eq.${profile.id}` },
+        (payload) => {
+          loadWorkOrders();
+          if (payload.eventType === 'UPDATE' && profile) {
+            NotificationService.getUnreadCount(profile.id).then(setUnreadCount);
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
+        () => {
+          if (profile) NotificationService.getUnreadCount(profile.id).then(setUnreadCount);
+        }
+      )
+      .subscribe();
+
+    return () => { channel.unsubscribe(); };
+  }, [profile, isConnected, loadWorkOrders]);
+
+  function onRefresh() {
     setRefreshing(true);
-    await loadWorkOrders();
+    loadWorkOrders();
   }
 
-  function getStatusColor(status: string): string {
-    switch (status) {
-      case 'pending':
-        return '#f59e0b';
-      case 'in_progress':
-        return '#3b82f6';
-      case 'scheduled':
-        return '#8b5cf6';
-      case 'completed':
-        return '#10b981';
-      default:
-        return '#6b7280';
-    }
+  function getBadgeVariant(status: string): 'blue' | 'green' | 'amber' | 'red' | 'gray' {
+    if (status === 'in_progress') return 'blue';
+    if (status === 'completed') return 'green';
+    if (status === 'pending') return 'amber';
+    if (status === 'scheduled') return 'blue';
+    if (status === 'cancelled') return 'gray';
+    return 'gray';
   }
 
-  function getTypeIcon(type: string): string {
+  function getTypeBadgeVariant(type: string): 'blue' | 'green' | 'amber' | 'red' | 'gray' {
     switch (type) {
-      case 'installation':
-        return '🔧';
-      case 'service':
-        return '🛠️';
-      case 'maintenance':
-        return '⚙️';
-      case 'inspection':
-        return '🔍';
-      case 'emergency':
-        return '🚨';
-      default:
-        return '📋';
+      case 'service': return 'green';
+      case 'maintenance': return 'amber';
+      case 'emergency': return 'red';
+      case 'inspection': return 'blue';
+      default: return 'blue';
     }
+  }
+
+  function formatDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   function renderWorkOrder({ item }: { item: WorkOrder }) {
     return (
       <TouchableOpacity
         style={styles.workOrderCard}
-        onPress={() => navigation.navigate('WorkOrderDetail', { workOrderId: item.id })}
+        onPress={() => navigation.navigate('WorkOrderDetail', { workOrderId: item.id, workOrder: item })}
+        activeOpacity={0.8}
       >
         <View style={styles.cardHeader}>
-          <View style={styles.typeContainer}>
-            <Text style={styles.typeIcon}>{getTypeIcon(item.work_order_type)}</Text>
+          <View style={styles.cardHeaderLeft}>
+            <Badge label={item.work_order_type} variant={getTypeBadgeVariant(item.work_order_type)} />
             <Text style={styles.workOrderNumber}>{item.work_order_number}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-            <Text style={styles.statusText}>{item.status.replace('_', ' ')}</Text>
-          </View>
+          <Badge label={item.status.replace(/_/g, ' ')} variant={getBadgeVariant(item.status)} />
         </View>
 
         <Text style={styles.customerName}>{item.customer_name}</Text>
 
-        {item.address && (
+        {item.address ? (
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📍</Text>
-            <Text style={styles.infoText}>{item.address}</Text>
+            <View style={styles.infoIconContainer}>
+              <View style={styles.locationPin} />
+            </View>
+            <Text style={styles.infoText} numberOfLines={2}>{item.address}</Text>
           </View>
-        )}
+        ) : null}
 
-        {item.scheduled_date && (
+        {item.scheduled_date ? (
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📅</Text>
-            <Text style={styles.infoText}>
-              {new Date(item.scheduled_date).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </Text>
+            <View style={styles.infoIconContainer}>
+              <View style={styles.calendarIcon} />
+            </View>
+            <Text style={styles.infoText}>{formatDate(item.scheduled_date)}</Text>
           </View>
-        )}
+        ) : null}
 
-        {item.description && (
-          <Text style={styles.description} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
+        {item.description ? (
+          <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+        ) : null}
 
         <View style={styles.cardFooter}>
-          <Text style={styles.viewDetails}>View Details →</Text>
+          <Text style={styles.viewDetailsText}>View Details</Text>
+          <View style={styles.chevronRight} />
         </View>
       </TouchableOpacity>
     );
@@ -159,7 +173,7 @@ export default function WorkOrdersScreen({ navigation }: any) {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#3b82f6" />
+        <ActivityIndicator size="large" color={Colors.primary[600]} />
         <Text style={styles.loadingText}>Loading work orders...</Text>
       </View>
     );
@@ -169,7 +183,7 @@ export default function WorkOrdersScreen({ navigation }: any) {
     <View style={styles.container}>
       {!isConnected && (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>📱 Viewing cached work orders</Text>
+          <Text style={styles.offlineText}>Viewing cached work orders</Text>
         </View>
       )}
 
@@ -178,17 +192,9 @@ export default function WorkOrdersScreen({ navigation }: any) {
         renderItem={renderWorkOrder}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary[600]]} />}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📋</Text>
-            <Text style={styles.emptyTitle}>No Work Orders</Text>
-            <Text style={styles.emptyText}>
-              You don't have any assigned work orders at the moment.
-            </Text>
-          </View>
+          <EmptyState title="No Work Orders" message="You don't have any assigned work orders at the moment." />
         }
       />
     </View>
@@ -196,129 +202,39 @@ export default function WorkOrdersScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#6b7280',
-  },
-  offlineBanner: {
-    backgroundColor: '#fef3c7',
-    padding: 12,
-    alignItems: 'center',
-  },
-  offlineText: {
-    color: '#78350f',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  listContainer: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: Colors.gray[100] },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[100] },
+  loadingText: { marginTop: Spacing.md, color: Colors.gray[500] },
+  offlineBanner: { backgroundColor: Colors.amber[100], padding: Spacing.md + 2, alignItems: 'center' },
+  offlineText: { color: Colors.amber[700], fontSize: 14, fontWeight: '600' },
+  listContainer: { padding: Spacing.lg },
   workOrderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: Colors.white, borderRadius: Radius.lg, padding: Spacing.lg + 2,
+    marginBottom: Spacing.lg, ...Shadows.small,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
+  workOrderNumber: { fontSize: 16, fontWeight: '700', color: Colors.gray[900] },
+  customerName: { fontSize: 18, fontWeight: '600', color: Colors.gray[900], marginBottom: Spacing.sm + 2 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm + 2 },
+  infoIconContainer: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm },
+  locationPin: {
+    width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: Colors.gray[400],
+    borderBottomColor: 'transparent', borderLeftColor: 'transparent', transform: [{ rotate: '135deg' }],
   },
-  typeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  calendarIcon: {
+    width: 14, height: 12, borderRadius: 2, borderWidth: 1.5, borderColor: Colors.gray[400],
+    borderTopWidth: 3,
   },
-  typeIcon: {
-    fontSize: 24,
-  },
-  workOrderNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  customerName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  infoIcon: {
-    fontSize: 14,
-    marginRight: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#6b7280',
-    flex: 1,
-  },
-  description: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 8,
-    lineHeight: 20,
-  },
+  infoText: { fontSize: 14, color: Colors.gray[500], flex: 1 },
+  description: { fontSize: 14, color: Colors.gray[500], marginTop: Spacing.sm, lineHeight: 20 },
   cardFooter: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.gray[200],
   },
-  viewDetails: {
-    fontSize: 14,
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    paddingHorizontal: 40,
+  viewDetailsText: { fontSize: 14, color: Colors.primary[600], fontWeight: '600', flex: 1 },
+  chevronRight: {
+    width: 8, height: 8, borderTopWidth: 2, borderRightWidth: 2, borderColor: Colors.primary[400],
+    transform: [{ rotate: '45deg' }],
   },
 });

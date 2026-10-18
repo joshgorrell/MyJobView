@@ -217,6 +217,9 @@ verify_jwt = true
 [functions.send-push-notification]
 verify_jwt = true
 
+[functions.send-mobile-push-notification]
+verify_jwt = true
+
 [functions.send-review-request-sms]
 verify_jwt = false
 
