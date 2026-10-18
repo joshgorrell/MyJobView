@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
-import { Star, Mail, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, CheckCircle, Lock } from 'lucide-react';
+import { Star, Mail, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, CheckCircle, Lock, TrendingUp } from 'lucide-react';
 import ProposalFollowUps from '../Reviews/ProposalFollowUps';
 import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
+import { ReviewStatsRow, type StatItem } from '../Reviews/ReviewStats';
 
 const jobReviewEmails = [
   { type: 'manual', title: 'Job Review & Private Feedback', description: 'After a completed job or one-time work order. Ask how we did; Good or Excellent invites a 5-star Google review.' },
@@ -218,7 +219,7 @@ export default function ReviewsView() {
   const [satLeadTechId, setSatLeadTechId] = useState('');
   const [satSending, setSatSending] = useState(false);
   const [satSuccess, setSatSuccess] = useState(false);
-  const [_stats, setStats] = useState({
+  const [stats, setStats] = useState({
     totalSent: 0,
     emailsOpened: 0,
     linksClicked: 0,
@@ -1307,12 +1308,15 @@ export default function ReviewsView() {
         <CustomerSatisfactionDashboard />
       )}
 
-      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && <div className="rounded-xl border border-gray-700 bg-gray-800 p-5"><h3 className="mb-3 text-base font-semibold text-white">Google Review Activity</h3><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[
-        ['Requests Sent', requests.length],
-        ['Open Detected', requests.filter(r => r.email_opened).length],
-        ['Google Link Clicked', requests.filter(r => r.link_clicked).length],
-        ['Reviews Confirmed by Staff', requests.filter(r => r.review_completed).length],
-      ].map(([label, value]) => <div key={label} className="rounded-lg bg-gray-900 p-3"><div className="text-2xl font-bold text-amber-300">{value}</div><div className="mt-1 text-xs text-gray-300">{label}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">Email opens and Google link clicks do not confirm that a public review was posted.</p></div>}
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && (() => {
+        const googleStats: StatItem[] = [
+          { label: 'Requests Sent', value: stats.totalSent, sublabel: 'all Google review emails', icon: Send, iconColor: 'text-cyan-400' },
+          { label: 'Open Rate', value: `${stats.openRate.toFixed(0)}%`, sublabel: `${stats.emailsOpened} opened`, icon: Eye, iconColor: 'text-blue-400' },
+          { label: 'Click Rate', value: `${stats.clickRate.toFixed(0)}%`, sublabel: `${stats.linksClicked} clicked Google link`, icon: TrendingUp, iconColor: 'text-amber-400' },
+          { label: 'Reviews Confirmed', value: stats.reviewsCompleted, sublabel: `${stats.conversionRate.toFixed(0)}% conversion`, icon: CheckCircle, iconColor: 'text-green-400' },
+        ];
+        return <div className="space-y-2"><h3 className="text-base font-semibold text-white">Google Review Activity</h3><ReviewStatsRow stats={googleStats} /><p className="text-xs text-gray-400">Email opens and Google link clicks do not confirm that a public review was posted.</p></div>;
+      })()}
 
       {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && reviewChampions.length > 0 && (
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">

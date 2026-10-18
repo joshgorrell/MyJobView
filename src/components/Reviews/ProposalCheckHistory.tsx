@@ -1,9 +1,10 @@
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEffect, useState } from 'react';
-import { Eye, RefreshCw, Trash2 } from 'lucide-react';
+import { Eye, RefreshCw, Trash2, Send, Mail, TrendingUp, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { proposalChoices, isProposalChoice } from '../../../supabase/functions/_shared/proposalCheckOptions';
+import { ReviewStatsRow, type StatItem } from './ReviewStats';
 interface EmailRecord {id:string;recipient_name:string;recipient_email:string;sender_name:string;reply_to:string;subject:string;variant:string;created_at:string;sent_at:string|null;opened_at:string|null;last_opened_at:string|null;status:string;proposal_id:string|null;click_count:number;interaction_count:number;message_count:number;latest_choice:string|null;confirmed_choice:string|null;last_clicked_at:string|null}
 interface Activity {id:string;kind:string;choice:string;step:string|null;message:string|null;suspected_automated:boolean;created_at:string}
 const date=(v:string|null)=>v?new Date(v).toLocaleString():'—';
@@ -50,9 +51,15 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
  async function showTimeline(row:EmailRecord,eventPage=0){const {data,error}=await supabase.from('proposal_check_events').select('id,kind,choice,step,message,suspected_automated,created_at').eq('email_id',row.id).order('created_at',{ascending:false}).order('id',{ascending:false}).range(eventPage*50,eventPage*50+49);if(error)setError('Activity could not load.');else setTimeline({row,events:(data||[]) as Activity[],page:eventPage,more:data?.length===50})}
  async function deleteEmailRecord(){if(!deleteEmailTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_email',email_id:deleteEmailTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Email record could not be deleted.');setDeleteEmailTarget(null);setTimeline(null);setRefresh(v=>v+1);}catch(e){setError(e instanceof Error?e.message:'Email record could not be deleted.');}finally{setDeleting(false);}}
  async function deleteSubmission(){if(!deleteTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_submission',event_id:deleteTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Submission could not be deleted.');setDeleteTarget(null);setRefresh(v=>v+1);if(response){setResponse(null);clearResponseTarget();}if(timeline)await showTimeline(timeline.row,0);}catch(e){setError(e instanceof Error?e.message:'Submission could not be deleted.');}finally{setDeleting(false);}}
+ const proposalStats: StatItem[] = [
+  { label: 'Sent', value: totals.sent, sublabel: 'all proposal checks', icon: Send, iconColor: 'text-cyan-400' },
+  { label: 'Open Detected', value: totals.opened, sublabel: 'tracking image loaded', icon: Mail, iconColor: 'text-blue-400' },
+  { label: 'Link Visits', value: totals.clicked, sublabel: 'response link clicks', icon: TrendingUp, iconColor: 'text-amber-400' },
+  { label: 'Messages Received', value: totals.messages, sublabel: 'customer replies', icon: MessageSquare, iconColor: 'text-green-400' },
+ ];
  return <section aria-label="Proposal Check Send History" className="space-y-4 rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5">
   <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold text-white">Proposal Check Reporting</h2><button disabled={loading} onClick={()=>setRefresh(v=>v+1)} className="flex min-h-11 items-center gap-2 text-gray-200"><RefreshCw size={18}/>Refresh</button></div>
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{Object.entries({Sent:totals.sent,'Open detected':totals.opened,'Link visits':totals.clicked,'Message received':totals.messages}).map(([name,value])=><div key={name} className="rounded-lg bg-gray-900 p-3"><p className="text-2xl font-bold text-white">{value}</p><p className="text-sm text-gray-400">{name}</p></div>)}</div><p className="text-xs text-gray-400">Totals count emails across all history you can access.</p>
+  <ReviewStatsRow stats={proposalStats} /><p className="text-xs text-gray-400">Totals count emails across all history you can access.</p>
   <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm text-gray-300">Search customer or email<input value={search} onChange={e=>setSearch(e.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white"/></label><label className="text-sm text-gray-300">Response filter<select value={filter} onChange={e=>{setFilter(e.target.value);setPage(0)}} className="mt-1 min-h-11 w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white"><option value="all">All</option>{Object.entries(proposalChoices).map(([key,value])=><option key={key} value={key}>{value.label}</option>)}<option value="clicked_no_message">Clicked, no message</option><option value="opened">Open detected</option><option value="message">Message received</option></select></label></div>
   {responseLoading&&<p role="status" className="text-cyan-300">Opening customer response…</p>}{responseError&&<p role="alert" className="text-red-300">{responseError}</p>}
   {error&&<p role="alert" className="text-red-300">{error}</p>}

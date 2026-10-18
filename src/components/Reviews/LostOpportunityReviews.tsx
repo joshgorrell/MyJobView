@@ -7,6 +7,8 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
 import { responseReasons, lostReviewAction } from "./lostReview";
 import { printLostReview } from "./printLostReview";
+import { ReviewStatsRow, ReviewFilterBar, type StatItem, type FilterOption } from "./ReviewStats";
+import { Send, Clock, TrendingUp, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react';
 import { bidFileFormat } from "../../../supabase/functions/lost-opportunity-review/bidFileTypes";
 interface Contact {
   id: string;
@@ -285,6 +287,31 @@ export default function LostOpportunityReviews(
       setNotice("Lost Opportunity review request sent.");
     }
   }
+  const totalSent = reviews.length;
+  const respondedCount = reviews.filter(v => !!v.responded_at).length;
+  const pendingCount = reviews.filter(v => !v.responded_at).length;
+  const reviewedCount = reviews.filter(v => !!v.reviewed_at).length;
+  const winnableCount = reviews.filter(v => ["yes", "maybe"].includes(v.response?.recoverable || "")).length;
+  const recoveredCount = reviews.filter(v => v.recovery_outcome === "won").length;
+  const responseRate = totalSent > 0 ? Math.round((respondedCount / totalSent) * 100) : 0;
+  const recoveryRate = respondedCount > 0 ? Math.round((recoveredCount / respondedCount) * 100) : 0;
+
+  const lostStats: StatItem[] = [
+    { label: 'Requests Sent', value: totalSent, sublabel: `${pendingCount} awaiting response`, icon: Send, iconColor: 'text-violet-400' },
+    { label: 'Response Rate', value: `${responseRate}%`, sublabel: `${respondedCount} of ${totalSent} responded`, icon: TrendingUp, iconColor: 'text-blue-400' },
+    { label: 'Recovery Rate', value: `${recoveryRate}%`, sublabel: `${recoveredCount} won back`, icon: RotateCcw, iconColor: 'text-green-400' },
+    { label: 'Winnable', value: winnableCount, sublabel: 'recoverable opportunities', icon: AlertCircle, iconColor: 'text-amber-400' },
+  ];
+
+  const filterOptions: FilterOption[] = [
+    { value: 'all', label: 'All', count: totalSent },
+    { value: 'awaiting', label: 'Awaiting', count: pendingCount },
+    { value: 'new', label: 'New', count: reviews.filter(v => !!v.responded_at && !v.reviewed_at).length },
+    { value: 'winnable', label: 'Winnable', count: winnableCount },
+    { value: 'complete', label: 'Complete', count: reviewedCount },
+    { value: 'bids', label: 'Bids', count: reviews.filter(v => !!v.response?.attachments.length).length },
+  ];
+
   const visible = reviews.filter((v) =>
     filter === "all" || v.request_id === expandedReview ||
     filter === "new" && !!v.responded_at && !v.reviewed_at ||
@@ -355,6 +382,7 @@ export default function LostOpportunityReviews(
 
         </div>
       </div>
+      <ReviewStatsRow stats={lostStats} />
       {error && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
           {error}
@@ -504,21 +532,8 @@ export default function LostOpportunityReviews(
         </div>
       )}
       {adminReview && <AdminSalesReviewModal requestId={adminReview.request_id} customer={adminReview.recipient || "Customer"} onClose={() => setAdminReview(null)} />}
-      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-white">Send History & Responses</h2>          <label className="flex min-w-0 items-center gap-2 text-gray-300 text-sm">
-            Filter
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="min-h-11 min-w-0 flex-1 rounded-lg bg-gray-800 border border-gray-600 p-2 text-base sm:text-sm"
-            >
-              <option value="all">All</option>
-              <option value="awaiting">Awaiting Response</option>
-              <option value="new">NEW!</option>
-              <option value="complete">Complete</option>
-              <option value="winnable">Still Winnable</option>
-              <option value="bids">Competing Bid Uploaded</option>
-            </select>
-          </label></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-white">Send History & Responses</h2>
+          <ReviewFilterBar options={filterOptions} active={filter} onChange={setFilter} /></div>
       {loading
         ? <p className="text-gray-400">Loading…</p>
         : visible.length === 0
