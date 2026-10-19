@@ -34,6 +34,7 @@ interface LineItem {
 
 interface Room {
   name: string;
+  description?: string;
   lineItems: LineItem[];
 }
 
