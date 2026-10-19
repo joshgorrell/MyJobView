@@ -200,7 +200,7 @@ BEGIN
  SELECT organization_id INTO org FROM public.contacts WHERE id=p_contact_id;
  IF org IS NULL OR NOT (private.punchlist_portal_identity(p_contact_id,org) OR private.punchlist_staff_identity(org)) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  SELECT jsonb_build_object('organization_id',org,'vip_service_access',private.vip_service_entitled(p_contact_id,org),
- 'projects',coalesce((SELECT jsonb_agg(jsonb_build_object('id',p.id,'name',p.name,'number',p.project_number,'end_date',p.substantial_completion_date+90,'can_submit',private.project_punchlist_open(p.id),
+ 'projects',coalesce((SELECT jsonb_agg(jsonb_build_object('id',p.id,'name',p.name,'number',p.project_number,'end_date',p.substantial_completion_date+90,'days_remaining',greatest(0,p.substantial_completion_date+90-CURRENT_DATE),'can_submit',private.project_punchlist_open(p.id),
  'tasks',coalesce((SELECT jsonb_agg(jsonb_build_object('id',t.id,'description',t.customer_description,'status',t.status,'progress',t.progress_status,'source',t.source,
  'requested',EXISTS(SELECT 1 FROM public.project_punchlist_requests r JOIN public.service_requests s ON s.id=r.request_id WHERE r.task_id=t.id AND s.status NOT IN ('closed','cancelled')) OR EXISTS(SELECT 1 FROM public.punchlist_tasks l WHERE l.id=t.legacy_punchlist_id AND l.service_request_id IS NOT NULL AND l.status<>'completed'),
  'photos',coalesce((SELECT jsonb_agg(f.storage_path) FROM public.portal_support_photos f WHERE f.task_id=t.id),'[]'),'legacy_photos',coalesce((SELECT jsonb_agg(f.photo_url) FROM public.punchlist_task_photos f WHERE f.task_id=t.legacy_punchlist_id),'[]')) ORDER BY t.sort_order,t.created_at)

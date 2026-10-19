@@ -18,6 +18,7 @@ interface Project {
   name: string;
   number: string;
   end_date: string;
+  days_remaining: number;
   can_submit: boolean;
   tasks: Item[];
 }
@@ -348,11 +349,20 @@ export function PortalPunchlist({
           )}
           {project && (
             <>
-              <p className="rounded-xl bg-blue-50 p-3 text-sm">
-                {project.can_submit
-                  ? `Test & Tune submissions are open through ${dateLabel(project.end_date)}.`
-                  : `View-only. Test & Tune ended ${dateLabel(project.end_date)} or access has been suspended. Existing items remain for our team to resolve.`}
-              </p>
+              <aside aria-label="Test & Tune access" className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2 text-sm">
+                <h2 className="font-semibold text-base text-gray-900">{project.can_submit
+                  ? `Test & Tune · ${project.days_remaining === 0 ? 'Ends today' : `${project.days_remaining} day${project.days_remaining === 1 ? '' : 's'} remaining`}`
+                  : project.days_remaining > 0 ? 'Project Punchlist · Submissions paused' : 'Test & Tune · Ended'}</h2>
+                <p>{project.can_submit
+                  ? `Your included project punchlist access is active through ${dateLabel(project.end_date)}. Add items and request a visit while this period is active.`
+                  : project.days_remaining > 0 ? 'View-only. New submissions are paused. You can still track your shared items.'
+                  : `View-only. Your included Test & Tune period ended ${dateLabel(project.end_date)}.`}</p>
+                <p><strong>What happens afterward?</strong> This project punchlist becomes view-only. Unfinished items remain for our team to resolve.</p>
+                <p>{data.vip_service_access
+                  ? 'Your active VIP plan lets you submit new general service requests online. Plan benefits determine any service charges.'
+                  : 'An active paid or complimentary VIP plan enables new general service requests online. Your shared project items remain viewable either way.'}</p>
+                <button type="button" disabled={busy} onClick={() => changeView('service')} className="min-h-11 text-blue-700 underline">{data.vip_service_access ? 'Open VIP Service Requests' : 'View Service Request Access'}</button>
+              </aside>
               <div className="space-y-3">
                 {project.tasks.map((item) => (
                   <article
