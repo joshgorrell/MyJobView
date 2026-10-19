@@ -977,11 +977,6 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
         .select('ai_summary')
         .single();
       if (error) throw error;
-      const updated = {
-        ...selectedBrief,
-        ai_summary: saved.ai_summary as ProposalPrefill,
-        status: 'building' as const,
-      };
       setBriefs(prev => prev.map(b => b.id === briefId ? { ...b, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : b));
       setSelectedBrief(prev => prev?.id === briefId ? { ...prev, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : prev);
     } catch (err) {
