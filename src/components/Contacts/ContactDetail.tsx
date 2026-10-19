@@ -729,12 +729,12 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ email: contact.email }),
+        body: JSON.stringify({ email: contact.email, organizationId: profile?.organization_id }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || data.success !== true) {
         throw new Error(data.error || 'Failed to send portal invite');
       }
 

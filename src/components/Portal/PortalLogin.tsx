@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 
 export function PortalLogin() {
-  const { tenant } = useTenant();
+  const { tenant, loading: tenantLoading } = useTenant();
   const dealerName = tenant?.organizationName || 'Electronic Life';
   const dealerLogo = tenant?.logoUrl;
   const [email, setEmail] = useState('');
@@ -17,14 +17,15 @@ export function PortalLogin() {
   const [incompleteSignup, setIncompleteSignup] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
-  const redirectParam = searchParams.get('redirect');
+  const requestedRedirect = searchParams.get('redirect');
+  const redirectParam = requestedRedirect && /^\/portal(?:\/|\?|$)/.test(requestedRedirect) && !requestedRedirect.includes('\\') ? requestedRedirect : null;
   const portalToken = searchParams.get('portal_token');
 
   useEffect(() => {
     async function checkExistingSession() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.user_metadata?.is_portal_user) {
-        window.location.href = redirectParam || '/portal/punchlist';
+        window.location.href = redirectParam || '/portal';
       }
     }
     if (!portalToken) {
@@ -59,7 +60,7 @@ export function PortalLogin() {
           return;
         }
 
-        const destination = redirectParam || '/portal/punchlist';
+        const destination = redirectParam || '/portal';
 
         const { error: sessionError } = await supabase.auth.verifyOtp({
           token_hash: data.token_hash,
@@ -99,7 +100,8 @@ export function PortalLogin() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email,
+          email: email.trim(),
+          organizationId: tenant?.organizationId,
           redirectTo: redirectParam || undefined,
         }),
       });
@@ -112,6 +114,7 @@ export function PortalLogin() {
         throw new Error(data.error || 'Failed to send magic link');
       }
 
+      if (data.success !== true) throw new Error(data.error || 'Failed to send magic link');
       setEmailSent(true);
     } catch (err) {
       console.error('Error sending magic link:', err);
@@ -153,7 +156,7 @@ export function PortalLogin() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">Check Your Email</h2>
             <p className="text-gray-600 mb-2 leading-relaxed">
-              We sent a secure login link to
+              Your magic link has been sent to
             </p>
             <p className="text-gray-900 font-semibold mb-6 text-lg">{email}</p>
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-left">
@@ -264,7 +267,7 @@ export function PortalLogin() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || tenantLoading}
                 className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 text-base"
               >
                 {loading ? (
@@ -275,7 +278,7 @@ export function PortalLogin() {
                 ) : (
                   <>
                     <Mail className="w-5 h-5" />
-                    Send Secure Login Link
+                    Send My Magic Link
                   </>
                 )}
               </button>
