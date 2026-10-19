@@ -820,7 +820,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   }
 
   async function handleRerunAI() {
-    if (!selectedBrief || !selectedBrief.raw_notes.trim()) return;
+    if (!selectedBrief || !selectedBrief.raw_notes.trim() || savingMatches) return;
+    const reviewedItems = (localRooms || selectedBrief.ai_summary?.rooms || []).flatMap(room => room.lineItems || []).filter(item => item.matchedProductId || item.matchConfidence === 'designer');
+    if (reviewedItems.length && !window.confirm(`Re-generating the design will replace ${reviewedItems.length} reviewed catalog selections. Continue?`)) return;
     setRerunningAI(true);
     setRerunError('');
     try {
@@ -1316,6 +1318,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 {isAdmin && !selectedBrief.linked_proposal_id && selectedBrief.status !== 'archived' && (
                   <button
                     onClick={() => setShowConvertModal(true)}
+                    disabled={savingMatches || rerunningAI}
+                    title={savingMatches ? 'Wait for catalog selections to finish saving' : undefined}
                     className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5" />
@@ -1325,7 +1329,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 {isAdmin && selectedBrief.status !== 'archived' && selectedBrief.raw_notes && (
                   <button
                     onClick={handleRerunAI}
-                    disabled={rerunningAI}
+                    disabled={rerunningAI || savingMatches}
                     className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 text-white text-sm font-medium rounded-lg transition-colors"
                     title="Re-process notes with AI"
                   >
