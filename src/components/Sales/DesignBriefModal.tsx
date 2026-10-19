@@ -412,7 +412,7 @@ export default function DesignBriefModal({
       'Analyzing your notes...',
       'Matching products to your catalog...',
       'Building room layout...',
-      'Generating draft proposal...',
+      'Preparing design preview...',
     ];
     let msgIndex = 0;
     const msgInterval = setInterval(() => {
@@ -919,7 +919,7 @@ export default function DesignBriefModal({
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                {alreadyProcessed ? 'Regenerate with AI' : 'Build with AI'}
+                {alreadyProcessed ? 'Regenerate with AI' : 'Preview with AI'}
                 {!alreadyProcessed && <ArrowRight className="w-4 h-4" />}
               </button>
               {(!isReady && openAIConfigured !== false) && (
@@ -994,7 +994,7 @@ export default function DesignBriefModal({
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm font-semibold rounded-xl transition-colors"
               >
                 <Send className="w-4 h-4" />
-                Submit to Design Team
+                Finish — Send to Design Queue
               </button>
               <div className="flex items-center gap-2">
                 {createdProposalId && (
