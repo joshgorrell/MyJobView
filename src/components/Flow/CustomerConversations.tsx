@@ -651,7 +651,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       {loadError && <div role="alert" className="p-2 text-sm text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }} className="underline">Retry</button></div>}
       {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert" className="p-2 text-sm text-secondary">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar — compact inline strip */}
-      <div className="flex items-center gap-3 sm:gap-4 mb-1.5 px-0.5">
+      <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} items-center gap-3 sm:gap-4 mb-1.5 px-0.5`}>
         <div className="flex items-center gap-1.5">
           <MessageSquare className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
           <span className="text-sm font-bold text-primary">{stats.total}</span>
@@ -671,9 +671,9 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
       </div>
 
-      <div ref={conversationSize.ref} style={{ height: conversationSize.height }} className="conversation-workspace min-h-0 min-w-0 flex flex-col sm:flex-row gap-2 sm:gap-3">
+      <div ref={conversationSize.ref} style={{ height: conversationSize.height }} className="conversation-workspace min-h-0 min-w-0 flex flex-col md:flex-row gap-2 md:gap-3">
         {/* Threads List */}
-        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-[34%] sm:max-w-88 shrink-0 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
+        <div className={`${selectedThread ? 'hidden md:flex' : 'flex'} w-full md:w-[34%] md:max-w-88 shrink-0 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
           <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm sm:text-base font-semibold text-primary flex items-center gap-2">
@@ -772,7 +772,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         <p className="text-xs font-medium text-blue-600 mb-1">{thread.proposal_number}</p>
                       )}
 
-                      {thread.related_context_name && <p className="text-xs text-secondary mb-1">{thread.related_context_name}</p>}
+                      {thread.related_context_name && !thread.contact_name && <p className="text-xs text-secondary mb-1 truncate">{thread.related_context_name}</p>}
                       {thread.contact_name && (
                         <p className="text-sm text-secondary mb-1 flex items-center gap-1">
                           <User className="w-3 h-3" />
@@ -780,7 +780,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         </p>
                       )}
 
-                      {thread.context_label && (
+                      {thread.context_label && !thread.related_context_name && (
                         <div className="flex items-center gap-1 mb-1">
                           <HelpCircle className="w-3 h-3 text-blue-500" />
                           <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
@@ -805,9 +805,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                               Unanswered
                             </span>
                           )}
-                          <span className="text-xs text-muted">
-                            {thread.message_count} msg{thread.message_count !== 1 ? 's' : ''}
-                          </span>
+                          
                         </div>
                         <span className="text-xs text-muted">{formatTime(thread.last_message_at)}</span>
                       </div>
@@ -820,7 +818,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
 
         {/* Messages Panel */}
-        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col overflow-hidden`}>
+        <div className={`${selectedThread ? 'flex' : 'hidden md:flex'} flex-1 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col overflow-hidden`}>
           {selectedThread ? (
             <>
               <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
@@ -828,7 +826,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                   <button
                     aria-label="Back to conversations"
                     onClick={() => setSelectedThread(null)}
-                    className="sm:hidden p-1.5 hover:bg-elevated active:bg-surface rounded-lg touch-manipulation"
+                    className="md:hidden p-1.5 hover:bg-elevated active:bg-surface rounded-lg touch-manipulation"
                   >
                     <ArrowLeft className="w-5 h-5 text-secondary" />
                   </button>
