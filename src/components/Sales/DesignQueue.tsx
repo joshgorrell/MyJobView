@@ -15,6 +15,7 @@ interface CatalogProduct {
   default_labor_hours: number | null;
   category: string | null;
   manufacturer: string | null;
+  model_number?: string | null;
   thumbnail_url: string | null;
   item_type: string | null;
 }
@@ -34,6 +35,7 @@ interface LineItem {
 
 interface Room {
   name: string;
+  description?: string;
   lineItems: LineItem[];
 }
 
@@ -117,8 +119,9 @@ function countMatchedItems(rooms?: Room[]): { matched: number; total: number } {
   let total = 0;
   for (const room of rooms) {
     for (const item of room.lineItems) {
+      if (item.itemType === 'labor') continue;
       total++;
-      if (item.matchedProductId || item.matchConfidence === 'ai') matched++;
+      if (item.matchedProductId) matched++;
     }
   }
   return { matched, total };
@@ -128,35 +131,51 @@ interface ProductPickerProps {
   onSelect: (product: CatalogProduct) => void;
   onClose: () => void;
   currentProductId?: string | null;
+  suggestedQuery?: string;
+  matchingCount?: number;
+  onApplyMatching?: (product: CatalogProduct) => void;
 }
 
-function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerProps) {
-  const [query, setQuery] = useState('');
+function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '', matchingCount = 0, onApplyMatching }: ProductPickerProps) {
+  const [query, setQuery] = useState(suggestedQuery);
   const [results, setResults] = useState<CatalogProduct[]>([]);
+  const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
-    searchProducts('');
+    searchProducts(suggestedQuery);
   }, []);
 
   async function searchProducts(q: string) {
     setLoading(true);
+    setSearchError('');
     const query_builder = supabase
       .from('products')
-      .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, thumbnail_url, item_type')
+      .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, model_number, thumbnail_url, item_type')
       .eq('is_active', true)
       .order('name')
-      .limit(20);
+      .limit(250);
 
-    if (q.trim()) {
-      query_builder.ilike('name', `%${q}%`);
+    const { data, error } = await query_builder;
+    if (error) {
+      setResults([]);
+      setSearchError('Catalog search failed. Please retry.');
+      setLoading(false);
+      return;
     }
-
-    const { data } = await query_builder;
-    setResults(data || []);
+    const tokens = q.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').split(/\s+/)
+      .filter(token => token.length > 1 && !['pair', 'pairs', 'the', 'for', 'with', 'need', 'each', 'inch', 'inches'].includes(token));
+    const ranked = (data || []).map(product => {
+      const haystack = [product.name, product.manufacturer, product.model_number, product.category]
+        .filter(Boolean).join(' ').toLowerCase();
+      const score = tokens.reduce((total, token) => total + (haystack.includes(token) ? 1 : 0), 0);
+      return { product, score };
+    }).sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name));
+    setResults(tokens.length ? ranked.filter(candidate => candidate.score > 0).map(candidate => candidate.product) : ranked.map(candidate => candidate.product));
     setLoading(false);
   }
 
@@ -176,7 +195,7 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
             type="text"
             value={query}
             onChange={e => handleQuery(e.target.value)}
-            placeholder="Search products by name..."
+            placeholder="Search by size, type, brand, or model..."
             className="flex-1 text-sm outline-none text-gray-800 placeholder-gray-400"
           />
           {loading && <Loader className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />}
@@ -186,15 +205,19 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-          {results.length === 0 && !loading && (
+          {searchError && <p role="alert" className="px-4 py-3 text-sm text-red-700">{searchError}</p>}
+          {results.length === 0 && !loading && !searchError && (
             <div className="py-8 text-center text-sm text-gray-400">
               {query ? `No products found for "${query}"` : 'No products in catalog'}
             </div>
           )}
           {results.map(product => (
-            <button
+            <div
               key={product.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(product)}
+              onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelect(product); } }}
               className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3 ${
                 currentProductId === product.id ? 'bg-blue-50' : ''
               }`}
@@ -209,7 +232,7 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                 <p className="text-xs text-gray-500 truncate">
-                  {[product.manufacturer, product.category].filter(Boolean).join(' · ')}
+                  {[product.manufacturer, product.model_number, product.category].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
@@ -220,10 +243,16 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
                 )}
                 {product.unit && <p className="text-xs text-gray-400">{product.unit}</p>}
               </div>
+              {product.name.toLowerCase().includes('pair') && (
+                <span className="text-[10px] text-amber-700 max-w-24">Sold as pair — verify quantity</span>
+              )}
+              {matchingCount > 1 && onApplyMatching && (
+                <button type="button" onClick={event => { event.stopPropagation(); onApplyMatching(product); }} className="px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">Apply to {matchingCount}</button>
+              )}
               {currentProductId === product.id && (
                 <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
               )}
-            </button>
+            </div>
           ))}
         </div>
 
@@ -264,7 +293,15 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [title, setTitle] = useState(brief.ai_summary?.title || '');
+  // Design/SOW preview remains available even when catalog equipment is incomplete.
+  const unresolvedEquipment = (brief.ai_summary?.rooms || []).flatMap(room =>
+    (room.lineItems || []).filter(item =>
+      item.itemType !== 'labor' && (!item.matchedProductId || (item.overridePrice ?? null) === 0)
+    ).map(item => `${room.name}: ${item.description}`)
+  );
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -346,10 +383,18 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   async function handleCreate() {
-    if (!selectedContact) return;
+    if (!selectedContact || creating) return;
+    setCreateError('');
     setCreating(true);
 
     try {
+      const { data: currentBrief, error: briefCheckError } = await supabase
+        .from('design_briefs').select('linked_proposal_id').eq('id', brief.id).single();
+      if (briefCheckError) throw briefCheckError;
+      if (currentBrief?.linked_proposal_id) {
+        onCreated(currentBrief.linked_proposal_id);
+        return;
+      }
       const rooms = brief.ai_summary?.rooms || [];
 
       let contactId = selectedContact.id;
@@ -395,90 +440,25 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
           .eq('id', brief.id);
       }
 
-      const { data: newProposal, error: proposalError } = await supabase
-        .from('proposals')
-        .insert({
-          contact_id: contactId,
-          title: title || `Design Brief - ${getContactName(selectedContact)}`,
-          status: 'designing',
-          tax_environment: taxEnvironment,
-          tax_project_type: taxProjectType,
-          tax_rate: taxRate,
-          created_by: profile?.id,
-        })
-        .select('id')
-        .single();
-
-      if (proposalError || !newProposal) throw new Error('Failed to create proposal');
-
-      for (let roomIndex = 0; roomIndex < rooms.length; roomIndex++) {
-        const room = rooms[roomIndex];
-
-        const { data: newRoom, error: roomError } = await supabase
-          .from('proposal_rooms')
-          .insert({
-            proposal_id: newProposal.id,
-            name: room.name,
-            sort_order: roomIndex,
-          })
-          .select('id')
-          .single();
-
-        if (!roomError && newRoom && room.lineItems?.length > 0) {
-          const productIds = room.lineItems
-            .map(li => li.matchedProductId)
-            .filter((id): id is string => !!id);
-
-          const productMap = new Map<string, CatalogProduct>();
-
-          if (productIds.length > 0) {
-            const { data: catalogProducts } = await supabase
-              .from('products')
-              .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, item_type, category, manufacturer, thumbnail_url')
-              .in('id', productIds);
-            if (catalogProducts) {
-              for (const p of catalogProducts) {
-                productMap.set(p.id, p as CatalogProduct);
-              }
-            }
-          }
-
-          const lineItemInserts = room.lineItems.map((li, liIndex) => {
-            const product = li.matchedProductId ? productMap.get(li.matchedProductId) : null;
-            const unitPrice = li.overridePrice ?? product?.our_price ?? 0;
-            const cost = product?.cost ?? 0;
-            const qty = li.overrideQuantity ?? li.quantity ?? product?.default_qty ?? 1;
-            const laborHours = li.laborHours ?? product?.default_labor_hours ?? null;
-            const lineTotal = qty * unitPrice;
-
-            return {
-              proposal_id: newProposal.id,
-              room_id: newRoom.id,
-              product_id: li.matchedProductId || null,
-              description: li.matchedProductName || li.description,
-              quantity: qty,
-              unit: li.unit || product?.unit || 'EA',
-              cost,
-              unit_price: unitPrice,
-              line_total: lineTotal,
-              item_type: li.itemType || 'material',
-              labor_hours: laborHours,
-              sort_order: liIndex,
-            };
-          });
-
-          await supabase.from('proposal_line_items').insert(lineItemInserts);
+      // One database transaction: row lock, idempotency, rooms, items and brief link.
+      const { data: proposalId, error: conversionError } = await supabase.rpc(
+        'design_brief_create_proposal',
+        {
+          p_brief: brief.id,
+          p_contact: contactId,
+          p_title: title || `Design Brief - ${getContactName(selectedContact)}`,
+          p_tax_environment: taxEnvironment,
+          p_tax_type: taxProjectType,
+          p_tax_rate: taxRate,
         }
+      );
+      if (conversionError || !proposalId) {
+        throw conversionError || new Error('Unable to create proposal');
       }
-
-      await supabase
-        .from('design_briefs')
-        .update({ linked_proposal_id: newProposal.id, status: 'building' })
-        .eq('id', brief.id);
-
-      onCreated(newProposal.id);
+      onCreated(proposalId);
     } catch (err) {
       console.error('Error creating proposal:', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create proposal. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -498,6 +478,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
         </div>
 
         <div className="p-5 space-y-4">
+          {createError && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg p-3">{createError}</p>}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Proposal Title</label>
             <input
@@ -602,6 +583,15 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
             )}
           </div>
 
+          {unresolvedEquipment.length > 0 && (
+            <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+              <p className="font-semibold">{unresolvedEquipment.length} equipment item(s) still need catalog matching or pricing.</p>
+              <p className="mt-1 text-xs">You can keep reviewing the design and scope of work. Assign verified products and prices in Design Queue before creating the proposal.</p>
+              <ul className="mt-2 list-disc pl-5 text-xs max-h-24 overflow-y-auto">
+                {unresolvedEquipment.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
           {brief.ai_summary?.rooms && (
             <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
               <p className="text-xs font-medium text-gray-600 mb-1.5">Will create:</p>
@@ -624,7 +614,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
           </button>
           <button
             onClick={handleCreate}
-            disabled={!selectedContact || creating}
+            disabled={!selectedContact || creating || unresolvedEquipment.length > 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
           >
             {creating ? (
@@ -659,6 +649,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
 
   const [pickerOpen, setPickerOpen] = useState<{ roomIndex: number; itemIndex: number } | null>(null);
   const [savingMatches, setSavingMatches] = useState(false);
+  const matchSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingMatchSaves = useRef(0);
+  const [matchSaveError, setMatchSaveError] = useState(false);
   const [localRooms, setLocalRooms] = useState<Room[] | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [rerunningAI, setRerunningAI] = useState(false);
@@ -830,7 +823,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   }
 
   async function handleRerunAI() {
-    if (!selectedBrief || !selectedBrief.raw_notes.trim()) return;
+    if (!selectedBrief || !selectedBrief.raw_notes.trim() || savingMatches) return;
+    const reviewedItems = (localRooms || selectedBrief.ai_summary?.rooms || []).flatMap(room => room.lineItems || []).filter(item => item.matchedProductId || item.matchConfidence === 'designer');
+    if (reviewedItems.length && !window.confirm(`Re-generating the design will replace ${reviewedItems.length} reviewed catalog selections. Continue?`)) return;
     setRerunningAI(true);
     setRerunError('');
     try {
@@ -873,9 +868,37 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     }
   }
 
+  function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): boolean {
+    if (!/\bpair\b/i.test(product.name)) return true;
+    const counts = items.map(item => Number(item.quantity));
+    const allEven = counts.every(count => Number.isFinite(count) && count > 0 && count % 2 === 0);
+    if (!allEven) {
+      window.alert('This catalog product is sold as a pair. At least one room has an odd or invalid speaker count. Verify the packaging and quantities before assigning.');
+      return false;
+    }
+    return window.confirm(
+      `"${product.name}" is sold as a pair. Convert each selected room's physical speaker count to half as many catalog pairs? Example: 2 speakers become 1 pair. Cancel to leave the design unchanged.`
+    );
+  }
+
+  function applyCatalogSelection(item: LineItem, product: CatalogProduct): LineItem {
+    const soldAsPair = /\bpair\b/i.test(product.name);
+    const physicalCount = Number(item.quantity);
+    return {
+      ...item,
+      matchedProductId: product.id,
+      matchedProductName: product.name,
+      matchConfidence: 'designer',
+      unit: product.unit || 'EA',
+      overrideQuantity: soldAsPair ? physicalCount / 2 : physicalCount,
+    };
+  }
+
   function handleProductSelected(product: CatalogProduct) {
     if (!pickerOpen || !localRooms) return;
     const { roomIndex, itemIndex } = pickerOpen;
+    const selected = localRooms[roomIndex]?.lineItems[itemIndex];
+    if (!selected || !confirmCatalogPackage(product, [selected])) return;
 
     const updated = localRooms.map((room, ri) => {
       if (ri !== roomIndex) return room;
@@ -883,17 +906,34 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
         ...room,
         lineItems: room.lineItems.map((item, li) => {
           if (li !== itemIndex) return item;
-          return {
-            ...item,
-            matchedProductId: product.id,
-            matchedProductName: product.name,
-            matchConfidence: 'designer' as const,
-            unit: item.unit || product.unit || 'EA',
-          };
+          return applyCatalogSelection(item, product);
         }),
       };
     });
 
+    setLocalRooms(updated);
+    setPickerOpen(null);
+    saveMatchesToBrief(updated);
+  }
+
+  function handleApplyToMatching(product: CatalogProduct) {
+    if (!pickerOpen || !localRooms) return;
+    const target = localRooms[pickerOpen.roomIndex]?.lineItems[pickerOpen.itemIndex];
+    if (!target || target.itemType === 'labor') return;
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const key = normalize(target.description);
+    const targets = localRooms.flatMap(room => room.lineItems.filter(item =>
+      item.itemType !== 'labor' && normalize(item.description) === key
+    ));
+    if (!confirmCatalogPackage(product, targets)) return;
+    const updated = localRooms.map(room => ({
+      ...room,
+      lineItems: room.lineItems.map(item =>
+        item.itemType !== 'labor' && normalize(item.description) === key
+          ? applyCatalogSelection(item, product)
+          : item
+      ),
+    }));
     setLocalRooms(updated);
     setPickerOpen(null);
     saveMatchesToBrief(updated);
@@ -916,29 +956,38 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     saveMatchesToBrief(updated);
   }
 
-  async function saveMatchesToBrief(rooms: Room[]) {
+  function saveMatchesToBrief(rooms: Room[]) {
     if (!selectedBrief) return;
+    const briefId = selectedBrief.id;
+    pendingMatchSaves.current += 1;
     setSavingMatches(true);
+    setMatchSaveError(false);
+    matchSaveQueue.current = matchSaveQueue.current.catch(() => {}).then(async () => {
     try {
-      const updatedSummary = { ...selectedBrief.ai_summary, rooms };
-      const { error } = await supabase
+      const { data: current, error: readError } = await supabase
+        .from('design_briefs').select('ai_summary, linked_proposal_id').eq('id', briefId).single();
+      if (readError) throw readError;
+      if (current.linked_proposal_id) throw new Error('This brief has already been converted.');
+      const updatedSummary = { ...current.ai_summary, rooms };
+      const { data: saved, error } = await supabase
         .from('design_briefs')
         .update({ ai_summary: updatedSummary, status: 'building' })
-        .eq('id', selectedBrief.id);
+        .eq('id', briefId)
+        .is('linked_proposal_id', null)
+        .select('ai_summary')
+        .single();
       if (error) throw error;
-
-      const updated = {
-        ...selectedBrief,
-        ai_summary: updatedSummary,
-        status: 'building' as const,
-      };
-      setBriefs(prev => prev.map(b => b.id === selectedBrief.id ? updated : b));
-      setSelectedBrief(updated);
+      setBriefs(prev => prev.map(b => b.id === briefId ? { ...b, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : b));
+      setSelectedBrief(prev => prev?.id === briefId ? { ...prev, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : prev);
     } catch (err) {
       console.error('Error saving matches:', err);
+      setMatchSaveError(true);
+      window.alert('Could not save catalog selections. Please retry before converting this brief.');
     } finally {
-      setSavingMatches(false);
+      pendingMatchSaves.current -= 1;
+      setSavingMatches(pendingMatchSaves.current > 0);
     }
+    });
   }
 
   function handleConvertCreated(proposalId: string) {
@@ -1281,6 +1330,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 {isAdmin && !selectedBrief.linked_proposal_id && selectedBrief.status !== 'archived' && (
                   <button
                     onClick={() => setShowConvertModal(true)}
+                    disabled={savingMatches || rerunningAI || matchSaveError}
+                    title={matchSaveError ? 'Resolve the failed catalog save before converting' : savingMatches ? 'Wait for catalog selections to finish saving' : undefined}
                     className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5" />
@@ -1290,7 +1341,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 {isAdmin && selectedBrief.status !== 'archived' && selectedBrief.raw_notes && (
                   <button
                     onClick={handleRerunAI}
-                    disabled={rerunningAI}
+                    disabled={rerunningAI || savingMatches}
                     className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 text-white text-sm font-medium rounded-lg transition-colors"
                     title="Re-process notes with AI"
                   >
@@ -1536,6 +1587,12 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                         </span>
                       </div>
 
+                      {room.description && (
+                        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/40">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Proposed scope of work</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{room.description}</p>
+                        </div>
+                      )}
                       <div className="divide-y divide-gray-50">
                         {room.lineItems.map((item, li) => {
                           const isMatched = !!item.matchedProductId;
@@ -1636,8 +1693,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                       <p className="text-sm font-medium text-blue-900">Ready to create the proposal?</p>
                       <p className="text-xs text-blue-600 mt-0.5">
                         {allMatched
-                          ? 'All products matched. Convert this layout into a full proposal.'
-                          : `${total - matched} item${total - matched !== 1 ? 's' : ''} still unmatched — you can still convert and assign later in the proposal builder.`}
+                          ? 'All equipment matched. Review pricing before creating the proposal.'
+                          : `${total - matched} equipment item${total - matched !== 1 ? 's' : ''} still unmatched — assign catalog products before creating the proposal.`}
                       </p>
                     </div>
                     <button
@@ -1727,7 +1784,15 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
       {pickerOpen && (
         <ProductPicker
           onSelect={handleProductSelected}
+          onApplyMatching={handleApplyToMatching}
+          matchingCount={(() => {
+            const item = localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex];
+            if (!item || item.itemType === 'labor') return 0;
+            const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return localRooms?.reduce((count, room) => count + room.lineItems.filter(candidate => candidate.itemType !== 'labor' && normalize(candidate.description) === normalize(item.description)).length, 0) || 0;
+          })()}
           onClose={() => setPickerOpen(null)}
+          suggestedQuery={localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.description || ''}
           currentProductId={
             localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.matchedProductId
           }

@@ -32,6 +32,7 @@ interface LineItemPreview {
 
 interface RoomPreview {
   name: string;
+  description?: string;
   lineItems: LineItemPreview[];
 }
 
@@ -108,7 +109,11 @@ export default function DesignBriefModal({
     return 'input';
   });
   const [title, setTitle] = useState(existingBrief?.title || '');
-  const [notes, setNotes] = useState(existingBrief?.raw_notes || '');
+  const [notes, setNotes] = useState('');
+  const [entries, setEntries] = useState<Array<{ id: string; content: string; source: string; created_at: string }>>([]);
+  const [entriesLoading, setEntriesLoading] = useState(!!existingBrief?.id);
+  const [voiceUsed, setVoiceUsed] = useState(false);
+  const conversationText = [...entries.map(e => e.content), notes.trim()].filter(Boolean).join('\n\n');
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -131,6 +136,34 @@ export default function DesignBriefModal({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!briefId) { setEntriesLoading(false); return; }
+    let active = true;
+    setEntriesLoading(true);
+    supabase.from('design_brief_entries').select('id, content, source, created_at')
+      .eq('brief_id', briefId).order('created_at', { ascending: true })
+      .then(({ data, error: loadError }) => {
+        if (!active) return;
+        if (loadError) setError(loadError.message);
+        else setEntries(data || []);
+        setEntriesLoading(false);
+      });
+    return () => { active = false; };
+  }, [briefId]);
+
+  async function appendEntry(id: string) {
+    if (!notes.trim()) return;
+    if (!profile?.id || !profile.organization_id) throw new Error('Organization profile required.');
+    const { data, error: entryError } = await supabase.from('design_brief_entries')
+      .insert({ brief_id: id, organization_id: profile.organization_id,
+        author_id: profile.id, source: voiceUsed ? 'voice' : 'typed', content: notes.trim() })
+      .select('id, content, source, created_at').single();
+    if (entryError || !data) throw entryError || new Error('Unable to save conversation entry');
+    setEntries(previous => [...previous, data]);
+    setNotes('');
+    setVoiceUsed(false);
+  }
 
   // Auto-grow textarea
   useEffect(() => {
@@ -271,7 +304,7 @@ export default function DesignBriefModal({
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
       let final = '';
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           final += result[0].transcript + ' ';
@@ -281,6 +314,7 @@ export default function DesignBriefModal({
       }
       if (final) {
         setNotes(prev => prev + final);
+        setVoiceUsed(true);
       }
       setInterimTranscript(interim);
     };
@@ -315,7 +349,8 @@ export default function DesignBriefModal({
   }
 
   async function handleSaveDraft() {
-    if (!notes.trim()) return;
+    if (!notes.trim() && !entries.length) return;
+    if (entriesLoading) return;
     setError('');
     setSavingDraft(true);
 
@@ -324,7 +359,7 @@ export default function DesignBriefModal({
       const payload = {
         contact_id: isLeadSelected ? null : (selectedContact?.id || null),
         lead_id: isLeadSelected ? selectedContact?.id : null,
-        raw_notes: notes.trim(),
+        raw_notes: conversationText,
         title: title.trim() || '',
         status: 'draft' as const,
       };
@@ -343,7 +378,9 @@ export default function DesignBriefModal({
           .single();
         if (insertError || !data) throw insertError || new Error('Failed to save draft');
         setBriefId(data.id);
+        await appendEntry(data.id);
       }
+      if (briefId) await appendEntry(briefId);
 
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 3000);
@@ -355,7 +392,7 @@ export default function DesignBriefModal({
   }
 
   async function handleProcess() {
-    if (!notes.trim()) {
+    if (!conversationText.trim()) {
       setError('Please enter some notes about the project.');
       return;
     }
@@ -366,6 +403,7 @@ export default function DesignBriefModal({
       return;
     }
 
+    if (entriesLoading) return;
     setError('');
     setContactError(false);
     setIsRegenerating(hasExistingAI || !!prefillResult);
@@ -375,7 +413,7 @@ export default function DesignBriefModal({
       'Analyzing your notes...',
       'Matching products to your catalog...',
       'Building room layout...',
-      'Generating draft proposal...',
+      'Preparing design preview...',
     ];
     let msgIndex = 0;
     const msgInterval = setInterval(() => {
@@ -399,7 +437,7 @@ export default function DesignBriefModal({
           .update({
             contact_id: briefContactId,
             lead_id: briefLeadId,
-            raw_notes: notes.trim(),
+            raw_notes: conversationText,
             title: title.trim() || '',
             status: 'submitted',
             submitted_at: new Date().toISOString(),
@@ -416,6 +454,7 @@ export default function DesignBriefModal({
             title: title.trim() || '',
             status: 'submitted',
             created_by: profile?.id,
+            organization_id: profile?.organization_id,
             submitted_at: new Date().toISOString(),
           })
           .select('id')
@@ -425,6 +464,7 @@ export default function DesignBriefModal({
         currentBriefId = briefData.id;
         setBriefId(currentBriefId);
       }
+      if (notes.trim()) await appendEntry(currentBriefId);
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-design-brief`,
@@ -436,7 +476,7 @@ export default function DesignBriefModal({
           },
           body: JSON.stringify({
             briefId: currentBriefId,
-            notes: notes.trim(),
+            notes: conversationText,
             contactId: selectedContact?.id,
             contactName: selectedContact ? getDisplayName(selectedContact) : contactSearch,
             regenerate: isRegenerating,
@@ -476,7 +516,7 @@ export default function DesignBriefModal({
   }
 
   const charCount = notes.length;
-  const isReady = notes.trim().length > 20 && !!selectedContact;
+  const isReady = conversationText.trim().length > 20 && !!selectedContact && !entriesLoading;
   const alreadyProcessed = !!(prefillResult || hasExistingAI);
   const isLockedStatus = existingBrief && !['draft', 'submitted', 'building', 'ready'].includes(existingBrief.status);
 
@@ -664,11 +704,25 @@ export default function DesignBriefModal({
                 />
               </div>
 
-              {/* Notes */}
+              {entriesLoading && <p className="text-xs text-gray-500">Loading earlier sessions...</p>}
+               {entries.length > 0 && (
+                 <div className="space-y-2">
+                   <p className="text-sm font-semibold text-gray-700">Conversation history ({entries.length})</p>
+                   {entries.map(entry => (
+                     <div key={entry.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                       <p className="text-xs text-gray-500 mb-1">
+                         {new Date(entry.created_at).toLocaleString()} · {entry.source === 'voice' ? 'Voice' : 'Typed'}
+                       </p>
+                       <p className="text-sm whitespace-pre-wrap">{entry.content}</p>
+                     </div>
+                   ))}
+                 </div>
+               )}
+               {/* Notes */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-sm font-medium text-gray-700">
-                    Project Notes
+                    Add to Design Brief
                   </label>
                   <span className={`text-xs font-medium ${charCount > 50 ? 'text-green-600' : 'text-gray-400'}`}>
                     {charCount} chars
@@ -801,7 +855,13 @@ export default function DesignBriefModal({
                             {room.lineItems.length} item{room.lineItems.length !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <div className="divide-y divide-gray-100">
+                        {room.description && (
+                        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/40">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Proposed scope of work</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{room.description}</p>
+                        </div>
+                      )}
+                      <div className="divide-y divide-gray-100">
                           {room.lineItems.map((item, li) => (
                             <div key={li} className="flex items-center gap-3 px-4 py-2.5">
                               {item.itemType === 'labor' ? (
@@ -867,7 +927,7 @@ export default function DesignBriefModal({
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                {alreadyProcessed ? 'Regenerate with AI' : 'Build with AI'}
+                {alreadyProcessed ? 'Regenerate with AI' : 'Preview with AI'}
                 {!alreadyProcessed && <ArrowRight className="w-4 h-4" />}
               </button>
               {(!isReady && openAIConfigured !== false) && (
@@ -942,7 +1002,7 @@ export default function DesignBriefModal({
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm font-semibold rounded-xl transition-colors"
               >
                 <Send className="w-4 h-4" />
-                Submit to Design Team
+                Finish — Send to Design Queue
               </button>
               <div className="flex items-center gap-2">
                 {createdProposalId && (
