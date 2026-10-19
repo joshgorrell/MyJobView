@@ -226,6 +226,9 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
                 )}
                 {product.unit && <p className="text-xs text-gray-400">{product.unit}</p>}
               </div>
+              {product.name.toLowerCase().includes('pair') && (
+                <span className="text-[10px] text-amber-700 max-w-24">Sold as pair — verify quantity</span>
+              )}
               {matchingCount > 1 && onApplyMatching && (
                 <button type="button" onClick={event => { event.stopPropagation(); onApplyMatching(product); }} className="px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">Apply to {matchingCount}</button>
               )}
