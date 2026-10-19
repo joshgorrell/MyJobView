@@ -1042,9 +1042,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   ] : [];
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full min-w-0 bg-gray-50">
       {/* Left panel */}
-      <div className="w-80 lg:w-96 flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
+      <div className={`${selectedBrief ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 min-w-0 flex-shrink-0 flex-col bg-white border-r border-gray-200`}>
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -1271,7 +1271,12 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`${selectedBrief ? 'block' : 'hidden md:block'} min-w-0 flex-1 overflow-y-auto`}>
+        {selectedBrief && (
+          <button type="button" onClick={() => setSelectedBrief(null)} className="md:hidden flex items-center gap-2 px-4 py-3 text-sm font-medium text-blue-700 bg-white border-b border-gray-200 w-full">
+            <span aria-hidden="true">←</span> All design briefs
+          </button>
+        )}
         {!selectedBrief ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-sm px-4">
