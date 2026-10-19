@@ -453,6 +453,7 @@ export default function DesignBriefModal({
             title: title.trim() || '',
             status: 'submitted',
             created_by: profile?.id,
+            organization_id: profile?.organization_id,
             submitted_at: new Date().toISOString(),
           })
           .select('id')
