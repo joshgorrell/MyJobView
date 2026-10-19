@@ -276,11 +276,10 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         onKeyUp={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         placeholder="Write your message… Use @ to mention someone or # to link a job."
         rows={5}
-        maxLength={2000}
         className="w-full min-h-40 resize-y rounded-xl border border-slate-600 bg-slate-900/70 px-4 py-4 text-slate-100 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
       />
 
-      <div className="-mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400"><span>@ Mention a person &nbsp; · &nbsp; # Link a job</span><span>{content.length}/2000</span></div>
+      <div className="-mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400"><span>@ Mention a person &nbsp; · &nbsp; # Link a job</span><span>{content.length} characters</span></div>
 
       {tag?.symbol === '#' && <div className="flow flow-tag-results" role="listbox" aria-label="Matching customers and jobs">{choices.filter(c => c.kind !== 'person').map((choice, index) => <button type="button" role="option" aria-selected={index === highlight} key={`${choice.kind}:${choice.id}`} onClick={() => chooseRoute(choice as FlowTarget)}>{choice.label} · {choice.kind.replace('_', ' ')}</button>)}</div>}
       {route && <p className="text-sm text-blue-700 my-2">Posting to {route.label} <button type="button" onClick={() => { setRoute(null); setRouteToken(''); }}>Remove</button></p>}
