@@ -98,6 +98,7 @@ Deno.serve(async (req: Request) => {
     const { data: settingsData } = await supabase
       .from("company_settings")
       .select("openai_api_key")
+      .eq("organization_id", permittedBrief.organization_id)
       .maybeSingle();
 
     if (!settingsData?.openai_api_key) {
@@ -116,6 +117,7 @@ Deno.serve(async (req: Request) => {
     const { data: products } = await supabase
       .from("products")
       .select("name, item_type, unit, our_price, cost, default_qty")
+      .eq("organization_id", permittedBrief.organization_id)
       .eq("is_active", true)
       .order("name");
 
@@ -292,12 +294,14 @@ PARSING RULES:
     const { data: repProfile } = await supabase
       .from("profiles")
       .select("full_name, email")
+      .eq("organization_id", permittedBrief.organization_id)
       .eq("id", user.id)
       .maybeSingle();
 
     const { data: admins } = await supabase
       .from("profiles")
       .select("id")
+      .eq("organization_id", permittedBrief.organization_id)
       .in("role", ["admin", "manager"]);
 
     if (admins && admins.length > 0) {
