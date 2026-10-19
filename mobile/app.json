@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Field Ops Pro",
+    "name": "MyJobView",
     "slug": "field-ops-mobile",
     "version": "1.0.0",
     "orientation": "default",
@@ -16,15 +16,15 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fieldops.mobile",
+      "bundleIdentifier": "com.myjobview.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
-        "NSLocationWhenInUseUsageDescription": "Field Ops Pro needs your location while you're working to track your position and calculate travel time.",
-        "NSLocationAlwaysUsageDescription": "Field Ops Pro needs background location access to continuously track your position during work hours, even when the app is in the background.",
-        "NSCameraUsageDescription": "Field Ops Pro needs camera access to capture job site photos and completion documentation.",
-        "NSPhotoLibraryUsageDescription": "Field Ops Pro needs photo library access to save and retrieve job site photos.",
-        "NSFaceIDUsageDescription": "Field Ops Pro uses Face ID to securely authenticate you when clocking in and out.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MyJobView needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
+        "NSLocationWhenInUseUsageDescription": "MyJobView needs your location while you're working to track your position and calculate travel time.",
+        "NSLocationAlwaysUsageDescription": "MyJobView needs background location access to continuously track your position during work hours, even when the app is in the background.",
+        "NSCameraUsageDescription": "MyJobView needs camera access to capture job site photos and completion documentation.",
+        "NSPhotoLibraryUsageDescription": "MyJobView needs photo library access to save and retrieve job site photos.",
+        "NSFaceIDUsageDescription": "MyJobView uses Face ID to securely authenticate you when clocking in and out.",
         "UIBackgroundModes": [
           "location",
           "fetch",
@@ -57,9 +57,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
-          "locationAlwaysPermission": "Field Ops Pro needs background location access to continuously track your position during work hours.",
-          "locationWhenInUsePermission": "Field Ops Pro needs your location while you're working to track your position.",
+          "locationAlwaysAndWhenInUsePermission": "MyJobView needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
+          "locationAlwaysPermission": "MyJobView needs background location access to continuously track your position during work hours.",
+          "locationWhenInUsePermission": "MyJobView needs your location while you're working to track your position.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
@@ -67,7 +67,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Field Ops Pro needs camera access to capture job site photos."
+          "cameraPermission": "MyJobView needs camera access to capture job site photos."
         }
       ],
       [
