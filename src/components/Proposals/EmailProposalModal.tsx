@@ -488,7 +488,7 @@ export function EmailProposalModal({
           </button>
           <button
             onClick={handleSend}
-            disabled={loading || !toEmail || !subject || !message}
+            disabled={loading || previewLoading || !previewMode || !previewHtml || !toEmail || !subject || !message}
             className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
