@@ -136,12 +136,6 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
   const [results, setResults] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Design/SOW preview remains available even when catalog equipment is incomplete.
-  const unresolvedEquipment = (brief.ai_summary?.rooms || []).flatMap(room =>
-    (room.lineItems || []).filter(item =>
-      item.itemType !== 'labor' && (!item.matchedProductId || (item.overridePrice ?? null) === 0)
-    ).map(item => `${room.name}: ${item.description}`)
-  );
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -274,6 +268,13 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [title, setTitle] = useState(brief.ai_summary?.title || '');
+  // Design/SOW preview remains available even when catalog equipment is incomplete.
+  const unresolvedEquipment = (brief.ai_summary?.rooms || []).flatMap(room =>
+    (room.lineItems || []).filter(item =>
+      item.itemType !== 'labor' && (!item.matchedProductId || (item.overridePrice ?? null) === 0)
+    ).map(item => `${room.name}: ${item.description}`)
+  );
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
