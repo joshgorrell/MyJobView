@@ -858,7 +858,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
 
   function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): boolean {
     if (!/\bpair\b/i.test(product.name)) return true;
-    const counts = items.map(item => Number(item.overrideQuantity ?? item.quantity));
+    const counts = items.map(item => Number(item.quantity));
     const allEven = counts.every(count => Number.isFinite(count) && count > 0 && count % 2 === 0);
     if (!allEven) {
       window.alert('This catalog product is sold as a pair. At least one room has an odd or invalid speaker count. Verify the packaging and quantities before assigning.');
@@ -871,14 +871,14 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
 
   function applyCatalogSelection(item: LineItem, product: CatalogProduct): LineItem {
     const soldAsPair = /\bpair\b/i.test(product.name);
-    const physicalCount = Number(item.overrideQuantity ?? item.quantity);
+    const physicalCount = Number(item.quantity);
     return {
       ...item,
       matchedProductId: product.id,
       matchedProductName: product.name,
       matchConfidence: 'designer',
       unit: product.unit || 'EA',
-      overrideQuantity: soldAsPair ? physicalCount / 2 : item.overrideQuantity,
+      overrideQuantity: soldAsPair ? physicalCount / 2 : physicalCount,
     };
   }
 
