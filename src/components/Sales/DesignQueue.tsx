@@ -15,6 +15,7 @@ interface CatalogProduct {
   default_labor_hours: number | null;
   category: string | null;
   manufacturer: string | null;
+  model_number?: string | null;
   thumbnail_url: string | null;
   item_type: string | null;
 }
@@ -152,17 +153,26 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
     setLoading(true);
     const query_builder = supabase
       .from('products')
-      .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, thumbnail_url, item_type')
+      .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, model_number, thumbnail_url, item_type')
       .eq('is_active', true)
       .order('name')
-      .limit(20);
+      .limit(250);
 
-    if (q.trim()) {
-      query_builder.ilike('name', `%${q}%`);
+    const { data, error } = await query_builder;
+    if (error) {
+      setResults([]);
+      setLoading(false);
+      return;
     }
-
-    const { data } = await query_builder;
-    setResults(data || []);
+    const tokens = q.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').split(/\s+/)
+      .filter(token => token.length > 1 && !['pair', 'pairs', 'the', 'for', 'with', 'need', 'each', 'inch', 'inches'].includes(token));
+    const ranked = (data || []).map(product => {
+      const haystack = [product.name, product.manufacturer, product.model_number, product.category]
+        .filter(Boolean).join(' ').toLowerCase();
+      const score = tokens.reduce((total, token) => total + (haystack.includes(token) ? 1 : 0), 0);
+      return { product, score };
+    }).sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name));
+    setResults(tokens.length ? ranked.filter(candidate => candidate.score > 0).map(candidate => candidate.product) : ranked.map(candidate => candidate.product));
     setLoading(false);
   }
 
@@ -182,7 +192,7 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
             type="text"
             value={query}
             onChange={e => handleQuery(e.target.value)}
-            placeholder="Search products by name..."
+            placeholder="Search by size, type, brand, or model..."
             className="flex-1 text-sm outline-none text-gray-800 placeholder-gray-400"
           />
           {loading && <Loader className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />}
@@ -215,7 +225,7 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                 <p className="text-xs text-gray-500 truncate">
-                  {[product.manufacturer, product.category].filter(Boolean).join(' · ')}
+                  {[product.manufacturer, product.model_number, product.category].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
