@@ -302,18 +302,15 @@ export function EmailProposalModal({
           )}
 
           {previewMode ? (
-            <div className="rounded-xl border border-gray-600 bg-white text-gray-800 overflow-hidden">
-              <div className="bg-gray-900 px-5 py-5 text-center text-white font-semibold text-lg">Email preview</div>
-              <div className="p-5 space-y-3 text-sm">
-                <p><span className="font-semibold">To:</span> {toEmail}</p>
-                {ccEmails.trim() && <p><span className="font-semibold">Cc:</span> {ccEmails}</p>}
-                {bccEmails.trim() && <p><span className="font-semibold">Bcc:</span> {bccEmails}</p>}
-                <p><span className="font-semibold">Subject:</span> {subject}</p>
-                <div className="border-t border-gray-200 pt-4 whitespace-pre-wrap leading-relaxed">{message}</div>
-                <p className="text-blue-700 font-semibold">View proposal (secure portal link added when sent)</p>
-                <p className="text-gray-500">{attachmentCount} attachment option{attachmentCount === 1 ? '' : 's'} selected</p>
+            <div className="rounded-xl border border-gray-600 bg-white overflow-hidden">
+              <div className="bg-gray-900 px-5 py-3 text-white text-sm">
+                <span className="font-semibold">To:</span> {toEmail}
+                <div><span className="font-semibold">Subject:</span> {subject}</div>
               </div>
-              <p className="px-5 py-3 bg-gray-100 text-xs text-gray-600">Content preview. Final email branding and secure links are added by the sending service.</p>
+              {previewLoading ? <div className="p-8 text-gray-700 text-center">Loading branded email preview...</div> :
+                <iframe title="Branded proposal email preview" sandbox="" srcDoc={previewHtml}
+                  className="w-full h-[420px] bg-white" />}
+              <p className="px-4 py-2 text-xs text-gray-600 bg-gray-100">Attachments are selected in the editor.</p>
             </div>
           ) : (
           <>
