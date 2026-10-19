@@ -268,103 +268,13 @@ PARSING RULES:
       .update({ ai_summary: prefill })
       .eq("id", briefId);
 
-    let proposalId: string | null = null;
-
-    if (contactId) {
-      const { data: contact } = await supabase
-        .from("contacts")
-        .select("tax_rate, tax_environment, tax_project_type")
-        .eq("id", contactId)
-        .maybeSingle();
-
-      const { data: newProposal, error: proposalError } = await supabase
-        .from("proposals")
-        .insert({
-          contact_id: contactId,
-          title: prefill.title || `Design Brief - ${contactName || "Customer"}`,
-          status: "designing",
-          tax_environment: prefill.taxEnvironment || contact?.tax_environment || "residential",
-          tax_project_type: prefill.taxProjectType || contact?.tax_project_type || "general_installation_repair",
-          tax_rate: contact?.tax_rate || 0,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-
-      if (!proposalError && newProposal) {
-        proposalId = newProposal.id;
-
-        if (prefill.rooms && prefill.rooms.length > 0) {
-          for (let roomIndex = 0; roomIndex < prefill.rooms.length; roomIndex++) {
-            const room = prefill.rooms[roomIndex];
-
-            const { data: newRoom, error: roomError } = await supabase
-              .from("proposal_rooms")
-              .insert({
-                proposal_id: proposalId,
-                name: room.name,
-                sort_order: roomIndex,
-              })
-              .select("id")
-              .single();
-
-            if (!roomError && newRoom && room.lineItems && room.lineItems.length > 0) {
-              const productNames = room.lineItems.map((li) => li.description);
-              const { data: catalogProducts } = await supabase
-                .from("products")
-                .select("id, name, our_price, cost, unit, default_qty, default_labor_hours")
-                .in("name", productNames);
-
-              const productMap = new Map<string, { id: string; name: string; our_price: number | null; cost: number | null; unit: string | null; default_qty: number | null; default_labor_hours: number | null }>();
-              if (catalogProducts) {
-                for (const p of catalogProducts) {
-                  if (p) productMap.set(p.name, p);
-                }
-              }
-
-              const lineItemInserts = room.lineItems.map((li, liIndex) => {
-                const catalogMatch = productMap.get(li.description);
-                const unitPrice = catalogMatch?.our_price ?? 0;
-                const cost = catalogMatch?.cost ?? 0;
-                const qty = li.quantity || catalogMatch?.default_qty || 1;
-                const laborHours = li.laborHours ?? catalogMatch?.default_labor_hours ?? null;
-                const lineTotal = qty * unitPrice;
-
-                return {
-                  proposal_id: proposalId,
-                  room_id: newRoom.id,
-                  product_id: catalogMatch?.id || null,
-                  description: li.description,
-                  quantity: qty,
-                  unit: li.unit || "EA",
-                  cost: cost,
-                  unit_price: unitPrice,
-                  line_total: lineTotal,
-                  item_type: li.itemType || "material",
-                  labor_hours: laborHours,
-                  sort_order: liIndex,
-                };
-              });
-
-              await supabase.from("proposal_line_items").insert(lineItemInserts);
-            }
-          }
-        }
-
-        await supabase
-          .from("design_briefs")
-          .update({
-            linked_proposal_id: proposalId,
-            status: "submitted",
-          })
-          .eq("id", briefId);
-      }
-    } else {
-      await supabase
-        .from("design_briefs")
-        .update({ status: "submitted" })
-        .eq("id", briefId);
-    }
+    // Analysis only: a proposal is never created as a side effect of AI preview.
+    // The designer can review this prefill and convert it through Design Queue.
+    const { error: submittedError } = await supabase
+      .from("design_briefs")
+      .update({ status: "submitted" })
+      .eq("id", briefId);
+    if (submittedError) throw submittedError;
 
     const { data: repProfile } = await supabase
       .from("profiles")
@@ -392,7 +302,7 @@ PARSING RULES:
     }
 
     return new Response(
-      JSON.stringify({ success: true, prefill, proposalId }),
+      JSON.stringify({ success: true, prefill, proposalId: null }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
