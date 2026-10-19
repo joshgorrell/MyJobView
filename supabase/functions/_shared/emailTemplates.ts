@@ -96,7 +96,7 @@ export function wrapInEmailLayout(
   offices: { office_name: string; phone: string }[] = [],
   footerTheme: 'dark' | 'light' = 'dark'
 ): string {
-  const resolvedLogoUrl = logoUrl || EL_LOGO_FALLBACK;
+  const resolvedLogoUrl = logoUrl || '';
   const lightFooter = footerTheme === 'light';
   const footerBackground = lightFooter ? '#f1f5f9' : '#1e293b';
   const footerText = lightFooter ? '#334155' : '#94a3b8';
@@ -124,7 +124,7 @@ export function wrapInEmailLayout(
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:32px 40px 28px;text-align:center;border-bottom:3px solid ${headerColor};">
-        <img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />
+        ${resolvedLogoUrl ? `<img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />` : `<span style="color:#ffffff;font-size:23px;font-weight:700;">${companyName}</span>`}
       </td></tr>
       <tr><td style="background:#ffffff;padding:40px 40px 32px;color:#374151;font-size:16px;line-height:1.7;">
         ${content}
