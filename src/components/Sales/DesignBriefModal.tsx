@@ -119,6 +119,8 @@ export default function DesignBriefModal({
   const [interimTranscript, setInterimTranscript] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactSearchError, setContactSearchError] = useState(false);
+  const contactSearchRequestRef = useRef(0);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [contactSearch, setContactSearch] = useState(contactName || '');
   const [showContactDropdown, setShowContactDropdown] = useState(false);
@@ -205,16 +207,19 @@ export default function DesignBriefModal({
   }, []);
 
   const searchContacts = useCallback(async (query: string) => {
+    const requestId = ++contactSearchRequestRef.current;
     if (!query.trim()) {
       setContacts([]);
       setShowContactDropdown(false);
+      setContactSearchError(false);
       return;
     }
     setContactsLoading(true);
+    setContactSearchError(false);
 
     const q = query.trim();
 
-    const [{ data: contactsData }, { data: leadsData }] = await Promise.all([
+    const [{ data: contactsData, error: contactsError }, { data: leadsData, error: leadsError }] = await Promise.all([
       supabase
         .from('contacts')
         .select('id, contact_name, first_name, last_name, full_name, company_name, address, city, state, contact_type, is_prospect')
@@ -227,6 +232,8 @@ export default function DesignBriefModal({
         .limit(10),
     ]);
 
+    if (requestId !== contactSearchRequestRef.current) return;
+    setContactSearchError(!!contactsError || !!leadsError);
     const fromContacts: Contact[] = (contactsData || []).map(c => ({ ...c, source: 'contact' as const }));
     const fromLeads: Contact[] = (leadsData || []).map(l => ({
       id: l.id,
@@ -240,15 +247,19 @@ export default function DesignBriefModal({
     combined.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
 
     setContacts(combined);
-    setShowContactDropdown(combined.length > 0);
+    setShowContactDropdown(true);
     setContactsLoading(false);
   }, [getDisplayName]);
 
   useEffect(() => {
-    if (selectedContact) return;
-    if (existingBrief?.contact_id && selectedContact) return;
+    if (selectedContact) {
+      contactSearchRequestRef.current += 1;
+      setShowContactDropdown(false);
+      return;
+    }
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     if (contactSearch.length === 0) {
+      contactSearchRequestRef.current += 1;
       setContacts([]);
       setShowContactDropdown(false);
       return;
@@ -632,7 +643,10 @@ export default function DesignBriefModal({
 
                     {showContactDropdown && !selectedContact && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-56 overflow-y-auto">
-                        {contacts.length === 0 && !contactsLoading && contactSearch.length > 0 && (
+                        {contactSearchError && !contactsLoading && (
+                          <p role="alert" className="px-3 py-2 text-sm text-red-600">Customer search could not load all results. Please try again.</p>
+                        )}
+                        {contacts.length === 0 && !contactsLoading && !contactSearchError && contactSearch.length > 0 && (
                           <div className="p-3 space-y-2">
                             <div className="flex items-center gap-2 px-1 text-sm text-gray-400">
                               <User className="w-4 h-4 flex-shrink-0" />
