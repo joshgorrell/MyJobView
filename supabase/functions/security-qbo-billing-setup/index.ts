@@ -11,7 +11,7 @@ Deno.serve(async(req:Request)=>{
   if(profile?.role!=='admin' || !profile.is_active) return respond({error:'Only Admin can configure monitoring billing'},403);
   const input=await req.json();
   if(!['list','save'].includes(input.action) || Object.keys(input).some(k=>!['action','itemId','purpose'].includes(k))) return respond({error:'Invalid request'},400);
-  const columns:Record<string,string>={monitoring:'security_monitoring_item_id',service_labor:'service_labor_item_id',service_parts:'service_parts_item_id'};
+  const columns:Record<string,string>={monitoring:'security_monitoring_item_id',service_labor:'service_labor_item_id',service_parts:'service_parts_item_id',vip_membership:'vip_membership_item_id'};
   const column=columns[input.purpose || 'monitoring'];if(!column)return respond({error:'Invalid billing item purpose'},400);
   const admin=getSupabaseAdmin();const connection=await getConnection(admin,profile.organization_id);
   if(!connection) return respond({error:'Connect QuickBooks Accounting first'},409);

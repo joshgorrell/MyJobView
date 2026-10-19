@@ -1,3 +1,4 @@
+import {reconcileVipCheckout} from '../_shared/vip-checkout.ts';
 import { createHmac } from 'node:crypto';
 import {
   corsHeaders,
@@ -176,6 +177,7 @@ async function processPaymentEvent(
       if (linkedTxn.TxnType !== 'Invoice') continue;
 
       const qboInvoiceId = linkedTxn.TxnId;
+      await reconcileVipCheckout(supabase,connection,String(qboInvoiceId),qboRequest);
       const amount = line.Amount || 0;
 
       const { data: pendingPayment } = await supabase
@@ -305,6 +307,7 @@ async function processInvoiceEvent(
   }
 
   const invoice = result.data.Invoice;
+  await reconcileVipCheckout(supabase,connection,String(invoice.Id),qboRequest);
   const { data: localInvoice } = await supabase
     .from('invoices')
     .select('id, total, amount_paid, amount_due, status')

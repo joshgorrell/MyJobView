@@ -1,3 +1,4 @@
+import {reconcileVipCheckout} from '../_shared/vip-checkout.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import {
   corsHeaders,
@@ -125,6 +126,7 @@ async function syncPaymentData(
       for (const transaction of line.LinkedTxn || []) {
         if (transaction.TxnType !== 'Invoice') continue;
         const qboInvoiceId = String(transaction.TxnId);
+        await reconcileVipCheckout(supabase,connection,qboInvoiceId,qboRequest);
         const amount = Number(line.Amount || 0);
 
         const { data: invoice } = await supabase

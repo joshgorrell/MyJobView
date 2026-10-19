@@ -124,6 +124,8 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [requestingMembership,setRequestingMembership]=useState(false);
+  const [checkout,setCheckout]=useState<{status:string;payment_url?:string;total:number;environment?:string;plan_name?:string;billing_frequency?:string;subtotal?:number}|null>(null);
+  const [checkoutError,setCheckoutError]=useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
@@ -151,7 +153,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
       .eq('id', user.id)
       .maybeSingle();
 
-    return profile?.contact_id || null;
+    return profile?.contact_id || (user.app_metadata?.is_portal_user ? user.app_metadata.contact_id : null) || null;
   };
 
   useEffect(() => {
@@ -201,6 +203,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         .select('*')
         .eq('is_active', true)
         .eq('plan_type', 'vip_plan')
+        .eq('show_on_portal', true)
         .order('amount');
 
       if (plansError) throw plansError;
@@ -213,7 +216,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         supabase.from('recurring_subscriptions').select(columns).eq('contact_id',contactId).eq('status','trial').eq('trial_source','vip_trial').gte('trial_end_date',new Date().toISOString().split('T')[0]).order('start_date',{ascending:false}).limit(1).maybeSingle()
       ]);
       if(paid.error)throw paid.error;if(trial.error)throw trial.error;
-      const subscription=paid.data || trial.data;
+      const {data:support,error:supportError}=await supabase.rpc('get_customer_support',{p_contact_id:contactId});
+      if(supportError)throw supportError;
+      const subscription=(support?.vip_service_access ? paid.data : null) || trial.data;
       setCurrentSubscription(subscription ? {...subscription,plan:Array.isArray(subscription.plan)?subscription.plan[0] || null:subscription.plan} as CurrentSubscription : null);
 
 
@@ -276,14 +281,22 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
   async function requestMembership() {
     if (!selectedPlan || requestingMembership) return;
-    const contactId=await getContactId();if(!contactId)return;
+    const contactId=await getContactId();if(!contactId){setCheckoutError('Please reopen your customer portal access link and try again.');return;}
     setRequestingMembership(true);
     try {
-      const {error}=await supabase.rpc('request_vip_membership',{p_contact_id:contactId,p_plan_id:selectedPlan.id});
-      if(error)throw error;
-      notify('Enrollment requested. Our team will confirm payment and activate your plan. No payment was charged here.',{theme:'blue',tone:'success'});
-      setShowPaymentModal(false);setSelectedPlan(null);await loadData();
-    } catch(error){notify((error as {message?:string}).message||'Could not request enrollment.',{theme:'blue',tone:'error'});}
+      setCheckoutError('');
+      const {data,error}=await supabase.functions.invoke('vip-membership-checkout',{body:{contact_id:contactId,plan_id:selectedPlan.id}});
+      if(error || data?.error){
+        let message=data?.error;
+        if(!message && error?.context instanceof Response){try{message=(await error.context.json()).error;}catch{ /* use fallback */ }}
+        throw new Error(message || 'Secure checkout is unavailable. Please retry or contact your representative.');
+      }
+      setCheckout(data);
+      if(data.status==='paid'){
+        notify('Payment confirmed. VIP service requests are now available.',{theme:'blue',tone:'success'});
+        await loadData();
+      }
+    } catch(error){setCheckoutError((error as {message?:string}).message||'Could not prepare checkout.');}
     finally{setRequestingMembership(false);}
   }
 
@@ -446,6 +459,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         </>
       )}
 
+      {currentSubscription?.status==='active'&&<div className="mb-4"><a href="/portal/punchlist?tab=service-requests" className="inline-flex items-center min-h-11 rounded-xl bg-blue-600 text-white px-5">Go to Service Requests</a></div>}
       {currentSubscription && (
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           {/* Status Badge */}
@@ -769,6 +783,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
                 <button
                   onClick={() => {
+                    setCheckout(null);setCheckoutError('');
                     setSelectedPlan(plan);
                     setShowPurchaseModal(true);
                   }}
@@ -1039,7 +1054,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-2xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Request VIP Enrollment</h3>
+              <h3 className="text-xl font-bold text-gray-900">Activate VIP Membership</h3>
               <button
                 onClick={() => {
                   setShowPaymentModal(false);
@@ -1052,20 +1067,29 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <div className="text-lg font-bold text-gray-900 mb-1">{selectedPlan.plan_name}</div>
+              <div className="text-lg font-bold text-gray-900 mb-1">{checkout?.plan_name || selectedPlan.plan_name}</div>
               {selectedPlan.description && (
                 <p className="text-gray-600 text-sm mb-3">{selectedPlan.description}</p>
               )}
               <div className="text-2xl font-bold text-gray-900">
-                ${selectedPlan.amount}
+                ${checkout?.subtotal ?? selectedPlan.amount}
                 <span className="text-sm text-gray-500 font-normal ml-2">
-                  {getBillingFrequencyLabel(selectedPlan.billing_frequency)}
+                  {getBillingFrequencyLabel(checkout?.billing_frequency || selectedPlan.billing_frequency)}
                 </span>
               </div>
             </div>
 
-            <p className="text-sm text-gray-600 mb-4">Our team will arrange payment and activate your plan. This request does not charge you or activate VIP access.</p>
-            <button disabled={requestingMembership} onClick={()=>void requestMembership()} className="min-h-11 rounded-xl bg-blue-600 text-white px-5 disabled:opacity-50">{requestingMembership?'Submitting…':'Request Enrollment'}</button>
+            <p className="text-sm text-gray-600 mb-4">Pay securely through QuickBooks. Your VIP plan activates after we confirm the invoice is paid in full. Closing checkout or a partial payment does not activate access. Future billing follows your selected plan; service charges depend on your plan.</p>
+            {checkoutError&&<p role="alert" className="text-red-700 mb-4">{checkoutError}</p>}
+            {checkout?.status==='paid' ? <div className="space-y-3"><p role="status" className="text-green-700">VIP is active. Add items and request a visit just like your punchlist.</p><a href="/portal/punchlist?tab=service-requests" className="inline-flex items-center min-h-11 rounded-xl bg-blue-600 text-white px-5">Continue to Service Requests</a></div> : checkout?.status==='review' || checkout?.status==='cancelled' ? <p role="status">This checkout needs provider review. Contact your representative before making another payment.</p> : <div className="space-y-3">
+              {checkout?.payment_url&&<>
+                {checkout.environment==='sandbox'&&<p role="status" className="text-amber-800">Test checkout — this connection uses QuickBooks sandbox.</p>}
+                <p className="font-semibold">Invoice total: ${checkout.total.toFixed(2)} (including applicable tax)</p>
+                <a href={checkout.payment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center min-h-11 rounded-xl bg-blue-600 text-white px-5">Pay securely with QuickBooks</a>
+                <p className="text-sm text-gray-600">After paying, return here and check your payment status. You can close this window and resume the same checkout from this plan later.</p>
+              </>}
+              <button disabled={requestingMembership} onClick={()=>void requestMembership()} className="min-h-11 rounded-xl border border-blue-600 text-blue-700 px-5 disabled:opacity-50">{requestingMembership?'Checking…':checkout?.payment_url?'Check Payment Status':'Prepare Secure Checkout'}</button>
+            </div>}
           </div>
         </div>
       )}

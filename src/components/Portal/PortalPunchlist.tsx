@@ -29,11 +29,14 @@ interface Service {
   created_at: string;
   photos: string[];
 }
+interface ServiceItem { id:string;description:string;status:string;photos:string[];updated_at:string;requested:boolean }
 interface Support {
   organization_id: string;
   vip_service_access: boolean;
   projects: Project[];
   requests: Service[];
+  service_items: ServiceItem[];
+  service_address?: string;
   legacy_items: Array<{ id: string; description: string; status: string }>;
 }
 const statusLabel = (value: string) =>
@@ -93,6 +96,7 @@ export function PortalPunchlist({
   const [projectId, setProjectId] = useState("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
+  const [editingServiceItem,setEditingServiceItem]=useState<ServiceItem|null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
@@ -116,6 +120,7 @@ export function PortalPunchlist({
     if (failure) setError(failure.message);
     else {
       setData(result);
+      setAddress(current=>current || result.service_address || '');
       setError("");
       setProjectId((previous) =>
         result.projects.some((p: Project) => p.id === previous)
@@ -193,22 +198,23 @@ export function PortalPunchlist({
               p_submission_id: submission.current,
               p_photos: photos,
             })
-          : await supabase.rpc("submit_vip_service_request", {
+          : await supabase.rpc("save_vip_service_item", {
               p_contact_id: contactId,
               p_description: description,
-              p_address: address,
-              p_submission_id: submission.current,
+              p_item_id: editingServiceItem?.id || submission.current,
+              p_expected_updated_at: editingServiceItem?.updated_at || null,
               p_photos: photos,
             });
       if (failure) throw failure;
       setDescription("");
+      setEditingServiceItem(null);
       setFiles([]);
       uploaded.current = [];
       submission.current = crypto.randomUUID();
       setMessage(
         view === "projects"
           ? "Item added. Select items and request a visit when ready."
-          : "Service request submitted. Our team will contact you to arrange service.",
+          : "Item saved. Select items and request service whenever you’re ready.",
       );
       await load();
     } catch (failure) {
@@ -228,14 +234,9 @@ export function PortalPunchlist({
     setError("");
     setMessage("");
     try {
-      const { error: failure } = await supabase.rpc(
-        "request_project_punchlist_visit",
-        {
-          p_project_id: projectId,
-          p_task_ids: selected,
-          p_submission_id: visitSubmission.current,
-        },
-      );
+      const { error: failure } = view==='projects'
+        ? await supabase.rpc('request_project_punchlist_visit',{p_project_id:projectId,p_task_ids:selected,p_submission_id:visitSubmission.current})
+        : await supabase.rpc('request_vip_service_visit',{p_contact_id:contactId,p_item_ids:selected,p_address:address,p_submission_id:visitSubmission.current});
       if (failure) throw failure;
       setSelected([]);
       visitSubmission.current = crypto.randomUUID();
@@ -251,11 +252,18 @@ export function PortalPunchlist({
       setBusy(false);
     }
   }
+  async function removeServiceItem(item:ServiceItem) {
+    if(writing.current||!window.confirm('Remove this unrequested item?'))return;
+    writing.current=true;setBusy(true);
+    try{const {error:failure}=await supabase.rpc('delete_vip_service_item',{p_item_id:item.id,p_expected_updated_at:item.updated_at});if(failure)throw failure;setSelected(current=>current.filter(id=>id!==item.id));await load();}
+    catch(failure){setError((failure as {message?:string}).message||'Could not remove this item.');}finally{writing.current=false;setBusy(false);}
+  }
   function changeView(next: "projects" | "service") {
     if (description || files.length) {
       if (!window.confirm("Discard this unsent draft?")) return;
     }
     setView(next);
+    setSelected([]);setEditingServiceItem(null);visitSubmission.current=crypto.randomUUID();
     setDescription("");
     setFiles([]);
     uploaded.current = [];
@@ -364,6 +372,7 @@ export function PortalPunchlist({
                   : project.days_remaining > 0 ? 'View-only. New submissions are paused. You can still track your shared items.'
                   : `View-only. Your included Test & Tune period ended ${dateLabel(project.end_date)}.`}</p>
                 <ProjectScopeNotice />
+                {!data.vip_service_access&&<a href="/portal/vip-membership?returnTo=service-requests" className="inline-flex min-h-11 items-center text-blue-700 underline">Continue with VIP after Test &amp; Tune</a>}
                 <p><strong>What happens afterward?</strong> This project punchlist becomes view-only. Unfinished items remain for our team to resolve.</p>
                 <p>{data.vip_service_access
                   ? 'Your active VIP plan lets you submit new general service requests online. Plan benefits determine any service charges.'
@@ -471,40 +480,23 @@ export function PortalPunchlist({
       )}
       {data && view === "service" && (
         <>
-          <p className="text-sm text-gray-600">
-            Ongoing service outside your project punchlist. An active paid or
-            complimentary VIP plan lets you submit online. Included work,
-            discounts, and charges follow your plan benefits.
-          </p>
-          {!data.vip_service_access && (
-            <p className="rounded-xl bg-blue-50 p-4">
-              An active paid or complimentary VIP plan is required for new
-              online service requests. Your previous requests remain available
-              below.
-            </p>
-          )}
-          <div className="space-y-3">
-            {data.requests.map((request) => (
-              <article
-                key={request.id}
-                className="rounded-xl border bg-white p-4 space-y-2"
-              >
-                <p className="text-sm text-gray-600">
-                  {dateLabel(request.created_at)} ·{" "}
-                  {statusLabel(request.status)}
-                </p>
-                <p className="whitespace-pre-wrap break-words">
-                  {request.description}
-                </p>
-                <SupportPhotos paths={request.photos} />
-              </article>
-            ))}
-          </div>
-          {!data.requests.length && (
-            <p className="text-sm text-gray-600">
-              No online service requests yet.
-            </p>
-          )}
+          <p className="text-sm text-gray-600">Use this just like your punchlist: add issues and photos, then select the items you want addressed and request a visit. Your VIP plan determines included work, discounts, and service charges.</p>
+          {!data.vip_service_access && <div className="rounded-xl bg-blue-50 p-4 space-y-3">
+            <p>Your included Test &amp; Tune access is for your completed project. To add new online service items or request a new service visit afterward, you need an active paid or complimentary VIP plan. Your earlier items and requests remain viewable.</p>
+            <a href="/portal/vip-membership?returnTo=service-requests" className="inline-flex items-center min-h-11 rounded-xl bg-blue-600 text-white px-4">View VIP Plans</a>
+          </div>}
+          <div className="space-y-3">{(data.service_items||[]).map(item=><article key={item.id} className="rounded-xl border bg-white p-4 space-y-2">
+            <div className="flex gap-3 items-start">{data.vip_service_access&&!preview&&!item.requested&&<input type="checkbox" disabled={busy} aria-label={`Select service item ${item.description}`} checked={selected.includes(item.id)} onChange={event=>{setSelected(current=>event.target.checked?[...current,item.id]:current.filter(id=>id!==item.id));visitSubmission.current=crypto.randomUUID();}} className="w-5 h-5 mt-1 shrink-0"/>}<p className="whitespace-pre-wrap break-words flex-1">{item.description}</p></div>
+            <p className="text-sm text-gray-600">{item.requested?statusLabel(item.status):'Not Requested'}</p><SupportPhotos paths={item.photos}/>
+            {data.vip_service_access&&!preview&&!item.requested&&<div className="flex gap-3"><button type="button" disabled={busy} onClick={()=>{if(description&&!window.confirm('Discard this unsent draft?'))return;setEditingServiceItem(item);setDescription(item.description);setFiles([]);uploaded.current=[];submission.current=crypto.randomUUID();}} className="min-h-11 text-blue-700 underline">Edit Item</button><button type="button" disabled={busy} onClick={()=>void removeServiceItem(item)} className="min-h-11 text-red-700 underline">Remove Item</button></div>}
+          </article>)}</div>
+          {data.vip_service_access&&!preview&&<div className="space-y-3 rounded-xl border bg-white p-4">
+            <button type="button" disabled={busy||!(data.service_items||[]).some(i=>!i.requested)} onClick={()=>{setSelected((data.service_items||[]).filter(i=>!i.requested).map(i=>i.id));visitSubmission.current=crypto.randomUUID();}} className="min-h-11 text-blue-700 underline">Select All Unrequested Items</button>
+            <label className="block text-sm">Service address<input disabled={busy} value={address} onChange={event=>setAddress(event.target.value)} maxLength={1000} className="block w-full mt-1 rounded-lg border p-3 text-base"/></label>
+            <button type="button" disabled={busy||!selected.length||!address.trim()} onClick={()=>void requestVisit()} className="min-h-11 rounded-xl bg-blue-600 text-white px-4 disabled:opacity-50">Request Service ({selected.length})</button>
+            <p className="text-xs text-gray-600">Adding an item saves it to your list. Service is requested only when you choose items and press Request Service.</p>
+          </div>}
+          {!!data.requests.length&&<details className="rounded-xl border bg-white p-4"><summary className="min-h-11 cursor-pointer font-medium">Service Request History ({data.requests.length})</summary>{data.requests.map(request=><article key={request.id} className="border-t py-3 space-y-2"><p className="text-sm text-gray-600">{dateLabel(request.created_at)} · {statusLabel(request.status)}</p><p className="whitespace-pre-wrap break-words">{request.description}</p><SupportPhotos paths={request.photos}/></article>)}</details>}
         </>
       )}
       {data &&
@@ -516,16 +508,16 @@ export function PortalPunchlist({
             className="rounded-xl border bg-white p-4 space-y-3"
           >
             <h2 className="font-semibold">
-              {view === "projects" ? "Add Punchlist Item" : "Request Service"}
+              {view === "projects" ? "Add Punchlist Item" : editingServiceItem ? "Edit Service Item" : "Add Service Item"}
             </h2>
             {view === "projects" && <ProjectScopeNotice />}
             <label className="block text-sm">
               {view === "projects"
                 ? "What needs attention?"
-                : "Describe the issues you want us to address"}
+                : "What needs attention?"}
               <textarea
                 required
-                maxLength={view === "projects" ? 10000 : 20000}
+                maxLength={10000}
                 disabled={busy}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -533,19 +525,6 @@ export function PortalPunchlist({
                 className="block w-full mt-1 rounded-lg border p-3 text-base"
               />
             </label>
-            {view === "service" && (
-              <label className="block text-sm">
-                Service address
-                <input
-                  required
-                  maxLength={1000}
-                  disabled={busy}
-                  value={address}
-                  onChange={(event) => setAddress(event.target.value)}
-                  className="block w-full mt-1 rounded-lg border p-3 text-base"
-                />
-              </label>
-            )}
             <label className="block text-sm">
               Photos (optional, up to 10)
               <input
@@ -589,8 +568,9 @@ export function PortalPunchlist({
                 ? "Saving…"
                 : view === "projects"
                   ? "Add Item"
-                  : "Submit Service Request"}
+                  : editingServiceItem ? "Save Item" : "Add Item"}
             </button>
+            {editingServiceItem&&<button type="button" disabled={busy} onClick={()=>{setEditingServiceItem(null);setDescription('');setFiles([]);uploaded.current=[];submission.current=crypto.randomUUID();}} className="min-h-11 px-4 underline">Cancel Edit</button>}
           </form>
         )}
     </section>

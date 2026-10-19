@@ -293,3 +293,7 @@ verify_jwt = true
 # Public opaque-token endpoint validates the share link and returns limited proposal data.
 [functions.view-shared-proposal]
 verify_jwt = false
+
+# Handler authenticates the caller and uses ownership-checked checkout RPCs.
+[functions.vip-membership-checkout]
+verify_jwt = false

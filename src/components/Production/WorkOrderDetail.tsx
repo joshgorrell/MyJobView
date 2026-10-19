@@ -1,3 +1,4 @@
+import { SupportPhotos } from '../Shared/SupportPhotos';
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { ScheduleWorkOrderModal } from './ScheduleWorkOrderModal';
 import { NotesPolishButton } from '../Shared/NotesPolishButton';
@@ -959,6 +960,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         ) : (
           <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap break-words">{workOrder.description || 'No instructions provided.'}</p>
         )}
+        <SupportPhotos workOrderId={workOrderId}/>
         <div id="work-order-tasks" className="border-t border-gray-100 pt-3 space-y-3 scroll-mt-24">
           <WorkOrderPunchlistChecklist workOrderId={workOrderId} contactId={workOrder.contact_id} readOnly={workOrder.status === 'completed' || !(isAssignedTech || canEdit)} />
           <WorkOrderTasksChecklist

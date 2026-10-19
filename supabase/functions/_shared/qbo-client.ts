@@ -24,6 +24,7 @@ export interface QBOConnection {
   security_monitoring_item_id: string | null;
   service_labor_item_id?: string | null;
   service_parts_item_id?: string | null;
+  vip_membership_item_id?: string | null;
 }
 
 export function getSupabaseAdmin() {

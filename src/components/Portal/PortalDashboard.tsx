@@ -112,7 +112,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
 
     const refreshPunchlistCount = async () => {
       const {data:support}=await supabase.rpc('get_customer_support',{p_contact_id:contactId});
-      if(support)setStats(prev => ({ ...prev, punchlistTasks: support.projects.reduce((sum:number,p:{tasks:Array<{status:string}>})=>sum+p.tasks.filter(t=>t.status==='open').length,0),serviceRequests:support.requests.filter((r:{status:string})=>!['closed','cancelled'].includes(r.status)).length }));
+      if(support)setStats(prev => ({ ...prev, punchlistTasks: support.projects.reduce((sum:number,p:{tasks:Array<{status:string}>})=>sum+p.tasks.filter(t=>t.status==='open').length,0),serviceRequests:(support.service_items || []).filter((i:{requested:boolean})=>!i.requested).length + support.requests.filter((r:{status:string})=>!['closed','cancelled'].includes(r.status)).length }));
     };
 
     const subscription = supabase
@@ -153,8 +153,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           .eq('id', user.id)
           .maybeSingle();
 
-        if (!profile?.contact_id) return;
-        contactId = profile.contact_id;
+        contactId = profile?.contact_id || (user.app_metadata?.is_portal_user ? user.app_metadata.contact_id : null);
+        if (!contactId) return;
       }
 
       if (!contactId) return;
@@ -235,7 +235,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         supabase.from('recurring_subscriptions').select('status,next_billing_date,trial_end_date,custom_amount,is_complimentary,plan:recurring_plans!inner(plan_name,billing_frequency,amount)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
         supabase.from('recurring_subscriptions').select(columns).eq('contact_id',contactId).eq('status','trial').eq('trial_source','vip_trial').gte('trial_end_date',new Date().toISOString().split('T')[0]).order('start_date',{ascending:false}).limit(1).maybeSingle()
       ]);
-      const vipSub=paid.data || trial.data;
+      const {data:membershipAccess}=await supabase.rpc('get_customer_support',{p_contact_id:contactId});
+      const vipSub=(membershipAccess?.vip_service_access?paid.data:null) || trial.data;
       setHasVipMembership(!!vipSub);
       if (vipSub) {
         const plan = Array.isArray(vipSub.plan) ? vipSub.plan[0] : vipSub.plan;
@@ -297,7 +298,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         unreadMessages: messagesRes.count || 0,
         vipWorkOrders: vipWorkOrdersRes.count || 0,
         punchlistTasks: support ? support.projects.reduce((sum:number,p:{tasks:Array<{status:string}>})=>sum+p.tasks.filter(t=>t.status==='open').length,0) : punchlistRes.count || 0,
-        serviceRequests: support ? support.requests.filter((r:{status:string})=>!['closed','cancelled'].includes(r.status)).length : 0,
+        serviceRequests: support ? (support.service_items || []).filter((i:{requested:boolean})=>!i.requested).length + support.requests.filter((r:{status:string})=>!['closed','cancelled'].includes(r.status)).length : 0,
         activeSalesOrders: salesOrdersRes.count || 0,
       });
     } catch (error) {

@@ -1,4 +1,4 @@
-// Called only after agreement-scoped access and Payments capability checks.
+// Called only after server-verified customer ownership and Payments capability checks.
 export async function ensureSecurityQboCustomer(admin:any, connection:any, contactId:string, request:any):Promise<string> {
  const {data:contact,error}=await admin.from('contacts').select('qbo_customer_id,contact_name,full_name,first_name,last_name,email,phone').eq('id',contactId).eq('organization_id',connection.organization_id).maybeSingle();
  if(error || !contact) throw new Error('Your provider needs to review the customer account before payment enrollment.');
