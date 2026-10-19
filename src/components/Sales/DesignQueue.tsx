@@ -264,6 +264,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [title, setTitle] = useState(brief.ai_summary?.title || '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -346,10 +347,18 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   async function handleCreate() {
-    if (!selectedContact) return;
+    if (!selectedContact || creating) return;
+    setCreateError('');
     setCreating(true);
 
     try {
+      const { data: currentBrief, error: briefCheckError } = await supabase
+        .from('design_briefs').select('linked_proposal_id').eq('id', brief.id).single();
+      if (briefCheckError) throw briefCheckError;
+      if (currentBrief?.linked_proposal_id) {
+        onCreated(currentBrief.linked_proposal_id);
+        return;
+      }
       const rooms = brief.ai_summary?.rooms || [];
 
       let contactId = selectedContact.id;
@@ -424,7 +433,8 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
           .select('id')
           .single();
 
-        if (!roomError && newRoom && room.lineItems?.length > 0) {
+        if (roomError || !newRoom) throw roomError || new Error('Failed to create proposal room');
+        if (room.lineItems?.length > 0) {
           const productIds = room.lineItems
             .map(li => li.matchedProductId)
             .filter((id): id is string => !!id);
@@ -467,18 +477,21 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
             };
           });
 
-          await supabase.from('proposal_line_items').insert(lineItemInserts);
+          const { error: itemsError } = await supabase.from('proposal_line_items').insert(lineItemInserts);
+          if (itemsError) throw itemsError;
         }
       }
 
-      await supabase
+      const { error: linkError } = await supabase
         .from('design_briefs')
         .update({ linked_proposal_id: newProposal.id, status: 'building' })
         .eq('id', brief.id);
+      if (linkError) throw linkError;
 
       onCreated(newProposal.id);
     } catch (err) {
       console.error('Error creating proposal:', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create proposal. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -498,6 +511,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
         </div>
 
         <div className="p-5 space-y-4">
+          {createError && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg p-3">{createError}</p>}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Proposal Title</label>
             <input
