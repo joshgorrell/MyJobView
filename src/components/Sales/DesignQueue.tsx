@@ -136,6 +136,13 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
   const [results, setResults] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Design/SOW preview remains available even when catalog equipment is incomplete.
+  const unresolvedEquipment = (brief.ai_summary?.rooms || []).flatMap(room =>
+    (room.lineItems || []).filter(item =>
+      item.itemType !== 'labor' && (!item.matchedProductId || (item.overridePrice ?? null) === 0)
+    ).map(item => `${room.name}: ${item.description}`)
+  );
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -548,6 +555,15 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
             )}
           </div>
 
+          {unresolvedEquipment.length > 0 && (
+            <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+              <p className="font-semibold">{unresolvedEquipment.length} equipment item(s) still need catalog matching or pricing.</p>
+              <p className="mt-1 text-xs">You can keep reviewing the design and scope of work. Assign verified products and prices in Design Queue before creating the proposal.</p>
+              <ul className="mt-2 list-disc pl-5 text-xs max-h-24 overflow-y-auto">
+                {unresolvedEquipment.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
           {brief.ai_summary?.rooms && (
             <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
               <p className="text-xs font-medium text-gray-600 mb-1.5">Will create:</p>
@@ -570,7 +586,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
           </button>
           <button
             onClick={handleCreate}
-            disabled={!selectedContact || creating}
+            disabled={!selectedContact || creating || unresolvedEquipment.length > 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
           >
             {creating ? (
