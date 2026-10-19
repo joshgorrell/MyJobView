@@ -1,0 +1,1 @@
+Proposal email modal: editable subject/message, recipients, attachments retained. Preview is a content-only preview and does not claim to reproduce final branded HTML. The server must eventually provide rendered preview for exact visual parity. No send behavior changed.
