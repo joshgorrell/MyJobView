@@ -3980,35 +3980,37 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               }
                             >
                               <td className="text-center py-2 px-2" >
-                                <div className="flex items-center justify-center gap-1">
-                                  {hasChildren && (
-                                    <button
-                                      onClick={() => {
-                                        const newCollapsed = new Set(collapsedParents);
-                                        if (isCollapsed) {
-                                          newCollapsed.delete(item.id);
-                                        } else {
-                                          newCollapsed.add(item.id);
-                                        }
-                                        setCollapsedParents(newCollapsed);
-                                      }}
-                                      className="text-cyan-400 hover:text-cyan-300 p-1 sm:p-0.5 -m-0.5"
-                                      title={isCollapsed ? `Show ${childrenCount} nested items` : `Hide ${childrenCount} nested items`}
-                                    >
-                                      {isCollapsed ? <ChevronRight className="w-4 h-4 sm:w-3 sm:h-3" /> : <ChevronDown className="w-4 h-4 sm:w-3 sm:h-3" />}
-                                    </button>
-                                  )}
-                                  {hasChildren && (
-                                    <Layers className="w-4 h-4 sm:w-3 sm:h-3 text-cyan-400"><title>{`${childrenCount} nested accessories`}</title></Layers>
-                                  )}
-                                  {!hasChildren && (
-                                    <div
-                                      className="cursor-move text-muted hover:text-secondary"
-                                      title={isNested ? "Drag to reorder within this parent" : "Drag to reorder parent and its accessories"}
-                                    >
-                                      <GripVertical className="w-4 h-4 sm:w-3 sm:h-3" />
-                                    </div>
-                                  )}
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <div className="flex items-center justify-center gap-1 w-8 sm:w-7 flex-shrink-0">
+                                    {hasChildren && (
+                                      <button
+                                        onClick={() => {
+                                          const newCollapsed = new Set(collapsedParents);
+                                          if (isCollapsed) {
+                                            newCollapsed.delete(item.id);
+                                          } else {
+                                            newCollapsed.add(item.id);
+                                          }
+                                          setCollapsedParents(newCollapsed);
+                                        }}
+                                        className="text-cyan-400 hover:text-cyan-300 p-1 sm:p-0.5 -m-0.5"
+                                        title={isCollapsed ? `Show ${childrenCount} nested items` : `Hide ${childrenCount} nested items`}
+                                      >
+                                        {isCollapsed ? <ChevronRight className="w-4 h-4 sm:w-3 sm:h-3" /> : <ChevronDown className="w-4 h-4 sm:w-3 sm:h-3" />}
+                                      </button>
+                                    )}
+                                    {hasChildren && (
+                                      <Layers className="w-4 h-4 sm:w-3 sm:h-3 text-cyan-400"><title>{`${childrenCount} nested accessories`}</title></Layers>
+                                    )}
+                                    {!hasChildren && (
+                                      <div
+                                        className="cursor-move text-muted hover:text-secondary"
+                                        title={isNested ? "Drag to reorder within this parent" : "Drag to reorder parent and its accessories"}
+                                      >
+                                        <GripVertical className="w-4 h-4 sm:w-3 sm:h-3" />
+                                      </div>
+                                    )}
+                                  </div>
                                   <input
                                     type="checkbox"
                                     checked={selectedItems.has(item.id)}
@@ -4016,13 +4018,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                       console.log('Checkbox onChange fired for item:', item.id, 'Checked:', e.target.checked);
                                       toggleItemSelection(item.id);
                                     }}
-                                    className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                    className="w-4 h-4 rounded border-strong bg-elevated text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer flex-shrink-0"
                                   />
                                 </div>
                               </td>
 
                               {visibleColumns.has('manufacturer') && (
-                                <td className="py-2 px-3 text-muted whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]" title={item.products?.manufacturers?.name || '-'}>
+                                <td className="py-2 px-3 text-muted whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]" title={item.products?.manufacturers?.name || '-'} style={isNested ? { paddingLeft: '1.5rem' } : undefined}>
                                   {item.products?.manufacturers?.name || '-'}
                                 </td>
                               )}
@@ -4031,6 +4033,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   className="py-2 px-3 text-cyan-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] cursor-pointer hover:bg-elevated hover:text-cyan-300 transition-colors underline"
                                   title={`${item.products?.sku || '-'} (click to edit)`}
                                   onClick={() => setShowProductDetail(item.id)}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {item.products?.sku || '-'}
                                 </td>
@@ -4082,6 +4085,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 <td
                                   className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${materialStrike || 'text-secondary'}`}
                                   onClick={() => startEditingItem(item.id, 'quantity', item.quantity)}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_quantity`] !== undefined ? (
                                     <input
@@ -4106,6 +4110,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 <td
                                   className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${materialStrike || 'text-muted'}`}
                                   onClick={() => startEditingItem(item.id, 'cost', item.cost || 0)}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_cost`] !== undefined ? (
                                     <input
@@ -4130,6 +4135,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 <td
                                   className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${materialStrike || 'text-secondary'}`}
                                   onClick={() => startEditingItem(item.id, 'unit_price', item.unit_price || 0)}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_unit_price`] !== undefined ? (
                                     <input
@@ -4153,6 +4159,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               {visibleColumns.has('laborPhase') && (
                                 <td
                                   className={`py-2 px-3 whitespace-nowrap ${laborStrike || 'text-muted'}`}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {isFullRemoval ? (
                                     <span className={laborStrike}>
@@ -4193,6 +4200,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 <td
                                   className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${laborStrike || 'text-muted'}`}
                                   onClick={() => !isFullRemoval && startEditingItem(item.id, 'labor_hours', item.labor_hours || 0)}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_labor_hours`] !== undefined && !isFullRemoval ? (
                                     <input
@@ -4217,6 +4225,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 <td
                                   className={`py-2 px-3 text-right whitespace-nowrap cursor-pointer hover:bg-elevated ${laborStrike || 'text-muted'}`}
                                   onClick={() => !isFullRemoval && startEditingItem(item.id, 'labor_rate', item.labor_rate || 0)}
+                                  style={isNested ? { paddingLeft: '1.5rem' } : undefined}
                                 >
                                   {editingItemId === item.id && editingValues[`${item.id}_labor_rate`] !== undefined && !isFullRemoval ? (
                                     <input
@@ -4238,22 +4247,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                 </td>
                               )}
                               {visibleColumns.has('laborTotal') && (
-                                <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-secondary'}`}>
+                                <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-secondary'}`} style={isNested ? { paddingLeft: '1.5rem' } : undefined}>
                                   ${parseFloat(String(item.labor_total || 0)).toFixed(2)}
                                 </td>
                               )}
                               {visibleColumns.has('partsTax') && (
-                                <td className={`py-2 px-3 text-right whitespace-nowrap ${materialStrike || 'text-green-400'}`}>
+                                <td className={`py-2 px-3 text-right whitespace-nowrap ${materialStrike || 'text-green-400'}`} style={isNested ? { paddingLeft: '1.5rem' } : undefined}>
                                   ${calculateItemTax(item, proposal).partsTax.toFixed(2)}
                                 </td>
                               )}
                               {visibleColumns.has('laborTax') && (
-                                <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-green-400'}`}>
+                                <td className={`py-2 px-3 text-right whitespace-nowrap ${laborStrike || 'text-green-400'}`} style={isNested ? { paddingLeft: '1.5rem' } : undefined}>
                                   ${calculateItemTax(item, proposal).laborTax.toFixed(2)}
                                 </td>
                               )}
                               {visibleColumns.has('lineTotal') && (
-                                <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${isCoRemoved ? 'line-through text-red-400' : 'text-primary'}`}>
+                                <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${isCoRemoved ? 'line-through text-red-400' : 'text-primary'}`} style={isNested ? { paddingLeft: '1.5rem' } : undefined}>
                                   {isCoRemoved ? (() => {
                                     const materialTotal = parseFloat(String(item.unit_price || 0)) * item.quantity;
                                     const laborTotal = parseFloat(String(item.labor_total || 0));
@@ -4273,7 +4282,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                                   })()}
                                 </td>
                               )}
-                              <td className="py-2 px-3 text-right">
+                              <td className="py-2 px-3 text-right" style={isNested ? { paddingLeft: '1.5rem' } : undefined}>
                                 <div className="flex items-center justify-end gap-1">
                                   {isCoRemoved ? (
                                     <button
