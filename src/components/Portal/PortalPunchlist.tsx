@@ -53,6 +53,12 @@ const statusLabel = (value: string) =>
 const dateLabel = (value: string) =>
   new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString();
 
+function ProjectScopeNotice() {
+  return <p className="text-sm text-gray-600 leading-relaxed">
+    <strong>For your existing project only.</strong> Project Punchlist is for completing and fine-tuning the work included in your agreed project scope. New equipment, upgrades, and other additions are not included. For additional work, <a href="/portal?tab=messages" className="text-blue-700 underline">send us a message</a> or contact your sales representative.
+  </p>;
+}
+
 export function PortalPunchlist({
   previewContactId,
   isEmbedded = false,
@@ -357,6 +363,7 @@ export function PortalPunchlist({
                   ? `Your included project punchlist access is active through ${dateLabel(project.end_date)}. Add items and request a visit while this period is active.`
                   : project.days_remaining > 0 ? 'View-only. New submissions are paused. You can still track your shared items.'
                   : `View-only. Your included Test & Tune period ended ${dateLabel(project.end_date)}.`}</p>
+                <ProjectScopeNotice />
                 <p><strong>What happens afterward?</strong> This project punchlist becomes view-only. Unfinished items remain for our team to resolve.</p>
                 <p>{data.vip_service_access
                   ? 'Your active VIP plan lets you submit new general service requests online. Plan benefits determine any service charges.'
@@ -511,6 +518,7 @@ export function PortalPunchlist({
             <h2 className="font-semibold">
               {view === "projects" ? "Add Punchlist Item" : "Request Service"}
             </h2>
+            {view === "projects" && <ProjectScopeNotice />}
             <label className="block text-sm">
               {view === "projects"
                 ? "What needs attention?"
