@@ -649,6 +649,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
 
   const [pickerOpen, setPickerOpen] = useState<{ roomIndex: number; itemIndex: number } | null>(null);
   const [savingMatches, setSavingMatches] = useState(false);
+  const matchSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingMatchSaves = useRef(0);
+  const [matchSaveError, setMatchSaveError] = useState(false);
   const [localRooms, setLocalRooms] = useState<Room[] | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [rerunningAI, setRerunningAI] = useState(false);
@@ -953,19 +956,23 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     saveMatchesToBrief(updated);
   }
 
-  async function saveMatchesToBrief(rooms: Room[]) {
+  function saveMatchesToBrief(rooms: Room[]) {
     if (!selectedBrief) return;
+    const briefId = selectedBrief.id;
+    pendingMatchSaves.current += 1;
     setSavingMatches(true);
+    setMatchSaveError(false);
+    matchSaveQueue.current = matchSaveQueue.current.catch(() => {}).then(async () => {
     try {
       const { data: current, error: readError } = await supabase
-        .from('design_briefs').select('ai_summary, linked_proposal_id').eq('id', selectedBrief.id).single();
+        .from('design_briefs').select('ai_summary, linked_proposal_id').eq('id', briefId).single();
       if (readError) throw readError;
       if (current.linked_proposal_id) throw new Error('This brief has already been converted.');
       const updatedSummary = { ...current.ai_summary, rooms };
       const { data: saved, error } = await supabase
         .from('design_briefs')
         .update({ ai_summary: updatedSummary, status: 'building' })
-        .eq('id', selectedBrief.id)
+        .eq('id', briefId)
         .is('linked_proposal_id', null)
         .select('ai_summary')
         .single();
@@ -975,14 +982,17 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
         ai_summary: saved.ai_summary as ProposalPrefill,
         status: 'building' as const,
       };
-      setBriefs(prev => prev.map(b => b.id === selectedBrief.id ? updated : b));
-      setSelectedBrief(updated);
+      setBriefs(prev => prev.map(b => b.id === briefId ? { ...b, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : b));
+      setSelectedBrief(prev => prev?.id === briefId ? { ...prev, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : prev);
     } catch (err) {
       console.error('Error saving matches:', err);
+      setMatchSaveError(true);
       window.alert('Could not save catalog selections. Please retry before converting this brief.');
     } finally {
-      setSavingMatches(false);
+      pendingMatchSaves.current -= 1;
+      setSavingMatches(pendingMatchSaves.current > 0);
     }
+    });
   }
 
   function handleConvertCreated(proposalId: string) {
@@ -1325,8 +1335,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 {isAdmin && !selectedBrief.linked_proposal_id && selectedBrief.status !== 'archived' && (
                   <button
                     onClick={() => setShowConvertModal(true)}
-                    disabled={savingMatches || rerunningAI}
-                    title={savingMatches ? 'Wait for catalog selections to finish saving' : undefined}
+                    disabled={savingMatches || rerunningAI || matchSaveError}
+                    title={matchSaveError ? 'Resolve the failed catalog save before converting' : savingMatches ? 'Wait for catalog selections to finish saving' : undefined}
                     className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5" />
