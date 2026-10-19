@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, CheckCircle, AlertCircle, Star, ArrowRight, Zap, Loader, LogIn } from 'lucide-react';
+import { Mail, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 
@@ -13,8 +13,6 @@ export function PortalLogin() {
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState('');
   const [tokenFailed, setTokenFailed] = useState(false);
-  const [isNewCustomer, setIsNewCustomer] = useState(false);
-  const [incompleteSignup, setIncompleteSignup] = useState(false);
 
   const searchParams = new URLSearchParams(window.location.search);
   const requestedRedirect = searchParams.get('redirect');
@@ -88,8 +86,6 @@ export function PortalLogin() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setIsNewCustomer(false);
-    setIncompleteSignup(false);
 
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-portal-magic-link`;
@@ -109,8 +105,6 @@ export function PortalLogin() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.isNewCustomer) setIsNewCustomer(true);
-        if (data.incompleteSignup) setIncompleteSignup(true);
         throw new Error(data.error || 'Failed to send magic link');
       }
 
@@ -150,7 +144,7 @@ export function PortalLogin() {
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-cyan-500/8 rounded-full blur-3xl" />
         </div>
         <div className="relative bg-white rounded-2xl shadow-2xl p-8 sm:p-10 max-w-md w-full">
-          <div className="text-center">
+          <div className="text-center" role="status">
             <div className="mx-auto w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 border-4 border-green-100">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
@@ -158,11 +152,11 @@ export function PortalLogin() {
             <p className="text-gray-600 mb-2 leading-relaxed">
               Your magic link has been sent to
             </p>
-            <p className="text-gray-900 font-semibold mb-6 text-lg">{email}</p>
+            <p className="text-gray-900 font-semibold mb-6 text-lg break-words">{email.trim()}</p>
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-left">
               <p className="text-sm text-blue-800 leading-relaxed">
                 <span className="font-semibold block mb-1">What to do next:</span>
-                Open your email and click the secure link to access your portal. The link is valid for <strong>30 days</strong> — save the email for easy access anytime!
+                Click the link in your email to open your customer portal. If you don’t see it, check your spam or junk folder.
               </p>
             </div>
             <button
@@ -199,47 +193,29 @@ export function PortalLogin() {
                 <span className="text-2xl sm:text-3xl font-bold text-white">{dealerName}</span>
               </div>
             )}
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Customer Portal</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Get Your Magic Link</h1>
             <p className="text-blue-200 text-sm sm:text-base">
-              {dealerName}
+              Customer Portal
             </p>
           </div>
 
           <div className="px-6 sm:px-8 py-6 sm:py-8">
             <p className="text-gray-600 text-sm sm:text-base text-center mb-6 leading-relaxed">
-              Enter your email address and we'll send you a secure, password-free login link.
+              Enter the email address associated with your customer portal. We’ll email you a secure login link.
             </p>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-red-700 leading-relaxed">
-                      {error.replace(' Click here to sign up now!', '')}
+                      {error}
                     </p>
                     {tokenFailed && (
                       <p className="text-xs text-red-600 mt-2 leading-relaxed">
                         Enter your email below to receive a fresh login link.
                       </p>
-                    )}
-                    {isNewCustomer && (
-                      <a
-                        href="/portal/signup"
-                        className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        Sign Up Now
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                    {incompleteSignup && (
-                      <a
-                        href="/portal/signup"
-                        className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        Complete Signup
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </a>
                     )}
                   </div>
                 </div>
@@ -259,6 +235,10 @@ export function PortalLogin() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    disabled={loading}
                     placeholder="your.email@example.com"
                     className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-all text-gray-900 placeholder-gray-400"
                   />
@@ -278,34 +258,11 @@ export function PortalLogin() {
                 ) : (
                   <>
                     <Mail className="w-5 h-5" />
-                    Send My Magic Link
+                    Send My Link
                   </>
                 )}
               </button>
             </form>
-
-            <div className="mt-8 pt-6 border-t border-gray-100">
-              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-5">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Star className="w-5 h-5 text-amber-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-amber-900 mb-1">Not a VIP Member Yet?</p>
-                    <p className="text-xs text-amber-700 mb-3 leading-relaxed">
-                      Get priority service, punchlist access, and exclusive member benefits.
-                    </p>
-                    <a
-                      href="/portal/membership"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-lg transition-colors"
-                    >
-                      <Zap className="w-3.5 h-3.5" />
-                      Join VIP Program
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <div className="mt-5 pt-4 border-t border-gray-100">
               <p className="text-xs text-gray-400 text-center mb-3">
@@ -320,16 +277,6 @@ export function PortalLogin() {
                   Terms of Service
                 </a>
               </div>
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  window.location.href = '/';
-                }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                Staff login
-              </button>
             </div>
           </div>
         </div>
