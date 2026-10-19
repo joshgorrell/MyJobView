@@ -120,6 +120,8 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [connections, setConnections] = useState<Connection[]>([]);
   const [sendingPortalInvite, setSendingPortalInvite] = useState(false);
   const [portalAccessEnabled, setPortalAccessEnabled] = useState((contact as any).portal_access_enabled || false);
+  const [punchlistExpirationEmailsEnabled, setPunchlistExpirationEmailsEnabled] = useState((contact as any).punchlist_expiration_emails_enabled !== false);
+  const [savingPunchlistExpirationEmails, setSavingPunchlistExpirationEmails] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow'>('overview');
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
@@ -682,6 +684,28 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
     } catch (error) {
       console.error('Error updating contact:', error);
       notify('Failed to update contact', { theme: 'blue', tone: 'error' });
+    }
+  }
+
+  async function handleTogglePunchlistExpirationEmails() {
+    if (savingPunchlistExpirationEmails) return;
+    const nextValue = !punchlistExpirationEmailsEnabled;
+    setSavingPunchlistExpirationEmails(true);
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .update({ punchlist_expiration_emails_enabled: nextValue })
+        .eq('id', contact.id)
+        .select('punchlist_expiration_emails_enabled')
+        .single();
+      if (error) throw error;
+      setPunchlistExpirationEmailsEnabled(data.punchlist_expiration_emails_enabled);
+      notify(data.punchlist_expiration_emails_enabled ? 'Expiration reminders enabled' : 'Expiration reminders disabled', { theme: 'blue', tone: 'success' });
+    } catch (error) {
+      console.error('Error updating expiration reminders:', error);
+      notify('Could not update expiration reminders', { theme: 'blue', tone: 'error' });
+    } finally {
+      setSavingPunchlistExpirationEmails(false);
     }
   }
 
@@ -2672,6 +2696,22 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                           )}
                         </p>
                       </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 sm:p-4">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={punchlistExpirationEmailsEnabled}
+                          onChange={handleTogglePunchlistExpirationEmails}
+                          disabled={savingPunchlistExpirationEmails}
+                          className="mt-1 h-4 w-4 accent-blue-600 disabled:opacity-50"
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-gray-800">Send Test &amp; Tune and VIP expiration reminders</span>
+                          <span className="block text-xs text-gray-600 mt-1">Turn off for test customers or customers who should not receive renewal reminders. Does not change portal access or VIP coverage.</span>
+                        </span>
+                      </label>
                     </div>
 
                     <div className="space-y-4">
