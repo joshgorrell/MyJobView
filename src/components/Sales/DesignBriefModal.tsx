@@ -32,6 +32,7 @@ interface LineItemPreview {
 
 interface RoomPreview {
   name: string;
+  description?: string;
   lineItems: LineItemPreview[];
 }
 
