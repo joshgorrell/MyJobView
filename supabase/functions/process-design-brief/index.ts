@@ -82,6 +82,19 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // Verify access through the caller's RLS policies before using the service-role client.
+    const { data: permittedBrief, error: accessError } = await supabaseUser
+      .from("design_briefs")
+      .select("id, organization_id")
+      .eq("id", briefId)
+      .maybeSingle();
+    if (accessError || !permittedBrief) {
+      return new Response(JSON.stringify({ error: "Design brief not found or access denied" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: settingsData } = await supabase
       .from("company_settings")
       .select("openai_api_key")
