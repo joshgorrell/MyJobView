@@ -855,7 +855,13 @@ export default function DesignBriefModal({
                             {room.lineItems.length} item{room.lineItems.length !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <div className="divide-y divide-gray-100">
+                        {room.description && (
+                        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/40">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Proposed scope of work</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{room.description}</p>
+                        </div>
+                      )}
+                      <div className="divide-y divide-gray-100">
                           {room.lineItems.map((item, li) => (
                             <div key={li} className="flex items-center gap-3 px-4 py-2.5">
                               {item.itemType === 'labor' ? (
