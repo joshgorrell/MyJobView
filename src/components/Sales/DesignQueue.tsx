@@ -1045,8 +1045,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     <div className="flex h-full min-w-0 bg-gray-50">
       {/* Left panel */}
       <div className={`${selectedBrief ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 min-w-0 flex-shrink-0 flex-col bg-white border-r border-gray-200`}>
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-3">
+        <div className="p-3 sm:p-4 border-b border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-white" />
@@ -1058,11 +1058,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               {onNewBrief && (
                 <button
                   onClick={onNewBrief}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
                   title="New Design Brief"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1102,11 +1102,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="bg-amber-50 rounded-lg px-3 py-2 text-center border border-amber-100">
               <p className="text-lg font-bold text-amber-700">{activeCount}</p>
-              <p className="text-xs text-amber-600">Awaiting</p>
+              <p className="text-xs text-amber-700">Awaiting Review</p>
             </div>
             <div className="bg-green-50 rounded-lg px-3 py-2 text-center border border-green-100">
               <p className="text-lg font-bold text-green-700">{readyCount}</p>
-              <p className="text-xs text-green-600">Ready</p>
+              <p className="text-xs text-green-700">Ready to Convert</p>
             </div>
           </div>
 
@@ -1116,23 +1116,23 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search briefs..."
+              placeholder="Search design briefs..."
               className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
           </div>
 
-          <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5 overflow-x-auto">
             {[
-              { key: 'active', label: 'Active' },
+              { key: 'all', label: 'All' },
+              { key: 'active', label: 'Awaiting' },
               { key: 'ready', label: 'Ready' },
               { key: 'drafts', label: 'Drafts', badge: draftCount > 0 ? draftCount : null },
               { key: 'mine', label: 'Mine' },
-              { key: 'all', label: 'All' },
             ].map(f => (
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ${
+                className={`flex-1 min-w-fit px-2 text-xs py-2 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ${
                   statusFilter === f.key
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -1155,14 +1155,21 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
               <Loader className="w-5 h-5 text-gray-400 animate-spin" />
             </div>
           ) : filteredBriefs.length === 0 ? (
-            <div className="text-center py-10 px-4">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="w-6 h-6 text-gray-400" />
+            <div className="text-center py-12 px-4 sm:px-6">
+              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-7 h-7 text-blue-500" />
               </div>
-              <p className="text-sm font-medium text-gray-600 mb-1">No briefs found</p>
-              <p className="text-xs text-gray-400">
-                {statusFilter === 'active' ? 'No briefs awaiting design review' : 'Try a different filter'}
+              <p className="text-base font-semibold text-gray-800 mb-1">
+                {briefs.length === 0 ? 'No design briefs yet' : 'No matching design briefs'}
               </p>
+              <p className="text-sm text-gray-500 mb-5">
+                {briefs.length === 0 ? 'Create your first design brief to get started.' : 'Try a different search or filter.'}
+              </p>
+              {onNewBrief && briefs.length === 0 && (
+                <button type="button" onClick={onNewBrief} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl px-5 py-3">
+                  <Plus className="w-4 h-4" /> New Design Brief
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
