@@ -139,6 +139,7 @@ interface ProductPickerProps {
 function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '', matchingCount = 0, onApplyMatching }: ProductPickerProps) {
   const [query, setQuery] = useState(suggestedQuery);
   const [results, setResults] = useState<CatalogProduct[]>([]);
+  const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -151,6 +152,7 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
 
   async function searchProducts(q: string) {
     setLoading(true);
+    setSearchError('');
     const query_builder = supabase
       .from('products')
       .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, model_number, thumbnail_url, item_type')
@@ -161,6 +163,7 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
     const { data, error } = await query_builder;
     if (error) {
       setResults([]);
+      setSearchError('Catalog search failed. Please retry.');
       setLoading(false);
       return;
     }
@@ -202,7 +205,8 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-          {results.length === 0 && !loading && (
+          {searchError && <p role="alert" className="px-4 py-3 text-sm text-red-700">{searchError}</p>}
+          {results.length === 0 && !loading && !searchError && (
             <div className="py-8 text-center text-sm text-gray-400">
               {query ? `No products found for "${query}"` : 'No products in catalog'}
             </div>
