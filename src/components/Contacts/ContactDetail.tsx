@@ -780,7 +780,8 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
       const { data, error } = await supabase.rpc('grant_punchlist_access_directly', {
         p_contact_id: contact.id,
-        p_days: 90
+        p_days: 90,
+        p_project_id: null
       });
 
       if (error) throw error;
