@@ -173,6 +173,9 @@ export function LoginForm() {
         </form>
 
         <div className="mt-6 text-center space-y-2">
+          <a href="/portal" className="block w-full rounded-lg border border-blue-400/40 px-4 py-3 text-sm text-blue-300 hover:bg-blue-400/10">
+            Customer Portal — Get your magic link here
+          </a>
           {!isForgotPassword && (
             <button
               type="button"

@@ -10,6 +10,7 @@ const corsHeaders = {
 interface RequestBody {
   email: string;
   redirectTo?: string;
+  organizationId?: string;
 }
 
 function generateSecureToken(): string {
@@ -28,66 +29,14 @@ type AccessContext = {
   accessGrantId?: string;
 };
 
-function detectAccessContext(
-  accessGrant: { id: string; access_type: string; expiration_date: string | null } | null,
-  subscription: { id: string; status: string } | null,
-  securityContract: { id: string; status: string } | null,
-): AccessContext {
-  if (accessGrant?.access_type === 'test_and_tune') {
-    return {
-      type: 'test_and_tune',
-      destinationPath: '/portal/punchlist',
-      emailSubjectSuffix: '90-Day Test & Tune Portal',
-      emailHeadline: 'Your 90-Day Test & Tune Portal',
-      emailBodyLine: 'Use the button below to access your personalized Test & Tune punchlist and track your service requests.',
-      buttonText: 'Open My Test & Tune Punchlist',
-      accessGrantId: accessGrant.id,
-    };
-  }
-
-  if (accessGrant?.access_type === 'vip_membership') {
-    return {
-      type: 'vip_membership',
-      destinationPath: '/portal/punchlist',
-      emailSubjectSuffix: 'VIP Member Portal',
-      emailHeadline: 'Your VIP Member Portal',
-      emailBodyLine: 'As a VIP member, use the button below to access your punchlist and full portal.',
-      buttonText: 'Open My VIP Punchlist',
-      accessGrantId: accessGrant.id,
-    };
-  }
-
-  if (subscription) {
-    return {
-      type: 'subscription',
-      destinationPath: '/portal',
-      emailSubjectSuffix: 'Customer Portal',
-      emailHeadline: 'Your Customer Portal',
-      emailBodyLine: 'Use the button below to securely log in to your customer portal.',
-      buttonText: 'Log In to Portal',
-    };
-  }
-
-  if (securityContract) {
-    return {
-      type: 'security_contract',
-      destinationPath: '/portal',
-      emailSubjectSuffix: 'Customer Portal',
-      emailHeadline: 'Your Customer Portal',
-      emailBodyLine: 'Use the button below to securely log in to your customer portal.',
-      buttonText: 'Log In to Portal',
-    };
-  }
-
-  return {
-    type: 'general',
-    destinationPath: '/portal',
-    emailSubjectSuffix: 'Customer Portal',
-    emailHeadline: 'Your Customer Portal',
-    emailBodyLine: 'Use the button below to securely log in to your customer portal.',
-    buttonText: 'Log In to Portal',
-  };
-}
+const portalContext: AccessContext = {
+  type: 'general',
+  destinationPath: '/portal',
+  emailSubjectSuffix: 'Customer Portal',
+  emailHeadline: 'Your Customer Portal',
+  emailBodyLine: 'Use the button below to securely log in to your customer portal.',
+  buttonText: 'Log In to Portal',
+};
 
 function buildEmailHtml(opts: {
   firstName: string;
@@ -141,7 +90,7 @@ function buildEmailHtml(opts: {
             <p style="margin:0 0 6px;color:#374151;font-size:13px;font-weight:600;">About this link</p>
             <p style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">
               This link is valid for <strong>${daysLabel}</strong> and can be used multiple times &mdash; save this email for easy access anytime.<br>
-              If you request a new login link, this one will be replaced.
+              You can request another link from the customer portal login page anytime.
             </p>
           </div>
 
@@ -170,17 +119,19 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  let pendingToken: string | null = null;
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const { email: rawEmail, redirectTo: requestedRedirect, organizationId }: RequestBody = await req.json();
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
 
-    const { email, redirectTo: requestedRedirect }: RequestBody = await req.json();
-
-    if (!email) {
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return new Response(
-        JSON.stringify({ error: 'Email is required' }),
+        JSON.stringify({ error: 'Enter a valid email address.' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -188,87 +139,39 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: contact, error: contactError } = await supabaseAdmin
-      .from('contacts')
-      .select('id, email, contact_name, full_name, company_name, first_name, last_name, portal_access_enabled, portal_user_id')
-      .eq('email', email.toLowerCase())
-      .maybeSingle();
-
-    if (contactError) {
-      console.error('Error fetching contact:', contactError);
-      return new Response(
-        JSON.stringify({ error: 'An error occurred. Please try again.' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    // Resolve the customer within the selected dealer, or require a unique match
+    // on the main MJV site. Never choose an arbitrary customer/company.
+    const escapedEmail = email.replace(/[\\%_]/g, character => `\\${character}`);
+    let contactQuery = supabaseAdmin.from('contacts')
+      .select('id, email, contact_name, full_name, company_name, first_name, last_name, portal_access_enabled, organization_id')
+      .ilike('email', escapedEmail);
+    if (organizationId) contactQuery = contactQuery.eq('organization_id', organizationId);
+    const { data: contacts, error: contactError } = await contactQuery.limit(2);
+    if (contactError) throw contactError;
+    if (contacts && contacts.length > 1) {
+      return new Response(JSON.stringify({ success: false, error: 'Please use your service provider’s portal link or contact them for assistance.' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const contact = contacts?.[0];
+    if (!contact?.portal_access_enabled) {
+      return new Response(JSON.stringify({ success: false, error: 'We couldn’t find portal access for this email. Please contact us for assistance.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    if (!contact || !contact.portal_access_enabled) {
-      return new Response(
-        JSON.stringify({ success: true, message: 'If a portal account exists for this email, a login link has been sent.' }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    // Portal login is independent of paid VIP/Punchlist eligibility.
+    const context = portalContext;
+    const { data: recentTokens, error: recentError } = await supabaseAdmin
+      .from('portal_access_tokens').select('id').eq('contact_id', contact.id)
+      .is('invalidated_at', null).gte('created_at', new Date(Date.now() - 60_000).toISOString()).limit(1);
+    if (recentError) throw recentError;
+    if (recentTokens?.length) {
+      return new Response(JSON.stringify({ success: false, error: 'A link was requested recently. Please check your inbox and spam folder, or try again in one minute.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' } });
     }
-
-    // Fetch all access sources in parallel
-    const [subscriptionResult, accessGrantResult, securityContractResult] = await Promise.all([
-      supabaseAdmin
-        .from('recurring_subscriptions')
-        .select('id, status')
-        .eq('contact_id', contact.id)
-        .in('status', ['active', 'trial', 'pending_payment'])
-        .maybeSingle(),
-
-      // Check for active punchlist grants — both test_and_tune (has expiration) and vip_membership (no expiration)
-      supabaseAdmin
-        .from('punchlist_access_grants')
-        .select('id, access_type, expiration_date')
-        .eq('contact_id', contact.id)
-        .eq('status', 'active')
-        .or(`expiration_date.is.null,expiration_date.gte.${new Date().toISOString().split('T')[0]}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-
-      supabaseAdmin
-        .from('security_contracts')
-        .select('id, status')
-        .eq('contact_id', contact.id)
-        .eq('status', 'active')
-        .maybeSingle(),
-    ]);
-
-    const subscription = subscriptionResult.data;
-    const accessGrant = accessGrantResult.data;
-    const securityContract = securityContractResult.data;
-
-    if (!subscription && !accessGrant && !securityContract) {
-      return new Response(
-        JSON.stringify({ success: true, message: 'If a portal account exists for this email, a login link has been sent.' }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Determine the access context — this drives the email content and redirect destination
-    const context = detectAccessContext(accessGrant, subscription, securityContract);
-
-    // Invalidate any existing active tokens for this contact
-    await supabaseAdmin
-      .from('portal_access_tokens')
-      .update({ invalidated_at: new Date().toISOString() })
-      .eq('contact_id', contact.id)
-      .is('invalidated_at', null);
 
     // Generate a new 30-day token
     const token = generateSecureToken();
+    pendingToken = token;
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
@@ -291,25 +194,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Build the portal link — caller-supplied redirect takes priority, then auto-detected destination
+    // Resolve branding and destination from this customer's organization.
     const { data: settingsForUrl } = await supabaseAdmin
       .from('company_settings')
       .select('portal_url, from_email, from_name, company_name')
+      .eq('organization_id', contact.organization_id)
       .maybeSingle();
 
     const { data: orgData } = await supabaseAdmin
       .from('organizations')
       .select('subdomain')
-      .limit(1)
+      .eq('id', contact.organization_id)
       .maybeSingle();
 
     const subdomain = orgData?.subdomain || null;
     const frontendUrl = subdomain
       ? `https://${subdomain}.myjobview.com`
-      : (settingsForUrl?.portal_url || Deno.env.get('FRONTEND_URL') || '');
+      : (settingsForUrl?.portal_url || Deno.env.get('FRONTEND_URL') || '').replace(/\/portal\/?$/, '').replace(/\/$/, '');
 
-    // Use caller-supplied redirect if provided, otherwise route based on detected access context
-    const destinationPath = requestedRedirect || context.destinationPath;
+    // Only allow local portal destinations.
+    const destinationPath = typeof requestedRedirect === 'string' && /^\/portal(?:\/|\?|$)/.test(requestedRedirect) && !requestedRedirect.includes('\\')
+      ? requestedRedirect : context.destinationPath;
+
+    if (!frontendUrl || !/^https:\/\//.test(frontendUrl)) throw new Error('Portal URL is not configured');
 
     // Build the full portal URL: base + /portal + redirect query param (if destination != /portal)
     // The portal login page sits at /portal and reads the ?redirect= param after verifying the token.
@@ -356,6 +263,7 @@ Deno.serve(async (req: Request) => {
       const emailData = await emailResponse.json();
 
       if (!emailResponse.ok) {
+        await supabaseAdmin.from('portal_access_tokens').update({ invalidated_at: new Date().toISOString() }).eq('token', token);
         console.error('Resend API error:', emailData);
         return new Response(
           JSON.stringify({ error: 'Failed to send login email. Please contact support.' }),
@@ -379,7 +287,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     } else {
-      console.log('Login link generated but email service not configured:', portalLink);
+      await supabaseAdmin.from('portal_access_tokens').update({ invalidated_at: new Date().toISOString() }).eq('token', token);
+      console.error('Portal email service not configured');
       return new Response(
         JSON.stringify({
           error: 'Email service not configured. Please contact support.',
@@ -392,6 +301,9 @@ Deno.serve(async (req: Request) => {
       );
     }
   } catch (error) {
+    if (pendingToken) {
+      await supabaseAdmin.from('portal_access_tokens').update({ invalidated_at: new Date().toISOString() }).eq('token', pendingToken);
+    }
     console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: 'An unexpected error occurred' }),
