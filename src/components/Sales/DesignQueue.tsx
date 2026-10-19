@@ -404,91 +404,22 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
           .eq('id', brief.id);
       }
 
-      const { data: newProposal, error: proposalError } = await supabase
-        .from('proposals')
-        .insert({
-          contact_id: contactId,
-          title: title || `Design Brief - ${getContactName(selectedContact)}`,
-          status: 'designing',
-          tax_environment: taxEnvironment,
-          tax_project_type: taxProjectType,
-          tax_rate: taxRate,
-          created_by: profile?.id,
-        })
-        .select('id')
-        .single();
-
-      if (proposalError || !newProposal) throw new Error('Failed to create proposal');
-
-      for (let roomIndex = 0; roomIndex < rooms.length; roomIndex++) {
-        const room = rooms[roomIndex];
-
-        const { data: newRoom, error: roomError } = await supabase
-          .from('proposal_rooms')
-          .insert({
-            proposal_id: newProposal.id,
-            name: room.name,
-            sort_order: roomIndex,
-          })
-          .select('id')
-          .single();
-
-        if (roomError || !newRoom) throw roomError || new Error('Failed to create proposal room');
-        if (room.lineItems?.length > 0) {
-          const productIds = room.lineItems
-            .map(li => li.matchedProductId)
-            .filter((id): id is string => !!id);
-
-          const productMap = new Map<string, CatalogProduct>();
-
-          if (productIds.length > 0) {
-            const { data: catalogProducts } = await supabase
-              .from('products')
-              .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, item_type, category, manufacturer, thumbnail_url')
-              .in('id', productIds);
-            if (catalogProducts) {
-              for (const p of catalogProducts) {
-                productMap.set(p.id, p as CatalogProduct);
-              }
-            }
-          }
-
-          const lineItemInserts = room.lineItems.map((li, liIndex) => {
-            const product = li.matchedProductId ? productMap.get(li.matchedProductId) : null;
-            const unitPrice = li.overridePrice ?? product?.our_price ?? 0;
-            const cost = product?.cost ?? 0;
-            const qty = li.overrideQuantity ?? li.quantity ?? product?.default_qty ?? 1;
-            const laborHours = li.laborHours ?? product?.default_labor_hours ?? null;
-            const lineTotal = qty * unitPrice;
-
-            return {
-              proposal_id: newProposal.id,
-              room_id: newRoom.id,
-              product_id: li.matchedProductId || null,
-              description: li.matchedProductName || li.description,
-              quantity: qty,
-              unit: li.unit || product?.unit || 'EA',
-              cost,
-              unit_price: unitPrice,
-              line_total: lineTotal,
-              item_type: li.itemType || 'material',
-              labor_hours: laborHours,
-              sort_order: liIndex,
-            };
-          });
-
-          const { error: itemsError } = await supabase.from('proposal_line_items').insert(lineItemInserts);
-          if (itemsError) throw itemsError;
+      // One database transaction: row lock, idempotency, rooms, items and brief link.
+      const { data: proposalId, error: conversionError } = await supabase.rpc(
+        'design_brief_create_proposal',
+        {
+          p_brief: brief.id,
+          p_contact: contactId,
+          p_title: title || `Design Brief - ${getContactName(selectedContact)}`,
+          p_tax_environment: taxEnvironment,
+          p_tax_type: taxProjectType,
+          p_tax_rate: taxRate,
         }
+      );
+      if (conversionError || !proposalId) {
+        throw conversionError || new Error('Unable to create proposal');
       }
-
-      const { error: linkError } = await supabase
-        .from('design_briefs')
-        .update({ linked_proposal_id: newProposal.id, status: 'building' })
-        .eq('id', brief.id);
-      if (linkError) throw linkError;
-
-      onCreated(newProposal.id);
+      onCreated(proposalId);
     } catch (err) {
       console.error('Error creating proposal:', err);
       setCreateError(err instanceof Error ? err.message : 'Failed to create proposal. Please try again.');
