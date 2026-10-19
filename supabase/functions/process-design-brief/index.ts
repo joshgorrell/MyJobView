@@ -85,7 +85,7 @@ Deno.serve(async (req: Request) => {
     // Verify access through the caller's RLS policies before using the service-role client.
     const { data: permittedBrief, error: accessError } = await supabaseUser
       .from("design_briefs")
-      .select("id, organization_id")
+      .select("id, organization_id, contact_id, raw_notes")
       .eq("id", briefId)
       .maybeSingle();
     if (accessError || !permittedBrief) {
@@ -129,9 +129,10 @@ Deno.serve(async (req: Request) => {
       productCatalogSection = `\n\nPRODUCT CATALOG (use EXACT names from this list when building the proposal):\n${lines}\n\nCRITICAL: Always use the exact product name from the catalog above as the "description" in line items. If no catalog match exists, use the name as stated in the notes.`;
     }
 
-    // Fetch customer history if a contact is linked
+    // Only the contact stored on this authorized brief may be used for history.
+    const authorizedContactId = permittedBrief.contact_id;
     let customerHistorySection = "";
-    if (contactId) {
+    if (authorizedContactId) {
       const { data: previousProposals } = await supabase
         .from("proposals")
         .select(`
@@ -153,7 +154,8 @@ Deno.serve(async (req: Request) => {
             )
           )
         `)
-        .eq("contact_id", contactId)
+        .eq("organization_id", permittedBrief.organization_id)
+        .eq("contact_id", authorizedContactId)
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -179,6 +181,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Use the saved brief rather than client-provided text as the AI source of truth.
+    const savedNotes = permittedBrief.raw_notes || notes;
     const systemPrompt = `You are an expert AV/smart home proposal builder for a high-end installation company.
 Your job is to parse a sales rep's field notes about a customer's project and produce a structured JSON proposal prefill.
 
@@ -202,6 +206,7 @@ PROPOSALPREFILL SCHEMA:
   "rooms": [
     {
       "name": "string — room or zone name e.g. 'Family Room', 'Master Bedroom', 'Outdoor Patio'",
+      "description": "string — customer-facing scope of work for this room, describing equipment, installation, programming, and exclusions; distinguish assumptions from confirmed work",
       "lineItems": [
         {
           "description": "string — exact catalog product name or custom item name",
@@ -223,7 +228,7 @@ PARSING RULES:
 4. For labor mentions: itemType=labor, unit=HR, quantity=hours, laborHours=hours
 5. Tax environment: home/house/residence/bedroom → residential; office/warehouse/commercial → commercial
 6. Tax project type: new construction → original_construction; renovations → remodel; most residential installs → general_installation_repair
-7. Put any extra rep instructions, customer preferences, or context into the "notes" field
+7. Put any extra rep instructions, customer preferences, or context into the "notes" field. Each room.description is its proposed scope of work; do not invent confirmed customer decisions.
 8. Generate a descriptive title from the project type and customer name
 9. If the rep asks to copy a previous proposal, replicate that proposal's rooms and items exactly, applying any stated modifications`;
 
@@ -239,7 +244,7 @@ PARSING RULES:
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Parse these field notes and produce the ProposalPrefill JSON:\n\n${notes}${contactName ? `\n\nCustomer name: ${contactName}` : ""}`,
+            content: `Parse these field notes and produce the ProposalPrefill JSON:\n\n${savedNotes}${contactName ? `\n\nCustomer name: ${contactName}` : ""}`,
           },
         ],
         max_tokens: 4000,
