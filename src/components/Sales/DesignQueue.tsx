@@ -131,9 +131,11 @@ interface ProductPickerProps {
   onClose: () => void;
   currentProductId?: string | null;
   suggestedQuery?: string;
+  matchingCount?: number;
+  onApplyMatching?: (product: CatalogProduct) => void;
 }
 
-function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '' }: ProductPickerProps) {
+function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '', matchingCount = 0, onApplyMatching }: ProductPickerProps) {
   const [query, setQuery] = useState(suggestedQuery);
   const [results, setResults] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -224,6 +226,9 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
                 )}
                 {product.unit && <p className="text-xs text-gray-400">{product.unit}</p>}
               </div>
+              {matchingCount > 1 && onApplyMatching && (
+                <button type="button" onClick={event => { event.stopPropagation(); onApplyMatching(product); }} className="px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">Apply to {matchingCount}</button>
+              )}
               {currentProductId === product.id && (
                 <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
               )}
@@ -859,6 +864,25 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
       };
     });
 
+    setLocalRooms(updated);
+    setPickerOpen(null);
+    saveMatchesToBrief(updated);
+  }
+
+  function handleApplyToMatching(product: CatalogProduct) {
+    if (!pickerOpen || !localRooms) return;
+    const target = localRooms[pickerOpen.roomIndex]?.lineItems[pickerOpen.itemIndex];
+    if (!target || target.itemType === 'labor') return;
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const key = normalize(target.description);
+    const updated = localRooms.map(room => ({
+      ...room,
+      lineItems: room.lineItems.map(item =>
+        item.itemType !== 'labor' && normalize(item.description) === key
+          ? { ...item, matchedProductId: product.id, matchedProductName: product.name, matchConfidence: 'designer' as const, unit: item.unit || product.unit || 'EA' }
+          : item
+      ),
+    }));
     setLocalRooms(updated);
     setPickerOpen(null);
     saveMatchesToBrief(updated);
@@ -1698,6 +1722,13 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
       {pickerOpen && (
         <ProductPicker
           onSelect={handleProductSelected}
+          onApplyMatching={handleApplyToMatching}
+          matchingCount={(() => {
+            const item = localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex];
+            if (!item || item.itemType === 'labor') return 0;
+            const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return localRooms?.reduce((count, room) => count + room.lineItems.filter(candidate => candidate.itemType !== 'labor' && normalize(candidate.description) === normalize(item.description)).length, 0) || 0;
+          })()}
           onClose={() => setPickerOpen(null)}
           suggestedQuery={localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.description || ''}
           currentProductId={
