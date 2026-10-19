@@ -52,6 +52,13 @@ interface PunchlistTask {
   completed_by_customer?: boolean;
   installer_notes: string | null;
   internal_work_note?: { notes: string | null } | null;
+  visit_history?: Array<{
+    visit_result: string | null;
+    completion_notes: string | null;
+    remaining_work: string | null;
+    reported_at: string | null;
+    work_order: { work_order_number: string } | null;
+  }>;
   service_request_id?: string | null;
   work_order_id?: string | null;
   combined_description?: string | null;
@@ -144,6 +151,13 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           access_grant:punchlist_access_grants(access_type, expiration_date),
           photos:punchlist_task_photos(*),
           internal_work_note:punchlist_staff_notes(notes),
+          visit_history:work_order_punchlist_items(
+            visit_result,
+            completion_notes,
+            remaining_work,
+            reported_at,
+            work_order:work_orders!work_order_id(work_order_number)
+          ),
           service_request:service_requests!service_request_id(
             id,
             status,
@@ -485,6 +499,38 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
                         </p>
                       </div>
                     )}
+
+                    {/* Visit History */}
+                    {task.visit_history && task.visit_history.length > 0 && (() => {
+                      const sorted = [...task.visit_history].sort((a, b) =>
+                        (b.reported_at || '').localeCompare(a.reported_at || '')
+                      );
+                      const unfinishedVisits = sorted.filter(v => v.visit_result === 'unfinished' && v.remaining_work);
+                      if (unfinishedVisits.length === 0) return null;
+                      return (
+                        <div>
+                          <div className="text-xs font-medium text-secondary mb-1 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                            Prior Visit Notes (Unfinished)
+                          </div>
+                          <div className="space-y-1.5">
+                            {unfinishedVisits.map((v, i) => (
+                              <div key={i} className="text-xs text-muted bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-2 rounded">
+                                {v.work_order && (
+                                  <span className="font-medium text-amber-700 dark:text-amber-400">WO #{v.work_order.work_order_number}: </span>
+                                )}
+                                <span className="whitespace-pre-wrap">{v.remaining_work}</span>
+                                {v.reported_at && (
+                                  <span className="block text-secondary mt-0.5 italic">
+                                    {new Date(v.reported_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Photos */}
                     {task.photos && task.photos.length > 0 && (

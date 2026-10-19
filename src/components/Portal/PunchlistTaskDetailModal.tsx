@@ -367,6 +367,18 @@ export function PunchlistTaskDetailModal({
             )}
 
             {noteError && <p role="alert" className="text-sm text-red-600">{noteError}</p>}
+
+            {/* Technician completion notes (customer-visible) */}
+            {!isAdmin && task.status === 'completed' && task.installer_notes && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+                <p className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Technician Notes
+                </p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{task.installer_notes}</p>
+              </div>
+            )}
+
             {/* Work order link */}
             {workOrder && (
               <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl p-3">
