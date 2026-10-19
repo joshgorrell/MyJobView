@@ -128,7 +128,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [pendingContactUpdates, setPendingContactUpdates] = useState<Record<string, string>>({});
   const [savingToContact, setSavingToContact] = useState(false);
 
-  const [requestType, setRequestType] = useState<'service' | 'project'>(editingRequest?.request_type || 'service');
+  const [requestType] = useState<'service' | 'project'>(editingRequest?.request_type || 'service');
   const [customerProjects, setCustomerProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(editingRequest?.project_id || '');
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -1074,8 +1074,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             />
           </div>
 
+          {!isEditMode&&<p className="text-sm text-secondary">For remaining project work, use the <a href="/?tab=punchlist" target="_blank" rel="noopener noreferrer" className="text-info underline">Project Punchlist</a>.</p>}
           <div className="grid grid-cols-3 gap-2">
-            <select aria-label="Request type" value={requestType} disabled={isEditMode} onChange={e => setRequestType(e.target.value as 'service' | 'project')} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="service">Service</option><option value="project">Project</option></select>
+            <select aria-label="Request type" value={requestType} disabled className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="service">Service</option>{isEditMode&&<option value="project">Project</option>}</select>
             <select aria-label="Priority" value={formData.priority} onChange={e => setFormData(prev => ({...prev, priority: e.target.value as 'normal' | 'urgent'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="normal">Normal</option><option value="urgent">Urgent</option></select>
             <select aria-label="Billing type" value={formData.billable_type} onChange={e => setFormData(prev => ({...prev, billable_type: e.target.value as 'billable' | 'warranty'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="billable">Billable</option><option value="warranty">Warranty</option></select>
           </div>

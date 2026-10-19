@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const PUNCHLIST_SEEN_EVENT = 'punchlist:seen';
 
-const ACTIVE_STATUSES = ['draft', 'requested', 'scheduled', 'in_work_order'];
 
 export function usePunchlistUnseenCount(): number {
   const { profile } = useAuth();
@@ -18,17 +17,7 @@ export function usePunchlistUnseenCount(): number {
     }
 
     try {
-      const lastSeen = lastSeenRef.current;
-      let query = supabase
-        .from('punchlist_tasks')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ACTIVE_STATUSES);
-
-      if (lastSeen) {
-        query = query.gt('created_at', lastSeen);
-      }
-
-      const { count: unseenCount, error } = await query;
+      const { data: unseenCount, error } = await supabase.rpc('get_punchlist_unseen_count', { p_after: lastSeenRef.current });
 
       if (error) {
         console.error('Punchlist unseen count error:', error);
@@ -58,6 +47,7 @@ export function usePunchlistUnseenCount(): number {
         schema: 'public',
         table: 'punchlist_tasks',
       }, () => loadCount())
+      .on('postgres_changes', {event:'*',schema:'public',table:'project_tasks'}, () => loadCount())
       .subscribe();
 
     const handleSeen = (e: Event) => {

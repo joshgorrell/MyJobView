@@ -1,3 +1,4 @@
+import { SupportPhotos } from '../Shared/SupportPhotos';
 import { requestConfirmation } from '../../lib/feedback';
 import { cacheVisitPacket, readVisitPacket, queueVisitEvent, syncVisitEvents, pendingVisitEvents, discardVisitEvent, PendingVisitEvent } from '../../lib/jobOffline';
 import { useEffect, useRef, useState } from 'react';
@@ -88,8 +89,8 @@ export default function WorkOrderTasksChecklist({ workOrderId, projectId, curren
   const handoff = scopeVersion==='sold'?context?.sold_handoff:scopeVersion==='retained'?context?.retained_handoff:scopeVersion==='current'?(context?.approved_scopes?.[context.approved_scopes.length-1]?.scope||context?.sold_handoff||context?.retained_handoff):context?.approved_scopes?.find(s=>s.id===scopeVersion)?.scope;
   const scopeLabel=scopeVersion==='sold'?'Original sold scope':scopeVersion==='retained'?'Earliest reviewed scope':'Approved scope';
   if (!loading && !error && !assignments.length && !projectId) return null;
-  return <section aria-label="Internal Tasks" className="space-y-4">
-    <h2 className="font-semibold text-primary">{assignments.length ? 'Internal Tasks' : 'Project Reference'}</h2>
+  return <section aria-label="Project Punchlist" className="space-y-4">
+    <h2 className="font-semibold text-primary">{assignments.length ? 'Project Punchlist' : 'Project Reference'}</h2>
     <div className="flex flex-wrap gap-2">
       <button type="button" onClick={() => setView('today')} className={`min-h-11 px-4 rounded-lg border border-subtle ${view === 'today' ? 'bg-blue-600 text-white' : 'bg-surface text-primary'}`}>Today's Work ({assignments.length})</button>
       {projectId && <button type="button" onClick={() => setView('project')} className={`min-h-11 px-4 rounded-lg border border-subtle ${view === 'project' ? 'bg-blue-600 text-white' : 'bg-surface text-primary'}`}>Full Project</button>}
@@ -112,6 +113,7 @@ export default function WorkOrderTasksChecklist({ workOrderId, projectId, curren
           <p className="text-sm text-primary">Visit: {labels[task.status] || task.status}{master && ` · Project task: ${master.status === 'open' ? labels[master.progress_status] || 'Open' : labels[master.status] || master.status}`}</p>
           {(master?.description || task.description) && <p className="text-sm text-secondary whitespace-pre-wrap">{master?.description || task.description}</p>}
           {master && master.description !== task.description && <details><summary className="text-xs text-info cursor-pointer min-h-11">Instructions when assigned</summary><p className="text-sm text-secondary whitespace-pre-wrap">{task.description || 'No instructions recorded.'}</p></details>}
+          {task.project_task_id&&<SupportPhotos taskId={task.project_task_id}/>}
           {task.visit_instructions && <p className="text-sm text-primary whitespace-pre-wrap border-l-2 border-blue-500 pl-3">This visit: {task.visit_instructions}</p>}
           {!!master?.covered_items?.length && <details><summary className="min-h-11 text-sm text-info cursor-pointer">Covered equipment ({master.covered_items.length})</summary><ul>{master.covered_items.map(item=><li key={item.id} className="text-sm text-secondary">{item.quantity} · {item.description}</li>)}</ul></details>}
           {history(rows)}

@@ -1,8 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { calculateConvenienceFee } from '../../lib/convenienceFee';
-import { PaymentMethodForm, PaymentFormData } from './PaymentMethodForm';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { VIPMembershipFAQ } from './VIPMembershipFAQ';
 import { TrialStatusBanner } from './TrialStatusBanner';
@@ -32,7 +30,7 @@ import {
 const BENEFITS = [
   {
     icon: ClipboardList,
-    title: 'Unlimited Punchlist Access',
+    title: 'Online Service Requests',
     description: 'Create, manage, and track all your service items in one place. Add photos, write details, and follow progress from request to completion.',
     color: 'blue',
   },
@@ -70,7 +68,7 @@ const BENEFITS = [
 
 const HOW_IT_WORKS = [
   { step: 1, title: 'Choose a Plan', description: 'Select the VIP membership level that fits your needs and budget.' },
-  { step: 2, title: 'Get Instant Access', description: 'Your punchlist unlocks immediately and your priority status is activated.' },
+  { step: 2, title: 'Activate Your Plan', description: 'Your active paid or complimentary VIP plan enables online service requests.' },
   { step: 3, title: 'Enjoy Year-Round Service', description: 'Submit items, schedule visits, and relax knowing your system is in expert hands.' },
 ];
 
@@ -101,6 +99,8 @@ interface CurrentSubscription {
   status: string;
   start_date: string;
   next_billing_date: string;
+  is_complimentary?: boolean;
+  custom_amount?: number | null;
   trial_source?: 'vip_trial'|'test_and_tune_legacy';
   trial_end_date: string | null;
   trial_started_date: string | null;
@@ -123,6 +123,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
   const [selectedPlan, setSelectedPlan] = useState<VIPPlan | null>(null);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [requestingMembership,setRequestingMembership]=useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
@@ -206,9 +207,9 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
       setAvailablePlans(plans || []);
 
       // Load current subscription (active or trial only - pending_payment doesn't grant access)
-      const columns='id,status,start_date,next_billing_date,trial_source,trial_end_date,trial_started_date,plan:recurring_plans(plan_name,description,amount,billing_frequency)';
+      const columns='id,status,start_date,next_billing_date,is_complimentary,custom_amount,trial_source,trial_end_date,trial_started_date,plan:recurring_plans(plan_name,description,amount,billing_frequency)';
       const [paid,trial]=await Promise.all([
-        supabase.from('recurring_subscriptions').select('id,status,start_date,next_billing_date,trial_source,trial_end_date,trial_started_date,plan:recurring_plans!inner(plan_name,description,amount,billing_frequency)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
+        supabase.from('recurring_subscriptions').select('id,status,start_date,next_billing_date,is_complimentary,custom_amount,trial_source,trial_end_date,trial_started_date,plan:recurring_plans!inner(plan_name,description,amount,billing_frequency)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
         supabase.from('recurring_subscriptions').select(columns).eq('contact_id',contactId).eq('status','trial').eq('trial_source','vip_trial').gte('trial_end_date',new Date().toISOString().split('T')[0]).order('start_date',{ascending:false}).limit(1).maybeSingle()
       ]);
       if(paid.error)throw paid.error;if(trial.error)throw trial.error;
@@ -273,96 +274,17 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
     }
   }
 
-  async function handlePayment(paymentData: PaymentFormData) {
-    if (!selectedPlan) return;
-
-    const contactId = await getContactId();
-    if (!contactId) {
-      throw new Error('Contact information not found');
-    }
-
+  async function requestMembership() {
+    if (!selectedPlan || requestingMembership) return;
+    const contactId=await getContactId();if(!contactId)return;
+    setRequestingMembership(true);
     try {
-      // In production, this would process payment through Stripe
-      // For now, we simulate successful payment and activate immediately
-
-      const startDate = new Date();
-      const nextBillingDate = new Date();
-
-      // Calculate next billing date based on frequency
-      switch (selectedPlan.billing_frequency) {
-        case 'monthly':
-          nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-          break;
-        case 'quarterly':
-          nextBillingDate.setMonth(nextBillingDate.getMonth() + 3);
-          break;
-        case 'yearly':
-          nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
-          break;
-      }
-
-      // Calculate payment amounts
-      const amount = selectedPlan.amount;
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('cc_convenience_fee_enabled, cc_convenience_fee_type, cc_convenience_fee_percentage, cc_convenience_fee_flat_amount, cc_convenience_fee_label')
-        .maybeSingle();
-      const feeResult = calculateConvenienceFee(amount, paymentData.paymentType === 'card' ? 'credit_card' : 'ach', settings as any);
-
-      const totalAmount = feeResult.totalWithFee;
-
-      // In production, payment method and transaction details would be stored
-      // For now, we just activate the subscription
-
-
-      // Check if user is converting from trial
-      if (currentSubscription?.status === 'trial') {
-        // Update existing trial subscription to active
-        const { data: _updatedSub, error: updateError } = await supabase
-          .from('recurring_subscriptions')
-          .update({
-            plan_id: selectedPlan.id,
-            status: 'active',
-            trial_end_date: null,
-            trial_started_date: null,
-            next_billing_date: nextBillingDate.toISOString().split('T')[0],
-            notes: `Converted from trial to paid subscription via customer portal. Amount: $${totalAmount} (${paymentData.paymentType})`
-          })
-          .eq('id', currentSubscription.id)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-      } else {
-        // Create new active subscription
-        const { data: _newSub, error: subError } = await supabase
-          .from('recurring_subscriptions')
-          .insert({
-            contact_id: contactId,
-            plan_id: selectedPlan.id,
-            start_date: startDate.toISOString().split('T')[0],
-            next_billing_date: nextBillingDate.toISOString().split('T')[0],
-            status: 'active',
-            auto_invoice: true,
-            auto_send: false,
-            notes: `Self-service signup via customer portal. Amount: $${totalAmount} (${paymentData.paymentType})`
-          })
-          .select()
-          .single();
-
-        if (subError) throw subError;
-      }
-
-      notify(currentSubscription?.status === 'trial'
-          ? 'Payment successful! Your trial has been converted to a paid membership.'
-          : 'Payment successful! Your VIP membership is now active. Welcome to the VIP program!', { theme: 'blue', tone: 'success' });
-      setShowPaymentModal(false);
-      setSelectedPlan(null);
-      loadData();
-    } catch (error: any) {
-      console.error('Error processing payment:', error);
-      throw new Error(error.message || 'Payment processing failed');
-    }
+      const {error}=await supabase.rpc('request_vip_membership',{p_contact_id:contactId,p_plan_id:selectedPlan.id});
+      if(error)throw error;
+      notify('Enrollment requested. Our team will confirm payment and activate your plan. No payment was charged here.',{theme:'blue',tone:'success'});
+      setShowPaymentModal(false);setSelectedPlan(null);await loadData();
+    } catch(error){notify((error as {message?:string}).message||'Could not request enrollment.',{theme:'blue',tone:'error'});}
+    finally{setRequestingMembership(false);}
   }
 
   async function handleCancelSubscription() {
@@ -382,7 +304,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
 
       if (error) throw error;
 
-      notify('Your VIP membership has been cancelled. You will have access until your next billing date.', { theme: 'blue', tone: 'info' });
+      notify('Your VIP membership has been cancelled. Your previous service requests remain available to view.', { theme: 'blue', tone: 'info' });
       setShowCancelModal(false);
       loadData();
     } catch (error) {
@@ -474,7 +396,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 Priority Service. Total Peace of Mind.
               </h3>
               <p className="text-blue-200 text-base mb-6 max-w-xl leading-relaxed">
-                VIP members get unlimited punchlist access, jump-the-queue scheduling, regular maintenance, and a dedicated support team — all for one predictable rate.
+                VIP members get online service requests, jump-the-queue scheduling, regular maintenance, and a dedicated support team — all for one predictable rate.
               </p>
               <a
                 href="/portal/contact"
@@ -534,7 +456,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 Current Membership
               </h3>
               <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-                {currentSubscription.plan.plan_name}
+                {currentSubscription.plan.plan_name}{currentSubscription.is_complimentary?' · Complimentary':''}
               </p>
               {currentSubscription.plan.description && (
                 <p className="text-gray-600 mb-4">{currentSubscription.plan.description}</p>
@@ -648,7 +570,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-500 mb-1">Monthly Cost</div>
                   <div className="text-xl font-bold text-gray-900">
-                    ${currentSubscription.plan.amount}
+                    ${currentSubscription.custom_amount ?? currentSubscription.plan.amount}
                     <span className="text-sm text-gray-500 font-normal ml-1">
                       /{getBillingFrequencyLabel(currentSubscription.plan.billing_frequency).replace('per ', '')}
                     </span>
@@ -686,7 +608,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             <ul className="space-y-2 text-gray-700">
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Unlimited punchlist access</span>
+                <span>Online service requests</span>
               </li>
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -765,11 +687,11 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex items-start gap-2">
                         <AlertCircle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                        <span><strong>Punchlist access will end</strong> - You won't be able to create new service items</span>
+                        <span><strong>New online service submissions will end</strong> - You won't be able to create new service items</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span><strong>Your data is saved</strong> - All your punchlist history remains accessible</span>
+                        <span><strong>Your data is saved</strong> - Shared project items and previous service requests remain viewable</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -783,7 +705,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                   </div>
                   <p className="text-gray-600 text-sm">
                     Ready to keep your VIP benefits? Choose a plan below to continue enjoying priority service,
-                    punchlist access, and regular maintenance after your trial ends.
+                    online service requests, and regular maintenance after your trial ends.
                   </p>
                 </div>
               </div>
@@ -797,7 +719,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
             <p className="text-gray-600 mb-6">
               {currentSubscription?.status === 'trial'
                 ? 'Choose a plan to continue enjoying uninterrupted VIP benefits after your trial expires.'
-                : 'Choose the VIP plan that best fits your needs. All plans include punchlist access, priority service, and regular maintenance.'
+                : 'Choose the VIP plan that best fits your needs. All active paid or complimentary plans include online service requests, priority service, and regular maintenance.'
               }
             </p>
           </div>
@@ -829,7 +751,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
                 <ul className="space-y-3 mb-6">
                   <li className="flex items-start gap-2 text-gray-700">
                     <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>Unlimited punchlist access</span>
+                    <span>Online service requests</span>
                   </li>
                   <li className="flex items-start gap-2 text-gray-700">
                     <Check className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
@@ -1117,7 +1039,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
         <div className="fixed inset-0 bg-black/75 flex items-end sm:items-center justify-center sm:p-4 z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-lg shadow-xl max-w-2xl w-full p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Complete Payment</h3>
+              <h3 className="text-xl font-bold text-gray-900">Request VIP Enrollment</h3>
               <button
                 onClick={() => {
                   setShowPaymentModal(false);
@@ -1142,14 +1064,8 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
               </div>
             </div>
 
-            <PaymentMethodForm
-              amount={selectedPlan.amount}
-              onSubmit={handlePayment}
-              onCancel={() => {
-                setShowPaymentModal(false);
-                setShowAddressModal(true);
-              }}
-            />
+            <p className="text-sm text-gray-600 mb-4">Our team will arrange payment and activate your plan. This request does not charge you or activate VIP access.</p>
+            <button disabled={requestingMembership} onClick={()=>void requestMembership()} className="min-h-11 rounded-xl bg-blue-600 text-white px-5 disabled:opacity-50">{requestingMembership?'Submitting…':'Request Enrollment'}</button>
           </div>
         </div>
       )}
@@ -1208,7 +1124,7 @@ export function PortalVIPMembership({ contactId: propContactId }: PortalVIPMembe
               <ul className="space-y-2 mb-4">
                 <li className="flex items-start gap-2 text-gray-700">
                   <X className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                  <span>Punchlist portal access</span>
+                  <span>Online service requests</span>
                 </li>
                 <li className="flex items-start gap-2 text-gray-700">
                   <X className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />

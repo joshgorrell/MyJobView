@@ -1,3 +1,5 @@
+import { SupportPhotos } from '../Shared/SupportPhotos';
+import { SupportRequestItems } from '../Shared/SupportRequestItems';
 import { notify } from '../../lib/feedback';
 import {useWorkOrderOptions} from '../../lib/workOrderOptions';
 import React, { useState, useEffect, useRef } from 'react';
@@ -847,6 +849,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+{serviceRequest&&<div className="px-4 py-3"><SupportPhotos requestId={serviceRequest.id}/><SupportRequestItems requestId={serviceRequest.id}/></div>}
           {/* Service Request Banner - shown when converting from a service request */}
           {serviceRequest && (
             <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4">

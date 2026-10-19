@@ -110,7 +110,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
     { id: 'flow' as TabType, label: 'Flow', icon: Clock },
     { id: 'overview' as TabType, label: 'Overview', icon: FileText },
     { id: 'scope' as TabType, label: 'Scope', icon: FileText },
-    { id: 'tasks' as TabType, label: 'Tasks', icon: CheckSquare },
+    { id: 'tasks' as TabType, label: 'Punchlist', icon: CheckSquare },
     { id: 'appointments' as TabType, label: 'Appointments', icon: Calendar },
     { id: 'invoices' as TabType, label: 'Invoices', icon: DollarSign },
     { id: 'communication' as TabType, label: 'Messages', icon: MessageSquare },
@@ -194,7 +194,7 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
           <div className="p-6">
             <ProjectTasksList
               projectId={projectId}
-              canEdit={profile?.role === 'admin' || profile?.role === 'manager'}
+              canEdit={!!profile && !profile.contact_id && !['portal_user','customer','portal','client'].includes(profile.role)}
             />
           </div>
         )}

@@ -31,7 +31,7 @@ for(const width of [320,375,390,430,768,1024,1280]){
  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c[0]==='search').length),0);
  await page.getByPlaceholder('Search name, company, phone, or email...').fill('John');
  await page.getByRole('button').filter({hasText:'John Smith'}).click();
- if(width===375){await page.getByLabel('Request type').selectOption('project');await page.getByLabel('Request type').selectOption('service');await page.waitForTimeout(400);assert.equal(await page.getByText('Wrong project address',{exact:true}).count(),0,'Late project lookup must not change service location');}
+ if(width===375){assert.equal(await page.getByLabel('Request type').isDisabled(),true);assert.equal(await page.getByLabel('Request type').locator('option[value=project]').count(),0,'New project work goes through Project Punchlist');}
  await page.getByPlaceholder('What needs to be done? *').fill('TV has no sound');
  const send=page.getByRole('button',{name:'Send to Service',exact:true});assert.equal(await send.isEnabled(),true);
  const box=await send.boundingBox();assert.ok(box.y+box.height<=844,`Submit visible at ${width}`);

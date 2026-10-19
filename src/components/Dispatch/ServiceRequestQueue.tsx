@@ -1,3 +1,5 @@
+import { SupportRequestItems } from '../Shared/SupportRequestItems';
+import { SupportPhotos } from '../Shared/SupportPhotos';
 import { notify } from '../../lib/feedback';
 import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { useState, useEffect, useRef } from 'react';
@@ -737,6 +739,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                     {/* Expanded Details */}
                     {expandedRequest === request.id && (
                       <div className="mt-3 space-y-3 pt-3 border-t border-strong">
+                        <SupportPhotos requestId={request.id}/><SupportRequestItems requestId={request.id}/>
                         {/* Address */}
                         <div className="flex items-start gap-2.5">
                           <MapPin className="w-4 h-4 text-muted mt-0.5 shrink-0" />

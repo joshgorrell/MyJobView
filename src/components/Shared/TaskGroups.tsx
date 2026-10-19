@@ -1,7 +1,7 @@
 import { useState } from 'react';
 export type ScopeTask = {
   id: string; title: string; description: string | null; estimated_hours: number | null;
-  room_name?: string | null; phase_name?: string | null; status?: string; sort_order?: number;
+  visibility?: string; room_name?: string | null; phase_name?: string | null; status?: string; sort_order?: number;
 };
 export function TaskGroups<T extends ScopeTask>({ tasks, renderActions, renderDetails }: {
   tasks: T[]; renderActions?: (task: T) => React.ReactNode; renderDetails?: (task: T) => React.ReactNode;
@@ -19,7 +19,7 @@ export function TaskGroups<T extends ScopeTask>({ tasks, renderActions, renderDe
     {[...groups].map(([name, rows]) => <section key={name} className="border border-subtle rounded-lg overflow-hidden bg-surface">
       <h3 className="font-semibold text-primary p-3 border-b border-subtle flex flex-wrap justify-between gap-2"><span>{name}</span><span className="text-sm text-muted font-normal">{rows.length} tasks · {total(rows)}h</span></h3>
       <div className="divide-y divide-subtle">{rows.map(task => <details key={task.id} className="p-3">
-        <summary className="cursor-pointer flex flex-wrap items-center justify-between gap-2 min-h-11 text-primary"><span className="font-medium">{task.title}</span><span className="text-xs text-muted">{(groupBy === 'room' ? task.phase_name : task.room_name) || 'Unassigned'} · {task.estimated_hours == null || task.estimated_hours === 0 ? 'Not estimated' : `${task.estimated_hours}h`}{task.status && ` · ${task.status}`}</span></summary>
+        <summary className="cursor-pointer flex flex-wrap items-center justify-between gap-2 min-h-11 text-primary"><span className="font-medium">{task.title}{task.visibility&&<span className="ml-2 inline-block rounded-full border border-subtle px-2 py-0.5 text-xs font-normal text-secondary">{task.visibility==='customer_visible'?'Customer-visible':'Internal'}</span>}</span><span className="text-xs text-muted">{(groupBy === 'room' ? task.phase_name : task.room_name) || 'Unassigned'} · {task.estimated_hours == null || task.estimated_hours === 0 ? 'Not estimated' : `${task.estimated_hours}h`}{task.status && ` · ${task.status}`}</span></summary>
         {task.description && <p className="whitespace-pre-wrap text-sm text-secondary py-2">{task.description}</p>}
         {renderDetails?.(task)}{renderActions?.(task)}
       </details>)}</div>

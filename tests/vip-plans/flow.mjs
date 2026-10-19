@@ -42,7 +42,7 @@ const fixture = {
 const mutations=[];
 let failingTable=null;
 const supabase={from(table){const predicates=[];let mutation;
-  const q={select(){return q;},order(){return q;},eq(k,v){predicates.push(row=>row[k]===v);return q;},neq(k,v){predicates.push(row=>row[k]!==v);return q;},update(data){mutation={table,data};return q;},insert(data){mutation={table,data};return q;},delete(){mutation={table,delete:true};return q;},then(resolve){if(mutation)mutations.push(mutation);return Promise.resolve({data:(fixture[table]||[]).filter(row=>predicates.every(test=>test(row))),error:failingTable===table?{message:'Failed'}:null}).then(resolve);}};return q;
+  const q={overrideTypes(){return q;},select(){return q;},order(){return q;},eq(k,v){predicates.push(row=>row[k]===v);return q;},neq(k,v){predicates.push(row=>row[k]!==v);return q;},update(data){mutation={table,data};return q;},insert(data){mutation={table,data};return q;},delete(){mutation={table,delete:true};return q;},then(resolve){if(mutation)mutations.push(mutation);return Promise.resolve({data:(fixture[table]||[]).filter(row=>predicates.every(test=>test(row))),error:failingTable===table?{message:'Failed'}:null}).then(resolve);}};return q;
 }};
 const notices=[];
 const toast={success(message){notices.push(message);},error(message){notices.push(message);}};

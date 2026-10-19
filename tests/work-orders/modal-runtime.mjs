@@ -17,6 +17,8 @@ function harness(path, globals = {}, imports = {}) {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText, {
     module, exports:module.exports, console, ...globals,
     require(name) {
+      if (name.endsWith('/SupportPhotos')) return {SupportPhotos:'SupportPhotos'};
+      if (name.endsWith('/SupportRequestItems')) return {SupportRequestItems:'SupportRequestItems'};
       if (name.endsWith('.css')) return {};
       if (name.endsWith('/feedback')) return {
         notify(message, options) { if (options?.tone === 'error' || options?.tone === 'warning') { if (globals.alert) globals.alert(message); else throw Error(message); } },
