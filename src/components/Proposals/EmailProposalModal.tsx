@@ -89,6 +89,7 @@ export function EmailProposalModal({
   const [error, setError] = useState('');
   const [showAttachments, setShowAttachments] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
 
   const [docAvailability, setDocAvailability] = useState<DocumentAvailability | null>(null);
   const [docsLoading, setDocsLoading] = useState(true);
