@@ -34,7 +34,7 @@ export async function getCompanySettings(supabaseUrl: string, supabaseKey: strin
   return {
     company_name: companyName,
     company_email: s?.company_email || s?.from_email || '',
-    company_logo_url: s?.company_logo_url || 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png',
+    company_logo_url: s?.company_logo_url || '',
     from_email: fromEmail,
     from_name: fromName,
     from_address: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
@@ -85,8 +85,6 @@ export function convertTextToHtml(text: string): string {
   return html;
 }
 
-const EL_LOGO_FALLBACK = 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png';
-
 export function wrapInEmailLayout(
   content: string,
   companyName: string,
@@ -96,7 +94,7 @@ export function wrapInEmailLayout(
   offices: { office_name: string; phone: string }[] = [],
   footerTheme: 'dark' | 'light' = 'dark'
 ): string {
-  const resolvedLogoUrl = logoUrl || EL_LOGO_FALLBACK;
+  const resolvedLogoUrl = logoUrl || '';
   const lightFooter = footerTheme === 'light';
   const footerBackground = lightFooter ? '#f1f5f9' : '#1e293b';
   const footerText = lightFooter ? '#334155' : '#94a3b8';
@@ -124,13 +122,13 @@ export function wrapInEmailLayout(
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:32px 40px 28px;text-align:center;border-bottom:3px solid ${headerColor};">
-        <img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />
+        ${resolvedLogoUrl ? `<img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />` : `<span style="color:#ffffff;font-size:23px;font-weight:700;">${companyName}</span>`}
       </td></tr>
       <tr><td style="background:#ffffff;padding:40px 40px 32px;color:#374151;font-size:16px;line-height:1.7;">
         ${content}
       </td></tr>
       <tr><td style="background:${footerBackground};border-radius:0 0 16px 16px;padding:24px 32px;text-align:center;border-top:1px solid ${lightFooter ? '#cbd5e1' : '#334155'};">
-        <img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:${lightFooter ? '1' : '0.85'};" />
+        ${resolvedLogoUrl ? `<img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:${lightFooter ? '1' : '0.85'};" />` : ''}
         <p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${companyName}</p>
         ${companyEmail ? `<p style="color:${footerText};font-size:13px;margin:0 0 2px 0;">${companyEmail}</p>` : ''}
         ${phonesHtml}

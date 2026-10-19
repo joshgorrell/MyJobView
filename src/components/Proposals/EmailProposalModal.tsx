@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
+import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info, Pencil, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailProposalModalProps {
@@ -88,6 +88,9 @@ export function EmailProposalModal({
   const [step, setStep] = useState<'idle' | 'loading_docs' | 'sending'>('idle');
   const [error, setError] = useState('');
   const [showAttachments, setShowAttachments] = useState(true);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const [docAvailability, setDocAvailability] = useState<DocumentAvailability | null>(null);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -137,6 +140,30 @@ export function EmailProposalModal({
       setDocsLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!previewMode) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewHtml('');
+    supabase.functions.invoke('send-proposal-email', {
+      body: { proposalId, subject, message, previewOnly: true },
+    }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error || !data?.html) {
+        setError('Unable to load the branded email preview.');
+        setPreviewMode(false);
+      } else {
+        setPreviewHtml(data.html);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setError('Unable to load the branded email preview.');
+        setPreviewMode(false);
+      }
+    }).finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [previewMode, proposalId]);
 
   const attachmentCount = Object.values(attachments).filter(Boolean).length;
 
@@ -274,6 +301,19 @@ export function EmailProposalModal({
             </div>
           )}
 
+          {previewMode ? (
+            <div className="rounded-xl border border-gray-600 bg-white overflow-hidden">
+              <div className="bg-gray-900 px-5 py-3 text-white text-sm">
+                <span className="font-semibold">To:</span> {toEmail}
+                <div><span className="font-semibold">Subject:</span> {subject}</div>
+              </div>
+              {previewLoading ? <div className="p-8 text-gray-700 text-center">Loading branded email preview...</div> :
+                <iframe title="Branded proposal email preview" sandbox="" srcDoc={previewHtml}
+                  className="w-full h-[420px] bg-white" />}
+              <p className="px-4 py-2 text-xs text-gray-600 bg-gray-100">Attachments are selected in the editor.</p>
+            </div>
+          ) : (
+          <>
           {/* To — supports one or multiple addresses */}
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
@@ -428,6 +468,8 @@ export function EmailProposalModal({
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer */}
@@ -439,9 +481,14 @@ export function EmailProposalModal({
           >
             Cancel
           </button>
+          <button type="button" onClick={() => setPreviewMode(value => !value)} disabled={loading}
+            className="px-4 py-2.5 text-sm text-blue-200 border border-blue-500/50 rounded-lg hover:bg-blue-500/10 flex items-center gap-2">
+            {previewMode ? <Pencil className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {previewMode ? 'Edit' : 'Preview'}
+          </button>
           <button
             onClick={handleSend}
-            disabled={loading || !toEmail || !subject || !message}
+            disabled={loading || previewLoading || !previewMode || !previewHtml || !toEmail || !subject || !message}
             className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
