@@ -225,7 +225,7 @@ PROPOSALPREFILL SCHEMA:
 PARSING RULES:
 1. Extract customer name → contactSearchName
 2. Identify every room/zone/area mentioned → rooms[].name
-3. For each product mentioned: match to catalog by name, set quantity, unit=EA (or FT for cable/wire), itemType=material
+3. For each product mentioned: match to catalog by name only when the exact manufacturer/model is specified and verified; otherwise retain a generic equipment requirement for later selection. Set quantity, unit=EA (or FT for cable/wire), itemType=material. Never invent a catalog match or price. If the user says a pair, quantity is 2 per room. Expand a requirement mentioned for several rooms into a separate line item in each room. Use the same concise description for identical requirements across rooms to enable bulk model selection.
 4. For labor mentions: itemType=labor, unit=HR, quantity=hours, laborHours=hours
 5. Tax environment: home/house/residence/bedroom → residential; office/warehouse/commercial → commercial
 6. Tax project type: new construction → original_construction; renovations → remodel; most residential installs → general_installation_repair
