@@ -856,9 +856,37 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     }
   }
 
+  function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): boolean {
+    if (!/\\bpair\\b/i.test(product.name)) return true;
+    const counts = items.map(item => Number(item.overrideQuantity ?? item.quantity));
+    const allEven = counts.every(count => Number.isFinite(count) && count > 0 && count % 2 === 0);
+    if (!allEven) {
+      window.alert('This catalog product is sold as a pair. At least one room has an odd or invalid speaker count. Verify the packaging and quantities before assigning.');
+      return false;
+    }
+    return window.confirm(
+      `"${product.name}" is sold as a pair. Convert each selected room's physical speaker count to half as many catalog pairs? Example: 2 speakers become 1 pair. Cancel to leave the design unchanged.`
+    );
+  }
+
+  function applyCatalogSelection(item: LineItem, product: CatalogProduct): LineItem {
+    const soldAsPair = /\\bpair\\b/i.test(product.name);
+    const physicalCount = Number(item.overrideQuantity ?? item.quantity);
+    return {
+      ...item,
+      matchedProductId: product.id,
+      matchedProductName: product.name,
+      matchConfidence: 'designer',
+      unit: product.unit || 'EA',
+      overrideQuantity: soldAsPair ? physicalCount / 2 : item.overrideQuantity,
+    };
+  }
+
   function handleProductSelected(product: CatalogProduct) {
     if (!pickerOpen || !localRooms) return;
     const { roomIndex, itemIndex } = pickerOpen;
+    const selected = localRooms[roomIndex]?.lineItems[itemIndex];
+    if (!selected || !confirmCatalogPackage(product, [selected])) return;
 
     const updated = localRooms.map((room, ri) => {
       if (ri !== roomIndex) return room;
@@ -866,13 +894,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
         ...room,
         lineItems: room.lineItems.map((item, li) => {
           if (li !== itemIndex) return item;
-          return {
-            ...item,
-            matchedProductId: product.id,
-            matchedProductName: product.name,
-            matchConfidence: 'designer' as const,
-            unit: item.unit || product.unit || 'EA',
-          };
+          return applyCatalogSelection(item, product);
         }),
       };
     });
@@ -888,11 +910,15 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     if (!target || target.itemType === 'labor') return;
     const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
     const key = normalize(target.description);
+    const targets = localRooms.flatMap(room => room.lineItems.filter(item =>
+      item.itemType !== 'labor' && normalize(item.description) === key
+    ));
+    if (!confirmCatalogPackage(product, targets)) return;
     const updated = localRooms.map(room => ({
       ...room,
       lineItems: room.lineItems.map(item =>
         item.itemType !== 'labor' && normalize(item.description) === key
-          ? { ...item, matchedProductId: product.id, matchedProductName: product.name, matchConfidence: 'designer' as const, unit: item.unit || product.unit || 'EA' }
+          ? applyCatalogSelection(item, product)
           : item
       ),
     }));
