@@ -48,6 +48,7 @@ Deno.serve(async (req: Request) => {
       sentAttachments = {} as Record<string, boolean>,
       // When true, skip sending the email notification (rep is with the customer)
       skipNotification = false,
+      previewOnly = false,
     } = body;
 
     if (!proposalId) {
@@ -162,6 +163,28 @@ Deno.serve(async (req: Request) => {
       emailBody = emailBody.split(placeholder).join(value);
     }
 
+    // Escape employee-entered plain text before adding it to the branded HTML shell.
+    // The proposal action URL is generated server-side and is not editable by the sender.
+    const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const messageHtml = escapeHtml(emailBody).replace(/\r?\n/g, '<br>');
+    const safeProposalUrl = escapeHtml(proposalUrl);
+    const htmlBody = wrapInEmailLayout(
+      `<div style="white-space:normal">${messageHtml}</div>
+       <p style="text-align:center;margin:28px 0"><a href="${safeProposalUrl}" style="background:#0e7490;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:600;display:inline-block">View Proposal</a></p>`,
+      companyName,
+      settings?.company_email || settings?.from_email || '',
+      '#0e7490',
+      settings?.company_logo_url || ''
+    );
+
+    if (previewOnly) {
+      return new Response(JSON.stringify({ subject, html: htmlBody, text: `${emailBody}\n\nView proposal: ${proposalUrl}` }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -229,21 +252,6 @@ Deno.serve(async (req: Request) => {
     const fromName = settings?.from_name || settings?.company_name || 'Your Company';
     const fromField = `${fromName} <${fromEmail}>`;
     const replyTo = settings?.reply_to_email || fromEmail;
-
-    // Escape employee-entered plain text before adding it to the branded HTML shell.
-    // The proposal action URL is generated server-side and is not editable by the sender.
-    const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const messageHtml = escapeHtml(emailBody).replace(/\r?\n/g, '<br>');
-    const safeProposalUrl = escapeHtml(proposalUrl);
-    const htmlBody = wrapInEmailLayout(
-      `<div style="white-space:normal">${messageHtml}</div>
-       <p style="text-align:center;margin:28px 0"><a href="${safeProposalUrl}" style="background:#0e7490;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:600;display:inline-block">View Proposal</a></p>`,
-      companyName,
-      settings?.company_email || fromEmail,
-      '#0e7490',
-      settings?.company_logo_url || ''
-    );
 
     // Build Resend payload
     const resendPayload: Record<string, unknown> = {
