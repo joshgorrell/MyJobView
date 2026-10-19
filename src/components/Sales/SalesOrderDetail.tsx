@@ -323,7 +323,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
   const tabs: { id: TabType; label: string; icon: typeof DollarSign; badge?: string }[] = [
     { id: 'scope', label: 'Sales Order', icon: Layers },
-    ...(order.project?.id ? [{id:'tasks' as TabType,label:'Tasks',icon:CheckSquare}] : []),
+    ...(order.project?.id ? [{id:'tasks' as TabType,label:'Punchlist',icon:CheckSquare}] : []),
     { id: 'primary_scope', label: 'Scope', icon: AlignLeft },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'billing', label: 'Billing', icon: DollarSign },

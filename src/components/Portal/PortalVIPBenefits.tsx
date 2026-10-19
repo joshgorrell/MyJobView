@@ -28,7 +28,7 @@ interface VIPPlan {
 const BENEFITS = [
   {
     icon: ClipboardList,
-    title: 'Unlimited Punchlist Access',
+    title: 'Online Service Requests',
     description:
       'Create, manage, and track all your service items in one place. Add photos, write details, and follow progress from request to completion.',
     color: 'blue',
@@ -78,8 +78,8 @@ const HOW_IT_WORKS = [
   },
   {
     step: 2,
-    title: 'Get Instant Access',
-    description: 'Your punchlist unlocks immediately and your priority status is activated.',
+    title: 'Activate Your Plan',
+    description: 'Your active paid or complimentary VIP plan enables online service requests.',
   },
   {
     step: 3,
@@ -177,7 +177,7 @@ export function PortalVIPBenefits() {
               Priority Service.<br className="hidden sm:block" /> Total Peace of Mind.
             </h2>
             <p className="text-blue-200 text-lg mb-8 max-w-xl leading-relaxed">
-              VIP members get unlimited punchlist access, jump-the-queue scheduling, regular
+              VIP members get online service requests, jump-the-queue scheduling, regular
               maintenance, and a dedicated support team — all for one predictable monthly rate.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -293,7 +293,7 @@ export function PortalVIPBenefits() {
 
                   <ul className="space-y-2.5 mb-8 flex-1">
                     {[
-                      'Unlimited punchlist access',
+                      'Online service requests',
                       'Priority service scheduling',
                       'Regular maintenance visits',
                       'Dedicated VIP support',
@@ -362,7 +362,7 @@ export function PortalVIPBenefits() {
           <Star className="w-10 h-10 text-yellow-400 fill-yellow-400 mx-auto mb-4" />
           <h3 className="text-xl sm:text-2xl font-bold mb-2">Ready to Become a VIP Member?</h3>
           <p className="text-blue-200 mb-6 max-w-md mx-auto">
-            Join today and start enjoying priority service, unlimited punchlist access, and expert support.
+            Join today and start enjoying priority service, online service requests, and expert support.
           </p>
           <a
             href="/portal/vip-membership"

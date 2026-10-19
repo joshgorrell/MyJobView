@@ -9,7 +9,7 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     question: "What happens to my punchlist after my trial ends?",
-    answer: "Your punchlist items and history are saved even after your trial ends. However, you won't be able to create new items or request service until you subscribe to a VIP plan. All your previous tasks and photos remain accessible once you upgrade."
+    answer: "Your project punchlist becomes view-only after Test & Tune. Existing items remain for our team to resolve. Active paid or complimentary VIP plans allow new online service requests. Your shared project items and photos remain viewable without upgrading."
   },
   {
     question: "Can I cancel my VIP membership anytime?",
@@ -25,7 +25,7 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What's the difference between Test & Tune and VIP membership?",
-    answer: "Test & Tune provides free project adjustments and tuning for 90 days after substantial completion. Punchlist is the tool for reporting issues. VIP membership continues Punchlist access afterward, with service benefits defined by your plan. A promotional VIP trial is a separate offer with its own dates."
+    answer: "Test & Tune provides free project adjustments and tuning for 90 days after substantial completion. Punchlist is the tool for reporting issues. After Test & Tune, Project Punchlist is view-only. Active paid or complimentary VIP plans provide online service requests, with service benefits defined by your plan. A promotional VIP trial is a separate offer with its own dates."
   },
   {
     question: "Can I change my VIP plan later?",
@@ -33,11 +33,11 @@ const faqs: FAQItem[] = [
   },
   {
     question: "What happens if I have open punchlist items when my trial expires?",
-    answer: "Don't worry! Any service requests you've already submitted will be completed regardless of your trial status. We'll finish what we started. However, you won't be able to submit new items without upgrading to a VIP plan."
+    answer: "Don't worry! Any service requests you've already submitted will be completed regardless of your trial status. We'll finish what we started. The project punchlist becomes view-only. Active paid or complimentary VIP plans let you submit new service requests."
   },
   {
     question: "How is VIP service different from regular service?",
-    answer: "VIP members get priority scheduling (faster appointments), direct punchlist access (no phone calls needed), dedicated support, and regular maintenance visits. Standard customers can still call for service, but may experience longer wait times."
+    answer: "VIP members get priority scheduling (faster appointments), online service requests (no phone calls needed), dedicated support, and regular maintenance visits. Standard customers can still call for service, but may experience longer wait times."
   }
 ];
 

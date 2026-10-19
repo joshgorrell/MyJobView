@@ -1,0 +1,39 @@
+name: Project punchlist and VIP service
+on:
+  pull_request:
+    paths:
+      - 'src/components/Portal/**'
+      - 'src/components/Projects/**'
+      - 'src/components/Production/**'
+      - 'src/components/Dispatch/ServiceRequestQueue.tsx'
+      - 'src/components/Service/ServiceRequestForm.tsx'
+      - 'src/hooks/usePunchlistUnseenCount.ts'
+      - 'src/components/Shared/Support*.tsx'
+      - 'src/components/Shared/TaskGroups.tsx'
+      - 'supabase/migrations/*project_punchlist*'
+      - 'tests/punchlist/**'
+      - 'package*.json'
+      - '.github/workflows/project-support.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  support:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:punchlist
+      - run: npm run test:punchlist:handoff
+      - run: npm run test:vip-plans
+      - run: npm run test:program-access
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:project-support:browser
+      - run: node tests/punchlist/dashboard-browser.mjs

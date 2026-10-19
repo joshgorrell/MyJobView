@@ -1,3 +1,4 @@
+import { ProjectPunchlistWorkspace, PlaceLegacyPunchlist } from './ProjectPunchlistWorkspace';
 import { punchlistDescription, punchlistList, canSchedulePunchlist, canRequestPunchlist } from '../../lib/punchlist';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -20,8 +21,6 @@ import {
   CheckCheck,
   RotateCcw,
   HelpCircle,
-  Star,
-  TrendingUp,
   AlertCircle,
   Layers,
   Info,
@@ -73,6 +72,7 @@ interface PunchlistTask {
     access_type: string;
     expiration_date: string | null;
   } | null;
+  project_task?: Array<{id:string}>;
   photos?: Array<{
     id: string;
     task_id: string;
@@ -103,7 +103,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   const [batchMode, setBatchMode] = useState<'request' | 'schedule'>('request');
   const [scheduleQueue, setScheduleQueue] = useState<ServiceRequestContext[]>([]);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'punchlist' | 'customers'>('punchlist');
+  const [activeTab, setActiveTab] = useState<'projects' | 'punchlist' | 'customers'>('projects');
   const [openInviteCount, setOpenInviteCount] = useState(0);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [showHelp, setShowHelp] = useState(false);
@@ -147,6 +147,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         .from('punchlist_tasks')
         .select(`
           *,
+          project_task:project_tasks!legacy_punchlist_id(id),
           contact:contacts!inner(full_name, first_name, last_name, email, phone),
           access_grant:punchlist_access_grants(access_type, expiration_date),
           photos:punchlist_task_photos(*),
@@ -172,7 +173,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
       if (error) throw error;
 
-      setTasks(data || []);
+      setTasks((data || []).filter(task=>!task.project_task?.length));
       const eligible = new Set((data || []).filter(canSchedulePunchlist).map(task => task.id));
       setSelectedTaskIds(previous => new Set([...previous].filter(id => eligible.has(id))));
     } catch (error) {
@@ -358,9 +359,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   return (
     <div className="space-y-2 sm:space-y-4 px-1 sm:px-0">
       <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2 min-w-0">
-        <select aria-label="Punchlist page" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'punchlist' | 'customers'))}
-          className="shrink-0 min-h-11 max-w-[110px] text-xs bg-surface border border-subtle rounded-lg text-primary px-1.5">
-          <option value="punchlist">Punchlist</option><option value="customers">Customers</option>
+        <select aria-label="Punchlist page" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'projects' | 'punchlist' | 'customers'))}
+          className="shrink-0 min-h-11 max-w-[180px] text-xs bg-surface border border-subtle rounded-lg text-primary px-1.5">
+          <option value="projects">Project Punchlist</option><option value="punchlist">Earlier Items</option><option value="customers">Customers</option>
         </select>
         {activeTab === 'punchlist' && (<>
           <button type="button" aria-expanded={showMobileFilters} aria-controls="punchlist-mobile-filters" onClick={() => setShowMobileFilters(value => !value)} className="sm:hidden min-h-11 px-3 rounded-lg border border-subtle text-primary">Filters</button>
@@ -419,6 +420,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
               return (
                 <div key={task.id}>
                   {showCustomerHeader && <div className="px-1 py-1 text-sm font-semibold text-primary">{task.contact.full_name}</div>}
+                  <PlaceLegacyPunchlist taskId={task.id} contactId={task.contact_id} onSaved={loadTasks}/>
                   {/* Task Card */}
                   <div className={`bg-surface border rounded-lg overflow-hidden transition-colors ${
                     selectedTaskIds.has(task.id)
@@ -677,6 +679,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         </>
       )}
 
+      {activeTab === 'projects' && <ProjectPunchlistWorkspace/>}
+
       {/* Customers Tab Content */}
       {activeTab === 'customers' && (
         <div>
@@ -724,146 +728,13 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Overview */}
-              <div>
-                <h3 className="text-lg font-bold text-primary mb-3">What is the Punchlist System?</h3>
-                <p className="text-secondary leading-relaxed">
-                  The Punchlist system provides customers with a dedicated portal to submit service requests, track warranty items,
-                  and communicate directly with your service team. Customers can create tasks, upload photos, and monitor progress
-                  in real-time. This system helps reduce phone calls, improves customer satisfaction, and streamlines your service operations.
-                </p>
-              </div>
-
-              {/* Access Methods */}
-              <div>
-                <h3 className="text-lg font-bold text-primary mb-3">Three Ways Customers Get Portal Access</h3>
-                <p className="text-secondary leading-relaxed mb-4">
-                  Your system supports three distinct methods for granting customers access to the Punchlist portal. Each method
-                  serves different business purposes and has different access durations:
-                </p>
-
-                <div className="space-y-3">
-                  {/* VIP Membership */}
-                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-300 rounded-lg p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-amber-500 text-primary rounded-full flex items-center justify-center flex-shrink-0">
-                        <Star className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-primary mb-2 text-lg">1. VIP Membership (Ongoing Access)</h4>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>When:</strong> Customer enrolls in your VIP/recurring service plan
-                        </p>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>Duration:</strong> Active as long as subscription is current
-                        </p>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>How to Grant:</strong> Create a VIP subscription in the Finance → VIP Plans section. Access is automatically
-                          granted when the subscription is active or in trial status.
-                        </p>
-                        <p className="text-sm text-secondary">
-                          <strong>Use Case:</strong> Premium customers who pay for ongoing service packages, maintenance plans, or security
-                          monitoring subscriptions. This is your highest tier of service access.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Test & Tune Program */}
-                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-blue-500 text-primary rounded-full flex items-center justify-center flex-shrink-0">
-                        <TrendingUp className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-primary mb-2 text-lg">2. Test & Tune Program (90 Days)</h4>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>When:</strong> Sales order is marked as complete with Test & Tune enabled
-                        </p>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>Duration:</strong> 90 days from completion date
-                        </p>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>How to Grant:</strong> Automatically created when completing a sales order with "Start 90-Day Test & Tune Program"
-                          checked. The system creates the access grant automatically, then you can optionally send a welcome email.
-                          Can also be granted manually from the Customers tab.
-                        </p>
-                        <p className="text-sm text-secondary mb-2">
-                          <strong>Note:</strong> Customers who already have VIP access don't need a separate Test & Tune grant -
-                          they already have punchlist access through their VIP membership.
-                        </p>
-                        <p className="text-sm text-secondary">
-                          <strong>Use Case:</strong> Post-installation warranty period for performance tracking and customer fine-tuning.
-                          Allows customers to submit adjustments while field teams work toward labor efficiency targets.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Access Priority */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-5">
-                <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-blue-600" />
-                  Access Priority Order
-                </h4>
-                <p className="text-sm text-secondary mb-3">
-                  If a customer has multiple access types, the system follows this priority order:
-                </p>
-                <ol className="text-sm text-secondary space-y-2 ml-4">
-                  <li><strong>1. VIP Membership</strong> - Highest priority, ongoing access</li>
-                  <li><strong>2. Test & Tune</strong> - Project-based warranty access</li>
-                </ol>
-                <p className="text-sm text-secondary mt-3">
-                  The customer's portal will display their current access type and days remaining (if applicable).
-                </p>
-              </div>
-
-              {/* How to Send Invites */}
-              <div>
-                <h3 className="text-lg font-bold text-primary mb-3">How Portal Access is Granted</h3>
-                <div className="space-y-3">
-                  <div className="border border-subtle rounded-lg p-4">
-                    <h5 className="font-semibold text-primary mb-2">From Sales Order Completion:</h5>
-                    <p className="text-sm text-secondary mb-2">
-                      When marking a sales order as complete with "Start 90-Day Test & Tune Program" checked:
-                    </p>
-                    <ul className="text-sm text-secondary space-y-1 ml-4 list-disc">
-                      <li>The system <strong>automatically creates</strong> a Test & Tune access grant for the customer</li>
-                      <li>Access is granted for 90 days, starting immediately</li>
-                      <li>You can optionally send a welcome email with portal instructions (checkbox below)</li>
-                      <li>If customer already has VIP access, no separate grant is created (they already have punchlist access)</li>
-                    </ul>
-                    <p className="text-sm text-secondary mt-2 italic">
-                      The email is optional - access is created automatically regardless of whether you send the email.
-                    </p>
-                  </div>
-                  <div className="border border-subtle rounded-lg p-4">
-                    <h5 className="font-semibold text-primary mb-2">Manual Invitation:</h5>
-                    <p className="text-sm text-secondary">
-                      Go to the <strong>Customers</strong> tab → Click "Send Invite" → Select a customer → Choose access type
-                      (Test & Tune or Test & Tune No Portal) → The system creates the database access grant and sends the invitation email automatically.
-                    </p>
-                  </div>
-                  <div className="border border-subtle rounded-lg p-4">
-                    <h5 className="font-semibold text-primary mb-2">VIP Membership:</h5>
-                    <p className="text-sm text-secondary">
-                      Create a recurring subscription in <strong>Finance → VIP Plans</strong>. Portal access is automatically
-                      granted when the subscription becomes active or enters trial status. No separate invite needed.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Info */}
-              <div className="border-t border-subtle pt-4">
-                <p className="text-sm text-secondary text-center">
-                  For technical support with the Punchlist system, contact your system administrator.
-                </p>
-              </div>
+            <div className="p-6 space-y-5 text-sm text-secondary">
+              <p><strong>Project Punchlist:</strong> The project's existing tasks are its punchlist. Staff can add remaining work at any stage. New staff items default to Internal.</p>
+              <p><strong>Customer-visible items:</strong> Choose Customer-visible and enter a separate customer description. Internal titles, instructions, technician notes, and visit history remain private.</p>
+              <p><strong>Customer access:</strong> Customers can add shared project items from substantial completion through the end of the project's 90-day Test &amp; Tune period. Afterward the list is view-only. Unfinished work remains for staff to resolve.</p>
+              <p><strong>VIP service:</strong> Active paid or complimentary VIP plans enable online general service requests, with multiple issues and photos. VIP does not extend a project's punchlist submission period. Coverage and charges follow the plan.</p>
+              <p><strong>Scheduling:</strong> Queue a visit from project items. Dispatch uses the existing Work Order Request Queue, and the original project items follow the scheduled work order.</p>
+              <p><strong>Earlier Items:</strong> Existing items with clear project links move into that project's punchlist. Assign unmatched items to the correct project here; existing requests and visits are preserved.</p>
             </div>
           </div>
         </div>

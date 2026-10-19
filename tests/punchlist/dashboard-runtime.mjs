@@ -32,7 +32,7 @@ const calls=[];
 const supabase={channel:()=>({on(){return this;},subscribe:()=>({unsubscribe(){}})}),from(table){let id;const q={select:()=>q,order:()=>q,eq:(k,v)=>{id=v;return q;},single:async()=>({data:requests[id],error:null}),then:resolve=>Promise.resolve({data:rows,error:null}).then(resolve)};return q;},rpc:async(name,args)=>{calls.push([name,args]);const id='sr-'+args.p_contact_id;requests[id]={id,contact_id:args.p_contact_id,status:'open',work_order_id:null};return{data:id,error:null};}};
 const toast={warning:msg=>calls.push(['warning',msg]),error:msg=>calls.push(['error',msg]),success(){}};
 const h=harness('src/components/Production/PunchlistAdminDashboard.tsx',{}, {
- '../../lib/punchlist':library.exports,'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile:{id:'admin'},loading:false})},
+ '../../lib/punchlist':library.exports,'./ProjectPunchlistWorkspace':{ProjectPunchlistWorkspace:'ProjectWorkspace',PlaceLegacyPunchlist:'PlaceLegacy'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile:{id:'admin'},loading:false})},
  '../Shared/Toast':{useToast:()=>toast},'../../hooks/usePunchlistUnseenCount':{markPunchlistSeen(){}},'./PunchlistInviteManager':{PunchlistInviteManager:'Invites'},'../Portal/PunchlistTaskDetailModal':{PunchlistTaskDetailModal:'Details'},'../Shared/ContactQuickViewModal':{ContactQuickViewModal:'Contact'},
 });
 let tree=h.render({},'PunchlistAdminDashboard');for(const effect of h.effects.splice(0))effect();await new Promise(r=>setTimeout(r,0));tree=h.render({},'PunchlistAdminDashboard');
@@ -40,6 +40,7 @@ const boxes=()=>nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox
 const button=(name)=>nodes(tree).find(n=>n.type==='button'&&(n.props['aria-label']===name||text(n)===name));
 const control=name=>nodes(tree).find(n=>n.props?.['aria-label']===name);
 const render=()=>{tree=h.render({},'PunchlistAdminDashboard');};
+control('Punchlist page').props.onChange({target:{value:'punchlist'}});render();
 assert.deepEqual(boxes().map(n=>n.props['aria-label']),['Select new item','Select second item','Select requested item','Select old item']);
 assert.equal(button('Select all visible items for this customer').props.disabled,true);
 boxes()[1].props.onChange();render();assert.equal(boxes()[0].props.disabled,true);
@@ -53,7 +54,7 @@ button('Request Service').props.onClick();render();let batch=nodes(tree).find(n=
 // Exercise the actual nested batch component by using its captured function in a hook renderer.
 let completed=false,scheduled;
 function runBatch(props){const source=fs.readFileSync('src/components/Production/PunchlistAdminDashboard.tsx','utf8')+'\nexport {BatchRequestModal};';
- const original=fs.readFileSync;fs.readFileSync=(path,...args)=>path==='batch.tsx'?source:original(path,...args);try{return harness('batch.tsx',{}, {'../../lib/punchlist':library.exports,'../../lib/supabase':{supabase},'../../contexts/AuthContext':{},'../Shared/Toast':{useToast:()=>toast},'../../hooks/usePunchlistUnseenCount':{},'./PunchlistInviteManager':{},'../Portal/PunchlistTaskDetailModal':{},'../Shared/ContactQuickViewModal':{}}).render(props,'BatchRequestModal');}finally{fs.readFileSync=original;}}
+ const original=fs.readFileSync;fs.readFileSync=(path,...args)=>path==='batch.tsx'?source:original(path,...args);try{return harness('batch.tsx',{}, {'../../lib/punchlist':library.exports,'./ProjectPunchlistWorkspace':{ProjectPunchlistWorkspace:'ProjectWorkspace',PlaceLegacyPunchlist:'PlaceLegacy'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{},'../Shared/Toast':{useToast:()=>toast},'../../hooks/usePunchlistUnseenCount':{},'./PunchlistInviteManager':{},'../Portal/PunchlistTaskDetailModal':{},'../Shared/ContactQuickViewModal':{}}).render(props,'BatchRequestModal');}finally{fs.readFileSync=original;}}
 let batchTree=runBatch({tasks:[rows[1]],mode:'request',onSuccess:()=>{completed=true;},onClose(){},onSchedule(){throw Error('Request Service must hand off to the queue without opening the scheduler');}});
 assert.ok(text(batchTree).includes('Your service manager will assign a technician and schedule the work.'));
 await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Request Service (1)').props.onClick();assert.ok(completed);assert.deepEqual(Array.from(calls.find(c=>c[0]==='request_punchlist_service')[1].p_task_ids),['new']);

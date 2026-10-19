@@ -23,7 +23,7 @@
     "test:security-onboarding": "node tests/security-onboarding/database.mjs && node tests/security-onboarding/payments.mjs && node tests/security-onboarding/payment-edge.mjs && node tests/security-onboarding/charges.mjs && node tests/security-onboarding/worker.mjs && node tests/security-onboarding/commission.mjs && node tests/security-onboarding/invitations.mjs && node tests/security-onboarding/oauth.mjs && node tests/security-onboarding/qbo-setup.mjs && node tests/security-onboarding/printing.mjs",
     "test:reviews": "node tests/reviews/database.mjs && node tests/reviews/edge.mjs",
     "test:service-requests": "node tests/service-requests/mobile-runtime.mjs && node tests/service-requests/intake-runtime.mjs && node tests/service-requests/intake-database.mjs",
-    "test:punchlist": "node tests/punchlist/database.mjs && node tests/punchlist/dashboard-runtime.mjs && node tests/punchlist/detail-actions.mjs",
+    "test:punchlist": "node tests/punchlist/database.mjs && node tests/punchlist/dashboard-runtime.mjs && node tests/punchlist/detail-actions.mjs && node tests/punchlist/project-support-database.mjs",
     "test:punchlist:browser": "npm run build && node tests/punchlist/dashboard-browser.mjs",
     "test:work-orders": "node tests/work-orders/deployment-contract.mjs && node tests/work-orders/complete-scheduling-database.mjs && node tests/work-orders/modal-runtime.mjs && node tests/work-orders/scheduling-runtime.mjs && node tests/work-orders/notes-polish-runtime.mjs",
     "test:work-orders:live-time": "node tests/work-orders/live-team-time.mjs",
@@ -63,7 +63,8 @@
     "test:welcome-onboarding": "node tests/welcome-onboarding/database.mjs && node tests/welcome-onboarding/push.mjs",
     "test:welcome-onboarding:browser": "npm run build && node tests/welcome-onboarding/browser.mjs",
     "test:smart-intake": "node tests/smart-intake/receipt-contract.mjs && node tests/smart-intake/attachment-manifest.mjs && node tests/smart-intake/private-malware-scanner.mjs && node tests/smart-intake/scan-worker.mjs && node tests/smart-intake/attachment-retention.mjs && node tests/smart-intake/attachment-metadata-permissions.mjs && node tests/smart-intake/customer-matching-contract.mjs && node tests/smart-intake/manual-draft-contract.mjs && node tests/smart-intake/manual-service-transaction.mjs && node tests/smart-intake/routing-readiness-contract.mjs && node tests/smart-intake/service-routing-contract.mjs && node tests/smart-intake/service-routing-worker.mjs",
-    "test:modals:feedback": "node tests/modals/dialog-runtime.mjs && node tests/modals/feedback-browser.mjs"
+    "test:modals:feedback": "node tests/modals/dialog-runtime.mjs && node tests/modals/feedback-browser.mjs",
+    "test:project-support:browser": "node tests/punchlist/project-support-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
