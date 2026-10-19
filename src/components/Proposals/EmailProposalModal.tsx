@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
+import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info, Pencil, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailProposalModalProps {
@@ -88,6 +88,7 @@ export function EmailProposalModal({
   const [step, setStep] = useState<'idle' | 'loading_docs' | 'sending'>('idle');
   const [error, setError] = useState('');
   const [showAttachments, setShowAttachments] = useState(true);
+  const [previewMode, setPreviewMode] = useState(false);
 
   const [docAvailability, setDocAvailability] = useState<DocumentAvailability | null>(null);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -274,6 +275,22 @@ export function EmailProposalModal({
             </div>
           )}
 
+          {previewMode ? (
+            <div className="rounded-xl border border-gray-600 bg-white text-gray-800 overflow-hidden">
+              <div className="bg-gray-900 px-5 py-5 text-center text-white font-semibold text-lg">Email preview</div>
+              <div className="p-5 space-y-3 text-sm">
+                <p><span className="font-semibold">To:</span> {toEmail}</p>
+                {ccEmails.trim() && <p><span className="font-semibold">Cc:</span> {ccEmails}</p>}
+                {bccEmails.trim() && <p><span className="font-semibold">Bcc:</span> {bccEmails}</p>}
+                <p><span className="font-semibold">Subject:</span> {subject}</p>
+                <div className="border-t border-gray-200 pt-4 whitespace-pre-wrap leading-relaxed">{message}</div>
+                <p className="text-blue-700 font-semibold">View proposal (secure portal link added when sent)</p>
+                <p className="text-gray-500">{attachmentCount} attachment option{attachmentCount === 1 ? '' : 's'} selected</p>
+              </div>
+              <p className="px-5 py-3 bg-gray-100 text-xs text-gray-600">Content preview. Final email branding and secure links are added by the sending service.</p>
+            </div>
+          ) : (
+          <>
           {/* To — supports one or multiple addresses */}
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
@@ -428,6 +445,8 @@ export function EmailProposalModal({
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer */}
@@ -438,6 +457,11 @@ export function EmailProposalModal({
             className="px-4 py-2.5 text-sm text-gray-300 hover:text-white transition-colors disabled:opacity-50 rounded-lg hover:bg-gray-700"
           >
             Cancel
+          </button>
+          <button type="button" onClick={() => setPreviewMode(value => !value)} disabled={loading}
+            className="px-4 py-2.5 text-sm text-blue-200 border border-blue-500/50 rounded-lg hover:bg-blue-500/10 flex items-center gap-2">
+            {previewMode ? <Pencil className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {previewMode ? 'Edit' : 'Preview'}
           </button>
           <button
             onClick={handleSend}
