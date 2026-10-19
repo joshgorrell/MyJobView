@@ -141,6 +141,30 @@ export function EmailProposalModal({
     }
   }
 
+  useEffect(() => {
+    if (!previewMode) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewHtml('');
+    supabase.functions.invoke('send-proposal-email', {
+      body: { proposalId, subject, message, previewOnly: true },
+    }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error || !data?.html) {
+        setError('Unable to load the branded email preview.');
+        setPreviewMode(false);
+      } else {
+        setPreviewHtml(data.html);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setError('Unable to load the branded email preview.');
+        setPreviewMode(false);
+      }
+    }).finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [previewMode, proposalId]);
+
   const attachmentCount = Object.values(attachments).filter(Boolean).length;
 
   const handleSend = async () => {
