@@ -118,8 +118,9 @@ function countMatchedItems(rooms?: Room[]): { matched: number; total: number } {
   let total = 0;
   for (const room of rooms) {
     for (const item of room.lineItems) {
+      if (item.itemType === 'labor') continue;
       total++;
-      if (item.matchedProductId || item.matchConfidence === 'ai') matched++;
+      if (item.matchedProductId) matched++;
     }
   }
   return { matched, total };
@@ -129,10 +130,11 @@ interface ProductPickerProps {
   onSelect: (product: CatalogProduct) => void;
   onClose: () => void;
   currentProductId?: string | null;
+  suggestedQuery?: string;
 }
 
-function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerProps) {
-  const [query, setQuery] = useState('');
+function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '' }: ProductPickerProps) {
+  const [query, setQuery] = useState(suggestedQuery);
   const [results, setResults] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,7 +143,7 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
 
   useEffect(() => {
     inputRef.current?.focus();
-    searchProducts('');
+    searchProducts(suggestedQuery);
   }, []);
 
   async function searchProducts(q: string) {
@@ -1605,8 +1607,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                       <p className="text-sm font-medium text-blue-900">Ready to create the proposal?</p>
                       <p className="text-xs text-blue-600 mt-0.5">
                         {allMatched
-                          ? 'All products matched. Convert this layout into a full proposal.'
-                          : `${total - matched} item${total - matched !== 1 ? 's' : ''} still unmatched — you can still convert and assign later in the proposal builder.`}
+                          ? 'All equipment matched. Review pricing before creating the proposal.'
+                          : `${total - matched} equipment item${total - matched !== 1 ? 's' : ''} still unmatched — assign catalog products before creating the proposal.`}
                       </p>
                     </div>
                     <button
@@ -1697,6 +1699,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
         <ProductPicker
           onSelect={handleProductSelected}
           onClose={() => setPickerOpen(null)}
+          suggestedQuery={localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.description || ''}
           currentProductId={
             localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.matchedProductId
           }
