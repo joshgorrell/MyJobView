@@ -1482,6 +1482,12 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                         </span>
                       </div>
 
+                      {room.description && (
+                        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/40">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Proposed scope of work</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{room.description}</p>
+                        </div>
+                      )}
                       <div className="divide-y divide-gray-50">
                         {room.lineItems.map((item, li) => {
                           const isMatched = !!item.matchedProductId;
