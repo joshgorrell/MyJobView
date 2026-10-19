@@ -208,9 +208,12 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
             </div>
           )}
           {results.map(product => (
-            <button
+            <div
               key={product.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(product)}
+              onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelect(product); } }}
               className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3 ${
                 currentProductId === product.id ? 'bg-blue-50' : ''
               }`}
@@ -245,7 +248,7 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
               {currentProductId === product.id && (
                 <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
               )}
-            </button>
+            </div>
           ))}
         </div>
 
