@@ -130,7 +130,7 @@ export function wrapInEmailLayout(
         ${content}
       </td></tr>
       <tr><td style="background:${footerBackground};border-radius:0 0 16px 16px;padding:24px 32px;text-align:center;border-top:1px solid ${lightFooter ? '#cbd5e1' : '#334155'};">
-        <img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:${lightFooter ? '1' : '0.85'};" />
+        ${resolvedLogoUrl ? `<img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:${lightFooter ? '1' : '0.85'};" />` : ''}
         <p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${companyName}</p>
         ${companyEmail ? `<p style="color:${footerText};font-size:13px;margin:0 0 2px 0;">${companyEmail}</p>` : ''}
         ${phonesHtml}
