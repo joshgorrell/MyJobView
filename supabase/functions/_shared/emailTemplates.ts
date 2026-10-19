@@ -34,7 +34,7 @@ export async function getCompanySettings(supabaseUrl: string, supabaseKey: strin
   return {
     company_name: companyName,
     company_email: s?.company_email || s?.from_email || '',
-    company_logo_url: s?.company_logo_url || 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png',
+    company_logo_url: s?.company_logo_url || '',
     from_email: fromEmail,
     from_name: fromName,
     from_address: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
@@ -84,8 +84,6 @@ export function convertTextToHtml(text: string): string {
 
   return html;
 }
-
-const EL_LOGO_FALLBACK = 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png';
 
 export function wrapInEmailLayout(
   content: string,
