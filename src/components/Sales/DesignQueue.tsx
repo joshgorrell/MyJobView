@@ -857,7 +857,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   }
 
   function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): boolean {
-    if (!/\\bpair\\b/i.test(product.name)) return true;
+    if (!/\bpair\b/i.test(product.name)) return true;
     const counts = items.map(item => Number(item.overrideQuantity ?? item.quantity));
     const allEven = counts.every(count => Number.isFinite(count) && count > 0 && count % 2 === 0);
     if (!allEven) {
@@ -870,7 +870,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   }
 
   function applyCatalogSelection(item: LineItem, product: CatalogProduct): LineItem {
-    const soldAsPair = /\\bpair\\b/i.test(product.name);
+    const soldAsPair = /\bpair\b/i.test(product.name);
     const physicalCount = Number(item.overrideQuantity ?? item.quantity);
     return {
       ...item,
