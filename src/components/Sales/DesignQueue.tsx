@@ -957,22 +957,29 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     if (!selectedBrief) return;
     setSavingMatches(true);
     try {
-      const updatedSummary = { ...selectedBrief.ai_summary, rooms };
-      const { error } = await supabase
+      const { data: current, error: readError } = await supabase
+        .from('design_briefs').select('ai_summary, linked_proposal_id').eq('id', selectedBrief.id).single();
+      if (readError) throw readError;
+      if (current.linked_proposal_id) throw new Error('This brief has already been converted.');
+      const updatedSummary = { ...current.ai_summary, rooms };
+      const { data: saved, error } = await supabase
         .from('design_briefs')
         .update({ ai_summary: updatedSummary, status: 'building' })
-        .eq('id', selectedBrief.id);
+        .eq('id', selectedBrief.id)
+        .is('linked_proposal_id', null)
+        .select('ai_summary')
+        .single();
       if (error) throw error;
-
       const updated = {
         ...selectedBrief,
-        ai_summary: updatedSummary,
+        ai_summary: saved.ai_summary as ProposalPrefill,
         status: 'building' as const,
       };
       setBriefs(prev => prev.map(b => b.id === selectedBrief.id ? updated : b));
       setSelectedBrief(updated);
     } catch (err) {
       console.error('Error saving matches:', err);
+      window.alert('Could not save catalog selections. Please retry before converting this brief.');
     } finally {
       setSavingMatches(false);
     }
