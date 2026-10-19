@@ -639,90 +639,90 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading messages...</p>
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-secondary text-sm">Loading messages...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="customer-conversations w-full min-w-0 px-2 sm:px-4 py-2 sm:py-3">
-      {loadError && <div role="alert" className="p-3 text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }}>Retry</button></div>}
-      {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert">This conversation is unavailable or you do not have access.</p>}
+    <div className="customer-conversations w-full min-w-0 px-1 sm:px-3 py-1 sm:py-2">
+      {loadError && <div role="alert" className="p-2 text-sm text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }} className="underline">Retry</button></div>}
+      {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert" className="p-2 text-sm text-secondary">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar — compact inline strip */}
-      <div className="flex items-center gap-3 sm:gap-5 mb-2 px-1">
+      <div className="flex items-center gap-3 sm:gap-4 mb-1.5 px-0.5">
         <div className="flex items-center gap-1.5">
           <MessageSquare className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-          <span className="text-sm font-bold text-gray-900">{stats.total}</span>
-          <span className="text-xs text-gray-500">total</span>
+          <span className="text-sm font-bold text-primary">{stats.total}</span>
+          <span className="text-xs text-secondary">total</span>
         </div>
-        <div className="w-px h-4 bg-gray-300" />
+        <div className="w-px h-4 bg-border-subtle" />
         <div className="flex items-center gap-1.5">
           <AlertCircle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" />
           <span className="text-sm font-bold text-orange-600">{stats.unanswered}</span>
-          <span className="text-xs text-gray-500">unanswered</span>
+          <span className="text-xs text-secondary">unanswered</span>
         </div>
-        <div className="w-px h-4 bg-gray-300" />
+        <div className="w-px h-4 bg-border-subtle" />
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
           <span className="text-sm font-bold text-red-600">{stats.unread}</span>
-          <span className="text-xs text-gray-500">unread</span>
+          <span className="text-xs text-secondary">unread</span>
         </div>
       </div>
 
-      <div ref={conversationSize.ref} style={{ height: conversationSize.height }} className="conversation-workspace min-h-0 min-w-0 flex flex-col sm:flex-row gap-2 sm:gap-4">
+      <div ref={conversationSize.ref} style={{ height: conversationSize.height }} className="conversation-workspace min-h-0 min-w-0 flex flex-col sm:flex-row gap-2 sm:gap-3">
         {/* Threads List */}
-        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-[35%] sm:max-w-96 shrink-0 min-h-0 min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col`}>
-          <div className="shrink-0 p-3 sm:p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-blue-600" />
+        <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} w-full sm:w-[34%] sm:max-w-88 shrink-0 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
+          <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm sm:text-base font-semibold text-primary flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
                 {conversationType === 'customer' ? 'Customer conversations' : conversationType === 'coworkers' ? 'Coworker conversations' : 'Conversations'}
               </h2>
 
             </div>
 
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search threads..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-canvas text-primary text-sm"
               />
             </div>
 
             {!hideFilters && <div className="flex gap-2">
               <button
                 onClick={() => setFilterCategory('all')}
-                className={`flex-1 px-3 py-2 sm:py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
-                  filterCategory === 'all' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'all' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
                 }`}
               >
                 All
               </button>
               <button
                 onClick={() => setFilterCategory('customer')}
-                className={`flex-1 px-3 py-2 sm:py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
-                  filterCategory === 'customer' ? 'bg-green-100 text-green-700 font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'customer' ? 'bg-green-100 text-green-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
                 }`}
               >
                 Customer
               </button>
               <button
                 onClick={() => setFilterCategory('proposals')}
-                className={`flex-1 px-3 py-2 sm:py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
-                  filterCategory === 'proposals' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'proposals' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
                 }`}
               >
                 Proposals
               </button>
               <button
                 onClick={() => setFilterCategory('internal')}
-                className={`flex-1 px-3 py-2 sm:py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
-                  filterCategory === 'internal' ? 'bg-orange-100 text-orange-700 font-medium' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'internal' ? 'bg-orange-100 text-orange-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
                 }`}
               >
                 Internal
@@ -732,12 +732,12 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
 
           <div className="flex-1 min-h-0 overflow-y-auto">
             {filteredThreads.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                <p>No message threads found</p>
+              <div className="p-6 text-center text-secondary">
+                <MessageSquare className="w-10 h-10 mx-auto mb-2 text-muted" />
+                <p className="text-sm">No message threads found</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-border-subtle">
                 {filteredThreads.map((thread) => {
                   const hasResponse = !thread.last_customer_message_at || (!!thread.last_rep_response_at && thread.last_rep_response_at >= thread.last_customer_message_at);
                   const isUrgent = !hasResponse && new Date().getTime() - new Date(thread.last_message_at).getTime() > 3600000;
@@ -746,12 +746,12 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     <button
                       key={thread.id}
                       onClick={() => { setSelectedThread(thread); if (!thread.source) onThreadSelected?.(thread.id); setShowQuestionSummary(true); }}
-                      className={`w-full p-3 sm:p-4 text-left hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation ${
+                      className={`w-full p-2.5 sm:p-3 text-left hover:bg-elevated active:bg-surface transition-colors touch-manipulation ${
                         selectedThread?.id === thread.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                       } ${thread.unread_count > 0 ? 'bg-blue-50/50' : ''}`}
                     >
                       <div className="flex items-start justify-between mb-1 gap-2">
-                        <h3 className="font-medium text-gray-900 line-clamp-1 text-sm sm:text-base">{thread.subject}</h3>
+                        <h3 className="font-medium text-primary line-clamp-1 text-sm">{thread.subject}</h3>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {thread.unread_count > 0 && (
                             <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
@@ -772,9 +772,9 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         <p className="text-xs font-medium text-blue-600 mb-1">{thread.proposal_number}</p>
                       )}
 
-                      {thread.related_context_name && <p className="text-xs text-gray-600 mb-1">{thread.related_context_name}</p>}
+                      {thread.related_context_name && <p className="text-xs text-secondary mb-1">{thread.related_context_name}</p>}
                       {thread.contact_name && (
-                        <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
+                        <p className="text-sm text-secondary mb-1 flex items-center gap-1">
                           <User className="w-3 h-3" />
                           {thread.contact_name}
                         </p>
@@ -793,10 +793,10 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         {thread.attachment_type === 'image' && thread.attachment_url && (
                           <img src={thread.attachment_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                         )}
-                        <p className="text-sm text-gray-500 line-clamp-2">{thread.source === 'coworker' ? '' : thread.last_message_author_type === 'customer' ? 'Customer: ' : 'Staff: '}{thread.last_message_preview}</p>
+                        <p className="text-sm text-secondary line-clamp-2">{thread.source === 'coworker' ? '' : thread.last_message_author_type === 'customer' ? 'Customer: ' : 'Staff: '}{thread.last_message_preview}</p>
                       </div>
 
-                      <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-2">
                           {!hasResponse && (
                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
@@ -805,11 +805,11 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                               Unanswered
                             </span>
                           )}
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-muted">
                             {thread.message_count} msg{thread.message_count !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <span className="text-xs text-gray-400">{formatTime(thread.last_message_at)}</span>
+                        <span className="text-xs text-muted">{formatTime(thread.last_message_at)}</span>
                       </div>
                     </button>
                   );
@@ -820,48 +820,48 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
 
         {/* Messages Panel */}
-        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 min-h-0 min-w-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col overflow-hidden`}>
+        <div className={`${selectedThread ? 'flex' : 'hidden sm:flex'} flex-1 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col overflow-hidden`}>
           {selectedThread ? (
             <>
-              <div className="shrink-0 p-3 sm:p-4 border-b border-gray-200">
-                <div className="flex items-center gap-2 sm:gap-3">
+              <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
+                <div className="flex items-center gap-2">
                   <button
                     aria-label="Back to conversations"
                     onClick={() => setSelectedThread(null)}
-                    className="sm:hidden p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg touch-manipulation"
+                    className="sm:hidden p-1.5 hover:bg-elevated active:bg-surface rounded-lg touch-manipulation"
                   >
-                    <ArrowLeft className="w-5 h-5 text-gray-600" />
+                    <ArrowLeft className="w-5 h-5 text-secondary" />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">{selectedThread.subject}</h2>
-                    {selectedThread.source === 'coworker' && <p className="text-sm text-gray-600 truncate">{selectedThread.audience_label} · {selectedThread.related_context_name}</p>}
+                    <h2 className="text-sm sm:text-base font-semibold text-primary truncate">{selectedThread.subject}</h2>
+                    {selectedThread.source === 'coworker' && <p className="text-xs text-secondary truncate">{selectedThread.audience_label} · {selectedThread.related_context_name}</p>}
                     {selectedThread.contact_name && (
-                      <p className="text-sm text-gray-600 truncate">{selectedThread.contact_name}</p>
+                      <p className="text-xs text-secondary truncate">{selectedThread.contact_name}</p>
                     )}
                   </div>
-                  {selectedThread.source === 'coworker' && ['task', 'question'].includes(selectedThread.discussion_type || '') && <a href={`?tab=feed&postId=${selectedThread.id}`} title="Open discussion actions" className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5 shrink-0"><ExternalLink className="w-4 h-4" /><span className="hidden sm:inline">Open discussion</span></a>}
+                  {selectedThread.source === 'coworker' && ['task', 'question'].includes(selectedThread.discussion_type || '') && <a href={`?tab=feed&postId=${selectedThread.id}`} title="Open discussion actions" className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5 shrink-0"><ExternalLink className="w-3.5 h-3.5" /><span className="hidden sm:inline">Open discussion</span></a>}
                   {selectedThread.proposal_id && onOpenProposal && (
                     <button
                       onClick={() => onOpenProposal(selectedThread.proposal_id!, selectedThread.id)}
-                      className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1.5 flex-shrink-0"
+                      className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1.5 flex-shrink-0"
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Open Proposal</span>
                     </button>
                   )}
                 </div>
               </div>
 
-              <div ref={historyRef} className="conversation-history flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
+              <div ref={historyRef} className="conversation-history flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3 space-y-2">
                 {messages.map((message) => {
                   const isOwnMessage = message.author_id === profile?.id || (selectedThread.source !== 'coworker' && message.author_type === 'staff');
 
                   return (
                     <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] sm:max-w-[70%] space-y-1`}>
+                      <div className={`max-w-[85%] sm:max-w-[70%] space-y-0.5`}>
                         <div className="flex items-center gap-2 px-1">
-                          <span className="text-xs font-medium text-gray-600">{message.author_name}</span>
-                          <span className="text-xs text-gray-400">{formatTime(message.created_at)}</span>
+                          <span className="text-xs font-medium text-secondary">{message.author_name}</span>
+                          <span className="text-xs text-muted">{formatTime(message.created_at)}</span>
                           {message.is_internal && selectedThread.source !== 'coworker' && (
                             <span className="text-xs font-medium text-orange-600">Internal</span>
                           )}
@@ -869,7 +869,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                         {message.context_label && (
                           <div className={`flex items-center gap-1 px-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                              isOwnMessage ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
+                              isOwnMessage ? 'bg-blue-100 text-blue-700' : 'bg-elevated text-secondary'
                             }`}>
                               <MessageSquare className="w-2.5 h-2.5" />
                               Re: {message.context_label}
@@ -877,11 +877,11 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                           </div>
                         )}
                         <div
-                          className={`rounded-lg p-3 ${
-                            isOwnMessage ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
+                          className={`rounded-lg p-2.5 ${
+                            isOwnMessage ? 'bg-blue-600 text-white' : 'bg-elevated text-primary'
                           }`}
                         >
-                          <p className="whitespace-pre-wrap text-sm sm:text-base break-words">{message.body}</p>
+                          <p className="whitespace-pre-wrap text-sm break-words">{message.body}</p>
                           {renderAttachment(message, isOwnMessage)}
                         </div>
                       </div>
@@ -911,8 +911,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                   }, {} as Record<string, Message[]>);
 
                   return (
-                    <div className="mx-3 sm:mx-4 mt-3 mb-1 rounded-lg border border-blue-200 bg-blue-50/60 overflow-hidden">
-                      <div className="flex items-center justify-between px-3 py-2 bg-blue-100/50">
+                    <div className="mx-2.5 sm:mx-3 mt-2 mb-1 rounded-lg border border-blue-200 bg-blue-50/60 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-1.5 bg-blue-100/50">
                         <div className="flex items-center gap-2">
                           <HelpCircle className="w-4 h-4 text-blue-600" />
                           <span className="text-sm font-semibold text-blue-900">
@@ -926,7 +926,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <div className="p-3 space-y-2 max-h-32 overflow-y-auto">
+                      <div className="p-2 space-y-1.5 max-h-28 overflow-y-auto">
                         {Object.entries(grouped).map(([label, msgs]) => (
                           <div key={label}>
                             {label !== 'General' && (
@@ -936,14 +936,14 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                               </p>
                             )}
                             {msgs.map(m => (
-                              <p key={m.id} className="text-xs text-gray-700 line-clamp-2 pl-3 border-l-2 border-blue-200">
+                              <p key={m.id} className="text-xs text-secondary line-clamp-2 pl-2.5 border-l-2 border-blue-200">
                                 {m.body}
                               </p>
                             ))}
                           </div>
                         ))}
                       </div>
-                      <div className="px-3 py-2 bg-blue-100/30 border-t border-blue-200/50">
+                      <div className="px-3 py-1.5 bg-blue-100/30 border-t border-blue-200/50">
                         <p className="text-xs text-blue-600">
                           Your reply below will be sent to the customer and will address all open questions.
                         </p>
@@ -961,12 +961,12 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                   )];
                   if (contextLabels.length === 0) return null;
                   return (
-                    <div className="mx-3 sm:mx-4 mt-2 flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-500">Tag reply to:</span>
+                    <div className="mx-2.5 sm:mx-3 mt-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-secondary">Tag reply to:</span>
                       <button
                         onClick={() => setReplyContextLabel(null)}
                         className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
-                          !replyContextLabel ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          !replyContextLabel ? 'bg-blue-600 text-white' : 'bg-elevated text-secondary hover:bg-surface'
                         }`}
                       >
                         General
@@ -976,7 +976,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                           key={label}
                           onClick={() => setReplyContextLabel(label)}
                           className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
-                            replyContextLabel === label ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            replyContextLabel === label ? 'bg-blue-600 text-white' : 'bg-elevated text-secondary hover:bg-surface'
                           }`}
                         >
                           <MessageSquare className="w-2.5 h-2.5" />
@@ -990,22 +990,22 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
               </div>
 
               {/* Composer */}
-              <div className="conversation-reply shrink-0 p-3 sm:p-4 border-t border-gray-200">
+              <div className="conversation-reply shrink-0 p-2.5 sm:p-3 border-t border-subtle">
                 {pendingAttachment && (
-                  <div className="mb-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                  <div className="mb-1.5 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
                     {pendingAttachment.type === 'image' ? (
-                      <img src={pendingAttachment.preview || pendingAttachment.url} alt="Pending" className="w-10 h-10 rounded object-cover" />
+                      <img src={pendingAttachment.preview || pendingAttachment.url} alt="Pending" className="w-9 h-9 rounded object-cover" />
                     ) : (
                       <LinkIcon className="w-4 h-4 text-blue-600" />
                     )}
                     <span className="text-xs text-blue-700 flex-1 truncate">Attachment ready</span>
-                    <button type="button" onClick={() => setPendingAttachment(null)} className="text-gray-400 hover:text-gray-600">
+                    <button type="button" onClick={() => setPendingAttachment(null)} className="text-secondary hover:text-primary">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 )}
                 {replyContextLabel && (
-                  <div className="mb-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
+                  <div className="mb-1.5 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
                     <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
                     <span className="text-xs text-blue-700 font-medium">Re: {replyContextLabel}</span>
                     <button type="button" onClick={() => setReplyContextLabel(null)} className="text-blue-400 hover:text-blue-600 ml-auto">
@@ -1013,14 +1013,14 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     </button>
                   </div>
                 )}
-                {selectedThread.source !== 'coworker' && <div className="mb-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                {selectedThread.source !== 'coworker' && <div className="mb-1.5">
+                  <label className="flex items-center gap-2 text-xs sm:text-sm text-secondary cursor-pointer">
                     <input
                       type="checkbox"
                       checked={selectedThread.visibility === 'internal' || isInternal}
                       disabled={selectedThread.visibility === 'internal'}
                       onChange={(e) => setIsInternal(e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-subtle text-blue-600 focus:ring-blue-500"
                     />
                     <span>Internal note (customer won't see this)</span>
                   </label>
@@ -1036,20 +1036,20 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     e.target.value = '';
                   }}
                 />
-                {naturalCandidate && staffChoices.length === 0 && <div className="mb-2 max-h-40 overflow-auto rounded border border-blue-200 bg-white p-2 text-sm" aria-label="Possible teammate mention">
-                  <div className="mb-1 text-gray-600">Mention a teammate? Select to notify; leave unchanged for plain text.</div>
+                {naturalCandidate && staffChoices.length === 0 && <div className="mb-1.5 max-h-36 overflow-auto rounded border border-blue-200 bg-canvas p-2 text-sm" aria-label="Possible teammate mention">
+                  <div className="mb-1 text-secondary">Mention a teammate? Select to notify; leave unchanged for plain text.</div>
                   {mentionPeople.filter(p => naturalCandidate.personIds.includes(p.id) && p.username).map(p => <button key={p.id} type="button" onClick={() => confirmNaturalMention(p)} className="mr-2 mb-1 rounded bg-blue-50 px-3 py-2 text-blue-700 hover:bg-blue-100">@{p.username} · {p.full_name}</button>)}
                 </div>}
-                {staffChoices.length > 0 && <div className="mb-2 max-h-40 overflow-auto rounded border border-blue-200 bg-white" role="listbox" aria-label="Mention teammates">{staffChoices.map((choice, index) => <button key={choice.id} type="button" role="option" aria-selected={index === mentionHighlight} onClick={() => chooseMessageMention(choice)} className={`block w-full px-3 py-2 text-left text-sm ${index === mentionHighlight ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}>@{choice.kind === 'person' ? choice.username : ''} · {choice.label}</button>)}</div>}
+                {staffChoices.length > 0 && <div className="mb-1.5 max-h-36 overflow-auto rounded border border-blue-200 bg-canvas" role="listbox" aria-label="Mention teammates">{staffChoices.map((choice, index) => <button key={choice.id} type="button" role="option" aria-selected={index === mentionHighlight} onClick={() => chooseMessageMention(choice)} className={`block w-full px-3 py-2 text-left text-sm ${index === mentionHighlight ? 'bg-blue-50 text-blue-700' : 'text-primary'}`}>@{choice.kind === 'person' ? choice.username : ''} · {choice.label}</button>)}</div>}
                 <div className="flex gap-2 items-end">
                   {selectedThread.source !== 'coworker' && <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading || sending}
-                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center"
+                    className="px-2.5 py-2 border border-subtle rounded-lg hover:bg-elevated disabled:opacity-50 transition-colors flex items-center"
                     title="Attach image"
                   >
-                    {uploading ? <Loader className="w-4 h-4 animate-spin text-gray-500" /> : <ImagePlus className="w-4 h-4 text-gray-500" />}
+                    {uploading ? <Loader className="w-4 h-4 animate-spin text-secondary" /> : <ImagePlus className="w-4 h-4 text-secondary" />}
                   </button>}
                   <textarea
                     ref={messageInput}
@@ -1066,7 +1066,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     }}
                     placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note…' : 'Type your message…'}
                     rows={2}
-                    className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base"
+                    className="min-w-0 flex-1 px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base bg-canvas text-primary"
                   />
                   <button
                     onClick={handleSendMessage}
@@ -1081,10 +1081,10 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-secondary">
               <div className="text-center">
-                <MessageSquare className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                <p>Select a thread to view messages</p>
+                <MessageSquare className="w-14 h-14 mx-auto mb-3 text-muted" />
+                <p className="text-sm">Select a thread to view messages</p>
               </div>
             </div>
           )}
@@ -1124,7 +1124,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
               {(
                 <div>
                   <label className="block text-sm font-medium text-secondary mb-1.5">Contact</label>
-                  <input aria-label="Search customers" placeholder="Search customers…" className="w-full px-3 py-2 mb-2 border rounded-lg" value={contactSearch} onChange={e => setContactSearch(e.target.value)} />
+                  <input aria-label="Search customers" placeholder="Search customers…" className="w-full px-3 py-2 mb-2 border border-subtle rounded-lg bg-canvas text-primary" value={contactSearch} onChange={e => setContactSearch(e.target.value)} />
                   <select
                     value={newThreadForm.contact_id}
                     onChange={(e) => setNewThreadForm({ ...newThreadForm, contact_id: e.target.value, context_id: '' })}
@@ -1181,7 +1181,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
             <div className="flex gap-3 p-4 sm:p-6 border-t border-subtle flex-shrink-0">
               <button
                 onClick={() => setShowNewThread(false)}
-                className="flex-1 px-4 py-3 sm:py-2 border border-strong text-secondary rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
+                className="flex-1 px-4 py-3 sm:py-2 border border-strong text-secondary rounded-lg hover:bg-elevated active:bg-surface transition-colors touch-manipulation"
               >
                 Cancel
               </button>

@@ -15,7 +15,7 @@ export function useConversationHeight(ready: boolean) {
       const viewport = window.visualViewport;
       const bottom = (viewport?.height ?? window.innerHeight) + (viewport?.offsetTop ?? 0);
       const boundary = scrollParent ? Math.min(bottom, scrollParent.getBoundingClientRect().bottom) : bottom;
-      setHeight(Math.max(140, Math.floor(boundary - panel.getBoundingClientRect().top - 24)));
+      setHeight(Math.max(120, Math.floor(boundary - panel.getBoundingClientRect().top - 12)));
     };
     measure();
     const observer = new ResizeObserver(measure);

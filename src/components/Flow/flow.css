@@ -197,7 +197,23 @@
   .flow .flow-toolbar { gap:4px; }
 }
 
-.flow-customer-inbox{min-width:0;color:#111827}.flow-customer-inbox input,.flow-customer-inbox textarea,.flow-customer-inbox select{min-width:0}
+.flow-customer-inbox{min-width:0;color:rgb(var(--text-primary))}.flow-customer-inbox input,.flow-customer-inbox textarea,.flow-customer-inbox select{min-width:0}
+
+/* Conversation workspace — responsive layout for iPhone/iPad/desktop */
+.conversation-workspace{min-height:0;min-width:0}
+@media(max-width:640px){
+  .conversation-workspace{gap:0}
+  .conversation-workspace>div{border-radius:8px}
+  /* On mobile, when a thread is selected the list is hidden so the message panel gets full height */
+  .conversation-workspace>div:first-child{flex:1}
+}
+@media(min-width:641px) and (max-width:1024px){
+  /* iPad — slightly narrower thread list to give messages more room */
+  .conversation-workspace>div:first-child{flex:0 0 36%;max-width:340px}
+}
+@media(min-width:1025px){
+  .conversation-workspace>div:first-child{flex:0 0 32%;max-width:360px}
+}
 
 .flow .flow-view-tabs button{color:var(--flow-secondary)}
 .flow .flow-view-tabs button.flow-selected{color:var(--flow-accent)}
@@ -214,8 +230,9 @@
 @media(max-width:640px){.flow .flow-heading .flow-desktop-label{display:none}.flow .flow-heading .flow-mobile-label{display:inline}}
 @container (max-width:340px){.flow .flow-heading{flex-wrap:nowrap}.flow .flow-heading>div:first-child{min-width:0}.flow-heading-actions{margin-left:auto}}
 
-.flow-message-filters { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 2px; }
-.flow-message-filters button { padding: 4px 10px; border: 1px solid var(--flow-border, #d1d5db); border-radius: 6px; font-size: 12px; min-height: 28px; }
+.flow-message-filters { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0 2px; }
+.flow-message-filters button { padding: 4px 10px; border: 1px solid var(--flow-line, #d1d5db); border-radius: 6px; font-size: 12px; min-height: 28px; background: var(--flow-bg, #fff); color: var(--flow-secondary, #64748b); }
+.flow-message-filters button.flow-selected { background: var(--flow-new, #f5f9ff); color: var(--flow-accent, #2563eb); font-weight: 600; box-shadow: 0 0 0 1px var(--flow-line, #e2e8f0); }
 
 .flow .flow-heading-actions .flow-create-action{width:40px;height:40px;min-height:40px;padding:0;border-radius:8px}
 @media(max-width:640px){.flow .flow-heading-actions .flow-create-action{width:44px;height:44px}}
