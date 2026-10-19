@@ -20,6 +20,7 @@ interface ProposalLineItem {
 
 interface ProposalRoom {
   name: string;
+  description?: string;
   lineItems: ProposalLineItem[];
 }
 
