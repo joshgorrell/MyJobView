@@ -1,3 +1,4 @@
+import { ProposalPromise } from './ProposalPromise';
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, ChevronUp, CreditCard, Printer, RotateCcw } from 'lucide-react';
@@ -221,6 +222,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [recordings, setRecordings] = useState<ProposalRecording[]>([]);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [promiseCompanyName, setPromiseCompanyName] = useState('');
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
   const [relatedInvoices, setRelatedInvoices] = useState<PortalInvoice[]>([]);
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
@@ -339,15 +341,18 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
         setRooms(roomsRes.data || []);
         setLineItems(itemsRes.data || []);
 
-        // Fetch organization logo for video overlay
+        setPromiseCompanyName('');
+        setOrgLogoUrl(null);
+        // Load the proposal organization’s branding
         if (proposalRes.data.organization_id) {
           supabase
             .from('organizations')
-            .select('header_logo_url')
+            .select('name, header_logo_url, logo_url')
             .eq('id', proposalRes.data.organization_id)
             .maybeSingle()
             .then(({ data: orgData }) => {
-              if (orgData?.header_logo_url) setOrgLogoUrl(orgData.header_logo_url);
+              setPromiseCompanyName(orgData?.name || '');
+              setOrgLogoUrl(orgData?.header_logo_url || orgData?.logo_url || null);
             });
         }
 
@@ -865,6 +870,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
         {!previewMode && !hideExpiration && <p className="mb-4 text-xs text-gray-500">Proposal visits, approximate active viewing time, and selected interactions are shared with your provider to help with follow-up.</p>}
+        <ProposalPromise companyName={promiseCompanyName} logoUrl={orgLogoUrl} />
         <div className="grid grid-cols-1 xl:grid-cols-3 items-start gap-6 xl:gap-8">
           {/* Main Content */}
           <div className="xl:col-span-2 min-w-0 space-y-6">

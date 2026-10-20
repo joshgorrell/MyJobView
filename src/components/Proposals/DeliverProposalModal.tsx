@@ -1,3 +1,4 @@
+import { loadProposalDocument, downloadProposalDocument } from '../../lib/proposalDocument';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, CheckSquare, ChevronDown, ChevronUp, Download, Globe2, Loader2, Mail, Send, Square, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -60,6 +61,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
   const [subject, setSubject] = useState('');
   const [approvalWindowDays, setApprovalWindowDays] = useState(30);
   const [showEmailDetails, setShowEmailDetails] = useState(false);
+  const [includePromisePage, setIncludePromisePage] = useState(true);
   const [includeProposal, setIncludeProposal] = useState(true);
   const [includeTerms, setIncludeTerms] = useState(false);
   const [includePaymentSchedule, setIncludePaymentSchedule] = useState(false);
@@ -117,7 +119,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
 
   const anySelected = email || portal || pdf;
   const deliveryLabel = useMemo(() => {
-    const chosen = [portal && 'Portal', email && 'Email', pdf && 'PDF'].filter(Boolean);
+    const chosen = [portal && 'Portal', email && 'Email', pdf && 'Print / PDF'].filter(Boolean);
     return chosen.length ? `Deliver via ${chosen.join(' + ')}` : 'Choose Delivery Method';
   }, [portal, email, pdf]);
 
@@ -130,9 +132,8 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
     if (!proposal) return [] as Array<{ filename: string; content: string }>;
     const attachments: Array<{ filename: string; content: string }> = [];
     if (includeProposal) {
-      const { data, error: pdfError } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
-      if (pdfError) throw pdfError;
-      if (data?.base64) attachments.push({ filename: `Proposal-${proposal.proposal_number}.pdf`, content: data.base64 });
+      const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage);
+      attachments.push({ filename: document.filename, content: document.content });
     }
     if (includeTerms && docs?.termsBase64) attachments.push({ filename: `Terms-Conditions-${proposal.proposal_number}.html`, content: docs.termsBase64 });
     if (includePaymentSchedule && docs?.paymentScheduleBase64) attachments.push({ filename: `Payment-Schedule-${proposal.proposal_number}.html`, content: docs.paymentScheduleBase64 });
@@ -151,19 +152,8 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
 
   async function downloadPdf() {
     if (!proposal) return;
-    const { data, error: pdfError } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
-    if (pdfError) throw pdfError;
-    if (!data?.base64) throw new Error('PDF generation did not return a file.');
-    const bytes = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Proposal-${proposal.proposal_number}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+    const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage);
+    downloadProposalDocument(document);
   }
 
   async function deliver() {
@@ -206,7 +196,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         completed.push(`Emailed to ${toEmail.trim()}`);
       }
 
-      if (pdf) { await downloadPdf(); completed.push('PDF generated'); }
+      if (pdf) { await downloadPdf(); completed.push('Printable proposal downloaded'); }
 
       const lockUpdates: Record<string, unknown> = { is_locked: true, locked_at: now.toISOString(), locked_by: profile?.id || null };
       if (!proposal.sent_at && !portal) { lockUpdates.sent_at = now.toISOString(); lockUpdates.status = 'sent'; }
@@ -237,7 +227,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
             <section><h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Delivery Methods</h3><div className="grid gap-2 sm:grid-cols-3">
               <Choice checked={portal} onClick={() => setPortal(v => !v)} icon={<Globe2 className="h-5 w-5" />} title="Customer Portal" description={proposal?.is_portal_visible ? 'Currently live. Publish/refresh this version.' : 'Publish this proposal to the customer portal.'} />
               <Choice checked={email} onClick={() => setEmail(v => !v)} icon={<Mail className="h-5 w-5" />} title="Email Customer" description="Send a personalized email with the secure proposal link." />
-              <Choice checked={pdf} onClick={() => setPdf(v => !v)} icon={<Download className="h-5 w-5" />} title="Print / PDF" description="Generate a PDF that can be saved or printed." />
+              <Choice checked={pdf} onClick={() => setPdf(v => !v)} icon={<Download className="h-5 w-5" />} title="Print / PDF" description="Download a printable proposal to open, print, or save as PDF." />
             </div></section>
 
             {(portal || email) && <section className="rounded-xl border border-gray-700 bg-gray-900/40 p-3 sm:p-4">
@@ -249,10 +239,11 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
 
             {portal && <section className="rounded-xl border border-gray-700 p-3 sm:p-4"><label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">Approval Window</label><select value={approvalWindowDays} onChange={e => setApprovalWindowDays(Number(e.target.value))} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white sm:max-w-xs"><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={45}>45 days</option><option value={60}>60 days</option><option value={90}>90 days</option></select><p className="mt-2 text-xs text-gray-500">Publishing locks the proposal. To change it later, use Take Offline & Unlock.</p></section>}
 
-            {email && <section className="rounded-xl border border-gray-700 p-3 sm:p-4"><button type="button" onClick={() => setShowEmailDetails(v => !v)} className="flex min-h-10 w-full items-center justify-between text-left"><span><span className="block text-sm font-semibold text-white">Email details & attachments</span><span className="block text-xs text-gray-400">{toEmail || 'No recipient email'} · Proposal PDF {includeProposal ? 'attached' : 'not attached'}</span></span>{showEmailDetails ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}</button>{showEmailDetails && <div className="mt-4 space-y-3 border-t border-gray-700 pt-4">
+            {(email || pdf) && <label className="flex items-start gap-3 rounded-xl border border-sky-700/50 bg-sky-900/20 p-4 text-sm text-gray-200"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} className="mt-1" /><span><span className="block font-semibold">Include Our Promise to You</span><span className="block text-xs text-gray-400">Include Electronic Life’s promise as a separate page. Open the printable file to print or save as PDF.</span></span></label>}
+            {email && <section className="rounded-xl border border-gray-700 p-3 sm:p-4"><button type="button" onClick={() => setShowEmailDetails(v => !v)} className="flex min-h-10 w-full items-center justify-between text-left"><span><span className="block text-sm font-semibold text-white">Email details & attachments</span><span className="block text-xs text-gray-400">{toEmail || 'No recipient email'} · Proposal document {includeProposal ? 'attached' : 'not attached'}</span></span>{showEmailDetails ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}</button>{showEmailDetails && <div className="mt-4 space-y-3 border-t border-gray-700 pt-4">
               <div className="grid gap-3 sm:grid-cols-2"><div><label className="mb-1 block text-xs text-gray-400">To</label><input type="email" value={toEmail} onChange={e => setToEmail(e.target.value)} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" /></div><div><label className="mb-1 block text-xs text-gray-400">CC</label><input value={ccEmails} onChange={e => setCcEmails(e.target.value)} placeholder="Optional, comma separated" className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" /></div></div>
               <div><label className="mb-1 block text-xs text-gray-400">Subject</label><input value={subject} onChange={e => setSubject(e.target.value)} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" /></div>
-              <div><div className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-500">Attachments</div><div className="grid sm:grid-cols-2"><AttachmentChoice checked={includeProposal} label="Proposal PDF" onClick={() => setIncludeProposal(v => !v)} /><AttachmentChoice checked={includeTerms} disabled={docsLoading || !docs?.termsAvailable} label={docsLoading ? 'Terms & Conditions (checking…)' : 'Terms & Conditions'} onClick={() => setIncludeTerms(v => !v)} /><AttachmentChoice checked={includePaymentSchedule} disabled={docsLoading || !docs?.paymentScheduleAvailable} label={docsLoading ? 'Payment Schedule (checking…)' : 'Payment Schedule'} onClick={() => setIncludePaymentSchedule(v => !v)} /><AttachmentChoice checked={includeFinancing} disabled={docsLoading || !docs?.financingAvailable} label={docsLoading ? 'Financing Documents (checking…)' : 'Financing Documents'} onClick={() => setIncludeFinancing(v => !v)} /></div></div>
+              <div><div className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-500">Attachments</div><div className="grid sm:grid-cols-2"><AttachmentChoice checked={includeProposal} label="Printable proposal" onClick={() => setIncludeProposal(v => !v)} /><AttachmentChoice checked={includeTerms} disabled={docsLoading || !docs?.termsAvailable} label={docsLoading ? 'Terms & Conditions (checking…)' : 'Terms & Conditions'} onClick={() => setIncludeTerms(v => !v)} /><AttachmentChoice checked={includePaymentSchedule} disabled={docsLoading || !docs?.paymentScheduleAvailable} label={docsLoading ? 'Payment Schedule (checking…)' : 'Payment Schedule'} onClick={() => setIncludePaymentSchedule(v => !v)} /><AttachmentChoice checked={includeFinancing} disabled={docsLoading || !docs?.financingAvailable} label={docsLoading ? 'Financing Documents (checking…)' : 'Financing Documents'} onClick={() => setIncludeFinancing(v => !v)} /></div></div>
             </div>}</section>}
 
             <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-200"><strong>After delivery:</strong> MyJobView locks this proposal to prevent accidental edits. If it is live on the portal, unlocking it automatically takes it offline first. Discussion history stays with the proposal.</div>
