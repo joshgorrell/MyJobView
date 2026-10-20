@@ -35,7 +35,7 @@ assert.equal(fs.readFileSync('mobile/App.tsx','utf8').includes('initializeLocati
 const nativeClockSource=fs.readFileSync('mobile/src/screens/TimeClockScreen.tsx','utf8');
 assert.ok(nativeClockSource.includes('await locationTrackingService.startTracking(profile.id, entryId)'), 'Native Daily Clock starts the authorized workday GPS session');
 assert.ok(nativeClockSource.includes('await locationTrackingService.stopTracking()'), 'Native Daily Clock stops workday GPS at clock-out');
-assert.equal(/\\.(startPreWarming|startPostCaptureRefinement)\\(/.test(nativeClockSource), false, 'Native clocks must not start web refinement');
+for (const retired of ['.startPreWarming(', '.startPostCaptureRefinement(']) assert.equal(nativeClockSource.includes(retired), false, 'Native clocks must not start web refinement');
 console.log('Web clocks avoid ongoing GPS collection; native workday tracking starts/stops with Daily Clock and not app opening.');
 
 let nativeSaved=[],nativeRemoved=[],nativeWrites=[],nativeSession='tech';
