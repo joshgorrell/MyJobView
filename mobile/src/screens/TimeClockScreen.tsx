@@ -1,3 +1,5 @@
+import { InternalTimeCard } from '../components/InternalTimeCard';
+import { assertNoInternalTimer } from '../services/InternalTime';
 import { saveNativeClockGps } from '../services/ClockEventGps';
 import * as Crypto from 'expo-crypto';
 import { openMJV } from '../services/OpenMJV';
@@ -153,6 +155,8 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   async function handleClockOut() {
     if (!todayEntry || !profile) return;
+    try { await assertNoInternalTimer(profile); }
+    catch (error: any) { Alert.alert('Unable to clock out', error.message); return; }
     if (activeBreak) { Alert.alert('Active Break', 'Please end your break before clocking out'); return; }
     if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) {
       Alert.alert('Unfinished shift', 'Ask your manager to correct this older shift before recording another day.');
@@ -165,6 +169,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     promptForNotes('Clock Out', 'Add notes about your day (optional):', async (notes) => {
       try {
         const now = new Date();
+        await assertNoInternalTimer(profile);
         const capture = locationTrackingService.captureHighAccuracyLocation();
         const updates = {
           clock_out: now.toISOString(), status: 'clocked_out', notes: notes || null,
@@ -191,16 +196,17 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
 
   async function handleStartBreak(breakType: 'lunch' | 'personal' | 'other') {
-    if (!todayEntry) return;
+    if (!todayEntry || !profile) return;
     try {
+      await assertNoInternalTimer(profile);
       const { error } = await supabase.from('daily_clock_breaks').insert({
         id: Crypto.randomUUID(), daily_clock_entry_id: todayEntry.id, break_start: new Date().toISOString(), break_type: breakType,
       });
       if (error) throw error;
       await loadBreaks(todayEntry.id);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting break:', error);
-      Alert.alert('Error', 'Failed to start break');
+      Alert.alert('Error', error.message || 'Failed to start break');
     }
   }
 
@@ -250,12 +256,12 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   if (!timeContext?.dailyClock) {
     return (
-      <ScreenContainer>
+      <ScreenContainer scroll>
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>My Work & Time</Text>
           <Text style={styles.infoText}>
             {timeContext?.basis === 'work_allocation'
-              ? 'Your approved Work Order time determines pay. Manual Job Time and Shop/Training Time require manager approval.'
+              ? 'Your approved Work Order time determines pay. Manual Job Time and recorded Shop/Training Time count toward payroll after manager approval.'
               : 'Your recorded job time is used for job costing. Your configuration does not require a Daily Clock.'}
           </Text>
           <TouchableOpacity onPress={openCommandCenter} style={styles.linkButton}>
@@ -265,6 +271,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
             <Text style={styles.primaryButtonText}>Open My Work Orders</Text>
           </TouchableOpacity>
         </View>
+        <InternalTimeCard key={profile?.id} />
       </ScreenContainer>
     );
   }
@@ -376,6 +383,8 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           </View>
         )}
       </LinearGradient>
+
+      <InternalTimeCard key={profile?.id} />
 
       {/* Breaks History */}
       {breaks.length > 0 && (
