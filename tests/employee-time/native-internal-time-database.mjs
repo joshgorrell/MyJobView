@@ -90,6 +90,7 @@ await start(202, 'training'); await stop(202);
 await assert.rejects(() => db.query(`SELECT review_internal_time('${id(202)}','approve_time')`), /Another manager/);
 const ownManager = await entry(202);
 await assert.rejects(() => db.exec(`UPDATE time_entries SET status='approved' WHERE id='${ownManager.id}'`), /Another manager/);
+await assert.rejects(() => db.exec(\`UPDATE time_entries SET internal_session_id=NULL,status='approved' WHERE id='${ownManager.id}'\`), /retain its session linkage/);
 // Effective config, not legacy job_time classification, requires this employee's Daily Clock.
 await as(11);
 await assert.rejects(() => start(203), /Clock in for the day/);

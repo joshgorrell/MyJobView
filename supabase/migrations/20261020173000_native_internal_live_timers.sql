@@ -117,6 +117,10 @@ CREATE OR REPLACE FUNCTION time_private.guard_live_internal_entry()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE s internal_time_sessions; v_tz text;
 BEGIN
+  IF TG_OP='UPDATE' AND NEW.internal_session_id IS DISTINCT FROM OLD.internal_session_id
+    AND EXISTS(SELECT 1 FROM internal_time_sessions prior WHERE prior.id=OLD.internal_session_id AND prior.employee_started) THEN
+    RAISE EXCEPTION 'Live internal time must retain its session linkage';
+  END IF;
   IF NEW.internal_session_id IS NULL THEN RETURN NEW; END IF;
   SELECT * INTO s FROM internal_time_sessions WHERE id=NEW.internal_session_id;
   IF NOT s.employee_started THEN RETURN NEW; END IF;
@@ -269,7 +273,7 @@ BEGIN
       AND e.clock_in<((NEW.period_end_date+1)::timestamp AT TIME ZONE v_tz)
       AND COALESCE(e.clock_out,now())>(NEW.period_start_date::timestamp AT TIME ZONE v_tz)
       AND (NEW.pay_schedule_id IS NULL OR config.pay_schedule_id=NEW.pay_schedule_id)
-      AND COALESCE(config.payroll_time_basis,'work_allocation')<>'salary'
+      AND COALESCE(config.payroll_time_basis,time_private.time_basis(e.technician_id,e.entry_date))<>'salary'
   ) THEN RAISE EXCEPTION 'Review pending Shop Time and Training before finalizing payroll'; END IF;
   RETURN NEW;
 END $$;
