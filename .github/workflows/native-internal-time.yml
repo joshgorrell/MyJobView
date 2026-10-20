@@ -1,0 +1,31 @@
+name: Native Internal Time Checks
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/src/components/InternalTimeCard.tsx'
+      - 'mobile/src/services/InternalTime.ts'
+      - 'mobile/src/screens/TimeClockScreen.tsx'
+      - 'supabase/migrations/20261020173000_native_internal_live_timers.sql'
+      - 'tests/employee-time/native-internal-time-*.mjs'
+      - '.github/workflows/native-internal-time.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node tests/employee-time/native-internal-time-database.mjs
+      - run: node tests/employee-time/native-internal-time-runtime.mjs
+      - run: npm run test:employee-time
+      - run: npm run build
