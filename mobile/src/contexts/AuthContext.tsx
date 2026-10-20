@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { NotificationService } from '../services/NotificationService';
 import * as SecureStore from 'expo-secure-store';
+import { locationTrackingService } from '../services/LocationTrackingService';
 
 interface Profile {
   id: string;
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    await locationTrackingService.stopTracking();
     await NotificationService.unregisterToken().catch(() => {});
     await supabase.auth.signOut();
     await SecureStore.deleteItemAsync('session');

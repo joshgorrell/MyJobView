@@ -52,13 +52,25 @@ export default function SettingsScreen() {
     }
   }
 
-  function handleSignOut() {
+  async function handleSignOut() {
+    if (!profile) return;
+    try {
+      const { data, error } = await supabase.from('daily_clock_entries').select('id').eq('technician_id', profile.id).is('clock_out', null).limit(1);
+      if (error) throw error;
+      if (data?.length) {
+        Alert.alert('Active Workday', 'You are still clocked in. Please clock out before signing out so your workday and GPS history remain accurate.');
+        return;
+      }
+    } catch (error) {
+      Alert.alert('Cannot Verify Workday', 'Please connect to the internet and confirm you are clocked out before signing out.');
+      return;
+    }
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut },
+        { text: 'Sign Out', style: 'destructive', onPress: () => { void signOut().catch(error => Alert.alert('Sign Out Failed', error instanceof Error ? error.message : 'Please try again.')); } },
       ]
     );
   }

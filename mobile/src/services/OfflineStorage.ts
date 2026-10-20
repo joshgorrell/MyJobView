@@ -35,8 +35,19 @@ interface PendingClockEvent {
 class OfflineStorage {
   private db: SQLite.SQLiteDatabase | null = null;
   private syncInProgress = false;
+  private initializing: Promise<void> | null = null;
 
   async initialize() {
+    if (this.initializing) return this.initializing;
+    this.initializing = this.initializeDatabase().catch(error => {
+      this.initializing = null;
+      this.db = null;
+      throw error;
+    });
+    return this.initializing;
+  }
+
+  private async initializeDatabase() {
     this.db = await SQLite.openDatabaseAsync('fieldops_offline.db');
 
     // Create tables
@@ -121,9 +132,9 @@ class OfflineStorage {
   }
 
   async saveBreadcrumb(breadcrumb: PendingBreadcrumb) {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) await this.initialize();
 
-    await this.db.runAsync(
+    await this.db!.runAsync(
       `INSERT INTO pending_breadcrumbs (
         id, technician_id, daily_clock_entry_id, latitude, longitude,
         altitude, accuracy, altitude_accuracy, heading, speed,
@@ -291,8 +302,10 @@ class OfflineStorage {
 
   private async syncClockEvents() {
     if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_clock_events');
+    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_clock_events WHERE technician_id = ?', [session.user.id]);
 
     for (const event of events) {
       try {
@@ -324,10 +337,13 @@ class OfflineStorage {
 
   private async syncBreadcrumbs() {
     if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
     // Get breadcrumbs in batches
     const breadcrumbs: any[] = await this.db.getAllAsync(
-      'SELECT * FROM pending_breadcrumbs ORDER BY captured_at LIMIT 100'
+      'SELECT * FROM pending_breadcrumbs WHERE technician_id = ? ORDER BY captured_at LIMIT 100',
+      [session.user.id]
     );
 
     if (breadcrumbs.length === 0) return;
@@ -336,7 +352,7 @@ class OfflineStorage {
       // Batch insert
       const { error } = await supabase
         .from('enhanced_gps_breadcrumbs')
-        .insert(breadcrumbs.map(b => ({
+        .upsert(breadcrumbs.map(b => ({
           id: b.id,
           technician_id: b.technician_id,
           daily_clock_entry_id: b.daily_clock_entry_id,
@@ -352,7 +368,7 @@ class OfflineStorage {
           battery_level: b.battery_level,
           device_model: b.device_model,
           os_version: b.os_version,
-        })));
+        })), { onConflict: 'id', ignoreDuplicates: true });
 
       if (error) throw error;
 
@@ -366,8 +382,8 @@ class OfflineStorage {
       console.log(`Synced ${breadcrumbs.length} breadcrumbs`);
 
       // If there are more, sync again
-      const remaining = await this.getPendingBreadcrumbsCount();
-      if (remaining > 0) {
+      const remaining = await this.db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM pending_breadcrumbs WHERE technician_id = ?', [session.user.id]);
+      if ((remaining?.count ?? 0) > 0) {
         await this.syncBreadcrumbs();
       }
     } catch (error) {
@@ -378,7 +394,9 @@ class OfflineStorage {
   private async syncGeofenceEvents() {
     if (!this.db) return;
 
-    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_geofence_events');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_geofence_events WHERE technician_id = ?', [session.user.id]);
 
     for (const event of events) {
       try {
