@@ -7,7 +7,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { OfflineProvider } from './src/contexts/OfflineContext';
-import { initializeLocationTracking } from './src/services/LocationTrackingService';
 import { NotificationService } from './src/services/NotificationService';
 
 import LoginScreen from './src/screens/LoginScreen';
@@ -28,7 +27,6 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        initializeLocationTracking();
         await NotificationService.initialize();
         const session = await SecureStore.getItemAsync('session');
         if (session) {
