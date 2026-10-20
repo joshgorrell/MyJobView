@@ -352,7 +352,7 @@ class OfflineStorage {
       // Batch insert
       const { error } = await supabase
         .from('enhanced_gps_breadcrumbs')
-        .insert(breadcrumbs.map(b => ({
+        .upsert(breadcrumbs.map(b => ({
           id: b.id,
           technician_id: b.technician_id,
           daily_clock_entry_id: b.daily_clock_entry_id,
@@ -368,7 +368,7 @@ class OfflineStorage {
           battery_level: b.battery_level,
           device_model: b.device_model,
           os_version: b.os_version,
-        })));
+        })), { onConflict: 'id', ignoreDuplicates: true });
 
       if (error) throw error;
 
