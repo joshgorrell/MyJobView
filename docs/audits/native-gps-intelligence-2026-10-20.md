@@ -47,3 +47,29 @@ The native app is the only continuous breadcrumb collector. Web clocks capture G
 - Offline points sync exactly once to the correct authenticated employee and organization.
 - Manager can view a clearly timestamped current location and replay actual route beside an expected route.
 - No GPS feature changes are merged until automated tests, RLS tests, and real-device scenarios pass.
+
+## Web employee clock retirement — approved direction, gated rollout
+Decision: employee daily clock, job clock and break punches should ultimately be native-app-only; retain web timesheets, corrections, approvals, payroll/job-cost reporting and manager GPS maps. This is a policy and implementation plan, NOT an immediate disablement.
+
+### Initial entry-point inventory
+- `src/components/Technician/DailyClock.tsx`: web daily clock flow.
+- `src/components/Layout/TimeClockModal.tsx`: web clock modal.
+- `src/components/Production/WorkOrderTimeControl.tsx`: job time controls.
+- `src/components/Production/TechnicianWorkCenter.tsx`: technician work center; inspect indirect punch actions.
+- `src/components/Shared/ClockOutModal.tsx`: web clock-out flow.
+- Search additional pages, keyboard actions, APIs, RPCs and mobile browser views before disabling any entry point.
+
+### Rollout gates
+1. Inventory every web employee punch path and the corresponding Supabase mutation; classify manager corrections separately from employee punches.
+2. Verify native daily in/out, job in/out, break in/out, offline queueing and GPS evidence, including salary/hourly variations and permission denial.
+3. Repair native background tracking and complete iOS TestFlight field tests.
+4. Add organization-scoped setting `employee_clock_channel` (proposed values `web_and_mobile`, `mobile_only`), default existing tenants to unchanged behavior. Admin overrides and historical entries remain accessible.
+5. Under `mobile_only`, hide/disable employee punch controls in all web surfaces with a clear app handoff. Enforce channel policy server-side for employee-originated mutations without blocking authorized manager edits, imports or synchronization. Server cannot reliably trust a client-provided channel flag; use an authenticated native-specific mechanism or equivalent verifiable architecture.
+6. Pilot with Electronic Life only after native acceptance criteria pass; measure GPS capture success, sync lag, missed punches and support incidents. Preserve rollback switch.
+7. Retire web employee punching broadly only after pilot signoff. Do not disable QuickBooks Time or iPoint integrations as part of this work.
+
+### Additional acceptance criteria
+- Every employee-facing web clock action respects the organization policy, including direct API attempts.
+- Manager corrections and historical timesheets remain functional in both policy modes.
+- Native-only mode never strands an employee without a documented missed-punch/manager correction procedure.
+- Changing policy does not delete historical data or interfere with existing reporting and payroll integrations.
