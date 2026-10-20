@@ -6,7 +6,7 @@ const id = n => '00000000-0000-0000-0000-' + String(n).padStart(12, '0');
 // Reuse the existing employee-time test's two schema/identity setup blocks.
 // Interpolate only its numeric fixture IDs; no source evaluation is needed.
 const existing = await readFile('tests/employee-time/database.mjs', 'utf8');
-const setups = [...existing.matchAll(/await db\.exec\(\`([\s\S]*?)\`\);/g)].slice(0, 2);
+const setups = [...existing.matchAll(/await db\.exec\(`([\s\S]*?)`\);/g)].slice(0, 2);
 assert.equal(setups.length, 2);
 for (const match of setups) await db.exec(match[1].replace(/\$\{id\((\d+)\)\}/g, (_, n) => id(Number(n))));
 await db.exec(await readFile('supabase/migrations/20261002110037_enforce_employee_time_authority.sql', 'utf8'));
@@ -90,7 +90,7 @@ await start(202, 'training'); await stop(202);
 await assert.rejects(() => db.query(`SELECT review_internal_time('${id(202)}','approve_time')`), /Another manager/);
 const ownManager = await entry(202);
 await assert.rejects(() => db.exec(`UPDATE time_entries SET status='approved' WHERE id='${ownManager.id}'`), /Another manager/);
-await assert.rejects(() => db.exec(\`UPDATE time_entries SET internal_session_id=NULL,status='approved' WHERE id='${ownManager.id}'\`), /retain its session linkage/);
+await assert.rejects(() => db.exec(`UPDATE time_entries SET internal_session_id=NULL,status='approved' WHERE id='${ownManager.id}'`), /retain its session linkage/);
 // Effective config, not legacy job_time classification, requires this employee's Daily Clock.
 await as(11);
 await assert.rejects(() => start(203), /Clock in for the day/);
