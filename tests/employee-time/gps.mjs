@@ -22,17 +22,21 @@ console.log('GPS records actual reading timestamps, denial without stale fallbac
 failWrite=false;helperNavigator.onLine=true;await helper.saveClockEventGps('entry','time_entries',true);assert.equal(addresses.at(-1)[1],0);assert.equal(addresses.at(-1)[2],0);assert.equal(saved.at(-1).data.clock_out_gps_quality_score,75);
 networkFailure=true;await helper.saveClockEventGps('entry','time_entries',true);assert.equal(networkQueue.length,1);assert.equal(networkQueue[0].data.id,'entry');
 let nativePermission='granted';
-const native=load('mobile/src/services/LocationTrackingService.ts',{'expo-location':{Accuracy:{BestForNavigation:1},getCurrentPositionAsync:async()=>{throw Error('No fix');},getForegroundPermissionsAsync:async()=>({status:nativePermission}),getLastKnownPositionAsync:async()=>null},'expo-task-manager':{},'expo-battery':{},'expo-device':{},'react-native':{Platform:{OS:'ios'}},'./supabase':{},'./OfflineStorage':{}}).locationTrackingService;
+const native=load('mobile/src/services/LocationTrackingService.ts',{'expo-location':{Accuracy:{BestForNavigation:1},getCurrentPositionAsync:async()=>{throw Error('No fix');},getForegroundPermissionsAsync:async()=>({status:nativePermission}),getLastKnownPositionAsync:async()=>null},'expo-task-manager':{defineTask(){}},'expo-secure-store':{},'expo-crypto':{},'expo-battery':{},'expo-device':{},'react-native':{Platform:{OS:'ios'}},'./supabase':{},'./OfflineStorage':{}}).locationTrackingService;
 native.lastKnownLocation={...position,timestamp:Date.now()-120000};assert.equal(await native.captureHighAccuracyLocation(),null,'Native capture rejects stale last known readings');
 native.lastKnownLocation={...position,timestamp:Date.now()-1000};const fallback=await native.captureHighAccuracyLocation();assert.equal(fallback.coords.method,'cached');assert.equal(fallback.timestamp,native.lastKnownLocation.timestamp);
 nativePermission='denied';assert.equal(await native.captureHighAccuracyLocation(),null,'Native permission denial cannot reuse a previous location');
 console.log('GPS handles zero coordinates, network-loss queueing, and native stale-location/permission fallbacks.');
 
-for (const path of ['src/components/Technician/DailyClock.tsx','src/components/Layout/TimeClockModal.tsx','src/components/Production/WorkOrderTimeControl.tsx','src/components/Production/TechnicianWorkCenter.tsx','src/components/Shared/ClockOutModal.tsx','mobile/src/screens/TimeClockScreen.tsx']) {
+for (const path of ['src/components/Technician/DailyClock.tsx','src/components/Layout/TimeClockModal.tsx','src/components/Production/WorkOrderTimeControl.tsx','src/components/Production/TechnicianWorkCenter.tsx','src/components/Shared/ClockOutModal.tsx']) {
  const source=fs.readFileSync(path,'utf8');assert.equal(/\.(startTracking|startPreWarming|startPostCaptureRefinement)\(/.test(source),false,`${path} must not start ongoing GPS collection`);
 }
 assert.equal(fs.readFileSync('mobile/App.tsx','utf8').includes('initializeLocationTracking'),false,'Opening the native app must not request background location');
-console.log('Clock flows never start GPS watches, pre-warming, refinement or background tracking.');
+const nativeClockSource=fs.readFileSync('mobile/src/screens/TimeClockScreen.tsx','utf8');
+assert.ok(nativeClockSource.includes('await locationTrackingService.startTracking(profile.id, entryId)'), 'Native Daily Clock starts the authorized workday GPS session');
+assert.ok(nativeClockSource.includes('await locationTrackingService.stopTracking()'), 'Native Daily Clock stops workday GPS at clock-out');
+assert.equal(/\\.(startPreWarming|startPostCaptureRefinement)\\(/.test(nativeClockSource), false, 'Native clocks must not start web refinement');
+console.log('Web clocks avoid ongoing GPS collection; native workday tracking starts/stops with Daily Clock and not app opening.');
 
 let nativeSaved=[],nativeRemoved=[],nativeWrites=[],nativeSession='tech';
 const nativeGps=load('mobile/src/services/ClockEventGps.ts',{

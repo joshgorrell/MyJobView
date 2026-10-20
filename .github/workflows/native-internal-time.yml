@@ -27,5 +27,5 @@ jobs:
       - run: npm ci
       - run: node tests/employee-time/native-internal-time-database.mjs
       - run: node tests/employee-time/native-internal-time-runtime.mjs
-      - run: npm run test:employee-time
       - run: npm run build
+      - run: npm run test:employee-time
