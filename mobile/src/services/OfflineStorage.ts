@@ -121,7 +121,7 @@ class OfflineStorage {
   }
 
   async saveBreadcrumb(breadcrumb: PendingBreadcrumb) {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) await this.initialize();
 
     await this.db.runAsync(
       `INSERT INTO pending_breadcrumbs (
@@ -324,10 +324,13 @@ class OfflineStorage {
 
   private async syncBreadcrumbs() {
     if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
     // Get breadcrumbs in batches
     const breadcrumbs: any[] = await this.db.getAllAsync(
-      'SELECT * FROM pending_breadcrumbs ORDER BY captured_at LIMIT 100'
+      'SELECT * FROM pending_breadcrumbs WHERE technician_id = ? ORDER BY captured_at LIMIT 100',
+      [session.user.id]
     );
 
     if (breadcrumbs.length === 0) return;
