@@ -135,7 +135,14 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       const { error } = await supabase.from('daily_clock_entries').insert(clockInData);
       if (error) throw error;
       void saveNativeClockGps(entryId, profile.id, false, capture, now.toISOString()).catch(e => console.error('Clock-in GPS save pending:', e));
-      void locationTrackingService.startTracking(profile.id, entryId).catch(e => console.error('Failed to start background tracking:', e));
+      try {
+        await locationTrackingService.startTracking(profile.id, entryId);
+      } catch (trackingError) {
+        console.error('Clock-in saved but GPS tracking failed:', trackingError);
+        await loadTodaysClock();
+        Alert.alert('GPS Tracking Unavailable', 'Clock-in saved, but background GPS did not start. Please enable background location access and notify your supervisor.');
+        return;
+      }
       await loadTodaysClock();
       Alert.alert('Success', 'Clocked in successfully!');
     } catch (error: any) {
@@ -166,7 +173,14 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         const { error } = await supabase.from('daily_clock_entries').update(updates).eq('id', todayEntry.id);
         if (error) throw error;
         void saveNativeClockGps(todayEntry.id, profile.id, true, capture, now.toISOString()).catch(e => console.error('Clock-out GPS save pending:', e));
-        void locationTrackingService.stopTracking().catch(e => console.error('Failed to stop background tracking:', e));
+        try {
+          await locationTrackingService.stopTracking();
+        } catch (trackingError) {
+          console.error('Clock-out saved but GPS stop failed:', trackingError);
+          await loadTodaysClock();
+          Alert.alert('GPS Tracking Warning', 'Clock-out saved, but the app could not confirm GPS tracking stopped. Please notify your supervisor.');
+          return;
+        }
         await loadTodaysClock();
         Alert.alert('Success', 'Clocked out successfully!');
       } catch (error: any) {
