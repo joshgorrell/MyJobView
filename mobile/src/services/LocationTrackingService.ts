@@ -4,6 +4,7 @@ import * as Battery from 'expo-battery';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
 import { supabase } from './supabase';
 import { offlineStorage } from './OfflineStorage';
 
@@ -61,6 +62,9 @@ class LocationTrackingService {
     const session: TrackingSession = { technicianId, clockEntryId };
     const existing = await SecureStore.getItemAsync(TRACKING_SESSION_KEY);
     const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (running && !existing) {
+      throw new Error('Location tracking is active without a recoverable shift; restart tracking after resolving the previous session');
+    }
     if (running && existing) {
       const previous = JSON.parse(existing) as TrackingSession;
       if (previous.technicianId !== technicianId || previous.clockEntryId !== clockEntryId) {
@@ -198,7 +202,7 @@ class LocationTrackingService {
     session: TrackingSession
   ) {
     const breadcrumb = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: Crypto.randomUUID(),
       technician_id: session.technicianId,
       daily_clock_entry_id: session.clockEntryId,
       latitude: location.coords.latitude,
@@ -217,7 +221,7 @@ class LocationTrackingService {
     try {
       const { error } = await supabase.from('enhanced_gps_breadcrumbs').insert(breadcrumb);
       if (error) throw error;
-    } catch {
+    } catch (error) {
       await offlineStorage.saveBreadcrumb(breadcrumb);
     }
   }
