@@ -1,4 +1,4 @@
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from 'expo-sqlite/next';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
 

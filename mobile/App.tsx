@@ -77,7 +77,7 @@ export default function App() {
                   <Stack.Screen
                     name="Dashboard"
                     component={DashboardScreen}
-                    options={{ title: 'Field Ops Pro' }}
+                    options={{ title: 'MyJobView' }}
                   />
                   <Stack.Screen
                     name="TimeClock"

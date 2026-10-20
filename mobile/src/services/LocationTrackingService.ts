@@ -77,7 +77,7 @@ class LocationTrackingService {
         timeInterval: config.timeInterval,
         distanceInterval: config.distanceInterval,
         foregroundService: Platform.OS === 'android' ? {
-          notificationTitle: 'Field Ops Pro',
+          notificationTitle: 'MyJobView',
           notificationBody: 'Location services active',
           notificationColor: '#2563eb',
         } : undefined,
@@ -128,7 +128,6 @@ class LocationTrackingService {
       if (permission.status !== 'granted') return null;
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
-        maximumAge: 1000,
       });
 
       const duration = Date.now() - startTime;
@@ -254,7 +253,7 @@ class LocationTrackingService {
         timeInterval: config.timeInterval,
         distanceInterval: config.distanceInterval,
         foregroundService: Platform.OS === 'android' ? {
-          notificationTitle: 'Field Ops Pro',
+          notificationTitle: 'MyJobView',
           notificationBody: 'Location services active',
           notificationColor: '#2563eb',
         } : undefined,

@@ -249,7 +249,7 @@ export default function DashboardScreen({ navigation }: any) {
       </TouchableOpacity>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Field Ops Pro</Text>
+        <Text style={styles.footerText}>MyJobView</Text>
         <Text style={styles.footerSubtext}>Version 1.0.0</Text>
       </View>
     </ScreenContainer>

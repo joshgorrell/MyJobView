@@ -64,7 +64,7 @@ export default function LoginScreen() {
           {/* Logo / Title */}
           <View style={styles.header}>
             <Logo size={88} variant="light" />
-            <Text style={styles.title}>Field Ops Pro</Text>
+            <Text style={styles.title}>MyJobView</Text>
             <Text style={styles.subtitle}>Mobile Time Clock</Text>
           </View>
 

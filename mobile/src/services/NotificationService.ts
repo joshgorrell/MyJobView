@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
 const PREFERENCE_KEY = 'notifications_enabled';
@@ -56,9 +57,13 @@ class NotificationServiceClass {
       return null;
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: 'field-ops-mobile',
-    });
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId || projectId === 'field-ops-mobile') {
+      console.warn('Push registration is unavailable until the EAS project is linked.');
+      return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
     return tokenData.data;
   }

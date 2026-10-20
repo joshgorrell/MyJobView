@@ -141,7 +141,7 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <Card style={styles.aboutCard}>
-          <InfoRow label="App Name" value="Field Ops Pro" />
+          <InfoRow label="App Name" value="MyJobView" />
           <InfoRow label="Version" value={Application.nativeApplicationVersion || '1.0.0'} />
           <InfoRow label="Build" value={Application.nativeBuildVersion || '1'} />
         </Card>
@@ -153,8 +153,8 @@ export default function SettingsScreen() {
       </TouchableOpacity>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Field Ops Pro</Text>
-        <Text style={styles.footerSubtext}>© 2025 Field Ops Pro</Text>
+        <Text style={styles.footerText}>MyJobView</Text>
+        <Text style={styles.footerSubtext}>© 2025 MyJobView</Text>
       </View>
     </ScreenContainer>
   );
