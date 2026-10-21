@@ -7,7 +7,7 @@ export const proposalPromise = {
   introduction: 'This proposal is the start of a conversation. Together, we’ll shape a system that fits your space, your priorities, and your budget.',
   promises: [
     { title: 'Let’s make it a perfect fit.', body: 'Want to bring the budget down, explore an upgrade, or take a different direction? We’re happy to adjust the equipment, features, and scope until the proposal feels right for you.', highlight: 'Go up. Go down. Make it yours.' },
-    { title: 'Our best price. Or dinner is on us.', body: 'For comparable equipment and the same scope of work, we’ll meet or beat the competing price. Share the competing proposal with us so we can compare the details and have the opportunity to make it right.', highlight: 'If we can’t, we’ll buy you dinner!' },
+    { title: 'The best price. Guaranteed.', body: 'For comparable equipment and the same scope of work, we’ll meet or beat the competing price. Share the competing proposal with us so we can compare the details and have the opportunity to make it right.', highlight: 'If we can’t, we’ll buy you dinner!' },
     { title: 'We’re here after installation.', body: 'Our 90-Day Test & Tune includes project adjustments, tuning, and guidance after substantial completion, giving you time to settle in and get comfortable with your system.', highlight: 'A great experience, from proposal to everyday life.' },
   ],
   closing: 'Tell us what you love. Tell us what you’d change. We’ll take it from there.',
