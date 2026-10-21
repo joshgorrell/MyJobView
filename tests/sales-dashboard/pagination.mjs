@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+const result=await build({entryPoints:['src/hooks/useSalesDashboardRecords.ts'],bundle:true,format:'esm',write:false,plugins:[{name:'stub',setup(b){b.onResolve({filter:/^\.\/supabase$|lib\/supabase$/},()=>({path:'stub',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export const supabase={}',loader:'js'}));b.onResolve({filter:/^react$/},()=>({path:'react',namespace:'react'}));b.onLoad({filter:/.*/,namespace:'react'},()=>({contents:'export const useEffect=()=>{};export const useState=()=>{};',loader:'js'}));}}]});
+const {readAllSalesRows}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
+const rows=Array.from({length:1201},(_,id)=>({id}));const pages=[];
+assert.equal((await readAllSalesRows(()=>({order(){return this},range(a,b){pages.push([a,b]);return Promise.resolve({data:rows.slice(a,b+1),error:null})}}))).length,1201);
+assert.deepEqual(pages,[[0,499],[500,999],[1000,1499]]);
+await assert.rejects(readAllSalesRows(()=>({order(){return this},range(){return Promise.resolve({data:null,error:new Error('Denied')})}})),/Denied/);
+console.log('PASS: full pagination beyond the API row cap; failed queries do not become zero counts.');

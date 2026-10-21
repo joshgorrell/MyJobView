@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { readAllSalesRows } from '../../hooks/useSalesDashboardRecords';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   CheckCircle, Circle, FileText, Wrench, Building2, Phone,
@@ -31,6 +32,7 @@ interface RecapWorkOrder {
 interface RecapAppointment {
   id: string;
   title: string;
+  appointment_date: string;
   start_time: string;
   end_time: string;
   status: string;
@@ -52,6 +54,7 @@ interface RecapLead {
 interface RecapScheduledConnection {
   id: string;
   scheduled_date: string;
+  prospect_id: string;
   notes: string | null;
   contact: { full_name: string; company_name: string } | null;
 }
@@ -88,12 +91,12 @@ function getToday(): Date {
 }
 
 function formatDateString(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 
 function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString('en-US', {
+  return new Date(dateStr.includes('T') ? dateStr : `2000-01-01T${dateStr}`).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
   });
@@ -126,6 +129,8 @@ function getStatusBadge(status: string) {
 
 export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }: DailyRecapProps) {
   const { profile } = useAuth();
+  const [recapList, setRecapList] = useState<string | null>(null);
+  const [recapDetail, setRecapDetail] = useState<{ title: string; notes: string; date: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [_refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,9 +144,9 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
   const effectiveRepId = repId || profile?.id || null;
-  const today = getToday();
-  const yesterday = getYesterday();
-  const todayStr = formatDateString(today);
+  const todayStr = formatDateString(new Date());
+  const today = useMemo(() => getToday(), [todayStr]);
+  const yesterday = useMemo(() => getYesterday(), [todayStr]);
 
 
   const loadRecap = useCallback(async () => {
@@ -157,14 +162,13 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
       yesterdayEnd.setHours(23, 59, 59, 999);
       const yesterdayEndStr = yesterdayEnd.toISOString();
 
-      const todayStart = today.toISOString();
       const todayEnd = new Date(today);
       todayEnd.setHours(23, 59, 59, 999);
       const todayEndStr = todayEnd.toISOString();
 
       // Fetch work orders for this rep's customers that had activity yesterday
       // or are completed and ready for billing
-      const safe = (q: any) => Promise.resolve(q).catch(() => ({ data: null, error: null }));
+      const safe = async (q: any) => ({ data: await readAllSalesRows(() => q), error: null });
 
       const [
         woYesterdayResult,
@@ -211,35 +215,33 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
         safe(supabase
           .from('appointments')
           .select(`
-            id, title, start_time, end_time, status, appointment_type,
+            id, title, appointment_date, start_time, end_time, status, appointment_type,
             contact:contacts(full_name, company_name)
           `)
-          .eq('sales_rep_id', effectiveRepId)
-          .gte('start_time', todayStart)
-          .lte('start_time', todayEndStr)
+          .eq('organization_id', profile.organization_id)
+          .eq('created_by', effectiveRepId)
+          .eq('appointment_date', todayStr)
           .order('start_time', { ascending: true })),
 
         // Leads assigned to this rep needing follow-up today
         safe(supabase
           .from('leads')
-          .select('id, company_name, contact_name, status, priority, estimated_value, next_follow_up, last_contact_date')
+          .select('id, company_name, contact_name, status, priority, estimated_value, next_follow_up:reminder_date, last_contact_date')
           .eq('assigned_to', effectiveRepId)
-          .in('status', ['new', 'contacted', 'qualified', 'proposal', 'negotiation'])
-          .or(`next_follow_up.lte.${todayEndStr},next_follow_up.is.null`)
+          .in('status', ['unclaimed', 'claimed', 'escalated', 'in_progress'])
+          .lte('reminder_date', todayEndStr)
           .order('priority', { ascending: true })
-          .limit(10)),
+),
 
-        // Scheduled connections due today
+        // Pending scheduled occurrences due today or earlier for this rep's schedules.
         safe(supabase
-          .from('scheduled_connections')
-          .select(`
-            id, scheduled_date, notes,
-            contact:contacts(full_name, company_name)
-          `)
-          .eq('assigned_to', effectiveRepId)
-          .eq('status', 'pending')
-          .gte('scheduled_date', todayStart)
-          .lte('scheduled_date', todayEndStr)
+          .from('scheduled_connection_occurrences')
+          .select(`id, scheduled_date, prospect_id, contact:contacts!scheduled_connection_occurrences_prospect_id_fkey(full_name, company_name), schedule:scheduled_connections!inner(created_by_user_id, default_notes)`)
+          .eq('organization_id', profile.organization_id)
+          .eq('schedule.created_by_user_id', effectiveRepId)
+          .eq('is_completed', false)
+          .eq('is_skipped', false)
+          .lte('scheduled_date', todayStr)
           .order('scheduled_date', { ascending: true })),
 
         // Existing todo items for today
@@ -254,7 +256,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
       setBillingWorkOrders((woBillingResult.data as RecapWorkOrder[]) || []);
       setTodayAppointments((apptsTodayResult.data as RecapAppointment[]) || []);
       setFollowUpLeads((leadsResult.data as RecapLead[]) || []);
-      setScheduledConnections((connectionsResult.data as RecapScheduledConnection[]) || []);
+      setScheduledConnections((connectionsResult.data || []).map((c: any) => ({ ...c, notes: c.schedule?.default_notes || null })));
       setTodoItems((todosResult.data as RecapTodoItem[]) || []);
     } catch (err) {
       console.error('Error loading daily recap:', err);
@@ -440,6 +442,31 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
     appointmentsToday: todayAppointments.length,
   };
 
+  const recapRows: { title: string; subtitle: string; open: () => void }[] = [];
+  if (recapList === 'Completed Yesterday' || recapList === 'Ready to Bill' || recapList === 'Notes to Review') {
+    const work = recapList === 'Ready to Bill' ? billingWorkOrders : yesterdayWorkOrders.filter(w => recapList === 'Completed Yesterday' ? w.status === 'completed' : !!(w.notes || w.internal_notes));
+    work.forEach(w => recapRows.push({ title: `${w.work_order_number} · ${w.contact?.full_name || w.contact?.company_name || w.title}`, subtitle: w.status.replace(/_/g, ' '), open: () => onNavigate('work_orders', w.id) }));
+  }
+  if (recapList === 'Follow-ups Due') {
+    followUpLeads.forEach(l => recapRows.push({ title: l.contact_name || l.company_name, subtitle: l.next_follow_up || '', open: () => onNavigate('pipeline_board', l.id) }));
+    scheduledConnections.forEach(c => recapRows.push({ title: c.contact?.full_name || c.contact?.company_name || 'Scheduled connection', subtitle: c.scheduled_date, open: () => setRecapDetail({ title: c.contact?.full_name || 'Scheduled connection', notes: c.notes || 'No notes recorded.', date: c.scheduled_date }) }));
+  }
+  if (recapList === 'Appointments Today') todayAppointments.forEach(a => recapRows.push({ title: a.title, subtitle: `${a.contact?.full_name || a.contact?.company_name || ''} · ${formatTime(a.start_time)}`, open: () => setRecapDetail({ title: a.title, notes: `Status: ${a.status.replace(/_/g, ' ')}. ${a.contact?.full_name || a.contact?.company_name || ''}`, date: `${a.appointment_date} · ${formatTime(a.start_time)} to ${formatTime(a.end_time)}` }) }));
+
+  const navigateTodoRecord = (tab: string, recordId?: string) => {
+    if (recordId && tab === 'pipeline_board') {
+      const work = [...yesterdayWorkOrders, ...billingWorkOrders].find(w => w.id === recordId);
+      if (work) { onNavigate('work_orders', recordId); return; }
+      const scheduled = scheduledConnections.find(c => c.id === recordId);
+      if (scheduled) { setRecapDetail({ title: scheduled.contact?.full_name || 'Scheduled connection', notes: scheduled.notes || 'No notes recorded.', date: scheduled.scheduled_date }); return; }
+    }
+    if (tab === 'calendar' && recordId) {
+      const appointment = todayAppointments.find(a => a.id === recordId);
+      if (appointment) { setRecapDetail({ title: appointment.title, notes: appointment.status, date: `${appointment.appointment_date} · ${formatTime(appointment.start_time)}` }); return; }
+    }
+    onNavigate(tab, recordId);
+  };
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -472,11 +499,13 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
 
   return (
     <div className="space-y-6">
+      {recapDetail ? <section className="rounded-xl bg-gray-800 border border-gray-700 p-5"><button className="text-blue-400 mb-3" onClick={() => setRecapDetail(null)}>Back to list</button><h3 className="text-lg text-white font-semibold">{recapDetail.title}</h3><p className="text-gray-400 text-sm mt-2">{recapDetail.date}</p><p className="text-gray-200 whitespace-pre-wrap mt-4">{recapDetail.notes}</p><button className="text-blue-400 mt-4" onClick={() => onNavigate('calendar')}>Open calendar</button></section> : recapList ? <section className="rounded-xl bg-gray-800 border border-gray-700 p-5"><button className="text-blue-400 mb-3" onClick={() => setRecapList(null)}>Back to daily recap</button><h3 className="text-lg text-white font-semibold">{recapList} ({recapRows.length})</h3>{recapRows.length === 0 && <p className="text-gray-400 py-6">No matching records.</p>}{recapRows.map((row, i) => <button key={i} onClick={row.open} className="block w-full text-left border-b border-gray-700 py-3 hover:bg-gray-700"><span className="block text-white">{row.title}</span><span className="text-xs text-gray-400">{row.subtitle}</span></button>)}</section> : <>
       {/* Summary bar */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <SummaryCard
           icon={<CheckCircle className="w-4 h-4" />}
           label="Completed Yesterday"
+          onClick={() => setRecapList('Completed Yesterday')}
           value={summary.completedYesterday}
           color="text-green-400"
           bg="bg-green-500/10 border-green-500/20"
@@ -484,6 +513,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
         <SummaryCard
           icon={<DollarSign className="w-4 h-4" />}
           label="Ready to Bill"
+          onClick={() => setRecapList('Ready to Bill')}
           value={summary.readyToBill}
           color="text-amber-400"
           bg="bg-amber-500/10 border-amber-500/20"
@@ -491,6 +521,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
         <SummaryCard
           icon={<StickyNote className="w-4 h-4" />}
           label="Notes to Review"
+          onClick={() => setRecapList('Notes to Review')}
           value={summary.notesToReview}
           color="text-blue-400"
           bg="bg-blue-500/10 border-blue-500/20"
@@ -498,6 +529,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
         <SummaryCard
           icon={<Phone className="w-4 h-4" />}
           label="Follow-ups Due"
+          onClick={() => setRecapList('Follow-ups Due')}
           value={summary.followUpsDue}
           color="text-orange-400"
           bg="bg-orange-500/10 border-orange-500/20"
@@ -505,6 +537,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
         <SummaryCard
           icon={<Calendar className="w-4 h-4" />}
           label="Appointments Today"
+          onClick={() => setRecapList('Appointments Today')}
           value={summary.appointmentsToday}
           color="text-cyan-400"
           bg="bg-cyan-500/10 border-cyan-500/20"
@@ -526,7 +559,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
                 key={todo.id}
                 todo={todo}
                 onToggle={() => toggleTodo(todo.id, todo.is_completed)}
-                onNavigate={onNavigate}
+                onNavigate={navigateTodoRecord}
               />
             ))}
             {completeTodos.length > 0 && (
@@ -541,7 +574,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
                       key={todo.id}
                       todo={todo}
                       onToggle={() => toggleTodo(todo.id, todo.is_completed)}
-                      onNavigate={onNavigate}
+                      onNavigate={navigateTodoRecord}
                     />
                   ))}
                 </div>
@@ -705,6 +738,7 @@ export function DailyRecap({ repId, isManagerView: _isManagerView, onNavigate }:
           </div>
         </RecapSection>
       )}
+      </>}
     </div>
   );
 }
@@ -717,21 +751,23 @@ function SummaryCard({
   value,
   color,
   bg,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   color: string;
   bg: string;
+  onClick: () => void;
 }) {
   return (
-    <div className={`rounded-lg border p-3 ${bg}`}>
+    <button type="button" onClick={onClick} className={`text-left rounded-lg border p-3 hover:border-blue-400 ${bg}`}>
       <div className="flex items-center gap-1.5 mb-1">
         <span className={color}>{icon}</span>
         <span className="text-xs text-gray-400 font-medium">{label}</span>
       </div>
       <div className={`text-xl font-bold ${color}`}>{value}</div>
-    </div>
+    </button>
   );
 }
 
@@ -826,7 +862,7 @@ function TodoRow({
           } else if (todo.item_type === 'follow_up') {
             onNavigate('pipeline_board', todo.record_id || undefined);
           } else if (todo.item_type === 'appointment') {
-            onNavigate('calendar');
+            onNavigate('calendar', todo.record_id || undefined);
           }
         }}
       >

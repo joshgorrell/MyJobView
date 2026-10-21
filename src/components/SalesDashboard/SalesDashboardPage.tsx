@@ -18,6 +18,11 @@ import { RecentProposalsCard } from './RecentProposalsCard';
 import { RecentActivityCard } from './RecentActivityCard';
 import { RefreshCw, AlertCircle, LayoutDashboard, FileText, Activity, BarChart3, Sunrise } from 'lucide-react';
 import { DailyRecap } from './DailyRecap';
+import { useSalesDashboardRecords } from '../../hooks/useSalesDashboardRecords';
+import { buildSalesLists, periodBounds, SALES_LIST_LABELS, type SalesPeriod, type SalesListKey, type SalesRecord } from '../../lib/salesDashboardRecords';
+import { SalesResultsSummary } from './SalesResultsSummary';
+import { SalesRecordList } from './SalesRecordList';
+import { SalesConnectionDetail } from './SalesConnectionDetail';
 import { DailySalesTotalsPanel } from './DailySalesTotalsPanel';
 
 export interface SalesRepAIContext {
@@ -41,7 +46,8 @@ export interface SalesRepAIContext {
 interface SalesDashboardPageProps {
   onProposalClick?: (proposalId: string) => void;
   onRepContextChange?: (ctx: SalesRepAIContext | null) => void;
-  onNavigateToTab?: (tab: string) => void;
+  onNavigateToTab?: (tab: string, recordId?: string) => void;
+  onOpenRecord?: (record: SalesRecord) => void;
 }
 
 const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboard }[] = [
@@ -52,9 +58,16 @@ const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboa
   { key: 'activity', label: 'Activity', icon: Activity },
 ];
 
-export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavigateToTab }: SalesDashboardPageProps) {
+export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavigateToTab, onOpenRecord }: SalesDashboardPageProps) {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('daily_recap');
+  const [period, setPeriod] = useState<SalesPeriod>('month');
+  const [selectedList, setSelectedList] = useState<SalesListKey | null>(null);
+  const [listSource, setListSource] = useState<'customer' | 'rep' | null>(null);
+  const [listReason, setListReason] = useState<string | null>(null);
+  const selectList = (key: SalesListKey) => { setListSource(null); setListReason(null); setSelectedList(key); };
+  const [connectionRecord, setConnectionRecord] = useState<SalesRecord | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
 
   const isManager = profile?.role
@@ -67,11 +80,47 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
   const isManagerView = isManager && selectedRepId !== null && selectedRepId !== profile?.id;
 
-  const { data, loading, error, refresh } = useSalesDashboard({
+  const { data: baseData, loading, error: baseError, refresh: refreshBase } = useSalesDashboard({
     repId: effectiveRepId,
     isManagerView,
   });
 
+  const records = useSalesDashboardRecords(effectiveRepId, profile?.organization_id || undefined, refreshKey);
+  const lists = useMemo(() => baseData && records.source ? buildSalesLists(records.source, period, baseData.quota) : null, [baseData, records.source, period]);
+  const refresh = useCallback(() => { refreshBase(); setRefreshKey(n => n + 1); }, [refreshBase]);
+  const error = baseError || records.error;
+  useEffect(() => { setSelectedList(null); setConnectionRecord(null); }, [effectiveRepId, period]);
+  const data = useMemo(() => {
+    if (!baseData || !lists || !records.source) return baseData;
+    const previousDate = new Date();
+    const previousQuota = { ...baseData.quota };
+    if (period === 'month' || period === 'quarter') {
+      const day = previousDate.getDate(); previousDate.setDate(1); previousDate.setMonth(previousDate.getMonth() - (period === 'month' ? 1 : 3));
+      previousDate.setDate(Math.min(day, new Date(previousDate.getFullYear(), previousDate.getMonth() + 1, 0).getDate()));
+    } else {
+      previousDate.setFullYear(previousDate.getFullYear() - 1);
+      previousQuota.quotaStartDate = `${Number(baseData.quota.quotaStartDate.slice(0, 4)) - 1}${baseData.quota.quotaStartDate.slice(4)}`;
+      previousQuota.quotaEndDate = `${Number(baseData.quota.quotaEndDate.slice(0, 4)) - 1}${baseData.quota.quotaEndDate.slice(4)}`;
+    }
+    const previous = buildSalesLists(records.source, period, previousQuota, previousDate);
+    const closed = lists.closed.length;
+    return { ...baseData,
+      closeRate: { ...baseData.closeRate, pct: closed ? Math.round(lists.won.length / closed * 1000) / 10 : 0, wonCount: lists.won.length, lostCount: lists.lost.length, prevPct: previous.closed.length ? Math.round(previous.won.length / previous.closed.length * 1000) / 10 : 0, prevWonCount: previous.won.length, prevLostCount: previous.lost.length },
+      pipeline: { count: lists.pipeline.length, total: lists.pipeline.reduce((sum, r) => sum + (r.amount || 0), 0) },
+      expiredProposalsCount: lists.stale.length,
+      hotLeads: lists.hot.slice(0, 5).map(r => ({ id: r.id, companyName: r.customer, contactName: r.title, estimatedValue: r.amount || 0, priority: records.source!.leads.find(l => l.id === r.id)?.priority || 'high', status: r.status })),
+      staleLeads: lists.staleLeads.slice(0, 5).map(r => ({ id: r.id, companyName: r.customer, contactName: r.title, estimatedValue: r.amount || 0, priority: '', lastContactDate: records.source!.leads.find(l => l.id === r.id)?.last_contact_date, daysSinceContact: r.detail === 'Never contacted' ? 999 : Math.floor((Date.now() - new Date(r.date).getTime()) / 86400000) })),
+      declineReasons: [...new Set(lists.lost.map(r => r.reason || 'unknown'))].map(reason => ({ reason, count: lists.lost.filter(r => (r.reason || 'unknown') === reason).length, byCustomer: lists.lost.filter(r => (r.reason || 'unknown') === reason && records.source!.proposals.find(p => p.id === r.id)?.declined_by === 'customer').length, byRep: lists.lost.filter(r => (r.reason || 'unknown') === reason && records.source!.proposals.find(p => p.id === r.id)?.declined_by !== 'customer').length })),
+      periodStats: { contactsAdded: lists.contacts.length, connectionsLogged: lists.connections.length, proposalsCreated: lists.created.length, proposalsExpired: lists.stale.length, proposalsDeclined: lists.lost.length },
+      recentProposals: [...lists.created].slice(0, 5).map(r => ({ id: r.id, proposalNumber: r.title, status: r.status, total: r.amount || 0, customerName: r.customer, createdAt: r.date })),
+      recentActivity: [...records.source.leads.filter(l => { const bounds = periodBounds(period, baseData.quota); return l.created_at.slice(0, 10) >= bounds.start && l.created_at.slice(0, 10) <= bounds.end; }).map(l => ({ id: l.id, kind: 'lead' as const, title: `Lead added: ${l.contact_name || l.company_name}`, customer: l.company_name || '', status: l.status, date: l.created_at })), ...lists.connections, ...lists.created.map(r => ({ ...r, title: `Created ${r.title}` })), ...lists.sent.map(r => ({ ...r, title: `Sent ${r.title}` })), ...lists.won.map(r => ({ ...r, title: `Won ${r.title}` })), ...lists.lost.map(r => ({ ...r, title: `Lost ${r.title}` }))].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map((r, i) => ({ id: `${r.kind}-${r.id}-${i}`, recordId: r.id, recordKind: r.kind, type: (r.kind === 'connection' ? 'connection' : 'proposal_created') as 'connection' | 'proposal_created', createdAt: r.date, title: r.kind === 'connection' ? r.title : `${r.title} · ${r.status.replace(/_/g, ' ')}`, description: r.customer })),
+    };
+  }, [baseData, lists, records.source]);
+  const openRecord = useCallback((record: SalesRecord) => {
+    if (record.kind === 'connection') { setConnectionRecord(record); return; }
+    if (record.kind === 'proposal' && onProposalClick) { onProposalClick(record.id); return; }
+    onOpenRecord?.({ ...record, id: record.recordId || record.id });
+  }, [onOpenRecord, onProposalClick]);
   const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
 
   useEffect(() => {
@@ -107,24 +156,14 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   }, [data]);
 
   const handleNavigate = useCallback((tab: string) => {
-    setActiveTab(tab as DashboardTab);
+    setActiveTab(tab === 'performance' ? 'overview' : tab as DashboardTab);
   }, []);
 
-  const handleNavigateToPipeline = useCallback(() => {
-    if (onNavigateToTab) onNavigateToTab('pipeline_board');
-    else handleNavigate('pipeline');
-  }, [onNavigateToTab, handleNavigate]);
+  const handleNavigateToProposals = useCallback(() => { setListSource(null); setListReason(null); setSelectedList('created'); }, []);
 
-  const handleNavigateToProposals = useCallback(() => {
-    if (onNavigateToTab) onNavigateToTab('proposals');
-    else if (onProposalClick) onProposalClick('');
-  }, [onNavigateToTab, onProposalClick]);
+  const handleNavigateToActivity = useCallback(() => { setListSource(null); setListReason(null); setSelectedList('connections'); }, []);
 
-  const handleNavigateToActivity = useCallback(() => {
-    if (onNavigateToTab) onNavigateToTab('sales_activity');
-  }, [onNavigateToTab]);
-
-  if (loading) {
+  if (loading || records.loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <DashboardSkeleton />
@@ -190,6 +229,16 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
         </div>
       </div>
 
+      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-gray-200">
+        <label htmlFor="sales-period">Reporting period</label>
+        <select id="sales-period" value={period} onChange={e => setPeriod(e.target.value as SalesPeriod)} className="rounded-lg border border-gray-600 bg-gray-800 p-2 text-white">
+          <option value="month">This month</option><option value="quarter">This quarter</option><option value="year">This calendar year</option><option value="quota">This quota year</option>
+        </select>
+        <span>Goals and booked sales use the quota year. Follow-up queues include all outstanding items.</span>
+      </div>
+      {connectionRecord ? <SalesConnectionDetail key={connectionRecord.id} record={connectionRecord} onBack={() => setConnectionRecord(null)} onSaved={refresh} /> : selectedList && lists ?
+        <SalesRecordList key={`${selectedList}:${effectiveRepId}:${period}`} title={SALES_LIST_LABELS[selectedList]} subtitle={`${data.repDisplayName} · ${['stale', 'pipeline', 'followups', 'untouched', 'hot', 'staleLeads'].includes(selectedList) ? 'All outstanding items' : ['booked', 'runRate'].includes(selectedList) ? selectedList === 'booked' ? `${data.quota.quotaStartDate} to ${data.quota.quotaEndDate}` : 'Last 90 days' : `${periodBounds(period, data.quota).start} to ${periodBounds(period, data.quota).end}`}`} records={listReason ? lists[selectedList].filter(r => (r.reason || 'unknown') === listReason && (!listSource || (records.source?.proposals.find(p => p.id === r.id)?.declined_by === 'customer' ? 'customer' : 'rep') === listSource)) : lists[selectedList]} onBack={() => setSelectedList(null)} onOpen={openRecord} /> : <>
+      {lists && <SalesResultsSummary lists={lists} onSelect={selectList} />}
       {/* Tab navigation */}
       <div className="flex items-center gap-1 mb-6 overflow-x-auto border-b border-gray-700">
         {TAB_CONFIG.map((tab) => {
@@ -222,9 +271,9 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
           <DailyRecap
             repId={effectiveRepId}
             isManagerView={isManagerView}
-            onNavigate={(tab, _recordId) => {
+            onNavigate={(tab, recordId) => {
               if (onNavigateToTab) {
-                onNavigateToTab(tab);
+                onNavigateToTab(tab, recordId);
               } else {
                 handleNavigate(tab as any);
               }
@@ -236,8 +285,8 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <AnnualGoalHero data={data} teamRank={data.teamRank ?? null} />
-          <SalesKpiGrid data={data} />
-          {data.periodStats && <PeriodStatsRow stats={data.periodStats} />}
+          <SalesKpiGrid data={data} onSelect={selectList} />
+          {data.periodStats && <PeriodStatsRow stats={data.periodStats} onSelect={selectList} />}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <SalesTrendChart data={data} />
@@ -248,15 +297,15 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
           </div>
           <SalesAttentionList items={attentionItems} onNavigate={handleNavigate} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HotLeadsCard leads={data.hotLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
-            <StaleLeadsCard leads={data.staleLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
+            <HotLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.hotLeads ?? []} onNavigateToPipeline={() => selectList('hot')} />
+            <StaleLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.staleLeads ?? []} onNavigateToPipeline={() => selectList('staleLeads')} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <RecentProposalsCard proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
-            <RecentActivityCard activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
+            <RecentProposalsCard onProposalClick={onProposalClick} proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
+            <RecentActivityCard onOpenRecord={openRecord} activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
           </div>
           {(data.declineReasons ?? []).length > 0 && (
-            <DeclineReasonsCard reasons={data.declineReasons ?? []} />
+            <DeclineReasonsCard onReasonClick={(reason, source) => { setListSource(source || null); setListReason(reason); setSelectedList('lost'); }} reasons={data.declineReasons ?? []} />
           )}
         </div>
       )}
@@ -274,12 +323,12 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
               </div>
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Active Proposals</p>
-                <p className="text-2xl font-bold text-gray-900">{data.pipeline.count}</p>
+                <button onClick={() => selectList('pipeline')} className="text-2xl font-bold text-blue-700 hover:underline">{data.pipeline.count}</button>
               </div>
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Close Rate</p>
                 <p className="text-2xl font-bold text-gray-900">{data.closeRate.pct}%</p>
-                <p className="text-xs text-gray-400 mt-0.5">{data.closeRate.wonCount} won / {data.closeRate.wonCount + data.closeRate.lostCount} closed</p>
+                <button onClick={() => selectList('closed')} className="text-xs text-blue-700 hover:underline mt-0.5">{data.closeRate.wonCount} won / {data.closeRate.wonCount + data.closeRate.lostCount} closed</button>
               </div>
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Run Rate (90d)</p>
@@ -290,28 +339,29 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HotLeadsCard leads={data.hotLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
-            <StaleLeadsCard leads={data.staleLeads ?? []} onNavigateToPipeline={handleNavigateToPipeline} />
+            <HotLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.hotLeads ?? []} onNavigateToPipeline={() => selectList('hot')} />
+            <StaleLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.staleLeads ?? []} onNavigateToPipeline={() => selectList('staleLeads')} />
           </div>
-          <RecentProposalsCard proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
+          <RecentProposalsCard onProposalClick={onProposalClick} proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
         </div>
       )}
 
       {activeTab === 'proposals' && (
         <div className="space-y-6">
-          <RecentProposalsCard proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
+          <RecentProposalsCard onProposalClick={onProposalClick} proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
           {(data.declineReasons ?? []).length > 0 && (
-            <DeclineReasonsCard reasons={data.declineReasons ?? []} />
+            <DeclineReasonsCard onReasonClick={(reason, source) => { setListSource(source || null); setListReason(reason); setSelectedList('lost'); }} reasons={data.declineReasons ?? []} />
           )}
         </div>
       )}
 
       {activeTab === 'activity' && (
         <div className="space-y-6">
-          <RecentActivityCard activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
-          {data.periodStats && <PeriodStatsRow stats={data.periodStats} />}
+          <RecentActivityCard onOpenRecord={openRecord} activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
+          {data.periodStats && <PeriodStatsRow stats={data.periodStats} onSelect={selectList} />}
         </div>
       )}
+      </>}
     </div>
   );
 }
