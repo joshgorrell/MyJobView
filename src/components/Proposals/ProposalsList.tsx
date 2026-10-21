@@ -2134,9 +2134,11 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
             setSelectedProposal(null);
           }}
           onSuccess={() => {
+            const reopenedProposalId = selectedProposal.id;
             setShowReactivateModal(false);
             setSelectedProposal(null);
             loadProposals();
+            onSelectProposal(reopenedProposalId);
           }}
           onReview={() => {
             setShowReactivateModal(false);
