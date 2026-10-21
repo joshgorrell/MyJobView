@@ -113,9 +113,10 @@ export function EmailProposalModal({
   }, []);
 
   async function loadSavedTemplate() {
-    const {data, error} = await supabase.from('proposals').select('report_template_id').eq('id', proposalId).maybeSingle();
+    const {data, error} = await supabase.from('proposals').select('report_template_id,include_promise_page').eq('id', proposalId).maybeSingle();
     if (error) { setError('Unable to load saved proposal template.'); return; }
     setSelectedTemplateId(data?.report_template_id || null);
+    setIncludePromisePage(data?.include_promise_page ?? true);
   }
 
   async function loadDefaults() {
