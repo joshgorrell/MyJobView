@@ -1,0 +1,32 @@
+name: Time Clock Access
+
+on:
+  pull_request:
+    paths:
+      - 'src/components/Layout/QuickClockButton.tsx'
+      - 'src/components/Layout/DailyLaunchpad.tsx'
+      - 'src/hooks/useEmployeeTimePolicy.ts'
+      - 'tests/employee-time/runtime.mjs'
+      - 'tests/employee-time/browser*'
+      - 'tests/employee-time/browser/**'
+      - '.github/workflows/time-clock-access.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node tests/employee-time/runtime.mjs
+      - run: node tests/employee-time/database.mjs
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:employee-time:browser

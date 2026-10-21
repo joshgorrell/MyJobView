@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { Clock, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { DailyLaunchpad } from './DailyLaunchpad';
 
 interface TimeButtonProps {
@@ -34,7 +33,7 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    if (timePolicy.dailyClock && profile?.id) {
+    if (profile?.id) {
       checkClockStatus();
 
       const timer = setInterval(() => {
@@ -61,19 +60,17 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
         channel.unsubscribe();
       };
     }
-  }, [profile, timePolicy.dailyClock]);
+  }, [profile?.id, timePolicy.dailyClock]);
 
   async function checkClockStatus() {
     if (!profile) return;
     try {
-      const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
-
-      const { data: dailyEntry } = await supabase
+      const { data: dailyEntry } = timePolicy.dailyClock ? await supabase
         .from('daily_clock_entries')
         .select('id, clock_in, clock_out')
         .eq('technician_id', profile.id)
         .is('clock_out', null)
-        .order('clock_in', { ascending: false }).limit(1).maybeSingle();
+        .order('clock_in', { ascending: false }).limit(1).maybeSingle() : { data: null };
 
       let isOnBreak = false;
       if (dailyEntry) {
@@ -93,8 +90,8 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
           work_order:work_orders!time_entries_work_order_id_fkey(id, work_order_number)
         `)
         .eq('technician_id', profile.id)
-        .eq('entry_date', today)
         .is('clock_out', null)
+        .in('status', ['draft', 'submitted'])
         .not('work_order_id', 'is', null)
         .order('clock_in', { ascending: false })
         .limit(1)
@@ -115,7 +112,8 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
     }
   }
 
-  if (!timePolicy.dailyClock) return null;
+  // Daily attendance and recording job time are independent capabilities.
+  if (!profile || profile.is_active === false) return null;
 
   const getElapsedTime = (startTime: string) => {
     const diffMs = currentTime.getTime() - new Date(startTime).getTime();
@@ -133,7 +131,9 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
     ? 'bg-blue-600 hover:bg-blue-700'
     : clockStatus.isClockedIn
     ? 'bg-green-600 hover:bg-green-700'
-    : 'bg-red-600 hover:bg-red-700';
+    : timePolicy.dailyClock
+    ? 'bg-red-600 hover:bg-red-700'
+    : 'bg-blue-600 hover:bg-blue-700';
 
   const statusLabel = isOnBreak
     ? 'On Break'
@@ -141,7 +141,9 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
     ? clockStatus.activeJobNumber
     : clockStatus.isClockedIn
     ? 'Clocked In'
-    : 'Clocked Out';
+    : timePolicy.dailyClock
+    ? 'Clocked Out'
+    : 'Job Time';
 
   const elapsedLabel = isOnBreak
     ? null
