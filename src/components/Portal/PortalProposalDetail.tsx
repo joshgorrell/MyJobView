@@ -124,6 +124,7 @@ interface Proposal {
   discount_amount: number;
   project_management_amount: number;
   current_portal_version?: number | null;
+  include_promise_page?: boolean | null;
 }
 
 interface ProposalRoom {
@@ -147,12 +148,14 @@ interface LineItem {
   is_hidden: boolean;
   parent_item_id: string | null;
   product_id: string | null;
-  products: { image_url: string | null } | null;
+  products: { image_url: string | null; item_color?: string | null; sku?: string | null } | null;
 }
 
 interface ReportTemplate {
   show_quantity: boolean;
   show_unit_price: boolean;
+  show_installed_price?: boolean;
+  show_item_color?: boolean;
   show_line_item_total: boolean;
   show_manufacturer: boolean;
   show_sku: boolean;
@@ -327,7 +330,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .order('sort_order'),
         supabase
           .from('proposal_line_items')
-          .select('*, products(image_url)')
+          .select('*, products(image_url,item_color,sku)')
           .eq('proposal_id', proposalId)
           .order('sort_order'),
       ]);
@@ -373,6 +376,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             setTemplate({
               show_quantity: true,
               show_unit_price: true,
+            show_installed_price: true,
+            show_item_color: false,
+              show_installed_price: true,
+              show_item_color: false,
               show_line_item_total: true,
               show_manufacturer: true,
               show_sku: true,
@@ -870,7 +877,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
         {!previewMode && !hideExpiration && <p className="mb-4 text-xs text-gray-500">Proposal visits, approximate active viewing time, and selected interactions are shared with your provider to help with follow-up.</p>}
-        <ProposalPromise companyName={promiseCompanyName} logoUrl={orgLogoUrl} />
+        {proposal.include_promise_page !== false && <ProposalPromise companyName={promiseCompanyName} logoUrl={orgLogoUrl} />}
         <div className="grid grid-cols-1 xl:grid-cols-3 items-start gap-6 xl:gap-8">
           {/* Main Content */}
           <div className="xl:col-span-2 min-w-0 space-y-6">
@@ -989,6 +996,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                             {template?.show_unit_price && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
                             )}
+                            {template?.show_installed_price !== false && !hideCostsOverride && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Installed</th>
+                            )}
                             {template?.show_line_item_total && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
                             )}
@@ -1014,7 +1024,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               <td className="py-4">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                                  {(template?.show_sku || template?.show_model_number) && item.products?.sku && <p className="mt-1 text-xs text-gray-500">{template?.show_model_number ? 'Model' : 'SKU'}: {item.products.sku}</p>}
                                 </div>
+                                {template?.show_item_color && item.products?.item_color && <p className="mt-1 text-xs text-gray-500">Color: {item.products.item_color}</p>}
                               </td>
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
@@ -1023,6 +1035,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 <td className="text-right py-4 text-sm text-gray-700">
                                   {formatCurrency(item.unit_price)}
                                 </td>
+                              )}
+                              {template?.show_installed_price !== false && !hideCostsOverride && (
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency((item.line_total || 0) + (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0))) )}</td>
                               )}
                               {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
@@ -1040,7 +1055,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 1 +
                                 (template?.show_quantity ? 1 : 0) +
                                 (template?.show_unit_price && !hideCostsOverride ? 1 : 0) +
-                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) - 1
+                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) +
+                                (template?.show_installed_price !== false && !hideCostsOverride ? 1 : 0) - 1
                               } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
                                 Room Subtotal:
                               </td>

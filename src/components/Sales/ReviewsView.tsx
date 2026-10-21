@@ -963,7 +963,7 @@ export default function ReviewsView() {
 
       {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><ProposalFollowUps /></section>}
 
-      {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><LostOpportunityReviews /></section>}
+       {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><LostOpportunityReviews /></section>}
 
       {/* Send Request Tab */}
       {activeTab === 'send' && (

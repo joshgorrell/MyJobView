@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadProposalDocument, downloadProposalDocument } from '../../lib/proposalDocument';
+import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck, Eye } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
 
 interface PreSendValidationModalProps {
@@ -9,6 +12,7 @@ interface PreSendValidationModalProps {
   onSend: (approvalWindow: number, visibleInPortal: boolean) => Promise<void>;
   initialPortalVisibility?: boolean;
   onEmailProposal?: () => void;
+  /** Retained for compatibility with existing callers; local Print/PDF uses selected options. */
   onPrintProposal?: () => void;
   onCopyLink?: () => void;
   copyingLink?: boolean;
@@ -26,7 +30,6 @@ export function PreSendValidationModal({
   onSend,
   initialPortalVisibility = false,
   onEmailProposal,
-  onPrintProposal,
   onCopyLink,
   copyingLink = false,
   canCopyLink = false,
@@ -34,7 +37,13 @@ export function PreSendValidationModal({
   alreadySubmitted = false,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = useState<Array<{id:string;name:string;is_default:boolean;is_personal:boolean;created_by:string}>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [includePromisePage, setIncludePromisePage] = useState(true);
+  const [previewing, setPreviewing] = useState(false);
+  const [showReadiness, setShowReadiness] = useState(false);
   const [validationData, setValidationData] = useState<any>(null);
   const approvalWindow = 30; // Dealer policy is resolved by the submission handler.
   const [visibleInPortal, setVisibleInPortal] = useState(initialPortalVisibility);
@@ -45,7 +54,47 @@ export function PreSendValidationModal({
 
   useEffect(() => {
     loadAndAutoConfirm();
-  }, [proposalId]);
+    void loadTemplates();
+  }, [proposalId, profile?.id]);
+
+  async function loadTemplates() {
+    const [{data: proposal}, {data: available, error}] = await Promise.all([
+      supabase.from('proposals').select('report_template_id,include_promise_page').eq('id', proposalId).maybeSingle(),
+      supabase.from('proposal_report_templates').select('id,name,is_default,is_personal,created_by').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
+    ]);
+    if (error) { setSubmissionError('Unable to load proposal templates.'); return; }
+    setIncludePromisePage(proposal?.include_promise_page ?? true);
+    const choices = available || [];
+    setTemplates(choices);
+    setSelectedTemplateId(choices.find(t => t.id === proposal?.report_template_id)?.id || choices.find(t => t.is_default)?.id || choices[0]?.id || '');
+  }
+
+  async function printSelectedDocument() {
+    try {
+      const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage, selectedTemplateId || null);
+      downloadProposalDocument(document);
+      setSubmissionError('');
+    } catch (e: unknown) { setSubmissionError(e instanceof Error ? e.message : 'Unable to generate proposal document.'); }
+  }
+
+  async function previewDocument() {
+    if (previewing) return;
+    const tab = window.open('', '_blank');
+    if (!tab) { setSubmissionError('Allow popups to preview the proposal.'); return; }
+    tab.document.body.textContent = 'Generating proposal preview…';
+    setPreviewing(true);
+    try {
+      const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage, selectedTemplateId || null);
+      const bytes = Uint8Array.from(atob(document.content), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], {type: document.mimeType}));
+      tab.location.replace(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setSubmissionError('');
+    } catch (e: unknown) {
+      tab.close();
+      setSubmissionError(e instanceof Error ? e.message : 'Could not generate preview.');
+    } finally { setPreviewing(false); }
+  }
 
   async function loadAndAutoConfirm() {
     setLoading(true);
@@ -87,6 +136,8 @@ export function PreSendValidationModal({
     if (!allowSubmission || !validationData?.isReady || sending) return;
     setSending(true);
     try {
+      const {error} = await supabase.from('proposals').update({report_template_id: selectedTemplateId || null, include_promise_page: includePromisePage}).eq('id', proposalId);
+      if (error) throw error;
       await onSend(approvalWindow, visibleInPortal);
       setLinkActivated(true);
       setSubmissionError('');
@@ -120,7 +171,7 @@ export function PreSendValidationModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-xl max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto flex flex-col">
+      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-xl max-h-[95dvh] sm:max-h-[90dvh] overflow-hidden flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/60">
@@ -136,7 +187,17 @@ export function PreSendValidationModal({
           </button>
         </div>
 
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-700/60 space-y-3">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="px-4 sm:px-6 py-3 border-b border-gray-700/60 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1"><label htmlFor="delivery-template" className="mb-1 block text-xs font-semibold text-gray-300">Proposal template</label>
+              <select id="delivery-template" value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="h-10 w-full rounded-lg border border-gray-600 bg-gray-800 px-3 text-sm text-white">
+                {!templates.length && <option value="">Standard layout</option>}
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (Default)' : ''}</option>)}
+              </select></div>
+            <button type="button" onClick={() => void previewDocument()} disabled={previewing} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-500/50 px-3 text-sm font-medium text-blue-300 hover:bg-blue-500/10 disabled:opacity-50"><Eye className="h-4 w-4" />{previewing ? 'Preparing…' : 'Preview proposal'}</button>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} /> Include Our Promise page in customer proposal</label>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-blue-400" />
             <div>
@@ -154,7 +215,7 @@ export function PreSendValidationModal({
               className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
               <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
             </button>
-            <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
+            <button type="button" onClick={() => void printSelectedDocument()} disabled={previewing}
               className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
               <Printer className="h-4 w-4" /> Print / PDF
             </button>
@@ -179,6 +240,8 @@ export function PreSendValidationModal({
           {submissionError && <p role="alert" className="mt-2 text-xs text-red-300">{submissionError}</p>}
         </div>
 
+        <button type="button" onClick={() => setShowReadiness(v => !v)} aria-expanded={showReadiness} className="flex w-full items-center justify-between px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-300"><span>Proposal readiness · {overallProgress}%</span>{showReadiness ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button>
+        {showReadiness && <>
         {/* Progress bar */}
         <div className="px-6 pt-4 pb-3">
           <div className="flex items-center justify-between mb-1.5">
@@ -262,6 +325,7 @@ export function PreSendValidationModal({
           })}
         </div>
 
+        </>}
         {/* Issues alert if any invalid */}
         {invalidSections.length > 0 && (
           <div className="mx-6 mb-3 flex items-start gap-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl">
@@ -286,7 +350,8 @@ export function PreSendValidationModal({
           </label>
         </div>
 
-        <div className="sticky bottom-0 border-t border-gray-700 bg-gray-900 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        </div>
+        <div className="shrink-0 border-t border-gray-700 bg-gray-900 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <p className="text-xs text-gray-400">{linkActivated ? 'Submitted — choose a delivery method above.' : 'No email is sent automatically.'}</p>
           <button type="button" onClick={onClose} className="min-h-11 rounded-xl bg-gray-700 px-5 text-sm font-semibold text-white hover:bg-gray-600">Done</button>
         </div>

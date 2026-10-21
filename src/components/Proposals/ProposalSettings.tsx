@@ -1376,7 +1376,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
           {/* Tabs */}
           <div className="bg-white rounded-t-lg border-b border-gray-200">
             <div
-              className="flex gap-1 px-2 pt-2 overflow-x-auto scrollbar-hide"
+              className="flex gap-1 px-2 pt-2 overflow-x-auto scrollbar-hide lg:grid lg:grid-cols-6 lg:overflow-visible lg:gap-2 lg:pb-2"
               style={{
                 WebkitOverflowScrolling: 'touch',
                 scrollbarWidth: 'none',
@@ -1385,7 +1385,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
             >
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('details'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-2 ${
                   activeTab === 'details'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1406,7 +1406,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('scope'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-2 ${
                   activeTab === 'scope'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1428,7 +1428,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('contract'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-2 ${
                   activeTab === 'contract'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1449,7 +1449,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('billing'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-2 ${
                   activeTab === 'billing'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1470,7 +1470,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('tax'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-2 ${
                   activeTab === 'tax'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1491,7 +1491,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('fees'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-2 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-2 ${
                   activeTab === 'fees'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1513,7 +1513,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('visibility'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center ${
                   activeTab === 'visibility'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1523,7 +1523,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('areas'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center ${
                   activeTab === 'areas'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1533,7 +1533,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('coverpage'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center ${
                   activeTab === 'coverpage'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1544,7 +1544,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('recordings'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-1.5 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-1.5 ${
                   activeTab === 'recordings'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1561,7 +1561,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('template'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-1.5 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-1.5 ${
                   activeTab === 'template'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -1572,7 +1572,7 @@ export default function ProposalSettings({ proposalId, onBack, initialTab = 'det
               </button>
               <button
                 type="button" onClick={(e) => { e.preventDefault(); setActiveTab('reports'); }}
-                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 flex items-center gap-1.5 ${
+                className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg font-medium transition-colors whitespace-nowrap text-sm sm:text-base flex-shrink-0 lg:flex-shrink lg:min-w-0 lg:justify-center flex items-center gap-1.5 ${
                   activeTab === 'reports'
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'

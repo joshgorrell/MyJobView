@@ -19,6 +19,20 @@ const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsW
 await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><div id="root"></div><script src="app.js"></script>');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));browser=await (process.env.BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.BROWSER_ENGINE==='webkit'?{}:{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})});
 const context=await browser.newContext();openPage=async viewport=>{const page=await context.newPage();await page.setViewportSize(viewport);return page;};
+// The compact default desktop request should not require scrolling; expanded flows may scroll.
+{
+ const desktop=await openPage({width:1440,height:1000});
+ await desktop.goto(`http://127.0.0.1:${server.address().port}`);
+ await desktop.getByPlaceholder('Search name, company, phone, or email...').waitFor();
+ const initial=await desktop.locator('.service-request-compact').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
+ assert.ok(initial.scroll<=initial.client+2,`Default desktop Service Request must fit without scrolling: ${JSON.stringify(initial)}`);
+ const dialog=await desktop.getByRole('dialog').boundingBox();
+ assert.ok(dialog.y>=0&&dialog.y+dialog.height<=1001,'Desktop modal stays within viewport');
+ await desktop.getByRole('button',{name:'New Customer',exact:true}).click();
+ const action=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
+ assert.ok(action.y>=0&&action.y+action.height<=1001,'Submit stays visible with expanded customer fields');
+ await desktop.close();
+}
 for(const width of [320,375,390,430,768,1024,1280]){
  const page=await openPage({width,height:844});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(`http://127.0.0.1:${server.address().port}`);
  await page.getByPlaceholder('Search name, company, phone, or email...').waitFor();

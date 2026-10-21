@@ -51,7 +51,7 @@ interface Review {
   manual_resend_history?: {sent_at:string;sent_by:string}[];
 }
 export default function LostOpportunityReviews(
-  { showCreate: _showCreate = false }: { showCreate?: boolean },
+  { showCreate = false }: { showCreate?: boolean },
 ) {
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -67,6 +67,7 @@ export default function LostOpportunityReviews(
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
+  const [senderVariant, setSenderVariant] = useState<"sales" | "owner">("sales");
   const [preview, setPreview] = useState<
     { subject: string; recipient: string; html: string } | null
   >(null);
@@ -75,8 +76,10 @@ export default function LostOpportunityReviews(
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const canSend = profile?.can_send_lost_opportunity_reviews ?? false;
-  const canView = profile?.can_view_lost_opportunity_submissions ?? false;
+  const isAdmin = ['admin', 'owner', 'super_admin'].includes(profile?.role || '');
+  const canSend = isAdmin || (profile?.can_send_lost_opportunity_reviews ?? false);
+  const canView = isAdmin || (profile?.can_view_lost_opportunity_submissions ?? false);
+  const [createOpen, setCreateOpen] = useState(showCreate);
   const org = profile?.organization_id;
   async function load() {
     if (!org) return;
@@ -263,8 +266,9 @@ export default function LostOpportunityReviews(
           action: "preview",
           contact_id: contact?.id,
           proposal_id: proposal || null,
-          opportunity_name: name || title,
+          opportunity_name: name,
           title,
+          sender_variant: senderVariant,
         }),
       );
     } catch (e) {
@@ -280,8 +284,9 @@ export default function LostOpportunityReviews(
         action: "create",
         contact_id: contact?.id,
         proposal_id: proposal || null,
-        opportunity_name: name || title,
+        opportunity_name: name,
         title,
+        sender_variant: senderVariant,
       })
     ) {
 
@@ -290,6 +295,8 @@ export default function LostOpportunityReviews(
       setName("");
       setTitle("");
       setTitleEdited(false);
+      setProposal("");
+      setPreview(null);
       setNotice("Lost Opportunity review request sent.");
     }
   }
@@ -386,11 +393,9 @@ export default function LostOpportunityReviews(
           </p>
         </div>
         <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-3">
-
-
+          {canSend && <button type="button" onClick={() => setCreateOpen(value => !value)} aria-expanded={createOpen} className="min-h-11 rounded-lg bg-violet-700 px-4 py-2 font-semibold text-white hover:bg-violet-600">{createOpen ? "Hide Feedback Form" : "Send Feedback Form"}</button>}
         </div>
       </div>
-      <ReviewStatsRow stats={lostStats} />
       {error && !expandedReview && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
           {error}
@@ -401,7 +406,7 @@ export default function LostOpportunityReviews(
           {notice}
         </p>
       )}
-      {canSend && (
+      {canSend && createOpen && (
         <form
           onSubmit={send}
           className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4"
@@ -465,6 +470,8 @@ export default function LostOpportunityReviews(
               ))}
             </select>
           </label>
+          {!proposal && <label className="block text-gray-200">Opportunity Name (required for manual entry)<input required maxLength={200} value={name} onChange={(e) => opportunity(e.target.value)} placeholder="e.g. Home Theater Installation" className={input} /></label>}
+          <fieldset className="space-y-2"><legend className="text-gray-200 font-medium">Send email from</legend><div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <label key={variant} className={`cursor-pointer rounded-xl border p-4 ${senderVariant === variant ? "border-cyan-400 bg-cyan-950/40" : "border-gray-600"}`}><input type="radio" name="lost-opportunity-sender" className="mr-2" checked={senderVariant === variant} onChange={() => { setSenderVariant(variant); setPreview(null); }} /><span className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</span><p className="mt-1 text-sm text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from Josh Gorrell with his signature and reply-to address."}</p></label>)}</div></fieldset>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
               required
@@ -483,7 +490,7 @@ export default function LostOpportunityReviews(
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
-              !title.trim()}
+              !title.trim() || !name.trim()}
             onClick={previewEmail}
             className="w-full sm:w-auto rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
           >
@@ -497,6 +504,7 @@ export default function LostOpportunityReviews(
           </button>
         </form>
       )}
+      <ReviewStatsRow stats={lostStats} />
       {preview && (
         <div
           role="dialog"

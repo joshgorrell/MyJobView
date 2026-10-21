@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings, CheckCircle, LayoutGrid } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { loadProposalDocument } from '../../lib/proposalDocument';
 
 interface ReportTemplate {
   created_at?: string;
@@ -35,6 +36,8 @@ interface ReportTemplate {
   show_model_number: boolean;
   show_quantity: boolean;
   show_unit_price: boolean;
+  show_installed_price: boolean;
+  show_item_color: boolean;
   show_line_item_total: boolean;
   show_item_cost: boolean;
   show_markup_percentage: boolean;
@@ -138,6 +141,8 @@ const templateSections: TemplateSection[] = [
       { key: 'show_model_number', label: 'Model Number' },
       { key: 'show_quantity', label: 'Quantity' },
       { key: 'show_unit_price', label: 'Unit Price' },
+      { key: 'show_installed_price', label: 'Installed Price (Equipment + Labor)' },
+      { key: 'show_item_color', label: 'Product Color' },
       { key: 'show_line_item_total', label: 'Line Total' },
       { key: 'show_item_cost', label: 'Item Cost', description: '⚠️ Internal only - shows your cost' },
       { key: 'show_markup_percentage', label: 'Markup %', description: '⚠️ Internal only - shows your margin' },
@@ -223,6 +228,10 @@ const templateSections: TemplateSection[] = [
 export default function ProposalTemplateManager() {
   const { profile, companySettings } = useAuth();
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [sampleProposals, setSampleProposals] = useState<Array<{id:string;proposal_number:string}>>([]);
+  const [sampleProposalId, setSampleProposalId] = useState('');
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -245,6 +254,7 @@ export default function ProposalTemplateManager() {
   useEffect(() => {
     loadTemplates();
     loadDefaultTemplate();
+    void loadSampleProposals();
   }, []);
 
   async function loadTemplates() {
@@ -266,6 +276,33 @@ export default function ProposalTemplateManager() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadSampleProposals() {
+    const { data, error } = await supabase.from('proposals').select('id,proposal_number').order('created_at', { ascending: false }).limit(30);
+    if (error) { setPreviewError('Unable to load sample proposals.'); return; }
+    setSampleProposals(data || []);
+    setSampleProposalId(current => current || data?.[0]?.id || '');
+  }
+
+  async function previewTemplate(template: ReportTemplate) {
+    const proposal = sampleProposals.find(p => p.id === sampleProposalId);
+    if (!proposal) { setPreviewError('Select a proposal to preview this template.'); return; }
+    const tab = window.open('', '_blank');
+    if (!tab) { setPreviewError('Please allow popups to preview templates.'); return; }
+    tab.document.body.textContent = 'Generating customer PDF preview…';
+    setPreviewingId(template.id);
+    setPreviewError('');
+    try {
+      const document = await loadProposalDocument(proposal.id, proposal.proposal_number, true, template.id);
+      const bytes = Uint8Array.from(atob(document.content), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: document.mimeType }));
+      tab.location.replace(url);
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (error) {
+      tab.close();
+      setPreviewError(error instanceof Error ? error.message : 'Could not preview this template.');
+    } finally { setPreviewingId(null); }
   }
 
   async function loadDefaultTemplate() {
@@ -465,6 +502,44 @@ export default function ProposalTemplateManager() {
           You can have different templates for different types of proposals (residential, commercial, service agreements, etc.)
         </p>
       </div>
+
+      {/* Visual template gallery — PDF previews use the actual document generator. */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Template gallery</h3>
+          <p className="text-sm text-gray-600">Choose a real proposal to compare customer-facing PDF layouts. Previewing never sends or submits a proposal.</p>
+        </div>
+        <label className="block max-w-md text-sm font-medium text-gray-700">Preview using proposal
+          <select value={sampleProposalId} onChange={e => setSampleProposalId(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+            {!sampleProposals.length && <option value="">No proposals available</option>}
+            {sampleProposals.map(p => <option key={p.id} value={p.id}>#{p.proposal_number}</option>)}
+          </select>
+        </label>
+        {previewError && <p role="alert" className="text-sm text-red-700">{previewError}</p>}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {templates.map(template => (
+            <article key={template.id} className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-sm">
+              <div className="flex aspect-[4/3] items-center justify-center bg-slate-100 p-6">
+                <div className="w-36 rounded-sm border border-gray-200 bg-white p-3 shadow-md" aria-hidden="true">
+                  <div className="mb-3 h-2 w-16 rounded bg-blue-700" />
+                  <div className="mb-1 h-1.5 w-24 rounded bg-slate-300" />
+                  <div className="mb-4 h-1.5 w-16 rounded bg-slate-200" />
+                  {template.include_cover_page && <div className="mb-3 h-10 rounded bg-blue-50" />}
+                  {template.show_product_images && <div className="mb-2 h-6 rounded bg-slate-100" />}
+                  <div className="space-y-1">{[0,1,2].map(i => <div key={i} className="flex gap-2"><div className="h-1.5 flex-1 rounded bg-slate-200" /><div className="h-1.5 w-6 rounded bg-slate-300" /></div>)}</div>
+                  <div className="mt-3 ml-auto h-2 w-12 rounded bg-blue-700" />
+                </div>
+              </div>
+              <div className="space-y-3 p-4">
+                <div><h4 className="font-semibold text-gray-900">{template.name}</h4><p className="mt-1 text-xs text-gray-500">{template.description || (template.is_personal ? 'Personal template' : 'Company template')}{template.is_default ? ' · Company default' : ''}</p></div>
+                <button type="button" disabled={!sampleProposalId || previewingId !== null} onClick={() => void previewTemplate(template)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Eye className="h-4 w-4" />{previewingId === template.id ? 'Generating…' : 'Preview actual PDF'}</button>
+                <button type="button" onClick={() => { setSelectedTemplate(template); setIsEditing(false); }} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white">Edit template settings</button>
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500">Thumbnails are illustrative. Use Preview actual PDF to see the generated customer document.</p>
+      </section>
 
       {/* My Default Template */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
