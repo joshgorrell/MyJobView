@@ -59,10 +59,11 @@ export function PreSendValidationModal({
 
   async function loadTemplates() {
     const [{data: proposal}, {data: available, error}] = await Promise.all([
-      supabase.from('proposals').select('report_template_id').eq('id', proposalId).maybeSingle(),
+      supabase.from('proposals').select('report_template_id,include_promise_page').eq('id', proposalId).maybeSingle(),
       supabase.from('proposal_report_templates').select('id,name,is_default,is_personal,created_by').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
     ]);
     if (error) { setSubmissionError('Unable to load proposal templates.'); return; }
+    setIncludePromisePage(proposal?.include_promise_page ?? true);
     const choices = available || [];
     setTemplates(choices);
     setSelectedTemplateId(choices.find(t => t.id === proposal?.report_template_id)?.id || choices.find(t => t.is_default)?.id || choices[0]?.id || '');
@@ -135,10 +136,8 @@ export function PreSendValidationModal({
     if (!allowSubmission || !validationData?.isReady || sending) return;
     setSending(true);
     try {
-      if (selectedTemplateId) {
-        const {error} = await supabase.from('proposals').update({report_template_id: selectedTemplateId}).eq('id', proposalId);
-        if (error) throw error;
-      }
+      const {error} = await supabase.from('proposals').update({report_template_id: selectedTemplateId || null, include_promise_page: includePromisePage}).eq('id', proposalId);
+      if (error) throw error;
       await onSend(approvalWindow, visibleInPortal);
       setLinkActivated(true);
       setSubmissionError('');
@@ -198,7 +197,7 @@ export function PreSendValidationModal({
               </select></div>
             <button type="button" onClick={() => void previewDocument()} disabled={previewing} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-500/50 px-3 text-sm font-medium text-blue-300 hover:bg-blue-500/10 disabled:opacity-50"><Eye className="h-4 w-4" />{previewing ? 'Preparing…' : 'Preview proposal'}</button>
           </div>
-          <label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} /> Include Our Promise page in preview</label>
+          <label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} /> Include Our Promise page in customer proposal</label>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-blue-400" />
             <div>
