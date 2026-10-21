@@ -11,9 +11,9 @@ DECLARE
   v_invoice_type text;
   v_origin uuid;
 BEGIN
-  IF NEW.status NOT IN ('submitted','partial','paid','overdue')
+  IF NEW.status NOT IN ('sent','submitted','partial','paid','overdue')
      OR NEW.project_id IS NOT NULL
-     OR (TG_OP = 'UPDATE' AND OLD.status IN ('submitted','partial','paid','overdue')) THEN
+     OR (TG_OP = 'UPDATE' AND OLD.status IN ('sent','submitted','partial','paid','overdue')) THEN
     RETURN NEW;
   END IF;
 
@@ -27,7 +27,7 @@ BEGIN
 
   -- Subscription recurring invoices are credited by their billing-link trigger.
   -- Security-cycle invoices use their separate contract origin snapshot.
-  IF v_invoice_type = 'recurring'
+  IF (v_invoice_type = 'recurring' OR v_source = 'recurring')
      AND NEW.security_billing_cycle_id IS NULL THEN RETURN NEW; END IF;
 
   v_org := NEW.organization_id;
