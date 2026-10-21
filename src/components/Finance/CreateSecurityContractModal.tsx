@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import { SecurityFieldVisibility, SecurityVisibilityGuide } from './SecurityFieldVisibility';
+import { SecurityFieldVisibility } from './SecurityFieldVisibility';
 import React, { useState, useEffect, useRef } from 'react';
 import { SECURITY_INITIAL_TERMS, staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
@@ -299,7 +299,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
   return (
     <div className="security-onboarding-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[95dvh] sm:max-h-[90dvh] overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
           <button
@@ -318,8 +318,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
-          <SecurityVisibilityGuide />
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-6 space-y-4 sm:space-y-5">
             {prefill && (
               <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-600">
