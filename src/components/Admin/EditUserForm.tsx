@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
+import { TimeClockAccess, defaultClockAccessForRole } from '../../lib/employeeTimePolicy';
 
 type TabKey = (typeof setupSections)[number]['key'] | 'review';
 
@@ -50,6 +51,7 @@ interface EmployeePayrollConfig {
   requires_daily_clock: boolean;
   requires_time_allocation: boolean;
   payroll_time_basis: 'salary' | 'daily_clock' | 'work_allocation';
+  time_clock_access: TimeClockAccess | null;
   expected_weekly_hours: number | null;
   standard_start_time: string | null;
   standard_end_time: string | null;
@@ -209,6 +211,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     requires_daily_clock: true,
     requires_time_allocation: false,
     payroll_time_basis: 'daily_clock' as 'salary' | 'daily_clock' | 'work_allocation',
+    time_clock_access: defaultClockAccessForRole(user.role) as TimeClockAccess,
     expected_weekly_hours: '40',
     standard_start_time: '08:00',
     standard_end_time: '17:00',
@@ -383,6 +386,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             requires_daily_clock: configData.requires_daily_clock,
             requires_time_allocation: configData.requires_time_allocation,
             payroll_time_basis: configData.payroll_time_basis,
+            time_clock_access: (configData.time_clock_access as TimeClockAccess) || defaultClockAccessForRole(user.role),
             expected_weekly_hours: configData.expected_weekly_hours?.toString() || '40',
             standard_start_time: configData.standard_start_time || '08:00',
             standard_end_time: configData.standard_end_time || '17:00',
@@ -528,6 +532,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       'requires_daily_clock',
       'requires_time_allocation',
       'payroll_time_basis',
+      'time_clock_access',
       'expected_weekly_hours',
       'standard_start_time',
       'standard_end_time',
@@ -716,6 +721,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           p_requires_daily_clock: employeeForm.requires_daily_clock,
           p_requires_time_allocation: employeeForm.requires_time_allocation,
           p_payroll_time_basis: employeeForm.payroll_time_basis,
+          p_time_clock_access: employeeForm.time_clock_access,
           p_expected_weekly_hours: employeeForm.expected_weekly_hours
             ? parseFloat(employeeForm.expected_weekly_hours)
             : null,
@@ -739,6 +745,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           p_requires_daily_clock: employeeForm.requires_daily_clock,
           p_requires_time_allocation: employeeForm.requires_time_allocation,
           p_payroll_time_basis: employeeForm.payroll_time_basis,
+          p_time_clock_access: employeeForm.time_clock_access,
           p_expected_weekly_hours: employeeForm.expected_weekly_hours
             ? parseFloat(employeeForm.expected_weekly_hours)
             : null,
@@ -1724,6 +1731,33 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       </select>
                       <p className="text-xs text-gray-400 mt-1">
                         {employeeForm.payroll_time_basis === 'work_allocation' ? 'No Daily Clock. Approved Work Order time determines pay. Manual Job Time and Shop/Training Time require permission and approval.' : employeeForm.payroll_time_basis === 'salary' ? 'Salary determines pay. Recorded time is used for job costing and operational reporting.' : 'Daily Clock determines paid hours. Job Time records where that labor went.'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Time Clock Access</label>
+                      <select
+                        value={employeeForm.time_clock_access}
+                        onChange={(e) => {
+                          setEmployeeForm({
+                            ...employeeForm,
+                            time_clock_access: e.target.value as TimeClockAccess,
+                          });
+                          setShowEffectiveDatePrompt(true);
+                        }}
+                        className={selectClass}
+                      >
+                        <option value="mobile">Mobile App Only</option>
+                        <option value="web">Web Only</option>
+                        <option value="both">Web and Mobile App</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {employeeForm.time_clock_access === 'mobile'
+                          ? 'Clock in/out from the mobile app only. The website Time Clock icon directs them to the app for GPS, route tracking, and breadcrumbs.'
+                          : employeeForm.time_clock_access === 'web'
+                          ? 'Clock in/out from the website only. No mobile app clock access.'
+                          : 'Clock in/out from either the website or the mobile app. The mobile app provides better GPS and route tracking.'}
+                        {' '}Role default for this user: {defaultClockAccessForRole(formData.role) === 'mobile' ? 'Mobile App Only' : 'Web and Mobile App'}.
                       </p>
                     </div>
 

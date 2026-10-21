@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { formatDateInTimezone, getOrganizationTimezone } from '../lib/timezoneUtils';
-import { canManageTime, PayrollTimeBasis } from '../lib/employeeTimePolicy';
+import { canManageTime, PayrollTimeBasis, TimeClockAccess, defaultClockAccessForRole } from '../lib/employeeTimePolicy';
 
 export function useEmployeeTimePolicy() {
   const { profile } = useAuth();
-  const [policy, setPolicy] = useState<{ basis: PayrollTimeBasis; dailyClock: boolean } | null>(null);
+  const [policy, setPolicy] = useState<{ basis: PayrollTimeBasis; dailyClock: boolean; clockAccess: TimeClockAccess } | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let disposed = false;
@@ -30,13 +30,15 @@ export function useEmployeeTimePolicy() {
           if (error) throw error;
           if (config && !disposed) {
             setPolicy({ basis: config.payroll_time_basis as PayrollTimeBasis,
-              dailyClock: config.payroll_time_basis !== 'work_allocation' && config.requires_daily_clock });
+              dailyClock: config.payroll_time_basis !== 'work_allocation' && config.requires_daily_clock,
+              clockAccess: (config.time_clock_access as TimeClockAccess) || defaultClockAccessForRole(profile.role) });
             return;
           }
         }
         if (!disposed) setPolicy({ basis: profile.employment_type === 'job_time' ? 'work_allocation' :
           profile.employment_type === 'salary' ? 'salary' : 'daily_clock',
-          dailyClock: profile.employment_type !== 'job_time' && !!profile.requires_daily_clock });
+          dailyClock: profile.employment_type !== 'job_time' && !!profile.requires_daily_clock,
+          clockAccess: defaultClockAccessForRole(profile.role) });
       } catch (error) {
         console.error('Unable to load employee time configuration', error);
         // No direct payable entry while the configuration cannot be verified.

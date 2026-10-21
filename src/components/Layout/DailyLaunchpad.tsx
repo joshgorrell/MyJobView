@@ -14,6 +14,7 @@ import { TeamTimeOffPanel } from '../Shared/TeamTimeOffPanel';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { WorkOrderTimeControl } from '../Production/WorkOrderTimeControl';
 import { TimeClockModal } from './TimeClockModal';
+import { MobileClockRedirect } from './MobileClockRedirect';
 const Calendar = lazy(() => import('../Appointments/AppointmentsCalendar').then(m => ({ default: m.AppointmentsCalendar })));
 
 export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; onNavigate?: (tab: string, params?: Record<string, string>) => void }) {
@@ -66,7 +67,7 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
         {tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`min-h-14 min-w-0 rounded-lg flex flex-col items-center justify-center gap-1 text-[11px] sm:text-sm transition-colors ${tab === key ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:bg-surface'}`}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
       {tab === 'work' && <>
-        {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <div className="rounded-2xl border border-subtle bg-elevated p-4"><p className="font-semibold">Ready for your next job?</p><p className="text-sm text-secondary mt-1">Your configuration does not require a daily clock. Record job time below.</p></div>}
+        {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.clockAccess === 'mobile' ? <MobileClockRedirect /> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <div className="rounded-2xl border border-subtle bg-elevated p-4"><p className="font-semibold">Ready for your next job?</p><p className="text-sm text-secondary mt-1">Your configuration does not require a daily clock. Record job time below.</p></div>}
         <div className="flex items-center justify-between"><div><h3 className="font-semibold text-primary">Today’s Jobs</h3><p className="text-xs text-secondary">{day}</p></div><button onClick={load} disabled={loading} aria-label="Refresh today’s work" className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-elevated"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
         {error && <p role="alert" className="text-red-600">{error}</p>}
         {activeJob && !jobs.some(j => j.id === activeJob.id) && <section className="rounded-xl border border-blue-300 p-3 space-y-2"><h4 className="font-semibold">{activeJob.title}</h4><WorkOrderTimeControl workOrderId={activeJob.id} assignedTo={profile?.id || null} onChanged={load} /></section>}

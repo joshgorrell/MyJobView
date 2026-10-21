@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 import { effectiveModuleAccess, isPermissionModule } from '../../lib/permissionCatalog';
 import { generateUsername } from '../../lib/username';
 import { CompanyOffice } from '../../lib/types';
+import { TimeClockAccess, defaultClockAccessForRole } from '../../lib/employeeTimePolicy';
 
 interface PaySchedule {
   id: string;
@@ -151,6 +152,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     requires_daily_clock: true,
     requires_time_allocation: false,
     payroll_time_basis: 'daily_clock' as 'salary' | 'daily_clock' | 'work_allocation',
+    time_clock_access: defaultClockAccessForRole(formData.role) as TimeClockAccess,
     expected_weekly_hours: '40',
     standard_start_time: '08:00',
     standard_end_time: '17:00',
@@ -445,6 +447,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           p_requires_daily_clock: employeeForm.requires_daily_clock,
           p_requires_time_allocation: employeeForm.requires_time_allocation,
           p_payroll_time_basis: employeeForm.payroll_time_basis,
+          p_time_clock_access: employeeForm.time_clock_access,
           p_expected_weekly_hours: employeeForm.expected_weekly_hours
             ? parseFloat(employeeForm.expected_weekly_hours)
             : null,
@@ -663,6 +666,10 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                       can_create_purchase_orders: ['admin', 'manager', 'finance'].includes(roleKey),
                       can_view_prospects: canViewProspects,
                     });
+                    setEmployeeForm((prev) => ({
+                      ...prev,
+                      time_clock_access: prev.time_clock_access || defaultClockAccessForRole(roleKey),
+                    }));
                   }}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 >
@@ -1159,6 +1166,31 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                       <option value="daily_clock">Daily Clock (one segment per clock entry)</option>
                       <option value="work_allocation">Work Allocation (segments from job time)</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Time Clock Access</label>
+                    <select
+                      value={employeeForm.time_clock_access}
+                      onChange={(e) =>
+                        setEmployeeForm({
+                          ...employeeForm,
+                          time_clock_access: e.target.value as TimeClockAccess,
+                        })
+                      }
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    >
+                      <option value="mobile">Mobile App Only</option>
+                      <option value="web">Web Only</option>
+                      <option value="both">Web and Mobile App</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {employeeForm.time_clock_access === 'mobile'
+                        ? 'Clock in/out from the mobile app only. The website Time Clock directs them to the app for GPS and route tracking.'
+                        : employeeForm.time_clock_access === 'web'
+                        ? 'Clock in/out from the website only.'
+                        : 'Clock in/out from either the website or the mobile app.'}
+                      {' '}Role default: {defaultClockAccessForRole(formData.role) === 'mobile' ? 'Mobile App Only' : 'Web and Mobile App'}.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">Pay Schedule</label>

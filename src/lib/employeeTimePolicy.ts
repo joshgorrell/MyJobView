@@ -4,3 +4,9 @@ export function canManageTime(role?: string | null) {
   return !!role && TIME_MANAGER_ROLES.includes(role);
 }
 export type PayrollTimeBasis = 'daily_clock' | 'work_allocation' | 'salary';
+export type TimeClockAccess = 'web' | 'mobile' | 'both';
+
+/** Default time-clock access based on role: technicians get mobile-only, everyone else gets both. */
+export function defaultClockAccessForRole(role?: string | null): TimeClockAccess {
+  return role === 'tech' ? 'mobile' : 'both';
+}
