@@ -42,7 +42,9 @@ BEGIN
       FROM public.security_billing_cycles bc
       JOIN public.security_contracts sc ON sc.id=bc.contract_id
       WHERE bc.id=NEW.security_billing_cycle_id
-        AND bc.organization_id=v_org AND sc.organization_id=v_org;
+        AND bc.organization_id=v_org
+        AND EXISTS (SELECT 1 FROM public.contacts ct
+                    WHERE ct.id=sc.contact_id AND ct.organization_id=v_org);
     v_rep := v_origin;
   END IF;
 
