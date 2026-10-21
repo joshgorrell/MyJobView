@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.sales_performance_credits (
   organization_id uuid NOT NULL,
   credited_rep_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   customer_id uuid REFERENCES public.contacts(id) ON DELETE SET NULL,
-  source_type text NOT NULL CHECK (source_type IN ('sales_order','service_invoice','retail_invoice','adjustment')),
+  source_type text NOT NULL CHECK (source_type IN ('sales_order','service_invoice','retail_invoice','recurring_invoice','adjustment')),
   source_id uuid NOT NULL,
   source_event_key text NOT NULL,
   effective_at timestamptz NOT NULL,
