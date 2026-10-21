@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { loadProposalDocument } from '../../lib/proposalDocument';
+import { loadProposalDocument, downloadProposalDocument } from '../../lib/proposalDocument';
 import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck, Eye } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
 
@@ -66,6 +66,14 @@ export function PreSendValidationModal({
     const choices = available || [];
     setTemplates(choices);
     setSelectedTemplateId(choices.find(t => t.id === proposal?.report_template_id)?.id || choices.find(t => t.is_default)?.id || choices[0]?.id || '');
+  }
+
+  async function printSelectedDocument() {
+    try {
+      const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage, selectedTemplateId || null);
+      downloadProposalDocument(document);
+      setSubmissionError('');
+    } catch (e: unknown) { setSubmissionError(e instanceof Error ? e.message : 'Unable to generate proposal document.'); }
   }
 
   async function previewDocument() {
@@ -208,7 +216,7 @@ export function PreSendValidationModal({
               className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
               <Copy className="h-4 w-4" /> {copyingLink ? 'Copying…' : 'Copy link'}
             </button>
-            <button type="button" onClick={onPrintProposal} disabled={!onPrintProposal}
+            <button type="button" onClick={() => void printSelectedDocument()} disabled={previewing}
               className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-3 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50">
               <Printer className="h-4 w-4" /> Print / PDF
             </button>
