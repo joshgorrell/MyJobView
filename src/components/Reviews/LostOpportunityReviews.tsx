@@ -396,7 +396,6 @@ export default function LostOpportunityReviews(
           {canSend && <button type="button" onClick={() => setCreateOpen(value => !value)} aria-expanded={createOpen} className="min-h-11 rounded-lg bg-violet-700 px-4 py-2 font-semibold text-white hover:bg-violet-600">{createOpen ? "Hide Feedback Form" : "Send Feedback Form"}</button>}
         </div>
       </div>
-      <ReviewStatsRow stats={lostStats} />
       {error && !expandedReview && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
           {error}
@@ -505,6 +504,7 @@ export default function LostOpportunityReviews(
           </button>
         </form>
       )}
+      <ReviewStatsRow stats={lostStats} />
       {preview && (
         <div
           role="dialog"
