@@ -18,6 +18,7 @@ interface ProposalInfo {
   is_portal_visible: boolean | null;
   sent_at: string | null;
   report_template_id: string | null;
+  include_promise_page?: boolean | null;
   portal_customer_message?: string | null;
   tax_calculation_status: string | null;
   contacts: { full_name: string | null; email: string | null } | null;
@@ -82,7 +83,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
       try {
         setLoading(true);
         const [{ data: p, error: pError }, { data: settings }, { data: availableTemplates, error: templateError }] = await Promise.all([
-          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
+          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,include_promise_page,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
           supabase.from('company_settings').select('company_name').eq('organization_id', profile?.organization_id).maybeSingle(),
           supabase.from('proposal_report_templates').select('id,name,is_default,is_personal').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
         ]);
@@ -100,6 +101,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         const saved = templateId || info.report_template_id;
         const preferred = available.find(t => t.id === saved) || available.find(t => t.id === profile?.default_proposal_report_template_id) || available.find(t => t.is_default && !t.is_personal) || available[0];
         setSelectedTemplateId(preferred?.id || '');
+        setIncludePromisePage(info.include_promise_page ?? true);
         setPortalMessage(defaultMessage);
         setEmailMessage(defaultMessage);
         setToEmail(info.contacts?.email || '');
@@ -203,7 +205,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         const { error: portalError } = await supabase.from('proposals').update({
           status: 'sent', sent_at: now.toISOString(), expires_at: expiresAt.toISOString(), is_portal_visible: true,
           is_locked: true, locked_at: now.toISOString(), locked_by: profile?.id || null,
-          report_template_id: selectedTemplateId || null, portal_customer_message: portalMessage.trim() || null,
+          report_template_id: selectedTemplateId || null, include_promise_page: includePromisePage, portal_customer_message: portalMessage.trim() || null,
         }).eq('id', proposalId);
         if (portalError) throw portalError;
         completed.push('Published to Customer Portal');
@@ -232,6 +234,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
       const lockUpdates: Record<string, unknown> = { is_locked: true, locked_at: now.toISOString(), locked_by: profile?.id || null };
       if (!proposal.sent_at && !portal) { lockUpdates.sent_at = now.toISOString(); lockUpdates.status = 'sent'; }
       lockUpdates.report_template_id = selectedTemplateId || null;
+      lockUpdates.include_promise_page = includePromisePage;
       const { error: lockError } = await supabase.from('proposals').update(lockUpdates).eq('id', proposalId);
       if (lockError) throw lockError;
       setResult(completed);
