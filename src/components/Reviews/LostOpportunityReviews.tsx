@@ -67,6 +67,7 @@ export default function LostOpportunityReviews(
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
+  const [senderVariant, setSenderVariant] = useState<"sales" | "owner">("sales");
   const [preview, setPreview] = useState<
     { subject: string; recipient: string; html: string } | null
   >(null);
@@ -267,6 +268,7 @@ export default function LostOpportunityReviews(
           proposal_id: proposal || null,
           opportunity_name: name || title,
           title,
+          sender_variant: senderVariant,
         }),
       );
     } catch (e) {
@@ -284,6 +286,7 @@ export default function LostOpportunityReviews(
         proposal_id: proposal || null,
         opportunity_name: name || title,
         title,
+        sender_variant: senderVariant,
       })
     ) {
 
@@ -466,6 +469,7 @@ export default function LostOpportunityReviews(
               ))}
             </select>
           </label>
+          <fieldset className="space-y-2"><legend className="text-gray-200 font-medium">Send email from</legend><div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <label key={variant} className={`cursor-pointer rounded-xl border p-4 ${senderVariant === variant ? "border-cyan-400 bg-cyan-950/40" : "border-gray-600"}`}><input type="radio" name="lost-opportunity-sender" className="mr-2" checked={senderVariant === variant} onChange={() => { setSenderVariant(variant); setPreview(null); }} /><span className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</span><p className="mt-1 text-sm text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from Josh Gorrell with his signature and reply-to address."}</p></label>)}</div></fieldset>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
               required
