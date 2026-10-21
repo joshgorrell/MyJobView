@@ -61,6 +61,7 @@ Deno.serve(async (req: Request) => {
           showUnitPrice: template.show_unit_price,
           showLinePrice: template.show_line_item_total,
           showSKU: template.show_sku,
+          showModelNumber: template.show_model_number,
           showManufacturer: template.show_manufacturer,
           showColor: template.show_item_color ?? false,
           showAreaTotals: template.show_area_subtotals,
@@ -89,6 +90,7 @@ Deno.serve(async (req: Request) => {
       showUnitPrice: true,
       showLinePrice: true,
       showSKU: true,
+      showModelNumber: false,
       showManufacturer: true,
       showColor: true,
       showAreaTotals: true,
@@ -379,7 +381,7 @@ function generateProposalHTML(
     const headers: string[] = [];
     if (options.showDescription) headers.push('<th style="text-align: left; padding: 14px 16px;">Description</th>');
     if (options.showManufacturer) headers.push('<th style="text-align: left; padding: 14px 16px; width: 120px;">Manufacturer</th>');
-    if (options.showSKU) headers.push('<th style="text-align: left; padding: 14px 16px; width: 100px;">SKU</th>');
+    if (options.showSKU || options.showModelNumber) headers.push(`<th style="text-align: left; padding: 14px 16px; width: 100px;">${options.showModelNumber ? 'Model' : 'SKU'}</th>`);
     if (options.showColor) headers.push('<th style="text-align: left; padding: 14px 16px; width: 100px;">Color</th>');
     headers.push('<th style="text-align: center; padding: 14px 16px; width: 60px;">Qty</th>');
     if (!options.hideAllPrices) {
@@ -410,7 +412,7 @@ function generateProposalHTML(
       `);
     }
     if (options.showManufacturer) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.manufacturer || '-'}</td>`);
-    if (options.showSKU) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.sku || '-'}</td>`);
+    if (options.showSKU || options.showModelNumber) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.sku || '-'}</td>`);
     if (options.showColor) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.color || '-'}</td>`);
     cells.push(`<td style="text-align: center; padding: 14px 16px; font-size: 13px; color: #2d3748; font-weight: 600;">${item.quantity}</td>`);
     if (!options.hideAllPrices) {
