@@ -1,3 +1,5 @@
+import { salesDashboardScope } from '../../lib/salesDashboardScope';
+import { companySalesDashboard } from '../../lib/companySalesDashboard';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSalesDashboard, useSalesLeaderboard } from '../../hooks/useSalesDashboard';
@@ -60,7 +62,7 @@ const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboa
 
 export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavigateToTab, onOpenRecord }: SalesDashboardPageProps) {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('daily_recap');
+  const [activeTab, setActiveTab] = useState<DashboardTab>(profile?.is_sales_rep ? 'daily_recap' : 'overview');
   const [period, setPeriod] = useState<SalesPeriod>('month');
   const [selectedList, setSelectedList] = useState<SalesListKey | null>(null);
   const [listSource, setListSource] = useState<'customer' | 'rep' | null>(null);
@@ -68,28 +70,24 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const selectList = (key: SalesListKey) => { setListSource(null); setListReason(null); setSelectedList(key); };
   const [connectionRecord, setConnectionRecord] = useState<SalesRecord | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
+  const [selectedRepId, setSelectedRepId] = useState<string | null | undefined>(undefined);
 
-  const isManager = profile?.role
-    ? ['admin', 'manager', 'sales_manager'].includes(profile.role)
-    : false;
+  const { repId: effectiveRepId, canSelectRep: isManager, allSales } = salesDashboardScope(profile, selectedRepId);
+  const isManagerView = isManager && effectiveRepId !== null && effectiveRepId !== profile?.id;
 
-  const effectiveRepId = isManager
-    ? (selectedRepId || profile?.id || null)
-    : (profile?.id || null);
-
-  const isManagerView = isManager && selectedRepId !== null && selectedRepId !== profile?.id;
-
-  const { data: baseData, loading, error: baseError, refresh: refreshBase } = useSalesDashboard({
+  const { data: repData, loading: repLoading, error: repError, refresh: refreshBase } = useSalesDashboard({
     repId: effectiveRepId,
     isManagerView,
   });
 
-  const records = useSalesDashboardRecords(effectiveRepId, profile?.organization_id || undefined, refreshKey);
+  const records = useSalesDashboardRecords(effectiveRepId, profile?.organization_id || undefined, refreshKey, allSales);
+  const baseData = useMemo(() => allSales ? (records.source ? companySalesDashboard(records.source) : null) : repData, [allSales, records.source, repData]);
+  const loading = allSales ? records.loading : repLoading;
+  const baseError = allSales ? null : repError;
   const lists = useMemo(() => baseData && records.source ? buildSalesLists(records.source, period, baseData.quota) : null, [baseData, records.source, period]);
   const refresh = useCallback(() => { refreshBase(); setRefreshKey(n => n + 1); }, [refreshBase]);
   const error = baseError || records.error;
-  useEffect(() => { setSelectedList(null); setConnectionRecord(null); }, [effectiveRepId, period]);
+  useEffect(() => { if (allSales && period === 'quota') setPeriod('year'); setSelectedList(null); setConnectionRecord(null); }, [effectiveRepId, period, allSales]);
   const data = useMemo(() => {
     if (!baseData || !lists || !records.source) return baseData;
     const previousDate = new Date();
@@ -105,6 +103,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     const previous = buildSalesLists(records.source, period, previousQuota, previousDate);
     const closed = lists.closed.length;
     return { ...baseData,
+      ...(allSales ? { runRate90Day: lists.runRate.reduce((sum, r) => sum + (r.amount || 0), 0) / 90 * 365 } : {}),
       closeRate: { ...baseData.closeRate, pct: closed ? Math.round(lists.won.length / closed * 1000) / 10 : 0, wonCount: lists.won.length, lostCount: lists.lost.length, prevPct: previous.closed.length ? Math.round(previous.won.length / previous.closed.length * 1000) / 10 : 0, prevWonCount: previous.won.length, prevLostCount: previous.lost.length },
       pipeline: { count: lists.pipeline.length, total: lists.pipeline.reduce((sum, r) => sum + (r.amount || 0), 0) },
       expiredProposalsCount: lists.stale.length,
@@ -115,16 +114,17 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
       recentProposals: [...lists.created].slice(0, 5).map(r => ({ id: r.id, proposalNumber: r.title, status: r.status, total: r.amount || 0, customerName: r.customer, createdAt: r.date })),
       recentActivity: [...records.source.leads.filter(l => { const bounds = periodBounds(period, baseData.quota); return l.created_at.slice(0, 10) >= bounds.start && l.created_at.slice(0, 10) <= bounds.end; }).map(l => ({ id: l.id, kind: 'lead' as const, title: `Lead added: ${l.contact_name || l.company_name}`, customer: l.company_name || '', status: l.status, date: l.created_at })), ...lists.connections, ...lists.created.map(r => ({ ...r, title: `Created ${r.title}` })), ...lists.sent.map(r => ({ ...r, title: `Sent ${r.title}` })), ...lists.won.map(r => ({ ...r, title: `Won ${r.title}` })), ...lists.lost.map(r => ({ ...r, title: `Lost ${r.title}` }))].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map((r, i) => ({ id: `${r.kind}-${r.id}-${i}`, recordId: r.id, recordKind: r.kind, type: (r.kind === 'connection' ? 'connection' : 'proposal_created') as 'connection' | 'proposal_created', createdAt: r.date, title: r.kind === 'connection' ? r.title : `${r.title} · ${r.status.replace(/_/g, ' ')}`, description: r.customer })),
     };
-  }, [baseData, lists, records.source]);
+  }, [baseData, lists, records.source, allSales]);
   const openRecord = useCallback((record: SalesRecord) => {
     if (record.kind === 'connection') { setConnectionRecord(record); return; }
     if (record.kind === 'proposal' && onProposalClick) { onProposalClick(record.id); return; }
     onOpenRecord?.({ ...record, id: record.recordId || record.id });
   }, [onOpenRecord, onProposalClick]);
-  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
+  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard(activeTab === 'overview');
 
   useEffect(() => {
-    if (!onRepContextChange || !data) return;
+    if (!onRepContextChange) return;
+    if (allSales || !data) { onRepContextChange(null); return; }
 
     const goal = computeGoalProgress(data);
     const currentMonth = data.monthlyTrend[0]?.total ?? 0;
@@ -148,7 +148,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
       quotaProgress: goal.hasQuota ? goal.pctAchieved : null,
       allTimeTotal: data.allTimeTotal ?? data.bookedSales.total,
     });
-  }, [data, onRepContextChange]);
+  }, [data, allSales, onRepContextChange]);
 
   const attentionItems = useMemo(() => {
     if (!data) return [];
@@ -163,9 +163,38 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
   const handleNavigateToActivity = useCallback(() => { setListSource(null); setListReason(null); setSelectedList('connections'); }, []);
 
+  const header = (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-6">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-white">Sales Dashboard</h1>
+          <p className="text-xs sm:text-sm text-gray-300 mt-0.5">
+            {loading ? 'Loading sales data…' : isManagerView ? `Viewing: ${data?.repDisplayName}` : data?.repDisplayName}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {isManager && profile?.organization_id && (
+            <ManagerRepSelector
+              selectedRepId={effectiveRepId}
+              onSelectRep={setSelectedRepId}
+              orgId={profile.organization_id}
+            />
+          )}
+          <button
+            onClick={refresh}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+      </div>
+  );
+
   if (loading || records.loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {header}
         <DashboardSkeleton />
       </div>
     );
@@ -202,45 +231,20 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-white">Sales Dashboard</h1>
-          <p className="text-sm text-gray-300 mt-0.5">
-            {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {isManager && profile?.organization_id && (
-            <ManagerRepSelector
-              selectedRepId={selectedRepId}
-              onSelectRep={setSelectedRepId}
-              orgId={profile.organization_id}
-            />
-          )}
-          <button
-            onClick={refresh}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
+      {header}
 
       <div className="mb-5 flex flex-wrap items-center gap-3 text-sm text-gray-200">
         <label htmlFor="sales-period">Reporting period</label>
         <select id="sales-period" value={period} onChange={e => setPeriod(e.target.value as SalesPeriod)} className="rounded-lg border border-gray-600 bg-gray-800 p-2 text-white">
-          <option value="month">This month</option><option value="quarter">This quarter</option><option value="year">This calendar year</option><option value="quota">This quota year</option>
+          <option value="month">This month</option><option value="quarter">This quarter</option><option value="year">This calendar year</option>{!allSales && <option value="quota">This quota year</option>}
         </select>
-        <span>Goals and booked sales use the quota year. Follow-up queues include all outstanding items.</span>
+        <span>{allSales ? 'Booked sales use the calendar year.' : 'Goals and booked sales use the quota year.'} Follow-up queues include all outstanding items.</span>
       </div>
       {connectionRecord ? <SalesConnectionDetail key={connectionRecord.id} record={connectionRecord} onBack={() => setConnectionRecord(null)} onSaved={refresh} /> : selectedList && lists ?
         <SalesRecordList key={`${selectedList}:${effectiveRepId}:${period}`} title={SALES_LIST_LABELS[selectedList]} subtitle={`${data.repDisplayName} · ${['stale', 'pipeline', 'followups', 'untouched', 'hot', 'staleLeads'].includes(selectedList) ? 'All outstanding items' : ['booked', 'runRate'].includes(selectedList) ? selectedList === 'booked' ? `${data.quota.quotaStartDate} to ${data.quota.quotaEndDate}` : 'Last 90 days' : `${periodBounds(period, data.quota).start} to ${periodBounds(period, data.quota).end}`}`} records={listReason ? lists[selectedList].filter(r => (r.reason || 'unknown') === listReason && (!listSource || (records.source?.proposals.find(p => p.id === r.id)?.declined_by === 'customer' ? 'customer' : 'rep') === listSource)) : lists[selectedList]} onBack={() => setSelectedList(null)} onOpen={openRecord} /> : <>
-      {lists && <SalesResultsSummary lists={lists} onSelect={selectList} />}
+      {lists && <SalesResultsSummary allSales={allSales} lists={lists} onSelect={selectList} />}
       {/* Tab navigation */}
-      <div className="flex items-center gap-1 mb-6 overflow-x-auto border-b border-gray-700">
+      <div className="flex items-center gap-1 mb-3 sm:mb-6 overflow-x-auto border-b border-gray-700 [scrollbar-width:thin] -mx-3 px-3 sm:mx-0 sm:px-0">
         {TAB_CONFIG.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -248,7 +252,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
                   ? 'border-blue-400 text-blue-400'
                   : 'border-transparent text-gray-300 hover:text-white hover:border-gray-500'
@@ -264,11 +268,12 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
       {/* Tab content */}
       {activeTab === 'daily_recap' && (
         <div className="space-y-6">
-          <DailySalesTotalsPanel
+          <DailySalesTotalsPanel key={effectiveRepId || "all"}
             repId={effectiveRepId}
+            allSales={allSales}
             onUpdateReport={profile?.role === 'admin' ? () => onNavigateToTab?.('daily_sales_report_import') : undefined}
           />
-          <DailyRecap
+          {allSales ? <p className="text-sm text-gray-300">Select a sales rep to view their daily recap and checklist.</p> : <DailyRecap
             repId={effectiveRepId}
             isManagerView={isManagerView}
             onNavigate={(tab, recordId) => {
@@ -278,13 +283,13 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
                 handleNavigate(tab as any);
               }
             }}
-          />
+          />}
         </div>
       )}
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <AnnualGoalHero data={data} teamRank={data.teamRank ?? null} />
+          {!allSales && <AnnualGoalHero data={data} teamRank={data.teamRank ?? null} />}
           <SalesKpiGrid data={data} onSelect={selectList} />
           {data.periodStats && <PeriodStatsRow stats={data.periodStats} onSelect={selectList} />}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

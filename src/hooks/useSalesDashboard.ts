@@ -60,14 +60,16 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
         const rpcName = isManagerView ? 'get_sales_rep_dashboard' : 'get_my_sales_dashboard';
         const params = isManagerView ? { p_target_rep_id: repId } : {};
 
-        const { data: result, error: rpcError } = await supabase.rpc(rpcName, params);
+        const [{ data: result, error: rpcError }, { data: ranks }] = await Promise.all([
+          supabase.rpc(rpcName, params),
+          supabase.from('profiles').select('id,points_earned').gt('points_earned', 0).order('points_earned', { ascending: false }),
+        ]);
         if (cancelled) return;
         if (rpcError) throw rpcError;
         if (!result || result.error) throw new Error(result?.error || 'No dashboard data returned');
 
         // Goals/trends retain the existing imported-sales RPC. Counts and record lists
         // are loaded together by useSalesDashboardRecords, so they cannot diverge.
-        const { data: ranks } = await supabase.from('profiles').select('id,points_earned').gt('points_earned', 0).order('points_earned', { ascending: false });
         if (cancelled) return;
         const rank = (ranks || []).findIndex(r => r.id === repId) + 1;
         setData({ ...result, teamRank: rank > 0 ? { rank, total: ranks!.length } : null } as SalesDashboardResult);
@@ -91,7 +93,7 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
   return { data, loading, error, refresh };
 }
 
-export function useSalesLeaderboard(): {
+export function useSalesLeaderboard(enabled = true): {
   data: LeaderboardResult | null;
   loading: boolean;
   error: string | null;
@@ -108,6 +110,7 @@ export function useSalesLeaderboard(): {
     let cancelled = false;
 
     async function load() {
+      if (!enabled) return;
       setLoading(true);
       setError(null);
 
@@ -139,7 +142,7 @@ export function useSalesLeaderboard(): {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, enabled]);
 
   return { data, loading, error, refresh };
 }

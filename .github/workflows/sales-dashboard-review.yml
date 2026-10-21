@@ -26,6 +26,9 @@ jobs:
       - run: npm run typecheck
       - run: node tests/sales-dashboard/records.mjs
       - run: node tests/sales-dashboard/pagination.mjs
+      - run: node tests/sales-dashboard/rep-default.mjs
+      - run: node tests/sales-dashboard/company.mjs
+      - run: node tests/sales-dashboard/company-queries.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: node tests/sales-dashboard/browser.mjs

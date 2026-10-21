@@ -126,7 +126,7 @@ export function computeSalesBookedKpi(data: SalesDashboardResult): KpiCardData {
   const change = pctChange(current, previous);
 
   return {
-    title: 'Sales Booked (This Quota Year)',
+    title: data.repId ? 'Sales Booked (This Quota Year)' : 'Sales Booked (This Calendar Year)',
     value: formatCurrency(current),
     supportingText: `${data.bookedSales.count} order${data.bookedSales.count !== 1 ? 's' : ''} · Avg ${formatCurrency(data.bookedSales.avgSale)}`,
     trend: trendFromPct(change),

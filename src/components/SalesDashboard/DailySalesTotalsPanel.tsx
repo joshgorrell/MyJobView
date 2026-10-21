@@ -1,3 +1,4 @@
+import { readAllSalesRows } from '../../hooks/useSalesDashboardRecords';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, FileUp, RefreshCw, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 
 interface DailySalesTotalsPanelProps {
   repId: string | null;
+  allSales?: boolean;
   onUpdateReport?: () => void;
 }
 
@@ -25,7 +27,7 @@ function money(value: number): string {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 }
 
-export function DailySalesTotalsPanel({ repId, onUpdateReport }: DailySalesTotalsPanelProps) {
+export function DailySalesTotalsPanel({ repId, onUpdateReport, allSales = false }: DailySalesTotalsPanelProps) {
   const { profile } = useAuth();
   const [rows, setRows] = useState<DailyTotalRow[]>([]);
   const [report, setReport] = useState<ReportRow | null>(null);
@@ -33,7 +35,7 @@ export function DailySalesTotalsPanel({ repId, onUpdateReport }: DailySalesTotal
   const [error, setError] = useState(false);
 
   const loadTotals = useCallback(async () => {
-    if (!profile?.organization_id || !repId) return;
+    if (!profile?.organization_id || (!repId && !allSales)) return;
     setLoading(true);
     setError(false);
     try {
@@ -44,20 +46,61 @@ export function DailySalesTotalsPanel({ repId, onUpdateReport }: DailySalesTotal
         setRows([]);
         return;
       }
-      const { data: totalData, error: totalError } = await supabase.from('sales_daily_totals').select('sales_date, invoice_total, invoice_count').eq('organization_id', profile.organization_id).eq('sales_rep_id', repId).gte('sales_date', reportData.report_period_start).lte('sales_date', reportData.report_period_end).order('sales_date', { ascending: false });
-      if (totalError) throw totalError;
-      setRows((totalData ?? []) as DailyTotalRow[]);
+      let totalsQuery = supabase.from('sales_daily_totals').select('sales_date, invoice_total, invoice_count').eq('organization_id', profile.organization_id).gte('sales_date', reportData.report_period_start).lte('sales_date', reportData.report_period_end).order('sales_date', { ascending: false });
+      if (!allSales) totalsQuery = totalsQuery.eq('sales_rep_id', repId);
+      const totalData = await readAllSalesRows(() => totalsQuery);
+      const byDay = new Map<string, DailyTotalRow>();
+      for (const row of totalData || []) { const prior = byDay.get(row.sales_date); byDay.set(row.sales_date, { sales_date: row.sales_date, invoice_total: Number(row.invoice_total) + Number(prior?.invoice_total || 0), invoice_count: Number(row.invoice_count) + Number(prior?.invoice_count || 0) }); }
+      setRows([...byDay.values()].sort((a, b) => b.sales_date.localeCompare(a.sales_date)));
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [profile?.organization_id, repId]);
+  }, [profile?.organization_id, repId, allSales]);
 
   useEffect(() => { void loadTotals(); }, [loadTotals]);
 
   const currentThrough = useMemo(() => rows.reduce((sum, row) => sum + Number(row.invoice_total), 0), [rows]);
   const latest = rows[0];
 
-  return <section className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm"><div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"><div><div className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-700" /><h2 className="text-base font-semibold text-gray-900">Current sales from daily reports</h2></div><p className="text-sm text-gray-600 mt-1">See reported sales now instead of waiting for month-end totals.</p></div><div className="flex items-center gap-2">{onUpdateReport && <button onClick={onUpdateReport} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800"><FileUp className="w-3.5 h-3.5" /> Update report</button>}<button onClick={() => void loadTotals()} className="rounded-lg border border-blue-200 bg-white p-2 text-blue-700 hover:bg-blue-100" title="Refresh daily totals"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button></div></div>{loading ? <p className="mt-5 text-sm text-gray-500">Loading daily totals…</p> : error ? <p className="mt-5 text-sm text-red-700">Daily totals could not be loaded. Try refreshing.</p> : !report ? <p className="mt-5 text-sm text-gray-600">No approved daily report is available yet.</p> : <><div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5"><div className="rounded-xl bg-white border border-blue-100 p-4"><p className="text-xs uppercase tracking-wide text-gray-500">Current through</p><p className="mt-1 text-2xl font-bold text-gray-900">{money(currentThrough)}</p><p className="text-xs text-gray-500 mt-1">{report.report_period_end}</p></div><div className="rounded-xl bg-white border border-blue-100 p-4"><p className="text-xs uppercase tracking-wide text-gray-500">Latest reported day</p><p className="mt-1 text-2xl font-bold text-gray-900">{latest ? money(Number(latest.invoice_total)) : '$0.00'}</p><p className="text-xs text-gray-500 mt-1">{latest?.sales_date ?? 'No daily entries'}</p></div><div className="rounded-xl bg-white border border-blue-100 p-4"><p className="text-xs uppercase tracking-wide text-gray-500">Days reported</p><p className="mt-1 text-2xl font-bold text-gray-900">{rows.length}</p><p className="text-xs text-gray-500 mt-1">{report.report_period_start} to {report.report_period_end}</p></div></div><div className="mt-4 flex items-center gap-2 text-xs text-gray-500"><CalendarDays className="w-3.5 h-3.5" /> Source: {report.source_file_name || 'Daily sales report'} · Approved {new Date(report.created_at).toLocaleDateString()}</div></>}</section>;
+  const daysOld = report ? Math.floor((Date.now() - new Date(report.report_period_end + 'T23:59:59').getTime()) / 86400000) : 0;
+  return (
+    <section className="rounded-xl border border-gray-700 bg-gray-800/90 p-3 sm:p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <TrendingUp className="w-4 h-4 shrink-0 text-blue-400" />
+          <h2 className="text-sm sm:text-base font-semibold text-white">Daily reported sales</h2>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {onUpdateReport && <button onClick={onUpdateReport} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-2 text-xs font-medium text-white hover:bg-blue-700"><FileUp className="w-3.5 h-3.5" /><span className="hidden sm:inline">Update report</span><span className="sm:hidden">Update</span></button>}
+          <button onClick={() => void loadTotals()} className="rounded-lg border border-gray-600 p-2 text-gray-200 hover:bg-gray-700" title="Refresh daily totals" aria-label="Refresh daily totals"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+        </div>
+      </div>
+      {loading ? <p className="mt-3 text-sm text-gray-400">Loading daily totals…</p>
+        : error ? <p className="mt-3 text-sm text-red-300">Daily totals could not be loaded. Try refreshing.</p>
+        : !report ? <p className="mt-3 text-sm text-gray-400">No approved daily report is available yet.</p>
+        : <>
+          {daysOld > 7 && <p role="status" className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Latest approved report ends {report.report_period_end}. Figures may be outdated.</p>}
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="col-span-2 sm:col-span-1 rounded-lg border border-gray-600 bg-gray-900/70 p-3">
+              <p className="text-xs text-gray-400">Reported total</p>
+              <p className="mt-1 text-xl sm:text-2xl font-bold text-white tabular-nums">{money(currentThrough)}</p>
+              <p className="mt-1 text-xs text-gray-400">Through {report.report_period_end}</p>
+            </div>
+            <div className="rounded-lg border border-gray-600 bg-gray-900/70 p-3">
+              <p className="text-xs text-gray-400">Latest day</p>
+              <p className="mt-1 text-lg sm:text-xl font-bold text-white tabular-nums">{latest ? money(Number(latest.invoice_total)) : '$0.00'}</p>
+              <p className="mt-1 text-xs text-gray-400">{latest?.sales_date ?? 'No entries'}</p>
+            </div>
+            <div className="rounded-lg border border-gray-600 bg-gray-900/70 p-3">
+              <p className="text-xs text-gray-400">Days reported</p>
+              <p className="mt-1 text-lg sm:text-xl font-bold text-white tabular-nums">{rows.length}</p>
+              <p className="mt-1 text-xs text-gray-400">{report.report_period_start} – {report.report_period_end}</p>
+            </div>
+          </div>
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-400"><CalendarDays className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Source: {report.source_file_name || 'Daily sales report'} · Approved {new Date(report.created_at).toLocaleDateString()}</span></p>
+        </>}
+    </section>
+  );
 }

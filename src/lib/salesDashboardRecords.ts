@@ -90,12 +90,13 @@ export function buildSalesLists(source: SalesSources, period: SalesPeriod, quota
     if (month >= qStart.slice(0, 7) && month <= qEnd.slice(0, 7)) lists.booked.push({ id: m.id, kind: 'source', title: `Sales report ${month}`, customer: 'Imported monthly summary', status: 'reported', date: `${month}-01`, amount: Number(m.total_sales || 0), weight: Number(m.sales_order_count || 0), detail: `${m.sales_order_count || 0} reported orders. This import contains summary totals; individual customer orders were not imported.` });
   }
   const ninetyDaysAgo = new Date(now); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const coveredMonths = new Set(source.months.map(m => `${m.user_id ?? null}:${m.year}-${String(m.month).padStart(2, '0')}`));
   for (const o of source.orders) {
     if (['cancelled', 'voided'].includes(o.status)) continue;
     const date = o.booked_at || o.created_at;
     const row: SalesRecord = { id: o.id, kind: 'order', title: o.order_number || 'Sales Order', customer: name(o), status: o.status, date, amount: Number(o.contract_total || 0) };
-    if (within(date, qStart, qEnd) && !source.months.some(m => `${m.year}-${String(m.month).padStart(2, '0')}` === date.slice(0, 7))) lists.booked.push(row);
-    if (within(date, dateKey(ninetyDaysAgo), today) && !source.months.some(m => `${m.year}-${String(m.month).padStart(2, '0')}` === date.slice(0, 7))) lists.runRate.push(row);
+    if (within(date, qStart, qEnd) && !coveredMonths.has(`${o.sales_rep_id || o.created_by || null}:${salesDate(date, source.timezone).slice(0, 7)}`)) lists.booked.push(row);
+    if (within(date, dateKey(ninetyDaysAgo), today) && !coveredMonths.has(`${o.sales_rep_id || o.created_by || null}:${salesDate(date, source.timezone).slice(0, 7)}`)) lists.runRate.push(row);
   }
   Object.values(lists).forEach(rows => rows.sort((a, b) => b.date.localeCompare(a.date)));
   lists.stale.sort((a, b) => a.date.localeCompare(b.date));

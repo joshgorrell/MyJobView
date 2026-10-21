@@ -11,7 +11,7 @@ window.calls=[];window.failSales=false;
 const now=new Date(),day=now.toISOString().slice(0,10),start=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
 const proposals=[{id:'stale-old',created_by:'rep1',proposal_number:'P-OLD',title:'Old proposal',status:'expired',created_at:'2025-01-01',valid_until:'2025-02-01',total:1200,contact:{full_name:'Old Customer'}},{id:'won',created_by:'rep1',proposal_number:'P-WON',status:'approved',created_at:start,approved_at:day,total:4500,contact:{full_name:'Won Customer'}},{id:'lost',created_by:'rep1',proposal_number:'P-LOST',status:'declined',created_at:start,declined_at:day,total:800,contact:{full_name:'Lost Customer'}},{id:'other',created_by:'rep2',proposal_number:'P-OTHER',status:'expired',created_at:'2025-01-01',valid_until:'2025-02-01',total:100,contact:{full_name:'Second Rep Customer'}}].map(p=>({...p,organization_id:'org'}));
 const tables={organizations:[{id:'org',timezone:'UTC'}],work_orders:[{id:'work1',organization_id:'org',customer_sales_rep_id:'rep1',work_order_number:'WO-1',title:'Finished Theater',status:'completed',type:'service',is_billable:true,is_archived:false,notes:'Installation complete',updated_at:day,actual_completion_date:day,customer_contacted:true,contact:{full_name:'Work Customer'}}],appointments:[{id:'appointment1',organization_id:'org',created_by:'rep1',appointment_date:day,start_time:'09:00:00',end_time:'10:00:00',title:'Sales Meeting',status:'scheduled',contact:{full_name:'Meeting Customer'}}],proposals,leads:[{id:'lead1',organization_id:'org',assigned_to:'rep1',created_by:'rep1',status:'claimed',priority:'urgent',contact_name:'Never Contacted',created_at:'2025-01-01',reminder_date:day}],contacts:[{id:'contact1',organization_id:'org',created_by:'rep1',full_name:'New Contact',created_at:start}],connections:[{id:'connection1',organization_id:'org',user_id:'rep1',contact_id:'contact1',connection_type:'call',connection_date:day,created_at:day,notes:'Talked about theater',contact:{full_name:'New Contact'}}],profiles:[{id:'rep1',first_name:'First',last_name:'Rep',organization_id:'org',is_sales_rep:true,is_active:true},{id:'rep2',first_name:'Second',last_name:'Rep',organization_id:'org',is_sales_rep:true,is_active:true}]};
-export const useAuth=()=>({profile:{id:'rep1',organization_id:'org',role:'sales_manager'},user:{id:'rep1'}});
+export const useAuth=()=>({profile:{id:'rep1',organization_id:'org',is_sales_rep:!new URLSearchParams(location.search).has('nonrep'),role:new URLSearchParams(location.search).get('role')||'sales_manager'},user:{id:'rep1'}});
 export const supabase={from(table){let filters=[],range=null,head=false,one=false;const q={select(c,opts){head=!!opts?.head;return q},eq(k,v){filters.push([k,v]);return q},in(){return q},or(){return q},is(){return q},gt(){return q},lt(){return q},lte(){return q},gte(){return q},order(){return q},limit(){return q},range(a,b){range=[a,b];return q},single(){one=true;return q},maybeSingle(){one=true;return q},insert(rows){tables[table]=[...(tables[table]||[]),...rows.map((r,i)=>({...r,id:'todo-'+i}))];return q},update(){return q},then(resolve,reject){window.calls.push(['query',table,filters]);let rows=(tables[table]||[]).filter(r=>filters.every(([k,v])=>k.includes('.')||r[k]===undefined||r[k]===v));if(range)rows=rows.slice(range[0],range[1]+1);return Promise.resolve({data:head?null:one?rows[0]||null:rows,count:rows.length,error:window.failSales&&table==='proposals'?{message:'Test query unavailable'}:null}).then(resolve,reject)}};return q},rpc:async(name,args)=>({data:name==='get_sales_goal_leaderboard'?{leaderboard:[]}: {repId:args?.p_target_rep_id||'rep1',repDisplayName:args?.p_target_rep_id==='rep2'?'Second Rep':'First Rep',quota:{annualQuota:100000,monthlyQuota:8333,quotaStartDate:now.getFullYear()+'-01-01',quotaEndDate:now.getFullYear()+'-12-31',quotaElapsedPct:50,hasQuota:true},bookedSales:{total:0,count:0,avgSale:0,prevTotal:0,prevCount:0},pipeline:{total:0,count:0},closeRate:{pct:0,wonCount:0,lostCount:0,prevPct:0,prevWonCount:0,prevLostCount:0},monthlyTrend:[],runRate90Day:0},error:null})};`;
 const source = `import React from 'react';import{createRoot}from'react-dom/client';import{SalesDashboardPage}from'./src/components/SalesDashboard/SalesDashboardPage';createRoot(document.getElementById('root')).render(<SalesDashboardPage onProposalClick={id=>window.calls.push(['proposal',id])} onOpenRecord={r=>window.calls.push(['record',r.kind,r.id])} onNavigateToTab={(tab,id)=>window.calls.push(['navigate',tab,id])}/>);`;
 let browser;
@@ -26,6 +26,7 @@ try {
   for(const width of [390,1440]) {
     await page.setViewportSize({width,height:1000});await page.goto('http://127.0.0.1:'+server.address().port);
     await page.getByRole('heading',{name:'My Results & Activity'}).waitFor();
+    assert.equal(await page.locator('select').filter({has:page.locator('option[value="rep2"]')}).inputValue(), 'rep1');
     for(const name of ['Daily Recap','Overview','Pipeline','Proposals','Activity']) assert.equal(await page.getByRole('button',{name,exact:true}).count(),1);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.getByRole('button',{name:/^Ready to Bill/}).click();
@@ -57,11 +58,31 @@ try {
     await page.getByRole('button',{name:'Back to dashboard'}).click();
     await page.getByRole('combobox').filter({has:page.locator('option[value="rep2"]')}).selectOption('rep2');
     await page.getByText('Viewing: Second Rep',{exact:true}).waitFor();
+    assert.equal((await page.evaluate(()=>window.calls)).filter(c=>c[0]==='query'&&c[1]==='profiles'&&c[2].some(f=>f[0]==='is_sales_rep')).length,1, 'Changing reps must not refetch the selector');
     await page.getByRole('button',{name:/^Stale Proposals/}).first().click();await page.getByRole('button',{name:/P-OTHER/}).waitFor();assert.equal(await page.getByRole('button',{name:/P-OLD/}).count(),0);
     await page.getByLabel('Search sales records').fill('missing');await page.getByText('No matching records.',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Back to dashboard'}).click();
     await page.evaluate(()=>window.failSales=true);await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByText('Failed to load dashboard',{exact:true}).waitFor();
   }
+  await page.goto('http://127.0.0.1:'+server.address().port+'/?role=sales_rep');
+  await page.getByRole('heading',{name:'My Results & Activity'}).waitFor();
+  assert.equal(await page.locator('option[value="rep2"]').count(),0);
+  await page.getByRole('button',{name:/^Stale Proposals/}).first().click();
+  await page.getByRole('button',{name:/P-OLD/}).waitFor();
+  assert.equal(await page.getByRole('button',{name:/P-OTHER/}).count(),0);
+  await page.goto('http://127.0.0.1:'+server.address().port+'/?role=admin&nonrep=1');
+  await page.getByRole('heading',{name:'Sales Results & Activity'}).waitFor();
+  const repFilter = page.locator('select').filter({has:page.locator('option[value="rep2"]')});
+  assert.equal(await repFilter.inputValue(),'');
+  await page.locator('p').filter({hasText:/^All sales$/}).waitFor();
+  await page.getByRole('button',{name:/^Stale Proposals/}).first().click();
+  await page.getByRole('button',{name:/P-OLD/}).waitFor();
+  await page.getByRole('button',{name:/P-OTHER/}).waitFor();
+  await page.getByRole('button',{name:'Back to dashboard'}).click();
+  await repFilter.selectOption('rep2');
+  await page.getByText('Viewing: Second Rep',{exact:true}).waitFor();
+  await repFilter.selectOption('');
+  await page.getByRole('heading',{name:'Sales Results & Activity'}).waitFor();
   assert.deepEqual(errors,[]);
   await page.screenshot({path:'/tmp/sales-dashboard.png',fullPage:true});
   console.log('PASS: phone/desktop counts, lists, direct proposal/contact/connection access, preserved tabs, periods, rep switching, search, and query-error visibility.');
