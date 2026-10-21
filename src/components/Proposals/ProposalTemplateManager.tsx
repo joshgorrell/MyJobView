@@ -36,6 +36,8 @@ interface ReportTemplate {
   show_model_number: boolean;
   show_quantity: boolean;
   show_unit_price: boolean;
+  show_installed_price: boolean;
+  show_item_color: boolean;
   show_line_item_total: boolean;
   show_item_cost: boolean;
   show_markup_percentage: boolean;
@@ -139,6 +141,8 @@ const templateSections: TemplateSection[] = [
       { key: 'show_model_number', label: 'Model Number' },
       { key: 'show_quantity', label: 'Quantity' },
       { key: 'show_unit_price', label: 'Unit Price' },
+      { key: 'show_installed_price', label: 'Installed Price (Equipment + Labor)' },
+      { key: 'show_item_color', label: 'Product Color' },
       { key: 'show_line_item_total', label: 'Line Total' },
       { key: 'show_item_cost', label: 'Item Cost', description: '⚠️ Internal only - shows your cost' },
       { key: 'show_markup_percentage', label: 'Markup %', description: '⚠️ Internal only - shows your margin' },
