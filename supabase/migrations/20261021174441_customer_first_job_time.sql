@@ -20,6 +20,7 @@ CREATE OR REPLACE FUNCTION time_private.classify_customer_time()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE target_contact uuid; target_project uuid; target_kind text; target_org uuid;
 BEGIN
+  IF NEW.entry_type='customer_activity' AND (NEW.work_order_id IS NOT NULL OR NEW.project_id IS NOT NULL) THEN RAISE EXCEPTION 'Customer activity cannot be linked as project or service work'; END IF;
   IF NEW.work_order_id IS NOT NULL THEN
     SELECT coalesce(w.contact_id,p.contact_id),w.project_id,w.type,w.organization_id
       INTO target_contact,target_project,target_kind,target_org FROM work_orders w LEFT JOIN projects p ON p.id=w.project_id WHERE w.id=NEW.work_order_id;
@@ -66,6 +67,7 @@ BEGIN
   IF target_org IS DISTINCT FROM NEW.organization_id OR (NEW.contact_id IS NOT NULL AND NEW.contact_id IS DISTINCT FROM target_contact)
     OR (target_contact IS NOT NULL AND NOT EXISTS(SELECT 1 FROM contacts WHERE id=target_contact AND organization_id=NEW.organization_id)) THEN RAISE EXCEPTION 'Selected work belongs to another customer or organization'; END IF;
   NEW.contact_id:=target_contact;
+  IF NEW.work_order_id IS NOT NULL OR NEW.project_id IS NOT NULL THEN NEW.activity_type:=NULL; END IF;
   SELECT coalesce(timezone,'America/Chicago') INTO v_tz FROM organizations WHERE id=NEW.organization_id;
   IF NEW.entry_date<>(NEW.clock_in AT TIME ZONE v_tz)::date OR NEW.clock_out>now() THEN RAISE EXCEPTION 'Use the work date in the organization timezone and time already worked'; END IF;
   RETURN NEW;
@@ -226,7 +228,7 @@ BEGIN
     SELECT 1 FROM (
       SELECT technician_id,organization_id,entry_date FROM manual_job_time_requests WHERE status='pending'
       UNION ALL
-      SELECT s.technician_id,s.organization_id,(s.clock_in AT TIME ZONE coalesce(o.timezone,'America/Chicago'))::date FROM customer_time_sessions s JOIN organizations o ON o.id=s.organization_id WHERE s.clock_out IS NULL
+      SELECT s.technician_id,s.organization_id,greatest((s.clock_in AT TIME ZONE coalesce(o.timezone,'America/Chicago'))::date,NEW.period_start_date) FROM customer_time_sessions s JOIN organizations o ON o.id=s.organization_id WHERE s.clock_out IS NULL AND (s.clock_in AT TIME ZONE coalesce(o.timezone,'America/Chicago'))::date<=NEW.period_end_date AND (now() AT TIME ZONE coalesce(o.timezone,'America/Chicago'))::date>=NEW.period_start_date
     ) pending
     WHERE pending.organization_id=NEW.organization_id AND pending.entry_date BETWEEN NEW.period_start_date AND NEW.period_end_date
       AND time_private.time_basis(pending.technician_id,pending.entry_date)='work_allocation'

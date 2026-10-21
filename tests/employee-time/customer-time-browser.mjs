@@ -17,7 +17,7 @@ try {
   for (const width of [320, 390, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 850 } });
     const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("pageerror", (e) => { errors.push(e.message); console.error("Customer time browser error:", e.message); });
     const open = async (name = "Randy Travis") => {
       await page.goto("http://127.0.0.1:5192");
       await page.getByRole("button", { name: new RegExp(name) }).click();

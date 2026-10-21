@@ -188,6 +188,11 @@ export function ManualJobTimeRequestModal({
   }, [customer?.id, profile?.id, reload]);
   function choose(value: CustomerTimeTarget) {
     setTarget(value);
+    if (value.kind === "customer_activity") setProject("");
+    if (value.kind === "work_order") {
+      const work = orders.find(order => order.id === value.id);
+      setProject(work && workTimeClassification(work) === "project" ? work.project_id || "" : "");
+    }
     setError("");
     startId.current = null;
   }

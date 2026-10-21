@@ -25,7 +25,7 @@ export function MyJobTimeView({salary=false}:{salary?:boolean}) {
         supabase.from('internal_time_sessions').select('id,session_date,predetermined_hours,status,title').eq('assigned_to',profile.id).eq('status','pending_approval'),
       ]);
       if(time.error) throw time.error;if(manual.error) throw manual.error;if(internal.error) throw internal.error;
-      setEntries(time.data||[]);setPending([...(manual.data||[]).map(r=>({...r,hours:(Date.parse(r.clock_out)-Date.parse(r.clock_in))/3600000-r.break_minutes/60,title:[r.customer?.full_name,r.work_order ? (r.work_order.type==='project'?'Project Work Order':'Service') : r.project_id?'Project':'Customer Activity',r.work_order?.work_order_number,r.reason].filter(Boolean).join(' · ')})),...(internal.data||[]).map(r=>({...r,hours:r.predetermined_hours||0}))]);
+      setEntries(time.data||[]);setPending([...(manual.data||[]).map((r:any)=>({...r,hours:(Date.parse(r.clock_out)-Date.parse(r.clock_in))/3600000-r.break_minutes/60,title:[r.customer?.full_name,r.work_order ? (r.work_order.type==='project'?'Project Work Order':'Service') : r.project_id?'Project':'Customer Activity',r.work_order?.work_order_number,r.reason].filter(Boolean).join(' · ')})),...(internal.data||[]).map(r=>({...r,hours:r.predetermined_hours||0}))]);
     } catch(error:any) {setError(error.message||'Unable to load time.');}
     finally {setLoading(false);}
   }

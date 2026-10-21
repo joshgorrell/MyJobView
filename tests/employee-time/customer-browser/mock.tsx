@@ -123,6 +123,7 @@ export const supabase = {
                           ? [state.session]
                           : []
                         : [];
+              data = data.map((row: any) => ({ ...row, organization_id: "org" }));
               for (const [kind, column, value] of filters) {
                 if (kind === "eq")
                   data = data.filter((r: any) => r[column] === value);

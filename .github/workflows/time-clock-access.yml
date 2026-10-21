@@ -37,6 +37,7 @@ jobs:
       - run: node tests/employee-time/runtime.mjs
       - run: node tests/employee-time/database.mjs
       - run: npm run test:customer-time
+      - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:employee-time:browser
