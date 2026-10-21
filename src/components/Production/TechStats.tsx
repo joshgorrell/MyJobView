@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { TechEfficiencyChart } from './TechEfficiencyChart';
 import { TechAdvisorTab } from './TechAdvisorTab';
+import {useAuth} from '../../contexts/AuthContext';
+import LaborDashboard from './LaborDashboard/LaborDashboard';
 import {
   Clock,
   TrendingUp,
@@ -193,6 +195,22 @@ interface TechStatsProps {
 }
 
 export function TechStats({ onNavigate }: TechStatsProps) {
+  const {profile,loading}=useAuth();
+  const [view,setView]=useState<'performance'|'activity'>('performance');
+  if(loading)return <p role="status">Loading Tech Stats…</p>;
+  // Imported payroll/financial reporting retains its established admin gate.
+  // Other staff keep the existing native activity view and its permissions.
+  if(profile?.role!=='admin')return <NativeTechActivity onNavigate={onNavigate}/>;
+  return <div className="space-y-5">
+    <nav aria-label="Tech Stats views" className="flex flex-wrap gap-2 border-b border-subtle pb-3">
+      <button aria-current={view==='performance'?'page':undefined} onClick={()=>setView('performance')} className={'rounded-lg px-4 py-2 text-sm '+(view==='performance'?'bg-blue-600 text-white':'bg-surface text-primary border border-subtle')}>Performance</button>
+      <button aria-current={view==='activity'?'page':undefined} onClick={()=>setView('activity')} className={'rounded-lg px-4 py-2 text-sm '+(view==='activity'?'bg-blue-600 text-white':'bg-surface text-primary border border-subtle')}>Native MJV activity & travel</button>
+    </nav>
+    {view==='performance'?<LaborDashboard/>:<><p className="text-sm text-secondary">Native MJV clocks, travel and advisor tools. Historical iPoint / QuickBooks Time performance is in the Performance tab.</p><NativeTechActivity onNavigate={onNavigate}/></>}
+  </div>;
+}
+
+function NativeTechActivity({onNavigate}:TechStatsProps){
   const defaultDates = getPresetDates('last_month');
 
   const [activeView, setActiveView] = useState<'stats' | 'advisor'>('stats');

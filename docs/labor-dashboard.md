@@ -1,6 +1,8 @@
 # External labor dashboard
 
-The Labor dashboard lives in **Time & Payroll** and at `/labor-dashboard`. It is available to active organization administrators. A single date selector controls the technician ranking, click-through history and project snapshot. Ranking switches between matched payroll/job efficiency and job-hour volume.
+Imported technician performance lives in the existing **Tech Stats → Performance** tab. It is available to active organization administrators; other staff retain the existing native activity view without gaining imported-payroll access. Native clocks/travel and advisor tools remain under **Native MJV activity & travel** on the same Tech Stats page. Legacy `/labor-dashboard` links open that same Tech Stats entry; the duplicate Time & Payroll tab is removed. Project reporting lives separately in **Projects → Project Stats** within the existing Projects workspace.
+
+The performance view defaults to the previous weekday (Monday uses Friday). Its single reporting period controls ranking, drilldown, team utilization and monthly job-hour breakdown. It loads the existing verified MJV import feed on entry, on focus and on manual refresh; the existing 4 AM Central weekday automation remains the only scheduled importer. No additional automation or provider credential is introduced.
 
 ## Calculation and source rules
 
@@ -40,3 +42,13 @@ Electronic Life's approved historical iPoint policy is isolated by organization 
 Quote accuracy counts assessed jobs, while labor budget efficiency weights by comparable quoted/used hours. The estimated earned rate uses quoted hours × average quoted rate ÷ recorded job hours. Jobs without comparable values are disclosed and excluded from the rate. Duplicate parent IDs are not counted twice and trigger a review notice. No period selector is shown for cumulative project snapshots. Individual imported project detail remains in iPoint.
 
 Additional checks: `node tests/projects/performance.mjs` and `node tests/projects/performance-ui.mjs`. The live October 19, 2026 MJV mirror was read-only verified at 580 completed parent projects, 5,756.0364167 quoted hours, 5,304.12675 used hours and 17 warranty flags during implementation.
+
+## Technician performance parity
+
+Team utilization divides summed matched job hours by summed matched paid work hours (not an average of technician percentages). Unmatched payroll hours remain visible as excluded coverage; unknown entries do not become zeros. The paid-hour earned-rate card multiplies the historical completed-project rate by selected-period utilization and is explicitly a planning scenario across different work/period populations, not actual period revenue or profit. Native cutover with no comparable quoted labor dollars withholds that rate.
+
+The modal averages complete unflagged per-day first/last pairs from imported source timestamps. It rejects overnight pairs, future/pre-hire dates and source timestamps after native cutover. Job clocks are not GPS arrivals. Electronic Life's Luis/Jesse schedule is explicitly assumed at 08:00–17:00; payroll efficiency still uses the established 8-hour weekday model less leave/holidays. Native timing unavailable in the aggregate RPC is withheld, never inferred from totals. Annual/multi-month selections expose technician job hours by month within the selected dates.
+
+Additional checks: `node tests/labor-dashboard/timing.mjs`, `node tests/labor-dashboard/team-utilization.mjs`, and `node tests/labor-dashboard/tech-stats-entry.mjs`. No native clock, employee setting, source switch, existing import history, standalone dashboard or schedule is changed by this frontend integration.
+
+Tech Stats validation: the complete labor regression suite, navigation routes and production build pass. The workspace-consolidation test fails at its existing Flow Tasks-button assertion on both unchanged main and this branch. Repository-wide typecheck also reports existing errors outside the changed files; compare against the same base before attributing them to this integration. Live MJV was still serving the prior Projects bundle at verification, so frontend publication remains required for both views.

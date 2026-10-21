@@ -57,7 +57,7 @@
     "test:punchlist:handoff:browser": "npm run build && node tests/punchlist/visit-checklist-browser.mjs",
     "test:sessions": "node tests/sessions/runtime.mjs && node tests/sessions/database.mjs",
     "test:pto": "node tests/pto/database.mjs && node tests/pto/browser.mjs",
-    "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs",
+    "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs && node tests/labor-dashboard/timing.mjs && node tests/labor-dashboard/tech-stats-entry.mjs && node tests/labor-dashboard/team-utilization.mjs",
     "test:proposal-sharing": "node tests/proposals/share-link-contract.mjs",
     "test:account-emails:browser": "npm run build && node tests/account-emails/browser.mjs && node tests/account-emails/portal-recovery-browser.mjs",
     "test:welcome-onboarding": "node tests/welcome-onboarding/database.mjs && node tests/welcome-onboarding/push.mjs",
