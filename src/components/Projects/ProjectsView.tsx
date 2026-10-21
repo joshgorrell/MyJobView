@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadProjectSummaries, projectOrderLink, type ProjectSummary } from '../../lib/projectOverview';
 import ProjectDetail from './ProjectDetail';
+import ProjectStats from './ProjectStats';
 import './projects.css';
 const hours = (value: number) => `${value.toFixed(1)}h`;
 const date = (value: string) => new Date(value.slice(0,10)+'T12:00:00').toLocaleDateString();
@@ -11,6 +12,8 @@ export default function ProjectsView() {
   const [rows,setRows] = useState<ProjectSummary[]>([]), [loading,setLoading] = useState(true), [error,setError] = useState('');
   const [expanded,setExpanded] = useState<string|null>(null);
   const initial = new URLSearchParams(window.location.search);
+  const [view,setView]=useState(initial.get('projectView')==='stats'?'stats':'management');
+  const showingStats=view==='stats'&&profile?.role==='admin';
   const [search,setSearch] = useState(()=>initial.get('projectSearch')||'');
   const [scope,setScope] = useState(()=>initial.get('projectScope')||'all');
   const [pm,setPm] = useState(()=>initial.get('projectPm')||'');
@@ -20,16 +23,17 @@ export default function ProjectsView() {
   const [legacyProject,setLegacyProject] = useState(()=>initial.get('projectId'));
   const request = useRef(0), busy = useRef(false);
   const load = useCallback(async (quiet=false) => {
-    if(!profile?.organization_id || busy.current) return;
+    if(!profile?.organization_id || busy.current || showingStats) return;
     busy.current=true; const id=++request.current;
     if(!quiet) setLoading(true);
     try {const result=await loadProjectSummaries(profile.organization_id);if(id===request.current){setRows(result);setError('');}}
     catch(failure){if(id===request.current)setError((failure as Error).message || 'Projects could not be loaded.');}
     finally{busy.current=false;if(id===request.current)setLoading(false);}
-  },[profile?.organization_id]);
+  },[profile?.organization_id,showingStats]);
   useEffect(()=>{void load(); const timer=setInterval(()=>{if(document.visibilityState==='visible')void load(true);},30000);const focus=()=>void load(true);window.addEventListener('focus',focus);return()=>{request.current++;busy.current=false;clearInterval(timer);window.removeEventListener('focus',focus);};},[load]);
   useEffect(()=>{const url=new URL(window.location.href);for(const [key,value] of Object.entries({projectSearch:search,projectScope:scope,projectPm:pm,projectOffice:office,projectStatus:status,projectSort:sort})){if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);}window.history.replaceState(null,'',url);},[search,scope,pm,office,status,sort]);
-  if(legacyProject) return <ProjectDetail projectId={legacyProject} onBack={()=>{setLegacyProject(null);const url=new URL(location.href);url.searchParams.delete('projectId');window.history.replaceState(null,'',url);void load();}}/>;
+  useEffect(()=>{const url=new URL(window.location.href);url.searchParams.set('projectView',view);url.searchParams.delete('orderTab');window.history.replaceState(null,'',url);},[view]);
+  if(legacyProject&&!showingStats) return <ProjectDetail projectId={legacyProject} onBack={()=>{setLegacyProject(null);const url=new URL(location.href);url.searchParams.delete('projectId');window.history.replaceState(null,'',url);void load();}}/>;
   const filtered=rows.filter(row=>{
     const project=row.project;
     return (status==='all'||status==='open'&&['planning','active'].includes(project.status)||status===project.status)
@@ -47,7 +51,9 @@ export default function ProjectsView() {
   const offices=[...new Map(rows.filter(row=>row.project.office_id).map(row=>[row.project.office_id,row.office])).entries()];
   const daysSince=(value:string,today:string)=>Math.max(0,Math.round((Date.parse(today)-Date.parse(value.slice(0,10)))/86400000));
   return <section className="pm-dashboard" aria-label="Project management dashboard">
-    <header className="pm-heading"><div><h1>Projects</h1><p>Customer and project overview · Recorded labor, remaining tasks and visits</p></div><button aria-label="Refresh projects" title="Refresh projects" onClick={()=>void load()} disabled={loading}><RefreshCw size={18}/></button></header>
+    <header className="pm-heading"><div><h1>Projects</h1><p>Manage project delivery and measure completed-project performance</p></div>{!showingStats&&<button aria-label="Refresh projects" title="Refresh projects" onClick={()=>void load()} disabled={loading}><RefreshCw size={18}/></button>}</header>
+    <nav className="project-view-tabs" aria-label="Project views"><button aria-current={!showingStats?'page':undefined} onClick={()=>setView('management')}>Project Management</button>{profile?.role==='admin'&&<button aria-current={showingStats?'page':undefined} onClick={()=>setView('stats')}>Project Stats</button>}</nav>
+    {showingStats?<ProjectStats/>:<>
     <div className="pm-filters">
       <label className="pm-search"><span>Search customer or project</span><div><Search size={16}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Customer, project or number"/></div></label>
       <label>Projects<select aria-label="Projects" value={scope} onChange={event=>{setScope(event.target.value);setPm('');}}><option value="all">All projects</option><option value="mine">My projects</option><option value="unassigned">Unassigned</option></select></label>
@@ -75,9 +81,9 @@ export default function ProjectsView() {
         </div>
         {open&&<div className="pm-details" id={`pm-details-${project.id}`}>
           <section><h2>Remaining tasks</h2>{!row.tasks.length?<p>No structured tasks yet.</p>:!row.openTasks.length?<p>All project tasks are complete or cancelled.</p>:<ul>{row.openTasks.map(task=><li key={task.id}><strong>{task.title}</strong><small>{task.room_name||'General / Unassigned'} · {task.progress_status||'Open'}{task.estimated_hours>0?` · ${hours(Number(task.estimated_hours))} estimated`:''}</small>{task.description&&<p>{task.description}</p>}</li>)}</ul>}</section>
-          <section><h2>Open work orders</h2>{!row.workOrders.length?<p>No open work orders.</p>:<ul>{row.workOrders.map(wo=><li key={wo.id}><a href={`/?tab=work_orders&workOrderId=${encodeURIComponent(wo.id)}`}>{wo.work_order_number} · {wo.title}</a><small>{wo.status_label?.replace(/_/g,' ')} · {wo.technician_name||'Unassigned'} · {wo.scheduled_date&&wo.scheduled_start_time?`${date(wo.scheduled_date)} ${wo.scheduled_start_time.slice(0,5)}`:'Unscheduled'}</small></li>)}</ul>}<p>Excluded labor: {hours(row.excludedHours)}</p><a href={projectOrderLink(row)}>Open Sales Order → Project</a></section>
+          <section><h2>Open work orders</h2>{!row.workOrders.length?<p>No open work orders.</p>:<ul>{row.workOrders.map(wo=><li key={wo.id}><a href={`/?tab=work_orders&workOrderId=${encodeURIComponent(wo.id)}`}>{wo.work_order_number} · {wo.title}</a><small>{wo.status_label?.replace(/_/g,' ')} · {wo.technician_name||'Unassigned'} · {wo.scheduled_date&&wo.scheduled_start_time?`${date(wo.scheduled_date)} ${wo.scheduled_start_time.slice(0,5)}`:'Unscheduled'}</small></li>)}</ul>}<p>Excluded labor: {hours(row.excludedHours)}</p><a href={projectOrderLink(row)}>Open project workspace</a></section>
         </div>}
       </article>;
-    })}</div>
+    })}</div></>}
   </section>;
 }
