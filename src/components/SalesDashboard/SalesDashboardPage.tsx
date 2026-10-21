@@ -126,7 +126,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         <DashboardSkeleton />
       </div>
     );
@@ -164,10 +164,10 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-6">
         <div>
-          <h1 className="text-xl font-bold text-white">Sales Dashboard</h1>
-          <p className="text-sm text-gray-300 mt-0.5">
+          <h1 className="text-lg sm:text-xl font-bold text-white">Sales Dashboard</h1>
+          <p className="text-xs sm:text-sm text-gray-300 mt-0.5">
             {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
           </p>
         </div>
@@ -191,7 +191,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
       </div>
 
       {/* Tab navigation */}
-      <div className="flex items-center gap-1 mb-6 overflow-x-auto border-b border-gray-700">
+      <div className="flex items-center gap-1 mb-3 sm:mb-6 overflow-x-auto border-b border-gray-700 [scrollbar-width:thin] -mx-3 px-3 sm:mx-0 sm:px-0">
         {TAB_CONFIG.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -199,7 +199,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
                   ? 'border-blue-400 text-blue-400'
                   : 'border-transparent text-gray-300 hover:text-white hover:border-gray-500'
