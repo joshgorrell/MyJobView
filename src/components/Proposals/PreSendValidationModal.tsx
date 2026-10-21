@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { loadProposalDocument } from '../../lib/proposalDocument';
 import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck, Eye } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
@@ -36,6 +37,7 @@ export function PreSendValidationModal({
   alreadySubmitted = false,
   onNavigateToSettings,
 }: PreSendValidationModalProps) {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<Array<{id:string;name:string;is_default:boolean}>>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -53,12 +55,12 @@ export function PreSendValidationModal({
   useEffect(() => {
     loadAndAutoConfirm();
     void loadTemplates();
-  }, [proposalId]);
+  }, [proposalId, profile?.id]);
 
   async function loadTemplates() {
     const [{data: proposal}, {data: available, error}] = await Promise.all([
       supabase.from('proposals').select('report_template_id').eq('id', proposalId).maybeSingle(),
-      supabase.from('proposal_report_templates').select('id,name,is_default').order('name'),
+      supabase.from('proposal_report_templates').select('id,name,is_default').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
     ]);
     if (error) { setSubmissionError('Unable to load proposal templates.'); return; }
     const choices = available || [];
