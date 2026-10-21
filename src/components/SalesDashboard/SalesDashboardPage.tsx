@@ -177,6 +177,8 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
               selectedRepId={selectedRepId}
               onSelectRep={setSelectedRepId}
               orgId={profile.organization_id}
+              currentUserId={profile.id}
+              currentUserIsSalesRep={profile.is_sales_rep === true}
             />
           )}
           <button
