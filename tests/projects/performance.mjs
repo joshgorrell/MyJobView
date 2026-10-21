@@ -1,0 +1,15 @@
+import {build} from 'esbuild';
+import assert from 'node:assert/strict';
+const output=await build({entryPoints:['src/lib/projectPerformance.ts'],bundle:true,format:'esm',write:false});
+const {projectPerformance,projectPolicy}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
+const p=(id,sold,used,extra={})=>({project_id:id,project_name:id,hours_sold:sold,hours_used:used,status:'completed',...extra});
+const policy=projectPolicy('b324e4e3-cd2e-4c68-8df8-3e27c7e08f15');
+let r=projectPerformance([p('a',100,80),p('b',100,100),p('c',100,110),p('d',100,111),p('e',0,0,{budget_used_override:90}),p('x',10,5,{status:'unknown'})],policy);
+assert.equal(r.completed,5);assert.equal(r.onTarget,3);assert.equal(r.within10,1);assert.equal(r.offTarget,1);assert.equal(r.assessed,5);assert.equal(r.used,401);assert.equal(r.sold,400);assert.equal(r.excludedRate,1);
+assert.ok(Math.abs(r.earned-400*122.7/401)<1e-8);
+r=projectPerformance([p('11463',100,120,{warranty_review:true})],policy);assert.equal(r.extra,28);assert.equal(r.rows[0].installation,92);assert.equal(r.rows[0].used,120);assert.equal(r.onTarget,1);assert.equal(r.warrantyCount,1);assert.equal(r.beforeWarranty,12270/92);
+r=projectPerformance([p('11463',100,90,{warranty_review:true})],policy);assert.equal(r.unassessed,1);assert.equal(r.warrantyCount,0);
+r=projectPerformance([p('11463',100,120,{warranty_review:true})],projectPolicy('other-dealer'));assert.equal(r.unassessed,1);assert.equal(r.earned,null);assert.equal(r.extra,0);
+r=projectPerformance([p('a',100,95),p('a',100,95)],policy);assert.equal(r.completed,1);assert.equal(r.duplicates,1);assert.equal(r.used,95);
+r=projectPerformance([p('a',100,null),p('b',null,10),p('c',100,-1)],policy);assert.equal(r.earned,null);assert.equal(r.assessed,0);
+console.log('PASS: completed-only parent totals, under/100/110/>110 boundaries, unknown targets, duplicate protection, rate weighting, warranty split and dealer isolation.');

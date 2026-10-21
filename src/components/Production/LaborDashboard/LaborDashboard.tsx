@@ -14,7 +14,6 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
 import {
   laborHistory,
-  laborProjectIsNative,
   laborRanking,
   laborSummary,
   periodDates,
@@ -237,13 +236,7 @@ export default function LaborDashboard() {
     totalPayroll = rows.some((r) => r.payroll !== null)
       ? rows.reduce((v, r) => v + (r.payroll ?? 0), 0)
       : null;
-  const projects = bundle?.project_snapshot?.payload.records ?? [];
-  const nativeProjectMode =
-    !!bundle && laborProjectIsNative(bundle, end, companyToday(timezone));
-  const projectRows = nativeProjectMode
-      ? (bundle?.native_projects ?? [])
-      : projects,
-    latestJob = bundle?.latest_job_day ?? "No import",
+  const latestJob = bundle?.latest_job_day ?? "No import",
     latestPayroll = bundle?.latest_payroll_day ?? "No import";
   if (profile?.role !== "admin")
     return (
@@ -584,70 +577,9 @@ export default function LaborDashboard() {
         </p>
       </div>
       <div className="bg-surface border border-subtle rounded-xl p-4">
-        <h2 className="text-lg font-semibold text-primary">
-          Project hours sold vs. used
-        </h2>
-        <p className="text-sm text-secondary mb-3">
-          {nativeProjectMode
-            ? "MJV approved project time and sales-order labor budgets"
-            : bundle?.project_snapshot
-              ? "iPoint snapshot as of " + bundle.project_snapshot.day
-              : "No verified project snapshot available"}{" "}
-          · Cumulative snapshots are not added together.
-        </p>
-        <div className="overflow-x-auto max-h-96">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                {[
-                  "Project",
-                  "Sold hours",
-                  "Used hours",
-                  "Remaining",
-                  "Budget used",
-                  "Status / bid assessment",
-                ].map((t) => (
-                  <th key={t} className="text-left p-2 text-secondary">
-                    {t}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {projectRows.map((p: any) => (
-                <tr key={p.project_id} className="border-t border-subtle">
-                  <td className="p-2 text-primary">{p.project_name}</td>
-                  <td className="p-2 text-primary">{f(p.hours_sold)}</td>
-                  <td className="p-2 text-primary">{f(p.hours_used)}</td>
-                  <td className="p-2 text-primary">
-                    {p.hours_used == null || p.hours_sold == null
-                      ? "—"
-                      : f(p.hours_sold - p.hours_used)}
-                  </td>
-                  <td className="p-2 text-primary">
-                    {p.hours_sold > 0 && p.hours_used != null
-                      ? f((p.hours_used / p.hours_sold) * 100) + "%"
-                      : "—"}
-                  </td>
-                  <td className="p-2 text-secondary">
-                    {p.status ?? "unknown"}
-                    {["completed", "complete"].includes(p.status) &&
-                      p.hours_sold > 0 &&
-                      p.hours_used != null && (
-                        <small className="block">
-                          {p.hours_used / p.hours_sold > 1.05
-                            ? "Potential underbid"
-                            : p.hours_used / p.hours_sold < 0.95
-                              ? "Potential overbid"
-                              : "Just right (±5%)"}
-                        </small>
-                      )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <h2 className="font-semibold text-primary">Project Stats</h2>
+        <p className="text-sm text-secondary mt-2">Quote accuracy, warranty impact and earned labor rate now live together in Projects.</p>
+        <a className="text-blue-600 underline inline-block mt-3" href="/projects?projectView=stats">Open Projects → Project Stats</a>
       </div>
       {selected && (
         <div
