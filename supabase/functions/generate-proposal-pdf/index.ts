@@ -1,3 +1,5 @@
+import { hasElectronicLifePromise, proposalPromiseStyles, renderProposalPromise } from '../_shared/proposalPromise.ts';
+import { applyProposalBrand, resolveProposalLogo } from '../_shared/proposalBrand.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
@@ -102,6 +104,7 @@ Deno.serve(async (req: Request) => {
       showContractPage: true,
       showDepositPage: true,
       classDisplayMode: 'none',
+      includePromisePage: true,
       ...templateOptions, // Apply template settings first
       ...displayOptions // Then apply any custom overrides
     };
@@ -241,7 +244,7 @@ Deno.serve(async (req: Request) => {
     const { data: org } = await supabaseClient
       .from('organizations')
       .select('*')
-      .limit(1)
+      .eq('id', proposal.organization_id)
       .maybeSingle();
 
     const companySettings = org ? {
@@ -249,7 +252,7 @@ Deno.serve(async (req: Request) => {
       company_email: org.primary_contact_email,
       company_phone: org.phone,
       company_address: org.address,
-      company_logo_url: org.logo_url
+      company_logo_url: org.header_logo_url || org.logo_url
     } : null;
 
     // Fetch sales rep profile
@@ -285,7 +288,7 @@ Deno.serve(async (req: Request) => {
       billingPhases
     );
 
-    return new Response(html, {
+    return new Response(applyProposalBrand(html, companySettings?.company_name || ''), {
       status: 200,
       headers: {
         ...corsHeaders,
@@ -721,7 +724,7 @@ function generateProposalHTML(
   const companyAddress = companySettings?.company_address || '';
   const companyPhone = companySettings?.company_phone || '';
   const companyEmail = companySettings?.company_email || '';
-  const companyLogoUrl = companySettings?.company_logo_url || '';
+  const companyLogoUrl = resolveProposalLogo(companyName, companySettings?.company_logo_url) || '';
 
   return `
     <!DOCTYPE html>
@@ -1189,6 +1192,7 @@ function generateProposalHTML(
       </div>
       ` : ''}
 
+      ${options.includePromisePage !== false && hasElectronicLifePromise(companyName) ? `<style>${proposalPromiseStyles}</style><div class="el-promise-print-page">${renderProposalPromise(companyName, companyLogoUrl)}</div>` : ''}
       <div class="container" style="padding: 32px;">
         <!-- Header -->
         <div class="header-section" style="display: flex; justify-content: space-between; align-items: flex-start;">

@@ -1,3 +1,4 @@
+import { ProposalPromise } from './ProposalPromise';
 import { formatCurrency } from '../../lib/utils';
 import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect } from 'react';
@@ -449,6 +450,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{greeting}, {firstName}!</h2>
           <p className="text-gray-500 text-sm mt-1">Here's an overview of your account.</p>
         </div>
+
+        <ProposalPromise companyName={tenant?.organizationName || ''} logoUrl={dealerLogo} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {securityPortalEnabled && <DashboardTile icon={<Shield className="w-5 h-5" />} title="Security agreements"
