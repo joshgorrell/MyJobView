@@ -124,6 +124,7 @@ interface Proposal {
   discount_amount: number;
   project_management_amount: number;
   current_portal_version?: number | null;
+  include_promise_page?: boolean | null;
 }
 
 interface ProposalRoom {
@@ -870,7 +871,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
         {!previewMode && !hideExpiration && <p className="mb-4 text-xs text-gray-500">Proposal visits, approximate active viewing time, and selected interactions are shared with your provider to help with follow-up.</p>}
-        <ProposalPromise companyName={promiseCompanyName} logoUrl={orgLogoUrl} />
+        {proposal.include_promise_page !== false && <ProposalPromise companyName={promiseCompanyName} logoUrl={orgLogoUrl} />}
         <div className="grid grid-cols-1 xl:grid-cols-3 items-start gap-6 xl:gap-8">
           {/* Main Content */}
           <div className="xl:col-span-2 min-w-0 space-y-6">
