@@ -542,6 +542,7 @@ export function ManualJobTimeRequestModal({
                       <label className="block text-sm">
                         Activity
                         <select
+                          aria-label="Activity"
                           value={activity}
                           onChange={(e) => {
                             setActivity(e.target.value);
