@@ -12,6 +12,8 @@ interface PreSendValidationModalProps {
   onSend: (approvalWindow: number, visibleInPortal: boolean) => Promise<void>;
   initialPortalVisibility?: boolean;
   onEmailProposal?: () => void;
+  /** Retained for compatibility with existing callers; local Print/PDF uses selected options. */
+  onPrintProposal?: () => void;
   onCopyLink?: () => void;
   copyingLink?: boolean;
   canCopyLink?: boolean;
