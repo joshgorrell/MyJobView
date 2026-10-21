@@ -16,16 +16,11 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- An explicit recurring billing linkage overrides any generic invoice type.
-  IF NULLIF(to_jsonb(NEW)->>'security_billing_cycle_id','') IS NOT NULL THEN
-    RETURN NEW;
-  END IF;
   v_source := lower(coalesce(to_jsonb(NEW)->>'source_type',''));
   v_invoice_type := lower(coalesce(to_jsonb(NEW)->>'invoice_type',''));
   -- Never treat project/deposit/progress/final billing as incremental sales.
   IF v_source IN ('progress','deposit','final','project','change_order')
-     OR v_invoice_type IN ('progress','deposit','final','project','change_order','recurring')
-     OR v_source IN ('recurring','subscription','security_monitoring') THEN
+     OR v_invoice_type IN ('progress','deposit','final','project','change_order') THEN
     RETURN NEW;
   END IF;
 
@@ -45,11 +40,16 @@ BEGIN
 
   IF NEW.work_order_billing_request_id IS NULL
      AND NOT EXISTS (SELECT 1 FROM public.work_order_invoice_links l WHERE l.invoice_id=NEW.id AND l.organization_id=v_org)
-     AND v_invoice_type <> 'retail' THEN RETURN NEW; END IF;
+     AND v_invoice_type NOT IN ('retail','recurring')
+     AND NULLIF(to_jsonb(NEW)->>'security_billing_cycle_id','') IS NULL THEN RETURN NEW; END IF;
 
   -- Service work-order linkage can be created before invoice submission.
   -- Unclassified standalone invoices are excluded; only explicit retail or service links qualify.
-  v_kind := CASE WHEN NEW.work_order_billing_request_id IS NOT NULL
+  v_kind := CASE WHEN v_invoice_type = 'recurring'
+                    OR NULLIF(to_jsonb(NEW)->>'security_billing_cycle_id','') IS NOT NULL
+                    OR v_source IN ('recurring','subscription','security_monitoring')
+                 THEN 'recurring_invoice'
+                 WHEN NEW.work_order_billing_request_id IS NOT NULL
                     OR EXISTS (SELECT 1 FROM public.work_order_invoice_links l
                                WHERE l.invoice_id=NEW.id AND l.organization_id=v_org)
                  THEN 'service_invoice'
