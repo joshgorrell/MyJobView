@@ -67,6 +67,7 @@
     "test:smart-intake": "node tests/smart-intake/receipt-contract.mjs && node tests/smart-intake/attachment-manifest.mjs && node tests/smart-intake/private-malware-scanner.mjs && node tests/smart-intake/scan-worker.mjs && node tests/smart-intake/attachment-retention.mjs && node tests/smart-intake/attachment-metadata-permissions.mjs && node tests/smart-intake/customer-matching-contract.mjs && node tests/smart-intake/manual-draft-contract.mjs && node tests/smart-intake/manual-service-transaction.mjs && node tests/smart-intake/routing-readiness-contract.mjs && node tests/smart-intake/service-routing-contract.mjs && node tests/smart-intake/service-routing-worker.mjs",
     "test:modals:feedback": "node tests/modals/dialog-runtime.mjs && node tests/modals/feedback-browser.mjs",
     "test:project-support:browser": "node tests/punchlist/project-support-browser.mjs",
+    "test:design-briefs": "node tests/design-briefs/database.mjs && node tests/design-briefs/runtime.mjs && node tests/design-briefs/edge.mjs",
     "test:loss-feedback": "node tests/reviews/loss-feedback.mjs && node tests/reviews/loss-reminders.mjs",
     "test:loss-feedback:browser": "npm run build && node tests/reviews/loss-feedback-browser.mjs"
   },
