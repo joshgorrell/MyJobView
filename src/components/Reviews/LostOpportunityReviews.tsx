@@ -51,7 +51,7 @@ interface Review {
   manual_resend_history?: {sent_at:string;sent_by:string}[];
 }
 export default function LostOpportunityReviews(
-  { showCreate: _showCreate = false }: { showCreate?: boolean },
+  { showCreate = false }: { showCreate?: boolean },
 ) {
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -75,8 +75,10 @@ export default function LostOpportunityReviews(
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const canSend = profile?.can_send_lost_opportunity_reviews ?? false;
-  const canView = profile?.can_view_lost_opportunity_submissions ?? false;
+  const isAdmin = ['admin', 'owner', 'super_admin'].includes(profile?.role || '');
+  const canSend = isAdmin || (profile?.can_send_lost_opportunity_reviews ?? false);
+  const canView = isAdmin || (profile?.can_view_lost_opportunity_submissions ?? false);
+  const [createOpen, setCreateOpen] = useState(showCreate);
   const org = profile?.organization_id;
   async function load() {
     if (!org) return;
@@ -386,8 +388,7 @@ export default function LostOpportunityReviews(
           </p>
         </div>
         <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-3">
-
-
+          {canSend && <button type="button" onClick={() => setCreateOpen(value => !value)} aria-expanded={createOpen} className="min-h-11 rounded-lg bg-violet-700 px-4 py-2 font-semibold text-white hover:bg-violet-600">{createOpen ? "Hide Feedback Form" : "Send Feedback Form"}</button>}
         </div>
       </div>
       <ReviewStatsRow stats={lostStats} />
@@ -401,7 +402,7 @@ export default function LostOpportunityReviews(
           {notice}
         </p>
       )}
-      {canSend && (
+      {canSend && createOpen && (
         <form
           onSubmit={send}
           className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4"
