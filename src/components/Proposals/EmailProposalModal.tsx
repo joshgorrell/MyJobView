@@ -89,6 +89,7 @@ export function EmailProposalModal({
   const [step, setStep] = useState<'idle' | 'loading_docs' | 'sending'>('idle');
   const [error, setError] = useState('');
   const [includePromisePage, setIncludePromisePage] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showAttachments, setShowAttachments] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -108,7 +109,14 @@ export function EmailProposalModal({
   useEffect(() => {
     loadDefaults();
     loadDocumentAvailability();
+    void loadSavedTemplate();
   }, []);
+
+  async function loadSavedTemplate() {
+    const {data, error} = await supabase.from('proposals').select('report_template_id').eq('id', proposalId).maybeSingle();
+    if (error) { setError('Unable to load saved proposal template.'); return; }
+    setSelectedTemplateId(data?.report_template_id || null);
+  }
 
   async function loadDefaults() {
     const { data: settings } = await supabase
@@ -190,7 +198,7 @@ export function EmailProposalModal({
 
       // Attach the actual document; generation failures stop the send.
       if (attachments.proposal) {
-        const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage);
+        const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage, selectedTemplateId);
         emailAttachments.push({ filename: document.filename, content: document.content });
         sentAttachmentsRecord.proposal = true;
       }
