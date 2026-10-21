@@ -184,16 +184,16 @@ for (const selector of ['input[type="text"]','select','textarea','input[type="ch
 }
 assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Staff creation fits mobile');
 for(const label of ['Company Name','Notes (Optional)','Email Override (Optional)','Account Type','Installation Date']) {
- assert.match(await staffPage.locator('label').filter({hasText:label}).first().innerText(),/Internal only/);
+ assert.equal(await staffPage.locator('label').filter({hasText:label}).first().locator('svg[role="img"][aria-label^="Internal only"]').count(),1);
 }
 for(const label of ['First Name','Agreement Term','Price Override (Optional)']) {
- assert.match(await staffPage.locator('label').filter({hasText:label}).first().innerText(),/Customer-visible/);
+ assert.equal(await staffPage.locator('label').filter({hasText:label}).first().locator('svg[role="img"][aria-label^="Customer-visible"]').count(),1);
 }
 assert.ok((await staffPage.locator('body').innerText()).includes('Service names: Customer-visible. Individual prices and catalog descriptions: Internal only.'));
 await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?edit');
 await staffPage.getByRole('heading',{name:'Edit Security Contract',exact:true}).waitFor();
-assert.match(await staffPage.locator('label').filter({hasText:'Monthly Price Override'}).innerText(),/Customer-visible/);
-assert.match(await staffPage.locator('label').filter({hasText:'Internal Notes'}).innerText(),/Internal only/);
+assert.equal(await staffPage.locator('label').filter({hasText:'Monthly Price Override'}).locator('svg[role="img"][aria-label^="Customer-visible"]').count(),1);
+assert.equal(await staffPage.locator('label').filter({hasText:'Internal Notes'}).locator('svg[role="img"][aria-label^="Internal only"]').count(),1);
 assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Staff edit visibility labels fit mobile');
 
 // Creation immediately offers sending; declining keeps the pending agreement.
