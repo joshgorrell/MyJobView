@@ -439,7 +439,7 @@ Deno.serve(async (req) => {
       }, Deno.env.get("SUPABASE_URL")!));
     }
     if (["create", "preview"].includes(b.action)) {
-      if (!profile.can_send_lost_opportunity_reviews) {
+      if (!["admin", "owner", "super_admin"].includes(profile.role) && !profile.can_send_lost_opportunity_reviews) {
         return json({
           error: "Sending Lost Opportunity reviews is not permitted.",
         }, 403);
@@ -585,7 +585,7 @@ Deno.serve(async (req) => {
       ).eq("organization_id", org).single(),
     );
     if (b.action === "resend") {
-      if (!profile.can_send_lost_opportunity_reviews)
+      if (!["admin", "owner", "super_admin"].includes(profile.role) && !profile.can_send_lost_opportunity_reviews)
         return json(
           { error: "Sending Lost Opportunity reviews is not permitted." },
           403,
@@ -734,7 +734,7 @@ Deno.serve(async (req) => {
     }
     if (b.action === "record_feedback") {
       if (
-        !profile.can_view_lost_opportunity_submissions ||
+        !(["admin", "owner", "super_admin"].includes(profile.role) || profile.can_view_lost_opportunity_submissions) ||
         !(
           profile.can_send_lost_opportunity_reviews ||
           ["admin", "owner", "super_admin"].includes(profile.role)
