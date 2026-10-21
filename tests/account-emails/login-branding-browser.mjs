@@ -39,7 +39,7 @@ try {
         }
         return route.fulfill({ contentType: 'application/json', headers, body: JSON.stringify(scenario === 'unknown' || url.pathname.endsWith('/subdomain_changes') ? null : { id: 'dealer-id', name: 'Electronic Life', subdomain: 'elife', logo_url: scenario === 'missing-logo' ? null : '/dealer.png' }) });
       }
-      if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].contents });
+      if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].text });
       if (url.pathname === '/style.css') return route.fulfill({ contentType: 'text/css', body: css });
       if (url.pathname === '/MJV_icon.PNG') return route.fulfill({ contentType: 'image/png', body: mjv });
       if (url.pathname === '/dealer.png') return scenario === 'broken-logo' ? route.fulfill({ status: 404, body: '' }) : route.fulfill({ contentType: 'image/png', body: logo });
