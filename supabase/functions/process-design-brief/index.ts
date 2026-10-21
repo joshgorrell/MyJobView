@@ -1,3 +1,4 @@
+import { validatePrefill } from "./validation.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -35,10 +36,11 @@ interface ProposalPrefill {
 
 interface RequestBody {
   briefId: string;
-  notes: string;
+  notes?: string;
   contactId?: string;
   contactName?: string;
   regenerate?: boolean;
+  action?: 'preview' | 'submit';
 }
 
 Deno.serve(async (req: Request) => {
@@ -74,10 +76,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { briefId, notes, contactId, contactName }: RequestBody = await req.json();
+    const { briefId, contactName, action }: RequestBody = await req.json();
 
-    if (!briefId || !notes) {
-      return new Response(JSON.stringify({ error: "briefId and notes are required" }), {
+    if (!briefId || (action && !['preview', 'submit'].includes(action))) {
+      return new Response(JSON.stringify({ error: "A valid briefId and action are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -86,7 +88,7 @@ Deno.serve(async (req: Request) => {
     // Verify access through the caller's RLS policies before using the service-role client.
     const { data: permittedBrief, error: accessError } = await supabaseUser
       .from("design_briefs")
-      .select("id, organization_id, contact_id, raw_notes")
+      .select("id, organization_id, contact_id, raw_notes, status, linked_proposal_id, updated_at")
       .eq("id", briefId)
       .maybeSingle();
     if (accessError || !permittedBrief) {
@@ -96,6 +98,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (permittedBrief.linked_proposal_id || permittedBrief.status === 'archived') {
+      throw new Error('This brief is view only. Continue changes in Design Queue.');
+    }
+    if (action === 'submit') {
+      const { data, error } = await supabaseUser.rpc('design_brief_submit', { p_brief: briefId });
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true, briefId: data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!permittedBrief.raw_notes?.trim()) throw new Error('Project notes are required.');
     const { data: settingsData } = await supabase
       .from("company_settings")
       .select("openai_api_key")
@@ -109,19 +122,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    await supabase
-      .from("design_briefs")
-      .update({ status: "building" })
-      .eq("id", briefId);
-
     // Fetch active product catalog
-    const { data: products } = await supabase
+    const { data: products, error: catalogError } = await supabase
       .from("products")
       .select("name, item_type, unit, our_price, cost, default_qty")
       .eq("organization_id", permittedBrief.organization_id)
       .eq("is_active", true)
       .order("name");
 
+    if (catalogError) throw new Error('Product catalog could not load. Please retry.');
     let productCatalogSection = "";
     if (products && products.length > 0) {
       const lines = products
@@ -183,7 +192,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Use the saved brief rather than client-provided text as the AI source of truth.
-    const savedNotes = permittedBrief.raw_notes || notes;
+    const savedNotes = permittedBrief.raw_notes;
     const systemPrompt = `You are an expert AV/smart home proposal builder for a high-end installation company.
 Your job is to parse a sales rep's field notes about a customer's project and produce a structured JSON proposal prefill.
 
@@ -248,24 +257,22 @@ PARSING RULES:
             content: `Parse these field notes and produce the ProposalPrefill JSON:\n\n${savedNotes}${contactName ? `\n\nCustomer name: ${contactName}` : ""}`,
           },
         ],
+        response_format: { type: "json_object" },
         max_tokens: 4000,
         temperature: 0.2,
       }),
     });
 
     if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      await supabase
-        .from("design_briefs")
-        .update({ status: "submitted" })
-        .eq("id", briefId);
-      return new Response(JSON.stringify({ error: `OpenAI error: ${errText}` }), {
+      console.error("Design brief AI request failed", openaiRes.status);
+      return new Response(JSON.stringify({ error: 'AI preview failed. Your notes are saved; please retry.' }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const openaiData = await openaiRes.json();
+    if (openaiData.choices?.[0]?.finish_reason !== 'stop') throw new Error('AI preview was incomplete. Your notes are saved; try a shorter session.');
     let rawContent = openaiData.choices?.[0]?.message?.content ?? "{}";
 
     rawContent = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -274,55 +281,21 @@ PARSING RULES:
     try {
       prefill = JSON.parse(rawContent);
     } catch {
-      await supabase
-        .from("design_briefs")
-        .update({ status: "submitted" })
-        .eq("id", briefId);
       return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    await supabase
-      .from("design_briefs")
+    validatePrefill(prefill);
+    // Compare the saved version so a slow preview cannot overwrite newer notes,
+    // catalog selections, archival or a proposal created in another session.
+    const { data: saved, error: saveError } = await supabaseUser.from('design_briefs')
       .update({ ai_summary: prefill })
-      .eq("id", briefId);
-
-    // Analysis only: a proposal is never created as a side effect of AI preview.
-    // The designer can review this prefill and convert it through Design Queue.
-    const { error: submittedError } = await supabase
-      .from("design_briefs")
-      .update({ status: "submitted" })
-      .eq("id", briefId);
-    if (submittedError) throw submittedError;
-
-    const { data: repProfile } = await supabase
-      .from("profiles")
-      .select("full_name, email")
-      .eq("organization_id", permittedBrief.organization_id)
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const { data: admins } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("organization_id", permittedBrief.organization_id)
-      .in("role", ["admin", "manager"]);
-
-    if (admins && admins.length > 0) {
-      const repName = repProfile?.full_name || repProfile?.email || "A sales rep";
-      const customerLabel = contactName || prefill.contactSearchName || "a customer";
-      const notifications = admins.map((admin) => ({
-        user_id: admin.id,
-        type: "task_assigned",
-        title: "New Design Brief",
-        message: `${repName} submitted a design brief for ${customerLabel}. Review and build the proposal.`,
-        related_id: briefId,
-        read: false,
-      }));
-      await supabase.from("notifications").insert(notifications);
-    }
+      .eq('id', briefId).eq('updated_at', permittedBrief.updated_at)
+      .is('linked_proposal_id', null).neq('status', 'archived')
+      .select('id').single();
+    if (saveError || !saved) throw new Error('Brief changed while processing. Reopen it and regenerate the preview.');
 
     return new Response(
       JSON.stringify({ success: true, prefill, proposalId: null }),
