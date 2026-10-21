@@ -37,7 +37,7 @@ export function PreSendValidationModal({
 }: PreSendValidationModalProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [templates, setTemplates] = useState<Array<{id:string;name:string;is_default:boolean}>>([]);
+  const [templates, setTemplates] = useState<Array<{id:string;name:string;is_default:boolean;is_personal:boolean;created_by:string}>>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [includePromisePage, setIncludePromisePage] = useState(true);
   const [previewing, setPreviewing] = useState(false);
@@ -58,11 +58,10 @@ export function PreSendValidationModal({
   async function loadTemplates() {
     const [{data: proposal}, {data: available, error}] = await Promise.all([
       supabase.from('proposals').select('report_template_id').eq('id', proposalId).maybeSingle(),
-      supabase.from('proposal_report_templates').select('id,name,is_default').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
+      supabase.from('proposal_report_templates').select('id,name,is_default,is_personal,created_by').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
     ]);
     if (error) { setSubmissionError('Unable to load proposal templates.'); return; }
-    const {data: authData} = await supabase.auth.getUser();
-    const choices = (available || []).filter(t => !t.is_personal || t.created_by === authData.user?.id);
+    const choices = available || [];
     setTemplates(choices);
     setSelectedTemplateId(choices.find(t => t.id === proposal?.report_template_id)?.id || choices.find(t => t.is_default)?.id || choices[0]?.id || '');
   }
