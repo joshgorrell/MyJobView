@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'src/components/Production/LaborDashboard/**'
+      - 'src/components/Production/TechStats.tsx'
       - 'src/lib/laborDashboard.ts'
       - 'src/components/Admin/*CSVImport.tsx'
       - 'supabase/functions/labor-dashboard-ingest/**'

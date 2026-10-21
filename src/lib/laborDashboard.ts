@@ -286,3 +286,34 @@ export function laborProjectIsNative(
   const cutoff = b.sources.find((s) => s.source === "ipoint")?.native_from;
   return !!cutoff && (periodEnd < today ? periodEnd : today) >= cutoff;
 }
+
+export function laborTiming(b:LaborBundle,id:string,start:string,end:string,asOf:string,assumedSchedule=false){
+ const mapping=(source:string)=>b.mappings.find(m=>m.source===source&&m.profile_id===id)?.external_employee_id;
+ const cutoff=(source:string)=>b.sources.find(s=>s.source===source)?.native_from;
+ const person=b.roster.find(p=>p.id===id);
+ const jobPairs:number[][]=[],payPairs:number[][]=[];
+ const minute=(value:unknown)=>typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value)?Number(value.slice(0,2))*60+Number(value.slice(3)):null;
+ const local=(value:unknown,day:string)=>{
+  if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))return null;
+  const date=new Date(value),zone=b.timezone||'America/Chicago';
+  if(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(date)!==day)return null;
+  return minute(new Intl.DateTimeFormat('en-GB',{timeZone:zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date));
+ };
+ for(const snapshot of b.snapshots){
+  const day=snapshot.day;if(day<start||day>end||day>asOf||(person?.hire_date&&day<person.hire_date))continue;
+  if(snapshot.kind==='technician'&&!(cutoff('ipoint')&&day>=cutoff('ipoint')!)){
+   const r=snapshot.payload.records.find(r=>r.technician===mapping('ipoint'));
+   if(!r?.job_timing_complete||r.review_flags?.length)continue;
+   const first=minute(r.first_job_in),last=minute(r.last_job_out);if(first!==null&&last!==null&&last>=first)jobPairs.push([first,last]);
+  }
+  if(snapshot.kind==='payroll'&&!(cutoff('quickbooks_time')&&day>=cutoff('quickbooks_time')!)){
+   const r=snapshot.payload.records.find(r=>String(r.user_id)===mapping('quickbooks_time'));
+   if(!r?.clock_timing_complete||r.flags?.length)continue;
+   const first=local(r.first_clock_in,day),last=local(r.last_clock_out,day);if(first!==null&&last!==null&&last>=first)payPairs.push([first,last]);
+  }
+ }
+ const history=laborHistory(b,id,start,end,asOf);
+ const assumed=assumedSchedule&&b.roster.some(p=>p.id===id&&['Jesse Roth','Luis Tetuan'].includes(p.name))&&history.some(r=>r.assumed);
+ const avg=(pairs:number[][],i:number)=>pairs.length?pairs.reduce((n,p)=>n+p[i],0)/pairs.length:null;
+ return{clockIn:assumed?480:avg(payPairs,0),clockOut:assumed?1020:avg(payPairs,1),jobIn:avg(jobPairs,0),jobOut:avg(jobPairs,1),clockDays:payPairs.length,jobDays:jobPairs.length,assumed};
+}

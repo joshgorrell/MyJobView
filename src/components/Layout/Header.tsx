@@ -1,5 +1,5 @@
 import { DailyLaunchpad, DailyLaunchpadButton } from './DailyLaunchpad';
-import { Plus, Menu, X, ChevronDown, UserPlus, MessageSquare, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
+import { Plus, Menu, X, ChevronDown, UserPlus, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { useState, useEffect, useRef } from 'react';
@@ -32,7 +32,7 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateFlowUpdate, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments: _mainDepartments, footerDepartments: _footerDepartments, getUserModules: _getUserModules, starredModules, loading: deptLoading } = useDepartments();

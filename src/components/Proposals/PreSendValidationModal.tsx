@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadProposalDocument, downloadProposalDocument } from '../../lib/proposalDocument';
-import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck, Eye } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, ChevronRight, Loader2, Wrench, Copy, Mail, Printer, ShieldCheck, Eye } from 'lucide-react';
 import { checkProposalReadiness, markAllSectionsReviewed, type ValidationSection } from '../../lib/proposalValidation';
 
 interface PreSendValidationModalProps {

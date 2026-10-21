@@ -9,7 +9,7 @@ import ConfirmModal from '../ui/ConfirmModal';
 export function MyCardView() {
   const { user, profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [companySettings, setCompanySettings] = useState<Pick<CompanySettings, 'company_name' | 'company_logo_url' | 'website'> | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
