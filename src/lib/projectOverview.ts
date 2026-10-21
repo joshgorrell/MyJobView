@@ -1,9 +1,10 @@
 import { supabase } from './supabase';
 import { getOrganizationTimezone } from './timezoneUtils';
+import { splitQuotedLabor } from './pmAllocation';
 export type ProjectRecord = Record<string, any>;
 export interface ProjectSummary {
   project: ProjectRecord; today: string; customer: string; pm: string; office: string;
-  soldHours: number; goalHours: number | null; fieldHours: number; excludedHours: number;
+  soldHours: number; goalHours: number | null; pmPercentage: number; pmAllocationHours: number; fieldHours: number; excludedHours: number;
   pendingHours: number; lastWorked: string | null; activeTimers: number;
   percentage: number | null; remainingHours: number | null; budgetWarning: string | null;
   tasks: ProjectRecord[]; openTasks: ProjectRecord[]; blockedTasks: number;
@@ -59,8 +60,10 @@ export function summarizeProjects(data: Record<string, ProjectRecord[]>, today =
     if (!baseItems.length && number(order?.total_estimated_labor_hours) > 0) {
       soldHours = number(order.total_estimated_labor_hours); budgetPhases.clear(); addBudget(null, soldHours);
     }
+    const pmPercentage = order?.pm_allocation_percentage == null ? 5 : number(order.pm_allocation_percentage);
+    const allocation = splitQuotedLabor(soldHours,pmPercentage);
     const savedGoal = !baseItems.length ? number(order?.field_labor_target_hours) : 0;
-    const goalHours = budgetWarning ? null : savedGoal > 0 ? savedGoal : soldHours > 0 ? soldHours * .95 : null;
+    const goalHours = budgetWarning ? null : savedGoal > 0 ? savedGoal : soldHours > 0 ? allocation.fieldHours : null;
     const actualPhases = new Map<string, number>();
     let fieldHours = 0, excludedHours = 0, pendingHours = 0, lastWorked: string | null = null, activeTimers = 0;
     times.forEach(entry => {
@@ -82,8 +85,8 @@ export function summarizeProjects(data: Record<string, ProjectRecord[]>, today =
     const openTasks = tasks.filter(task => !['completed', 'cancelled'].includes(task.status));
     const openWorkOrders = workOrders.filter(wo => wo.project_id === project.id && !wo.is_archived && !['completed', 'complete', 'cancelled', 'canceled'].includes(wo.behavior || wo.status));
     const nextVisit = openWorkOrders.filter(wo => wo.scheduled_date >= today && wo.scheduled_start_time && wo.assigned_to).sort((a, b) => `${a.scheduled_date} ${a.scheduled_start_time}`.localeCompare(`${b.scheduled_date} ${b.scheduled_start_time}`))[0] || null;
-    const phases = [...new Set([...budgetPhases.keys(), ...actualPhases.keys()])].map(id => ({ id: id === 'unassigned' ? null : id, name: phaseMap.get(id)?.name || 'Unassigned', sold_hours: budgetPhases.get(id) || 0, goal_hours: (budgetPhases.get(id) || 0) * .95, actual_hours: actualPhases.get(id) || 0, excluded: excluded.has(id) }));
-    return {project, today, customer: project.contact?.company_name || project.contact?.full_name || project.contact?.contact_name || 'Unknown customer', pm: person(project.assigned_pm), office: (data.offices || []).find(row => row.id === project.office_id)?.name || 'Unassigned', soldHours, goalHours, fieldHours, excludedHours, pendingHours, lastWorked, activeTimers, percentage: goalHours ? fieldHours / goalHours * 100 : null, remainingHours: goalHours ? goalHours - fieldHours : null, budgetWarning, tasks, openTasks, blockedTasks: openTasks.filter(task => task.progress_status === 'blocked').length, workOrders: openWorkOrders, nextVisit, phases};
+    const phases = [...new Set([...budgetPhases.keys(), ...actualPhases.keys()])].map(id => ({ id: id === 'unassigned' ? null : id, name: phaseMap.get(id)?.name || 'Unassigned', sold_hours: budgetPhases.get(id) || 0, goal_hours: splitQuotedLabor(Math.max(0,budgetPhases.get(id) || 0),pmPercentage).fieldHours, actual_hours: actualPhases.get(id) || 0, excluded: excluded.has(id) }));
+    return {project, today, customer: project.contact?.company_name || project.contact?.full_name || project.contact?.contact_name || 'Unknown customer', pm: person(project.assigned_pm), office: (data.offices || []).find(row => row.id === project.office_id)?.name || 'Unassigned', soldHours, goalHours, pmPercentage, pmAllocationHours:allocation.pmHours, fieldHours, excludedHours, pendingHours, lastWorked, activeTimers, percentage: goalHours ? fieldHours / goalHours * 100 : null, remainingHours: goalHours ? goalHours - fieldHours : null, budgetWarning, tasks, openTasks, blockedTasks: openTasks.filter(task => task.progress_status === 'blocked').length, workOrders: openWorkOrders, nextVisit, phases};
   });
 }
 async function readAll(query: () => any, orderColumn = 'id'): Promise<ProjectRecord[]> {
@@ -96,7 +99,7 @@ async function related(table: string, field: string, ids: string[], organization
   return rows;
 }
 export async function loadProjectSummaries(organizationId: string, projectIds?: string[]): Promise<ProjectSummary[]> {
-  const projects = await readAll(() => { let query = supabase.from('projects').select('*, contact:contacts(full_name,contact_name,company_name), sales_order:sales_orders!projects_sales_order_id_fkey(id,proposal_id,total_estimated_labor_hours,field_labor_target_hours)').eq('organization_id',organizationId); return projectIds ? query.in('id',projectIds) : query; });
+  const projects = await readAll(() => { let query = supabase.from('projects').select('*, contact:contacts(full_name,contact_name,company_name), sales_order:sales_orders!projects_sales_order_id_fkey(id,proposal_id,total_estimated_labor_hours,field_labor_target_hours,pm_allocation_percentage)').eq('organization_id',organizationId); return projectIds ? query.in('id',projectIds) : query; });
   if(!projects.length) return [];
   const timezone = await getOrganizationTimezone(organizationId);
   const today = new Intl.DateTimeFormat('en-CA', {timeZone: timezone, year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

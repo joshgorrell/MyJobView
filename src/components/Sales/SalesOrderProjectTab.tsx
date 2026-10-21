@@ -90,12 +90,13 @@ interface SalesOrderProjectTabProps {
   onRefresh: () => void;
 }
 
-const GOAL_PCT = 0.95;
 
 
 export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabProps) {
   const {profile} = useAuth();
   const [summary,setSummary] = useState<ProjectSummary|null>(null);
+  const pmPercentage=summary?.pmPercentage??5;
+  const fieldShare=1-pmPercentage/100;
   const [summaryError,setSummaryError] = useState('');
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [laborBreakdown, setLaborBreakdown] = useState<LaborPhaseBreakdown[]>([]);
@@ -310,7 +311,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     const breakdown: LaborPhaseBreakdown[] = Array.from(allPhaseIds).map(phaseId => {
       const sold = soldByPhase[phaseId] || 0;
       const actual = actualByPhase[phaseId]?.hours || 0;
-      const goal = sold * GOAL_PCT;
+      const goal = sold * fieldShare;
       const row: LaborPhaseBreakdown = {
         phase_id: phaseId === 'unassigned' ? null : phaseId,
         phase_name: actualByPhase[phaseId]?.name !== 'Unassigned' && actualByPhase[phaseId]?.name
@@ -650,7 +651,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor Hours</h3>
             <div className="flex items-center gap-1 text-xs text-gray-600 bg-gray-800 border border-gray-700 rounded px-2 py-0.5">
               <Target className="w-3 h-3" />
-              Goal = 95% of sold
+              Field goal = {100-pmPercentage}% of sold
             </div>
           </div>
           <button
@@ -671,7 +672,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             icon={FileText}
           />
           <HourStat
-            label="Goal (95%)"
+            label={`Goal (${100-pmPercentage}%)`}
             value={goalHours > 0 ? `${goalHours.toFixed(1)}h` : '—'}
             sub="Target on-site hours"
             color="teal"
@@ -766,7 +767,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
                         <span className="text-gray-400 tabular-nums">{row.sold_hours.toFixed(1)}h</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Goal (95%)</span>
+                        <span className="text-gray-500">Goal ({100-pmPercentage}%)</span>
                         <span className="text-teal-400 tabular-nums font-medium">{row.goal_hours.toFixed(1)}h</span>
                       </div>
                       <div className="flex justify-between">
@@ -826,7 +827,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
                   <tr className="border-b border-gray-700/60">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phase</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sold</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-teal-600 uppercase tracking-wider">Goal (95%)</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-teal-600 uppercase tracking-wider">Goal ({100-pmPercentage}%)</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actual</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Remaining</th>
                   </tr>
@@ -942,7 +943,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
           </div>
           <p className="text-xs text-gray-600 mt-2 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
-            Goal = 95% of sold hours. The remaining 5% is reserved for "Project Management" phase time.
+            Field goal = {100-pmPercentage}% of sold hours. The remaining {pmPercentage}% is reserved for Project Management phase time within the same quoted total.
           </p>
         </div>
       )}
@@ -978,7 +979,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         ) : (
           <div className="space-y-2">
             {visibleWOs.map(wo => (
-              <WorkOrderCard key={wo.id} wo={wo} soldHours={soldLaborHours} onClick={() => setSelectedWorkOrderId(wo.id)} />
+              <WorkOrderCard key={wo.id} wo={wo} soldHours={soldLaborHours} fieldShare={fieldShare} onClick={() => setSelectedWorkOrderId(wo.id)} />
             ))}
             {workOrders.length > 5 && (
               <button
@@ -1522,7 +1523,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   );
 }
 
-function WorkOrderCard({ wo, soldHours: _soldHours, onClick }: { wo: WorkOrder; soldHours: number; onClick?: () => void }) {
+function WorkOrderCard({ wo, soldHours: _soldHours, fieldShare, onClick }: { wo: WorkOrder; soldHours: number; fieldShare:number; onClick?: () => void }) {
   const statusStyles: Record<string, string> = {
     completed: 'bg-green-500/20 text-green-400 border border-green-500/30',
     in_progress: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
@@ -1540,7 +1541,7 @@ function WorkOrderCard({ wo, soldHours: _soldHours, onClick }: { wo: WorkOrder; 
 
   const actualH = wo.actual_hours || 0;
   const estH = wo.estimated_hours || 0;
-  const goalH = estH * GOAL_PCT;
+  const goalH = estH * fieldShare;
   const overGoal = actualH > goalH && goalH > 0;
   const overEst = actualH > estH && estH > 0;
 
@@ -1680,7 +1681,7 @@ function HoursProgressBar({ soldHours, goalHours, actualHours }: { soldHours: nu
         <span>0h</span>
         <span className="flex items-center gap-1 text-teal-600">
           <Target className="w-3 h-3" />
-          {goalHours.toFixed(1)}h goal (95%)
+          {goalHours.toFixed(1)}h field goal
         </span>
         <span className="flex items-center gap-1">
           <Flag className="w-3 h-3" />
