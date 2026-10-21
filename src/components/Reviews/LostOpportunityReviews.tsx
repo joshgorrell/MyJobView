@@ -266,7 +266,7 @@ export default function LostOpportunityReviews(
           action: "preview",
           contact_id: contact?.id,
           proposal_id: proposal || null,
-          opportunity_name: name || title,
+          opportunity_name: name,
           title,
           sender_variant: senderVariant,
         }),
@@ -284,7 +284,7 @@ export default function LostOpportunityReviews(
         action: "create",
         contact_id: contact?.id,
         proposal_id: proposal || null,
-        opportunity_name: name || title,
+        opportunity_name: name,
         title,
         sender_variant: senderVariant,
       })
@@ -295,6 +295,8 @@ export default function LostOpportunityReviews(
       setName("");
       setTitle("");
       setTitleEdited(false);
+      setProposal("");
+      setPreview(null);
       setNotice("Lost Opportunity review request sent.");
     }
   }
@@ -469,6 +471,7 @@ export default function LostOpportunityReviews(
               ))}
             </select>
           </label>
+          {!proposal && <label className="block text-gray-200">Opportunity Name (required for manual entry)<input required maxLength={200} value={name} onChange={(e) => opportunity(e.target.value)} placeholder="e.g. Home Theater Installation" className={input} /></label>}
           <fieldset className="space-y-2"><legend className="text-gray-200 font-medium">Send email from</legend><div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <label key={variant} className={`cursor-pointer rounded-xl border p-4 ${senderVariant === variant ? "border-cyan-400 bg-cyan-950/40" : "border-gray-600"}`}><input type="radio" name="lost-opportunity-sender" className="mr-2" checked={senderVariant === variant} onChange={() => { setSenderVariant(variant); setPreview(null); }} /><span className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</span><p className="mt-1 text-sm text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from Josh Gorrell with his signature and reply-to address."}</p></label>)}</div></fieldset>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
@@ -488,7 +491,7 @@ export default function LostOpportunityReviews(
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
-              !title.trim()}
+              !title.trim() || !name.trim()}
             onClick={previewEmail}
             className="w-full sm:w-auto rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
           >
