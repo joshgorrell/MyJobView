@@ -12,7 +12,8 @@ BEGIN
     NEW.originating_sales_rep_id := OLD.originating_sales_rep_id;
     RETURN NEW;
   END IF;
-  v_org := NEW.organization_id;
+  SELECT organization_id INTO v_org FROM public.contacts WHERE id=NEW.contact_id;
+  IF v_org IS NULL THEN RETURN NEW; END IF;
   SELECT c.assigned_to INTO v_owner FROM public.contacts c
    WHERE c.id=NEW.contact_id AND c.organization_id=v_org;
   IF v_owner IS NOT NULL AND EXISTS (
