@@ -283,6 +283,11 @@ const after=(await db.query(`SELECT count(*)::int n FROM manual_job_time_request
 assert.equal(after-before,2);
 await db.query(`SELECT stop_customer_job_time('${id(263)}')`);
 assert.equal((await db.query(`SELECT count(*)::int n FROM manual_job_time_requests WHERE technician_id='${id(14)}'`)).rows[0].n,after);
+await as(12);
+await db.exec(`RESET ROLE;INSERT INTO profiles(id,organization_id,role,employment_type) VALUES('${id(15)}','${id(1)}','portal_user','salary_no_clock');SET ROLE authenticated;`);
+await as(15);
+await assert.rejects(() => start(270), /Active employee/);
+await assert.rejects(() => db.exec(`INSERT INTO manual_job_time_requests(technician_id,contact_id,activity_type,entry_date,clock_in,clock_out,reason) VALUES('${id(15)}','${id(70)}','meeting','2026-10-01','2026-10-01T13:00Z','2026-10-01T14:00Z','Portal time is not employee time')`), /different organization/);
 await as(null);
 await assert.rejects(() => start(204), /Authentication required/);
 await db.exec("RESET ROLE;SET ROLE anon;");

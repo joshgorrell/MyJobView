@@ -20,6 +20,7 @@ CREATE OR REPLACE FUNCTION time_private.classify_customer_time()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE target_contact uuid; target_project uuid; target_kind text; target_org uuid;
 BEGIN
+  IF NEW.entry_type='customer_activity' AND EXISTS(SELECT 1 FROM profiles WHERE id=NEW.technician_id AND role IN ('portal_user','customer')) THEN RAISE EXCEPTION 'Employee time is unavailable for portal accounts'; END IF;
   IF NEW.entry_type='customer_activity' AND (NEW.work_order_id IS NOT NULL OR NEW.project_id IS NOT NULL) THEN RAISE EXCEPTION 'Customer activity cannot be linked as project or service work'; END IF;
   IF NEW.work_order_id IS NOT NULL THEN
     SELECT coalesce(w.contact_id,p.contact_id),w.project_id,w.type,w.organization_id
@@ -55,8 +56,8 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp
 DECLARE v_tz text; target_contact uuid; target_org uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
-  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND organization_id=NEW.organization_id AND is_active IS DISTINCT FROM false)
-    OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=NEW.technician_id AND organization_id=NEW.organization_id AND is_active IS DISTINCT FROM false)
+  IF NOT EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND organization_id=NEW.organization_id AND is_active IS DISTINCT FROM false AND role NOT IN ('portal_user','customer'))
+    OR NOT EXISTS(SELECT 1 FROM profiles WHERE id=NEW.technician_id AND organization_id=NEW.organization_id AND is_active IS DISTINCT FROM false AND role NOT IN ('portal_user','customer'))
     OR (NEW.labor_phase_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM labor_phases WHERE id=NEW.labor_phase_id AND organization_id=NEW.organization_id)) THEN RAISE EXCEPTION 'Time request references a different organization'; END IF;
   IF NEW.work_order_id IS NOT NULL THEN
     SELECT coalesce(w.contact_id,p.contact_id),w.organization_id INTO target_contact,target_org FROM work_orders w LEFT JOIN projects p ON p.id=w.project_id WHERE w.id=NEW.work_order_id;
