@@ -7,6 +7,7 @@ import { AnnualGoalHero } from './AnnualGoalHero';
 import { SalesKpiGrid } from './SalesKpiGrid';
 import { SalesTrendChart } from './SalesTrendChart';
 import { SalesGoalLeaderboard } from './SalesGoalLeaderboard';
+import { MonthlySalesCompetition } from './MonthlySalesCompetition';
 import { SalesAttentionList } from './SalesAttentionList';
 import { ManagerRepSelector } from './ManagerRepSelector';
 import { DashboardSkeleton } from './DashboardSkeleton';
@@ -235,6 +236,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          <MonthlySalesCompetition />
           <AnnualGoalHero data={data} teamRank={data.teamRank ?? null} />
           <SalesKpiGrid data={data} />
           {data.periodStats && <PeriodStatsRow stats={data.periodStats} />}
