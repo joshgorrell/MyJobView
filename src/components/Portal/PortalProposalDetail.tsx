@@ -148,7 +148,7 @@ interface LineItem {
   is_hidden: boolean;
   parent_item_id: string | null;
   product_id: string | null;
-  products: { image_url: string | null; item_color?: string | null; sku?: string | null } | null;
+  products: { image_url: string | null; item_color?: string | null; sku?: string | null; manufacturer_model_number?: string | null } | null;
 }
 
 interface ReportTemplate {
@@ -330,7 +330,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .order('sort_order'),
         supabase
           .from('proposal_line_items')
-          .select('*, products(image_url,item_color,sku)')
+          .select('*, products(image_url,item_color,sku,manufacturer_model_number)')
           .eq('proposal_id', proposalId)
           .order('sort_order'),
       ]);
@@ -1024,7 +1024,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                               <td className="py-4">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  {(template?.show_sku || template?.show_model_number) && item.products?.sku && <p className="mt-1 text-xs text-gray-500">{template?.show_model_number ? 'Model' : 'SKU'}: {item.products.sku}</p>}
+                                  {template?.show_model_number && item.products?.manufacturer_model_number && <p className="mt-1 text-xs text-gray-500">Model: {item.products.manufacturer_model_number}</p>}
+                                  {template?.show_sku && item.products?.sku && <p className="mt-1 text-xs text-gray-500">SKU: {item.products.sku}</p>}
                                 </div>
                                 {template?.show_item_color && item.products?.item_color && <p className="mt-1 text-xs text-gray-500">Color: {item.products.item_color}</p>}
                               </td>
