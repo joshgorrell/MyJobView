@@ -18,6 +18,7 @@ export default defineConfig({
             "/lib/feedback",
             "/lib/gpsTracking",
             "/lib/offlineSupport",
+              "/lib/offlineStorage",
             "/Production/WorkOrderTimeControl",
             "/Layout/MobileClockRedirect",
           ].some((s) => source.endsWith(s))

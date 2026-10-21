@@ -182,3 +182,5 @@ export const WorkOrderTimeControl = ({ workOrderId }: any) => (
   </button>
 );
 export const MobileClockRedirect = () => <p>Use the mobile app</p>;
+
+export const offlineStorage = { addToSyncQueue: async (value: any) => { state.writes.push({ queue: value }); } };
