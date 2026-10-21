@@ -963,7 +963,7 @@ export default function ReviewsView() {
 
       {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><ProposalFollowUps /></section>}
 
-      {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-6"><LostOpportunityReviews />{canManageCustomerFeedback && <section aria-label="Sales Rep and Owner Proposal Follow-Up Emails" className="space-y-3"><div><h3 className="text-lg font-semibold text-white">Sales Rep &amp; Owner Email Templates</h3><p className="text-sm text-gray-400">The original proposal follow-up emails are separate from the lost-opportunity feedback questionnaire above. Choose the salesperson or owner version, preview the original branded email, then send when ready.</p></div><ProposalFollowUps /></section>}</section>}
+       {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><LostOpportunityReviews /></section>}
 
       {/* Send Request Tab */}
       {activeTab === 'send' && (
