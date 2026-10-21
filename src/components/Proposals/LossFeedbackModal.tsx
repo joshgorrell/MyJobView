@@ -70,6 +70,7 @@ export function LossFeedbackModal({
           >
             <option value="phone">Customer told us by phone</option>
             <option value="email">Customer told us by email</option>
+            <option value="in_person">Customer told us in person</option>
             <option value="staff_assessment">
               Staff assessment / unconfirmed
             </option>
