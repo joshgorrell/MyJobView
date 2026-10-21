@@ -109,7 +109,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
 
   if (selectedProposalId) return (
     <Suspense fallback={<div className="w-full h-full min-h-[400px] flex items-center justify-center bg-canvas text-muted">Loading proposal...</div>}>
-      <div className="w-full h-full flex flex-col min-h-0 bg-canvas">
+      <div className="w-full flex flex-col bg-canvas">
         {activityProposalId && <ProposalActivityDialog proposalId={activityProposalId} onClose={closeActivity} />}
         <div className="min-h-0 flex-1">
           <ProposalBuilderCompact proposalId={selectedProposalId}
