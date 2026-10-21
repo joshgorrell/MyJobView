@@ -148,12 +148,14 @@ interface LineItem {
   is_hidden: boolean;
   parent_item_id: string | null;
   product_id: string | null;
-  products: { image_url: string | null } | null;
+  products: { image_url: string | null; item_color?: string | null } | null;
 }
 
 interface ReportTemplate {
   show_quantity: boolean;
   show_unit_price: boolean;
+  show_installed_price?: boolean;
+  show_item_color?: boolean;
   show_line_item_total: boolean;
   show_manufacturer: boolean;
   show_sku: boolean;
@@ -328,7 +330,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .order('sort_order'),
         supabase
           .from('proposal_line_items')
-          .select('*, products(image_url)')
+          .select('*, products(image_url,item_color)')
           .eq('proposal_id', proposalId)
           .order('sort_order'),
       ]);
@@ -374,6 +376,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             setTemplate({
               show_quantity: true,
               show_unit_price: true,
+            show_installed_price: true,
+            show_item_color: false,
+              show_installed_price: true,
+              show_item_color: false,
               show_line_item_total: true,
               show_manufacturer: true,
               show_sku: true,
@@ -990,6 +996,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                             {template?.show_unit_price && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
                             )}
+                            {template?.show_installed_price !== false && !hideCostsOverride && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Installed</th>
+                            )}
                             {template?.show_line_item_total && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
                             )}
@@ -1016,6 +1025,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
                                 </div>
+                                {template?.show_item_color && item.products?.item_color && <p className="mt-1 text-xs text-gray-500">Color: {item.products.item_color}</p>}
                               </td>
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
@@ -1024,6 +1034,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 <td className="text-right py-4 text-sm text-gray-700">
                                   {formatCurrency(item.unit_price)}
                                 </td>
+                              )}
+                              {template?.show_installed_price !== false && !hideCostsOverride && (
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency((item.line_total || 0) + (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0))) )}</td>
                               )}
                               {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
@@ -1041,7 +1054,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 1 +
                                 (template?.show_quantity ? 1 : 0) +
                                 (template?.show_unit_price && !hideCostsOverride ? 1 : 0) +
-                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) - 1
+                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) +
+                                (template?.show_installed_price !== false && !hideCostsOverride ? 1 : 0) - 1
                               } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
                                 Room Subtotal:
                               </td>
