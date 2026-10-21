@@ -2849,7 +2849,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     };
   }
 
-  const containerClass = isCoMode ? "h-full min-w-0 w-full flex flex-col bg-canvas overflow-hidden" : "h-screen min-w-0 w-full flex flex-col bg-canvas overflow-hidden";
+  const containerClass = "min-w-0 w-full flex flex-col bg-canvas";
 
   const containerStyle = {};
 
@@ -3304,7 +3304,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       )}
 
       {/* Main Content: Sidebar + Items */}
-      <div className="flex-1 flex relative overflow-hidden">
+      <div className="flex relative items-start min-w-0">
         {/* Floating Edge Arrow (when sidebar collapsed) — desktop only */}
         {sidebarCollapsed && !isMobile && (
           <button
@@ -3318,7 +3318,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
         {/* ── DESKTOP SIDEBAR (md and up) ── */}
         {!sidebarCollapsed && !isMobile && (
-          <div className="w-64 bg-surface border-r border-subtle flex flex-col overflow-y-auto flex-shrink-0">
+          <div className="w-64 bg-surface border-r border-subtle flex flex-col flex-shrink-0 self-stretch">
             <div className="p-3 sm:p-4 border-b border-subtle">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-primary font-semibold text-sm sm:text-base">Areas</h2>
@@ -3751,7 +3751,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         )}
 
         {/* Line Items Area */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-auto overscroll-contain">
+        <div className="flex-1 flex flex-col min-w-0">
             {rooms.length === 0 && unassignedItems.filter(i => isCoMode || !i.is_hidden).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Package className="w-16 h-16 text-gray-600 mb-4" />
