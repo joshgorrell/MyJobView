@@ -1,8 +1,8 @@
 import { supabase } from './supabase';
 export interface ProposalDocument { filename: string; content: string; mimeType: string }
 /** The current generator returns printable HTML; also accept future PDF responses. */
-export async function loadProposalDocument(proposalId: string, proposalNumber: string, includePromisePage = true): Promise<ProposalDocument> {
-  const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId, displayOptions: { includePromisePage } } });
+export async function loadProposalDocument(proposalId: string, proposalNumber: string, includePromisePage = true, templateId?: string | null): Promise<ProposalDocument> {
+  const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId, templateId, displayOptions: { includePromisePage } } });
   if (error) throw error;
   if (typeof data?.base64 === 'string' && data.base64) return { filename: `Proposal-${proposalNumber}.pdf`, content: data.base64, mimeType: 'application/pdf' };
   if (typeof data === 'string' && /^\s*<!doctype html/i.test(data)) {
