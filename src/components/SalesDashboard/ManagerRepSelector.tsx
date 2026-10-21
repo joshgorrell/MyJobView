@@ -77,7 +77,7 @@ export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId, currentU
         onChange={(e) => onSelectRep(e.target.value || null)}
         className="min-w-0 max-w-[190px] sm:max-w-none px-2 sm:px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
       >
-        {!currentUserIsSalesRep && <option value="">My dashboard</option>}
+        {!currentUserIsSalesRep && <option value="">Select sales rep</option>}
         {reps.map((rep) => (
           <option key={rep.id} value={rep.id}>
             {rep.name}
