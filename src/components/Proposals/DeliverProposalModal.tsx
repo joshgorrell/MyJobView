@@ -183,7 +183,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
 
   async function downloadPdf() {
     if (!proposal) return;
-    const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage);
+    const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage, selectedTemplateId || null);
     downloadProposalDocument(document);
   }
 
