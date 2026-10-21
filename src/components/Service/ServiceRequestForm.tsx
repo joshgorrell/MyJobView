@@ -743,13 +743,12 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       icon={isEditMode ? <RotateCcw className="w-5 h-5 text-primary" /> : <FileText className="w-5 h-5 text-primary" />}
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
-      stableHeight
       scrollBody={false}
       showSuccess={showSuccess}
       successMessage="Work Order Request Created!"
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-        <div className="qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-4 sm:p-5 space-y-3">
+        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 space-y-2.5">
           {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
 
           {/* Kickback reason banner (edit mode only) */}
@@ -779,7 +778,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search name, company, phone, or email..."
-                    className="w-full pl-10 pr-4 py-3 bg-surface border-2 border-blue-500/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg text-primary placeholder-gray-500"
+                    className="w-full pl-10 pr-4 h-11 bg-surface border-2 border-blue-500/60 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base text-primary placeholder-gray-500"
                   />
                 </div>
 
@@ -829,7 +828,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <button
                   type="button"
                   onClick={() => setShowNewCustomer(true)}
-                  className="w-full py-2.5 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+                  className="w-fit min-h-9 px-2 rounded-lg text-sm text-blue-400 hover:bg-elevated transition-colors flex items-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" />
                   New Customer
@@ -1069,7 +1068,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               onChange={(e) => setFormData(prev => ({ ...prev, job_description: e.target.value }))}
               placeholder="What needs to be done? *"
               required
-              rows={3}
+              rows={2}
               className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500 resize-none"
             />
           </div>
@@ -1232,7 +1231,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 </details>
         </div>
           {/* Action Buttons */}
-          <div className="shrink-0 flex gap-2 bg-canvas border-t border-subtle px-4 py-3 sm:px-5">
+          <div className="shrink-0 flex gap-2 bg-canvas border-t border-subtle px-3 py-2 sm:px-4">
             <button
               type="button"
               onClick={onClose}

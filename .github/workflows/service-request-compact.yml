@@ -1,0 +1,25 @@
+name: Service request compact layout
+on:
+  pull_request:
+    paths:
+      - 'src/components/Service/ServiceRequestForm.tsx'
+      - 'src/components/Shared/QuickActionModal.tsx'
+      - 'tests/service-requests/intake-browser.mjs'
+      - '.github/workflows/service-request-compact.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  service-request-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/service-requests/intake-browser.mjs
