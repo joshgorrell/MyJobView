@@ -92,7 +92,7 @@ export default function AddItemToAreasModal({
   const [localRooms, setLocalRooms] = useState<ProposalRoom[]>(initialRooms);
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(
     new Set(defaultAreaIds?.length ? defaultAreaIds.filter(id => initialRooms.some(room => room.id === id))
-      : activeAreaId ? [activeAreaId] : initialRooms.length === 1 ? [initialRooms[0].id] : [])
+      : activeAreaId ? [activeAreaId] : [])
   );
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
