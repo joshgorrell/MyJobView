@@ -19,7 +19,8 @@ BEGIN
   v_invoice_type := lower(coalesce(to_jsonb(NEW)->>'invoice_type',''));
   -- Never treat project/deposit/progress/final billing as incremental sales.
   IF v_source IN ('progress','deposit','final','project','change_order')
-     OR v_invoice_type IN ('progress','deposit','final','project','change_order') THEN
+     OR v_invoice_type IN ('progress','deposit','final','project','change_order','recurring')
+     OR v_source IN ('recurring','subscription','security_monitoring') THEN
     RETURN NEW;
   END IF;
 
@@ -36,6 +37,10 @@ BEGIN
   ) THEN
     v_rep := NULL;
   END IF;
+
+  IF NEW.work_order_billing_request_id IS NULL
+     AND NOT EXISTS (SELECT 1 FROM public.work_order_invoice_links l WHERE l.invoice_id=NEW.id AND l.organization_id=v_org)
+     AND v_invoice_type <> 'retail' THEN RETURN NEW; END IF;
 
   -- Service work-order linkage can be created before invoice submission.
   -- Only classify standalone invoices; retail is the conservative default.
