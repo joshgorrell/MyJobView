@@ -25,6 +25,11 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Subscription recurring invoices are credited by their billing-link trigger.
+  -- Security-cycle invoices use their separate contract origin snapshot.
+  IF v_invoice_type = 'recurring'
+     AND NEW.security_billing_cycle_id IS NULL THEN RETURN NEW; END IF;
+
   v_org := NEW.organization_id;
   SELECT c.assigned_to INTO v_rep
   FROM public.contacts c
