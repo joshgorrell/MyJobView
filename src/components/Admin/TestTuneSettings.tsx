@@ -68,6 +68,7 @@ interface CustomTier {
 type TierMode = 'flat_hours' | 'pct_of_estimated';
 
 function HistoryTable({ fieldName, refresh }: { fieldName: string; refresh: number }) {
+  const {profile}=useAuth();
   const [rows, setRows] = useState<SettingsHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,6 +82,7 @@ function HistoryTable({ fieldName, refresh }: { fieldName: string; refresh: numb
       .from('test_tune_settings_history')
       .select('*, changed_by_profile:profiles!changed_by(full_name)')
       .eq('field_name', fieldName)
+      .eq('organization_id', profile!.organization_id)
       .order('changed_at', { ascending: false })
       .limit(10);
 
@@ -192,9 +194,11 @@ export function TestTuneSettings() {
       if (error) throw error;
 
       if (data) {
+        const {data:pm,error:pmError}=await supabase.rpc('get_company_pm_allocation');
+        if(pmError) throw pmError;
         const s: TestTuneSettings = {
           id: data.id,
-          pm_allocation_percentage: data.pm_allocation_percentage ?? 5,
+          pm_allocation_percentage: Number(pm),
           tier_1_min_hours: data.tier_1_min_hours ?? 1,
           tier_1_max_hours: data.tier_1_max_hours ?? 5,
           tier_1_percentage: data.tier_1_percentage ?? 20,
@@ -251,6 +255,7 @@ export function TestTuneSettings() {
   async function writeHistory(fieldName: string, oldValue: string | null, newValue: string, effectiveDate: string, reason: string) {
     try {
       await supabase.from('test_tune_settings_history').insert({
+        organization_id: profile?.organization_id,
         field_name: fieldName,
         old_value: oldValue,
         new_value: newValue,
@@ -295,7 +300,6 @@ export function TestTuneSettings() {
       const { error } = await supabase
         .from('test_tune_settings')
         .update({
-          pm_allocation_percentage: updatedSettings.pm_allocation_percentage,
           tier_1_min_hours: updatedSettings.tier_1_min_hours,
           tier_1_max_hours: updatedSettings.tier_1_max_hours,
           tier_1_percentage: updatedSettings.tier_1_percentage,
@@ -330,7 +334,8 @@ export function TestTuneSettings() {
         await writeHistory('default_labor_burden_rate', String(o.default_labor_burden_rate), String(updatedSettings.default_labor_burden_rate), burdenEffectiveDate, burdenReason);
       }
       if (updatedSettings.pm_allocation_percentage !== o.pm_allocation_percentage) {
-        await writeHistory('pm_allocation_percentage', String(o.pm_allocation_percentage), String(updatedSettings.pm_allocation_percentage), pmAllocEffectiveDate, pmAllocReason);
+        const {error:pmError}=await supabase.rpc('set_company_pm_allocation',{p_percentage:updatedSettings.pm_allocation_percentage,p_effective_date:pmAllocEffectiveDate||new Date().toLocaleDateString('en-CA'),p_reason:pmAllocReason||null});
+        if(pmError) throw pmError;
       }
       if (updatedSettings.tech_bonus_percentage !== o.tech_bonus_percentage || updatedSettings.pm_bonus_percentage !== o.pm_bonus_percentage) {
         await writeHistory('bonus_split', `${o.tech_bonus_percentage}/${o.pm_bonus_percentage}`, `${updatedSettings.tech_bonus_percentage}/${updatedSettings.pm_bonus_percentage}`, splitEffectiveDate, splitReason);
@@ -486,7 +491,7 @@ export function TestTuneSettings() {
           <h3 className="text-lg font-semibold text-gray-900">PM Allocation</h3>
         </div>
         <p className="text-sm text-gray-600 mb-4">
-          Percentage of total estimated labor hours allocated to the Project Manager for non-performance tracking. Default: 5%.
+          Reserve part of quoted labor for project management. At 5%, 100 quoted hours means 95 field hours + 5 PM hours, not 105 hours. Changes apply to new sales orders from the effective date; existing orders keep their allocation.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -496,6 +501,7 @@ export function TestTuneSettings() {
               <input
                 type="number"
                 value={settings.pm_allocation_percentage}
+                disabled={profile?.role!=='admin'}
                 onChange={(e) => updateSettings({ pm_allocation_percentage: parseFloat(e.target.value) || 0 })}
                 step="0.5"
                 min="0"
@@ -510,6 +516,8 @@ export function TestTuneSettings() {
             <input
               type="date"
               value={pmAllocEffectiveDate}
+              min={new Date().toLocaleDateString('en-CA')}
+              disabled={profile?.role!=='admin'}
               onChange={(e) => setPmAllocEffectiveDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
