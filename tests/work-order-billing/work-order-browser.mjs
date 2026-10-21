@@ -26,6 +26,6 @@ try {
  const queries=await page.evaluate(()=>window.queries);for(const table of ['service_parts_used','time_entries'])assert.deepEqual(queries.find(q=>q.table===table).ids,['a','b']);
  await page.getByLabel('Quantity for Part b').fill('3');await page.getByText('Parts — all linked work orders',{exact:true}).click();assert.deepEqual(await page.evaluate(()=>window.writes[0].payload),{quantity:3});
  await page.getByRole('button',{name:'Add Parts',exact:true}).click();await page.getByRole('button',{name:'Add catalog item',exact:true}).click();await page.getByText('Catalog addition',{exact:true}).waitFor();
- await page.getByRole('button',{name:/^Time/}).click();await page.getByText('4.13h total across linked work orders',{exact:true}).waitFor();await page.getByRole('button',{name:'Review & Invoice',exact:true}).click();await page.getByText('Review invoice from a',{exact:true}).waitFor();assert.deepEqual(errors,[]);await page.close();
+ await page.getByRole('button',{name:/^Time/}).click();await page.getByText('4.13h total (4.13h completed + 0.00h running) across linked work orders',{exact:true}).waitFor();await page.getByRole('button',{name:'Review & Invoice',exact:true}).click();await page.getByText('Review invoice from a',{exact:true}).waitFor();assert.deepEqual(errors,[]);await page.close();
  console.log('Work-order loading, linked parts/time, office quantity correction, catalog addition and closeout entry passed.');
 }finally{await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}

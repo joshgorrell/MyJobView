@@ -85,12 +85,12 @@ try {
         .first()
         .click();
       await page
-        .getByLabel("Assignment Title", { exact: false })
+        .getByLabel("Internal title", { exact: true })
         .fill("Draft kept in this tab");
       await page.reload();
-      await page.getByLabel("Assignment Title", { exact: false }).waitFor();
+      await page.getByLabel("Internal title", { exact: true }).waitFor();
       assert.equal(
-        await page.getByLabel("Assignment Title", { exact: false }).inputValue(),
+        await page.getByLabel("Internal title", { exact: true }).inputValue(),
         "Draft kept in this tab",
       );
       assert.ok(
