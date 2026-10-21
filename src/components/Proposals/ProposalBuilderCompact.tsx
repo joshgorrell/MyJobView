@@ -3462,6 +3462,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                               <h3 className={`font-medium truncate ${isActive ? 'text-blue-400' : 'text-primary'}`}>
                                 {room.name}
                               </h3>
+                              {isActive && <span className="text-[10px] font-bold uppercase tracking-wide text-cyan-300">Live</span>}
                             </div>
                             <div className="flex items-center justify-between mt-1 gap-2">
                               <span className="text-xs text-muted truncate">
