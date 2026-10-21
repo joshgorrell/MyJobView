@@ -527,7 +527,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
   const [editingAreaName, setEditingAreaName] = useState('');
-  const [activeAreaId, setActiveAreaId] = useState<string | null>(null);
+  const [liveAreaIds, setLiveAreaIds] = useState<Set<string>>(new Set());
+  const toggleLiveArea = (id: string) => setLiveAreaIds(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState<{
     areas: string[];
@@ -1728,9 +1729,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       if (error) throw error;
 
-      if (activeAreaId === areaId) {
-        setActiveAreaId(null);
-      }
+      setLiveAreaIds(previous => { const next = new Set(previous); next.delete(areaId); return next; });
       await loadData();
     } catch (error: any) {
       console.error('Error deleting area:', error);
@@ -2901,6 +2900,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     ...unassignedItems.map(item => ({ ...item, areaName: 'Unassigned', areaId: '__unassigned__' }))
   ].filter(item => isCoMode || !item.is_hidden);
 
+  // Live areas control the visible working set, not proposal inclusion or totals.
+  if (liveAreaIds.size > 0) displayItems = displayItems.filter(item => liveAreaIds.has(item.areaId));
   // Apply filters
   if (filters.areas.length > 0) {
     displayItems = displayItems.filter(item => filters.areas.includes(item.areaId));
@@ -3356,7 +3357,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             <div className="flex-1">
               {unassignedItems.filter(i => isCoMode || !i.is_hidden).length > 0 && (() => {
                 const visibleUnassigned = unassignedItems.filter(i => isCoMode || !i.is_hidden);
-                const isActive = activeAreaId === '__unassigned__';
+                const isActive = liveAreaIds.has('__unassigned__');
                 const topLevelUnassigned = visibleUnassigned.filter(i => !i.parent_item_id);
                 const unassignedTotal = topLevelUnassigned.reduce((sum, item) => {
                   const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
@@ -3371,7 +3372,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     className={`border-b border-amber-700/40 ${isActive ? 'bg-amber-900/20' : 'bg-amber-900/10'}`}
                   >
                     <div
-                      onClick={() => setActiveAreaId(isActive ? null : '__unassigned__')}
+                      onClick={() => toggleLiveArea('__unassigned__')}
                       className={`p-3 cursor-pointer hover:bg-amber-900/30 transition-colors ${isActive ? 'border-l-4 border-amber-500' : ''}`}
                       title="Items without an assigned area. Click to target these items, or reassign them to a room."
                     >
@@ -3398,7 +3399,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 );
               })()}
               {rooms.map((room) => {
-                const isActive = activeAreaId === room.id;
+                const isActive = liveAreaIds.has(room.id);
                 const topLevelItems = room.line_items.filter(item => !item.parent_item_id);
                 const roomTotal = topLevelItems.reduce((sum, item) => {
                   const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
@@ -3451,7 +3452,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       </div>
                     ) : (
                       <div
-                        onClick={() => setActiveAreaId(isActive ? null : room.id)}
+                        onClick={() => toggleLiveArea(room.id)}
                         className={`p-3 cursor-pointer hover:bg-elevated/50 transition-colors ${isActive ? 'border-l-4 border-cyan-500' : ''}`}
                       >
                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -3592,7 +3593,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     >
                       <div
                         onClick={() => {
-                          setActiveAreaId(isActive ? null : '__unassigned__');
+                          toggleLiveArea('__unassigned__');
                           if (!isActive) setSidebarCollapsed(true);
                         }}
                         className={`p-4 cursor-pointer transition-colors ${isActive ? 'border-l-4 border-amber-500' : ''}`}
@@ -3674,7 +3675,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       ) : (
                         <div
                           onClick={() => {
-                            setActiveAreaId(isActive ? null : room.id);
+                            toggleLiveArea(room.id);
                             if (!isActive) setSidebarCollapsed(true);
                           }}
                           className={`p-4 cursor-pointer transition-colors ${isActive ? 'border-l-4 border-cyan-500' : ''}`}
@@ -3818,7 +3819,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     {(() => {
                       const visibleUnassigned = unassignedItems.filter(item => {
                         if (!isCoMode && item.is_hidden) return false;
-                        if (filters.areas.length > 0 && !filters.areas.includes('__unassigned__')) return false;
+                        if (liveAreaIds.size > 0 && !liveAreaIds.has('__unassigned__')) return false;
+                         if (filters.areas.length > 0 && !filters.areas.includes('__unassigned__')) return false;
                         return displayItems.some(di => di.id === item.id);
                       });
                       const hasUnassigned = visibleUnassigned.length > 0;
@@ -3840,7 +3842,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                       const roomsToRender: RoomWithItems[] = [
                         ...(hasUnassigned ? [unassignedVirtualRoom] : []),
                         ...rooms.filter(room => {
-                          if (filters.areas.length > 0 && !filters.areas.includes(room.id)) return false;
+                          if (liveAreaIds.size > 0 && !liveAreaIds.has(room.id)) return false;
+                           if (filters.areas.length > 0 && !filters.areas.includes(room.id)) return false;
                           const roomItems = room.line_items.filter(item => {
                             const itemWithMeta = { ...item, areaId: room.id, areaName: room.name };
                             return displayItems.some(di => di.id === itemWithMeta.id);
@@ -4751,7 +4754,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         <Suspense fallback={null}><AddItemToAreasModal
           proposalId={proposalId}
           rooms={rooms}
-          activeAreaId={activeAreaId && activeAreaId !== '__unassigned__' ? activeAreaId : undefined}
+          defaultAreaIds={Array.from(liveAreaIds).filter(id => id !== '__unassigned__')}
           onClose={() => setShowAddItemToAreasModal(false)}
           onItemsAdded={async () => {
             setShowAddItemToAreasModal(false);
