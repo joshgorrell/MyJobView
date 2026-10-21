@@ -1,3 +1,4 @@
+import { LossFeedbackModal } from './LossFeedbackModal';
 import { requestConfirmation, notify } from '../../lib/feedback';
 import { proposalStatusLabel } from '../../lib/proposalPresentation';
 import { useState, useEffect, useRef } from 'react';
@@ -60,6 +61,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [pendingDepositSalesOrders, setPendingDepositSalesOrders] = useState<Record<string, string>>({});
   const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [lossFeedbackId,setLossFeedbackId]=useState<string|null>(null);
   const [declineModalMode, setDeclineModalMode] = useState<'decline' | 'cancel'>('decline');
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(null);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
@@ -1527,6 +1529,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                               Recall from Portal
                             </button>
                           )}
+                          {(proposal.status==='declined'||(proposal.status==='archived'&&proposal.auto_archived))&&<button onClick={e=>{e.stopPropagation();setLossFeedbackId(proposal.id);setOpenMenuId(null);}} className="w-full min-h-11 px-4 py-3 text-left text-sm text-cyan-300 hover:bg-strong/25">Record loss feedback</button>}
                           {(proposal.status !== 'declined' && proposal.status !== 'cancelled' && proposal.status !== 'archived' && proposal.status !== 'approved') && (
                             <button
                               onClick={(e) => {
@@ -1831,7 +1834,8 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                             Recall from Portal
                           </button>
                         )}
-                        {(proposal.status !== 'declined' && proposal.status !== 'cancelled' && proposal.status !== 'archived' && proposal.status !== 'approved') && (
+                        {(proposal.status==='declined'||(proposal.status==='archived'&&proposal.auto_archived))&&<button onClick={e=>{e.stopPropagation();setLossFeedbackId(proposal.id);setOpenMenuId(null);}} className="w-full min-h-11 px-4 py-3 text-left text-sm text-cyan-300 hover:bg-strong/25">Record loss feedback</button>}
+                          {(proposal.status !== 'declined' && proposal.status !== 'cancelled' && proposal.status !== 'archived' && proposal.status !== 'approved') && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -2105,6 +2109,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
         />
       )}
 
+      {lossFeedbackId&&<LossFeedbackModal proposalId={lossFeedbackId} onClose={()=>setLossFeedbackId(null)} onSaved={()=>{setLossFeedbackId(null);loadProposals();}}/>}
       {showDeclineModal && selectedProposal && (
         <DeclineProposalModal
           proposalId={selectedProposal.id}

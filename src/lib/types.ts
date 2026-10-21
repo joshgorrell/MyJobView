@@ -244,6 +244,8 @@ export interface CompanySettings {
   id: string;
   company_name: string;
   google_maps_api_key?: string | null;
+  lost_review_followup_enabled?: boolean;
+  lost_review_followup_days?: number;
   company_email?: string | null;
   company_logo_url: string | null;
   print_accent_color?: string | null;

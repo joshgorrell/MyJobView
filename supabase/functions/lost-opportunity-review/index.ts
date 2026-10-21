@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       }
       const token = await checked(
         await admin.from("lost_review_tokens").select("request_id,expires_at")
-          .eq("token_hash", await hash(b.token)).maybeSingle(),
+          .or(`token_hash.eq.${await hash(b.token)},followup_token_hash.eq.${await hash(b.token)}`).maybeSingle(),
       );
       if (!token || Date.parse(token.expires_at) < Date.now()) {
         return json({ error: "This review link is invalid or expired." }, 404);
@@ -583,6 +583,15 @@ Deno.serve(async (req) => {
         b.request_id,
       ).eq("organization_id", org).single(),
     );
+    if (b.action === "record_feedback") {
+      if (!profile.can_view_lost_opportunity_submissions || !(profile.can_send_lost_opportunity_reviews || ["admin","owner","super_admin"].includes(profile.role))) return json({error:"Lost Opportunity send and submission access required."},403);
+      if (detail.responded_at) return json({error:"Feedback already exists. The original customer response is preserved."},409);
+      const selected=Array.isArray(b.reasons)?[...new Set(b.reasons)]:[];
+      if (!["phone","email"].includes(b.source)||!selected.length||selected.some(r=>!reasons.includes(r as string))||typeof b.message!=="string"||b.message.length>10000||!["yes","maybe","no"].includes(b.recoverable)) return json({error:"Choose the source, reasons, and whether the opportunity can be recovered."},400);
+      const result=await admin.from("lost_review_responses").insert({request_id:detail.request_id,reasons:selected,message:b.message.trim(),recoverable:b.recoverable,recovery_message:"",attachments:[],source:b.source,recorded_by:user.id});
+      if(result.error?.code==="23505") return json({error:"Feedback was just submitted. Reload to see it."},409);
+      await checked(result);return json({success:true});
+    }
     if (["assessment_load", "assessment_save"].includes(b.action)) {
       if (profile.role !== "admin" || !profile.can_view_lost_opportunity_submissions) {
         return json({ error: "Admin submission access required." }, 403);

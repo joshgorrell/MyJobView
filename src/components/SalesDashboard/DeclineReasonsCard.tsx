@@ -17,8 +17,9 @@ export function DeclineReasonsCard({ reasons }: DeclineReasonsCardProps) {
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
         <TrendingDown className="w-5 h-5 text-red-500" />
-        <h3 className="text-sm font-medium text-gray-700">Decline Reasons This Month</h3>
+        <h3 className="text-sm font-medium text-gray-700">Initial Decline Reasons This Month</h3>
       </div>
+      <p className="mb-3 text-xs text-gray-500">See Lost Deals for customer follow-up feedback and call notes.</p>
       <div className="space-y-3">
         {reasons.slice(0, 5).map((r) => {
           const label = REASON_LABELS[r.reason] || r.reason;

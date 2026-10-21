@@ -59,6 +59,7 @@ const REASON_LABELS: Record<string, string> = {
   error: 'Created in Error',
   replaced_by_revision: 'Replaced by Revision',
   other: 'Other',
+  unknown:'Unknown / Feedback Needed',
 };
 
 interface Lead {
@@ -661,10 +662,13 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         }
       }
 
+      let lossQuery=supabase.from('proposals').select('id,status,decline_reason,declined_by').eq('created_by',targetId).or('status.eq.declined,and(status.eq.archived,archived_loss_status.eq.declined)');
+      if(!isAllTime)lossQuery=lossQuery.gte('declined_at',firstDayOfMonth).lte('declined_at',lastDayOfMonth);
       // Parallel data fetching (all queries run simultaneously)
       // Each query uses .catch() so a single failure degrades gracefully instead of blanking the dashboard
       const safe = <T,>(q: PromiseLike<T>) => Promise.resolve(q).catch(() => ({ data: null, count: null, error: null }));
       const [
+        lossesResult,
         myLeadsResult,
         closedLeadsThisMonthResult,
         proposalsThisMonthResult,
@@ -684,6 +688,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         monthlyStatsResult,
         importedHistoricalResult
       ] = await Promise.all([
+        safe(lossQuery),
         // My open leads for pipeline value
         safe(supabase
           .from('leads')
@@ -903,12 +908,10 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         : 0;
 
       // Build decline reason breakdown for rep's own data
-      const declinedAndCancelled = proposals.filter(p =>
-        p.status === 'declined' || p.status === 'cancelled'
-      );
+      const declinedAndCancelled=lossesResult.data||[];
       const reasonMap = new Map<string, DeclineBreakdown>();
       declinedAndCancelled.forEach(p => {
-        const r = p.decline_reason || 'other';
+        const r = p.decline_reason || 'unknown';
         if (!reasonMap.has(r)) {
           reasonMap.set(r, { reason: r, count: 0, byCustomer: 0, byRep: 0 });
         }
@@ -2079,7 +2082,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
             </div>
             <div className="text-xs text-rose-400/50 mt-1 flex items-center gap-1">
               <Ban className="w-3 h-3" />
-              {metrics.proposalsDeclined} declined · {metrics.proposalsCancelled} cancelled
+              {declineBreakdown.reduce((n,item)=>n+item.count,0)} declined
             </div>
           </div>
           <div className="bg-canvas rounded-lg p-3 border border-strong">
@@ -2182,14 +2185,15 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
         <div className="bg-canvas rounded-xl border border-rose-900/40 p-5">
           <div className="flex items-center gap-2 mb-4">
             <Ban className="w-5 h-5 text-rose-400" />
-            <h2 className="text-base font-bold text-primary">Lost Deals Breakdown — {getDateRangeLabel()}</h2>
+            <h2 className="text-base font-bold text-primary">Initial Decline Reasons — {getDateRangeLabel()}</h2>
             <span className="ml-auto text-xs text-muted">
-              {metrics.proposalsDeclined} declined · {metrics.proposalsCancelled} cancelled
+              {declineBreakdown.reduce((n,item)=>n+item.count,0)} declined
             </span>
           </div>
+          <p className="mb-3 text-xs text-muted">Includes the reason recorded at decline. See Lost Deals for follow-up feedback and customer call notes.</p>
           <div className="space-y-2">
             {declineBreakdown.map((item) => {
-              const total = metrics.proposalsDeclined + metrics.proposalsCancelled;
+              const total = declineBreakdown.reduce((n,item)=>n+item.count,0);
               const pct = total > 0 ? Math.round((item.count / total) * 100) : 0;
               const label = REASON_LABELS[item.reason] || item.reason;
               const isSensitive = item.reason === 'dont_want_rep' || item.reason === 'dont_want_company';

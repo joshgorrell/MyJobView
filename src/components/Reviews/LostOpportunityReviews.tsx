@@ -1,3 +1,4 @@
+import {RecordLostFeedback} from './RecordLostFeedback';
 import { requestConfirmation } from '../../lib/feedback';
 import { FullEmailPreview } from "./FullEmailPreview";
 import AdminSalesReviewModal from "./AdminSalesReviewModal";
@@ -8,7 +9,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { responseReasons, lostReviewAction } from "./lostReview";
 import { printLostReview } from "./printLostReview";
 import { ReviewStatsRow, ReviewFilterBar, type StatItem, type FilterOption } from "./ReviewStats";
-import { Send, Clock, TrendingUp, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, TrendingUp, RotateCcw, AlertCircle } from 'lucide-react';
 import { bidFileFormat } from "../../../supabase/functions/lost-opportunity-review/bidFileTypes";
 interface Contact {
   id: string;
@@ -26,6 +27,8 @@ interface Response {
   message: string;
   recoverable: string;
   recovery_message: string;
+  source?: string;
+  recorded_by?: string;
   attachments: { name: string; path: string }[];
 }
 interface Review {
@@ -43,6 +46,7 @@ interface Review {
   sent_at: string | null;
   sent_by_name: string | null;
   response_created_at: string | null;
+  follow_up_sent_at?: string|null;
 }
 export default function LostOpportunityReviews(
   { showCreate: _showCreate = false }: { showCreate?: boolean },
@@ -306,6 +310,7 @@ export default function LostOpportunityReviews(
   const filterOptions: FilterOption[] = [
     { value: 'all', label: 'All', count: totalSent },
     { value: 'awaiting', label: 'Awaiting', count: pendingCount },
+    { value:'call_list',label:'Call list',count:reviews.filter(v=>!v.responded_at&&!!v.follow_up_sent_at).length },
     { value: 'new', label: 'New', count: reviews.filter(v => !!v.responded_at && !v.reviewed_at).length },
     { value: 'winnable', label: 'Winnable', count: winnableCount },
     { value: 'complete', label: 'Complete', count: reviewedCount },
@@ -314,6 +319,7 @@ export default function LostOpportunityReviews(
 
   const visible = reviews.filter((v) =>
     filter === "all" || v.request_id === expandedReview ||
+    filter === "call_list" && !v.responded_at && !!v.follow_up_sent_at ||
     filter === "new" && !!v.responded_at && !v.reviewed_at ||
     filter === "awaiting" && !v.responded_at ||
     filter === "complete" && !!v.reviewed_at ||
@@ -614,6 +620,9 @@ export default function LostOpportunityReviews(
 
               <div className="space-y-4 py-4">
                 <HistoryLine v={v} />
+                {v.follow_up_sent_at&&<p className="text-sm text-gray-400">Final feedback reminder sent {formatDateTime(v.follow_up_sent_at)}</p>}
+                {!v.responded_at&&canView&&(canSend||['admin','owner','super_admin'].includes(profile?.role||''))&&<RecordLostFeedback requestId={v.request_id} onSaved={()=>void load()}/>}
+                {v.response?.source&&<p className="text-sm text-cyan-300">Feedback source: {v.response.source==='customer'?'Customer online':`Customer by ${v.response.source}`}</p>}
                 {v.responded_at && !v.response && (
                   <p className="text-sm text-gray-400">Private — viewing this response requires the View Lost Opportunity Submissions permission.</p>
                 )}

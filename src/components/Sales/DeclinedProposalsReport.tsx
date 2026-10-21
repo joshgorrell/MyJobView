@@ -1,417 +1,408 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, Filter, User, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-
-interface DeclinedRow {
-  id: string;
-  proposal_number: string;
-  status: 'declined' | 'cancelled';
-  total: number;
-  declined_at: string | null;
-  decline_reason: string | null;
-  decline_notes: string | null;
-  declined_by: 'customer' | 'rep' | 'company' | null;
-  created_by_name: string | null;
-  contact_name: string | null;
-  contact_company: string | null;
-}
-
-interface ReasonStat {
-  reason: string;
-  label: string;
-  count: number;
-  byCustomer: number;
-  byRep: number;
-}
-
-const REASON_LABELS: Record<string, string> = {
-  price_too_high: 'Price Too High',
-  went_with_competitor: 'Went with a Competitor',
-  project_cancelled: 'Project Cancelled',
-  no_response: 'No Response / Unresponsive',
-  timing: 'Not the Right Time',
-  budget_cut: 'Budget Cut',
-  scope_change: 'Scope Changed',
-  changed_mind: 'Changed Mind',
-  dont_want_rep: 'Rep Relationship Issue',
-  dont_want_company: 'Company Relationship Issue',
-  duplicate: 'Duplicate Proposal',
-  customer_request: 'Customer Requested',
-  error: 'Created in Error',
-  replaced_by_revision: 'Replaced by Revision',
-  other: 'Other',
-};
-
-const SENSITIVE_REASONS = new Set(['dont_want_rep', 'dont_want_company']);
-
-type DateFilter = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'all_time';
-
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  LOSS_REASONS,
+  SOURCE_LABELS,
+  lossDateRange,
+  lossReasonStats,
+  needsLossFeedback,
+  type LossRow,
+} from "../../lib/proposalLoss";
+import { loadProposalLosses } from "../../lib/loadProposalLosses";
+import { LossFeedbackModal } from "../Proposals/LossFeedbackModal";
+const money = (n: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+const selectClass =
+  "min-h-11 max-w-full rounded-lg border border-gray-600 bg-gray-900 px-3 text-sm text-white";
 export function DeclinedProposalsReport() {
   const { profile } = useAuth();
-  const [rows, setRows] = useState<DeclinedRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [dateFilter, setDateFilter] = useState<DateFilter>('this_year');
-  const [repFilter, setRepFilter] = useState<string>('all');
-  const [reasonFilter, setReasonFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'declined' | 'cancelled'>('all');
-  const [reps, setReps] = useState<{ id: string; name: string }[]>([]);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const isAdmin = profile?.role && ['admin', 'manager', 'sales_manager', 'finance'].includes(profile.role);
-
-  useEffect(() => {
-    if (isAdmin) {
-      loadData();
-      loadReps();
-    }
-  }, [dateFilter, repFilter, reasonFilter, statusFilter]);
-
-  async function loadReps() {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, first_name, last_name')
-      .eq('organization_id', profile!.organization_id)
-      .eq('is_active', true)
-      .order('full_name');
-    if (data) {
-      setReps(data.map(p => ({
-        id: p.id,
-        name: p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown',
-      })));
-    }
-  }
-
-  async function loadData() {
-    if (!profile?.organization_id) return;
-    setRefreshing(true);
+  const org = profile?.organization_id,
+    canView = !!profile?.can_view_lost_opportunity_submissions;
+  const isAdmin = [
+    "admin",
+    "owner",
+    "super_admin",
+    "manager",
+    "sales_manager",
+    "finance",
+  ].includes(profile?.role || "");
+  const [rows, setRows] = useState<LossRow[]>([]),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [period, setPeriod] = useState("this_year"),
+    [rep, setRep] = useState("all"),
+    [reason, setReason] = useState("all"),
+    [status, setStatus] = useState("declined"),
+    [feedback, setFeedback] = useState("all"),
+    [expanded, setExpanded] = useState<string | null>(null),
+    [editing, setEditing] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    if (!org || !isAdmin) return;
+    setLoading(true);
+    setError("");
     try {
-      const now = new Date();
-      let startDate: string | null = null;
-      switch (dateFilter) {
-        case 'this_month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-          break;
-        case 'last_month':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-          break;
-        case 'this_quarter':
-          startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1).toISOString();
-          break;
-        case 'this_year':
-          startDate = new Date(now.getFullYear(), 0, 1).toISOString();
-          break;
-        case 'all_time':
-        default:
-          startDate = null;
-      }
-
-      let query = supabase
-        .from('proposals')
-        .select(`
-          id, proposal_number, status, total, declined_at, decline_reason, decline_notes, declined_by, created_by_name,
-          contact:contacts!proposals_contact_id_fkey(full_name, company_name)
-        `)
-        .eq('organization_id', profile.organization_id)
-        .in('status', statusFilter === 'all' ? ['declined', 'cancelled'] : [statusFilter])
-        .order('declined_at', { ascending: false, nullsFirst: false });
-
-      if (startDate) {
-        query = query.gte('declined_at', startDate);
-      }
-      if (repFilter !== 'all') {
-        query = query.eq('created_by', repFilter);
-      }
-      if (reasonFilter !== 'all') {
-        query = query.eq('decline_reason', reasonFilter);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const mapped: DeclinedRow[] = (data || []).map((r: any) => ({
-        id: r.id,
-        proposal_number: r.proposal_number,
-        status: r.status,
-        total: parseFloat(r.total || '0'),
-        declined_at: r.declined_at,
-        decline_reason: r.decline_reason,
-        decline_notes: r.decline_notes,
-        declined_by: r.declined_by,
-        created_by_name: r.created_by_name,
-        contact_name: r.contact?.full_name || null,
-        contact_company: r.contact?.company_name || null,
-      }));
-      setRows(mapped);
-    } catch (err) {
-      console.error('Error loading declined proposals:', err);
+      setRows(await loadProposalLosses(org, canView));
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Unable to load loss feedback.",
+      );
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }
-
+  }, [org, isAdmin, canView]);
+  useEffect(() => {
+    void load();
+  }, [load]);
   if (!isAdmin) return null;
-
-  // Compute reason stats
-  const reasonStats = new Map<string, ReasonStat>();
-  rows.forEach(r => {
-    const key = r.decline_reason || 'other';
-    if (!reasonStats.has(key)) {
-      reasonStats.set(key, { reason: key, label: REASON_LABELS[key] || key, count: 0, byCustomer: 0, byRep: 0 });
-    }
-    const s = reasonStats.get(key)!;
+  const range = lossDateRange(period);
+  const visible = rows
+    .filter(
+      (r) =>
+        (status === "all" || r.status === status) &&
+        (rep === "all" || r.rep === rep) &&
+        (reason === "all" || r.evidence.reasons.includes(reason)) &&
+        (feedback === "all" ||
+          (feedback === "needed"
+            ? needsLossFeedback(r.evidence)
+            : !needsLossFeedback(r.evidence))) &&
+        (period === "all_time" ||
+          (r.date &&
+            (!range.start || Date.parse(r.date) >= Date.parse(range.start)) &&
+            Date.parse(r.date) < Date.parse(range.end))),
+    )
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const losses = visible.filter((r) => r.status === "declined"),
+    stats = lossReasonStats(losses),
+    needed = losses.filter((r) => needsLossFeedback(r.evidence)),
+    missingDates = rows.filter((r) => !r.date).length;
+  const months = new Map<
+    string,
+    { count: number; value: number; needed: number }
+  >();
+  for (const r of losses) {
+    const m = r.date
+        ? new Date(r.date).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+          })
+        : "Date unknown",
+      s = months.get(m) || { count: 0, value: 0, needed: 0 };
     s.count++;
-    if (r.declined_by === 'customer') s.byCustomer++;
-    else s.byRep++;
-  });
-  const sortedReasons = Array.from(reasonStats.values()).sort((a, b) => b.count - a.count);
-  const totalDeclined = rows.filter(r => r.status === 'declined').length;
-  const totalCancelled = rows.filter(r => r.status === 'cancelled').length;
-  const totalValue = rows.reduce((s, r) => s + r.total, 0);
-  const byCustomerCount = rows.filter(r => r.declined_by === 'customer').length;
-  const byRepCount = rows.filter(r => r.declined_by !== 'customer').length;
-
-  function formatCurrency(n: number) {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+    s.value += r.total;
+    if (needsLossFeedback(r.evidence)) s.needed++;
+    months.set(m, s);
   }
-
-  const DATE_LABELS: Record<DateFilter, string> = {
-    this_month: 'This Month',
-    last_month: 'Last Month',
-    this_quarter: 'This Quarter',
-    this_year: 'This Year',
-    all_time: 'All Time',
-  };
-
+  const reps = new Map<string, string>();
+  for (const r of rows)
+    if (r.rep && !reps.has(r.rep)) reps.set(r.rep, r.repName);
   return (
-    <div className="p-5 space-y-5">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
-        {/* Date */}
+    <div className="space-y-5 p-4 text-white">
+      <div>
+        <h2 className="text-lg font-semibold">Why we lose proposals</h2>
+        <p className="text-sm text-gray-400">
+          Each proposal counts once. Customer answers take priority over staff
+          assessments. Cancellations are excluded from loss statistics.
+        </p>
+      </div>
+      {!canView && (
+        <p className="text-sm text-amber-200">
+          Private questionnaire responses require Lost Opportunity submission
+          permission and Reviews access. These totals include only feedback you
+          can access.
+        </p>
+      )}
+      {missingDates > 0 && (
+        <p className="text-sm text-amber-200">
+          {missingDates} older records have no loss date and appear under All
+          time only.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
         <select
-          value={dateFilter}
-          onChange={e => setDateFilter(e.target.value as DateFilter)}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-700 text-white rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+          aria-label="Loss date range"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className={selectClass}
         >
-          {(Object.keys(DATE_LABELS) as DateFilter[]).map(k => (
-            <option key={k} value={k}>{DATE_LABELS[k]}</option>
+          {Object.entries({
+            this_month: "This month",
+            last_month: "Last month",
+            this_quarter: "This quarter",
+            this_year: "This year",
+            all_time: "All time",
+          }).map(([k, l]) => (
+            <option key={k} value={k}>
+              {l}
+            </option>
           ))}
         </select>
-        {/* Status */}
         <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as 'all' | 'declined' | 'cancelled')}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-700 text-white rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+          aria-label="Loss status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className={selectClass}
         >
-          <option value="all">Declined + Cancelled</option>
-          <option value="declined">Declined Only</option>
-          <option value="cancelled">Cancelled Only</option>
+          <option value="declined">Lost proposals</option>
+          <option value="cancelled">Cancellations</option>
+          <option value="all">Losses and cancellations</option>
         </select>
-        {/* Rep */}
         <select
-          value={repFilter}
-          onChange={e => setRepFilter(e.target.value)}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-700 text-white rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+          aria-label="Sales representative"
+          value={rep}
+          onChange={(e) => setRep(e.target.value)}
+          className={selectClass}
         >
-          <option value="all">All Reps</option>
-          {reps.map(r => (
-            <option key={r.id} value={r.id}>{r.name}</option>
+          <option value="all">All reps</option>
+          {[...reps].map(([k, l]) => (
+            <option key={k} value={k}>
+              {l}
+            </option>
           ))}
         </select>
-        {/* Reason */}
         <select
-          value={reasonFilter}
-          onChange={e => setReasonFilter(e.target.value)}
-          className="px-3 py-1.5 bg-gray-900 border border-gray-700 text-white rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+          aria-label="Loss reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className={selectClass}
         >
-          <option value="all">All Reasons</option>
-          {Object.entries(REASON_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+          <option value="all">All reasons</option>
+          {Object.entries(LOSS_REASONS).map(([k, l]) => (
+            <option key={k} value={k}>
+              {l}
+            </option>
           ))}
+        </select>
+        <select
+          aria-label="Feedback status"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          className={selectClass}
+        >
+          <option value="all">All feedback</option>
+          <option value="needed">Feedback needed / call list</option>
+          <option value="confirmed">Customer confirmed</option>
         </select>
         <button
-          onClick={() => loadData()}
-          disabled={refreshing}
-          className="ml-auto p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-gray-700 transition-colors"
+          onClick={() => void load()}
+          disabled={loading}
+          className={selectClass}
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
         </button>
       </div>
-
+      {error && (
+        <p role="alert" className="text-red-300">
+          {error}
+        </p>
+      )}
       {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => <div key={i} className="h-12 bg-gray-700/40 rounded-lg animate-pulse" />)}
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="text-center py-12 text-gray-500 text-sm">
-          No lost deals found for the selected filters.
-        </div>
+        <p>Loading loss feedback…</p>
       ) : (
         <>
-          {/* Summary Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-rose-950/30 border border-rose-900/40 rounded-lg p-3">
-              <div className="text-xs text-rose-400/70 uppercase tracking-wide mb-1">Total Lost</div>
-              <div className="text-2xl font-bold text-rose-400 tabular-nums">{rows.length}</div>
-              <div className="text-xs text-rose-400/50 mt-0.5">{totalDeclined} declined · {totalCancelled} cancelled</div>
-            </div>
-            <div className="bg-gray-900/60 border border-gray-700/50 rounded-lg p-3">
-              <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Lost Value</div>
-              <div className="text-lg font-bold text-white tabular-nums leading-tight">{formatCurrency(totalValue)}</div>
-              <div className="text-xs text-gray-500 mt-0.5">total proposal value</div>
-            </div>
-            <div className="bg-gray-900/60 border border-gray-700/50 rounded-lg p-3">
-              <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">By Customer</div>
-              <div className="text-2xl font-bold text-blue-400 tabular-nums">{byCustomerCount}</div>
-              <div className="text-xs text-gray-500 mt-0.5">customer-initiated</div>
-            </div>
-            <div className="bg-gray-900/60 border border-gray-700/50 rounded-lg p-3">
-              <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">By Rep / Co.</div>
-              <div className="text-2xl font-bold text-gray-300 tabular-nums">{byRepCount}</div>
-              <div className="text-xs text-gray-500 mt-0.5">rep or company initiated</div>
-            </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              ["Lost proposals", losses.length],
+              [
+                "Known proposal value",
+                money(losses.reduce((n, r) => n + r.total, 0)),
+              ],
+              [
+                "Customer-confirmed reasons",
+                `${losses.length ? Math.round(((losses.length - needed.length) / losses.length) * 100) : 0}%`,
+              ],
+              ["Feedback needed", needed.length],
+            ].map(([l, v]) => (
+              <div
+                key={l}
+                className="rounded-xl border border-gray-700 bg-gray-800 p-4"
+              >
+                <p className="text-xs text-gray-400">{l}</p>
+                <p className="mt-1 text-2xl font-semibold">{v}</p>
+              </div>
+            ))}
           </div>
-
-          {/* Reason Breakdown Chart */}
-          {sortedReasons.length > 0 && (
-            <div className="bg-gray-900/40 border border-gray-700/50 rounded-lg p-4 space-y-2.5">
-              <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-3">Reason Breakdown</div>
-              {sortedReasons.map(s => {
-                const pct = rows.length > 0 ? Math.round((s.count / rows.length) * 100) : 0;
-                const isSensitive = SENSITIVE_REASONS.has(s.reason);
-                return (
-                  <div key={s.reason} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`font-medium ${isSensitive ? 'text-rose-300' : 'text-gray-300'}`}>
-                        {s.label}
-                        {isSensitive && <span className="ml-1.5 text-rose-500/70">(admin only)</span>}
-                      </span>
-                      <div className="flex items-center gap-3 text-gray-500">
-                        {s.byCustomer > 0 && <span className="text-blue-400">{s.byCustomer}c</span>}
-                        {s.byRep > 0 && <span>{s.byRep}r</span>}
-                        <span className="text-white font-bold w-5 text-right tabular-nums">{s.count}</span>
-                        <span className="text-gray-600 w-8 text-right tabular-nums">{pct}%</span>
-                      </div>
-                    </div>
-                    <div className="relative h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-700 ${isSensitive ? 'bg-rose-600' : 'bg-rose-500'}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          {losses.some((r) => !r.valueKnown) && (
+            <p className="text-xs text-gray-400">
+              External opportunities count toward reasons; their dollar values
+              are unknown and excluded from value totals.
+            </p>
+          )}
+          <div className="overflow-x-auto rounded-xl border border-gray-700">
+            <table className="w-full text-sm">
+              <caption className="p-3 text-left font-semibold">
+                Loss reasons
+              </caption>
+              <thead className="text-gray-400">
+                <tr>
+                  <th className="p-3 text-left">Reason</th>
+                  <th>Proposals</th>
+                  <th>% of losses</th>
+                  <th className="pr-3 text-right">Known value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((s) => (
+                  <tr key={s.reason} className="border-t border-gray-700">
+                    <td className="p-3">
+                      {LOSS_REASONS[s.reason] || s.reason}
+                    </td>
+                    <td className="text-center">{s.count}</td>
+                    <td className="text-center">
+                      {losses.length
+                        ? Math.round((s.count / losses.length) * 100)
+                        : 0}
+                      %
+                    </td>
+                    <td className="pr-3 text-right">{money(s.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-400">
+            Customers may give several reasons. Percentages can total more than
+            100%, and proposal value can appear under several reasons.
+          </p>
+          {!!months.size && (
+            <div className="overflow-x-auto rounded-xl border border-gray-700">
+              <table className="w-full text-sm">
+                <caption className="p-3 text-left font-semibold">
+                  Monthly loss trend
+                </caption>
+                <thead className="text-gray-400">
+                  <tr>
+                    <th className="p-3 text-left">Month</th>
+                    <th>Losses</th>
+                    <th>Feedback needed</th>
+                    <th className="pr-3 text-right">Known value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...months].map(([m, s]) => (
+                    <tr key={m} className="border-t border-gray-700">
+                      <td className="p-3">{m}</td>
+                      <td className="text-center">{s.count}</td>
+                      <td className="text-center">{s.needed}</td>
+                      <td className="pr-3 text-right">{money(s.value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-
-          {/* Full List */}
-          <div className="space-y-1.5">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide px-1 mb-2">
-              All Lost Deals ({rows.length})
-            </div>
-            {rows.map(row => {
-              const expanded = expandedId === row.id;
-              const isSensitiveReason = row.decline_reason && SENSITIVE_REASONS.has(row.decline_reason);
-              return (
-                <div
-                  key={row.id}
-                  className={`rounded-lg border transition-colors ${
-                    row.status === 'declined'
-                      ? 'bg-rose-950/20 border-rose-900/30 hover:border-rose-800/50'
-                      : 'bg-gray-900/40 border-gray-700/50 hover:border-gray-600/50'
-                  }`}
+          <div className="space-y-2">
+            <h3 className="font-semibold">
+              {feedback === "needed"
+                ? "Customer follow-up list"
+                : "Proposals and feedback"}{" "}
+              ({visible.length})
+            </h3>
+            {!visible.length && (
+              <p className="text-gray-400">No records match these filters.</p>
+            )}
+            {visible.map((r) => (
+              <div
+                key={r.id}
+                className="rounded-xl border border-gray-700 bg-gray-800"
+              >
+                <button
+                  onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                  className="w-full p-4 text-left"
                 >
-                  <button
-                    onClick={() => setExpandedId(expanded ? null : row.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono text-gray-400">{row.proposal_number}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                          row.status === 'declined'
-                            ? 'bg-rose-500/20 text-rose-400'
-                            : 'bg-gray-600/40 text-gray-400'
-                        }`}>
-                          {row.status}
-                        </span>
-                        {row.declined_by && (
-                          <span className="text-xs text-gray-600">
-                            by {row.declined_by}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm font-medium text-white mt-0.5">
-                        {row.contact_name || row.contact_company || 'Unknown Customer'}
-                        {row.contact_company && row.contact_name && (
-                          <span className="text-gray-500 font-normal text-xs ml-1">· {row.contact_company}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-bold text-white tabular-nums">{formatCurrency(row.total)}</div>
-                      {row.declined_at && (
-                        <div className="text-xs text-gray-500">
-                          {new Date(row.declined_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0 ml-1">
-                      {expanded
-                        ? <ChevronUp className="w-4 h-4 text-gray-500" />
-                        : <ChevronDown className="w-4 h-4 text-gray-500" />}
-                    </div>
-                  </button>
-
-                  {expanded && (
-                    <div className="px-4 pb-3 pt-0 border-t border-gray-700/30 space-y-1.5 mt-0">
-                      <div className="flex items-center gap-2 pt-2">
-                        {row.created_by_name && (
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <User className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-gray-400">Rep:</span>
-                            <span className="text-white">{row.created_by_name}</span>
-                          </div>
-                        )}
-                        {row.declined_at && (
-                          <div className="flex items-center gap-1.5 text-xs ml-4">
-                            <Calendar className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-gray-400">Date:</span>
-                            <span className="text-white">
-                              {new Date(row.declined_at).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric', year: 'numeric'
-                              })}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {row.decline_reason && (
-                        <div className="text-xs">
-                          <span className="text-gray-500">Reason: </span>
-                          <span className={isSensitiveReason ? 'text-rose-300 font-medium' : 'text-gray-200'}>
-                            {REASON_LABELS[row.decline_reason] || row.decline_reason}
-                          </span>
-                          {isSensitiveReason && (
-                            <span className="ml-1.5 text-rose-500/70">(admin only)</span>
+                  <span className="block font-medium">{r.name}</span>
+                  <span className="block text-xs text-gray-400">
+                    {r.number} · {r.repName} ·{" "}
+                    {r.valueKnown ? money(r.total) : "Value unknown"} ·{" "}
+                    {r.status}
+                    {r.proposalStatus &&
+                      !["declined", "cancelled", "archived"].includes(
+                        r.proposalStatus,
+                      ) &&
+                      ` · Lost-opportunity request; proposal status: ${r.proposalStatus}`}
+                  </span>
+                  <span className="mt-1 block text-sm text-cyan-200">
+                    {r.evidence.reasons
+                      .map((k) => LOSS_REASONS[k] || k)
+                      .join(", ")}
+                  </span>
+                  <span className="block text-xs text-gray-400">
+                    {SOURCE_LABELS[r.evidence.source]}
+                    {needsLossFeedback(r.evidence)
+                      ? " · Customer feedback needed"
+                      : ""}
+                    {r.reminderSent ? " · Reminder sent" : ""}
+                  </span>
+                </button>
+                {expanded === r.id && (
+                  <div className="space-y-3 border-t border-gray-700 p-4">
+                    {r.date && (
+                      <p className="text-xs text-gray-400">
+                        Loss date: {new Date(r.date).toLocaleDateString()}
+                      </p>
+                    )}
+                    {r.history
+                      .slice()
+                      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+                      .map((h, i) => (
+                        <div
+                          key={i}
+                          className="border-l-2 border-cyan-700 pl-3 text-sm"
+                        >
+                          <p>
+                            {SOURCE_LABELS[h.source]} ·{" "}
+                            {h.created_at === "1970-01-01"
+                              ? "Date unknown"
+                              : new Date(h.created_at).toLocaleString()}
+                          </p>
+                          <p>
+                            {h.reasons
+                              .map((k) => LOSS_REASONS[k] || k)
+                              .join(", ")}
+                          </p>
+                          {h.notes && (
+                            <p className="whitespace-pre-wrap text-gray-300">
+                              {h.notes}
+                            </p>
                           )}
                         </div>
+                      ))}
+                    {r.proposalId &&
+                      r.canRecord &&
+                      profile?.role !== "finance" &&
+                      r.status === "declined" && (
+                        <button
+                          className="min-h-11 rounded bg-cyan-700 px-4"
+                          onClick={() => setEditing(r.proposalId)}
+                        >
+                          Record customer call / feedback
+                        </button>
                       )}
-                      {row.decline_notes && (
-                        <div className="text-xs italic text-gray-400">
-                          "{row.decline_notes}"
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    {!r.canRecord && (
+                      <p className="text-sm text-gray-400">
+                        Record phone or email feedback in Reviews → Lost
+                        Opportunities.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </>
+      )}
+      {editing && (
+        <LossFeedbackModal
+          proposalId={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            void load();
+          }}
+        />
       )}
     </div>
   );

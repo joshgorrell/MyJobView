@@ -1,3 +1,4 @@
+import { DeclineProposalModal } from './DeclineProposalModal';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { ProposalWithDetails } from '../../lib/types';
@@ -61,6 +62,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [activityData, setActivityData] = useState<any>(null);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [showPortalNotificationModal, setShowPortalNotificationModal] = useState(false);
   const [notifyCustomerOnPortal, setNotifyCustomerOnPortal] = useState(true);
   const [showReactivateModal, setShowReactivateModal] = useState(false);
@@ -191,6 +193,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
   }
 
   async function handleStatusChange(newStatus: string) {
+    if(newStatus==='declined'&&currentStatus!=='declined'){setShowDeclineModal(true);return;}
     // If changing to "sent" and not already sent, show the submission modal
     if (newStatus === 'sent' && !proposal.sent_at) {
       setPendingStatusChange(newStatus);
@@ -1099,6 +1102,7 @@ export default function ProposalSummary({ proposal, onSave, changeOrderMode = fa
       </div>
       )}
 
+      {showDeclineModal&&<DeclineProposalModal proposalId={proposal.id} proposalNumber={proposal.proposal_number} customerName={proposal.contacts?.full_name||'Customer'} mode="decline" onClose={()=>setShowDeclineModal(false)} onSuccess={()=>{setShowDeclineModal(false);setCurrentStatus('declined');setStatusOverride(true);statusOverrides.set(proposal.id,'declined');onSave?.();}}/>}
       {showSubmissionModal && (
         <ProposalSubmissionModal
           proposalId={proposal.id}
