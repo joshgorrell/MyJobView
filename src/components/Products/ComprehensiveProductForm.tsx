@@ -408,7 +408,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                 {/* Model Number */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Manufacturer Model Number
+                    Model / Alias
                   </label>
                   <input
                     type="text"
@@ -488,14 +488,14 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                 {/* SKU */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SKU
+                    Ordering SKU
                   </label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="Internal SKU"
+                    placeholder="Manufacturer / distributor ordering SKU"
                   />
                 </div>
 
