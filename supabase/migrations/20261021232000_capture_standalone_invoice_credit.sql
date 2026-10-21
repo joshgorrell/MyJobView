@@ -9,6 +9,7 @@ DECLARE
   v_kind text;
   v_source text;
   v_invoice_type text;
+  v_origin uuid;
 BEGIN
   IF NEW.status NOT IN ('submitted','partial','paid','overdue')
      OR NEW.project_id IS NOT NULL
@@ -28,6 +29,17 @@ BEGIN
   SELECT c.assigned_to INTO v_rep
   FROM public.contacts c
   WHERE c.id=NEW.contact_id AND c.organization_id=v_org;
+
+  -- Security recurring billing uses the contract's snapshotted originator,
+  -- not the customer's current assigned salesperson.
+  IF NEW.security_billing_cycle_id IS NOT NULL THEN
+    SELECT sc.originating_sales_rep_id INTO v_origin
+      FROM public.security_billing_cycles bc
+      JOIN public.security_contracts sc ON sc.id=bc.contract_id
+      WHERE bc.id=NEW.security_billing_cycle_id
+        AND bc.organization_id=v_org AND sc.organization_id=v_org;
+    v_rep := v_origin;
+  END IF;
 
   -- If the owner is not an active sales rep in this organization, leave
   -- the event unassigned; never credit the invoice creator.
@@ -63,7 +75,9 @@ BEGIN
     NEW.id, 'invoice:posted:'||NEW.id::text,
     (COALESCE(NEW.invoice_date,CURRENT_DATE)::timestamp AT TIME ZONE 'America/Chicago'),
     COALESCE(NEW.subtotal,NEW.total-COALESCE(NEW.tax_amount,0)),
-    CASE WHEN v_rep IS NULL THEN 'customer_unassigned_at_posting'
+    CASE WHEN NEW.security_billing_cycle_id IS NOT NULL THEN
+           CASE WHEN v_rep IS NULL THEN 'security_contract_origin_unassigned' ELSE 'security_contract_origin_snapshot' END
+         WHEN v_rep IS NULL THEN 'customer_unassigned_at_posting'
          ELSE 'customer_owner_at_invoice_posting' END
   )
   ON CONFLICT (organization_id,source_event_key) DO NOTHING;
