@@ -75,7 +75,7 @@ BEGIN
   IF b.submitted_at IS NOT NULL THEN RETURN b.id; END IF;
   UPDATE public.design_briefs SET status='submitted',submitted_at=now() WHERE id=b.id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Unable to submit design brief'; END IF;
-  INSERT INTO public.notifications(organization_id,user_id,type,title,message,related_id,read)
+  INSERT INTO public.notifications(organization_id,user_id,type,title,body,related_id,is_read)
     SELECT b.organization_id,p.id,'task_assigned','New Design Brief',
       coalesce(actor.full_name,'A sales rep') || ' submitted a design brief. Review the design and select products.',b.id,false
     FROM public.profiles p WHERE p.organization_id=b.organization_id AND p.role IN ('admin','manager','service_manager') AND p.is_active IS DISTINCT FROM false;
@@ -90,7 +90,7 @@ CREATE OR REPLACE FUNCTION public.design_brief_convert(
   p_brief uuid, p_contact uuid, p_lead uuid, p_title text,
   p_tax_environment text, p_tax_type text, p_tax_rate numeric
 ) RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path=public AS $$
-DECLARE b public.design_briefs; actor public.profiles; l public.leads; customer uuid:=p_contact; proposal uuid;
+DECLARE b public.design_briefs; actor public.profiles; l public.leads; customer uuid:=p_contact; proposal uuid; office uuid;
 BEGIN
   SELECT * INTO actor FROM public.profiles WHERE id=auth.uid() AND is_active IS DISTINCT FROM false AND role IN ('admin','manager','service_manager');
   IF actor.organization_id IS NULL THEN RAISE EXCEPTION 'Manager authorization required'; END IF;
@@ -104,14 +104,21 @@ BEGIN
     IF NOT FOUND THEN RAISE EXCEPTION 'Lead not found'; END IF;
     SELECT id INTO customer FROM public.contacts WHERE id=l.converted_from_contact_id AND organization_id=actor.organization_id;
     IF customer IS NULL THEN
-      INSERT INTO public.contacts(organization_id,contact_name,company_name,email,phone,contact_type)
-        VALUES(actor.organization_id,l.contact_name,l.company_name,l.email,l.phone,'person') RETURNING id INTO customer;
+      office:=coalesce(l.office_id,actor.primary_office_id,actor.default_office_id);
+      IF office IS NULL OR NOT EXISTS(SELECT 1 FROM public.offices WHERE id=office AND organization_id=actor.organization_id) THEN
+        RAISE EXCEPTION 'Assign an office to the lead before creating its customer';
+      END IF;
+      INSERT INTO public.contacts(organization_id,contact_name,first_name,last_name,company_name,email,phone,contact_type,username,office_id,created_by)
+        VALUES(actor.organization_id,l.contact_name,split_part(btrim(l.contact_name),' ',1),
+          nullif(btrim(substr(btrim(l.contact_name),length(split_part(btrim(l.contact_name),' ',1))+1)),''),
+          l.company_name,l.email,l.phone,'person','lead'||replace(l.id::text,'-',''),office,actor.id) RETURNING id INTO customer;
     END IF;
   END IF;
   proposal:=public.design_brief_create_proposal(p_brief,customer,p_title,p_tax_environment,p_tax_type,p_tax_rate);
   UPDATE public.design_briefs SET contact_id=customer,lead_id=NULL WHERE id=p_brief;
   IF p_lead IS NOT NULL THEN
-    UPDATE public.leads SET status='converted' WHERE id=p_lead;
+    UPDATE public.leads SET converted_from_contact_id=customer,
+      status=CASE WHEN status IN ('closed_won','closed_lost') THEN status ELSE 'in_progress' END WHERE id=p_lead;
     IF NOT FOUND THEN RAISE EXCEPTION 'Unable to convert lead'; END IF;
   END IF;
   RETURN proposal;
