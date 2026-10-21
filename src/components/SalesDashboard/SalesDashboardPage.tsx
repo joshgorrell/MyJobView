@@ -62,7 +62,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     : false;
 
   const effectiveRepId = isManager
-    ? (selectedRepId || profile?.id || null)
+    ? (selectedRepId || (profile?.is_sales_rep ? profile.id : null))
     : (profile?.id || null);
 
   const isManagerView = isManager && selectedRepId !== null && selectedRepId !== profile?.id;
@@ -149,6 +149,16 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             </button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!data && isManager && !effectiveRepId) {
+    return (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        <h1 className="text-lg font-semibold text-white">Sales Dashboard</h1>
+        <p className="text-sm text-gray-300">Select a salesperson to view their dashboard. Company-wide reporting is not available here yet.</p>
+        {profile?.organization_id && <ManagerRepSelector selectedRepId={selectedRepId} onSelectRep={setSelectedRepId} orgId={profile.organization_id} currentUserId={profile.id} currentUserIsSalesRep={false} />}
       </div>
     );
   }
