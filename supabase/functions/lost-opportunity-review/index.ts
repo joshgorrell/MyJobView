@@ -69,12 +69,13 @@ function buildInvitationEmail(
 ): string {
   const company = escape(settings?.company_name || "Our team");
   const personal = !!settings?.invitation_owner_name;
+  const repName = settings?.invitation_rep_name;
   const introduction = personal
     ? `I’m ${escape(settings.invitation_owner_name)}, owner of ${company}.`
-    : `We’re the leadership team at ${company}.`;
+    : repName ? `I’m ${escape(repName)} with ${company}.` : `We’re the team at ${company}.`;
   const signature = personal && settings?.invitation_owner_photo_url
     ? `<p>Thank you,</p><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px;vertical-align:middle"><img src="${escape(settings.invitation_owner_photo_url)}" alt="${escape(settings.invitation_owner_name)}" width="72" style="display:block;width:72px;height:auto;border-radius:10px;border:0" /></td><td style="vertical-align:middle;line-height:1.5"><strong>${escape(settings.invitation_owner_name)}</strong><br><span style="font-size:14px">Owner, ${company}</span></td></tr></table>`
-    : `<p>Thank you,<br>${personal ? escape(settings.invitation_owner_name) : `${company} leadership team`}</p>`;
+    : `<p>Thank you,<br>${repName ? escape(repName) : personal ? escape(settings.invitation_owner_name) : `${company} team`}</p>`;
   const html = wrapInEmailLayout(
     `<p>Hi ${escape(contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p>${signature}`,
     company,
@@ -482,10 +483,29 @@ Deno.serve(async (req) => {
           400,
         );
       }
-      // Electronic Life's owner introduction is specific to its tenant.
-      if (settings && organization.subdomain === "elife") {
-        settings.invitation_owner_name = "Josh Gorrell";
-        settings.invitation_owner_photo_url = `${base}/images/josh-gorrell-email.jpg`;
+      const senderVariant = b.sender_variant || "sales";
+      if (!["sales", "owner"].includes(senderVariant)) return json({ error: "Choose a sender." }, 400);
+      if (senderVariant === "owner" && organization.subdomain !== "elife") return json({ error: "Owner template is configured for Electronic Life only." }, 400);
+      let senderName = "";
+      let senderEmail = "";
+      if (senderVariant === "owner") {
+        senderName = "Josh Gorrell";
+        senderEmail = "josh@electroniclife.com";
+        if (settings) {
+          settings.invitation_owner_name = senderName;
+          settings.invitation_owner_photo_url = `${base}/images/josh-gorrell-email.jpg`;
+        }
+      } else {
+        let rep: any = null;
+        if (b.proposal_id) {
+          const linked = await checked(await client.from("proposals").select("created_by").eq("id", b.proposal_id).eq("contact_id", contact.id).eq("organization_id", org).single());
+          if (linked.created_by) rep = await checked(await admin.from("profiles").select("first_name,last_name,email,is_active").eq("id", linked.created_by).eq("organization_id", org).maybeSingle());
+        }
+        if (!rep) rep = profile;
+        senderName = [rep.first_name, rep.last_name].filter(Boolean).join(" ").trim();
+        senderEmail = rep.email || "";
+        if (!senderName || !senderEmail || rep.is_active === false) return json({ error: "The salesperson needs an active profile with a name and email." }, 400);
+        if (settings) settings.invitation_rep_name = senderName;
       }
       if (b.action === "preview") {
         const previewUrl = new URL("/lost-opportunity-review", base);
@@ -556,11 +576,9 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: `${
-            settings?.from_name || settings?.company_name || "Our team"
-          } <${settings?.from_email || settings?.company_email}>`,
+          from: `${senderName.replace(/[<>\r\n]/g, "")} <${settings?.from_email || settings?.company_email}>`,
           to: contact.email,
-          reply_to: settings?.reply_to_email || settings?.company_email,
+          reply_to: senderEmail,
           subject: b.title,
           html: trackedHtml,
         }),
