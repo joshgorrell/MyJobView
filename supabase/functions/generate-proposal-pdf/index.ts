@@ -62,9 +62,9 @@ Deno.serve(async (req: Request) => {
           showLinePrice: template.show_line_item_total,
           showSKU: template.show_sku,
           showManufacturer: template.show_manufacturer,
-          showColor: false, // Not explicitly in template
+          showColor: template.show_item_color ?? false,
           showAreaTotals: template.show_area_subtotals,
-          showInstalledPrice: true, // Calculated from parts + labor
+          showInstalledPrice: template.show_installed_price ?? true, // Equipment plus labor
           showLaborPerLine: template.show_labor_total,
           separatePartsLabor: template.show_labor_separate_from_parts,
           showSalesTax: template.show_tax_breakdown,
