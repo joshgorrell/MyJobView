@@ -66,7 +66,7 @@ export default function ProductCatalogView(props: Props) {
 function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onDuplicate, onDelete, onArchive }: Props) {
   const actions = (product: CatalogProduct) => <div className="flex items-center justify-end gap-1">
     {canEdit && <>
-      <button type="button" aria-label={`Edit ${product.sku || product.manufacturer_model_number}`} onClick={() => onEdit(product.id)} className="p-2 text-blue-400"><Pencil size={16} /></button>
+      <button type="button" aria-label={`Edit ${product.manufacturer_model_number || product.sku}`} onClick={() => onEdit(product.id)} className="p-2 text-blue-400"><Pencil size={16} /></button>
       <button type="button" aria-label={`Duplicate ${product.sku || product.manufacturer_model_number}`} onClick={() => onDuplicate(product.id)} className="p-2 text-purple-400"><Copy size={16} /></button>
       <button type="button" aria-label={`${product.is_active === false ? 'Restore' : 'Archive'} ${product.sku || product.manufacturer_model_number}`} onClick={() => onArchive(product.id, product.is_active !== false)} className="p-2 text-gray-400">{product.is_active === false ? <ArchiveRestore size={16} /> : <Archive size={16} />}</button>
       <button type="button" aria-label={`Delete ${product.sku || product.manufacturer_model_number}`} onClick={() => onDelete(product.id)} className="p-2 text-red-400"><Trash2 size={16} /></button>
@@ -116,7 +116,7 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
           <col style={{ width: canEdit ? 144 : 48 }} />
         </colgroup>
         <thead className="border-b border-gray-700 text-xs text-gray-400"><tr>
-          <th className="p-2 text-left">Model / SKU</th><th className="p-2 text-left">Description</th>
+          <th className="p-2 text-left">Model / Alias</th><th className="p-2 text-left">Description</th>
           {groupBy !== 'vendor' && <th className="p-2 text-left">Vendor</th>}
           <th className="p-2 text-right">Price</th>{!hideCost && <th className="p-2 text-right">Cost</th>}<th className="p-2 text-right">Actions</th>
         </tr></thead>
