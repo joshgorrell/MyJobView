@@ -1,3 +1,4 @@
+import { needsPersonalFollowup } from "../../lib/lostOpportunityFollowup";
 import {RecordLostFeedback} from './RecordLostFeedback';
 import { requestConfirmation } from '../../lib/feedback';
 import { FullEmailPreview } from "./FullEmailPreview";
@@ -47,6 +48,7 @@ interface Review {
   sent_by_name: string | null;
   response_created_at: string | null;
   follow_up_sent_at?: string|null;
+  manual_resend_history?: {sent_at:string;sent_by:string}[];
 }
 export default function LostOpportunityReviews(
   { showCreate: _showCreate = false }: { showCreate?: boolean },
@@ -296,7 +298,7 @@ export default function LostOpportunityReviews(
   const pendingCount = reviews.filter(v => !v.responded_at).length;
   const reviewedCount = reviews.filter(v => !!v.reviewed_at).length;
   const winnableCount = reviews.filter(v => ["yes", "maybe"].includes(v.response?.recoverable || "")).length;
-  const recoveredCount = reviews.filter(v => v.recovery_outcome === "won").length;
+  const recoveredCount = reviews.filter(v => v.recovery_outcome === "recovered").length;
   const responseRate = totalSent > 0 ? Math.round((respondedCount / totalSent) * 100) : 0;
   const recoveryRate = respondedCount > 0 ? Math.round((recoveredCount / respondedCount) * 100) : 0;
 
@@ -310,7 +312,7 @@ export default function LostOpportunityReviews(
   const filterOptions: FilterOption[] = [
     { value: 'all', label: 'All', count: totalSent },
     { value: 'awaiting', label: 'Awaiting', count: pendingCount },
-    { value:'call_list',label:'Call list',count:reviews.filter(v=>!v.responded_at&&!!v.follow_up_sent_at).length },
+    { value:'call_list',label:'Needs Personal Follow-up',count:reviews.filter(v=>needsPersonalFollowup(v)).length },
     { value: 'new', label: 'New', count: reviews.filter(v => !!v.responded_at && !v.reviewed_at).length },
     { value: 'winnable', label: 'Winnable', count: winnableCount },
     { value: 'complete', label: 'Complete', count: reviewedCount },
@@ -319,7 +321,7 @@ export default function LostOpportunityReviews(
 
   const visible = reviews.filter((v) =>
     filter === "all" || v.request_id === expandedReview ||
-    filter === "call_list" && !v.responded_at && !!v.follow_up_sent_at ||
+    filter === "call_list" && needsPersonalFollowup(v) ||
     filter === "new" && !!v.responded_at && !v.reviewed_at ||
     filter === "awaiting" && !v.responded_at ||
     filter === "complete" && !!v.reviewed_at ||
@@ -389,7 +391,7 @@ export default function LostOpportunityReviews(
         </div>
       </div>
       <ReviewStatsRow stats={lostStats} />
-      {error && (
+      {error && !expandedReview && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
           {error}
         </p>
@@ -553,7 +555,7 @@ export default function LostOpportunityReviews(
                 ? "Delivery Failed"
                 : v.delivery_status === "pending"
                 ? "Delivery Pending"
-                : "Awaiting Response";
+                : needsPersonalFollowup(v) ? "Needs Follow-up" : "Awaiting Response";
               const activityAt = v.response_created_at || v.responded_at || v.sent_at;
               return (
                 <button
@@ -619,10 +621,22 @@ export default function LostOpportunityReviews(
               </div>
 
               <div className="space-y-4 py-4">
+                {error&&<p role="alert" className="text-sm text-red-300">{error}</p>}
                 <HistoryLine v={v} />
+                {needsPersonalFollowup(v)&&<p className="rounded-lg border border-amber-700 bg-amber-900/20 p-3 text-sm text-amber-200">Needs Personal Follow-up — 30 days or more without customer feedback. No automatic email is sent at day 30.</p>}
+                {(v.manual_resend_history||[]).map((entry,i)=><p key={i} className="text-sm text-gray-400">Survey manually resent {formatDateTime(entry.sent_at)}</p>)}
+                {!v.responded_at&&canSend&&<button type="button" disabled={busy} className="min-h-11 rounded-lg bg-violet-700 px-4 text-white disabled:opacity-50" onClick={async()=>{
+                  const confirmed=await requestConfirmation(`Send the survey again to ${v.recipient||'this customer'}? This keeps the original request date and follow-up flag.`,{title:'Resend feedback survey?',confirmLabel:'Resend survey',theme:'violet'});
+                  if(!confirmed)return;
+                  setBusy(true);setError('');
+                  try{await lostReviewAction({action:'resend',request_id:v.request_id});setNotice('Survey resent. The request is still awaiting feedback.');await load();}
+                  catch(e){setError(e instanceof Error?e.message:'Unable to resend survey.');}
+                  finally{setBusy(false);}
+                }}>Resend survey</button>}
+
                 {v.follow_up_sent_at&&<p className="text-sm text-gray-400">Final feedback reminder sent {formatDateTime(v.follow_up_sent_at)}</p>}
                 {!v.responded_at&&canView&&(canSend||['admin','owner','super_admin'].includes(profile?.role||''))&&<RecordLostFeedback requestId={v.request_id} onSaved={()=>void load()}/>}
-                {v.response?.source&&<p className="text-sm text-cyan-300">Feedback source: {v.response.source==='customer'?'Customer online':`Customer by ${v.response.source}`}</p>}
+                {v.response?.source&&<p className="text-sm text-cyan-300">Feedback source: {v.response.source==='customer'?'Customer online':v.response.source==='in_person'?'Customer in person':`Customer by ${v.response.source}`}</p>}
                 {v.responded_at && !v.response && (
                   <p className="text-sm text-gray-400">Private — viewing this response requires the View Lost Opportunity Submissions permission.</p>
                 )}

@@ -29,7 +29,7 @@ const now = new Date("2026-10-20T12:00:00Z"),
   org = {
     organization_id: "org1",
     lost_review_followup_enabled: true,
-    lost_review_followup_days: 7,
+    lost_review_followup_days: 14,
   };
 let tables,
   emails = [],
@@ -57,7 +57,7 @@ function add(id, overrides = {}) {
     opportunity_name: "Home theater",
     title: "Our quote",
     review_requests: {
-      sent_at: "2026-10-12T12:00:00Z",
+      sent_at: "2026-10-06T12:00:00Z",
       recipient_name: "Test",
       recipient_email: "customer@example.com",
     },
@@ -155,6 +155,8 @@ add("other-org", { organization_id: "org2" });
 add("fresh", {
   review_requests: { ...due.review_requests, sent_at: "2026-10-19T12:00:00Z" },
 });
+add("day-thirty", { review_requests: {...due.review_requests,sent_at:"2026-09-20T12:00:00Z"} });
+add("day-before", { review_requests: {...due.review_requests,sent_at:"2026-10-06T12:00:01Z"} });
 add("missing-date", {
   review_requests: { ...due.review_requests, sent_at: null },
 });
@@ -262,5 +264,5 @@ assert.ok(
   ).includes("<script>"),
 );
 console.log(
-  "Seven-day reminder eligibility, links, original-token preservation, tenant isolation, manual feedback suppression, concurrent claims and delivery retries passed.",
+  "Fourteen-day reminder eligibility, links, original-token preservation, tenant isolation, manual feedback suppression, concurrent claims and delivery retries passed.",
 );

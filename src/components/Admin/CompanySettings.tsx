@@ -68,7 +68,7 @@ export function CompanySettings() {
   const [autoReviewFollowupEnabled, setAutoReviewFollowupEnabled] = useState(false);
   const [autoReviewFollowupDays, setAutoReviewFollowupDays] = useState(14);
   const [lostFollowupEnabled,setLostFollowupEnabled]=useState(false);
-  const [lostFollowupDays,setLostFollowupDays]=useState(7);
+  const [lostFollowupDays,setLostFollowupDays]=useState(14);
 
   // Billing Preference Settings
   const [annualBillingEnabled, setAnnualBillingEnabled] = useState(false);
@@ -158,7 +158,7 @@ export function CompanySettings() {
         setAutoReviewFollowupEnabled(data.auto_review_followup_enabled ?? false);
         setAutoReviewFollowupDays(data.auto_review_followup_days ?? 14);
         setLostFollowupEnabled(data.lost_review_followup_enabled??false);
-        setLostFollowupDays(data.lost_review_followup_days??7);
+        setLostFollowupDays(data.lost_review_followup_days??14);
         setAnnualBillingEnabled(data.annual_billing_enabled ?? false);
         setDefaultBillingPreference(data.default_billing_preference ?? 'monthly');
         setAnnualDiscountType(data.annual_discount_type ?? 'none');
@@ -1909,7 +1909,7 @@ export function CompanySettings() {
           )}
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6"><h2 className="text-xl font-semibold text-gray-900">Lost Opportunity Feedback Reminders</h2><p className="text-sm text-gray-600">Send one final reminder with a private questionnaire link when the customer has not provided feedback online, by phone, or by email. Staff assessments do not stop reminders.</p><label className="flex items-center gap-3 text-gray-900"><input type="checkbox" checked={lostFollowupEnabled} onChange={e=>setLostFollowupEnabled(e.target.checked)}/>Enable lost-opportunity feedback reminders</label><label className="block text-sm text-gray-700">Days after the first request<input aria-label="Lost opportunity reminder delay" type="number" min={1} max={90} value={lostFollowupDays} onChange={e=>setLostFollowupDays(Math.min(90,Math.max(1,Number(e.target.value))))} className="block mt-1 rounded border border-gray-300 p-2"/></label><p className="text-xs text-gray-500">Runs daily. Default: 7 days. After the reminder, unanswered requests remain available for staff follow-up.</p></div>
+        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6"><h2 className="text-xl font-semibold text-gray-900">Lost Opportunity Feedback Reminders</h2><p className="text-sm text-gray-600">Send one final reminder with a private questionnaire link when the customer has not provided feedback online, by phone, or by email. Staff assessments do not stop reminders.</p><label className="flex items-center gap-3 text-gray-900"><input type="checkbox" checked={lostFollowupEnabled} onChange={e=>setLostFollowupEnabled(e.target.checked)}/>Enable lost-opportunity feedback reminders</label><label className="block text-sm text-gray-700">Days after the first request<input aria-label="Lost opportunity reminder delay" type="number" min={1} max={90} value={lostFollowupDays} onChange={e=>setLostFollowupDays(Math.min(90,Math.max(1,Number(e.target.value))))} className="block mt-1 rounded border border-gray-300 p-2"/></label><p className="text-xs text-gray-500">Runs daily. Default: 14 days. At day 30 from the original request, unanswered requests are flagged for personal follow-up. No automatic email is sent at day 30.</p></div>
         {/* Automated Follow-Up Settings */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6">
           <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">

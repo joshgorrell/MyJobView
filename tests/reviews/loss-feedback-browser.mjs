@@ -167,11 +167,11 @@ try {
     );
     await page
       .getByRole("button", {
-        name: "Record customer call / email feedback",
+        name: "Record customer feedback",
         exact: true,
       })
       .click();
-    await page.getByLabel("Customer feedback source").selectOption("email");
+    await page.getByLabel("Customer feedback source").selectOption("in_person");
     await page.getByLabel("Price was too high", { exact: true }).check();
     await page.getByLabel("Recovery opportunity").selectOption("no");
     await page
@@ -180,7 +180,7 @@ try {
     await page.waitForFunction(() => window.manualSaved === true);
     assert.equal(
       await page.evaluate(() => window.endpointCalls[0].source),
-      "email",
+      "in_person",
     );
     assert.deepEqual(errors, []);
     await page.close();

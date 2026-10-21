@@ -124,7 +124,7 @@ export function DeclineProposalModal({
         <div className="p-5 space-y-4">
           <p className="text-sm text-gray-400">{description}</p>
 
-          {isDecline&&<label className="block text-sm font-medium text-gray-300">Feedback source<select aria-label="Decline feedback source" value={feedbackSource} onChange={e=>{setFeedbackSource(e.target.value);if(['no_response','unknown'].includes(reason))setReason('');}} className="mt-1.5 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"><option value="staff_assessment">Staff assessment / unconfirmed</option><option value="phone">Customer told us by phone</option><option value="email">Customer told us by email</option></select></label>}
+          {isDecline&&<label className="block text-sm font-medium text-gray-300">Feedback source<select aria-label="Decline feedback source" value={feedbackSource} onChange={e=>{setFeedbackSource(e.target.value);if(['no_response','unknown'].includes(reason))setReason('');}} className="mt-1.5 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"><option value="staff_assessment">Staff assessment / unconfirmed</option><option value="phone">Customer told us by phone</option><option value="email">Customer told us by email</option><option value="in_person">Customer told us in person</option></select></label>}
           {/* Reason */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">

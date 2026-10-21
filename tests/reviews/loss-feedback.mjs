@@ -157,6 +157,8 @@ const settings = (
 ).rows;
 assert.equal(settings[0].lost_review_followup_enabled, true);
 assert.equal(settings[0].lost_review_followup_days, 7);
+await db.exec(await readFile(new URL('../../supabase/migrations/20261021135208_lost_feedback_personal_followup.sql',import.meta.url),'utf8'));
+assert.equal((await db.query("select lost_review_followup_days from company_settings where organization_id='00000000-0000-0000-0000-000000000001'")).rows[0]?.lost_review_followup_days,14);
 assert.equal(settings[0].auto_review_followup_enabled, false);
 assert.equal(settings[0].auto_review_followup_days, 14);
 assert.equal(settings[1].lost_review_followup_enabled, false);
@@ -179,6 +181,10 @@ assert.equal(
   (await db.query("select * from proposal_loss_feedback")).rows.length,
   1,
 );
+await db.exec('BEGIN');
+await insert(30,1,'in_person');
+assert.equal((await db.query("select count(*)::int as total from proposal_loss_feedback where source='in_person'")).rows[0].total,1);
+await db.exec('ROLLBACK');
 await assert.rejects(
   db.query(
     "INSERT INTO proposal_loss_feedback(organization_id,proposal_id,source,reasons,recorded_by)VALUES($1,$2,$3,$4,$5)",
@@ -293,3 +299,14 @@ await db.close();
 console.log(
   "Loss reporting, source priority, deduplication, dates, immutable history, tenant/rep/module isolation, atomic declines and archived outcomes passed.",
 );
+
+const { needsPersonalFollowup } = await moduleFrom(await readFile(new URL('../../src/lib/lostOpportunityFollowup.ts',import.meta.url),'utf8'));
+const clock=Date.parse('2026-10-21T12:00:00Z');
+const waiting={sent_at:'2026-09-21T12:00:00Z',responded_at:null,delivery_status:'sent'};
+assert.equal(needsPersonalFollowup(waiting,clock-1),false);
+assert.equal(needsPersonalFollowup(waiting,clock),true);
+assert.equal(needsPersonalFollowup({...waiting,responded_at:'2026-10-20'},clock),false);
+assert.equal(needsPersonalFollowup({...waiting,delivery_status:'failed'},clock),false);
+assert.equal(needsPersonalFollowup({...waiting,sent_at:'invalid'},clock),false);
+
+console.log('Day-30 personal follow-up boundaries and in-person feedback passed.');

@@ -36,6 +36,7 @@ export type FeedbackSource =
   | "customer"
   | "phone"
   | "email"
+  | "in_person"
   | "staff_assessment"
   | "legacy_staff"
   | "unknown";
@@ -43,6 +44,7 @@ export const SOURCE_LABELS: Record<FeedbackSource, string> = {
   customer: "Customer online",
   phone: "Customer by phone",
   email: "Customer by email",
+  in_person: "Customer in person",
   staff_assessment: "Staff assessment",
   legacy_staff: "Staff entry (unverified)",
   unknown: "No feedback",
@@ -109,12 +111,12 @@ export interface ReviewResponse {
   request_id: string;
   reasons: string[];
   message: string;
-  source: "customer" | "phone" | "email";
+  source: "customer" | "phone" | "email" | "in_person";
   created_at: string;
   recorded_by: string | null;
 }
 export const isConfirmed = (source: FeedbackSource) =>
-  ["customer", "phone", "email"].includes(source);
+  ["customer", "phone", "email", "in_person"].includes(source);
 export const needsLossFeedback = (e: LossEvidence) =>
   !isConfirmed(e.source) ||
   !e.reasons.some((r) => !["unknown", "no_response"].includes(r));

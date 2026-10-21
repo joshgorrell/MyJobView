@@ -16,7 +16,7 @@ try {
     await page.goto('http://127.0.0.1:5189');
     await page.getByRole('button', { name: /John Valley Home theater/ }).getByText('NEW!', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.reviewCalls), 0, 'Loading list does not complete responses');
-    await page.getByRole('combobox').selectOption('new');
+    await page.getByRole('button', {name:/^New/}).click();
     assert.equal(await page.getByText('Awaiting customer', { exact: true }).count(), 0);
     await page.getByRole('button', { name: /John Valley Home theater/ }).getByText('NEW!', { exact: true }).click();
     await page.getByRole('button', { name: /John Valley Home theater/ }).getByText('Complete', { exact: true }).waitFor();
@@ -26,7 +26,7 @@ try {
     assert.equal(await page.getByRole('button', { name: 'Mark Reviewed' }).count(), 0);
     assert.equal(await page.evaluate(() => window.reviewCalls), 1);
     await page.getByRole('dialog', { name: 'John Valley', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
-    await page.getByRole('combobox').selectOption('complete');
+    await page.getByRole('button', {name:/^Complete/}).click();
     await page.getByRole('button', { name: /Home theater/ }).click();
     assert.equal(await page.evaluate(() => window.reviewCalls), 1, 'Reopening preserves first review');
     const card = page.getByRole('button', { name: /John Valley Home theater/ });
@@ -53,6 +53,28 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Fits viewport');
     await page.close();
   }
+  for(const width of [390,1280]){
+    const followup=await browser.newPage({viewport:{width,height:900}});
+    await followup.goto('http://127.0.0.1:5189/?personal=1');
+    const filter=followup.getByRole('button',{name:/Needs Personal Follow-up/});
+    await filter.click();
+    await followup.getByRole('button',{name:/Other customer Awaiting customer/}).click();
+    await followup.getByText(/No automatic email is sent at day 30/).waitFor();
+    await followup.getByRole('button',{name:'Resend survey',exact:true}).click();
+    await followup.getByRole('dialog',{name:'Resend feedback survey?'}).getByRole('button',{name:'Resend survey',exact:true}).click();
+    await followup.getByText(/Survey manually resent/).waitFor();
+    await followup.getByRole('button',{name:'Record customer feedback',exact:true}).click();
+    await followup.getByLabel('Customer feedback source').selectOption('in_person');
+    await followup.getByLabel('Price was too high',{exact:true}).check();
+    await followup.getByLabel('Recovery opportunity').selectOption('no');
+    await followup.getByRole('button',{name:'Save customer feedback',exact:true}).click();
+    await followup.getByRole('button',{name:'Save customer feedback',exact:true}).waitFor({state:'hidden'});
+    await followup.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+    assert.equal(await followup.getByRole('button',{name:/Other customer Awaiting customer/}).count(),0,'Recording feedback clears day-30 call list');
+    assert.ok(await followup.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await followup.close();
+  }
+  console.log('Day-30 follow-up flag, manual resend history and in-person completion passed on phone and desktop.');
   const page = await browser.newPage();
   await page.goto('http://127.0.0.1:5189');
   await page.getByRole('button', { name: /John Valley Home theater/ }).getByText('NEW!', { exact: true }).waitFor();
