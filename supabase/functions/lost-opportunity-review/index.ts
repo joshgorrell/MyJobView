@@ -734,7 +734,7 @@ Deno.serve(async (req) => {
     }
     if (b.action === "record_feedback") {
       if (
-        !profile.can_view_lost_opportunity_submissions ||
+        !(["admin", "owner", "super_admin"].includes(profile.role) || profile.can_view_lost_opportunity_submissions) ||
         !(
           profile.can_send_lost_opportunity_reviews ||
           ["admin", "owner", "super_admin"].includes(profile.role)
