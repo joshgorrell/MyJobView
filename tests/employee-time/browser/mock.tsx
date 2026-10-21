@@ -20,3 +20,5 @@ export const WorkOrderTimeControl=()=> <button>Start Job Time</button>;
 export const TimeClockModal=()=> <button>Start Your Day</button>;
 
 export const MyJobTimeView=()=> <div>Job time history</div>;
+
+export const CustomerTimeTimer=()=>null;

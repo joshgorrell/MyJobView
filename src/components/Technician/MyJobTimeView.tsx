@@ -19,13 +19,13 @@ export function MyJobTimeView({salary=false}:{salary?:boolean}) {
       const anchor=new Date(today+'T12:00:00Z');anchor.setUTCDate(anchor.getUTCDate()-6);
       const from=anchor.toISOString().slice(0,10);
       const [time,manual,internal]=await Promise.all([
-        supabase.from('time_entries').select('id,entry_date,clock_in,clock_out,total_hours,entry_type,status,notes,work_order:work_orders(work_order_number),project:projects(project_number,name)')
-          .eq('technician_id',profile.id).in('entry_type',['work_order','project','shop_time','training']).gte('entry_date',from).lte('entry_date',today).order('clock_in',{ascending:false}),
-        supabase.from('manual_job_time_requests').select('id,entry_date,clock_in,clock_out,break_minutes,status,reason').eq('technician_id',profile.id).eq('status','pending'),
+        supabase.from('time_entries').select('id,entry_date,clock_in,clock_out,total_hours,entry_type,status,notes,work_classification,activity_type,customer:contacts(full_name),work_order:work_orders(work_order_number,type),project:projects(project_number,name)')
+          .eq('technician_id',profile.id).in('entry_type',['work_order','project','customer_activity','shop_time','training']).gte('entry_date',from).lte('entry_date',today).order('clock_in',{ascending:false}),
+        supabase.from('manual_job_time_requests').select('id,entry_date,clock_in,clock_out,break_minutes,status,reason,project_id,work_order_id,customer:contacts(full_name),work_order:work_orders(work_order_number,type)').eq('technician_id',profile.id).eq('status','pending'),
         supabase.from('internal_time_sessions').select('id,session_date,predetermined_hours,status,title').eq('assigned_to',profile.id).eq('status','pending_approval'),
       ]);
       if(time.error) throw time.error;if(manual.error) throw manual.error;if(internal.error) throw internal.error;
-      setEntries(time.data||[]);setPending([...(manual.data||[]).map(r=>({...r,hours:(Date.parse(r.clock_out)-Date.parse(r.clock_in))/3600000-r.break_minutes/60,title:r.reason})),...(internal.data||[]).map(r=>({...r,hours:r.predetermined_hours||0}))]);
+      setEntries(time.data||[]);setPending([...(manual.data||[]).map(r=>({...r,hours:(Date.parse(r.clock_out)-Date.parse(r.clock_in))/3600000-r.break_minutes/60,title:[r.customer?.full_name,r.work_order ? (r.work_order.type==='project'?'Project Work Order':'Service') : r.project_id?'Project':'Customer Activity',r.work_order?.work_order_number,r.reason].filter(Boolean).join(' · ')})),...(internal.data||[]).map(r=>({...r,hours:r.predetermined_hours||0}))]);
     } catch(error:any) {setError(error.message||'Unable to load time.');}
     finally {setLoading(false);}
   }
@@ -38,7 +38,7 @@ export function MyJobTimeView({salary=false}:{salary?:boolean}) {
     {loading?<p>Loading time…</p>:error?<p role="alert" className="text-red-600">{error}</p>:<>
       <div className="rounded-lg border border-subtle bg-elevated p-3"><p className="text-sm text-primary">{salary ? `${recorded.toFixed(2)} recorded hours` : `${approved.toFixed(2)} approved payable hours`}</p><p className="text-xs text-secondary">{salary?'Recorded time is for job costing; salary determines pay.':'Work Order time and approved manual/internal time determine pay. Pending and unapproved hours are excluded.'}</p></div>
       {entries.length===0 && <p className="text-sm text-secondary">No recorded job time in the last seven days.</p>}
-      {entries.map(e=><div key={e.id} className="rounded-lg border border-subtle p-3 text-sm"><div className="flex justify-between gap-2"><span className="text-primary">{e.entry_date} · {e.work_order?.work_order_number || e.project?.project_number || e.entry_type.replaceAll('_',' ')}</span><span className="text-secondary">{Number(e.total_hours||0).toFixed(2)}h · {e.status}</span></div><p className="text-xs text-secondary">{formatTimeInTimezone(e.clock_in,timezone)}–{e.clock_out?formatTimeInTimezone(e.clock_out,timezone):'Running'}</p></div>)}
+      {entries.map(e=><div key={e.id} className="rounded-lg border border-subtle p-3 text-sm"><div className="flex justify-between gap-2"><span className="text-primary">{[e.entry_date,e.work_classification === 'service' || (e.work_order && e.work_order.type !== 'project') ? 'Service' : e.entry_type === 'customer_activity' ? 'Customer Activity' : e.work_classification === 'project' || e.project || e.work_order ? 'Project' : null,e.customer?.full_name,e.work_order?.work_order_number || e.project?.project_number || e.entry_type.replaceAll('_',' ')].filter(Boolean).join(' · ')}</span><span className="text-secondary">{Number(e.total_hours||0).toFixed(2)}h · {e.status}</span></div><p className="text-xs text-secondary">{formatTimeInTimezone(e.clock_in,timezone)}–{e.clock_out?formatTimeInTimezone(e.clock_out,timezone):'Running'}</p></div>)}
       <h4 className="font-semibold text-sm text-primary">Pending Requests · {pending.reduce((sum,r)=>sum+r.hours,0).toFixed(2)}h</h4>
       {!pending.length && <p className="text-xs text-secondary">No requests awaiting approval.</p>}
       {pending.map(r=><p key={r.id} className="text-sm text-secondary">{r.entry_date || r.session_date} · {r.title} · {r.hours.toFixed(2)}h · Pending approval</p>)}

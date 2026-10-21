@@ -53,10 +53,15 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
           event: '*', schema: 'public', table: 'time_entries',
           filter: `technician_id=eq.${profile.id}`
         }, checkClockStatus)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_time_sessions', filter: `technician_id=eq.${profile.id}` }, checkClockStatus)
         .subscribe();
+      window.addEventListener('customer-time-changed', checkClockStatus);
+      window.addEventListener('focus', checkClockStatus);
 
       return () => {
         clearInterval(timer);
+        window.removeEventListener('customer-time-changed', checkClockStatus);
+        window.removeEventListener('focus', checkClockStatus);
         channel.unsubscribe();
       };
     }
@@ -98,14 +103,16 @@ export function TimeButton({ onNavigate }: TimeButtonProps) {
         .maybeSingle();
 
       const wo = activeJobEntry?.work_order as any;
+      const { data: customerTimer } = await supabase.from('customer_time_sessions')
+        .select('id,clock_in,project_id').eq('technician_id', profile.id).is('clock_out', null).maybeSingle();
 
       setClockStatus({
         isClockedIn: !!dailyEntry,
         clockInTime: dailyEntry?.clock_in || null,
         isOnBreak,
-        activeJobId: wo?.id || null,
-        activeJobNumber: wo?.work_order_number || null,
-        activeJobClockIn: activeJobEntry?.clock_in || null,
+        activeJobId: wo?.id || customerTimer?.id || null,
+        activeJobNumber: wo?.work_order_number || (customerTimer ? (customerTimer.project_id ? 'Project Time' : 'Customer Time') : null),
+        activeJobClockIn: activeJobEntry?.clock_in || customerTimer?.clock_in || null,
       });
     } catch (error) {
       console.error('Error checking clock status:', error);

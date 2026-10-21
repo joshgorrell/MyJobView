@@ -32,7 +32,7 @@ const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
   '../../lib/timezoneUtils':{getOrganizationTimezone:async()=> 'America/Chicago',formatDateInTimezone:()=> '2026-10-02'},
   '../Technician/ManualJobTimeRequestModal':{ManualJobTimeRequestModal:'ManualJobTimeRequestModal'},
   '../Technician/RequestInternalTimeModal':{RequestInternalTimeModal:'RequestInternalTimeModal'},
-  '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},
+  '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},'../Technician/CustomerTimeTimer':{CustomerTimeTimer:'CustomerTimeTimer'},
   '../Technician/MyTimeView':{MyTimeView:'MyTimeView'},
   '../Dispatch/MyTimeOff':{MyTimeOff:'MyTimeOff'},'../Shared/TeamTimeOffPanel':{TeamTimeOffPanel:'TeamTimeOffPanel'},
   '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},'./MobileClockRedirect':{MobileClockRedirect:'MobileClockRedirect'},
@@ -44,7 +44,7 @@ let tree=launch.render('DailyLaunchpad',props);
 assert.ok(text(tree).includes('Install Speakers'));
 const card=nodes(tree).find(n=>n.type==='button'&&text(n).includes('Install Speakers'));
 card.props.onClick();assert.equal(nav[0][0],'work_orders');assert.equal(nav[0][1].workOrderId,'wo-1');assert.equal(closed,1);assert.equal(writes.length,0);
-assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Record Manual Job Time'));
+assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Record Job Time'));
 nodes(tree).find(n=>n.type==='button'&&text(n)==='Calendar').props.onClick();tree=launch.render('DailyLaunchpad',props);
 const calendar=nodes(tree).find(n=>n.type==='Calendar');assert.ok(calendar);assert.equal(calendar.props.personalOnly,true);
 calendar.props.onWorkOrderSelect('wo-2');assert.equal(nav[1][1].workOrderId,'wo-2');assert.equal(writes.length,0);
@@ -62,7 +62,7 @@ nodes(launch.render('DailyLaunchpad',props)).find(n=>n.type==='button'&&text(n)=
 tree=launch.render('DailyLaunchpad',props);
 assert.ok(!nodes(tree).some(n=>n.type==='TimeClockModal'),'Salary without attendance has no daily punch');
 assert.ok(nodes(tree).some(n=>n.type==='WorkOrderTimeControl'&&n.props.workOrderId==='wo-1'),'Assigned job timer remains available');
-nodes(tree).find(n=>n.type==='button'&&text(n)==='Record Manual Job Time').props.onClick();
+nodes(tree).find(n=>n.type==='button'&&text(n)==='Record Job Time').props.onClick();
 tree=launch.render('DailyLaunchpad',props);assert.ok(nodes(tree).some(n=>n.type==='ManualJobTimeRequestModal'));
 // Exercise the actual header component with salary/no attendance, overnight job time,
 // and the existing hourly attendance states. Opening the tools must never write time.
@@ -72,7 +72,7 @@ const headerSupabase={from(table){const q=new Proxy({}, {get(_,key){if(key==='th
 const header=harness('src/components/Layout/QuickClockButton.tsx',{
  '../../hooks/useEmployeeTimePolicy':policy,'../../contexts/AuthContext':auth,
  '../../lib/supabase':{supabase:headerSupabase},'./DailyLaunchpad':{DailyLaunchpad:'DailyLaunchpad'},
-},{setInterval:()=>1,clearInterval(){}});
+},{setInterval:()=>1,clearInterval(){},window:{addEventListener(){},removeEventListener(){}}});
 tree=header.render('TimeButton');assert.ok(text(tree).includes('Job Time'));assert.ok(!text(tree).includes('Clocked Out'));
 header.effects.splice(0).forEach(fn=>fn());for(let i=0;i<20;i++)await Promise.resolve();
 tree=header.render('TimeButton');nodes(tree).find(n=>n.type==='button').props.onClick();

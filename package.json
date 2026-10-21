@@ -69,7 +69,9 @@
     "test:project-support:browser": "node tests/punchlist/project-support-browser.mjs",
     "test:design-briefs": "node tests/design-briefs/database.mjs && node tests/design-briefs/runtime.mjs && node tests/design-briefs/edge.mjs",
     "test:loss-feedback": "node tests/reviews/loss-feedback.mjs && node tests/reviews/loss-reminders.mjs",
-    "test:loss-feedback:browser": "npm run build && node tests/reviews/loss-feedback-browser.mjs"
+    "test:loss-feedback:browser": "npm run build && node tests/reviews/loss-feedback-browser.mjs",
+    "test:customer-time": "node tests/employee-time/customer-time-database.mjs",
+    "test:customer-time:browser": "node tests/employee-time/customer-time-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

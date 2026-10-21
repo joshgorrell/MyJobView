@@ -6,6 +6,15 @@ on:
       - 'src/components/Layout/QuickClockButton.tsx'
       - 'src/components/Layout/DailyLaunchpad.tsx'
       - 'src/hooks/useEmployeeTimePolicy.ts'
+      - 'src/lib/customerJobTime.ts'
+      - 'src/components/Technician/ManualJobTimeRequestModal.tsx'
+      - 'src/components/Technician/CustomerTimeTimer.tsx'
+      - 'src/components/Technician/MyJobTimeView.tsx'
+      - 'src/components/Admin/Payroll/ManualJobTimeRequests.tsx'
+      - 'src/components/Projects/AddProjectTimeModal.tsx'
+      - 'supabase/migrations/*customer_first_job_time.sql'
+      - 'tests/employee-time/customer*'
+      - 'tests/employee-time/customer-browser/**'
       - 'tests/employee-time/runtime.mjs'
       - 'tests/employee-time/browser*'
       - 'tests/employee-time/browser/**'
@@ -27,6 +36,8 @@ jobs:
       - run: npm ci
       - run: node tests/employee-time/runtime.mjs
       - run: node tests/employee-time/database.mjs
+      - run: npm run test:customer-time
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:employee-time:browser
+      - run: npm run test:customer-time:browser
