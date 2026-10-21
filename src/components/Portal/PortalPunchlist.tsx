@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { SupportPhotos } from "../Shared/SupportPhotos";
+import { requestConfirmation } from "../../lib/feedback";
 
 interface Item {
   id: string;
@@ -251,9 +252,9 @@ export function PortalPunchlist({
       setBusy(false);
     }
   }
-  function changeView(next: "projects" | "service") {
+  async function changeView(next: "projects" | "service") {
     if (description || files.length) {
-      if (!window.confirm("Discard this unsent draft?")) return;
+      if (!(await requestConfirmation("Discard this unsent draft?"))) return;
     }
     setView(next);
     setDescription("");
@@ -327,11 +328,12 @@ export function PortalPunchlist({
               <select
                 disabled={busy}
                 value={projectId}
-                onChange={(event) => {
+                onChange={async (event) => {
+                  const nextProjectId = event.target.value;
                   if (description || files.length) {
-                    if (!window.confirm("Discard this unsent draft?")) return;
+                    if (!(await requestConfirmation("Discard this unsent draft?"))) return;
                   }
-                  setProjectId(event.target.value);
+                  setProjectId(nextProjectId);
                   setDescription("");
                   setFiles([]);
                   uploaded.current = [];

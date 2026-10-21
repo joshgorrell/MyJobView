@@ -475,6 +475,7 @@ export default function DesignBriefModal({
         currentBriefId = briefData.id;
         setBriefId(currentBriefId);
       }
+      if (!currentBriefId) throw new Error('Failed to identify the saved brief');
       if (notes.trim()) await appendEntry(currentBriefId);
 
       const res = await fetch(

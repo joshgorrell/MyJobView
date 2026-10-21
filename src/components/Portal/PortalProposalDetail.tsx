@@ -376,8 +376,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             setTemplate({
               show_quantity: true,
               show_unit_price: true,
-            show_installed_price: true,
-            show_item_color: false,
               show_installed_price: true,
               show_item_color: false,
               show_line_item_total: true,

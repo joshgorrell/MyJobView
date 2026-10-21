@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Clock, CheckCircle, AlertCircle, User, Calendar, FileText, Layers, Package, ExternalLink, MessageSquare, RefreshCw, Search, Loader, Send, Archive, PenTool, Trash2, CreditCard as Edit2, X, Save, ChevronDown, ChevronUp, Info, Plus, Zap, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
@@ -286,7 +287,6 @@ interface ConvertContact {
 }
 
 function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposalModalProps) {
-  const { profile } = useAuth();
   const [contacts, setContacts] = useState<ConvertContact[]>([]);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContact, setSelectedContact] = useState<ConvertContact | null>(null);
@@ -395,7 +395,6 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
         onCreated(currentBrief.linked_proposal_id);
         return;
       }
-      const rooms = brief.ai_summary?.rooms || [];
 
       let contactId = selectedContact.id;
       let taxEnvironment = brief.ai_summary?.taxEnvironment || selectedContact.tax_environment || 'residential';
@@ -825,7 +824,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   async function handleRerunAI() {
     if (!selectedBrief || !selectedBrief.raw_notes.trim() || savingMatches) return;
     const reviewedItems = (localRooms || selectedBrief.ai_summary?.rooms || []).flatMap(room => room.lineItems || []).filter(item => item.matchedProductId || item.matchConfidence === 'designer');
-    if (reviewedItems.length && !window.confirm(`Re-generating the design will replace ${reviewedItems.length} reviewed catalog selections. Continue?`)) return;
+    if (reviewedItems.length && !(await requestConfirmation(`Re-generating the design will replace ${reviewedItems.length} reviewed catalog selections. Continue?`))) return;
     setRerunningAI(true);
     setRerunError('');
     try {
@@ -868,15 +867,15 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     }
   }
 
-  function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): boolean {
+  async function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): Promise<boolean> {
     if (!/\bpair\b/i.test(product.name)) return true;
     const counts = items.map(item => Number(item.quantity));
     const allEven = counts.every(count => Number.isFinite(count) && count > 0 && count % 2 === 0);
     if (!allEven) {
-      window.alert('This catalog product is sold as a pair. At least one room has an odd or invalid speaker count. Verify the packaging and quantities before assigning.');
+      notify('This catalog product is sold as a pair. At least one room has an odd or invalid speaker count. Verify the packaging and quantities before assigning.', { tone: 'warning' });
       return false;
     }
-    return window.confirm(
+    return requestConfirmation(
       `"${product.name}" is sold as a pair. Convert each selected room's physical speaker count to half as many catalog pairs? Example: 2 speakers become 1 pair. Cancel to leave the design unchanged.`
     );
   }
@@ -894,11 +893,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     };
   }
 
-  function handleProductSelected(product: CatalogProduct) {
+  async function handleProductSelected(product: CatalogProduct) {
     if (!pickerOpen || !localRooms) return;
     const { roomIndex, itemIndex } = pickerOpen;
     const selected = localRooms[roomIndex]?.lineItems[itemIndex];
-    if (!selected || !confirmCatalogPackage(product, [selected])) return;
+    if (!selected || !(await confirmCatalogPackage(product, [selected]))) return;
 
     const updated = localRooms.map((room, ri) => {
       if (ri !== roomIndex) return room;
@@ -916,7 +915,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     saveMatchesToBrief(updated);
   }
 
-  function handleApplyToMatching(product: CatalogProduct) {
+  async function handleApplyToMatching(product: CatalogProduct) {
     if (!pickerOpen || !localRooms) return;
     const target = localRooms[pickerOpen.roomIndex]?.lineItems[pickerOpen.itemIndex];
     if (!target || target.itemType === 'labor') return;
@@ -925,7 +924,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     const targets = localRooms.flatMap(room => room.lineItems.filter(item =>
       item.itemType !== 'labor' && normalize(item.description) === key
     ));
-    if (!confirmCatalogPackage(product, targets)) return;
+    if (!(await confirmCatalogPackage(product, targets))) return;
     const updated = localRooms.map(room => ({
       ...room,
       lineItems: room.lineItems.map(item =>
@@ -982,7 +981,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     } catch (err) {
       console.error('Error saving matches:', err);
       setMatchSaveError(true);
-      window.alert('Could not save catalog selections. Please retry before converting this brief.');
+      notify('Could not save catalog selections. Please retry before converting this brief.', { tone: 'error' });
     } finally {
       pendingMatchSaves.current -= 1;
       setSavingMatches(pendingMatchSaves.current > 0);

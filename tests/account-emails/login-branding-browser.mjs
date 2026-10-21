@@ -43,7 +43,7 @@ try {
       if (url.pathname === '/dealer.png') return scenario === 'broken-logo' ? route.fulfill({ status: 404, body: '' }) : route.fulfill({ contentType: 'image/png', body: logo });
       return route.fulfill({ contentType: 'text/html', body: '<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"><div id="root"></div><script src="/app.js"></script>' });
     });
-    await page.goto(`https://${host}`);
+    await page.goto(`https://${host}`, { waitUntil: 'domcontentloaded' });
     const dealer = !['generic', 'unknown'].includes(scenario);
     await page.getByRole('heading', { name: dealer ? 'Electronic Life' : 'MyJobView', exact: true }).waitFor();
     await page.getByText(dealer ? 'Sign in to Electronic Life' : 'Sign in to MyJobView', { exact: true }).waitFor();

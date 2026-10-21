@@ -3578,7 +3578,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               <div className="flex-1 overflow-y-auto">
                 {unassignedItems.filter(i => isCoMode || !i.is_hidden).length > 0 && (() => {
                   const visibleUnassigned = unassignedItems.filter(i => isCoMode || !i.is_hidden);
-                  const isActive = activeAreaId === '__unassigned__';
                   const topLevelUnassigned = visibleUnassigned.filter(i => !i.parent_item_id);
                   const unassignedTotal = topLevelUnassigned.reduce((sum, item) => {
                     const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
@@ -3622,7 +3621,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   );
                 })()}
                 {rooms.map((room) => {
-                  const isActive = activeAreaId === room.id;
                   const topLevelItems = room.line_items.filter(item => !item.parent_item_id);
                   const roomTotal = topLevelItems.reduce((sum, item) => {
                     const itemTotal = (item.unit_price * item.quantity) + parseFloat(String(item.labor_total || 0));
