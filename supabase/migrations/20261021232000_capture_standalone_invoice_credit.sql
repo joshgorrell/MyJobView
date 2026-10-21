@@ -11,10 +11,15 @@ DECLARE
   v_invoice_type text;
 BEGIN
   IF NEW.status NOT IN ('submitted','partial','paid','overdue')
-     OR NEW.project_id IS NOT NULL THEN
+     OR NEW.project_id IS NOT NULL
+     OR (TG_OP = 'UPDATE' AND OLD.status IN ('submitted','partial','paid','overdue')) THEN
     RETURN NEW;
   END IF;
 
+  -- An explicit recurring billing linkage overrides any generic invoice type.
+  IF NULLIF(to_jsonb(NEW)->>'security_billing_cycle_id','') IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
   v_source := lower(coalesce(to_jsonb(NEW)->>'source_type',''));
   v_invoice_type := lower(coalesce(to_jsonb(NEW)->>'invoice_type',''));
   -- Never treat project/deposit/progress/final billing as incremental sales.
@@ -43,7 +48,7 @@ BEGIN
      AND v_invoice_type <> 'retail' THEN RETURN NEW; END IF;
 
   -- Service work-order linkage can be created before invoice submission.
-  -- Only classify standalone invoices; retail is the conservative default.
+  -- Unclassified standalone invoices are excluded; only explicit retail or service links qualify.
   v_kind := CASE WHEN NEW.work_order_billing_request_id IS NOT NULL
                     OR EXISTS (SELECT 1 FROM public.work_order_invoice_links l
                                WHERE l.invoice_id=NEW.id AND l.organization_id=v_org)
