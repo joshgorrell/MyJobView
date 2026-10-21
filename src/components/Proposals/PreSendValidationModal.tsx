@@ -12,7 +12,6 @@ interface PreSendValidationModalProps {
   onSend: (approvalWindow: number, visibleInPortal: boolean) => Promise<void>;
   initialPortalVisibility?: boolean;
   onEmailProposal?: () => void;
-  onPrintProposal?: () => void;
   onCopyLink?: () => void;
   copyingLink?: boolean;
   canCopyLink?: boolean;
@@ -29,7 +28,6 @@ export function PreSendValidationModal({
   onSend,
   initialPortalVisibility = false,
   onEmailProposal,
-  onPrintProposal,
   onCopyLink,
   copyingLink = false,
   canCopyLink = false,
@@ -63,7 +61,8 @@ export function PreSendValidationModal({
       supabase.from('proposal_report_templates').select('id,name,is_default').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
     ]);
     if (error) { setSubmissionError('Unable to load proposal templates.'); return; }
-    const choices = available || [];
+    const {data: authData} = await supabase.auth.getUser();
+    const choices = (available || []).filter(t => !t.is_personal || t.created_by === authData.user?.id);
     setTemplates(choices);
     setSelectedTemplateId(choices.find(t => t.id === proposal?.report_template_id)?.id || choices.find(t => t.is_default)?.id || choices[0]?.id || '');
   }
