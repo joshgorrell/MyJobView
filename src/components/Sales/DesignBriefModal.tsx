@@ -5,6 +5,7 @@ import {
   User, RefreshCw, ArrowLeft, Send
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { searchBriefCustomers } from '../../lib/designBriefSearch';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Contact {
@@ -113,12 +114,14 @@ export default function DesignBriefModal({
   const [entries, setEntries] = useState<Array<{ id: string; content: string; source: string; created_at: string }>>([]);
   const [entriesLoading, setEntriesLoading] = useState(!!existingBrief?.id);
   const [voiceUsed, setVoiceUsed] = useState(false);
-  const conversationText = [...entries.map(e => e.content), notes.trim()].filter(Boolean).join('\n\n');
+  const [savedNotes, setSavedNotes] = useState(existingBrief?.raw_notes || '');
+  const conversationText = [savedNotes, notes.trim()].filter(Boolean).join('\n\n');
   const [isRecording, setIsRecording] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactsLimited, setContactsLimited] = useState(false);
   const [contactSearchError, setContactSearchError] = useState(false);
   const contactSearchRequestRef = useRef(0);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -131,7 +134,12 @@ export default function DesignBriefModal({
   const [processingMessage, setProcessingMessage] = useState('Analyzing your notes...');
   const [savingDraft, setSavingDraft] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const savingRef = useRef(false);
+  const newBriefIdRef = useRef(crypto.randomUUID());
+  const entryIdRef = useRef(crypto.randomUUID());
   const [briefId, setBriefId] = useState<string | null>(existingBrief?.id || null);
+  const [submitting, setSubmitting] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [openAIConfigured, setOpenAIConfigured] = useState<boolean | null>(null);
 
@@ -140,32 +148,44 @@ export default function DesignBriefModal({
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!briefId) { setEntriesLoading(false); return; }
+    if (!existingBrief?.id) { setEntriesLoading(false); return; }
     let active = true;
     setEntriesLoading(true);
     supabase.from('design_brief_entries').select('id, content, source, created_at')
-      .eq('brief_id', briefId).order('created_at', { ascending: true })
+      .eq('brief_id', existingBrief.id).order('created_at', { ascending: true })
       .then(({ data, error: loadError }) => {
         if (!active) return;
-        if (loadError) setError(loadError.message);
+        if (loadError) { setHistoryError(true); setError('Earlier sessions could not load. Reopen this brief to retry.'); }
         else setEntries(data || []);
         setEntriesLoading(false);
       });
     return () => { active = false; };
-  }, [briefId]);
+  }, [existingBrief?.id]);
 
-  async function appendEntry(id: string) {
-    if (!notes.trim()) return;
+  async function saveSession() {
     if (!profile?.id || !profile.organization_id) throw new Error('Organization profile required.');
-    const { data, error: entryError } = await supabase.from('design_brief_entries')
-      .insert({ brief_id: id, organization_id: profile.organization_id,
-        author_id: profile.id, source: voiceUsed ? 'voice' : 'typed', content: notes.trim() })
-      .select('id, content, source, created_at').single();
-    if (entryError || !data) throw entryError || new Error('Unable to save conversation entry');
-    setEntries(previous => [...previous, data]);
+    const id = briefId || newBriefIdRef.current;
+    const content = notes.trim();
+    const entryId = entryIdRef.current;
+    const { data, error: saveError } = await supabase.rpc('design_brief_save_session', {
+      p_brief: id, p_entry: entryId,
+      p_contact: selectedContact?.source === 'lead' ? null : selectedContact?.id || null,
+      p_lead: selectedContact?.source === 'lead' ? selectedContact.id : null,
+      p_title: title.trim(), p_content: content, p_source: voiceUsed ? 'voice' : 'typed',
+    });
+    if (saveError || !data) throw saveError || new Error('Unable to save design brief.');
+    setBriefId(id);
+    setSavedNotes(data.raw_notes);
+    if (content) setEntries(previous => previous.some(e => e.id === entryId) ? previous : [
+      ...previous, { id: entryId, content, source: voiceUsed ? 'voice' : 'typed', created_at: new Date().toISOString() },
+    ]);
     setNotes('');
     setVoiceUsed(false);
+    entryIdRef.current = crypto.randomUUID();
+    return id;
   }
+
+  useEffect(() => () => { recognitionRef.current?.stop(); }, []);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -184,11 +204,12 @@ export default function DesignBriefModal({
     supabase
       .from('company_settings')
       .select('has_openai_api_key')
+      .eq('organization_id', profile?.organization_id)
       .maybeSingle()
-      .then(({ data }) => {
-        setOpenAIConfigured(!!(data?.has_openai_api_key));
+      .then(({ data, error: settingsError }) => {
+        setOpenAIConfigured(settingsError ? null : !!data?.has_openai_api_key);
       });
-  }, []);
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     if (existingBrief?.contact_id) {
@@ -200,7 +221,7 @@ export default function DesignBriefModal({
     } else if (leadId) {
       loadLead(leadId);
     }
-  }, [contactId, leadId, existingBrief?.contact_id, existingBrief?.lead_id]);
+  }, [contactId, leadId, existingBrief?.contact_id, existingBrief?.lead_id, profile?.organization_id]);
 
   const getDisplayName = useCallback((c: Contact): string => {
     return c.full_name || c.contact_name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.company_name || 'Unknown';
@@ -217,44 +238,30 @@ export default function DesignBriefModal({
     setContactsLoading(true);
     setContactSearchError(false);
 
-    const q = query.trim();
-
-    const [{ data: contactsData, error: contactsError }, { data: leadsData, error: leadsError }] = await Promise.all([
-      supabase
-        .from('contacts')
-        .select('id, contact_name, first_name, last_name, full_name, company_name, address, city, state, contact_type, is_prospect')
-        .or(`contact_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%`)
-        .limit(10),
-      supabase
-        .from('leads')
-        .select('id, contact_name, company_name')
-        .or(`contact_name.ilike.%${q}%,company_name.ilike.%${q}%`)
-        .limit(10),
-    ]);
-
-    if (requestId !== contactSearchRequestRef.current) return;
-    setContactSearchError(!!contactsError || !!leadsError);
-    const fromContacts: Contact[] = (contactsData || []).map(c => ({ ...c, source: 'contact' as const }));
-    const fromLeads: Contact[] = (leadsData || []).map(l => ({
-      id: l.id,
-      contact_name: l.contact_name,
-      company_name: l.company_name,
-      contact_type: 'lead',
-      source: 'lead' as const,
-    }));
-
-    const combined: Contact[] = [...fromContacts, ...fromLeads];
-    combined.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
-
-    setContacts(combined);
-    setShowContactDropdown(true);
-    setContactsLoading(false);
-  }, [getDisplayName]);
+    try {
+      const result = await searchBriefCustomers(supabase, profile?.organization_id || '', query);
+      if (requestId !== contactSearchRequestRef.current) return;
+      result.contacts.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
+      setContacts(result.contacts);
+      setContactSearchError(result.failed);
+      setContactsLimited(result.limited);
+    } catch {
+      if (requestId !== contactSearchRequestRef.current) return;
+      setContacts([]);
+      setContactSearchError(true);
+    } finally {
+      if (requestId === contactSearchRequestRef.current) {
+        setShowContactDropdown(true);
+        setContactsLoading(false);
+      }
+    }
+  }, [getDisplayName, profile?.organization_id]);
 
   useEffect(() => {
     if (selectedContact) {
       contactSearchRequestRef.current += 1;
       setShowContactDropdown(false);
+      setContactsLoading(false);
       return;
     }
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
@@ -262,6 +269,7 @@ export default function DesignBriefModal({
       contactSearchRequestRef.current += 1;
       setContacts([]);
       setShowContactDropdown(false);
+      setContactsLoading(false);
       return;
     }
     searchDebounceRef.current = setTimeout(() => {
@@ -273,11 +281,13 @@ export default function DesignBriefModal({
   }, [contactSearch, selectedContact, existingBrief?.contact_id, searchContacts]);
 
   async function loadContact(id: string) {
-    const { data } = await supabase
+    const { data, error: loadError } = await supabase
       .from('contacts')
-      .select('id, contact_name, first_name, last_name, full_name, company_name, address, city, state')
+      .select('id, contact_name, first_name, last_name, full_name, company_name, city, state')
       .eq('id', id)
+      .eq('organization_id', profile?.organization_id)
       .maybeSingle();
+    if (loadError || !data) setError('Customer could not load. Search and select the customer to retry.');
     if (data) {
       setSelectedContact(data);
       setContactSearch(data.full_name || data.contact_name || [data.first_name, data.last_name].filter(Boolean).join(' ') || '');
@@ -285,11 +295,13 @@ export default function DesignBriefModal({
   }
 
   async function loadLead(id: string) {
-    const { data } = await supabase
+    const { data, error: loadError } = await supabase
       .from('leads')
       .select('id, contact_name, company_name')
       .eq('id', id)
+      .eq('organization_id', profile?.organization_id)
       .maybeSingle();
+    if (loadError || !data) setError('Customer could not load. Search and select the customer to retry.');
     if (data) {
       const contact: Contact = {
         id: data.id,
@@ -360,44 +372,18 @@ export default function DesignBriefModal({
   }
 
   async function handleSaveDraft() {
-    if (!notes.trim() && !entries.length) return;
-    if (entriesLoading) return;
+    if (savingRef.current || entriesLoading || historyError || !conversationText.trim()) return;
+    savingRef.current = true;
     setError('');
     setSavingDraft(true);
-
     try {
-      const isLeadSelected = selectedContact?.source === 'lead';
-      const payload = {
-        contact_id: isLeadSelected ? null : (selectedContact?.id || null),
-        lead_id: isLeadSelected ? selectedContact?.id : null,
-        raw_notes: conversationText,
-        title: title.trim() || '',
-        status: 'draft' as const,
-      };
-
-      if (briefId) {
-        const { error: updateError } = await supabase
-          .from('design_briefs')
-          .update(payload)
-          .eq('id', briefId);
-        if (updateError) throw updateError;
-      } else {
-        const { data, error: insertError } = await supabase
-          .from('design_briefs')
-          .insert({ ...payload, created_by: profile?.id })
-          .select('id')
-          .single();
-        if (insertError || !data) throw insertError || new Error('Failed to save draft');
-        setBriefId(data.id);
-        await appendEntry(data.id);
-      }
-      if (briefId) await appendEntry(briefId);
-
+      await saveSession();
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save draft.');
     } finally {
+      savingRef.current = false;
       setSavingDraft(false);
     }
   }
@@ -414,7 +400,8 @@ export default function DesignBriefModal({
       return;
     }
 
-    if (entriesLoading) return;
+    if (savingRef.current || entriesLoading || historyError) return;
+    savingRef.current = true;
     setError('');
     setContactError(false);
     setIsRegenerating(hasExistingAI || !!prefillResult);
@@ -436,47 +423,8 @@ export default function DesignBriefModal({
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      let currentBriefId = briefId;
-
-      const isLeadSelected = selectedContact?.source === 'lead';
-      const briefContactId = isLeadSelected ? null : (selectedContact?.id || null);
-      const briefLeadId = isLeadSelected ? selectedContact?.id : null;
-
-      if (currentBriefId) {
-        const { error: updateError } = await supabase
-          .from('design_briefs')
-          .update({
-            contact_id: briefContactId,
-            lead_id: briefLeadId,
-            raw_notes: conversationText,
-            title: title.trim() || '',
-            status: 'submitted',
-            submitted_at: new Date().toISOString(),
-          })
-          .eq('id', currentBriefId);
-        if (updateError) throw updateError;
-      } else {
-        const { data: briefData, error: briefError } = await supabase
-          .from('design_briefs')
-          .insert({
-            contact_id: briefContactId,
-            lead_id: briefLeadId,
-            raw_notes: notes.trim(),
-            title: title.trim() || '',
-            status: 'submitted',
-            created_by: profile?.id,
-            organization_id: profile?.organization_id,
-            submitted_at: new Date().toISOString(),
-          })
-          .select('id')
-          .single();
-
-        if (briefError || !briefData) throw new Error('Failed to save brief');
-        currentBriefId = briefData.id;
-        setBriefId(currentBriefId);
-      }
-      if (!currentBriefId) throw new Error('Failed to identify the saved brief');
-      if (notes.trim()) await appendEntry(currentBriefId);
+      if (!token) throw new Error('Your session expired. Sign in again to continue.');
+      const currentBriefId = await saveSession();
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-design-brief`,
@@ -491,7 +439,7 @@ export default function DesignBriefModal({
             notes: conversationText,
             contactId: selectedContact?.id,
             contactName: selectedContact ? getDisplayName(selectedContact) : contactSearch,
-            regenerate: isRegenerating,
+            regenerate: alreadyProcessed,
           }),
         }
       );
@@ -511,14 +459,27 @@ export default function DesignBriefModal({
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       setStep('input');
     } finally {
+      savingRef.current = false;
       setIsRegenerating(false);
     }
   }
 
-  function handleDone() {
-    setStep('done');
-    if (createdProposalId && onProposalCreated) {
-      onProposalCreated(createdProposalId);
+  async function handleDone() {
+    if (!briefId || savingRef.current || isLockedStatus) return;
+    savingRef.current = true;
+    setSubmitting(true);
+    setError('');
+    try {
+      const { data, error: submitError } = await supabase.functions.invoke('process-design-brief', {
+        body: { briefId, action: 'submit' },
+      });
+      if (submitError || data?.error) throw new Error(data?.error || submitError?.message || 'Unable to submit brief.');
+      setStep('done');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to submit brief. Please retry.');
+    } finally {
+      savingRef.current = false;
+      setSubmitting(false);
     }
   }
 
@@ -528,13 +489,13 @@ export default function DesignBriefModal({
   }
 
   const charCount = notes.length;
-  const isReady = conversationText.trim().length > 20 && !!selectedContact && !entriesLoading;
+  const isReady = conversationText.trim().length > 20 && !!selectedContact && !entriesLoading && !historyError && !savingDraft;
   const alreadyProcessed = !!(prefillResult || hasExistingAI);
-  const isLockedStatus = existingBrief && !['draft', 'submitted', 'building', 'ready'].includes(existingBrief.status);
+  const isLockedStatus = existingBrief && (!!existingBrief.linked_proposal_id || existingBrief.status === 'archived');
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95dvh] sm:max-h-[90vh]">
+      <div role="dialog" aria-modal="true" aria-label="Design Brief" className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95dvh] sm:max-h-[90vh]">
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 flex-shrink-0">
@@ -547,7 +508,7 @@ export default function DesignBriefModal({
             </h2>
             <p className="text-xs text-gray-500 truncate">
               {isLockedStatus
-                ? `${existingBrief.status} — view only`
+                ? 'View only — continue changes in Design Queue'
                 : alreadyProcessed
                 ? 'Edit notes and regenerate anytime'
                 : 'Describe the project — AI will draft the proposal'}
@@ -555,6 +516,8 @@ export default function DesignBriefModal({
           </div>
           <button
             onClick={onClose}
+            disabled={step === 'processing' || submitting || savingDraft}
+            aria-label="Close design brief"
             className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600 flex-shrink-0"
           >
             <X className="w-5 h-5" />
@@ -614,12 +577,14 @@ export default function DesignBriefModal({
                         type="text"
                         value={contactSearch}
                         onChange={e => {
+                          contactSearchRequestRef.current += 1;
+                          setContacts([]);
                           setContactSearch(e.target.value);
                           if (selectedContact) setSelectedContact(null);
                           if (contactError) setContactError(false);
                         }}
                         placeholder="Search customers, contacts, or leads..."
-                        disabled={!!isLockedStatus}
+                        disabled={!!isLockedStatus || savingDraft}
                         className={`w-full pl-9 pr-10 py-3 border rounded-xl text-sm focus:ring-2 focus:border-transparent outline-none disabled:bg-gray-50 ${
                           contactError
                             ? 'border-red-400 bg-red-50 focus:ring-red-400'
@@ -645,8 +610,9 @@ export default function DesignBriefModal({
                     {showContactDropdown && !selectedContact && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-56 overflow-y-auto">
                         {contactSearchError && !contactsLoading && (
-                          <p role="alert" className="px-3 py-2 text-sm text-red-600">Customer search could not load all results. Please try again.</p>
+                          <p role="alert" className="px-3 py-2 text-sm text-red-600">Customer search could not load all results. <button type="button" className="underline" onClick={() => searchContacts(contactSearch)}>Retry</button></p>
                         )}
+                        {contactsLimited && <p className="px-3 py-2 text-xs text-gray-500">More matches available. Add a first name, last name, or company to narrow the search.</p>}
                         {contacts.length === 0 && !contactsLoading && !contactSearchError && contactSearch.length > 0 && (
                           <div className="p-3 space-y-2">
                             <div className="flex items-center gap-2 px-1 text-sm text-gray-400">
@@ -673,7 +639,7 @@ export default function DesignBriefModal({
                             : { label: 'Customer', cls: 'bg-green-100 text-green-700' };
                           return (
                             <button
-                              key={c.id}
+                              key={`${c.source}:${c.id}`}
                               onClick={() => {
                                 setSelectedContact(c);
                                 setContactSearch(name);
@@ -714,11 +680,12 @@ export default function DesignBriefModal({
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder="e.g. Home Theater & Whole-Home Audio"
-                  disabled={!!isLockedStatus}
+                  disabled={!!isLockedStatus || savingDraft}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 disabled:text-gray-400"
                 />
               </div>
 
+              {savedNotes && <div className="rounded-xl border border-gray-200 bg-gray-50 p-3"><p className="text-xs font-semibold mb-1">Saved brief notes</p><p className="text-sm whitespace-pre-wrap">{savedNotes}</p></div>}
               {entriesLoading && <p className="text-xs text-gray-500">Loading earlier sessions...</p>}
                {entries.length > 0 && (
                  <div className="space-y-2">
@@ -749,7 +716,7 @@ export default function DesignBriefModal({
                     ref={textareaRef}
                     value={notes + (interimTranscript ? ' ' + interimTranscript : '')}
                     onChange={e => setNotes(e.target.value)}
-                    disabled={!!isLockedStatus}
+                    disabled={!!isLockedStatus || savingDraft}
                     placeholder={`Describe the project — be as detailed as you like.\n\nTip: mention rooms, systems, products, customer preferences, and any special requests. You can also say things like "Make it similar to the Johnson proposal but swap the projector for a 75-inch TV."`}
                     className={`w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none leading-relaxed disabled:bg-gray-50 disabled:text-gray-400 transition-colors ${
                       isRecording ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
@@ -814,18 +781,18 @@ export default function DesignBriefModal({
         {step === 'preview' && prefillResult && (
           <div className="flex-1 overflow-y-auto">
             <div className="p-5 space-y-4">
+              {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
               <div className="flex items-start gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
                 <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-green-800">Brief processed successfully</p>
+                  <p className="text-sm font-medium text-green-800">Design preview saved</p>
                   <p className="text-xs text-green-600 mt-0.5">
-                    {createdProposalId
-                      ? 'Draft proposal created and design team notified.'
-                      : 'Brief saved. A proposal will be built once a customer is linked.'}
+                    Review the design, then send it to Design Queue for product selection and proposal creation.
                   </p>
                 </div>
                 <button
                   onClick={handleBackToEdit}
+                  disabled={!!isLockedStatus || submitting}
                   className="flex items-center gap-1 text-xs text-green-700 hover:text-green-900 border border-green-300 bg-white hover:bg-green-50 px-2.5 py-1.5 rounded-lg transition-colors flex-shrink-0 whitespace-nowrap"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -917,8 +884,8 @@ export default function DesignBriefModal({
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">Brief Submitted!</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  The design team has been notified and will review the draft proposal shortly.
-                  You'll receive a notification when it's ready to send to the customer.
+                  Your brief is in Design Queue for design review and product selection.
+                  Create the proposal after reviewing the design and catalog selections.
                 </p>
               </div>
             </div>
@@ -933,7 +900,7 @@ export default function DesignBriefModal({
               {/* Primary CTA */}
               <button
                 onClick={handleProcess}
-                disabled={!isReady || openAIConfigured === false}
+                disabled={isRecording || !isReady || openAIConfigured === false}
                 title={openAIConfigured === false ? 'OpenAI API key not configured — go to Admin > Integrations' : undefined}
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-200 disabled:cursor-not-allowed text-white disabled:text-gray-400 text-sm font-semibold rounded-xl transition-colors"
               >
@@ -980,7 +947,7 @@ export default function DesignBriefModal({
 
                 <button
                   onClick={handleSaveDraft}
-                  disabled={savingDraft || !notes.trim()}
+                  disabled={isRecording || savingDraft || entriesLoading || historyError || !conversationText.trim()}
                   className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl text-sm font-medium border border-gray-200 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 transition-colors"
                 >
                   {savingDraft ? (
@@ -1001,7 +968,7 @@ export default function DesignBriefModal({
             </div>
           )}
 
-          {step === 'input' && isLockedStatus && (
+          {(step === 'input' || step === 'preview') && isLockedStatus && (
             <button
               onClick={onClose}
               className="w-full py-3 text-sm text-gray-600 hover:text-gray-900 transition-colors"
@@ -1010,14 +977,15 @@ export default function DesignBriefModal({
             </button>
           )}
 
-          {step === 'preview' && (
+          {step === 'preview' && !isLockedStatus && (
             <div className="flex flex-col gap-2.5">
               <button
                 onClick={handleDone}
+                disabled={submitting}
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm font-semibold rounded-xl transition-colors"
               >
                 <Send className="w-4 h-4" />
-                Finish — Send to Design Queue
+                {submitting ? 'Sending…' : 'Finish — Send to Design Queue'}
               </button>
               <div className="flex items-center gap-2">
                 {createdProposalId && (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Clock, CheckCircle, AlertCircle, User, Calendar, FileText, Layers, Package, ExternalLink, MessageSquare, RefreshCw, Search, Loader, Send, Archive, PenTool, Trash2, CreditCard as Edit2, X, Save, ChevronDown, ChevronUp, Info, Plus, Zap, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { nameFilters, searchBriefCustomers } from '../../lib/designBriefSearch';
 import { useAuth } from '../../contexts/AuthContext';
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -138,6 +139,9 @@ interface ProductPickerProps {
 }
 
 function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '', matchingCount = 0, onApplyMatching }: ProductPickerProps) {
+  const { profile } = useAuth();
+  const productRequestRef = useRef(0);
+  const [moreProducts, setMoreProducts] = useState(false);
   const [query, setQuery] = useState(suggestedQuery);
   const [results, setResults] = useState<CatalogProduct[]>([]);
   const [searchError, setSearchError] = useState('');
@@ -149,38 +153,36 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
   useEffect(() => {
     inputRef.current?.focus();
     searchProducts(suggestedQuery);
+    return () => { productRequestRef.current += 1; if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
   async function searchProducts(q: string) {
+    const request = ++productRequestRef.current;
     setLoading(true);
     setSearchError('');
-    const query_builder = supabase
-      .from('products')
-      .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, model_number, thumbnail_url, item_type')
-      .eq('is_active', true)
-      .order('name')
-      .limit(250);
-
-    const { data, error } = await query_builder;
-    if (error) {
+    try {
+      if (!profile?.organization_id) throw new Error('Organization required');
+      let builder = supabase.from('products')
+        .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, model_number, thumbnail_url, item_type')
+        .eq('organization_id', profile.organization_id).eq('is_active', true);
+      const tokens = q.trim().split(/\s+/).filter(token => !['pair', 'pairs', 'the', 'for', 'with', 'need', 'each', 'inch', 'inches'].includes(token.toLowerCase()));
+      for (const filter of nameFilters(tokens.join(' '), ['name', 'manufacturer', 'model_number', 'category'])) builder = builder.or(filter);
+      const { data, error } = await builder.order('name').order('id').limit(100);
+      if (request !== productRequestRef.current) return;
+      if (error) throw error;
+      setResults(data || []);
+      setMoreProducts(data?.length === 100);
+    } catch {
+      if (request !== productRequestRef.current) return;
       setResults([]);
       setSearchError('Catalog search failed. Please retry.');
-      setLoading(false);
-      return;
+    } finally {
+      if (request === productRequestRef.current) setLoading(false);
     }
-    const tokens = q.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').split(/\s+/)
-      .filter(token => token.length > 1 && !['pair', 'pairs', 'the', 'for', 'with', 'need', 'each', 'inch', 'inches'].includes(token));
-    const ranked = (data || []).map(product => {
-      const haystack = [product.name, product.manufacturer, product.model_number, product.category]
-        .filter(Boolean).join(' ').toLowerCase();
-      const score = tokens.reduce((total, token) => total + (haystack.includes(token) ? 1 : 0), 0);
-      return { product, score };
-    }).sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name));
-    setResults(tokens.length ? ranked.filter(candidate => candidate.score > 0).map(candidate => candidate.product) : ranked.map(candidate => candidate.product));
-    setLoading(false);
   }
 
   function handleQuery(val: string) {
+    productRequestRef.current += 1;
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => searchProducts(val), 200);
@@ -206,7 +208,8 @@ function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-          {searchError && <p role="alert" className="px-4 py-3 text-sm text-red-700">{searchError}</p>}
+          {searchError && <p role="alert" className="px-4 py-3 text-sm text-red-700">{searchError} <button onClick={() => searchProducts(query)} className="underline">Retry</button></p>}
+          {moreProducts && <p className="px-4 py-2 text-xs text-gray-500">Showing 100 matches. Add a brand or model to narrow your search.</p>}
           {results.length === 0 && !loading && !searchError && (
             <div className="py-8 text-center text-sm text-gray-400">
               {query ? `No products found for "${query}"` : 'No products in catalog'}
@@ -287,10 +290,13 @@ interface ConvertContact {
 }
 
 function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposalModalProps) {
+  const { profile } = useAuth();
   const [contacts, setContacts] = useState<ConvertContact[]>([]);
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContact, setSelectedContact] = useState<ConvertContact | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const searchRequestRef = useRef(0);
+  const [customerSearchError, setCustomerSearchError] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -343,32 +349,23 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   async function searchContacts(q: string) {
-    if (!q.trim()) { setContacts([]); setShowDropdown(false); return; }
+    const request = ++searchRequestRef.current;
+    if (!q.trim()) { setContacts([]); setShowDropdown(false); setSearchLoading(false); return; }
     setSearchLoading(true);
-    const [{ data: contactsData }, { data: leadsData }] = await Promise.all([
-      supabase
-        .from('contacts')
-        .select('id, full_name, contact_name, first_name, last_name, company_name, tax_rate, tax_environment, tax_project_type')
-        .or(`full_name.ilike.%${q}%,contact_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%`)
-        .limit(8),
-      supabase
-        .from('leads')
-        .select('id, contact_name, company_name')
-        .or(`contact_name.ilike.%${q}%,company_name.ilike.%${q}%`)
-        .limit(5),
-    ]);
-    const fromContacts: ConvertContact[] = (contactsData || []).map(c => ({ ...c, source: 'contact' as const }));
-    const fromLeads: ConvertContact[] = (leadsData || []).map(l => ({
-      id: l.id,
-      contact_name: l.contact_name,
-      company_name: l.company_name,
-      source: 'lead' as const,
-    }));
-    const combined = [...fromContacts, ...fromLeads];
-    combined.sort((a, b) => getContactName(a).localeCompare(getContactName(b)));
-    setContacts(combined);
-    setShowDropdown(combined.length > 0);
-    setSearchLoading(false);
+    setCustomerSearchError(false);
+    try {
+      const result = await searchBriefCustomers(supabase, profile?.organization_id || '', q);
+      if (request !== searchRequestRef.current) return;
+      setContacts(result.contacts);
+      setCustomerSearchError(result.failed);
+      setShowDropdown(true);
+    } catch {
+      if (request !== searchRequestRef.current) return;
+      setCustomerSearchError(true);
+      setShowDropdown(true);
+    } finally {
+      if (request === searchRequestRef.current) setSearchLoading(false);
+    }
   }
 
   function getContactName(c: ConvertContact) {
@@ -376,6 +373,8 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   function handleContactSearch(val: string) {
+    searchRequestRef.current += 1;
+    setContacts([]);
     setContactSearch(val);
     if (selectedContact) setSelectedContact(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -395,56 +394,18 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
         onCreated(currentBrief.linked_proposal_id);
         return;
       }
-
-      let contactId = selectedContact.id;
-      let taxEnvironment = brief.ai_summary?.taxEnvironment || selectedContact.tax_environment || 'residential';
-      let taxProjectType = brief.ai_summary?.taxProjectType || selectedContact.tax_project_type || 'general_installation_repair';
-      let taxRate = selectedContact.tax_rate || 0;
-
-      if (selectedContact.source === 'lead') {
-        const { data: existingContact } = await supabase
-          .from('contacts')
-          .select('id, tax_rate, tax_environment, tax_project_type')
-          .eq('contact_name', selectedContact.contact_name || '')
-          .maybeSingle();
-
-        if (existingContact) {
-          contactId = existingContact.id;
-          taxEnvironment = brief.ai_summary?.taxEnvironment || existingContact.tax_environment || 'residential';
-          taxProjectType = brief.ai_summary?.taxProjectType || existingContact.tax_project_type || 'general_installation_repair';
-          taxRate = existingContact.tax_rate || 0;
-        } else {
-          const { data: newContact, error: contactError } = await supabase
-            .from('contacts')
-            .insert({
-              contact_name: selectedContact.contact_name || selectedContact.company_name || 'Unknown',
-              company_name: selectedContact.company_name || null,
-              contact_type: 'person',
-            })
-            .select('id')
-            .single();
-
-          if (contactError || !newContact) throw new Error('Failed to promote lead to contact');
-          contactId = newContact.id;
-
-          await supabase
-            .from('leads')
-            .update({ status: 'converted' })
-            .eq('id', selectedContact.id);
-        }
-
-        await supabase
-          .from('design_briefs')
-          .update({ contact_id: contactId, lead_id: null })
-          .eq('id', brief.id);
-      }
+      const contactId = selectedContact.source === 'lead' ? null : selectedContact.id;
+      const taxEnvironment = brief.ai_summary?.taxEnvironment || selectedContact.tax_environment || 'residential';
+      const taxProjectType = brief.ai_summary?.taxProjectType || selectedContact.tax_project_type || 'general_installation_repair';
+      const taxRate = selectedContact.tax_rate || 0;
 
       // One database transaction: row lock, idempotency, rooms, items and brief link.
       const { data: proposalId, error: conversionError } = await supabase.rpc(
-        'design_brief_create_proposal',
+        'design_brief_convert',
         {
           p_brief: brief.id,
           p_contact: contactId,
+          p_lead: selectedContact.source === 'lead' ? selectedContact.id : null,
           p_title: title || `Design Brief - ${getContactName(selectedContact)}`,
           p_tax_environment: taxEnvironment,
           p_tax_type: taxProjectType,
@@ -531,6 +492,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
                 {searchLoading && (
                   <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
                 )}
+                {customerSearchError && <p role="alert" className="text-sm text-red-700">Customer search failed. <button className="underline" onClick={() => searchContacts(contactSearch)}>Retry</button></p>}
                 {showDropdown && !selectedContact && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto">
                     {contacts.map(c => (
@@ -807,10 +769,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     try {
       const { error } = await supabase
         .from('design_briefs')
-        .update({ raw_notes: editNotesDraft })
+        .update({ raw_notes: editNotesDraft, ai_summary: null, status: 'draft', submitted_at: null })
         .eq('id', selectedBrief.id);
       if (error) throw error;
-      const updated = { ...selectedBrief, raw_notes: editNotesDraft };
+      const updated = { ...selectedBrief, raw_notes: editNotesDraft, ai_summary: null, status: 'draft' as const, submitted_at: null };
+      setLocalRooms(null);
       setBriefs(prev => prev.map(b => b.id === selectedBrief.id ? updated : b));
       setSelectedBrief(updated);
       setEditingNotes(false);
@@ -1006,7 +969,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   const isCreator = (brief: DesignBrief) => brief.created_by === profile?.id;
 
   const canEdit = (brief: DesignBrief) =>
-    (isCreator(brief) && (brief.status === 'draft' || brief.status === 'submitted')) || isAdmin;
+    !brief.linked_proposal_id && brief.status !== 'archived' && (isCreator(brief) || isAdmin);
 
   const canDelete = (brief: DesignBrief) =>
     (isCreator(brief) && (brief.status === 'draft' || brief.status === 'submitted')) || isAdmin;
@@ -1349,7 +1312,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                     Convert to Proposal
                   </button>
                 )}
-                {isAdmin && selectedBrief.status !== 'archived' && selectedBrief.raw_notes && (
+                {isAdmin && !selectedBrief.linked_proposal_id && selectedBrief.status !== 'archived' && selectedBrief.raw_notes && (
                   <button
                     onClick={handleRerunAI}
                     disabled={rerunningAI || savingMatches}
