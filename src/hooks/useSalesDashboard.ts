@@ -27,6 +27,7 @@ const REASON_LABELS: Record<string, string> = {
   error: 'Created in Error',
   replaced_by_revision: 'Replaced by Revision',
   other: 'Other',
+  unknown:'Unknown / Feedback Needed',
 };
 
 interface UseSalesDashboardOptions {
@@ -111,9 +112,9 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
             .from('proposals')
             .select('id, status, decline_reason, declined_by')
             .eq('created_by', repId)
-            .in('status', ['declined', 'cancelled'])
-            .gte('created_at', startOfMonth)
-            .lte('created_at', endOfMonth)),
+            .or('status.eq.declined,and(status.eq.archived,archived_loss_status.eq.declined)')
+            .gte('declined_at', startOfMonth)
+            .lte('declined_at', endOfMonth)),
 
           safe(supabase
             .from('proposals')
@@ -221,7 +222,7 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
         const declinedProposals = declinedProposalsResult.data || [];
         const reasonMap = new Map<string, DeclineReason>();
         declinedProposals.forEach((p: any) => {
-          const r = p.decline_reason || 'other';
+          const r = p.decline_reason || 'unknown';
           if (!reasonMap.has(r)) {
             reasonMap.set(r, { reason: r, count: 0, byCustomer: 0, byRep: 0 });
           }

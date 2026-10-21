@@ -18,7 +18,7 @@ const emails = [], uploads = [];
 function reset() { detail = { request_id: 'request-1', organization_id: 'org-1', opportunity_name: 'Home theater', responded_at: null, reviewed_at: null, reviewed_by: null }; stored = null; emails.length = uploads.length = 0; }
 function from(table) {
   const filters = {}; let update, insert;
-  const q = { order: () => q, select: () => q, eq: (k, v) => { filters[k] = v; return q; }, is: (k, v) => { filters[k] = v; return q; },
+  const q = { or:()=>q, order: () => q, select: () => q, eq: (k, v) => { filters[k] = v; return q; }, is: (k, v) => { filters[k] = v; return q; },
     update: v => { update = v; return q; }, insert: v => { insert = v; return q; }, single: async () => result(), maybeSingle: async () => result(), then: (ok, fail) => Promise.resolve(result()).then(ok, fail) };
   function result() {
     if (table === 'lost_review_tokens') return { data: { request_id: 'request-1', expires_at: '2099-01-01' } };
@@ -28,7 +28,7 @@ function from(table) {
       return { data: assessment };
     }
     if (table === 'profiles' && filters.id === 'rep-1') return { data: repValid ? { id: 'rep-1' } : null };
-    if (table === 'profiles') return { data: { role, organization_id: 'org-1', is_active: true, can_view_lost_opportunity_submissions: permitted } };
+    if (table === 'profiles') return { data: { role, organization_id: 'org-1', is_active: true, can_view_lost_opportunity_submissions: permitted,can_send_lost_opportunity_reviews:true } };
     if (table === 'lost_review_details') {
       if (filters.organization_id && filters.organization_id !== detail.organization_id) return { error: { message: 'Not found' } };
       if (update && Object.entries(filters).every(([k, v]) => detail[k] === v)) Object.assign(detail, update);
@@ -145,4 +145,12 @@ assert.equal((await saveAssessment({ ...values, findings: 'Updated' },assessment
 assert.equal(assessment.findings,'Updated');
 console.log('Admin assessment permission, tenant, validation, save and conflict checks passed.');
 
+reset();
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Customer confirmed by phone',recoverable:'no'})).status,200);
+assert.equal(stored.source,'phone');assert.equal(stored.recorded_by,'employee-1');
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'email',reasons:['price'],message:'Overwrite',recoverable:'no'})).status,409);
+reset();permitted=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403);
+permitted=true;
+console.log('Manual feedback authorization, audit source and original-answer preservation passed.');
 delete globalThis.__lostDeps; delete globalThis.__lostHandler;

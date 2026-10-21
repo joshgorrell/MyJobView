@@ -46,6 +46,7 @@ export function DeclineProposalModal({
 }: DeclineProposalModalProps) {
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [feedbackSource, setFeedbackSource] = useState('staff_assessment');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,16 +68,9 @@ export function DeclineProposalModal({
     setError(null);
 
     try {
-      const { error: updateError } = await supabase
-        .from('proposals')
-        .update({
-          status: newStatus,
-          decline_reason: reason,
-          decline_notes: notes.trim() || null,
-          declined_at: new Date().toISOString(),
-          declined_by: 'rep',
-        })
-        .eq('id', proposalId);
+      const { error: updateError } = isDecline
+        ? await supabase.rpc('record_proposal_decline',{p_proposal_id:proposalId,p_reason:reason,p_notes:notes.trim(),p_source:feedbackSource})
+        : await supabase.from('proposals').update({status:newStatus,decline_reason:reason,decline_notes:notes.trim()||null,declined_at:new Date().toISOString(),declined_by:'rep'}).eq('id',proposalId);
 
       if (updateError) throw updateError;
 
@@ -84,12 +78,12 @@ export function DeclineProposalModal({
       await Promise.resolve(supabase.from('proposal_activity').insert({
         proposal_id: proposalId,
         activity_type: newStatus,
-        metadata: { reason, notes: notes.trim() || null, by: 'rep' },
+        metadata: { reason, notes: notes.trim() || null, by: 'rep', source:isDecline?feedbackSource:null },
       }).throwOnError()).catch(() => {
         // Non-fatal if activity log fails
       });
 
-      notify('Proposal marked declined.', { theme: 'violet', tone: 'info' });
+      notify(isDecline?'Proposal marked declined.':'Proposal cancelled.', { theme: 'violet', tone: 'info' });
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to update proposal. Please try again.');
@@ -130,6 +124,7 @@ export function DeclineProposalModal({
         <div className="p-5 space-y-4">
           <p className="text-sm text-gray-400">{description}</p>
 
+          {isDecline&&<label className="block text-sm font-medium text-gray-300">Feedback source<select aria-label="Decline feedback source" value={feedbackSource} onChange={e=>{setFeedbackSource(e.target.value);if(['no_response','unknown'].includes(reason))setReason('');}} className="mt-1.5 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white"><option value="staff_assessment">Staff assessment / unconfirmed</option><option value="phone">Customer told us by phone</option><option value="email">Customer told us by email</option></select></label>}
           {/* Reason */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">
@@ -141,7 +136,7 @@ export function DeclineProposalModal({
               className="w-full px-3 py-2 bg-gray-900 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="">Select a reason...</option>
-              {reasons.map((r) => (
+              {reasons.filter(r=>!isDecline||feedbackSource==='staff_assessment'||!['no_response','unknown'].includes(r.value)).map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
