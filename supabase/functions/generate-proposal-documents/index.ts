@@ -1,3 +1,4 @@
+import { applyProposalBrand, renderProposalBrandHeader } from '../_shared/proposalBrand.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -19,11 +20,12 @@ function textToBase64(text: string): string {
 
 function buildTermsHtml(params: {
   companyName: string;
+  companyLogoUrl?: string | null;
   customerName: string;
   proposalNumber: string;
   contractContent: string;
 }): string {
-  const { companyName, customerName, proposalNumber, contractContent } = params;
+  const { companyName, companyLogoUrl, customerName, proposalNumber, contractContent } = params;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -42,7 +44,7 @@ function buildTermsHtml(params: {
 </head>
 <body>
   <div class="header">
-    <div class="company">${companyName}</div>
+    <div class="company">${renderProposalBrandHeader(companyName, companyLogoUrl)}</div>
     <div>
       <div class="doc-title">Terms &amp; Conditions</div>
       <div class="meta">Proposal #${proposalNumber} &bull; Prepared for ${customerName}</div>
@@ -56,6 +58,7 @@ function buildTermsHtml(params: {
 
 function buildPaymentScheduleHtml(params: {
   companyName: string;
+  companyLogoUrl?: string | null;
   customerName: string;
   proposalNumber: string;
   proposalTotal: number;
@@ -69,7 +72,7 @@ function buildPaymentScheduleHtml(params: {
   billingPhases: Array<{ phase_order: number; title: string; amount_type: string; amount: number; notes: string | null }>;
 }): string {
   const {
-    companyName, customerName, proposalNumber, proposalTotal,
+    companyName, companyLogoUrl, customerName, proposalNumber, proposalTotal,
     depositType, depositPercent, depositAmount, depositAmountDue,
     balancePaymentTerms, progressBillingType, progressInvoiceTerms,
     billingPhases,
@@ -161,7 +164,7 @@ function buildPaymentScheduleHtml(params: {
 </head>
 <body>
   <div class="header">
-    <div class="company">${companyName}</div>
+    <div class="company">${renderProposalBrandHeader(companyName, companyLogoUrl)}</div>
     <div>
       <div class="doc-title">Payment Schedule</div>
       <div class="meta">Proposal #${proposalNumber} &bull; Prepared for ${customerName}</div>
@@ -229,7 +232,7 @@ Deno.serve(async (req: Request) => {
     const { data: proposal, error: proposalError } = await supabase
       .from('proposals')
       .select(`
-        id, proposal_number, title, total,
+        id, organization_id, proposal_number, title, total,
         contacts:contact_id ( contact_name, first_name, last_name ),
         proposal_settings (
           contract_id, deposit_type, deposit_percent, deposit_amount,
@@ -247,11 +250,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: settings } = await supabase
-      .from('company_settings')
-      .select('company_name')
+      .from('organizations')
+      .select('name, logo_url, header_logo_url')
+      .eq('id', proposal.organization_id)
       .maybeSingle();
 
-    const companyName = settings?.company_name || 'Your Company';
+    const companyName = settings?.name || 'Your Company';
+    const companyLogoUrl = settings?.header_logo_url || settings?.logo_url;
     const customerName = proposal.contacts?.contact_name ||
       `${proposal.contacts?.first_name || ''} ${proposal.contacts?.last_name || ''}`.trim() ||
       'Valued Customer';
@@ -276,11 +281,12 @@ Deno.serve(async (req: Request) => {
         termsAvailable = true;
         const html = buildTermsHtml({
           companyName,
+          companyLogoUrl,
           customerName,
           proposalNumber,
           contractContent: contract.content,
         });
-        termsBase64 = textToBase64(html);
+        termsBase64 = textToBase64(applyProposalBrand(html, companyName));
       }
     }
 
@@ -305,6 +311,7 @@ Deno.serve(async (req: Request) => {
 
       const html = buildPaymentScheduleHtml({
         companyName,
+        companyLogoUrl,
         customerName,
         proposalNumber,
         proposalTotal,
@@ -317,7 +324,7 @@ Deno.serve(async (req: Request) => {
         progressInvoiceTerms: ps?.progress_invoice_terms ?? null,
         billingPhases: billingPhases || [],
       });
-      paymentScheduleBase64 = textToBase64(html);
+      paymentScheduleBase64 = textToBase64(applyProposalBrand(html, companyName));
     }
 
     // Check for financing PDFs uploaded to this proposal

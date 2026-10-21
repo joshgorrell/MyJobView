@@ -12,10 +12,11 @@ assert.ok(batches.every(b => b.reduce((n, a) => n + a.content.length, 0) <= 18_0
 assert.deepEqual(bidEmailBatches([]), [[]], 'No-file response still generates one email');
 const { bidFileFormat, bidFileHelp, validBidFile } = await moduleFrom(await readFile(new URL('../../supabase/functions/lost-opportunity-review/bidFileTypes.ts', import.meta.url), 'utf8'));
 const { validateAssessment } = await moduleFrom(await readFile(new URL('../../supabase/functions/lost-opportunity-review/adminReview.ts', import.meta.url), 'utf8'));
-let assessment = null, role = 'admin', repValid = true;
+let assessment = null, role = 'admin', repValid = true, sendPermitted=true, sendFail=false;
 let detail, stored, permitted = true, moduleAccess = true, user = 'employee-1';
 const emails = [], uploads = [];
-function reset() { detail = { request_id: 'request-1', organization_id: 'org-1', opportunity_name: 'Home theater', responded_at: null, reviewed_at: null, reviewed_by: null }; stored = null; emails.length = uploads.length = 0; }
+const {tokenFor}=await moduleFrom(await readFile(new URL('../../supabase/functions/send-review-followup-job/lostFeedback.ts',import.meta.url),'utf8'));
+function reset() { detail = { request_id: 'request-1', organization_id: 'org-1', opportunity_name: 'Home theater', responded_at: null, reviewed_at: null, reviewed_by: null,followup_claimed_at:null,manual_resend_history:[] }; stored = null; emails.length = uploads.length = 0; }
 function from(table) {
   const filters = {}; let update, insert;
   const q = { or:()=>q, order: () => q, select: () => q, eq: (k, v) => { filters[k] = v; return q; }, is: (k, v) => { filters[k] = v; return q; },
@@ -28,7 +29,7 @@ function from(table) {
       return { data: assessment };
     }
     if (table === 'profiles' && filters.id === 'rep-1') return { data: repValid ? { id: 'rep-1' } : null };
-    if (table === 'profiles') return { data: { role, organization_id: 'org-1', is_active: true, can_view_lost_opportunity_submissions: permitted,can_send_lost_opportunity_reviews:true } };
+    if (table === 'profiles') return { data: { role, organization_id: 'org-1', is_active: true, can_view_lost_opportunity_submissions: permitted,can_send_lost_opportunity_reviews:sendPermitted } };
     if (table === 'lost_review_details') {
       if (filters.organization_id && filters.organization_id !== detail.organization_id) return { error: { message: 'Not found' } };
       if (update && Object.entries(filters).every(([k, v]) => detail[k] === v)) Object.assign(detail, update);
@@ -48,11 +49,11 @@ function from(table) {
 const client = { from, auth: { getUser: async () => ({ data: { user: user ? { id: user } : null } }) }, rpc: async name => ({ data: name === 'flow_has_module_access' ? moduleAccess : [{ email: 'reviewer@example.com' }] }),
   storage: { from: () => ({ upload: async (path, bytes) => { uploads.push({ path, bytes }); return { data: {} }; }, remove: async () => ({ data: {} }), createSignedUrl: async path => ({ data: { signedUrl: 'https://private.example/' + path } }) }) } };
 const realFetch = globalThis.fetch;
-globalThis.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); emails.push(JSON.parse(options.body)); return new Response('{}', { status: 200 }); };
-globalThis.__lostDeps = { sendSystemEmail:init=>fetch('https://api.resend.com/emails',init), validateAssessment, createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
+globalThis.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); emails.push(JSON.parse(options.body)); return new Response('{}', { status: sendFail?502:200 }); };
+globalThis.__lostDeps = { tokenFor, sendSystemEmail:init=>fetch('https://api.resend.com/emails',init), validateAssessment, createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
 const source = (await readFile(new URL('../../supabase/functions/lost-opportunity-review/index.ts', import.meta.url), 'utf8')).replace(/^import[^;]+;\n/gm, '');
-await moduleFrom(`const {sendSystemEmail,validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
-const Deno={env:{get:key=>key==='RESEND_API_KEY'?'test-key':''},serve:handler=>{globalThis.__lostHandler=handler;}};
+await moduleFrom(`const {tokenFor,sendSystemEmail,validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
+const Deno={env:{get:key=>key==='RESEND_API_KEY'?'test-key':key==='SUPABASE_SERVICE_ROLE_KEY'?'test-secret':''},serve:handler=>{globalThis.__lostHandler=handler;}};
 ${source}`);
 async function call(body) { const r = await globalThis.__lostHandler(new Request('https://test.example', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, body: await r.json() }; }
 reset();
@@ -153,4 +154,21 @@ reset();permitted=false;
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403);
 permitted=true;
 console.log('Manual feedback authorization, audit source and original-answer preservation passed.');
+reset();
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'in_person',reasons:['price'],message:'Restaurant conversation',recoverable:'maybe',recovery_message:'Revisit budget'})).status,200);
+assert.equal(stored.source,'in_person');assert.equal(stored.recovery_message,'Revisit budget');
+globalThis.fetch=async(url,options)=>{emails.push(JSON.parse(options.body));return new Response('{}',{status:sendFail?502:200});};
+reset();detail.sent_at='2026-01-01';detail.follow_up_sent_at='2026-01-15';
+assert.equal((await call({action:'resend',request_id:'request-1'})).status,200);
+assert.equal(emails.length,1);assert.equal(detail.manual_resend_history.length,1);
+assert.equal(detail.manual_resend_history[0].sent_by,'employee-1');
+assert.equal(detail.sent_at,'2026-01-01');assert.equal(detail.follow_up_sent_at,'2026-01-15');
+sendFail=true;
+assert.equal((await call({action:'resend',request_id:'request-1'})).status,502);
+assert.equal(detail.manual_resend_history.length,1);assert.equal(detail.followup_claimed_at,null);sendFail=false;
+sendPermitted=false;assert.equal((await call({action:'resend',request_id:'request-1'})).status,403);sendPermitted=true;
+detail.responded_at='2026-10-21';assert.equal((await call({action:'resend',request_id:'request-1'})).status,409);
+moduleAccess=false;assert.equal((await call({action:'resend',request_id:'request-1'})).status,403);moduleAccess=true;
+console.log('In-person feedback, manual resend history, failures, original age, response and permission guards passed.');
+globalThis.fetch=realFetch;
 delete globalThis.__lostDeps; delete globalThis.__lostHandler;

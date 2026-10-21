@@ -1,3 +1,4 @@
+import { loadProposalDocument } from '../../lib/proposalDocument';
 import { useState, useEffect } from 'react';
 import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info, Pencil, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -87,6 +88,7 @@ export function EmailProposalModal({
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'idle' | 'loading_docs' | 'sending'>('idle');
   const [error, setError] = useState('');
+  const [includePromisePage, setIncludePromisePage] = useState(true);
   const [showAttachments, setShowAttachments] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -186,18 +188,11 @@ export function EmailProposalModal({
 
       setStep('loading_docs');
 
-      // Generate proposal PDF if selected
+      // Attach the actual document; generation failures stop the send.
       if (attachments.proposal) {
-        const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-proposal-pdf', {
-          body: { proposalId },
-        });
-        if (!pdfError && pdfData?.base64) {
-          emailAttachments.push({
-            filename: `Proposal-${proposalNumber}.pdf`,
-            content: pdfData.base64,
-          });
-          sentAttachmentsRecord.proposal = true;
-        }
+        const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage);
+        emailAttachments.push({ filename: document.filename, content: document.content });
+        sentAttachmentsRecord.proposal = true;
       }
 
       // Terms & Conditions
@@ -424,7 +419,7 @@ export function EmailProposalModal({
                 </div>
 
                 <AttachmentToggle
-                  label="Proposal PDF"
+                  label="Printable proposal"
                   description="Full proposal with line items, pricing, and totals"
                   enabled={attachments.proposal}
                   available={true}
@@ -432,6 +427,7 @@ export function EmailProposalModal({
                   onChange={(val) => setAttachments(prev => ({ ...prev, proposal: val }))}
                 />
 
+                {attachments.proposal && <label className="flex items-start gap-3 rounded-lg border border-sky-700/50 bg-sky-900/20 p-3 text-sm text-gray-200"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} className="mt-1" /><span><span className="block font-medium">Include Our Promise to You</span><span className="block text-xs text-gray-400">Include Electronic Life’s promise as a separate page in the printable proposal.</span></span></label>}
                 <AttachmentToggle
                   label="Terms & Conditions"
                   description="Contract terms attached to this proposal"
@@ -505,7 +501,7 @@ export function EmailProposalModal({
                   Send Email
                   {attachmentCount > 0 && (
                     <span className="ml-1.5 text-blue-200 font-normal">
-                      + {attachmentCount} PDF{attachmentCount !== 1 ? 's' : ''}
+                      + {attachmentCount} attachment{attachmentCount !== 1 ? 's' : ''}
                     </span>
                   )}
                 </span>

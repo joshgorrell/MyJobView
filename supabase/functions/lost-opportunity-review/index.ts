@@ -1,3 +1,4 @@
+import { tokenFor } from "../send-review-followup-job/lostFeedback.ts";
 import { deleteProposalSubmission, deleteProposalEmail } from './deleteProposalSubmission.ts';
 import { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } from "./proposalFollowUp.ts";
 import { sendTrackedProposalCheck } from "./proposalCheckDelivery.ts";
@@ -583,14 +584,215 @@ Deno.serve(async (req) => {
         b.request_id,
       ).eq("organization_id", org).single(),
     );
+    if (b.action === "resend") {
+      if (!profile.can_send_lost_opportunity_reviews)
+        return json(
+          { error: "Sending Lost Opportunity reviews is not permitted." },
+          403,
+        );
+      if (detail.responded_at)
+        return json(
+          { error: "Customer feedback has already been recorded." },
+          409,
+        );
+      if (!Deno.env.get("RESEND_API_KEY"))
+        return json({ error: "Email delivery is not configured." }, 503);
+      const request = await checked(
+        await admin
+          .from("review_requests")
+          .select("recipient_name,recipient_email")
+          .eq("id", detail.request_id)
+          .eq("organization_id", org)
+          .single(),
+      );
+      if (!request.recipient_email)
+        return json({ error: "This request has no recipient email." }, 400);
+      const settings = await checked(
+        await admin
+          .from("company_settings")
+          .select(
+            "company_name,company_email,company_logo_url,from_email,from_name,reply_to_email,app_url",
+          )
+          .eq("organization_id", org)
+          .single(),
+      );
+      const organization = await checked(
+        await admin
+          .from("organizations")
+          .select("subdomain")
+          .eq("id", org)
+          .single(),
+      );
+      const base = organization.subdomain
+        ? `https://${organization.subdomain}.myjobview.com`
+        : settings.app_url;
+      if (!base || !base.startsWith("https://"))
+        return json({ error: "Configure a secure dealer app URL." }, 400);
+      const now = new Date().toISOString();
+      const claim = await checked(
+        await admin
+          .from("lost_review_details")
+          .update({ followup_claimed_at: now })
+          .eq("request_id", detail.request_id)
+          .eq("organization_id", org)
+          .is("responded_at", null)
+          .or(
+            `followup_claimed_at.is.null,followup_claimed_at.lt.${new Date(Date.now() - 15 * 60000).toISOString()}`,
+          )
+          .select("request_id,manual_resend_history")
+          .maybeSingle(),
+      );
+      if (!claim)
+        return json(
+          {
+            error:
+              "A send is already in progress or feedback just arrived. Reload and try again.",
+          },
+          409,
+        );
+      try {
+        const token = await tokenFor(
+          detail.request_id,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        await checked(
+          await admin
+            .from("lost_review_tokens")
+            .update({
+              followup_token_hash: await hash(token),
+              expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+            })
+            .eq("request_id", detail.request_id)
+            .select("request_id")
+            .single(),
+        );
+        const url = new URL("/lost-opportunity-review", base);
+        url.searchParams.set("token", token);
+        const latest = await checked(
+          await admin
+            .from("lost_review_details")
+            .select("responded_at")
+            .eq("request_id", detail.request_id)
+            .single(),
+        );
+        if (latest.responded_at)
+          return json(
+            { error: "Customer feedback has just been recorded." },
+            409,
+          );
+        const result = await sendSystemEmail({
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": `lost-manual-${detail.request_id}-${now}`,
+          },
+          body: JSON.stringify({
+            from: `${settings.from_name || settings.company_name || "Our team"} <${settings.from_email || settings.company_email}>`,
+            to: request.recipient_email,
+            reply_to: settings.reply_to_email || settings.company_email,
+            subject: detail.title,
+            html: buildInvitationEmail(
+              settings,
+              {
+                contact_name: request.recipient_name,
+                email: request.recipient_email,
+              },
+              detail.opportunity_name,
+              detail.title,
+              url,
+            ),
+          }),
+        });
+        if (!result.ok)
+          return json(
+            { error: "Survey resend failed. Please try again." },
+            502,
+          );
+        await checked(
+          await admin
+            .from("lost_review_details")
+            .update({
+              manual_resend_history: [
+                ...(claim.manual_resend_history || []),
+                { sent_at: now, sent_by: user.id },
+              ],
+            })
+            .eq("request_id", detail.request_id)
+            .eq("organization_id", org),
+        );
+        return json({ success: true });
+      } finally {
+        await checked(
+          await admin
+            .from("lost_review_details")
+            .update({ followup_claimed_at: null })
+            .eq("request_id", detail.request_id)
+            .eq("followup_claimed_at", now),
+        );
+      }
+    }
     if (b.action === "record_feedback") {
-      if (!profile.can_view_lost_opportunity_submissions || !(profile.can_send_lost_opportunity_reviews || ["admin","owner","super_admin"].includes(profile.role))) return json({error:"Lost Opportunity send and submission access required."},403);
-      if (detail.responded_at) return json({error:"Feedback already exists. The original customer response is preserved."},409);
-      const selected=Array.isArray(b.reasons)?[...new Set(b.reasons)]:[];
-      if (!["phone","email"].includes(b.source)||!selected.length||selected.some(r=>!reasons.includes(r as string))||typeof b.message!=="string"||b.message.length>10000||!["yes","maybe","no"].includes(b.recoverable)) return json({error:"Choose the source, reasons, and whether the opportunity can be recovered."},400);
-      const result=await admin.from("lost_review_responses").insert({request_id:detail.request_id,reasons:selected,message:b.message.trim(),recoverable:b.recoverable,recovery_message:"",attachments:[],source:b.source,recorded_by:user.id});
-      if(result.error?.code==="23505") return json({error:"Feedback was just submitted. Reload to see it."},409);
-      await checked(result);return json({success:true});
+      if (
+        !profile.can_view_lost_opportunity_submissions ||
+        !(
+          profile.can_send_lost_opportunity_reviews ||
+          ["admin", "owner", "super_admin"].includes(profile.role)
+        )
+      )
+        return json(
+          { error: "Lost Opportunity send and submission access required." },
+          403,
+        );
+      if (detail.responded_at)
+        return json(
+          {
+            error:
+              "Feedback already exists. The original customer response is preserved.",
+          },
+          409,
+        );
+      const selected = Array.isArray(b.reasons) ? [...new Set(b.reasons)] : [];
+      if (
+        !["phone", "email", "in_person"].includes(b.source) ||
+        !selected.length ||
+        selected.some((r) => !reasons.includes(r as string)) ||
+        typeof b.message !== "string" ||
+        b.message.length > 10000 ||
+        (b.recovery_message !== undefined &&
+          (typeof b.recovery_message !== "string" ||
+            b.recovery_message.length > 10000)) ||
+        !["yes", "maybe", "no"].includes(b.recoverable)
+      )
+        return json(
+          {
+            error:
+              "Choose the source, reasons, and whether the opportunity can be recovered.",
+          },
+          400,
+        );
+      const result = await admin
+        .from("lost_review_responses")
+        .insert({
+          request_id: detail.request_id,
+          reasons: selected,
+          message: b.message.trim(),
+          recoverable: b.recoverable,
+          recovery_message:
+            typeof b.recovery_message === "string"
+              ? b.recovery_message.trim()
+              : "",
+          attachments: [],
+          source: b.source,
+          recorded_by: user.id,
+        });
+      if (result.error?.code === "23505")
+        return json(
+          { error: "Feedback was just submitted. Reload to see it." },
+          409,
+        );
+      await checked(result);
+      return json({ success: true });
     }
     if (["assessment_load", "assessment_save"].includes(b.action)) {
       if (profile.role !== "admin" || !profile.can_view_lost_opportunity_submissions) {

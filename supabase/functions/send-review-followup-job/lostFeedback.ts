@@ -15,7 +15,7 @@ export function lostFeedbackEmail(
 ) {
   return `<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f1f5f9;padding:24px"><div style="max-width:600px;margin:auto;background:white;border-radius:16px;padding:32px">${logo ? `<img src="${escape(logo)}" alt="${escape(company)}" style="max-width:220px;max-height:60px">` : `<h2>${escape(company)}</h2>`}<h1 style="color:#0e7490">Could you tell us why?</h1><p>Hi ${escape(name || "there")},</p><p>We recently asked for your feedback about ${escape(opportunity)}. Since we did not earn your business, could you take 30 seconds to tell us why? Your honest answer helps us improve.</p><p><a href="${escape(url)}" style="display:inline-block;background:#0e7490;color:white;padding:16px 24px;border-radius:8px;text-decoration:none">Tell Us Why</a></p><p>This is our final email reminder. Your feedback is shared privately with authorized company reviewers. You can also reply if you prefer.</p><p>Thank you for the opportunity,<br>${escape(company)}</p></div></body></html>`;
 }
-async function tokenFor(id: string, secret: string) {
+export async function tokenFor(id: string, secret: string) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -74,7 +74,7 @@ async function proposalAnswered(db: any, proposalId: string, org: string) {
       .select("id")
       .eq("proposal_id", proposalId)
       .eq("organization_id", org)
-      .in("source", ["phone", "email"])
+      .in("source", ["phone", "email", "in_person"])
       .limit(1),
   );
   return !!manual?.length;
@@ -89,7 +89,7 @@ export async function sendLostFeedbackReminders(
 ) {
   if (!org.lost_review_followup_enabled) return { sent: 0, errors: 0 };
   const cutoff = new Date(
-      now.getTime() - (org.lost_review_followup_days ?? 7) * 86400000,
+      now.getTime() - (org.lost_review_followup_days ?? 14) * 86400000,
     ).toISOString(),
     claimCutoff = new Date(now.getTime() - 15 * 60000).toISOString();
   const rows = await checked(
@@ -115,7 +115,9 @@ export async function sendLostFeedbackReminders(
         : row.review_requests;
       if (
         !request?.sent_at ||
-        request.sent_at > cutoff ||
+        !Number.isFinite(Date.parse(request.sent_at)) ||
+        Date.parse(request.sent_at) > Date.parse(cutoff) ||
+        now.getTime() - Date.parse(request.sent_at) >= 30 * 86400000 ||
         !request.recipient_email
       )
         continue;

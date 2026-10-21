@@ -1,6 +1,7 @@
 import React from 'react';
+import {FeedbackHost} from '../../../src/components/Shared/FeedbackHost';
 import { createRoot } from 'react-dom/client';
 import LostOpportunityReviews from '../../../src/components/Reviews/LostOpportunityReviews';
 import '../../../src/index.css';
 import LostOpportunityForm from '../../../src/components/Reviews/LostOpportunityForm';
-createRoot(document.getElementById('root')!).render(window.location.search.includes("customer=1") ? <LostOpportunityForm /> : <LostOpportunityReviews showCreate={window.location.search.includes("email-preview=1")} />);
+createRoot(document.getElementById('root')!).render(window.location.search.includes("customer=1") ? <LostOpportunityForm /> : <><LostOpportunityReviews showCreate={window.location.search.includes("email-preview=1")} /><FeedbackHost/></>);

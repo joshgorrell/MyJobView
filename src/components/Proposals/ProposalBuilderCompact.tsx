@@ -672,6 +672,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     fullUpdates: any;
   } | null>(null);
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
+  const [includePromisePage, setIncludePromisePage] = useState(true);
   const [coverPageImage, setCoverPageImage] = useState<string | null>(null);
   const [showQA, setShowQA] = useState(false);
   const [showTasksPanel, setShowTasksPanel] = useState(false);
@@ -1185,7 +1186,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           body: JSON.stringify({
             proposalId,
             templateId: selectedTemplateId,
-            displayOptions: pdfDisplayOptions,
+            displayOptions: { ...pdfDisplayOptions, includePromisePage },
             coverPageImage: coverPageImage || undefined
           })
         }
@@ -5479,6 +5480,10 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                 </p>
 
                 <div className="grid grid-cols-1 gap-3">
+                  <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong cursor-pointer">
+                    <input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} className="mt-0.5" />
+                    <div><div className="text-sm font-medium text-primary">Our Promise to You</div><div className="text-xs text-muted mt-0.5">Include Electronic Life’s promise as its own page before the proposal details</div></div>
+                  </label>
                   <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
