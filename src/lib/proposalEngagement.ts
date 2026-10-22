@@ -7,6 +7,7 @@ export const ENGAGEMENT_ACTIONS = {
   change_request_clicked: 'Change request opened',
   decline_clicked: 'Decline opened',
   decline_to_changes_clicked: 'Chose changes after viewing Our Promise',
+  decline_to_approval_clicked: 'Chose approval after viewing Our Promise',
   decline_continue_clicked: 'Acknowledged Our Promise and continued declining',
   video_opened: 'Video opened',
   video_played: 'Video played',
