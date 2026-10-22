@@ -64,7 +64,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     : false;
 
   const showTeamView = isManager && (teamView || (!profile?.is_sales_rep && !selectedRepId));
-  const effectiveRepId = isManager
+  const effectiveRepId = showTeamView ? null : isManager
     ? (selectedRepId || profile?.id || null)
     : (profile?.id || null);
 
@@ -78,7 +78,11 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
 
   useEffect(() => {
-    if (!onRepContextChange || !data) return;
+    if (!onRepContextChange) return;
+    if (!data) {
+      onRepContextChange(null);
+      return;
+    }
 
     const goal = computeGoalProgress(data);
     const currentMonth = data.monthlyTrend[0]?.total ?? 0;
@@ -132,7 +136,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-lg font-semibold text-white">Sales Dashboard</h1>
-          {profile.is_sales_rep && <button type="button" onClick={() => setTeamView(false)} className="rounded-lg border border-gray-600 px-3 py-2 text-sm text-white">My dashboard</button>}
+          {profile.is_sales_rep && <button type="button" onClick={() => { setSelectedRepId(null); setTeamView(false); }} className="rounded-lg border border-gray-600 px-3 py-2 text-sm text-white">My dashboard</button>}
         </div>
         <SalesTeamOverview orgId={profile.organization_id} onSelectRep={(id) => { setSelectedRepId(id); setTeamView(false); }} />
       </div>
@@ -186,7 +190,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isManager && profile?.organization_id && <button type="button" onClick={() => setTeamView(true)} className="rounded-lg border border-gray-600 px-3 py-2 text-xs sm:text-sm text-white hover:bg-gray-700">All sales reps</button>}
           {isManager && profile?.organization_id && (
             <ManagerRepSelector

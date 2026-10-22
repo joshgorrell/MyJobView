@@ -21,6 +21,7 @@ export function SalesTeamOverview({ orgId, onSelectRep }: Props) {
     async function load() {
       setLoading(true);
       setError(null);
+      setReps([]);
       try {
         const { data: profiles, error: profileError } = await supabase.from('profiles')
           .select('id').eq('organization_id', orgId).eq('is_sales_rep', true).eq('is_active', true);
@@ -34,8 +35,16 @@ export function SalesTeamOverview({ orgId, onSelectRep }: Props) {
         const { data, error: rpcError } = await supabase.rpc('get_sales_team_dashboard', { p_rep_ids: ids });
         if (rpcError) throw rpcError;
         if (data?.error) throw new Error(data.error);
-        const results = (data?.reps ?? []) as SalesDashboardResult[];
-        if (results.some(rep => !rep || (rep as any).error)) throw new Error('Unable to load one or more sales reps');
+        const results = (Array.isArray(data?.reps) ? data.reps : []) as SalesDashboardResult[];
+        const returnedIds = new Set(results.map(rep => rep?.repId));
+        const incomplete = results.length !== ids.length || returnedIds.size !== ids.length
+          || ids.some(id => !returnedIds.has(id))
+          || results.some(rep => !rep || (rep as any).error || [
+            rep.bookedSales?.total, rep.bookedSales?.count,
+            rep.pipeline?.total, rep.pipeline?.count,
+            rep.closeRate?.wonCount, rep.closeRate?.lostCount,
+          ].some(value => value == null || !Number.isFinite(Number(value))));
+        if (incomplete) throw new Error('Unable to load complete sales team totals. Please refresh.');
         if (!cancelled) setReps(results);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load team sales');
@@ -61,18 +70,18 @@ export function SalesTeamOverview({ orgId, onSelectRep }: Props) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div><h2 className="text-lg font-semibold text-white">All sales reps</h2>
-          <p className="text-xs text-gray-400">Company team totals from active sales reps. Individual quota periods may differ.</p></div>
+          <p className="text-xs text-gray-400">Active sales reps only. Booked sales, jobs and close rate combine individual quota periods, which may differ.</p></div>
         <button type="button" onClick={() => setRefreshKey(k => k + 1)} aria-label="Refresh team sales" className="rounded-lg border border-gray-600 p-2 text-gray-200 hover:bg-gray-700"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
       </div>
       {loading ? <p className="text-sm text-gray-300">Loading team sales…</p> : error ? <p role="alert" className="text-sm text-red-300">{error}</p> : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {[
-              ['Booked sales', currency(totals.booked)],
+              ['Booked sales (rep periods)', currency(totals.booked)],
               ['Active pipeline', currency(totals.pipeline)],
-              ['Booked jobs', totals.bookedCount.toLocaleString()],
+              ['Booked jobs (rep periods)', totals.bookedCount.toLocaleString()],
               ['Close rate', `${closeRate}%`],
-            ].map(([label, value]) => <div key={label} className="rounded-xl border border-gray-700 bg-gray-800 p-3"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 text-lg font-semibold text-white tabular-nums">{value}</p></div>)}
+            ].map(([label, value]) => <div key={label} className="rounded-xl border border-gray-700 bg-gray-800 p-3"><p className="text-xs text-gray-400">{label}</p><p className="mt-1 break-words text-lg font-semibold text-white tabular-nums">{value}</p></div>)}
           </div>
           <div className="rounded-xl border border-gray-700 bg-gray-800 p-3 sm:p-4">
             <h3 className="mb-3 text-sm font-semibold text-white">Salespeople ({reps.length})</h3>
