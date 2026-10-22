@@ -40,7 +40,7 @@ BEGIN
         'Completed discussion task: ' || left(v_post.content,100));
       INSERT INTO public.notifications
         (user_id,type,title,body)
-      VALUES (v_actor,'points_earned','+'||v_points||' Points!',
+      VALUES (v_actor,'system','+'||v_points||' Points!',
         'You earned '||v_points||' points for completing a task');
     END IF;
   ELSE
