@@ -41,7 +41,7 @@ try {
   await page.setViewportSize({width,height:900});
   for(const role of ['sales_rep','admin','manager','sales_manager']){
    await page.goto(url+'?role='+role+'&rep=true');
-   await page.getByText('Zach Self',{exact:true}).waitFor();
+   await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
    assert.equal(await page.evaluate(()=>window.rpcCalls.some(c=>c.args?.p_target_rep_id==='alphabetical')),false);
    if(role==='sales_rep')assert.equal(await page.getByRole('combobox').count(),0);
    else {
@@ -49,7 +49,7 @@ try {
     await page.getByText('Viewing: Aaron Example',{exact:true}).waitFor();
     if(teamEnabled){await page.getByRole('button',{name:'All sales reps',exact:true}).click();await page.getByRole('button',{name:'My dashboard',exact:true}).click();}
     else await page.getByRole('combobox',{name:'Salesperson'}).selectOption('self');
-    await page.getByText('Zach Self',{exact:true}).waitFor();
+    await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
    }
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,role+' '+width+' overflow');
   }
@@ -72,7 +72,7 @@ try {
  if(teamEnabled){
   await page.goto(url+'?role=manager&empty=true');await page.getByText('No active sales reps found.').waitFor();
   assert.equal(await page.evaluate(()=>window.rpcCalls.some(c=>c.name==='get_sales_team_dashboard')),false);
-  await page.goto(url+'?role=manager&partial=true');await page.getByRole('alert').waitFor();assert.equal(await page.getByText('Booked sales',{exact:true}).count(),0);
+  await page.goto(url+'?role=manager&partial=true');await page.getByRole('alert').waitFor();assert.equal(await page.getByText(/^Booked sales/).count(),0);
  }
  assert.deepEqual(errors,[]);
 } finally {await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}
