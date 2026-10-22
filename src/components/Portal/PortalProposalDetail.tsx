@@ -695,7 +695,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       if (msgError) throw msgError;
 
       setComment('');
+      setActiveDecisionForm(null);
       setShowQA(true);
+      notify('Your change request was sent to the proposal conversation.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error submitting change request:', error);
       notify('Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
@@ -1249,6 +1251,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     <button
                       data-engagement-action="change_request_clicked"
                       onClick={() => { setActiveDecisionForm(activeDecisionForm === 'changes' ? null : 'changes'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                      aria-expanded={activeDecisionForm === 'changes'}
+                      aria-controls="proposal-change-request-form"
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
@@ -1260,6 +1264,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     <button
                       data-engagement-action="decline_clicked"
                       onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                      aria-expanded={activeDecisionForm === 'decline'}
+                      aria-controls="proposal-decline-form"
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
@@ -1303,7 +1309,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Request Changes / Comments Section */}
             {activeDecisionForm === 'changes' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div id="proposal-change-request-form" role="region" aria-label="Request proposal changes" className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Request Changes / Questions
@@ -1327,7 +1333,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Decline Section */}
             {activeDecisionForm === 'decline' && (
-              <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
+              <div id="proposal-decline-form" role="region" aria-label="Decline proposal" className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
                   <XCircle className="w-4 h-4" />
                   Decline This Proposal
