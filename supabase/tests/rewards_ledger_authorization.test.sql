@@ -14,10 +14,10 @@ SELECT ok(NOT has_table_privilege('authenticated','public.reward_redemptions','D
 SELECT ok(NOT has_table_privilege('anon','public.points_transactions','INSERT'), 'anon cannot insert points');
 SELECT ok(NOT has_table_privilege('anon','public.reward_redemptions','INSERT'), 'anon cannot insert redemptions');
 SET LOCAL ROLE authenticated;
-SELECT throws_ok('INSERT INTO public.points_transactions DEFAULT VALUES', '42501', NULL, 'direct points write rejected');
+SELECT throws_ok('INSERT INTO public.points_transactions DEFAULT VALUES', '42501', 'permission denied for table points_transactions', 'direct points write rejected');
 RESET ROLE;
 SET LOCAL ROLE authenticated;
-SELECT throws_ok('DELETE FROM public.reward_redemptions WHERE false', '42501', NULL, 'direct redemption delete rejected');
+SELECT throws_ok('DELETE FROM public.reward_redemptions WHERE false', '42501', 'permission denied for table reward_redemptions', 'direct redemption delete rejected');
 RESET ROLE;
 SELECT * FROM finish();
 ROLLBACK;
