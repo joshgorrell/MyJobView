@@ -21,6 +21,7 @@ export function TestTuneProjectAdjustments() {
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [submittedThisSession, setSubmittedThisSession] = useState<Set<string>>(new Set());
   useEffect(() => {
     let active = true;
     async function load() {
@@ -46,7 +47,7 @@ export function TestTuneProjectAdjustments() {
     return () => { active = false; void supabase.removeChannel(subscription); };
   }, []);
 
-  const selectedItems = items.filter(item => selected.includes(item.id) && item.status === 'open');
+  const selectedItems = items.filter(item => selected.includes(item.id) && item.status === 'open' && !submittedThisSession.has(item.id));
   const selectedProject = selectedItems[0]?.project_id;
   async function submitSelected() {
     if (!selectedProject || submitting || selectedItems.length !== selected.length || selectedItems.some(item => item.project_id !== selectedProject)) return;
@@ -61,6 +62,7 @@ export function TestTuneProjectAdjustments() {
         p_submission_id: crypto.randomUUID(),
       });
       if (failure) throw failure;
+      setSubmittedThisSession(previous => new Set([...previous, ...selectedItems.map(item => item.id)]));
       setSelected([]);
       setNotice('Adjustments submitted to the Work Order Request Queue. Already-submitted items cannot be requested again.');
     } catch (failure) {
@@ -89,10 +91,10 @@ export function TestTuneProjectAdjustments() {
       <div className="divide-y divide-subtle">
         {visible.map(item => (
           <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-            <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} disabled={submitting || item.status !== 'open' || Boolean(selectedProject && selectedProject !== item.project_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />
+            <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} disabled={submitting || item.status !== 'open' || submittedThisSession.has(item.id) || Boolean(selectedProject && selectedProject !== item.project_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />
             <div className="min-w-0">
               <div className="font-medium text-primary">{item.customer_description || item.title}</div>
-              <div className="text-xs text-muted">{projects[item.project_id]?.name || 'Project'} · {item.status}</div>
+              <div className="text-xs text-muted">{projects[item.project_id]?.name || 'Project'} · {submittedThisSession.has(item.id) ? 'Submitted this session' : item.status}</div>
             </div>
             <a className="text-info hover:underline" href={`/projects?projectId=${encodeURIComponent(item.project_id)}`}>Open project →</a>
           </div>
