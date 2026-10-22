@@ -267,10 +267,10 @@ export function ProposalApprovalModal({
               {requireDeposit && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm font-medium text-amber-900 mb-1">
-                    Deposit Required: ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    Deposit Due: ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-xs text-amber-700">
-                    Complete your deposit payment to finalize approval. Your order will be ready for scheduling once the deposit is confirmed.
+                    Your approval is recorded separately from your deposit payment. You can pay when the invoice is available; scheduling may depend on receiving the deposit.
                   </p>
                 </div>
               )}
@@ -297,11 +297,11 @@ export function ProposalApprovalModal({
                         <p className={`font-medium ${
                           selectedMethod === 'payment' ? 'text-blue-900' : 'text-gray-900'
                         }`}>
-                          {requireDeposit ? 'Pay Deposit & Approve' : 'Approve Proposal'}
+                          {requireDeposit ? 'Approve Proposal' : 'Approve Proposal'}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
                           {requireDeposit
-                            ? `Pay your $${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} deposit now to finalize approval`
+                            ? `Approve this proposal now; you can pay the deposit when the invoice is available`
                             : 'Approve this proposal and create a sales order'}
                         </p>
                       </div>
@@ -353,7 +353,7 @@ export function ProposalApprovalModal({
                 </h3>
                 <p className="text-sm text-gray-500">
                   {requireDeposit
-                    ? 'Click below to open the secure payment window and complete your deposit.'
+                    ? 'Approve the proposal first. If your deposit invoice is available, you can choose to pay it immediately or later.'
                     : 'Click below to approve this proposal and create your sales order.'}
                 </p>
               </div>
