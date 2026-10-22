@@ -965,8 +965,9 @@ GRANT EXECUTE ON FUNCTION public.auto_clock_out_forgotten_entries() TO service_r
 -- Admin's single-entry clock-out uses the same authoritative ledger as the job.
 CREATE OR REPLACE FUNCTION public.admin_forgotten_clock_out(p_entry_id uuid,p_clock_out timestamptz)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
-DECLARE org uuid:=private.rewards_actor_org(true); e public.daily_clock_entries; penalty integer; reset_at timestamptz;
+DECLARE org uuid:=private.rewards_actor_org(); e public.daily_clock_entries; penalty integer; reset_at timestamptz;
 BEGIN
+ IF NOT time_private.can_manage_time(org) THEN RAISE EXCEPTION 'Time management access required' USING ERRCODE='42501'; END IF;
  SELECT * INTO e FROM public.daily_clock_entries WHERE id=p_entry_id AND organization_id=org FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'Clock entry not found'; END IF;
  IF e.clock_out IS NOT NULL OR e.status<>'clocked_in' THEN RETURN; END IF;
@@ -982,3 +983,5 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.admin_forgotten_clock_out(uuid,timestamptz) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.admin_forgotten_clock_out(uuid,timestamptz) TO authenticated;
+-- FK cascade deletion would erase redemption history; archive catalog items instead.
+REVOKE DELETE,TRUNCATE ON public.rewards_catalog FROM PUBLIC,anon,authenticated;

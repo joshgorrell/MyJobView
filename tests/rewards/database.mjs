@@ -27,6 +27,7 @@ await denied('update points_transactions set points_amount=999');
 await denied('delete from points_transactions');
 await denied('insert into reward_redemptions(user_id) values($1)',[alice]);
 await denied('update reward_redemptions set status=\'fulfilled\'');
+await denied('delete from rewards_catalog');
 await denied('select award_points($1,1000,\'Forged\')',[alice]);
 await denied('update profiles set points_earned=999 where id=$1',[alice]);
 await denied('select private.post_reward_points($1,$2,100,\'admin_adjustment\',NULL,\'Forged\',\'fake\')',[org,alice]);
@@ -102,6 +103,14 @@ await denied("insert into tasks(id,organization_id,user_id,title)values($1,$2,$3
 await denied("insert into points_configuration(organization_id)values($1)",[org],/row-level security/);
 await as(admin);await db.query('update points_configuration set contact_created_points=0 where organization_id=$1',[org]);
 await as(alice);assert.equal((await rows('select * from get_reward_points_menu()')).some(r=>r.id==='contact_created'),false);
+// Install the actual attendance guard too: even owner DELETE must be protected.
+const attendanceMigration=await sql('../../supabase/migrations/20261016131655_time_clock_attendance_pto_routing.sql');
+await db.exec('RESET ROLE');
+await db.exec(attendanceMigration.match(/CREATE OR REPLACE FUNCTION time_private\.guard_attendance_ledger[\s\S]*?\$\$;/)[0]);
+await db.exec('CREATE TRIGGER protect_attendance_ledger BEFORE INSERT OR UPDATE OR DELETE ON points_transactions FOR EACH ROW EXECUTE FUNCTION time_private.guard_attendance_ledger()');
+await db.exec("CREATE TABLE attendance_test_source(id uuid,organization_id uuid,user_id uuid);CREATE FUNCTION private.test_arrival() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$BEGIN INSERT INTO points_transactions(organization_id,user_id,points_amount,transaction_type,reference_id)VALUES(NEW.organization_id,NEW.user_id,10,'attendance',NEW.id);RETURN NEW;END$$;CREATE TRIGGER test_arrival AFTER INSERT ON attendance_test_source FOR EACH ROW EXECUTE FUNCTION private.test_arrival()");
+await db.query('insert into attendance_test_source values($1,$2,$3)',[id(699),org,alice]);
+await denied("delete from points_transactions where transaction_type='attendance'",[],/Attendance points/);
 // Authorized test reset is tenant-scoped and records a cutover.
 await db.exec('RESET ROLE');await db.query('update profiles set points_earned=77 where id=$1',[foreign]);
 await db.exec(await sql('../../supabase/migrations/20261022171746_reset_elife_test_rewards.sql'));
@@ -110,7 +119,7 @@ assert.equal(await scalar('select count(*)::int from reward_redemptions where or
 assert.equal(await scalar('select sum(points_earned)::int from profiles where organization_id=$1',[org]),0);
 assert.equal(await scalar('select points_earned from profiles where id=$1',[foreign]),77);
 await db.query('insert into daily_clock_entries(id,organization_id,technician_id,clock_in)values($1,$2,$3,now()-interval \'1 day\')',[id(700),org,alice]);
-await db.query("insert into points_transactions(organization_id,user_id,points_amount,transaction_type,reference_id)values($1,$2,10,'attendance',$3)",[org,alice,id(700)]);
+await db.query('insert into attendance_test_source values($1,$2,$3)',[id(700),org,alice]);
 assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),0,'Pre-reset attendance cannot replay');
 
 // Real deduction triggers update the balance once and respect event idempotency.
@@ -137,6 +146,6 @@ assert.equal((await scalar('select auto_clock_out_forgotten_entries()')).entries
 await db.query("insert into daily_clock_entries(id,organization_id,technician_id,clock_in)values($1,$2,$3,now()-interval '2 hours')",[id(730),org,alice]);
 await as(alice);await denied('select admin_forgotten_clock_out($1,now()-interval \'1 hour\')',[id(730)]);
 await as(foreign);await denied('select admin_forgotten_clock_out($1,now()-interval \'1 hour\')',[id(730)]);
-await as(admin);await db.query("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);await db.query("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);
+await as(admin);await db.exec("SET test.time_access='false'");await denied("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);await db.exec("SET test.time_access='true'");await db.query("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);await db.query("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);
 assert.equal(await scalar('select get_user_points_balance($1)',[alice]),-50);
 await db.close();console.log('Rewards SQL: direct-write denial, tenant/role/module boundaries, resolver credit, exact reversals, zero values, idempotent redemption/refund, stock, producer awards and scoped test reset passed.');

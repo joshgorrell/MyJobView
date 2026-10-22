@@ -8,7 +8,11 @@ BEGIN
  PERFORM 1 FROM public.profiles WHERE organization_id=org ORDER BY id FOR UPDATE;
  UPDATE public.company_settings SET rewards_reset_at=clock_timestamp() WHERE organization_id=org;
  DELETE FROM public.reward_redemptions WHERE organization_id=org;
+ -- Attendance's trigger intentionally rejects direct DELETE even for postgres.
+ -- Transactional ALTER holds a table lock; restore before leaving this migration.
+ ALTER TABLE public.points_transactions DISABLE TRIGGER protect_attendance_ledger;
  DELETE FROM public.points_transactions WHERE organization_id=org;
+ ALTER TABLE public.points_transactions ENABLE TRIGGER protect_attendance_ledger;
  -- Clear the old, disconnected test ledgers as well, if installed.
  FOREACH t IN ARRAY ARRAY['user_points','points_history','points_log','point_events','clock_out_rewards_log'] LOOP
   IF to_regclass('public.'||t) IS NULL THEN CONTINUE; END IF;
