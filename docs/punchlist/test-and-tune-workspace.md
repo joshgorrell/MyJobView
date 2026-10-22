@@ -22,10 +22,11 @@
 - A deep link must preserve the target customer/project and item context; authorization and organization boundaries apply at both ends.
 
 ## Required two-way page navigation
-- The **Test & Tune** page header provides **Service Requests**, opening the existing Service Requests page with its T&T-origin filter preselected.
-- The **Service Requests** page header provides **Test & Tune**, opening the staff Test & Tune dashboard. This navigation is available even if the selected service request is not T&T-related, subject to module permission.
+- The **Test & Tune** page header provides a simple **Service Requests** navigation link, opening the normal Service Requests page without automatically filtering it.
+- The **Service Requests** page header provides a simple **Test & Tune** navigation link, opening the normal Test & Tune dashboard without automatically filtering it. These links are general navigation shortcuts for service staff, subject to module permission.
+- **Unsubmitted Test & Tune adjustments must never appear in Service Requests or create a service request record.** Only explicit customer or authorized-staff submission creates a formal request in the existing queue.
 - Every submitted T&T task displays a clickable canonical service request number. Open the **specific request detail**, not just the queue. If multiple tasks share a request, they all point to the same request.
-- Every T&T-origin service request detail displays a visible **View Test & Tune** link to the originating customer and project. Preselect the related submitted tasks while still showing other accumulated, unsubmitted customer adjustments for context.
+- An optional record-specific **View Test & Tune** link on a T&T-origin service request may open the originating customer/project adjustment history; this is separate from the general header shortcut. Unsubmitted adjustments remain visible only within Test & Tune, not in the Service Requests queue.
 - Preserve customer ID, project ID, request ID, and selected task IDs in route state or stable deep-link query parameters; support browser back/forward and page reload. Never use a customer name alone as a lookup key.
 - On a missing/deleted target or revoked permission, show a useful unavailable/access-denied state rather than sending staff to an unrelated customer's record.
 - Service Requests remains the sole formal request queue; Test & Tune remains the adjustment overview. Neither page duplicates or silently edits the other's underlying records.
