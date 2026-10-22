@@ -64,7 +64,7 @@ export function TestTuneProjectAdjustments() {
       if (failure) throw failure;
       setSubmittedThisSession(previous => new Set([...previous, ...selectedItems.map(item => item.id)]));
       setSelected([]);
-      setNotice('Adjustments submitted to the Work Order Request Queue. Already-submitted items cannot be requested again.');
+      setNotice('Adjustments submitted to the Work Order Request Queue. These items cannot be submitted again until you leave or refresh this page.');
     } catch (failure) {
       const message = (failure as { message?: string }).message || 'Could not submit adjustments.';
       setError(/already requested/i.test(message) ? 'One or more adjustments have already been requested. No new request was created; refresh the project to review the existing request.' : message);
@@ -80,7 +80,7 @@ export function TestTuneProjectAdjustments() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-primary">Project adjustments</h2>
-          <p className="text-xs text-muted">Customer-visible project items not already in the earlier adjustment list. Select adjustments from the same project to request service, or open the project for full task history.</p>
+          <p className="text-xs text-muted">Customer-visible project items not already in the earlier adjustment list. Select adjustments from the same project to request service, or open the project for full task history. Open status does not indicate whether a service request was previously submitted; the server checks for duplicates.</p>
         </div>
         <input aria-label="Search project adjustments" className="min-h-10 rounded-md border border-subtle bg-canvas px-3 text-sm text-primary" placeholder="Find an adjustment" value={search} onChange={event => setSearch(event.target.value)} />
       </div>
