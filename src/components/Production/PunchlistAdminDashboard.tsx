@@ -1,3 +1,4 @@
+import { TestTuneProjectAdjustments } from './TestTuneProjectAdjustments';
 import { PlaceLegacyPunchlist } from './ProjectPunchlistWorkspace';
 import { punchlistDescription, punchlistList, canSchedulePunchlist, canRequestPunchlist } from '../../lib/punchlist';
 import { useState, useEffect, lazy, Suspense } from 'react';
@@ -680,6 +681,8 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         </>
       )}
 
+
+      {activeTab === 'punchlist' && <TestTuneProjectAdjustments />}
 
       {/* Customers Tab Content */}
       {activeTab === 'customers' && (
