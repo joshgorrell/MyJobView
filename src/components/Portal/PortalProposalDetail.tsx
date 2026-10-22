@@ -701,6 +701,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       setComment('');
       setActiveDecisionForm(null);
+      setDeclinePromiseAcknowledged(false);
       setShowQA(true);
       notify('Your change request was sent to the proposal conversation.', { theme: 'blue', tone: 'success' });
     } catch (error) {
@@ -1385,7 +1386,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setActiveDecisionForm(null); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                    onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 font-medium text-sm transition-colors"
                   >
                     Cancel
