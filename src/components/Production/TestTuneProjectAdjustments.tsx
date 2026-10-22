@@ -25,24 +25,27 @@ export function TestTuneProjectAdjustments() {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [tasks, projectRows] = await Promise.all([
+      const [tasks, projectRows, requestLinks] = await Promise.all([
         supabase.from('project_tasks')
           .select('id,project_id,title,status,source,visibility,customer_description,legacy_punchlist_id')
           .eq('visibility', 'customer_visible'),
         supabase.from('projects').select('id,name,project_number'),
+        supabase.from('project_punchlist_requests').select('task_id'),
       ]);
       if (!active) return;
-      if (tasks.error || projectRows.error) {
-        setError((tasks.error || projectRows.error)!.message);
+      if (tasks.error || projectRows.error || requestLinks.error) {
+        setError((tasks.error || projectRows.error || requestLinks.error)!.message);
         return;
       }
-      setItems((tasks.data || []).filter(task => !task.legacy_punchlist_id && task.status === 'open' && !submittedThisSession.has(task.id)));
+      const requestedIds = new Set((requestLinks.data || []).map(link => link.task_id));
+      setItems((tasks.data || []).filter(task => !task.legacy_punchlist_id && task.status === 'open' && !requestedIds.has(task.id) && !submittedThisSession.has(task.id)));
       setProjects(Object.fromEntries((projectRows.data || []).map(project => [project.id, project])));
       setError('');
     }
     void load();
     const subscription = supabase.channel('test_tune_project_adjustments')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'project_tasks' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_punchlist_requests' }, () => void load())
       .subscribe();
     return () => { active = false; void supabase.removeChannel(subscription); };
   }, []);
@@ -82,7 +85,7 @@ export function TestTuneProjectAdjustments() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-primary">Project adjustments</h2>
-          <p className="text-xs text-muted">Customer-visible project items not already in the earlier adjustment list. Select adjustments from the same project to request service, or open the project for full task history. Open status does not indicate whether a service request was previously submitted; the server checks for duplicates.</p>
+          <p className="text-xs text-muted">Customer-visible project items not already in the earlier adjustment list. Select adjustments from the same project to request service, or open the project for full task history. Only unsubmitted adjustments appear here. Requested adjustments move to Service Requests.</p>
         </div>
         <input aria-label="Search project adjustments" className="min-h-10 rounded-md border border-subtle bg-canvas px-3 text-sm text-primary" placeholder="Find an adjustment" value={search} onChange={event => setSearch(event.target.value)} />
       </div>
