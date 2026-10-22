@@ -112,35 +112,10 @@ export function RewardsDashboard() {
     }
 
     try {
-      const [redemptionResult, transactionResult] = await Promise.all([
-        supabase.from('reward_redemptions').insert([
-          {
-            user_id: profile.id,
-            reward_id: reward.id,
-            points_spent: reward.points_cost,
-            status: 'pending',
-          },
-        ]),
-        supabase.from('points_transactions').insert([
-          {
-            user_id: profile.id,
-            points_amount: -reward.points_cost,
-            transaction_type: 'reward_redemption',
-            reference_id: reward.id,
-            description: `Redeemed: ${reward.name}`,
-          },
-        ]),
-      ]);
-
-      if (redemptionResult.error) throw redemptionResult.error;
-      if (transactionResult.error) throw transactionResult.error;
-
-      if (reward.stock_quantity !== null) {
-        await supabase
-          .from('rewards_catalog')
-          .update({ stock_quantity: reward.stock_quantity - 1 })
-          .eq('id', reward.id);
-      }
+      const { error: redemptionError } = await supabase.rpc('redeem_reward_atomic', {
+        p_reward_id: reward.id,
+      });
+      if (redemptionError) throw redemptionError;
 
       notify('Reward redeemed successfully! It will be processed by an administrator.', { theme: 'amber', tone: 'success' });
       loadData();
