@@ -3,8 +3,8 @@
 CREATE OR REPLACE FUNCTION public.validate_customer_owner_office()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = public
+SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   rep_org uuid;
@@ -45,5 +45,8 @@ CREATE TRIGGER validate_customer_owner_office_trigger
 --        p.organization_id IS DISTINCT FROM c.organization_id OR
 --        o.organization_id IS DISTINCT FROM c.organization_id);
 
+-- SECURITY DEFINER is needed for cross-row checks regardless of the writer's
+-- profile/office SELECT RLS permissions. Fixed search_path and revoked EXECUTE
+-- prevent direct invocation by application roles.
 -- Trigger functions should not be directly callable through the API.
 REVOKE ALL ON FUNCTION public.validate_customer_owner_office() FROM PUBLIC, anon, authenticated;
