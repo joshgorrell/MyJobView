@@ -26,7 +26,17 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const isScheduled = body?.scheduled === true;
 
-    if (!isScheduled) {
+    if (isScheduled) {
+      // Scheduled calls must prove possession of a server-side secret. A request
+      // body flag is not authorization and must never bypass authentication.
+      const expected = Deno.env.get('SESSION_LOGOUT_CRON_SECRET');
+      const supplied = req.headers.get('x-session-logout-secret');
+      if (!expected || !supplied || supplied !== expected) {
+        return new Response(JSON.stringify({ success: false, message: 'Unauthorized scheduled request' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
         return new Response(
@@ -100,6 +110,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const sessionsClosedCount = activeSessions?.length || 0;
+    const completed = revokeErrors.length === 0 && !updateError;
 
     await supabase.rpc('record_scheduled_logout_run', {
       sessions_closed: sessionsClosedCount,
@@ -107,7 +118,7 @@ Deno.serve(async (req: Request) => {
 
     await supabase.from('session_cleanup_log').insert({
       sessions_closed: sessionsClosedCount,
-      success: revokeErrors.length === 0,
+      success: completed,
       error_message: revokeErrors.length > 0 ? revokeErrors.join('; ') : null,
     }).catch((e: any) => console.error('Failed to write cleanup log:', e));
 
@@ -115,14 +126,14 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: completed,
         users_signed_out: revokedCount,
         sessions_closed: sessionsClosedCount,
         errors: revokeErrors.length > 0 ? revokeErrors : undefined,
         executed_at: now,
         message: `Successfully logged out ${revokedCount} user(s) and closed ${sessionsClosedCount} session(s).`,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: completed ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
