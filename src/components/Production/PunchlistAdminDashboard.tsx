@@ -174,7 +174,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
       if (error) throw error;
 
-      setTasks((data || []).filter(task=>!task.project_task?.length));
+      setTasks((data || []).filter(task => !task.project_task?.length && task.status === 'draft' && !task.service_request_id && !task.requested_at));
       const eligible = new Set((data || []).filter(canSchedulePunchlist).map(task => task.id));
       setSelectedTaskIds(previous => new Set([...previous].filter(id => eligible.has(id))));
     } catch (error) {
@@ -300,13 +300,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     });
   };
 
-  const stats = {
-    draft: tasks.filter(t => t.status === 'draft').length,
-    requested: tasks.filter(t => t.status === 'requested').length,
-    scheduled: tasks.filter(t => t.status === 'scheduled').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    total: tasks.length,
-  };
+  const stats = { draft: tasks.length, total: tasks.length };
 
   const filteredTasks = punchlistList(tasks, {search: searchQuery, status: selectedFilter, contactId: contactFilter?.id, order: listOrder});
   const selectionContactId = tasks.find(task => selectedTaskIds.has(task.id))?.contact_id || contactFilter?.id;
@@ -380,7 +374,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           <select aria-label="Punchlist status" value={selectedFilter} onChange={e => changeView(() => setSelectedFilter(e.target.value))}
             className="shrink-0 min-h-11 w-full sm:w-auto sm:max-w-[130px] px-2 text-base sm:text-xs bg-surface border border-subtle rounded-lg text-primary">
             <option value="all">All ({stats.total})</option><option value="draft">Not Requested ({stats.draft})</option>
-            <option value="requested">Requested ({stats.requested})</option><option value="scheduled">Scheduled ({stats.scheduled})</option><option value="completed">Completed ({stats.completed})</option>
+
           </select>
           </div>
           {contactFilter && <button onClick={() => changeView(() => setContactFilter(null))} title={`Clear customer filter: ${contactFilter.name}`}
