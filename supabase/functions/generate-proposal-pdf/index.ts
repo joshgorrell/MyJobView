@@ -1,3 +1,4 @@
+import { proposalLineAmounts } from '../_shared/proposalLineAmounts.ts';
 import { hasElectronicLifePromise, proposalPromiseStyles, renderProposalPromise } from '../_shared/proposalPromise.ts';
 import { applyProposalBrand, resolveProposalLogo } from '../_shared/proposalBrand.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -5,7 +6,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
@@ -17,18 +19,31 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const authorization = req.headers.get('Authorization') || '';
+  if (!/^Bearer \S+$/i.test(authorization)) return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
   try {
     const { proposalId, templateId, displayOptions, coverPageImage } = await req.json();
 
-    if (!proposalId) {
+    if (typeof proposalId !== 'string' || !proposalId || (templateId != null && typeof templateId !== 'string')) {
       return new Response(JSON.stringify({ error: 'Proposal ID is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('Generating PDF for proposal:', proposalId);
-    console.log('Template ID:', templateId);
+    const caller = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: authorization } }, auth: { persistSession: false },
+    });
+    const { data: identity, error: identityError } = await caller.auth.getUser();
+    if (identityError || !identity?.user) return new Response(JSON.stringify({ error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // This RPC validates active staff/tenant or the actual portal customer before
+    // any service-role read, and validates selected/private template ownership.
+    const { data: resolved, error: accessError } = await caller.rpc('get_proposal_display_template', {
+      p_proposal_id: proposalId, p_template_id: templateId ?? null,
+    });
+    if (accessError || !resolved) return new Response(JSON.stringify({ error: 'Proposal or template access denied' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -41,23 +56,17 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    // Load template settings if templateId is provided
+    // Use the resolved proposal/company template; portal callers cannot override it.
     let templateOptions: any = {};
-    if (templateId) {
-      const { data: template } = await supabaseClient
-        .from('proposal_report_templates')
-        .select('*')
-        .eq('id', templateId)
-        .maybeSingle();
-
-      if (template) {
-        console.log('Loaded template:', template.name);
+    const template = resolved.template;
+    if (template) {
         // Map template settings to display options
         templateOptions = {
           showRoomScope: template.show_area_descriptions,
           showProposalNotes: template.show_notes,
           showDeposit: template.show_deposit_amount,
           showModifiers: template.show_discount || template.show_project_management_fee,
+          showQuantity: template.show_quantity,
           showUnitPrice: template.show_unit_price,
           showLinePrice: template.show_line_item_total,
           showSKU: template.show_sku,
@@ -78,7 +87,6 @@ Deno.serve(async (req: Request) => {
           showDepositPage: template.show_payment_schedule,
           classDisplayMode: 'none'
         };
-      }
     }
 
     // Default display options (all true)
@@ -87,6 +95,7 @@ Deno.serve(async (req: Request) => {
       showProposalNotes: true,
       showDeposit: true,
       showModifiers: true,
+      showQuantity: true,
       showUnitPrice: true,
       showLinePrice: true,
       showSKU: true,
@@ -108,7 +117,7 @@ Deno.serve(async (req: Request) => {
       classDisplayMode: 'none',
       includePromisePage: true,
       ...templateOptions, // Apply template settings first
-      ...displayOptions // Then apply any custom overrides
+      ...(resolved.can_customize ? displayOptions : {}) // Only authorized staff may customize a document
     };
 
     // Fetch proposal first
@@ -140,6 +149,7 @@ Deno.serve(async (req: Request) => {
         .from('contacts')
         .select('contact_name, first_name, last_name, full_name, email, phone, street_address, city, state, zip_code')
         .eq('id', proposal.contact_id)
+        .eq('organization_id', proposal.organization_id)
         .maybeSingle();
       contact = contactData;
     }
@@ -151,6 +161,7 @@ Deno.serve(async (req: Request) => {
         .from('contacts')
         .select('contact_name, first_name, last_name, full_name, company_name, email, phone, street_address, city, state, zip_code')
         .eq('id', proposal.bill_to_contact_id)
+        .eq('organization_id', proposal.organization_id)
         .maybeSingle();
       billToContact = billToData;
     }
@@ -170,6 +181,7 @@ Deno.serve(async (req: Request) => {
         sort_order
       `)
       .eq('proposal_id', proposalId)
+      .eq('organization_id', proposal.organization_id)
       .order('sort_order');
 
     // Fetch line items with task notes and product details
@@ -190,34 +202,42 @@ Deno.serve(async (req: Request) => {
         show_task_notes,
         sort_order,
         item_type,
+        is_customer_supplied,
+        is_hidden,
         product_id,
         products (
           sku,
+          manufacturer_model_number,
           manufacturer,
           item_color
         )
       `)
       .eq('proposal_id', proposalId)
+      .eq('organization_id', proposal.organization_id)
       .order('sort_order');
 
     // Flatten product data into line items
-    const flattenedLineItems = (lineItems || []).map(item => ({
-      ...item,
-      sku: item.products?.sku,
-      manufacturer: item.products?.manufacturer,
-      color: item.products?.item_color
-    }));
+    const flattenedLineItems = (lineItems || []).map(item => {
+      const product = Array.isArray(item.products) ? item.products[0] : item.products;
+      return {
+        ...item,
+        sku: escapeProposalText(product?.sku),
+        model: escapeProposalText(product?.manufacturer_model_number),
+        manufacturer: escapeProposalText(product?.manufacturer),
+        color: escapeProposalText(product?.item_color),
+      };
+    });
 
     console.log('Rooms fetched:', rooms?.length || 0);
     console.log('Line items fetched:', flattenedLineItems?.length || 0);
-    if (roomsError) console.error('Rooms error:', roomsError);
-    if (itemsError) console.error('Items error:', itemsError);
+    if (roomsError || itemsError) throw new Error('Proposal items could not be loaded');
 
     // Fetch proposal settings
     const { data: proposalSettings } = await supabaseClient
       .from('proposal_settings')
       .select('*')
       .eq('proposal_id', proposalId)
+      .eq('organization_id', proposal.organization_id)
       .maybeSingle();
 
     // Fetch billing phases if deposit type is custom
@@ -238,6 +258,7 @@ Deno.serve(async (req: Request) => {
         .from('contracts')
         .select('*')
         .eq('id', proposalSettings.contract_id)
+        .eq('organization_id', proposal.organization_id)
         .maybeSingle();
       contract = contractData;
     }
@@ -264,6 +285,7 @@ Deno.serve(async (req: Request) => {
         .from('profiles')
         .select('id, full_name, first_name, last_name, email, username')
         .eq('id', proposal.created_by)
+        .eq('organization_id', proposal.organization_id)
         .maybeSingle();
       salesRep = repData;
     }
@@ -273,6 +295,7 @@ Deno.serve(async (req: Request) => {
       .from('proposal_classes')
       .select('id, name, color')
       .eq('is_active', true)
+      .eq('organization_id', proposal.organization_id)
       .order('sort_order');
 
     console.log('Generating HTML...');
@@ -285,7 +308,7 @@ Deno.serve(async (req: Request) => {
       options,
       contract,
       proposalClasses || [],
-      coverPageImage || null,
+      resolved.can_customize ? coverPageImage || null : null,
       salesRep,
       billingPhases
     );
@@ -299,18 +322,19 @@ Deno.serve(async (req: Request) => {
     });
 
   } catch (error: any) {
-    console.error('PDF generation error:', error);
-    console.error('Error stack:', error.stack);
+    console.error('PDF generation error:', error instanceof Error ? error.message : String(error));
     return new Response(
       JSON.stringify({
-        error: error.message || 'Unknown error occurred',
-        details: error.stack,
-        timestamp: new Date().toISOString()
+        error: 'The proposal document could not be generated'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+function escapeProposalText(value: unknown): string {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
 
 function generateProposalHTML(
   proposal: any,
@@ -351,7 +375,7 @@ function generateProposalHTML(
   const salesRepEmail = salesRep?.email || '';
 
   // Filter line items based on display options
-  let filteredLineItems = lineItems;
+  let filteredLineItems = lineItems.filter(item => !item.is_hidden);
 
   console.log('Line items before filtering:', filteredLineItems.length);
 
@@ -381,9 +405,10 @@ function generateProposalHTML(
     const headers: string[] = [];
     if (options.showDescription) headers.push('<th style="text-align: left; padding: 14px 16px;">Description</th>');
     if (options.showManufacturer) headers.push('<th style="text-align: left; padding: 14px 16px; width: 120px;">Manufacturer</th>');
-    if (options.showSKU || options.showModelNumber) headers.push(`<th style="text-align: left; padding: 14px 16px; width: 100px;">${options.showModelNumber ? 'Model' : 'SKU'}</th>`);
+    if (options.showModelNumber) headers.push('<th style="text-align: left; padding: 14px 16px; width: 100px;">Model</th>');
+    if (options.showSKU) headers.push('<th style="text-align: left; padding: 14px 16px; width: 100px;">SKU</th>');
     if (options.showColor) headers.push('<th style="text-align: left; padding: 14px 16px; width: 100px;">Color</th>');
-    headers.push('<th style="text-align: center; padding: 14px 16px; width: 60px;">Qty</th>');
+    if (options.showQuantity) headers.push('<th style="text-align: center; padding: 14px 16px; width: 60px;">Qty</th>');
     if (!options.hideAllPrices) {
       if (options.showUnitPrice) headers.push('<th style="text-align: right; padding: 14px 16px; width: 90px;">Unit Price</th>');
       if (options.showLaborPerLine) headers.push('<th style="text-align: right; padding: 14px 16px; width: 80px;">Labor</th>');
@@ -412,18 +437,18 @@ function generateProposalHTML(
       `);
     }
     if (options.showManufacturer) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.manufacturer || '-'}</td>`);
-    if (options.showSKU || options.showModelNumber) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.sku || '-'}</td>`);
+    if (options.showModelNumber) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.model || '-'}</td>`);
+    if (options.showSKU) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.sku || '-'}</td>`);
     if (options.showColor) cells.push(`<td style="padding: 14px 16px; font-size: 12px; color: #718096;">${item.color || '-'}</td>`);
-    cells.push(`<td style="text-align: center; padding: 14px 16px; font-size: 13px; color: #2d3748; font-weight: 600;">${item.quantity}</td>`);
+    if (options.showQuantity) cells.push(`<td style="text-align: center; padding: 14px 16px; font-size: 13px; color: #2d3748; font-weight: 600;">${item.quantity}</td>`);
     if (!options.hideAllPrices) {
       if (options.showUnitPrice) cells.push(`<td style="text-align: right; padding: 14px 16px; font-size: 13px; color: #2d3748;">$${item.unit_price.toFixed(2)}</td>`);
       if (options.showLaborPerLine) {
-        const laborCost = (item.labor_hours || 0) * (item.labor_rate || 0);
+        const laborCost = proposalLineAmounts(item).labor;
         cells.push(`<td style="text-align: right; padding: 14px 16px; font-size: 13px; color: #2d3748;">$${laborCost.toFixed(2)}</td>`);
       }
       if (options.showInstalledPrice) {
-        const laborCost = item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0));
-        const installedPrice = (item.line_total || 0) + laborCost;
+        const installedPrice = proposalLineAmounts(item).installed;
         cells.push(`<td style="text-align: right; padding: 14px 16px; font-size: 13px; color: #1a202c; font-weight: 700;">$${installedPrice.toFixed(2)}</td>`);
       }
       if (options.showLinePrice) cells.push(`<td style="text-align: right; padding: 14px 16px; font-size: 13px; color: #1a202c; font-weight: 700;">$${(item.line_total || 0).toFixed(2)}</td>`);
@@ -464,8 +489,8 @@ function generateProposalHTML(
     let roomPartsTotal = 0;
     let roomLaborTotal = 0;
     roomItems.forEach((item: any) => {
-      roomPartsTotal += item.line_total || 0;
-      roomLaborTotal += item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0));
+      roomPartsTotal += proposalLineAmounts(item).parts;
+      roomLaborTotal += proposalLineAmounts(item).labor;
     });
     const roomGrandTotal = roomPartsTotal + roomLaborTotal;
 
@@ -545,8 +570,8 @@ function generateProposalHTML(
     let unassignedPartsTotal = 0;
     let unassignedLaborTotal = 0;
     unassignedPdfItems.forEach((item: any) => {
-      unassignedPartsTotal += item.line_total || 0;
-      unassignedLaborTotal += item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0));
+      unassignedPartsTotal += proposalLineAmounts(item).parts;
+      unassignedLaborTotal += proposalLineAmounts(item).labor;
     });
     const unassignedGrandTotal = unassignedPartsTotal + unassignedLaborTotal;
 
@@ -613,7 +638,7 @@ function generateProposalHTML(
     const classTotals = new Map<string, number>();
     lineItems.forEach((item: any) => {
       const classKey = item.class_id || 'no-class';
-      const itemTotal = (item.line_total || 0) + (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0)));
+      const itemTotal = proposalLineAmounts(item).installed;
       classTotals.set(classKey, (classTotals.get(classKey) || 0) + itemTotal);
     });
     return classTotals;
@@ -702,7 +727,7 @@ function generateProposalHTML(
       depositLabel = 'Deposit Required';
     } else if (proposalSettings.deposit_type === 'parts_total') {
       // Calculate parts total (items without labor)
-      const partsTotal = filteredLineItems.reduce((sum, item) => sum + ((item.line_total || 0) - (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0)))), 0);
+      const partsTotal = proposal.parts_total ?? lineItems.reduce((sum, item) => sum + proposalLineAmounts(item).parts, 0);
       depositAmount = partsTotal;
       depositLabel = 'Deposit Required (Parts Total)';
     }
@@ -1360,7 +1385,7 @@ function generateProposalHTML(
                 balanceAmount = 0;
                 depositDescription = 'Custom payment schedule';
               } else if (proposalSettings.deposit_type === 'parts_total') {
-                const partsTotal = filteredLineItems.reduce((sum, item) => sum + ((item.line_total || 0) - (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0)))), 0);
+                const partsTotal = proposal.parts_total ?? lineItems.reduce((sum, item) => sum + proposalLineAmounts(item).parts, 0);
                 depositAmount = partsTotal;
                 balanceAmount = finalTotal - depositAmount;
                 depositDescription = 'Full parts and materials cost';
@@ -1371,8 +1396,8 @@ function generateProposalHTML(
               const balancePaymentTerms = proposalSettings.balance_payment_terms || 'upon_completion';
 
               // Format progress invoice terms for display
-              const formatProgressTerms = (terms) => {
-                const termsMap = {
+              const formatProgressTerms = (terms: string) => {
+                const termsMap: Record<string, string> = {
                   'monthly': 'Monthly',
                   'milestone_based': 'Milestone-based',
                   'weekly': 'Weekly',
@@ -1382,8 +1407,8 @@ function generateProposalHTML(
               };
 
               // Format balance payment terms for display
-              const formatBalanceTerms = (terms) => {
-                const termsMap = {
+              const formatBalanceTerms = (terms: string) => {
+                const termsMap: Record<string, string> = {
                   'upon_completion': 'Upon project completion',
                   'net_10': 'Net 10 days after completion',
                   'net_30': 'Net 30 days after completion',

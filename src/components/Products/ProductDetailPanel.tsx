@@ -183,7 +183,8 @@ export default function ProductDetailPanel({
             {data.manufacturerName && <InfoRow label="Mfr" value={data.manufacturerName} />}
             {data.modelNumber && <InfoRow label="Model" value={data.modelNumber} />}
             {data.vendorName && <InfoRow label="Vendor" value={data.vendorName} />}
-            {data.sku && data.sku !== data.modelNumber && <InfoRow label="SKU" value={data.sku} />}
+            {data.sku && data.sku !== data.modelNumber && <InfoRow label="Ordering SKU" value={data.sku} />}
+            {data.upc && <InfoRow label="UPC" value={data.upc} />}
             {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}
             {data.itemColor && (
               <div className="flex items-baseline gap-1 py-1">

@@ -322,7 +322,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     };
   }, [scrollPositionKey]);
 
-  // Auto-populate SKU from Model Number (unless user has manually edited it)
+  // Auto-populate ordering SKU from internal Model / Alias (unless user has manually edited it)
   useEffect(() => {
     // Only auto-populate if:
     // 1. User hasn't manually edited the SKU
@@ -1427,7 +1427,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* Model Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Model Number <span className="text-red-500">*</span>
+                Model / Alias <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1540,7 +1540,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* SKU */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU <span className="text-red-500">*</span>
+                Ordering SKU (Manufacturer / Distributor) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1552,7 +1552,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                   errors.sku ? 'border-red-500' : 'border-gray-300'
                 }`}
-                placeholder="Auto-filled from Model Number"
+                placeholder="Initially copied from Model / Alias; editable for purchasing"
               />
               {errors.sku && (
                 <p className="text-sm text-red-600 mt-1">{errors.sku}</p>

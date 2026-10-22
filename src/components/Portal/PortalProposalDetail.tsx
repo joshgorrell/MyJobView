@@ -1,3 +1,4 @@
+import { proposalLineAmounts } from '../../../supabase/functions/_shared/proposalLineAmounts';
 import { ProposalPromise } from './ProposalPromise';
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
@@ -148,7 +149,7 @@ interface LineItem {
   is_hidden: boolean;
   parent_item_id: string | null;
   product_id: string | null;
-  products: { image_url: string | null; item_color?: string | null; sku?: string | null } | null;
+  products: { image_url: string | null; item_color?: string | null; sku?: string | null; manufacturer_model_number?: string | null } | null;
 }
 
 interface ReportTemplate {
@@ -222,6 +223,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [showQA, setShowQA] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [animate, setAnimate] = useState(false);
+  const [templateLoadError, setTemplateLoadError] = useState('');
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [recordings, setRecordings] = useState<ProposalRecording[]>([]);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
@@ -313,6 +315,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function loadProposalDetails() {
+    setTemplateLoadError('');
     try {
       const [proposalRes, roomsRes, itemsRes] = await Promise.all([
         supabase
@@ -330,7 +333,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .order('sort_order'),
         supabase
           .from('proposal_line_items')
-          .select('*, products(image_url,item_color,sku)')
+          .select('*, products(image_url,item_color,sku,manufacturer_model_number)')
           .eq('proposal_id', proposalId)
           .order('sort_order'),
       ]);
@@ -359,15 +362,18 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             });
         }
 
-        // Load template settings — use override ID (from sales order) if provided, else fall back to proposal's own template
+        // Resolve only this authorized proposal's template, including a valid order override.
         const effectiveTemplateId = templateOverrideId !== undefined ? templateOverrideId : proposalRes.data.report_template_id;
-        if (effectiveTemplateId) {
-          const { data: templateData, error: templateError } = await supabase
-            .from('proposal_report_templates')
-            .select('*')
-            .eq('id', effectiveTemplateId)
-            .maybeSingle();
-
+        {
+          const { data: resolved, error: templateError } = await supabase.rpc('get_proposal_display_template', {
+            p_proposal_id: proposalId,
+            p_template_id: effectiveTemplateId ?? null,
+          });
+          if (templateError) {
+            setTemplateLoadError('The proposal display settings could not be loaded. Please retry.');
+            return;
+          }
+          const templateData = resolved?.template;
           if (!templateError && templateData) {
             setTemplate(templateData);
           } else {
@@ -393,25 +399,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               show_product_images: true,
             });
           }
-        } else {
-          // No template assigned, show everything
-          setTemplate({
-            show_quantity: true,
-            show_unit_price: true,
-            show_line_item_total: true,
-            show_manufacturer: true,
-            show_sku: true,
-            show_model_number: true,
-            show_labor_hours: true,
-            show_labor_rate: true,
-            show_labor_total: true,
-            show_area_descriptions: true,
-            show_area_subtotals: true,
-            show_tax_breakdown: true,
-            show_accepted_payment_methods: true,
-            show_payment_instructions: true,
-            show_product_images: true,
-          });
         }
 
         if (proposalRes.data.contacts) {
@@ -712,6 +699,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       </div>
     );
   }
+
+  if (templateLoadError) return <div role="alert" className="p-6 text-center">{templateLoadError}<button type="button" onClick={loadProposalDetails} className="ml-3 underline">Retry</button></div>;
 
   if (!proposal) {
     return (
@@ -1020,9 +1009,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               <td className="py-4">
-                                <div className="flex items-center gap-2">
+                                <div className="min-w-0 space-y-1 break-words">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  {(template?.show_sku || template?.show_model_number) && item.products?.sku && <p className="mt-1 text-xs text-gray-500">{template?.show_model_number ? 'Model' : 'SKU'}: {item.products.sku}</p>}
+                                  {template?.show_model_number && item.products?.manufacturer_model_number && <p className="mt-1 text-xs text-gray-500">Model: {item.products.manufacturer_model_number}</p>}
+                                  {template?.show_sku && item.products?.sku && <p className="mt-1 text-xs text-gray-500">SKU: {item.products.sku}</p>}
                                 </div>
                                 {template?.show_item_color && item.products?.item_color && <p className="mt-1 text-xs text-gray-500">Color: {item.products.item_color}</p>}
                               </td>
@@ -1035,7 +1025,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               {template?.show_installed_price !== false && !hideCostsOverride && (
-                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency((item.line_total || 0) + (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0))) )}</td>
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency(proposalLineAmounts(item).installed )}</td>
                               )}
                               {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">

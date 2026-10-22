@@ -1,0 +1,56 @@
+name: Proposal template and SKU integrity
+on:
+  pull_request:
+    paths:
+      - 'src/components/Products/**'
+      - 'src/components/Proposals/**'
+      - 'src/components/Portal/PortalProposalDetail.tsx'
+      - 'src/components/Inventory/CreatePurchaseOrderModal.tsx'
+      - 'supabase/functions/generate-proposal-pdf/**'
+      - 'supabase/functions/_shared/proposalLineAmounts.ts'
+      - 'supabase/migrations/*proposal_template*'
+      - 'tests/proposal-templates/**'
+      - 'tests/proposals/promise.mjs'
+      - '.github/workflows/proposal-template-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  templates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: template-ci-only
+          POSTGRES_DB: templates_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEMPLATE_DATABASE_URL: postgres://postgres:template-ci-only@localhost:5432/templates_test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Check Deno edge function
+        timeout-minutes: 5
+        run: npx --yes deno@2.5.6 check --no-config supabase/functions/generate-proposal-pdf/index.ts
+      - run: npm install --no-save --package-lock=false pg@8.16.3 playwright@1.55.1
+      - run: npm run test:proposal-templates && node tests/proposal-templates/concurrency.mjs
+      - name: Install and verify headless Chromium
+        timeout-minutes: 5
+        run: |
+          npx playwright install --only-shell chromium
+          node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch(); await browser.close();'
+      - run: npm run test:proposal-templates:browser
+      - run: node tests/proposals/preview-browser.mjs

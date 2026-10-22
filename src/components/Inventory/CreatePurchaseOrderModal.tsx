@@ -618,7 +618,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-3 py-2 text-left font-medium text-gray-600">Product</th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">SKU/Model</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Ordering SKU</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Qty</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Unit Cost</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Total</th>
@@ -644,7 +644,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                             type="text"
                             value={li.model_number || ''}
                             onChange={e => updateLineItem(index, 'model_number', e.target.value)}
-                            placeholder="SKU"
+                            placeholder="Manufacturer / distributor SKU"
                             className="w-24 px-2 py-1 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
