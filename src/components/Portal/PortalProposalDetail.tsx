@@ -674,17 +674,16 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
         : { data: null };
       const assignedRepId = customerOwner?.assigned_to || null;
       // Customer ownership is authoritative; do not silently route to proposal creator.
-      if (!assignedRepId) throw new Error('Customer has no assigned sales representative');
+      if (!assignedRepId) throw new Error('Your customer record needs a sales representative assigned before we can route this request. Please contact our office.');
 
-      // Preserve the thread's existing assigned representative. The proposal creator
-      // is only a legacy fallback and must never override an existing assignment.
+      // Customer ownership is authoritative, including for legacy proposal threads.
       if (threadId && existingThread?.assigned_sales_rep_id !== assignedRepId) {
         const { error: assignmentError } = await supabase
           .from('message_threads')
           .update({ assigned_sales_rep_id: assignedRepId })
           .eq('id', threadId)
           .eq('proposal_id', proposalId);
-        if (assignmentError) console.warn('Proposal thread rep assignment could not be updated', assignmentError);
+        if (assignmentError) throw new Error('Unable to route your request to your assigned representative. Please try again or contact our office.');
       }
 
       if (!threadId) {
@@ -742,7 +741,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       notify('Your change request was sent to the proposal conversation.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error submitting change request:', error);
-      notify('Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
+      notify(error instanceof Error && /representative|route this request/.test(error.message) ? error.message : 'Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
