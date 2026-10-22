@@ -218,6 +218,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState('');
   const [declineReason, setDeclineReason] = useState('');
+  const [activeDecisionForm, setActiveDecisionForm] = useState<'changes' | 'decline' | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
@@ -1246,7 +1247,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="change_request_clicked"
-                      onClick={() => setComment(comment ? '' : 'open')}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'changes' ? null : 'changes'); setDeclineReason(''); setComment(''); }}
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
@@ -1257,7 +1258,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="decline_clicked"
-                      onClick={() => setDeclineReason(declineReason ? '' : 'open')}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclineReason(''); setComment(''); }}
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
@@ -1300,7 +1301,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             </div>
 
             {/* Request Changes / Comments Section */}
-            {comment && comment !== '' && (
+            {activeDecisionForm === 'changes' && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
@@ -1324,7 +1325,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             )}
 
             {/* Decline Section */}
-            {declineReason && (
+            {activeDecisionForm === 'decline' && (
               <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
                   <XCircle className="w-4 h-4" />
@@ -1362,7 +1363,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setDeclineReason(''); setComment(''); }}
+                    onClick={() => { setActiveDecisionForm(null); setDeclineReason(''); setComment(''); }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 font-medium text-sm transition-colors"
                   >
                     Cancel
