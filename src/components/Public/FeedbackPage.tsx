@@ -1,39 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2 } from 'lucide-react';
-
+import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2, X, Sparkles } from 'lucide-react';
 
 type Rating = 'excellent' | 'good' | 'okay' | 'needs_attention';
 type Phase = 'rating' | 'comment' | 'positive' | 'negative' | 'submitting' | 'error';
 
-const ratingConfig: Record<Rating, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
+const ratingConfig: Record<Rating, {
+  label: string;
+  sublabel: string;
+  gradient: string;
+  ring: string;
+  icon: React.ReactNode;
+}> = {
   excellent: {
     label: 'Excellent',
-    color: 'text-green-400',
-    bg: 'bg-green-600 hover:bg-green-500',
-    border: 'border-green-500',
-    icon: <ThumbsUp className="w-7 h-7" />,
+    sublabel: 'Loved it',
+    gradient: 'from-green-500 to-emerald-600',
+    ring: 'ring-green-400',
+    icon: <ThumbsUp className="w-6 h-6" />,
   },
   good: {
     label: 'Good',
-    color: 'text-blue-400',
-    bg: 'bg-blue-600 hover:bg-blue-500',
-    border: 'border-blue-500',
-    icon: <ThumbsUp className="w-7 h-7" />,
+    sublabel: 'Pretty good',
+    gradient: 'from-blue-500 to-blue-600',
+    ring: 'ring-blue-400',
+    icon: <ThumbsUp className="w-6 h-6" />,
   },
   okay: {
     label: 'Okay',
-    color: 'text-amber-400',
-    bg: 'bg-amber-600 hover:bg-amber-500',
-    border: 'border-amber-500',
-    icon: <Meh className="w-7 h-7" />,
+    sublabel: 'Could be better',
+    gradient: 'from-amber-500 to-amber-600',
+    ring: 'ring-amber-400',
+    icon: <Meh className="w-6 h-6" />,
   },
   needs_attention: {
-    label: 'Needs Attention',
-    color: 'text-red-400',
-    bg: 'bg-red-600 hover:bg-red-500',
-    border: 'border-red-500',
-    icon: <AlertCircle className="w-7 h-7" />,
+    label: 'Needs Work',
+    sublabel: 'Not great',
+    gradient: 'from-red-500 to-rose-600',
+    ring: 'ring-red-400',
+    icon: <AlertCircle className="w-6 h-6" />,
   },
 };
 
@@ -83,7 +88,7 @@ export function FeedbackPage() {
     try {
       const { data } = await supabase
         .from('company_settings')
-.select('company_name, company_logo_url, company_email')
+        .select('company_name, company_logo_url, company_email')
         .maybeSingle();
       if (data) {
         setCompanyInfo({
@@ -161,88 +166,112 @@ export function FeedbackPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-gray-300 text-lg">Invalid feedback link.</p>
-          <p className="text-gray-500 text-sm mt-2">This link may be expired or malformed.</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-gray-900/80 backdrop-blur-sm border border-gray-800 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+          <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7 text-red-400" />
+          </div>
+          <p className="text-gray-200 text-lg font-semibold">Invalid feedback link</p>
+          <p className="text-gray-500 text-sm mt-1">This link may be expired or malformed.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-900 flex flex-col relative overflow-hidden">
+      {/* Decorative background glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-emerald-600/5 rounded-full blur-3xl pointer-events-none" />
+
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-4 py-5 flex justify-center">
+      <div className="relative bg-gray-900/60 backdrop-blur-sm border-b border-gray-800/60 px-4 py-3 flex justify-center">
         <img
           src={companyInfo.logoUrl}
           alt={companyInfo.name}
-          className="h-10 object-contain"
+          className="h-9 object-contain"
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-lg">
+      <div className="relative flex-1 flex items-center justify-center p-4 py-8">
+        <div className="w-full max-w-md">
 
           {/* Rating Selection Phase */}
           {phase === 'rating' && (
-            <div className="text-center">
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-3">How did we do?</h1>
-                <p className="text-gray-400 text-lg">Tap the button that best describes your experience with {companyInfo.name}.</p>
+            <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 mb-4">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-blue-300 text-xs font-medium tracking-wide uppercase">Quick Feedback</span>
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-1.5">How did we do?</h1>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Tap the option that best describes your experience with {companyInfo.name}.
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 {(Object.entries(ratingConfig) as [Rating, typeof ratingConfig[Rating]][]).map(([key, config]) => (
                   <button
                     key={key}
                     onClick={() => handleRatingSelect(key)}
                     disabled={submitting}
-                    className={`${config.bg} text-white rounded-2xl p-6 flex flex-col items-center gap-3 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg`}
+                    className={`bg-gradient-to-br ${config.gradient} text-white rounded-2xl py-5 px-4 flex flex-col items-center gap-2 transition-all hover:scale-[1.03] hover:shadow-xl active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed shadow-md ring-1 ring-white/10`}
                   >
                     {submitting && selectedRating === key ? (
-                      <Loader2 className="w-7 h-7 animate-spin" />
+                      <Loader2 className="w-6 h-6 animate-spin" />
                     ) : (
                       config.icon
                     )}
-                    <span className="font-bold text-base">{config.label}</span>
+                    <span className="font-bold text-sm">{config.label}</span>
+                    <span className="text-white/70 text-xs font-normal">{config.sublabel}</span>
                   </button>
                 ))}
               </div>
+
+              <p className="text-center text-gray-600 text-xs mt-5">
+                Takes less than 30 seconds
+              </p>
             </div>
           )}
 
           {/* Comment Phase */}
           {phase === 'comment' && selectedRating && (
-            <div>
-              <div className="text-center mb-6">
-                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 border ${ratingConfig[selectedRating].border} ${ratingConfig[selectedRating].color} bg-gray-900`}>
+            <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+              {/* Rating badge inline */}
+              <div className="flex items-center justify-center mb-4">
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${ratingConfig[selectedRating].ring} ring-1 bg-gray-800/50 text-white`}>
                   {ratingConfig[selectedRating].icon}
-                  You selected: {ratingConfig[selectedRating].label}
+                  {ratingConfig[selectedRating].label}
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Thank you for your feedback!</h2>
-                <p className="text-gray-400">Would you like to share anything about your experience? (optional)</p>
               </div>
 
-              {/* Google Review prompt shown immediately for positive ratings */}
+              <h2 className="text-xl font-bold text-white text-center mb-1">Thanks for the feedback!</h2>
+              <p className="text-gray-400 text-sm text-center mb-5">
+                Want to share more? (optional)
+              </p>
+
+              {/* Google Review prompt for positive ratings */}
               {companyInfo.reviewUrl && (selectedRating === 'excellent' || selectedRating === 'good') && (
-                <div className="mb-6 p-5 bg-gray-900 border border-gray-700 rounded-2xl">
-                  <div className="flex items-center gap-2 mb-3">
+                <div className="mb-5 p-4 bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg">
+                  <div className="flex items-center gap-1.5 mb-2">
                     {[1,2,3,4,5].map(i => (
-                      <Star key={i} className="w-5 h-5 text-amber-400 fill-amber-400" />
+                      <Star key={i} className="w-4 h-4 text-amber-400 fill-amber-400" />
                     ))}
+                    <span className="text-gray-800 text-xs font-bold ml-1.5 uppercase tracking-wide">Google Review</span>
                   </div>
-                  <p className="text-white font-semibold mb-1">Sounds like we earned a 5-star review!</p>
-                  <p className="text-gray-400 text-sm mb-4">Would you mind sharing on Google? It takes less than 2 minutes and helps other customers find us.</p>
+                  <p className="text-gray-900 font-bold text-sm mb-1">Sounds like we earned 5 stars!</p>
+                  <p className="text-gray-500 text-xs mb-3 leading-relaxed">
+                    Would you mind sharing on Google? It takes under 2 minutes and helps other customers find us.
+                  </p>
                   <a
                     href={companyInfo.reviewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-3 w-full py-4 bg-white hover:bg-gray-100 text-gray-900 rounded-xl font-bold text-base transition-colors shadow-lg"
+                    className="inline-flex items-center justify-center gap-2 w-full py-3 bg-white hover:bg-gray-50 text-gray-900 rounded-xl font-bold text-sm transition-all hover:shadow-md border border-gray-200"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48">
                       <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
                       <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                       <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -257,19 +286,19 @@ export function FeedbackPage() {
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                rows={4}
-                placeholder="We love feedback, is there anything we could have done better?"
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-gray-500 transition-colors resize-none text-base mb-4"
+                rows={3}
+                placeholder="Is there anything we could have done better?"
+                className="w-full bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none text-sm mb-3"
               />
 
               <button
                 onClick={() => handleSubmitComment(false)}
                 disabled={submitting}
-                className="w-full py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold text-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-all hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Submitting...
                   </>
                 ) : (
@@ -279,7 +308,7 @@ export function FeedbackPage() {
               <button
                 onClick={() => handleSubmitComment(true)}
                 disabled={submitting}
-                className="w-full mt-3 py-3 text-gray-500 hover:text-gray-400 transition-colors text-sm disabled:opacity-40"
+                className="w-full mt-2 py-2.5 text-gray-500 hover:text-gray-400 transition-colors text-xs disabled:opacity-40"
               >
                 Skip and submit without a comment
               </button>
@@ -288,68 +317,123 @@ export function FeedbackPage() {
 
           {/* Positive Outcome — Google Review Prompt */}
           {phase === 'positive' && (
-            <div className="text-center">
-              <div className="mb-6">
-                <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                <h2 className="text-3xl font-bold text-white mb-3">We're so glad to hear that!</h2>
-                <p className="text-gray-400 text-lg leading-relaxed">
-                  Sounds like we earned a 5-star review. Would you mind sharing your experience on Google? It takes less than 2 minutes and helps other customers find reliable service.
-                </p>
+            <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+              {/* Success banner */}
+              <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Feedback received!</h2>
+                  <p className="text-green-100 text-xs">Your feedback has been shared with our team.</p>
+                </div>
               </div>
 
-              <p className="text-gray-300 text-base mb-5">Thank you. Your feedback has been shared with our team.</p>
+              <div className="p-6 sm:p-7">
+                {companyInfo.reviewUrl ? (
+                  <>
+                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star key={i} className="w-6 h-6 text-amber-400 fill-amber-400" />
+                      ))}
+                    </div>
+                    <h3 className="text-xl font-bold text-white text-center mb-1.5">
+                      We'd love a Google review!
+                    </h3>
+                    <p className="text-gray-400 text-sm text-center leading-relaxed mb-5">
+                      It takes under 2 minutes and helps other customers find reliable service.
+                    </p>
 
-              <div className="flex items-center gap-2 justify-center mb-6">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Star key={i} className="w-6 h-6 text-amber-400 fill-amber-400" />
-                ))}
+                    {/* Google Review CTA — primary focal point */}
+                    <a
+                      href={companyInfo.reviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-3 w-full py-4 bg-white hover:bg-gray-50 text-gray-900 rounded-xl font-bold text-base transition-all hover:shadow-xl hover:scale-[1.02] active:scale-100 border border-gray-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-3.58-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                        <path fill="none" d="M0 0h48v48H0z"/>
+                      </svg>
+                      Leave a Google Review
+                    </a>
+                    <p className="text-center text-gray-600 text-xs mt-3">
+                      Your review helps our team grow and helps other customers find great service.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center gap-1.5 mb-3">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star key={i} className="w-6 h-6 text-amber-400 fill-amber-400" />
+                      ))}
+                    </div>
+                    <h3 className="text-lg font-bold text-white text-center mb-1.5">
+                      Thank you for your feedback!
+                    </h3>
+                    <p className="text-gray-400 text-sm text-center leading-relaxed">
+                      Your review helps our team grow and helps other customers find great service.
+                    </p>
+                  </>
+                )}
               </div>
-
-              <p className="text-gray-500 text-sm">
-                Your review helps our team grow and helps other customers find great service.
-              </p>
             </div>
           )}
 
           {/* Negative Outcome — Thank You Without Review Link */}
           {phase === 'negative' && (
-            <div className="text-center">
-              <CheckCircle className="w-16 h-16 text-blue-400 mx-auto mb-6" />
-              <h2 className="text-3xl font-bold text-white mb-3">Thank you for letting us know.</h2>
-              <p className="text-gray-400 text-lg leading-relaxed mb-6">
-                We're sorry your experience wasn't everything it should have been. Your feedback has been shared with our team and we'll use it to improve.
-              </p>
-              {companyInfo.email && (
-                <p className="text-gray-500 text-sm">
-                  If you'd like to speak with someone directly, feel free to reach us at{' '}
-                  <a href={`mailto:${companyInfo.email}`} className="text-blue-400 hover:underline">
-                    {companyInfo.email}
-                  </a>.
+            <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Thank you for letting us know</h2>
+                  <p className="text-blue-100 text-xs">Your feedback has been shared with our team.</p>
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-7">
+                <p className="text-gray-300 text-sm leading-relaxed mb-4">
+                  We're sorry your experience wasn't everything it should have been. We'll use your feedback to improve.
                 </p>
-              )}
+                {companyInfo.email && (
+                  <div className="bg-gray-800/50 rounded-xl p-4 text-center">
+                    <p className="text-gray-400 text-xs mb-1">Need to talk to someone?</p>
+                    <a href={`mailto:${companyInfo.email}`} className="text-blue-400 hover:text-blue-300 font-semibold text-sm transition-colors">
+                      {companyInfo.email}
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Submitting / Loading */}
           {phase === 'submitting' && (
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 text-gray-400 animate-spin mx-auto mb-4" />
-              <p className="text-gray-300 text-lg">Saving your feedback...</p>
+            <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-800 rounded-3xl p-8 shadow-2xl text-center">
+              <Loader2 className="w-10 h-10 text-blue-400 animate-spin mx-auto mb-3" />
+              <p className="text-gray-300 text-sm">Saving your feedback...</p>
             </div>
           )}
 
           {/* Error */}
           {phase === 'error' && (
-            <div className="text-center">
-              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
-              <p className="text-gray-400">We couldn't save your feedback. This link may have already been used.</p>
+            <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-800 rounded-3xl p-8 shadow-2xl text-center">
+              <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-7 h-7 text-red-400" />
+              </div>
+              <h2 className="text-lg font-bold text-white mb-1">Something went wrong</h2>
+              <p className="text-gray-400 text-sm">We couldn't save your feedback. This link may have already been used.</p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="text-center py-6 text-gray-600 text-xs">
+      <div className="relative text-center py-3 text-gray-700 text-xs">
         &copy; {new Date().getFullYear()} {companyInfo.name}
       </div>
     </div>
