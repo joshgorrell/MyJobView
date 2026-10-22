@@ -358,6 +358,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
   return (
     <div className="space-y-2 sm:space-y-4 px-1 sm:px-0">
+      <div className="flex justify-end"><a href="/service-requests" className="inline-flex min-h-10 items-center rounded-lg border border-subtle px-3 py-2 text-sm text-info hover:underline">Service Requests →</a></div>
       <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2 min-w-0">
         <select aria-label="Punchlist page" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'projects' | 'punchlist' | 'customers'))}
           className="shrink-0 min-h-11 max-w-[180px] text-xs bg-surface border border-subtle rounded-lg text-primary px-1.5">
