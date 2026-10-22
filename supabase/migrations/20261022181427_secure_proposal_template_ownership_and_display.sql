@@ -111,6 +111,9 @@ CREATE OR REPLACE FUNCTION private.guard_customer_document_ownership() RETURNS t
 DECLARE n jsonb:=to_jsonb(NEW); o jsonb;
 BEGIN
  IF current_user NOT IN ('authenticated','anon') THEN RETURN NEW;END IF;
+ -- Public intake may create an unbound contact under its existing RLS policy.
+ -- It may not attach an account or rewrite an existing customer binding.
+ IF TG_TABLE_NAME='contacts' AND TG_OP='INSERT' AND n->>'portal_user_id' IS NULL THEN RETURN NEW; END IF;
  IF TG_OP='UPDATE' THEN
   o:=to_jsonb(OLD);
   IF n->'id' IS NOT DISTINCT FROM o->'id' AND n->'organization_id' IS NOT DISTINCT FROM o->'organization_id' AND n->'contact_id' IS NOT DISTINCT FROM o->'contact_id' AND n->'proposal_id' IS NOT DISTINCT FROM o->'proposal_id' AND n->'portal_user_id' IS NOT DISTINCT FROM o->'portal_user_id' THEN RETURN NEW;END IF;

@@ -57,4 +57,5 @@ await db.exec('RESET ROLE');await query('insert into sales_orders(id,organizatio
 await db.exec('RESET ROLE');await query('update proposals set report_template_id=NULL where id=$1',[id(53)]);await as(portal);assert.equal((await scalar('select get_proposal_display_template($1)',[id(53)])).template.id,id(44),'Company default fallback is preserved');
 for(const who of[inactive,foreign,null]){await as(who);await denied('select get_proposal_display_template($1)',[id(50)]);}
 await db.exec('RESET ROLE;SET ROLE anon');await denied('select get_proposal_display_template($1)',[id(50)]);
+await db.exec('RESET ROLE;GRANT INSERT ON public.contacts TO anon;SET ROLE anon');await query('insert into contacts values($1,$2,NULL)',[id(34),org]);await denied('insert into contacts values($1,$2,$3)',[id(35),org,portal]);
 await db.close();console.log('Template SQL: admin company ownership, private personal CRUD, immutable metadata, atomic defaults, foreign/portal/inactive denial, selected-proposal and order-override rendering passed.');
