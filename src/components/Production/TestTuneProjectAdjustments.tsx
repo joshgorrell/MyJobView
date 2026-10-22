@@ -46,10 +46,10 @@ export function TestTuneProjectAdjustments() {
     return () => { active = false; void supabase.removeChannel(subscription); };
   }, []);
 
-  const selectedItems = items.filter(item => selected.includes(item.id));
+  const selectedItems = items.filter(item => selected.includes(item.id) && item.status === 'open');
   const selectedProject = selectedItems[0]?.project_id;
   async function submitSelected() {
-    if (!selectedProject || submitting || selectedItems.some(item => item.project_id !== selectedProject)) return;
+    if (!selectedProject || submitting || selectedItems.length !== selected.length || selectedItems.some(item => item.project_id !== selectedProject)) return;
     setSubmitting(true);
     setError('');
     setNotice('');
@@ -86,7 +86,8 @@ export function TestTuneProjectAdjustments() {
       {!error && visible.length === 0 && <p className="text-sm text-muted">No matching project adjustments.</p>}
       <div className="divide-y divide-subtle">
         {visible.map(item => (
-          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">\n            <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} disabled={submitting || Boolean(selectedProject && selectedProject !== item.project_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />
+          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+            <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} disabled={submitting || item.status !== 'open' || Boolean(selectedProject && selectedProject !== item.project_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />
             <div className="min-w-0">
               <div className="font-medium text-primary">{item.customer_description || item.title}</div>
               <div className="text-xs text-muted">{projects[item.project_id]?.name || 'Project'} · {item.status}</div>
