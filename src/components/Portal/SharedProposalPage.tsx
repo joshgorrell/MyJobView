@@ -45,8 +45,8 @@ export default function SharedProposalPage() {
           {representative?.email && <a href={'mailto:' + representative.email + '?subject=' + encodeURIComponent('Changes requested for proposal ' + proposal.number)} className="mt-3 inline-block rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">Request Changes</a>}
           <div className="mt-5"><button type="button" onClick={() => setShowDeclineHelp(value => !value)} className="text-sm text-gray-300 underline underline-offset-2">{showDeclineHelp ? 'Hide decline information' : 'Considering declining?'}</button></div>
           {showDeclineHelp && <div className="mt-3 rounded-lg border border-blue-700 bg-blue-950/50 p-4">
-            <h3 className="font-semibold text-white">Before you decide, remember Our Promise</h3>
-            <p className="mt-2 text-sm text-blue-100">We can easily tweak this proposal to make it perfect for you. We guarantee the best price against any competitor for the same scope of work. We won't be undersold!</p>
+            <h3 className="font-semibold text-white">The Best Price. Guaranteed.</h3>
+            <p className="mt-2 text-sm text-blue-100">We want your proposal to be the perfect fit. Changes are easy, and we guarantee the best price against any competitor for the same scope of work. If you've received a better quote, give us the opportunity to match or beat it.</p>
             <p className="mt-3 text-sm text-gray-200">To decline, contact your representative. This shared link does not submit a decline or change your proposal status.</p>
             {representative?.email && <a href={'mailto:' + representative.email + '?subject=' + encodeURIComponent('Proposal ' + proposal.number + ' — decision')} className="mt-3 inline-block text-sm font-semibold text-blue-200 underline">Email your representative</a>}
           </div>}
