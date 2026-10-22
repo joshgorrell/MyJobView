@@ -660,12 +660,23 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       // Find or create the proposal message thread
       let { data: existingThread } = await supabase
         .from('message_threads')
-        .select('id')
+        .select('id, assigned_sales_rep_id')
         .eq('proposal_id', proposalId)
         .eq('context_type', 'proposal')
         .maybeSingle();
 
       let threadId = existingThread?.id;
+
+      // Customer messages use the existing notification trigger, which routes to
+      // message_threads.assigned_sales_rep_id. Repair legacy unassigned threads.
+      if (threadId && !existingThread?.assigned_sales_rep_id && proposal.created_by) {
+        const { error: assignmentError } = await supabase
+          .from('message_threads')
+          .update({ assigned_sales_rep_id: proposal.created_by })
+          .eq('id', threadId)
+          .is('assigned_sales_rep_id', null);
+        if (assignmentError) console.warn('Proposal thread rep assignment could not be updated', assignmentError);
+      }
 
       if (!threadId) {
         const { data: proposalData } = await supabase
