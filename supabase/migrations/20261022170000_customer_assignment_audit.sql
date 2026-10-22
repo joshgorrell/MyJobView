@@ -30,6 +30,7 @@ WHERE c.contact_type IN ('person', 'business')
 
 -- This is an internal audit, not a customer-facing API endpoint.
 REVOKE ALL ON public.customer_assignment_audit FROM PUBLIC, anon, authenticated;
+-- The view uses invoker security; only privileged database operators should query it.
 -- Run as database administrator:
 -- SELECT rep_issue, office_issue, count(*) FROM public.customer_assignment_audit
 -- GROUP BY rep_issue, office_issue ORDER BY count(*) DESC;
