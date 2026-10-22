@@ -20,7 +20,8 @@ jobs:
   verify:
     name: Build and isolated onboarding checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Slow Ubuntu package mirrors must not consume the browser test budget.
+    timeout-minutes: 30
     env:
       VITE_SUPABASE_URL: https://security-test.supabase.co
       VITE_SUPABASE_ANON_KEY: test-key
@@ -43,6 +44,8 @@ jobs:
       - name: Install pinned browser test runtime
         run: npm install --no-save --package-lock=false playwright@1.55.1
       - name: Install Chromium
+        timeout-minutes: 20
         run: npx playwright install --with-deps chromium
       - name: Mobile resume, signing and printable agreement
+        timeout-minutes: 5
         run: node tests/security-onboarding/browser.mjs
