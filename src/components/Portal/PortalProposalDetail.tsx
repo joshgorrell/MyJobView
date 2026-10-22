@@ -667,8 +667,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       let threadId = existingThread?.id;
 
-      // Customer messages use the existing notification trigger, which routes to
-      // message_threads.assigned_sales_rep_id. Repair legacy unassigned threads.
+      // Preserve the thread's existing assigned representative. The proposal creator
+      // is only a legacy fallback and must never override an existing assignment.
       if (threadId && !existingThread?.assigned_sales_rep_id && proposal.created_by) {
         const { error: assignmentError } = await supabase
           .from('message_threads')
