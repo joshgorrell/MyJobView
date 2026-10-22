@@ -19,6 +19,7 @@ interface IPNickname {
   total_time_seconds: number;
   is_trusted: boolean;
   organization_id: string;
+  location_classification: 'office' | 'remote' | 'unknown';
 }
 
 const PRESET_NICKNAMES = [
@@ -54,6 +55,7 @@ export function IPNicknameManager() {
     color: '#3B82F6',
     icon: 'map-pin',
     is_trusted: true,
+    location_classification: 'unknown' as 'office' | 'remote' | 'unknown',
   });
 
   useEffect(() => {
@@ -90,6 +92,7 @@ export function IPNicknameManager() {
             color: formData.color,
             icon: formData.icon,
             is_trusted: formData.is_trusted,
+            location_classification: formData.location_classification,
           })
           .eq('id', editingId)
           .eq('organization_id', profile.organization_id);
@@ -147,6 +150,7 @@ export function IPNicknameManager() {
       color: ipNickname.color,
       icon: ipNickname.icon,
       is_trusted: ipNickname.is_trusted,
+      location_classification: ipNickname.location_classification || 'unknown',
     });
   }
 
@@ -169,6 +173,7 @@ export function IPNicknameManager() {
       color: '#3B82F6',
       icon: 'map-pin',
       is_trusted: true,
+      location_classification: 'unknown',
     });
   }
 
@@ -385,7 +390,12 @@ export function IPNicknameManager() {
                               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
                               placeholder="Description"
                             />
-                            <div className="flex items-center gap-2">
+                            <label className="block text-sm">Network classification
+              <select value={formData.location_classification} onChange={e => setFormData({ ...formData, location_classification: e.target.value as 'office' | 'remote' | 'unknown' })} className="ml-2 rounded border p-2">
+                <option value="unknown">Unknown</option><option value="office">Office</option><option value="remote">Remote</option>
+              </select>
+            </label>
+            <div className="flex items-center gap-2">
                               <input
                                 type="color"
                                 value={formData.color}
