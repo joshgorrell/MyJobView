@@ -1,0 +1,13 @@
+import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';import assert from 'node:assert/strict';
+const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/laborDashboard.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:m,exports:m.exports,Date,Intl,Math,Number,Set});
+const {laborTiming}=m.exports;
+const day='2026-10-20',p={user_id:1,worked_hours:8,leave_hours:0,unknown_hours:0,flags:[],clock_timing_complete:true,first_clock_in:'2026-10-20T13:00:00Z',last_clock_out:'2026-10-20T22:00:00Z'},j={technician:'Hourly',job_hours:4,first_job_in:'09:15',last_job_out:'15:30',job_timing_complete:true};
+const b={timezone:'America/Chicago',roster:[{id:'a',name:'Hourly'}],configs:[{profile_id:'a',compensation_type:'hourly',expected_weekly_hours:40,effective_from:'2026-01-01'}],mappings:[{source:'ipoint',profile_id:'a',external_employee_id:'Hourly'},{source:'quickbooks_time',profile_id:'a',external_employee_id:'1'}],sources:[{source:'ipoint',native_from:null},{source:'quickbooks_time',native_from:null}],holidays:[],native_jobs:[],native_payroll:[],snapshots:[{kind:'technician',day,payload:{records:[j]}},{kind:'payroll',day,payload:{records:[p]}}]};
+let t=laborTiming(b,'a',day,day,day);assert.equal(t.clockIn,480);assert.equal(t.clockOut,1020);assert.equal(t.jobIn,555);assert.equal(t.jobOut,930);assert.equal(t.jobDays,1);
+j.review_flags=['Open entry'];t=laborTiming(b,'a',day,day,day);assert.equal(t.jobIn,null);delete j.review_flags;
+p.last_clock_out='2026-10-21T06:00:00Z';assert.equal(laborTiming(b,'a',day,day,day).clockDays,0);p.last_clock_out='2026-10-20T22:00:00Z';
+b.sources[0].native_from=day;assert.equal(laborTiming(b,'a',day,day,day).jobDays,0);b.sources[0].native_from=null;
+assert.equal(laborTiming(b,'a',day,day,'2026-10-19').jobDays,0);
+b.roster[0].name='Jesse Roth';b.configs[0].compensation_type='salary';b.mappings[0].external_employee_id='Jesse Roth';j.technician='Jesse Roth';p.first_clock_in=null;p.last_clock_out=null;
+t=laborTiming(b,'a',day,day,day,true);assert.equal(t.clockIn,480);assert.equal(t.clockOut,1020);assert.equal(t.clockDays,0);assert.equal(t.assumed,true);assert.equal(laborTiming(b,'a',day,day,day).clockIn,null);
+console.log('Labor timing: verified Central pairs, overnight/open exclusions, native cutover, future dates and explicit salary schedule passed.');

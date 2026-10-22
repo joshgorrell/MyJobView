@@ -239,15 +239,14 @@ export default function ProposalTemplateManager() {
   const [saving, setSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
-  const canManage = profile?.role === 'admin' || profile?.role === 'manager';
   // Company templates are administrator-owned; managers may create personal templates.
-  const canManageCompanyTemplates = profile?.role === 'admin';
+  const canManageCompanyTemplates = !!profile && ['admin', 'owner', 'super_admin'].includes(profile.role);
   const canEditSelected = selectedTemplate && (
     selectedTemplate.is_personal ? selectedTemplate.created_by === profile?.id : canManageCompanyTemplates
   );
   const canDeleteSelected = selectedTemplate && (
     (selectedTemplate.is_personal && selectedTemplate.created_by === profile?.id) ||
-    (!selectedTemplate.is_personal && profile?.role === 'admin')
+    (!selectedTemplate.is_personal && canManageCompanyTemplates)
   );
 
   const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
@@ -377,9 +376,9 @@ export default function ProposalTemplateManager() {
   async function handleCreate(newTemplate: Partial<ReportTemplate>) {
     if (!profile) return;
 
-    // Validate: only admins/sales managers can create company-wide templates
+    // Company templates require administrator authorization on the server too.
     if (!newTemplate.is_personal && !canManageCompanyTemplates) {
-      notify('Only admins and sales managers can create company-wide templates', { theme: 'violet', tone: 'info' });
+      notify('Only administrators can create company-wide templates', { theme: 'violet', tone: 'info' });
       return;
     }
 
@@ -388,9 +387,10 @@ export default function ProposalTemplateManager() {
       const { data, error } = await supabase
         .from('proposal_report_templates')
         .insert({
+          ...newTemplate,
           company_id: companySettings?.id,
-          created_by: profile.id,
-          ...newTemplate
+          organization_id: profile.organization_id,
+          created_by: profile.id
         })
         .select()
         .single();
@@ -456,17 +456,9 @@ export default function ProposalTemplateManager() {
     if (!selectedTemplate || !canManageCompanyTemplates || !profile) return;
 
     try {
-      // Unset all defaults for this company
-      await supabase
-        .from('proposal_report_templates')
-        .update({ is_default: false })
-        .eq('company_id', companySettings?.id);
-
-      // Set this one as default
-      const { error } = await supabase
-        .from('proposal_report_templates')
-        .update({ is_default: true })
-        .eq('id', selectedTemplate.id);
+      const { error } = await supabase.rpc('set_company_proposal_template_default', {
+        p_template_id: selectedTemplate.id,
+      });
 
       if (error) throw error;
 

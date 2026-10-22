@@ -27,7 +27,7 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
   const { profile } = useAuth();
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [photoPoints, setPhotoPoints] = useState(1);
+  const [photoPoints, setPhotoPoints] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,11 +40,12 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
       const { data, error } = await supabase
         .from('company_settings')
         .select('photo_upload_points')
-        .single();
+        .eq('organization_id', profile?.organization_id)
+        .maybeSingle();
 
       if (error) throw error;
-      if (data?.photo_upload_points) {
-        setPhotoPoints(data.photo_upload_points);
+      if (data) {
+        setPhotoPoints(data.photo_upload_points ?? 0);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -143,15 +144,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
         if (dbError) throw dbError;
 
         // Award points for photo upload
-        try {
-          await supabase.rpc('award_points', {
-            p_user_id: profile.id,
-            p_points: photoPoints,
-            p_reason: 'Uploaded job photo'
-          });
-        } catch (err) {
-          console.error('Error awarding points:', err);
-        }
+        // The saved media row awards points atomically on the server.
+
       }
 
       setPhotos([]);

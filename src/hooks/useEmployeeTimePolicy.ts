@@ -24,7 +24,7 @@ export function useEmployeeTimePolicy() {
         if (employeeError) throw employeeError;
         if (employee) {
           const { data: config, error } = await supabase.from('employee_payroll_configs')
-            .select('payroll_time_basis, requires_daily_clock').eq('employee_id', employee.id)
+            .select('payroll_time_basis, requires_daily_clock, time_clock_access').eq('employee_id', employee.id)
             .lte('effective_from', day).or(`effective_to.is.null,effective_to.gte.${day}`)
             .order('effective_from', { ascending: false }).limit(1).maybeSingle();
           if (error) throw error;

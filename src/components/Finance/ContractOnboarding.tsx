@@ -233,25 +233,25 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   }
 
   return (
-    <div className="security-onboarding-controls p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="security-onboarding-controls px-3 py-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Shield className="w-6 h-6 text-blue-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-start sm:items-center gap-2">
+            <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400 shrink-0 mt-1 sm:mt-0" />
             Security Contract Management
           </h1>
-          <p className="text-gray-300 mt-1">Review, approve, activate, and manage security monitoring contracts</p>
+          <p className="text-sm sm:text-base text-gray-300 mt-1">Review, approve, activate, and manage security monitoring contracts</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 lg:flex gap-2 w-full lg:w-auto">
         {onNavigateToOnboarding && (
-          <button onClick={onNavigateToOnboarding} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
+          <button onClick={onNavigateToOnboarding} className="flex items-center justify-center gap-2 px-2 sm:px-4 py-2.5 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
             <ArrowRight className="w-4 h-4" /> Create New Contract
           </button>
         )}
         {onNavigateToImport && (
           <button
             onClick={onNavigateToImport}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="flex items-center justify-center gap-2 px-2 sm:px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             <Upload className="w-4 h-4" />
             Import Security Contracts
@@ -260,10 +260,10 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </div>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-white/10 rounded-lg p-1 w-fit">
+      <div className="grid grid-cols-2 gap-1 mb-5 sm:mb-6 bg-white/10 rounded-lg p-1 w-full sm:w-fit">
         <button
           onClick={() => setActiveTab('contracts')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'contracts'
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-300 hover:text-white'
@@ -274,7 +274,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </button>
         <button
           onClick={() => setActiveTab('stats')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2.5 rounded-md text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'stats'
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-300 hover:text-white'
@@ -288,34 +288,34 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
       {activeTab === 'stats' && <SecurityAccountStats />}
 
       {activeTab === 'contracts' && <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-5">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-5 sm:mb-6">
+        <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-3 sm:p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-red-600 font-medium mb-1">Total Cancelled</p>
-              <p className="text-3xl font-bold text-red-900">{stats.totalCancelled}</p>
+              <p className="text-xs sm:text-sm text-red-600 font-medium mb-1">Total Cancelled</p>
+              <p className="text-2xl sm:text-3xl font-bold text-red-900">{stats.totalCancelled}</p>
             </div>
-            <XCircle className="w-10 h-10 text-red-600 opacity-50" />
+            <XCircle className="w-6 h-6 sm:w-10 sm:h-10 text-red-600 opacity-50 shrink-0" />
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-5">
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-3 sm:p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-orange-600 font-medium mb-1">Cancelled This Month</p>
-              <p className="text-3xl font-bold text-orange-900">{stats.cancelledThisMonth}</p>
+              <p className="text-xs sm:text-sm text-orange-600 font-medium mb-1">Cancelled This Month</p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-900">{stats.cancelledThisMonth}</p>
             </div>
-            <AlertCircle className="w-10 h-10 text-orange-600 opacity-50" />
+            <AlertCircle className="w-6 h-6 sm:w-10 sm:h-10 text-orange-600 opacity-50 shrink-0" />
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-5">
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-3 sm:p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-purple-600 font-medium mb-1">Avg Contract Duration</p>
-              <p className="text-3xl font-bold text-purple-900">{stats.averageContractDuration} mo</p>
+              <p className="text-xs sm:text-sm text-purple-600 font-medium mb-1">Avg Contract Duration</p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-900">{stats.averageContractDuration} mo</p>
             </div>
-            <Calendar className="w-10 h-10 text-purple-600 opacity-50" />
+            <Calendar className="w-6 h-6 sm:w-10 sm:h-10 text-purple-600 opacity-50 shrink-0" />
           </div>
         </div>
       </div>
@@ -350,14 +350,14 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {statusColumns.map((column) => {
           const Icon = column.icon;
           const columnContracts = getContractsByStatus(column.key);
 
           return (
             <div key={column.key} className="flex flex-col">
-              <div className={`${column.bgColor} ${column.borderColor} border-2 rounded-t-lg p-4`}>
+              <div className={`${column.bgColor} ${column.borderColor} border-2 rounded-t-lg p-3 sm:p-4`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Icon className={`w-6 h-6 ${column.color}`} />
@@ -369,10 +369,10 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                 </div>
               </div>
 
-              <div className={`flex-1 ${column.bgColor} ${column.borderColor} border-2 border-t-0 rounded-b-lg p-4 space-y-4 min-h-[600px]`}>
+              <div className={`flex-1 ${column.bgColor} ${column.borderColor} border-2 border-t-0 rounded-b-lg p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0 lg:min-h-[600px]`}>
                 {columnContracts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Icon className={`w-12 h-12 ${column.color} opacity-50 mx-auto mb-2`} />
+                  <div className="text-center py-5 sm:py-12 text-gray-500">
+                    <Icon className={`w-8 h-8 sm:w-12 sm:h-12 ${column.color} opacity-50 mx-auto mb-2`} />
                     <p className="font-medium">No security contracts</p>
                   </div>
                 ) : (
@@ -380,7 +380,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                     return (
                       <div
                         key={contract.id}
-                        className="bg-white border-2 border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-lg transition-all"
+                        className="bg-white border-2 border-gray-200 rounded-lg p-3 sm:p-5 shadow-sm hover:shadow-lg transition-all"
                       >
                         <div className="flex items-start gap-4 mb-4">
                           <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">

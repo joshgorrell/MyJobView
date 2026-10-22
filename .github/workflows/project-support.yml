@@ -19,7 +19,8 @@ permissions:
   contents: read
 jobs:
   support:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -34,6 +35,12 @@ jobs:
       - run: npm run test:vip-plans
       - run: npm run test:program-access
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      # Ubuntu 24.04 provides Chromium system libraries; avoid unbounded apt downloads.
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
+      - name: Install and verify headless Chromium
+        timeout-minutes: 5
+        run: |
+          npx playwright install --only-shell chromium
+          node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({headless: true}); await browser.close();'
       - run: npm run test:project-support:browser
       - run: node tests/punchlist/dashboard-browser.mjs

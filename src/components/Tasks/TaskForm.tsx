@@ -52,7 +52,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [users, setUsers] = useState<Pick<Profile, 'id' | 'full_name'>[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; display_name: string }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
-  const [workOrders, setWorkOrders] = useState<Array<{ id: string; wo_number: string }>>([]);
+  const [workOrders, setWorkOrders] = useState<Array<{ id: string; work_order_number: string }>>([]);
   const [proposals, setProposals] = useState<Array<{ id: string; proposal_number: string; title: string }>>([]);
   const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
@@ -420,10 +420,11 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Task Title */}
             <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5">
+              <label htmlFor="assignment-title" className="block text-sm font-medium text-secondary mb-1.5">
                 Assignment Title <span className="text-red-400">*</span>
               </label>
               <input
+                id="assignment-title"
                 type="text"
                 required
                 value={formData.title}

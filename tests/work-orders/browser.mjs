@@ -85,12 +85,12 @@ try {
         .first()
         .click();
       await page
-        .getByLabel("Title", { exact: true })
+        .getByLabel("Internal title", { exact: true })
         .fill("Draft kept in this tab");
       await page.reload();
-      await page.getByLabel("Title", { exact: true }).waitFor();
+      await page.getByLabel("Internal title", { exact: true }).waitFor();
       assert.equal(
-        await page.getByLabel("Title", { exact: true }).inputValue(),
+        await page.getByLabel("Internal title", { exact: true }).inputValue(),
         "Draft kept in this tab",
       );
       assert.ok(
@@ -115,7 +115,9 @@ try {
       await page.goto(`http://127.0.0.1:5187?theme=${theme}`);
       const dialog = page.getByRole("dialog");
       await dialog.waitFor();
-      await page.getByText("Customer", { exact: true }).first().waitFor();
+      // Wait for the selected customer's name in the form, rather than the
+      // first generic Customer match anywhere on the page.
+      await dialog.locator('p').filter({ hasText: /^Customer$/ }).waitFor();
       const type = page
         .locator("select")
         .filter({ has: page.locator('option[value="type-service"]') })
@@ -139,7 +141,7 @@ try {
       const fieldCount = await dialog.locator("input,select,textarea").count();
       await page.goto(`http://127.0.0.1:5187?service&theme=${theme}`);
       await page.getByRole("dialog").waitFor();
-      await page.getByText("Customer", { exact: true }).first().waitFor();
+      await page.getByRole('dialog').locator('p').filter({ hasText: /^Customer$/ }).waitFor();
       assert.ok(
         (await page.locator('select option[value="type-project"]').count()) > 0,
         "Service origin can select project type",

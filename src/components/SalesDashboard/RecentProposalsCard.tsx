@@ -31,10 +31,11 @@ function formatDate(dateStr: string): string {
 
 interface RecentProposalsCardProps {
   proposals: RecentProposal[];
+  onProposalClick?: (id: string) => void;
   onNavigateToProposals?: () => void;
 }
 
-export function RecentProposalsCard({ proposals, onNavigateToProposals }: RecentProposalsCardProps) {
+export function RecentProposalsCard({ proposals, onNavigateToProposals, onProposalClick }: RecentProposalsCardProps) {
   if (proposals.length === 0) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -67,7 +68,7 @@ export function RecentProposalsCard({ proposals, onNavigateToProposals }: Recent
         {proposals.map((p) => {
           const statusCls = STATUS_COLORS[p.status] || 'bg-gray-50 text-gray-600 border-gray-200';
           return (
-            <div key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+            <button type="button" onClick={() => onProposalClick?.(p.id)} key={p.id} className="w-full text-left flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${statusCls}`}>
                 {p.status.replace(/_/g, ' ')}
               </span>
@@ -77,7 +78,7 @@ export function RecentProposalsCard({ proposals, onNavigateToProposals }: Recent
               </div>
               <span className="text-sm font-semibold text-gray-700 tabular-nums">{formatCurrency(p.total)}</span>
               <span className="text-xs text-gray-400 whitespace-nowrap">{formatDate(p.createdAt)}</span>
-            </div>
+            </button>
           );
         })}
       </div>

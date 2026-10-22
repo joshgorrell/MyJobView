@@ -24,6 +24,7 @@ import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { SalesRecord } from './lib/salesDashboardRecords';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
@@ -123,7 +124,7 @@ const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => (
 const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
 
-const LaborDashboard = lazy(() => import('./components/Production/LaborDashboard/LaborDashboard'));
+const TechStats = lazy(() => import('./components/Production/TechStats').then(m=>({default:m.TechStats})));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
 const MyTimeOff = lazy(() => import('./components/Dispatch/MyTimeOff').then(m => ({ default: m.MyTimeOff })));
@@ -205,6 +206,17 @@ function AppContent() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('leadId'));
   const [openTaskId, setOpenTaskId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('taskId'));
   const [openFlowThreadId, setOpenFlowThreadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('threadId'));
+  const openSalesDashboardRecord = (record: SalesRecord) => {
+    if (record.kind === 'proposal') { setOpenProposalId(record.id); setActiveTab('proposals'); }
+    else if (record.kind === 'lead') { setSelectedLeadId(record.id); }
+    else if (record.kind === 'order') { setOpenSalesOrderId(record.id); setActiveTab('sales_orders'); }
+    else if (record.kind === 'contact') { const url = new URL(window.location.href); url.searchParams.set('contactId', record.id); window.history.replaceState({}, '', url); setActiveTab('contacts'); }
+  };
+  const navigateSalesDashboard = (tab: string, recordId?: string) => {
+    if (recordId && tab === 'work_orders') setSelectedWorkOrderId(recordId);
+    if (recordId && tab === 'pipeline_board') { setSelectedLeadId(recordId); return; }
+    setActiveTab(tab);
+  };
   const [openProposalId, setOpenProposalId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('proposalId'));
   const [aiProposalPrefill, setAiProposalPrefill] = useState<ProposalPrefill | null>(null);
   const [aiServiceRequestPrefill, setAiServiceRequestPrefill] = useState<ServiceRequestPrefill | null>(null);
@@ -939,10 +951,10 @@ function AppContent() {
             />
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
-          {['payroll', 'time_approval', 'labor_dashboard'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+          {activeTab === 'labor_dashboard' && profile.role==='admin' && <TechStats key={activeTab}/>}
+          {['payroll', 'time_approval'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
             ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Review', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
             ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
-            ...(profile.role === 'admin' ? [{ key: 'labor_dashboard', label: 'Labor dashboard', content: <LaborDashboard /> }] : []),
           ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
@@ -1007,8 +1019,9 @@ function AppContent() {
                 setOpenProposalId(proposalId);
                 setActiveTab('proposals');
               }}
+              onOpenRecord={openSalesDashboardRecord}
               onRepContextChange={setSalesRepAIContext}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
+              onNavigateToTab={navigateSalesDashboard}
             />
           )}
           {activeTab === 'sales_orders' && checkModuleAccess('sales_orders') && (
@@ -1022,7 +1035,7 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onOpenRecord={openSalesDashboardRecord} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={navigateSalesDashboard} />}
           {['pipeline_board', 'prospects', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
             ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
             ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
@@ -1108,7 +1121,7 @@ function AppContent() {
 
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('labor_dashboard')} />}
+          {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('tech_stats')} />}
 
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}

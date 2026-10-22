@@ -24,5 +24,5 @@ assert.match(form, /if \(submitError\) throw submitError/);
 assert.match(form, /selectedCustomer\.office_id !== draft\.officeId/);
 assert.match(form, /\(onCreated \?\? onClose\)\(\)/);
 assert.match(consoleView, /setActiveTab\('queue'\)/);
-assert.match(consoleView, /ServiceRequestQueue key=\{queueRevision\}/);
+assert.match(consoleView, /ServiceRequestQueue key=\{`\$\{queueRevision\}:\$\{requestId \|\| 'queue'\}`\}/);
 console.log('Manual service transaction contract passed');

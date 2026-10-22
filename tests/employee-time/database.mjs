@@ -154,6 +154,21 @@ await db.exec(`UPDATE pay_periods SET status='open' WHERE id='${id(90)}'`);
 await db.exec(`SELECT review_internal_time('${id(72)}','approve_time');SELECT review_internal_time('${id(72)}','approve_time');`);
 assert.equal((await db.query(`SELECT status FROM time_entries WHERE id='${completed}'`)).rows[0].status,'approved');
 assert.equal((await db.query(`SELECT count(*)::int n FROM time_entries WHERE internal_session_id='${id(72)}'`)).rows[0].n,1);
+// Salary without attendance can start/stop assigned job time without creating daily punches.
+await as(12);
+await db.exec(`RESET ROLE;
+INSERT INTO profiles(id,organization_id,role,employment_type,requires_daily_clock) VALUES('${id(15)}','${id(1)}','admin','salary_no_clock',false);
+INSERT INTO employees VALUES('${id(22)}','${id(1)}','${id(15)}');
+INSERT INTO employee_payroll_configs VALUES('${id(32)}','${id(22)}','${id(1)}','2020-01-01',null,'salary',null,false);
+INSERT INTO work_orders VALUES('${id(53)}','${id(1)}','${id(15)}','assigned','${id(45)}');`);
+await as(15);
+const salaryEntry=(await db.query(`SELECT start_work_order_time('${id(53)}') id`)).rows[0].id;
+await db.exec(`UPDATE time_entries SET clock_out=clock_in+interval '30 minutes',total_hours=0.5,status='submitted' WHERE id='${salaryEntry}'`);
+const salaryTime=(await db.query(`SELECT work_order_id,total_hours,status FROM time_entries WHERE id='${salaryEntry}'`)).rows[0];
+assert.equal(salaryTime.work_order_id,id(53));assert.equal(Number(salaryTime.total_hours),0.5);assert.equal(salaryTime.status,'submitted');
+assert.equal((await db.query(`SELECT count(*)::int n FROM daily_clock_entries WHERE technician_id='${id(15)}'`)).rows[0].n,0);
+assert.deepEqual((await db.query(`SELECT payroll_time_basis,requires_daily_clock FROM employee_payroll_configs WHERE id='${id(32)}'`)).rows[0],{payroll_time_basis:'salary',requires_daily_clock:false});
+console.log('Salary without daily punches records assigned job time and keeps its salary configuration.');
 // A disabled manager cannot approve with a still-valid access token or reactivate themselves.
 await as(12);await db.exec(`UPDATE profiles SET is_active=false WHERE id='${id(12)}'`);
 await assert.rejects(()=>db.exec(`SELECT review_manual_job_time_request('${id(60)}','approve')`),/review permission/);

@@ -146,13 +146,20 @@ assert.equal((await saveAssessment({ ...values, findings: 'Updated' },assessment
 assert.equal(assessment.findings,'Updated');
 console.log('Admin assessment permission, tenant, validation, save and conflict checks passed.');
 
-reset();
+reset();role='sales';
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Customer confirmed by phone',recoverable:'no'})).status,200);
 assert.equal(stored.source,'phone');assert.equal(stored.recorded_by,'employee-1');
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'email',reasons:['price'],message:'Overwrite',recoverable:'no'})).status,409);
 reset();permitted=false;
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403);
 permitted=true;
+reset();sendPermitted=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403,'Staff need send permission as well as submission access');
+sendPermitted=true;moduleAccess=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403,'Module access is required');
+moduleAccess=true;role='admin';permitted=false;sendPermitted=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Admin feedback',recoverable:'no'})).status,200,'Admins retain feedback access without individual staff flags');
+role='sales';permitted=sendPermitted=true;
 console.log('Manual feedback authorization, audit source and original-answer preservation passed.');
 reset();
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'in_person',reasons:['price'],message:'Restaurant conversation',recoverable:'maybe',recovery_message:'Revisit budget'})).status,200);

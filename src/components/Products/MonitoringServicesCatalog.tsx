@@ -32,7 +32,7 @@ export default function MonitoringServicesCatalog() {
     sort_order: 0
   });
 
-  const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
+  const canEdit = profile?.can_manage_monitoring_services === true || profile?.role === 'admin';
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {

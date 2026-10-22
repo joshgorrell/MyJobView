@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
-// Exercise the real public tenant lookup and login UI in a fresh browser.
+// Exercise the real tenant provider and login UI with isolated fixture requests.
 const bundle = await build({
   stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {TenantProvider} from './src/contexts/TenantContext'; import {LoginForm} from './src/components/Auth/LoginForm'; createRoot(document.getElementById('root')).render(<TenantProvider><LoginForm/></TenantProvider>);`, resolveDir: process.cwd(), loader: 'tsx' },
   bundle: true, write: false, format: 'iife', jsx: 'automatic',
@@ -21,7 +21,7 @@ const mjv = await readFile('public/MJV_icon.PNG');
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 try {
   for (const scenario of ['dealer', 'missing-logo', 'broken-logo', 'generic', 'unknown']) {
-    const host = scenario === 'generic' ? 'myjobview.com' : 'elife.myjobview.com';
+    const host = scenario === 'generic' ? 'localhost' : 'elife.localhost';
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     const errors = [];
@@ -30,20 +30,22 @@ try {
     await context.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.hostname === 'fixture.supabase.co') {
+        const headers = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
+        if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
         if (url.pathname.endsWith('/organizations')) {
           lookupCount++;
           assert.equal(url.searchParams.get('subdomain'), 'eq.elife');
           assert.equal(url.searchParams.get('select'), 'id,name,logo_url,subdomain');
         }
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify(scenario === 'unknown' || url.pathname.endsWith('/subdomain_changes') ? null : { id: 'dealer-id', name: 'Electronic Life', subdomain: 'elife', logo_url: scenario === 'missing-logo' ? null : '/dealer.png' }) });
+        return route.fulfill({ contentType: 'application/json', headers, body: JSON.stringify(scenario === 'unknown' || url.pathname.endsWith('/subdomain_changes') ? null : { id: 'dealer-id', name: 'Electronic Life', subdomain: 'elife', logo_url: scenario === 'missing-logo' ? null : '/dealer.png' }) });
       }
-      if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].contents });
+      if (url.pathname === '/app.js') return route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].text });
       if (url.pathname === '/style.css') return route.fulfill({ contentType: 'text/css', body: css });
       if (url.pathname === '/MJV_icon.PNG') return route.fulfill({ contentType: 'image/png', body: mjv });
       if (url.pathname === '/dealer.png') return scenario === 'broken-logo' ? route.fulfill({ status: 404, body: '' }) : route.fulfill({ contentType: 'image/png', body: logo });
       return route.fulfill({ contentType: 'text/html', body: '<meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"><div id="root"></div><script src="/app.js"></script>' });
     });
-    await page.goto(`https://${host}`);
+    await page.goto(`http://${host}`, { waitUntil: 'domcontentloaded' });
     const dealer = !['generic', 'unknown'].includes(scenario);
     await page.getByRole('heading', { name: dealer ? 'Electronic Life' : 'MyJobView', exact: true }).waitFor();
     await page.getByText(dealer ? 'Sign in to Electronic Life' : 'Sign in to MyJobView', { exact: true }).waitFor();

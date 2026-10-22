@@ -77,7 +77,8 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
     : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-700"><Package size={18} className="text-gray-400" /></div>;
   const identity = (product: CatalogProduct) => <>
     {groupBy !== 'brand' && product.brandName && <div className="text-xs text-gray-400 break-words">{product.brandName}</div>}
-    <div className="font-mono text-sm font-medium text-white break-all">{product.sku || product.manufacturer_model_number}</div>
+    <div className="font-mono text-sm font-medium text-white break-all">{product.manufacturer_model_number || product.sku}</div>
+    {product.sku && product.sku !== product.manufacturer_model_number && <div className="text-xs text-gray-400 break-all">Ordering SKU: {product.sku}</div>}
     <ProductStatusNotice product={product} />
   </>;
   const category = (product: CatalogProduct) => <div className="text-xs text-gray-400 break-words">{[product.categoryName, product.subcategoryName].filter(Boolean).join(' / ')}</div>;
@@ -93,7 +94,8 @@ function ProductList({ products, groupBy, canEdit, hideCost, onView, onEdit, onD
       >
         {image(product)}
         <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-sm font-semibold text-white">{product.sku || product.manufacturer_model_number}</div>
+          <div className="truncate font-mono text-sm font-semibold text-white">{product.manufacturer_model_number || product.sku}</div>
+          {product.sku && product.sku !== product.manufacturer_model_number && <div className="text-xs text-gray-400 break-all">Ordering SKU: {product.sku}</div>}
           <div className="truncate text-xs text-gray-300" title={product.description || ''}>{product.description || 'No description'}</div>
           <div className="flex min-w-0 items-center gap-2 text-xs">
             <span className="shrink-0 font-semibold text-white">{price(product)}</span>

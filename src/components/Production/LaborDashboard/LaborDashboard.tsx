@@ -12,10 +12,12 @@ import {
 } from "recharts";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import TeamUtilization from './TeamUtilization';
 import {
   laborHistory,
   laborRanking,
   laborSummary,
+  laborTiming,
   periodDates,
   validLaborDay,
   type LaborBundle,
@@ -46,7 +48,7 @@ function lastDay(zone = "America/Chicago") {
 }
 export default function LaborDashboard() {
   const { profile } = useAuth();
-  const [mode, setMode] = useState("month"),
+  const [mode, setMode] = useState("day"),
     [anchor, setAnchor] = useState(() => lastDay()),
     [rangeStart, setRangeStart] = useState(
       () => lastDay().slice(0, 4) + "-01-01",
@@ -153,7 +155,10 @@ export default function LaborDashboard() {
   }, [profile?.organization_id, start, end, valid, timezone]);
   useEffect(() => {
     void load();
+    const refresh=()=>{if(document.visibilityState==='visible')void load();};
+    window.addEventListener('focus',refresh);
     return () => {
+      window.removeEventListener('focus',refresh);
       generation.current++;
       controller.current?.abort();
     };
@@ -219,6 +224,8 @@ export default function LaborDashboard() {
   const asOf = lastDay(timezone),
     rows = bundle && valid ? laborRanking(bundle, start, end, asOf, by) : [],
     person = rows.find((r) => r.id === selected);
+  const timing=bundle&&selected?laborTiming(bundle,selected,detailDay??start,detailDay??end,asOf,profile?.organization_id==='b324e4e3-cd2e-4c68-8df8-3e27c7e08f15'):null;
+  const displayTime=(value:number|null|undefined)=>value==null?'Unavailable':new Date(Date.UTC(2000,0,1,0,Math.round(value))).toLocaleTimeString('en-US',{timeZone:'UTC',hour:'numeric',minute:'2-digit'});
   const history =
       bundle && selected
         ? laborHistory(
@@ -250,7 +257,7 @@ export default function LaborDashboard() {
         <div>
           <h1 className="text-2xl font-semibold text-primary flex items-center gap-2">
             <BarChart3 />
-            Labor dashboard
+            Tech Stats
           </h1>
           <p className="text-sm text-secondary mt-2">
             Job hours, payroll work hours and project labor in one place.
@@ -581,6 +588,7 @@ export default function LaborDashboard() {
         <p className="text-sm text-secondary mt-2">Quote accuracy, warranty impact and earned labor rate now live together in Projects.</p>
         <a className="text-blue-600 underline inline-block mt-3" href="/projects?projectView=stats">Open Projects → Project Stats</a>
       </div>
+      {bundle&&valid&&<TeamUtilization bundle={bundle} start={start} end={end} asOf={asOf} organizationId={profile.organization_id!} onSelect={id=>{setSelected(id);setDetailDay(null);}}/>}
       {selected && (
         <div
           className="fixed inset-0 z-50 bg-black/60 flex justify-center items-center p-3"
@@ -608,16 +616,16 @@ export default function LaborDashboard() {
                 <X />
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-3 my-4">
+            <div className="grid gap-3 my-4 border-y border-subtle py-4">
               <span className="text-sm text-secondary">
                 {detailDay ? "One day" : start + " through " + end}
               </span>
-              <label className="text-sm text-secondary">
+              <label className="text-sm text-secondary grid gap-2 min-w-0 max-w-xs">
                 Inspect day{" "}
                 <input
                   aria-label="Technician history day"
                   type="date"
-                  className="bg-surface text-primary border border-subtle rounded p-2"
+                  className="bg-surface text-primary border border-subtle rounded p-2 block w-full min-w-0 text-base h-11"
                   min={start}
                   max={end < asOf ? end : asOf}
                   value={detailDay ?? ""}
@@ -631,6 +639,12 @@ export default function LaborDashboard() {
                 Whole selected range
               </button>
             </div>
+            <section className="my-4"><h3 className="font-semibold text-primary mb-3">Typical start & finish · {timezone}</h3><div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[
+              [timing?.assumed?'Assumed start':'Avg payroll clock-in',displayTime(timing?.clockIn)],
+              [timing?.assumed?'Assumed finish':'Avg payroll clock-out',displayTime(timing?.clockOut)],
+              ['Avg first job clock-in',displayTime(timing?.jobIn)],
+              ['Avg last job clock-out',displayTime(timing?.jobOut)]
+            ].map(([label,value])=><div className="bg-elevated rounded-lg p-3 min-w-0" key={label}><span className="text-xs text-secondary">{label}</span><strong className="block text-xl text-primary mt-2 break-words">{value}</strong></div>)}</div><p className="text-xs text-secondary mt-3">{timing?.assumed?'Assumed 8 AM–5 PM schedule; efficiency still uses 8 available paid hours per weekday, less leave and holidays.':`${timing?.clockDays??0} days with complete payroll timing.`} Job averages use {timing?.jobDays??0} days with complete first/last job pairs. These are job-clock times, not GPS arrival/departure. Open, flagged, overnight or unavailable timestamps are excluded.</p></section>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {[
                 ["Job hours", f(summary.job)],
