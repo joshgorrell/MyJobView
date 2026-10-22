@@ -227,7 +227,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-[70vh] sm:min-h-[480px] sm:max-h-[90dvh] min-h-0">
+      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-[calc(100dvh-2rem)] min-h-0">
         {/* Header */}
         <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
@@ -250,11 +250,11 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto sm:overflow-hidden p-4 sm:p-6 bg-gray-50/50">
+        <div className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4 bg-gray-50/50">
           {activeTab === 'overview' ? (
             <>
               <CatalogProductOverview data={panelData} />
-              <div className="mt-3"><ProductAccessories productId={productId} readOnly summaryOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} /></div>
+              <div className="mt-2"><ProductAccessories productId={productId} readOnly summaryOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} /></div>
               {photoOpen && canEdit && (
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3" onPaste={e => {
                   const file = Array.from(e.clipboardData.files).find(item => item.type.startsWith('image/'));
