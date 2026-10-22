@@ -61,9 +61,11 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     ? ['admin', 'manager', 'sales_manager'].includes(profile.role)
     : false;
 
+  const canViewDashboard = isManager || profile?.is_sales_rep === true;
+
   const effectiveRepId = isManager
-    ? (selectedRepId || profile?.id || null)
-    : (profile?.id || null);
+    ? (selectedRepId || (profile?.is_sales_rep ? profile.id : null))
+    : (profile?.is_sales_rep ? profile.id : null);
 
   const isManagerView = isManager && selectedRepId !== null && selectedRepId !== profile?.id;
 
@@ -72,10 +74,14 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     isManagerView,
   });
 
-  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
+  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard(canViewDashboard);
 
   useEffect(() => {
-    if (!onRepContextChange || !data) return;
+    if (!onRepContextChange) return;
+    if (!data) {
+      onRepContextChange(null);
+      return;
+    }
 
     const goal = computeGoalProgress(data);
     const currentMonth = data.monthlyTrend[0]?.total ?? 0;
@@ -124,6 +130,10 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     if (onNavigateToTab) onNavigateToTab('sales_activity');
   }, [onNavigateToTab]);
 
+  if (!canViewDashboard) {
+    return <p className="px-4 py-6 text-sm text-gray-300">You do not have access to the Sales Dashboard.</p>;
+  }
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
@@ -153,6 +163,16 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     );
   }
 
+  if (!data && isManager && !effectiveRepId) {
+    return (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        <h1 className="text-lg font-semibold text-white">Sales Dashboard</h1>
+        <p className="text-sm text-gray-300">Select a salesperson to view their dashboard. Company-wide reporting is not available here yet.</p>
+        {profile?.organization_id && <ManagerRepSelector selectedRepId={selectedRepId} onSelectRep={setSelectedRepId} orgId={profile.organization_id} currentUserId={profile.id} currentUserIsSalesRep={false} />}
+      </div>
+    );
+  }
+
   if (!data) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -171,12 +191,14 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isManager && profile?.organization_id && (
             <ManagerRepSelector
               selectedRepId={selectedRepId}
               onSelectRep={setSelectedRepId}
               orgId={profile.organization_id}
+              currentUserId={profile.id}
+              currentUserIsSalesRep={profile.is_sales_rep === true}
             />
           )}
           <button
