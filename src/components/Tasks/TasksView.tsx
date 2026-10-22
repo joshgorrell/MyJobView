@@ -273,17 +273,6 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
         });
         if (error) throw error;
       } else {
-              const { error: notificationError } = await supabase.from('notifications').insert([{
-                user_id: profile.id,
-                type: 'points_earned',
-                title: `+${postPoints} Points!`,
-                body: `You earned ${postPoints} points for completing a task`,
-              }]);
-              if (notificationError) console.error('Failed to send points notification:', notificationError);
-            }
-          }
-        }
-      } else {
         // Regular tasks complete atomically in the database so only the first
         // eligible user can claim an open/department task and receive points.
         if (newStatus === 'completed') {
