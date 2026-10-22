@@ -1276,7 +1276,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="decline_clicked"
-                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); recordDecisionStep('decline_cancelled'); }}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); recordDecisionStep(activeDecisionForm === 'decline' ? 'decline_cancelled' : 'decline_started'); }}
                       aria-expanded={activeDecisionForm === 'decline'}
                       aria-controls="proposal-decline-form"
                       disabled={previewMode}
