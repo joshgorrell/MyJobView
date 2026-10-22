@@ -589,6 +589,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     }
   }
 
+  function recordDecisionStep(step: 'decline_started' | 'decline_to_changes' | 'decline_to_approval' | 'decline_acknowledged' | 'decline_cancelled' | 'change_request_submitted') {
+    if (previewMode) return;
+    void supabase.rpc('record_proposal_decision_step', { p_proposal_id: proposalId, p_step: step })
+      .then(({ error, data }) => { if (error || data !== true) console.warn('Proposal decision breadcrumb was not recorded', error); });
+  }
+
   async function handleDecline() {
     if (previewMode) return;
     if (!proposal) return;
@@ -699,6 +705,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       if (msgError) throw msgError;
 
+      recordDecisionStep('change_request_submitted');
       setComment('');
       setActiveDecisionForm(null);
       setDeclinePromiseAcknowledged(false);
@@ -1269,7 +1276,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="decline_clicked"
-                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); recordDecisionStep('decline_cancelled'); }}
                       aria-expanded={activeDecisionForm === 'decline'}
                       aria-controls="proposal-decline-form"
                       disabled={previewMode}
@@ -1348,9 +1355,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   <div data-engagement-section="promise" className="rounded-xl border border-blue-200 bg-blue-50 p-4 mb-4 space-y-3">
                     <p className="text-sm font-bold text-blue-950">Before you decide — Our Promise</p>
                     <p className="text-sm text-blue-900">We can easily tweak your proposal to get it just right. And we guarantee the best price against any competitor for the same scope of work. We won't be undersold! Before you decline, would you like us to make an adjustment?</p>
-                    <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
-                    <button type="button" data-engagement-action="decline_to_approval_clicked" onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); handleApprove(); }} disabled={previewMode || submitting} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50">Actually, I'd Like to Approve</button>
-                    <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => setDeclinePromiseAcknowledged(true)} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
+                    <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_changes'); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
+                    <button type="button" data-engagement-action="decline_to_approval_clicked" onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_approval'); handleApprove(); }} disabled={previewMode || submitting} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50">Actually, I'd Like to Approve</button>
+                    <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => { setDeclinePromiseAcknowledged(true); recordDecisionStep('decline_acknowledged'); }} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
                   </div>
                 )}
                 {declinePromiseAcknowledged && <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>}
