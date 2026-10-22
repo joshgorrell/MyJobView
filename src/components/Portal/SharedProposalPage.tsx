@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
 type Scope = { rooms: { id: string; name: string; description: string | null }[]; items: { id: string; roomId: string | null; description: string; quantity: number }[] };
+type Representative = { name: string; email: string | null; phone: string | null };
 type Summary = { id: string; number: string; title: string; status: string; total: number; expiresAt: string | null };
 export default function SharedProposalPage() {
   const [proposal, setProposal] = useState<Summary | null>(null);
   const [error, setError] = useState('');
   const [scope, setScope] = useState<Scope | null>(null);
+  const [representative, setRepresentative] = useState<Representative | null>(null);
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('token');
     if (!token) { setError('This proposal link is incomplete.'); return; }
@@ -14,6 +16,7 @@ export default function SharedProposalPage() {
       if (failure || !data?.proposal) { setError('This proposal link is invalid, expired, or no longer available.'); return; }
       setProposal(data.proposal);
       setScope(data.scope || null);
+      setRepresentative(data.representative || null);
     }).catch(() => setError('Unable to open this proposal. Please contact your representative.'));
   }, []);
   return <main className="min-h-screen bg-gray-950 text-white px-4 py-12">
@@ -34,6 +37,7 @@ export default function SharedProposalPage() {
           </div>)}
           {scope.items.some(item => !item.roomId) && <div className="mt-5"><h3 className="font-semibold text-blue-300">Additional Items</h3><ul className="mt-2 space-y-1 text-sm text-gray-200">{scope.items.filter(item => !item.roomId).map(item => <li key={item.id}>{item.quantity} × {item.description}</li>)}</ul></div>}
         </section>}
+        {representative && <section className="mt-8 border-t border-gray-700 pt-5"><h2 className="font-semibold">Contact your representative: {representative.name}</h2><div className="mt-3 flex gap-4">{representative.phone && <a href={'tel:' + representative.phone.replace(/[^+0-9]/g, '')} className="text-blue-300 underline">Call</a>}{representative.email && <a href={'mailto:' + representative.email} className="text-blue-300 underline">Email</a>}</div></section>}
         <p className="mt-8 border-t border-gray-700 pt-5 text-sm text-gray-400">This is a read-only summary. For the complete proposal, approval, or attachments, please contact your representative.</p>
       </> : <p className="mt-8 text-gray-400">Loading your proposal…</p>}
     </div>
