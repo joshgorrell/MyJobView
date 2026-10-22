@@ -7,6 +7,7 @@ const AdvancedTools = lazy(() => import('./UserSessionsViewerEnhanced').then(m =
 type Person = { id: string; full_name: string; email: string; role: string; is_active: boolean };
 type Session = { id: string; user_id: string; device_signature: string | null; device_type: string | null; browser_name: string | null; os_name: string | null; device_model: string | null; session_start: string; session_end: string | null; last_activity: string; is_active: boolean; city: string | null; region: string | null; ip_city: string | null; ip_region: string | null; ip_address: string | null; current_page: string | null };
 type Nickname = { id: string; device_signature: string; nickname: string };
+type IPLabel = { ip_address: string; nickname: string; icon: string; is_trusted: boolean };
 const panel = 'rounded-xl border border-subtle bg-surface p-4';
 const button = 'min-h-[44px] rounded-lg border border-subtle px-3 py-2 text-sm hover:bg-elevated disabled:opacity-50';
 function ago(value: string | null) {
@@ -25,6 +26,7 @@ export function UserSessionsDashboard() {
   const [people, setPeople] = useState<Person[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [nicknames, setNicknames] = useState<Nickname[]>([]);
+  const [ipLabels, setIpLabels] = useState<IPLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -46,12 +48,14 @@ export function UserSessionsDashboard() {
     busy.current = true; setRefreshing(true);
     try {
       const org = profile.organization_id;
-      const [users, names] = await Promise.all([
+      const [users, names, locations] = await Promise.all([
         supabase.from('profiles').select('id, full_name, email, role, is_active').eq('organization_id', org).order('full_name'),
         supabase.from('device_nicknames').select('id, device_signature, nickname').eq('organization_id', org),
+        supabase.from('ip_nicknames').select('ip_address, nickname, icon, is_trusted'),
       ]);
       if (users.error) throw users.error;
       if (names.error) throw names.error;
+      if (locations.error) throw locations.error;
       const rows: Session[] = [];
       const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
       for (let offset = 0; ; offset += 1000) {
@@ -60,7 +64,7 @@ export function UserSessionsDashboard() {
         rows.push(...(result.data || []));
         if ((result.data?.length || 0) < 1000) break;
       }
-      setPeople(users.data || []); setNicknames(names.data || []); setSessions(rows);
+      setPeople(users.data || []); setNicknames(names.data || []); setIpLabels(locations.data || []); setSessions(rows);
       setUpdated(new Date().toISOString()); setError('');
     } catch (e) { setError(`Could not load session data. ${e instanceof Error ? e.message : 'Please try refreshing.'}`); }
     finally { busy.current = false; setRefreshing(false); setLoading(false); }
@@ -93,6 +97,12 @@ export function UserSessionsDashboard() {
       setNicknames(current => current.map(n => n.id === data.id ? data : n)); setEditing(null);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save device name.'); }
     finally { setSaving(false); }
+  }
+  const ipMap = new Map(ipLabels.map(location => [location.ip_address, location]));
+  function locationLabel(s: Session) {
+    const known = s.ip_address ? ipMap.get(s.ip_address) : null;
+    const classification = known?.icon === 'building-2' && known.is_trusted ? 'Office' : known && ['home', 'coffee', 'wifi'].includes(known.icon) ? 'Remote' : 'Unknown';
+    return { name: known?.nickname || 'Unlabeled network', classification };
   }
   function SessionRow({ session: s }: { session: Session }) {
     return <div className="grid gap-2 border-t border-subtle py-3 sm:grid-cols-[1fr_auto]">
@@ -133,7 +143,7 @@ export function UserSessionsDashboard() {
           {sessions.filter(s => s.user_id === workUserId && Date.parse(s.session_start) >= Date.now() - 7 * 86400000).sort((a, b) => Date.parse(b.session_start) - Date.parse(a.session_start)).map(s => <div key={s.id} className="rounded-lg border border-subtle p-3">
             <p className="font-medium">{new Date(s.session_start).toLocaleDateString()}</p>
             <p className="text-sm">{new Date(s.session_start).toLocaleTimeString()} – {s.session_end ? new Date(s.session_end).toLocaleTimeString() : 'No recorded end'}</p>
-            <p className="text-xs text-muted">{[s.city || s.ip_city, s.region || s.ip_region].filter(Boolean).join(', ') || 'Location unknown'} · {s.ip_address || 'IP unavailable'} · Office/remote unverified</p>
+            <p className="text-xs text-muted">{locationLabel(s).name} · {locationLabel(s).classification} (network label, not verified presence) · {s.ip_address || 'IP unavailable'}</p>
           </div>)}
           {!sessions.some(s => s.user_id === workUserId && Date.parse(s.session_start) >= Date.now() - 7 * 86400000) && <p className="text-sm text-muted">No session records for this employee in the last 7 days.</p>}
         </div>}
