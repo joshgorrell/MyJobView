@@ -8,7 +8,7 @@ BEGIN
   LEFT JOIN public.profiles p ON p.id = c.assigned_to
   LEFT JOIN public.company_offices o ON o.id = c.office_id
   WHERE c.contact_type IN ('person', 'business')
-    AND (c.assigned_to IS NULL OR c.office_id IS NULL OR
+    AND (c.organization_id IS NULL OR c.assigned_to IS NULL OR c.office_id IS NULL OR
          p.organization_id IS DISTINCT FROM c.organization_id OR
          o.organization_id IS DISTINCT FROM c.organization_id);
   IF broken_count > 0 THEN
@@ -16,8 +16,15 @@ BEGIN
   END IF;
 END $$;
 
--- Check the constraint was installed and validated before declaring rollout complete.
-SELECT conname, convalidated
-FROM pg_constraint
-WHERE conrelid = 'public.contacts'::regclass
-  AND conname = 'contacts_customer_rep_office_required';
+-- Require a validated constraint, not merely a matching constraint name.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.contacts'::regclass
+      AND conname = 'contacts_customer_rep_office_required'
+      AND convalidated = true
+  ) THEN
+    RAISE EXCEPTION 'Customer assignment constraint missing or not validated';
+  END IF;
+END $$;
