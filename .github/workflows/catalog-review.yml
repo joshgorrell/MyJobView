@@ -18,9 +18,9 @@ concurrency:
 jobs:
   verify:
     name: Catalog interactions and product dialogs
-    runs-on: ubuntu-latest
-    # Ubuntu package mirrors can take 15 minutes before Chromium even downloads.
-    # Keep installation and the actual tests independently bounded.
+    runs-on: ubuntu-24.04
+    # Hosted Ubuntu 24.04 includes Chromium system libraries.
+    # Bound download/launch separately from the actual catalog tests.
     timeout-minutes: 30
     env:
       VITE_SUPABASE_URL: https://security-test.supabase.co
@@ -40,8 +40,10 @@ jobs:
       - name: Install pinned browser test runtime
         run: npm install --no-save --package-lock=false playwright@1.55.1
       - name: Install Chromium
-        timeout-minutes: 20
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: |
+          npx playwright install --only-shell chromium
+          node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({headless: true}); await browser.close();'
       - name: Catalog filters, history and product dialogs
         timeout-minutes: 5
         run: npm run test:catalog && npm run test:catalog:browser && node tests/catalog/product-dialog-browser.mjs
