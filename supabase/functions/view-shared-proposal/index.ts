@@ -16,7 +16,7 @@ Deno.serve(async req => {
       .eq('token_hash', hash).maybeSingle();
     if (linkError || !link || link.revoked_at || (link.expires_at && Date.parse(link.expires_at) <= Date.now())) return json({ error: 'Invalid or expired link' }, 404);
     const { data: proposal, error: proposalError } = await db.from('proposals')
-      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at')
+      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at,contact_id')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
     if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
     // A newly published portal revision invalidates an older shared document link.
@@ -47,14 +47,15 @@ Deno.serve(async req => {
     }));
     // Return only the assigned proposal representative's public business contact details.
     // Do not expose profile identifiers, internal roles, or customer contact records.
-    const { data: rep } = await db.from('proposals')
-      .select('created_by')
-      .eq('id', proposal.id).eq('organization_id', link.organization_id).maybeSingle();
+    const { data: owner } = proposal.contact_id ? await db.from('contacts')
+      .select('assigned_to').eq('id', proposal.contact_id)
+      .eq('organization_id', link.organization_id).maybeSingle() : { data: null };
+    const repId = owner?.assigned_to;
     let representative: { name: string; email: string | null; phone: string | null } | null = null;
-    if (rep?.created_by) {
+    if (repId) {
       const { data: profile } = await db.from('profiles')
         .select('full_name,email,phone,organization_id')
-        .eq('id', rep.created_by).eq('organization_id', link.organization_id).maybeSingle();
+        .eq('id', repId).eq('organization_id', link.organization_id).maybeSingle();
       if (profile) representative = {
         name: profile.full_name || 'Your representative',
         email: profile.email || null, phone: profile.phone || null,
