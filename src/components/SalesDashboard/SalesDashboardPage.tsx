@@ -61,9 +61,11 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     ? ['admin', 'manager', 'sales_manager'].includes(profile.role)
     : false;
 
+  const canViewDashboard = isManager || profile?.is_sales_rep === true;
+
   const effectiveRepId = isManager
     ? (selectedRepId || (profile?.is_sales_rep ? profile.id : null))
-    : (profile?.id || null);
+    : (profile?.is_sales_rep ? profile.id : null);
 
   const isManagerView = isManager && selectedRepId !== null && selectedRepId !== profile?.id;
 
@@ -72,7 +74,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     isManagerView,
   });
 
-  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
+  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard(canViewDashboard);
 
   useEffect(() => {
     if (!onRepContextChange) return;
@@ -127,6 +129,10 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const handleNavigateToActivity = useCallback(() => {
     if (onNavigateToTab) onNavigateToTab('sales_activity');
   }, [onNavigateToTab]);
+
+  if (!canViewDashboard) {
+    return <p className="px-4 py-6 text-sm text-gray-300">You do not have access to the Sales Dashboard.</p>;
+  }
 
   if (loading) {
     return (

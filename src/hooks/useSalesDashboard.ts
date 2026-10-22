@@ -331,7 +331,7 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
   };
 }
 
-export function useSalesLeaderboard(): {
+export function useSalesLeaderboard(enabled = true): {
   data: LeaderboardResult | null;
   loading: boolean;
   error: string | null;
@@ -348,6 +348,12 @@ export function useSalesLeaderboard(): {
     let cancelled = false;
 
     async function load() {
+      if (!enabled) {
+        setData(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
 
@@ -379,9 +385,9 @@ export function useSalesLeaderboard(): {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [enabled, refreshKey]);
 
-  return { data, loading, error, refresh };
+  return { data: enabled ? data : null, loading: enabled && loading, error: enabled ? error : null, refresh };
 }
 
 export { REASON_LABELS };

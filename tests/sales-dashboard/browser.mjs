@@ -33,17 +33,17 @@ try {
  await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
  await writeFile(join(directory,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>');
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const url='http://127.0.0.1:'+server.address().port;
  const teamEnabled=(await readFile('src/components/SalesDashboard/SalesDashboardPage.tsx','utf8')).includes('SalesTeamOverview');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
-  for(const role of ['sales_rep','admin','manager','sales_manager']){
+  for(const role of ['sales','service_manager','admin','manager','sales_manager']){
    await page.goto(url+'?role='+role+'&rep=true');
    await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
    assert.equal(await page.evaluate(()=>window.rpcCalls.some(c=>c.args?.p_target_rep_id==='alphabetical')),false);
-   if(role==='sales_rep')assert.equal(await page.getByRole('combobox').count(),0);
+   if(!['admin','manager','sales_manager'].includes(role))assert.equal(await page.getByRole('combobox').count(),0);
    else {
     await page.getByRole('combobox',{name:'Salesperson'}).selectOption('alphabetical');
     await page.getByText('Viewing: Aaron Example',{exact:true}).waitFor();
@@ -52,6 +52,11 @@ try {
     await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
    }
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,role+' '+width+' overflow');
+  }
+  for(const role of ['sales','tech','finance']) {
+   await page.goto(url+'?role='+role);
+   await page.getByText('You do not have access to the Sales Dashboard.',{exact:true}).waitFor();
+   assert.equal(await page.evaluate(()=>window.rpcCalls.length),0);
   }
   await page.goto(url+'?role=manager');
   if(teamEnabled){
