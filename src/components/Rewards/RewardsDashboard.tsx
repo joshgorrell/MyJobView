@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { Award, Trophy, ShoppingCart, History, Check } from 'lucide-react';
+import { Award, Trophy, ShoppingCart, History, Check, ListChecks } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../ui/ConfirmModal';
@@ -30,6 +30,21 @@ interface Redemption {
   rewards_catalog: { name: string };
 }
 
+interface PointsRule {
+  id: string;
+  category: string;
+  name: string;
+  description: string;
+  points: number;
+}
+
+const confirmedPointsRules: PointsRule[] = [
+  { id: 'attendance_early', category: 'Attendance', name: 'Arrive at least 15 minutes early', description: 'First qualifying daily clock-in', points: 10 },
+  { id: 'attendance_on_time', category: 'Attendance', name: 'Arrive on time', description: 'First qualifying daily clock-in', points: 5 },
+  { id: 'attendance_late', category: 'Attendance', name: 'Arrive 1–15 minutes late', description: 'Attendance deduction', points: -5 },
+  { id: 'attendance_very_late', category: 'Attendance', name: 'Arrive more than 15 minutes late', description: 'Attendance deduction', points: -10 },
+];
+
 interface TopPerformer {
   id: string;
   full_name: string;
@@ -42,7 +57,7 @@ export function RewardsDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'rewards' | 'history'>('rewards');
+  const [activeTab, setActiveTab] = useState<'rewards' | 'earn' | 'history'>('rewards');
   const [userPoints, setUserPoints] = useState(0);
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -211,6 +226,17 @@ export function RewardsDashboard() {
           Available Rewards
         </button>
         <button
+          onClick={() => setActiveTab('earn')}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === 'earn'
+              ? 'text-cyan-400 border-b-2 border-cyan-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          <ListChecks className="w-4 h-4 inline mr-2" />
+          Earn Points
+        </button>
+        <button
           onClick={() => setActiveTab('history')}
           className={`px-4 py-2 font-medium transition-colors ${
             activeTab === 'history'
@@ -269,6 +295,32 @@ export function RewardsDashboard() {
             ))
           )}
         </div>
+      )}
+
+      {activeTab === 'earn' && (
+        <section className="bg-gray-800 rounded-lg border border-gray-700 p-5 space-y-4">
+          <div>
+            <h3 className="text-xl font-semibold text-white">How to Earn Points</h3>
+            <p className="text-sm text-gray-400 mt-1">
+              Confirmed attendance values are shown below. Additional earning rules will appear once their server configuration is audited and connected.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {confirmedPointsRules.map(rule => (
+              <div key={rule.id} className="flex items-center justify-between gap-4 border-b border-gray-700 py-3 last:border-0">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-400">{rule.category}</p>
+                  <p className="font-medium text-white">{rule.name}</p>
+                  <p className="text-sm text-gray-400">{rule.description}</p>
+                </div>
+                <span className={`font-semibold whitespace-nowrap ${rule.points >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {rule.points > 0 ? '+' : ''}{rule.points} pts
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">Values reflect the currently audited attendance rules and are not yet dynamically administered.</p>
+        </section>
       )}
 
       {activeTab === 'history' && (
