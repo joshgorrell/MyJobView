@@ -93,7 +93,6 @@ export function IPNicknameManager() {
             icon: formData.icon,
             is_trusted: formData.is_trusted,
             location_classification: formData.location_classification,
-            location_classification: formData.location_classification,
           })
           .eq('id', editingId)
           .eq('organization_id', profile.organization_id);
@@ -110,6 +109,7 @@ export function IPNicknameManager() {
             color: formData.color,
             icon: formData.icon,
             is_trusted: formData.is_trusted,
+            location_classification: formData.location_classification,
           });
 
         if (error) throw error;
