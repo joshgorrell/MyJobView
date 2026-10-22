@@ -45,8 +45,23 @@ Deno.serve(async req => {
     const items = (itemsResult.data ?? []).map(item => ({
       id: item.id, roomId: item.room_id, description: item.description, quantity: item.quantity,
     }));
+    // Return only the assigned proposal representative's public business contact details.
+    // Do not expose profile identifiers, internal roles, or customer contact records.
+    const { data: rep } = await db.from('proposals')
+      .select('created_by')
+      .eq('id', proposal.id).eq('organization_id', link.organization_id).maybeSingle();
+    let representative: { name: string; email: string | null; phone: string | null } | null = null;
+    if (rep?.created_by) {
+      const { data: profile } = await db.from('profiles')
+        .select('full_name,email,phone,organization_id')
+        .eq('id', rep.created_by).eq('organization_id', link.organization_id).maybeSingle();
+      if (profile) representative = {
+        name: profile.full_name || 'Your representative',
+        email: profile.email || null, phone: profile.phone || null,
+      };
+    }
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
-    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at }, scope: { rooms, items } });
+    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at }, scope: { rooms, items }, representative });
   } catch (error) {
     console.error('Proposal share validation failed', error);
     return json({ error: 'Unable to validate link' }, 500);
