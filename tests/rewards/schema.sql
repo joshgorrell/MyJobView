@@ -1,0 +1,52 @@
+CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+CREATE SCHEMA auth; CREATE SCHEMA private;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid',true),'')::uuid$$;
+CREATE TABLE organizations(id uuid PRIMARY KEY,subdomain text,timezone text DEFAULT 'America/Chicago');
+CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid REFERENCES organizations,is_active boolean DEFAULT true,role text DEFAULT 'sales',role_id uuid,full_name text,points_earned integer DEFAULT 0,updated_at timestamptz);
+CREATE FUNCTION public.get_user_org_id() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$SELECT organization_id FROM profiles WHERE id=auth.uid()$$;
+CREATE FUNCTION public.flow_has_module_access(text) RETURNS boolean LANGUAGE sql STABLE AS $$SELECT coalesce(current_setting('test.module_access',true),'true')<>'false'$$;
+CREATE FUNCTION public.flow_can_view_discussion(uuid) RETURNS boolean LANGUAGE sql STABLE AS $$SELECT coalesce(current_setting('test.discussion_access',true),'true')<>'false'$$;
+CREATE TABLE departments(id uuid PRIMARY KEY,organization_id uuid,is_active boolean DEFAULT true,display_name text);
+CREATE TABLE department_user_overrides(user_id uuid,department_id uuid,has_access boolean);
+CREATE TABLE role_department_access(role_id uuid,department_id uuid,has_access boolean);
+CREATE FUNCTION private.user_has_department_access(uuid,uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$ SELECT EXISTS(SELECT 1 FROM department_user_overrides WHERE user_id=$1 AND department_id=$2 AND has_access) $$;
+CREATE TABLE points_configuration(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid,company_id uuid,task_completion_points integer DEFAULT 5,question_answer_points integer DEFAULT 5,contact_created_points integer DEFAULT 5,connection_logged_points integer DEFAULT 10,lead_created_points integer DEFAULT 20,lead_claimed_points integer DEFAULT 15,lead_converted_points integer DEFAULT 50,manual_entry_points_loss integer DEFAULT 10,fishbowl_post_points integer DEFAULT 5,updated_at timestamptz DEFAULT now());
+CREATE TABLE company_settings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid,photo_upload_points integer DEFAULT 10,pto_same_day_callin_points_loss integer DEFAULT 10,pto_same_day_callin_cutoff_time time DEFAULT '07:00',auto_clock_out_enabled boolean DEFAULT true,forgot_clock_out_penalty_points integer DEFAULT -15);
+CREATE TABLE points_transactions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid DEFAULT get_user_org_id(),user_id uuid REFERENCES profiles,points_amount integer NOT NULL,transaction_type text NOT NULL CHECK(transaction_type IN ('task_completion','question_answer','reward_redemption','admin_adjustment','attendance')),reference_id uuid,description text,created_at timestamptz DEFAULT now());
+CREATE TABLE rewards_catalog(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid,company_id uuid,name text,available boolean DEFAULT true,points_cost integer,stock_quantity integer);
+CREATE TABLE reward_redemptions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid DEFAULT get_user_org_id(),user_id uuid REFERENCES profiles,reward_id uuid REFERENCES rewards_catalog,points_spent integer,status text DEFAULT 'pending' CHECK(status IN ('pending','approved','fulfilled','cancelled')),fulfilled_at timestamptz,created_at timestamptz DEFAULT now());
+CREATE TABLE tasks(id uuid PRIMARY KEY,organization_id uuid,user_id uuid,title text,status text DEFAULT 'pending',points integer DEFAULT 10,assigned_to uuid,assigned_department_id uuid,claimed_by uuid,completed_by uuid,completed_at timestamptz);
+CREATE TABLE task_watchers(task_id uuid,user_id uuid);
+CREATE TABLE discussion_posts(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),user_id uuid,content text,post_type text DEFAULT 'general',parent_id uuid,is_private boolean DEFAULT false,assigned_to uuid,points integer DEFAULT 10,is_completed boolean DEFAULT false,completed_by uuid,completed_at timestamptz);
+CREATE TABLE notifications(id uuid DEFAULT gen_random_uuid(),organization_id uuid,user_id uuid,type text,title text,body text,is_read boolean,related_id uuid,created_at timestamptz DEFAULT now());
+CREATE TABLE contacts(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),created_by uuid,full_name text);
+CREATE TABLE connections(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),user_id uuid,contact_id uuid);
+CREATE TABLE leads(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),created_by uuid,assigned_to uuid,status text DEFAULT 'unclaimed');
+CREATE TABLE job_photos(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),technician_id uuid,media_type text DEFAULT 'photo');
+CREATE TABLE daily_clock_entries(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),technician_id uuid,clock_in timestamptz,admin_adjusted boolean DEFAULT false,deduct_points boolean DEFAULT false,points_deducted integer DEFAULT 0,adjustment_reason text);
+CREATE TABLE pto_policies(id uuid PRIMARY KEY,pto_type text);
+CREATE TABLE pto_requests(id uuid PRIMARY KEY,organization_id uuid DEFAULT get_user_org_id(),employee_id uuid,status text,start_date date,policy_id uuid,is_same_day_callin boolean DEFAULT false,points_deducted integer DEFAULT 0);
+CREATE FUNCTION public.award_points(uuid,integer,text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$BEGIN UPDATE profiles SET points_earned=points_earned+$2 WHERE id=$1;END$$;
+CREATE FUNCTION public.sync_profile_points() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$BEGIN UPDATE profiles SET points_earned=points_earned+NEW.points_amount WHERE id=NEW.user_id;RETURN NEW;END$$;
+CREATE TRIGGER trigger_sync_profile_points AFTER INSERT ON points_transactions FOR EACH ROW EXECUTE FUNCTION sync_profile_points();
+DO $$DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['points_transactions','reward_redemptions','rewards_catalog','points_configuration','profiles','tasks','discussion_posts','contacts','connections','leads','job_photos'] LOOP
+ EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t);
+ EXECUTE format('CREATE POLICY same_org ON %I TO authenticated USING(organization_id=get_user_org_id()) WITH CHECK(organization_id=get_user_org_id())',t);
+END LOOP;END$$;
+GRANT USAGE ON SCHEMA public,auth,private TO authenticated,anon,service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT ON profiles TO anon;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+-- Also exercise explicit column grants, which table-level REVOKE alone leaves behind.
+GRANT INSERT(points_amount),UPDATE(points_amount) ON points_transactions TO authenticated;
+GRANT UPDATE(status) ON reward_redemptions TO authenticated;
+
+ALTER TABLE profiles ADD COLUMN requires_daily_clock boolean DEFAULT true,ADD COLUMN standard_end_time time;
+ALTER TABLE company_settings ADD COLUMN timezone text DEFAULT 'UTC',ADD COLUMN auto_clock_out_cutoff_time time DEFAULT '00:00',ADD COLUMN auto_clock_out_time time DEFAULT '16:00',ADD COLUMN home_clock_notification_roles text[],ADD COLUMN last_auto_clock_out_run timestamptz;
+ALTER TABLE daily_clock_entries ADD COLUMN entry_date date,ADD COLUMN status text DEFAULT 'clocked_in',ADD COLUMN auto_clocked_out boolean DEFAULT false,ADD COLUMN clock_out timestamptz,ADD COLUMN total_hours numeric,ADD COLUMN auto_clocked_out_at timestamptz,ADD COLUMN auto_clock_out_approved boolean,ADD COLUMN notes text;
+CREATE TABLE time_entries(id uuid PRIMARY KEY,organization_id uuid,technician_id uuid,clock_in timestamptz,clock_out timestamptz,entry_date date,status text,total_hours numeric,notes text);
+CREATE TABLE auto_clock_out_execution_log(id uuid DEFAULT gen_random_uuid(),organization_id uuid,executed_at timestamptz,entries_processed integer,entry_ids uuid[],technician_ids uuid[],technician_names text[],total_points_deducted integer,admin_notified boolean,admin_notification_ids uuid[],success boolean,execution_duration_ms integer,error_message text);
+
+CREATE SCHEMA time_private;
+CREATE FUNCTION private.can_access_page(uuid,text) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$SELECT EXISTS(SELECT 1 FROM profiles WHERE id=$1 AND role IN ('admin','office_manager')) AND coalesce(current_setting('test.time_access',true),'true')<>'false'$$;
+CREATE FUNCTION time_private.can_manage_time(p_org uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public AS $$SELECT EXISTS(SELECT 1 FROM public.profiles p WHERE p.id=auth.uid() AND p.organization_id=p_org AND p.is_active) AND (private.can_access_page(auth.uid(),'time_approval') OR private.can_access_page(auth.uid(),'payroll') OR private.can_access_page(auth.uid(),'dispatch_dashboard'))$$;

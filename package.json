@@ -71,7 +71,9 @@
     "test:loss-feedback": "node tests/reviews/loss-feedback.mjs && node tests/reviews/loss-reminders.mjs",
     "test:loss-feedback:browser": "npm run build && node tests/reviews/loss-feedback-browser.mjs",
     "test:customer-time": "node tests/employee-time/customer-time-database.mjs",
-    "test:customer-time:browser": "node tests/employee-time/customer-time-browser.mjs"
+    "test:customer-time:browser": "node tests/employee-time/customer-time-browser.mjs",
+    "test:rewards": "node tests/rewards/database.mjs",
+    "test:rewards:browser": "node tests/rewards/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
