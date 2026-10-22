@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Award, Trophy, ShoppingCart, History, Check, ListChecks } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,15 +35,9 @@ interface PointsRule {
   category: string;
   name: string;
   description: string;
-  points: number;
+  points: number | null;
 }
 
-const confirmedPointsRules: PointsRule[] = [
-  { id: 'attendance_early', category: 'Attendance', name: 'Arrive at least 15 minutes early', description: 'First qualifying daily clock-in', points: 10 },
-  { id: 'attendance_on_time', category: 'Attendance', name: 'Arrive on time', description: 'First qualifying daily clock-in', points: 5 },
-  { id: 'attendance_late', category: 'Attendance', name: 'Arrive 1–15 minutes late', description: 'Attendance deduction', points: -5 },
-  { id: 'attendance_very_late', category: 'Attendance', name: 'Arrive more than 15 minutes late', description: 'Attendance deduction', points: -10 },
-];
 
 interface TopPerformer {
   id: string;
@@ -53,6 +47,12 @@ interface TopPerformer {
 
 export function RewardsDashboard() {
   const { profile } = useAuth();
+  const [pointsRules, setPointsRules] = useState<PointsRule[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  const inFlight = useRef(false);
+  const loadVersion = useRef(0);
+  const redemptionKeys = useRef(new Map<string, string>());
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
@@ -64,14 +64,17 @@ export function RewardsDashboard() {
 
   useEffect(() => {
     loadData();
-  }, [profile]);
+    return () => { loadVersion.current++; };
+  }, [profile?.id, profile?.organization_id]);
 
   async function loadData() {
-    if (!profile) return;
-
+    if (!profile) { setLoading(false); return; }
+    const request = ++loadVersion.current;
+    setLoading(true);
+    setLoadError('');
     try {
-      const [rewardsResult, transactionsResult, redemptionsResult, topPerformersResult] = await Promise.all([
-        supabase.from('rewards_catalog').select('*').eq('available', true).order('points_cost'),
+      const [rewardsResult, transactionsResult, redemptionsResult, topPerformersResult, rulesResult, balanceResult] = await Promise.all([
+        supabase.from('rewards_catalog').select('*').eq('organization_id', profile.organization_id).eq('available', true).order('points_cost'),
         supabase
           .from('points_transactions')
           .select('*')
@@ -86,42 +89,65 @@ export function RewardsDashboard() {
         supabase
           .from('profiles')
           .select('id, full_name, points_earned')
+          .eq('organization_id', profile.organization_id)
           .gt('points_earned', 0)
           .order('points_earned', { ascending: false })
           .limit(10),
+        supabase.rpc('get_reward_points_menu'),
+        supabase.rpc('get_user_points_balance', { user_uuid: profile.id }),
       ]);
 
+      for (const result of [rewardsResult, transactionsResult, redemptionsResult, topPerformersResult, rulesResult, balanceResult]) {
+        if (result.error) throw result.error;
+      }
+      if (request !== loadVersion.current) return;
+      setPointsRules(rulesResult.data || []);
       setRewards(rewardsResult.data || []);
       setTransactions(transactionsResult.data || []);
       setRedemptions(redemptionsResult.data || []);
-      setUserPoints(profile.points_earned || 0);
+      setUserPoints(balanceResult.data ?? 0);
       setTopPerformers(topPerformersResult.data || []);
     } catch (error) {
       console.error('Error loading data:', error);
+      if (request === loadVersion.current) setLoadError('Rewards could not be loaded. Please retry.');
     } finally {
-      setLoading(false);
+      if (request === loadVersion.current) setLoading(false);
     }
   }
 
   async function redeemReward(reward: Reward) {
-    if (!profile) return;
+    if (!profile || inFlight.current) return;
 
     if (userPoints < reward.points_cost) {
       notify(`You need ${reward.points_cost - userPoints} more points to redeem this reward.`, { theme: 'amber', tone: 'warning' });
       return;
     }
 
+    inFlight.current = true;
+    setRedeeming(true);
+    const storageKey = `reward-request:${profile.organization_id}:${profile.id}:${reward.id}`;
+    let storedKey: string | null = null;
+    try { storedKey = sessionStorage.getItem(storageKey); } catch { /* In-memory retry remains available. */ }
+    const requestKey = redemptionKeys.current.get(reward.id) ?? storedKey ?? crypto.randomUUID();
+    try { sessionStorage.setItem(storageKey, requestKey); } catch { /* Storage may be disabled. */ }
+    redemptionKeys.current.set(reward.id, requestKey);
     try {
       const { error: redemptionError } = await supabase.rpc('redeem_reward_atomic', {
         p_reward_id: reward.id,
+        p_request_key: requestKey,
       });
       if (redemptionError) throw redemptionError;
+      redemptionKeys.current.delete(reward.id);
+      try { sessionStorage.removeItem(storageKey); } catch { /* Storage may be disabled. */ }
 
       notify('Reward redeemed successfully! It will be processed by an administrator.', { theme: 'amber', tone: 'success' });
       loadData();
     } catch (error) {
       console.error('Error redeeming reward:', error);
       notify('Failed to redeem reward. Please try again.', { theme: 'amber', tone: 'error' });
+    } finally {
+      inFlight.current = false;
+      setRedeeming(false);
     }
   }
 
@@ -129,14 +155,16 @@ export function RewardsDashboard() {
     return <div className="text-center py-8 text-gray-400">Loading...</div>;
   }
 
+  if (loadError) return <div role="alert" className="p-4 text-primary">{loadError}<button type="button" className="ml-3 underline" onClick={loadData}>Retry</button></div>;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-gradient-to-r from-cyan-600 via-blue-600 to-blue-700 rounded-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <h2 className="text-3xl font-bold mb-2">Your Points</h2>
-              <p className="text-cyan-100">Earn points by completing tasks, creating contacts, logging connections, and converting leads</p>
+              <p className="text-cyan-100">See Earn Points for current activities, assignment values, and deductions</p>
             </div>
             <div className="text-right">
               <div className="flex items-center gap-2 justify-end">
@@ -188,7 +216,7 @@ export function RewardsDashboard() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-700">
+      <div className="flex flex-wrap gap-2 border-b border-gray-700">
         <button
           onClick={() => setActiveTab('rewards')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -254,7 +282,7 @@ export function RewardsDashboard() {
                   <button
                     onClick={() => setConfirmModal({ title: 'Redeem Reward', message: `Redeem ${reward.name} for ${reward.points_cost} points?`, onConfirm: () => redeemReward(reward) })}
                     disabled={
-                      userPoints < reward.points_cost ||
+                      redeeming || userPoints < reward.points_cost ||
                       (reward.stock_quantity !== null && reward.stock_quantity <= 0)
                     }
                     className="w-full mt-4 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
@@ -277,24 +305,24 @@ export function RewardsDashboard() {
           <div>
             <h3 className="text-xl font-semibold text-white">How to Earn Points</h3>
             <p className="text-sm text-gray-400 mt-1">
-              Confirmed attendance values are shown below. Additional earning rules will appear once their server configuration is audited and connected.
+              Current activities and deductions for your company. Assignment rewards use the value shown on each assignment.
             </p>
           </div>
           <div className="space-y-2">
-            {confirmedPointsRules.map(rule => (
-              <div key={rule.id} className="flex items-center justify-between gap-4 border-b border-gray-700 py-3 last:border-0">
+            {pointsRules.map(rule => (
+              <div key={rule.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 py-3 last:border-0">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-400">{rule.category}</p>
                   <p className="font-medium text-white">{rule.name}</p>
                   <p className="text-sm text-gray-400">{rule.description}</p>
                 </div>
-                <span className={`font-semibold whitespace-nowrap ${rule.points >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {rule.points > 0 ? '+' : ''}{rule.points} pts
+                <span className={`font-semibold whitespace-nowrap ${(rule.points ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {rule.points === null ? 'Shown on assignment' : `${rule.points > 0 ? '+' : ''}${rule.points} pts`}
                 </span>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500">Values reflect the currently audited attendance rules and are not yet dynamically administered.</p>
+          <p className="text-xs text-gray-500">Reopened assignments reverse their actual award. Cancelled redemptions return the points spent.</p>
         </section>
       )}
 

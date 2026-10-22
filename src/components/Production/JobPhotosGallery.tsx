@@ -747,15 +747,8 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
 
         if (insertError) throw insertError;
 
-        try {
-          await supabase.rpc('award_points', {
-            p_user_id: profile.id,
-            p_points: photoPoints,
-            p_reason: isVideo ? 'Uploaded job video' : 'Uploaded job photo'
-          });
-        } catch (err) {
-          console.error('Error awarding points:', err);
-        }
+        // The saved media row awards points atomically on the server.
+
       }
 
       if (selectedPaparazziRequestId) {

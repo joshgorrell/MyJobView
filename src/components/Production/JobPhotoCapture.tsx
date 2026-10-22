@@ -143,15 +143,8 @@ export function JobPhotoCapture({ workOrderId, onSuccess, onComplete, onCancel, 
         if (dbError) throw dbError;
 
         // Award points for photo upload
-        try {
-          await supabase.rpc('award_points', {
-            p_user_id: profile.id,
-            p_points: photoPoints,
-            p_reason: 'Uploaded job photo'
-          });
-        } catch (err) {
-          console.error('Error awarding points:', err);
-        }
+        // The saved media row awards points atomically on the server.
+
       }
 
       setPhotos([]);

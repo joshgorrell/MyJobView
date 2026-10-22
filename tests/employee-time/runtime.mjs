@@ -23,7 +23,8 @@ const nodes=t=>Array.isArray(t)?t.flatMap(nodes):t&&typeof t==='object'?[t,...no
 const text=t=>Array.isArray(t)?t.map(text).join(''):t&&typeof t==='object'?text(t.props?.children):t==null?'':String(t);
 const profile={id:'tech',organization_id:'org',employment_type:'job_time',requires_daily_clock:false,full_name:'Technician'};
 const auth={useAuth:()=>({profile})};
-const policy={useEmployeeTimePolicy:()=>({ready:true,loading:false,basis:'work_allocation',dailyClock:false,canManage:false})};
+let effectivePolicy={ready:true,loading:false,basis:'work_allocation',dailyClock:false,canManage:false};
+const policy={useEmployeeTimePolicy:()=>effectivePolicy};
 const nav=[];const writes=[];
 function query(table){const q=new Proxy({}, {get(_,key){if(key==='then')return(resolve)=>resolve({error:null,data:table==='work_orders'?[{id:'wo-1',work_order_number:'WO-100',title:'Install Speakers',status:'assigned',scheduled_start_time:'08:00',project:{name:'Home'}}]:table==='company_settings'?{shop_time_request_enabled:true,training_time_request_enabled:true}:[]});return(...args)=>{if(['insert','update','delete','upsert'].includes(key))writes.push([table,key,args]);return q;};}});return q;}
 const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
@@ -31,10 +32,10 @@ const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
   '../../lib/timezoneUtils':{getOrganizationTimezone:async()=> 'America/Chicago',formatDateInTimezone:()=> '2026-10-02'},
   '../Technician/ManualJobTimeRequestModal':{ManualJobTimeRequestModal:'ManualJobTimeRequestModal'},
   '../Technician/RequestInternalTimeModal':{RequestInternalTimeModal:'RequestInternalTimeModal'},
-  '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},
+  '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},'../Technician/CustomerTimeTimer':{CustomerTimeTimer:'CustomerTimeTimer'},
   '../Technician/MyTimeView':{MyTimeView:'MyTimeView'},
   '../Dispatch/MyTimeOff':{MyTimeOff:'MyTimeOff'},'../Shared/TeamTimeOffPanel':{TeamTimeOffPanel:'TeamTimeOffPanel'},
-  '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},
+  '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},'./MobileClockRedirect':{MobileClockRedirect:'MobileClockRedirect'},
 },{window:{location:{search:''},addEventListener(){},removeEventListener(){}},document:{activeElement:null,body:{style:{overflow:""}}}});
 let closed=0;const props={onClose(){closed++;},onNavigate:(...args)=>nav.push(args)};
 launch.render('DailyLaunchpad',props);launch.effects.splice(0).forEach(fn=>fn());
@@ -43,7 +44,7 @@ let tree=launch.render('DailyLaunchpad',props);
 assert.ok(text(tree).includes('Install Speakers'));
 const card=nodes(tree).find(n=>n.type==='button'&&text(n).includes('Install Speakers'));
 card.props.onClick();assert.equal(nav[0][0],'work_orders');assert.equal(nav[0][1].workOrderId,'wo-1');assert.equal(closed,1);assert.equal(writes.length,0);
-assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Record Manual Job Time'));
+assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Record Job Time'));
 nodes(tree).find(n=>n.type==='button'&&text(n)==='Calendar').props.onClick();tree=launch.render('DailyLaunchpad',props);
 const calendar=nodes(tree).find(n=>n.type==='Calendar');assert.ok(calendar);assert.equal(calendar.props.personalOnly,true);
 calendar.props.onWorkOrderSelect('wo-2');assert.equal(nav[1][1].workOrderId,'wo-2');assert.equal(writes.length,0);
@@ -55,6 +56,38 @@ const mytime=harness('src/components/Technician/MyTimeView.tsx',{
   './TimeAdjustmentRequestModal':{TimeAdjustmentRequestModal:'TimeAdjustmentRequestModal'},'../ui/ConfirmModal':{default:'ConfirmModal'},
 });
 tree=mytime.render('MyTimeView');assert.equal(tree.type,'MyJobTimeView');assert.equal(tree.props.salary,false);
+effectivePolicy={...effectivePolicy,basis:'salary'};
+tree=mytime.render('MyTimeView');assert.equal(tree.type,'MyJobTimeView');assert.equal(tree.props.salary,true);
+nodes(launch.render('DailyLaunchpad',props)).find(n=>n.type==='button'&&text(n)==='Today').props.onClick();
+tree=launch.render('DailyLaunchpad',props);
+assert.ok(!nodes(tree).some(n=>n.type==='TimeClockModal'),'Salary without attendance has no daily punch');
+assert.ok(nodes(tree).some(n=>n.type==='WorkOrderTimeControl'&&n.props.workOrderId==='wo-1'),'Assigned job timer remains available');
+nodes(tree).find(n=>n.type==='button'&&text(n)==='Record Job Time').props.onClick();
+tree=launch.render('DailyLaunchpad',props);assert.ok(nodes(tree).some(n=>n.type==='ManualJobTimeRequestModal'));
+// Exercise the actual header component with salary/no attendance, overnight job time,
+// and the existing hourly attendance states. Opening the tools must never write time.
+const headerReads=[],headerCallbacks=[];
+let headerJob=null,headerDaily=null;
+const headerSupabase={from(table){const q=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({error:null,data:table==='time_entries'?headerJob:table==='daily_clock_entries'?headerDaily:null});return(...args)=>{assert.ok(!['insert','update','delete','upsert'].includes(key));headerReads.push([table,key,args]);return q;};}});return q;},channel(){return {on(_,filter,callback){headerCallbacks.push(callback);return this;},subscribe(){return this;},unsubscribe(){}};}};
+const header=harness('src/components/Layout/QuickClockButton.tsx',{
+ '../../hooks/useEmployeeTimePolicy':policy,'../../contexts/AuthContext':auth,
+ '../../lib/supabase':{supabase:headerSupabase},'./DailyLaunchpad':{DailyLaunchpad:'DailyLaunchpad'},
+},{setInterval:()=>1,clearInterval(){},window:{addEventListener(){},removeEventListener(){}}});
+tree=header.render('TimeButton');assert.ok(text(tree).includes('Job Time'));assert.ok(!text(tree).includes('Clocked Out'));
+header.effects.splice(0).forEach(fn=>fn());for(let i=0;i<20;i++)await Promise.resolve();
+tree=header.render('TimeButton');nodes(tree).find(n=>n.type==='button').props.onClick();
+tree=header.render('TimeButton');assert.ok(nodes(tree).some(n=>n.type==='DailyLaunchpad'));
+assert.ok(!headerReads.some(([table])=>table==='daily_clock_entries'),'Salary job tracking never queries attendance');
+headerJob={clock_in:'2026-01-01T20:00:00Z',work_order:{id:'overnight',work_order_number:'WO-OVERNIGHT'}};
+await headerCallbacks[0]();tree=header.render('TimeButton');assert.ok(text(tree).includes('WO-OVERNIGHT'));
+assert.ok(!headerReads.some(([table,key,args])=>table==='time_entries'&&key==='eq'&&args[0]==='entry_date'),'An overnight timer stays visible');
+effectivePolicy={...effectivePolicy,basis:'daily_clock',dailyClock:true};headerJob=null;
+header.render('TimeButton');header.effects.splice(0).forEach(fn=>fn());for(let i=0;i<20;i++)await Promise.resolve();
+assert.ok(text(header.render('TimeButton')).includes('Clocked Out'));
+headerDaily={id:'daily',clock_in:'2026-10-21T13:00:00Z'};await headerCallbacks.at(-1)();
+assert.ok(text(header.render('TimeButton')).includes('Clocked In'));
+effectivePolicy={...effectivePolicy,basis:'work_allocation',dailyClock:false};
+console.log('Salary employees can open header job tools, use assigned/manual job time and job history without attendance; overnight job status and hourly punches remain available.');
 const manual=harness('src/components/Dispatch/ManualJobTimeEntry.tsx',{
   '../../lib/employeeTimePolicy':{canManageTime:()=>false},'../../lib/timezoneUtils':{},'../../lib/supabase':{supabase:{}},'../../contexts/AuthContext':auth,
 });

@@ -1,39 +1,96 @@
-# Rewards & Points — audit and implementation plan (2026-10-22)
+# Rewards audit and implementation — October 22, 2026
 
-## Confirmed source evidence
-- `supabase/migrations/20261005131500_task_department_assignment_and_atomic_completion.sql`: tasks default to 10 points; `complete_task_atomic` records the first eligible completer and inserts `task_completion` transaction; reopening reverses points. Verify reversal against original award rather than mutable task value.
-- `src/components/Tasks/TasksView.tsx`: discussion tasks update completion and insert points from the client, separate from regular task atomic RPC. This is a consistency and potential duplication risk.
-- `supabase/migrations/20261016131655_time_clock_attendance_pto_routing.sql`: attendance tiers: early (>=15 min early) +10, on time +5, late (1-15 min) -5, very late (>15 min) -10. Once-per-day attendance log, offline correction delta, PTO checks, protected attendance ledger. Values are hard-coded in the function.
+PR #261 integrates main through merged Sales Dashboard PR #250 (e88a3c37).
+The audit inspected repository producers and the installed MJV database routines,
+triggers, grants, policies and table definitions. Earlier notes describing this
+as documentation-only are superseded by this implementation.
 
-## Inventory to complete before implementing
-Search source and schema for all writes to `points_transactions`, `points_configuration`, rewards/redemption tables, and points balance triggers; enumerate every awarding/deducting event and role eligibility. Verify proposal approval, positive/negative customer review, referrals, job notes, photos, job clock, completion, callbacks, punchlist, questions, manual adjustment, redemption and cancellation; classify each as implemented, missing, or intentionally disabled. Inspect existing Rewards UI and admin settings before modifying, preserving redemption behavior.
+## Effective producer inventory
 
-## Proposed architecture
-1. Server-side, tenant-scoped points rule catalog with stable event key, category, title, explanation, signed point amount, eligibility, enabled state, thresholds, effective date and admin editor; seed from existing configuration with no silent balance recalculation.
-2. One server-authoritative idempotent award/reversal entrypoint for all producers, using immutable source event IDs and unique transaction keys; no client direct insert/update/delete privileges. Ledger holds rule snapshot, actor, beneficiary, source, timestamp, adjustment/reversal link and reason. Do not permit self-awards.
-3. Attribute department assignments to actual first completer, sales approvals to customer-owned sales rep, and reviews to explicit eligible contributor(s) per policy. Reversal uses exact prior ledger amount.
-4. Rewards page tabs: Redeem Rewards (retain existing catalog and requests), Earn Points (read-only grouped applicable enabled rules and signed values), My History (ledger with explanations). Admin Points Rules and ledger review.
-5. Attendance rules must respect schedules, approved PTO, exempt employees, offline sync and configurable thresholds. Avoid historical backfill unless separately approved.
+| Activity | Implemented source and award |
+| --- | --- |
+| Regular assignment | `complete_task_atomic`; first eligible individual/department resolver; assignment value, including explicit zero |
+| Fishbowl task/question | `set_discussion_task_completion`; actual audience and assignment authorization; task value or company question value |
+| Assignment reopening | Creator/admin only; reverses the actual outstanding ledger award, even if assignment value changed; a new completion has a new event identity |
+| Contact / connection | Source-row triggers; company's contact/connection configuration |
+| Lead created / claimed / converted | Source-row triggers; company configuration; each event once per lead |
+| Public general Fishbowl post | Original public general posts only; no replies, private posts, tasks or questions; correct `user_id` attribution |
+| Job photo/video | Source-row insert trigger; company's upload value, attributed to uploader; removes separate browser award RPC |
+| Daily attendance | Existing schedule/PTO/holiday/offline correction workflow retained: early +10, on-time +5, late -5, very late -10 |
+| Forgotten daily clock-out | Existing scheduled service job; company-configured penalty; scoped entries/recipients and no pre-reset test-entry penalties |
+| Manual time correction | Existing authorized correction trigger; company loss amount; ledger applies balance delta once |
+| Same-day PTO call-in | Existing company cutoff/timezone and exempt leave checks; ledger applies loss once |
+| Redemption | Atomic profile/reward locks; company and module authorization; cost snapshot, request identity, stock and signed debit in one transaction |
+| Cancellation | Authorized admin status RPC; one exact refund and stock return; fulfilled requests cannot cancel |
+| Admin correction | `adjust_reward_points`; active company admin, another employee, amount, reason and retry identity required |
 
-## Required tests / acceptance
-- Same event submitted twice, concurrently, or replayed: one award.
-- Assignment individual/department first completer, reassign, reopen, recomplete; exact reversal with changed rule value.
-- Discussion task completion uses same server path; reopen reversal and no duplicate points.
-- Attendance boundary minutes, exempt days, PTO, offline earlier arrival correction and time zones.
-- Proposal approval once, reassignment/ownership, reversals/cancellation policy.
-- Reviews verified source, duplicate review suppression, attribution and fraud controls.
-- Redemption atomic balance check, cancellation/refund, concurrent requests.
-- Tenant isolation, role-based admin access, historical ledger reconciliation and nonnegative redemption availability.
-- Rewards menu matches effective server rules; disabled rules hidden from employees, admin visible.
+Assignment creators receive zero points for completing their own assignments.
+Employee-provided amounts cannot write the ledger or modify profile balances.
+Replays of a lead claim/conversion do not farm additional awards. Configuration
+zeroes disable fixed-value activities in the employee menu.
 
-## Release strategy
-First finish source inventory and schema reconciliation; then migration + server RPC + producer migration + UI + tests in reviewable changes. No deployment or historical points adjustment without explicit approval.
+No active producer was verified for proposal approval, customer reviews,
+referrals, ordinary job notes, callbacks or punchlist completion. Legacy job-note
+and daily-note routines have no installed awarding triggers. This change does
+not invent award values or attribution policies for those activities. Ordinary
+job clock-in/out is not an additional reward. These remain policy/implementation
+follow-ups rather than advertised earning activities.
 
-## Follow-up source inspection (2026-10-22)
-- Code search is returning no indexed matches for points/rewards terms; a repository-wide producer inventory is **not yet complete**. Do not infer missing functionality from empty search results.
-- Inspected `src/components/Tasks/TasksView.tsx` lines 264-320. Discussion task status is updated first; a separate points insert then occurs without checking its returned error. Therefore task completion can succeed while points fail silently. The client also creates a points notification independently; if points fail, the notification may still claim points were earned.
-- Discussion task reopening clears `completed_by` and `completed_at` but contains **no corresponding points reversal** in this handler. Subsequent recompletion can insert additional awards.
-- Discussion task point fallback uses `post.points || config.task_completion_points || 10`; an explicit zero is overridden. Replace with nullish fallback when migrating to server-owned rules.
-- Regular task completion/reopening calls `complete_task_atomic`/`reopen_task_atomic`; discussion tasks do not. Move discussion completion, award, reversal, and notification into one server transaction.
-- For regular task reopening, the migration uses current `task.points` for the reversal; ensure the reversal amount comes from the actual original award ledger row if rule/task values can change.
-- No runtime implementation changes have been made by this documentation-only PR.
+## Security and accounting changes
+
+The live database allowed arbitrary authenticated calls to `award_points`, client
+ledger writes, profile balance edits, global `LIMIT 1` configuration selection,
+and broken public-post attribution. The follow-up migration replaces browser
+writers with authenticated, active-employee, tenant-scoped RPCs/triggers. Private
+posting helpers are not executable by browsers. Catalog/configuration writes
+require company admins; history reads are own-or-admin. Direct ledger/redemption
+table and column write grants are revoked. Profile increments use serialized
+row updates rather than concurrent ledger SUM snapshots.
+
+Rewards shown in Earn Points come from the server's current company settings,
+not four hard-coded UI values. Balances are refreshed from the database.
+Redemption request IDs survive same-tab page reload after an ambiguous response.
+Admin errors are checked. Removing a catalog item archives it, retaining prior
+redemption history.
+
+The existing scheduled auto-clock-out entrypoint still chooses one company's
+settings per invocation; this patch scopes all processed records, recipients and
+settings updates to that company. A multi-company scheduler interface is a
+separate operational follow-up. Trusted service-role jobs retain compatibility
+with `award_points`; browsers cannot call it.
+
+## Authorized test reset
+
+Josh explicitly authorized historical balances/history to be cleared because
+they were test data. `20261022171746_reset_elife_test_rewards.sql` resolves the
+Electronic Life organization by subdomain, locks its profiles, records a reset
+cutover, clears its redemption requests/current and legacy reward ledgers and
+sets its balances to zero. Other companies and work records are retained.
+Catalog stock is retained as configured, without inventing a historical stock
+baseline. Old attendance and forgotten-clock-out entries cannot replay points.
+This migration must be applied once; migration history is the rollout guard.
+Legacy redemptions in other companies require debit reconciliation before
+cancellation and refund; ambiguous old debits are never guessed.
+
+## Verification and release gates
+
+- `npm run typecheck` and `npm run build`.
+- `npm run test:rewards`: executable PostgreSQL fixture, direct/column grant
+  denial, active/portal/anonymous/admin/tenant/module authorization, real
+  department-access helper, first resolver, explicit zero, questions, self-task
+  zero award, exact reversals, cancellation/refund, fulfillment, source events,
+  disabled values, manual/PTO deductions, scoped reset and scheduled clock-out.
+- `npm run test:rewards:browser`: actual Rewards component at 320, 390, 768 and
+  1440 pixels, both theme contexts; current balance/menu, history, errors/retry
+  and reload-safe redemption identity.
+- Existing `npm run test:flow` and `npm run test:employee-time` regressions.
+- `Rewards integrity` CI repeats build/typecheck and SQL tests against a real
+  PostgreSQL 17 service, then uses separate connections to race last stock,
+  shared balance, identical request IDs and first task completion. Injected
+  ledger failure must roll back balance, stock and redemption together.
+- Merge only the reviewed latest head after its checks succeed, no review
+  blockers remain, current main is integrated, and rollout is verified.
+
+Local SQL execution uses PGlite. It is not evidence of multi-session concurrency;
+that gate is explicitly assigned to real PostgreSQL CI. Production rollout and
+latest-head CI status must be recorded separately from these test descriptions.

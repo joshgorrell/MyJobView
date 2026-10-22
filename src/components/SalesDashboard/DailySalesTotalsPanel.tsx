@@ -1,3 +1,4 @@
+import { readAllSalesRows } from '../../hooks/useSalesDashboardRecords';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, FileUp, RefreshCw, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 
 interface DailySalesTotalsPanelProps {
   repId: string | null;
+  allSales?: boolean;
   onUpdateReport?: () => void;
 }
 
@@ -25,7 +27,7 @@ function money(value: number): string {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 }
 
-export function DailySalesTotalsPanel({ repId, onUpdateReport }: DailySalesTotalsPanelProps) {
+export function DailySalesTotalsPanel({ repId, onUpdateReport, allSales = false }: DailySalesTotalsPanelProps) {
   const { profile } = useAuth();
   const [rows, setRows] = useState<DailyTotalRow[]>([]);
   const [report, setReport] = useState<ReportRow | null>(null);
@@ -33,7 +35,7 @@ export function DailySalesTotalsPanel({ repId, onUpdateReport }: DailySalesTotal
   const [error, setError] = useState(false);
 
   const loadTotals = useCallback(async () => {
-    if (!profile?.organization_id || !repId) return;
+    if (!profile?.organization_id || (!repId && !allSales)) return;
     setLoading(true);
     setError(false);
     try {
@@ -44,15 +46,18 @@ export function DailySalesTotalsPanel({ repId, onUpdateReport }: DailySalesTotal
         setRows([]);
         return;
       }
-      const { data: totalData, error: totalError } = await supabase.from('sales_daily_totals').select('sales_date, invoice_total, invoice_count').eq('organization_id', profile.organization_id).eq('sales_rep_id', repId).gte('sales_date', reportData.report_period_start).lte('sales_date', reportData.report_period_end).order('sales_date', { ascending: false });
-      if (totalError) throw totalError;
-      setRows((totalData ?? []) as DailyTotalRow[]);
+      let totalsQuery = supabase.from('sales_daily_totals').select('sales_date, invoice_total, invoice_count').eq('organization_id', profile.organization_id).gte('sales_date', reportData.report_period_start).lte('sales_date', reportData.report_period_end).order('sales_date', { ascending: false });
+      if (!allSales) totalsQuery = totalsQuery.eq('sales_rep_id', repId);
+      const totalData = await readAllSalesRows(() => totalsQuery);
+      const byDay = new Map<string, DailyTotalRow>();
+      for (const row of totalData || []) { const prior = byDay.get(row.sales_date); byDay.set(row.sales_date, { sales_date: row.sales_date, invoice_total: Number(row.invoice_total) + Number(prior?.invoice_total || 0), invoice_count: Number(row.invoice_count) + Number(prior?.invoice_count || 0) }); }
+      setRows([...byDay.values()].sort((a, b) => b.sales_date.localeCompare(a.sales_date)));
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [profile?.organization_id, repId]);
+  }, [profile?.organization_id, repId, allSales]);
 
   useEffect(() => { void loadTotals(); }, [loadTotals]);
 
