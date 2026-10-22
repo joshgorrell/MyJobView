@@ -100,15 +100,21 @@ Deno.serve(async (req: Request) => {
     }
     .page {
       background: white;
-      max-width: 8.5in;
+      width: 8.5in;
+      min-height: 11in;
       margin: 0 auto 20px;
-      padding: 0.75in;
+      padding: 0.5in;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
   }
   @media print {
     body { background: white; }
     .page {
+      width: 7.5in;
+      max-width: 7.5in;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
       page-break-after: always;
     }
     .page:last-child {
@@ -128,6 +134,7 @@ Deno.serve(async (req: Request) => {
 
   .page {
     position: relative;
+    overflow-wrap: anywhere;
   }
 
   .print-btn {
@@ -354,11 +361,11 @@ ${branding.css}
       <div class="field-label">Account Type (Check One)</div>
       <div class="account-type-row">
         <div class="checkbox-field">
-          <span class="checkbox"></span>
+          <span class="checkbox">${contract.account_type === 'residential' ? '&#10003;' : ''}</span>
           <span>Residential</span>
         </div>
         <div class="checkbox-field">
-          <span class="checkbox"></span>
+          <span class="checkbox">${contract.account_type === 'commercial' ? '&#10003;' : ''}</span>
           <span>Commercial</span>
         </div>
       </div>
@@ -369,20 +376,20 @@ ${branding.css}
     <div class="section-header">Property Address (Where System is Installed)</div>
     <div class="field-group">
       <div class="field-label">Street Address</div>
-      <div class="field-input"></div>
+      <div class="field-value">${escapeHtml(contract.propertyInfo?.address_line1 || contract.contact?.street_address || '')}</div>
     </div>
     <div class="grid-thirds">
       <div class="field-group">
         <div class="field-label">City</div>
-        <div class="field-input"></div>
+        <div class="field-value">${escapeHtml(contract.propertyInfo?.city || contract.contact?.city || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">State</div>
-        <div class="field-input"></div>
+        <div class="field-value">${escapeHtml(contract.propertyInfo?.state || contract.contact?.state || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">ZIP Code</div>
-        <div class="field-input"></div>
+        <div class="field-value">${escapeHtml(contract.propertyInfo?.zip_code || contract.contact?.zip_code || '')}</div>
       </div>
     </div>
   </div>
