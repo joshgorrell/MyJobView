@@ -140,6 +140,7 @@ const clock=await scalar('select auto_clock_out_forgotten_entries()');assert.equ
 assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),-35);
 assert.equal(await scalar('select points_earned from profiles where id=$1',[bob]),0,'Historical clock entry has no penalty');
 assert.equal(await scalar('select status from daily_clock_entries where id=$1',[id(722)]),'clocked_in','Other company untouched');
+assert.equal(await scalar('select points_deducted from daily_clock_entries where id=$1',[id(721)]),0,'Historical entry reports zero deducted');
 assert.equal(await scalar("select count(*)::int from notifications n join profiles p on p.id=n.user_id where n.organization_id IS DISTINCT FROM p.organization_id"),0);
 assert.equal((await scalar('select auto_clock_out_forgotten_entries()')).entries_processed,0);
 // The admin single-entry path is atomic, tenant-bound and idempotent too.

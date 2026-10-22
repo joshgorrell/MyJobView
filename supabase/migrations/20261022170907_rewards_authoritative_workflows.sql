@@ -121,10 +121,6 @@ BEGIN
     RAISE EXCEPTION 'Task not found';
   END IF;
 
-  IF v_task.status = 'completed' THEN
-    RETURN QUERY SELECT p_task_id,v_task.completed_by,0; RETURN;
-  END IF;
-
   SELECT (role IN ('admin','owner','super_admin')) INTO v_is_admin
   FROM profiles
   WHERE id = v_user_id;
@@ -141,6 +137,10 @@ BEGIN
        AND NOT COALESCE(v_is_admin, false) THEN
       RAISE EXCEPTION 'You do not have access to this department task';
     END IF;
+  END IF;
+
+  IF v_task.status = 'completed' THEN
+    RETURN QUERY SELECT p_task_id,v_task.completed_by,0; RETURN;
   END IF;
 
   v_points := COALESCE(v_task.points, 0);
@@ -635,6 +635,7 @@ AS $function$
 DECLARE
 v_settings                record;
 v_reset_at timestamptz;
+v_penalty_entry record;
 v_cutoff_time             time;
 v_default_clock_out_time  time;
 v_cutoff_timestamp        timestamptz;
@@ -760,8 +761,8 @@ total_hours             = GREATEST(
 0,
 EXTRACT(EPOCH FROM (etp.calculated_clock_out - dce.clock_in)) / 3600
 ),
-deduct_points           = true,
-points_deducted         = v_penalty_points,
+deduct_points           = (v_reset_at IS NULL OR etp.clock_in>=v_reset_at),
+points_deducted         = CASE WHEN v_reset_at IS NOT NULL AND etp.clock_in<v_reset_at THEN 0 ELSE v_penalty_points END,
 auto_clocked_out        = true,
 auto_clocked_out_at     = now(),
 auto_clock_out_approved = false,
@@ -769,7 +770,7 @@ notes = COALESCE(notes || E'\n', '') ||
 'Auto-clocked out at ' ||
 to_char(etp.calculated_clock_out AT TIME ZONE v_timezone, 'YYYY-MM-DD HH12:MI:SS AM TZ') ||
 ' (cutoff was ' || to_char(v_cutoff_timestamp AT TIME ZONE v_timezone, 'HH12:MI:SS AM') ||
-'). Penalty: ' || v_penalty_points || ' points.'
+'). Penalty: ' || CASE WHEN v_reset_at IS NOT NULL AND etp.clock_in<v_reset_at THEN 0 ELSE v_penalty_points END || ' points.'
 FROM entries_to_process etp
 WHERE dce.id = etp.id
 AND etp.calculated_clock_out > dce.clock_in
@@ -833,15 +834,8 @@ SELECT COUNT(*)::integer INTO v_job_entries_count FROM updated_job_entries;
 -- Award penalty points and notify admins
 -- -------------------------------------------------------
 IF v_affected_count > 0 THEN
-FOR i IN 1..array_length(v_tech_ids, 1) LOOP
-IF EXISTS(SELECT 1 FROM daily_clock_entries WHERE id=ANY(v_entry_ids) AND technician_id=v_tech_ids[i] AND (v_reset_at IS NULL OR clock_in>=v_reset_at)) THEN
-PERFORM award_points(
-v_tech_ids[i],
-v_penalty_points,
-'Automatic clock-out penalty for forgotten clock-out on ' ||
-to_char((now() AT TIME ZONE v_timezone)::date, 'YYYY-MM-DD')
-);
-END IF;
+FOR v_penalty_entry IN SELECT * FROM daily_clock_entries WHERE id=ANY(v_entry_ids) AND (v_reset_at IS NULL OR clock_in>=v_reset_at) LOOP
+PERFORM private.post_reward_points(v_org_id,v_penalty_entry.technician_id,v_penalty_points,'admin_adjustment',v_penalty_entry.id,'Automatic forgotten clock-out penalty','forgotten_entry:'||v_penalty_entry.id);
 END LOOP;
 
 IF v_settings.home_clock_notification_roles IS NOT NULL
