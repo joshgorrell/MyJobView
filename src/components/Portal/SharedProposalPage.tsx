@@ -11,6 +11,7 @@ export default function SharedProposalPage() {
   const [representative, setRepresentative] = useState<Representative | null>(null);
   const [showDeclineHelp, setShowDeclineHelp] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [requestedChanges, setRequestedChanges] = useState('');
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('token');
     if (!token) { setError('This proposal link is incomplete.'); return; }
@@ -43,7 +44,7 @@ export default function SharedProposalPage() {
         {['sent', 'portal'].includes(proposal.status) && <section className="mt-8 border-t border-gray-700 pt-6">
           <h2 className="text-lg font-semibold">Need to make a change?</h2>
           <p className="mt-2 text-sm text-gray-300">We can easily adjust the scope to make this proposal right for you.</p>
-          {representative?.email && <a href={'mailto:' + representative.email + '?subject=' + encodeURIComponent('Changes requested for proposal ' + proposal.number)} className="mt-3 inline-block rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">Request Changes</a>}
+          {representative?.email && <div className="mt-4"><label htmlFor="shared-proposal-changes" className="block text-sm font-medium text-gray-200">What would you like us to change?</label><textarea id="shared-proposal-changes" value={requestedChanges} onChange={event => setRequestedChanges(event.target.value)} maxLength={4000} rows={4} placeholder="Tell us which rooms, products, or pricing options you would like adjusted." className="mt-2 w-full rounded-lg border border-gray-600 bg-gray-800 p-3 text-sm text-white placeholder:text-gray-400" /><a href={'mailto:' + representative.email + '?subject=' + encodeURIComponent('Changes requested for proposal ' + proposal.number) + '&body=' + encodeURIComponent(requestedChanges.trim() || 'I would like to discuss changes to this proposal.')} className="mt-3 inline-block rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">Email Change Request</a><p className="mt-2 text-xs text-gray-400">This opens your email application. Your request is not submitted until you send the email.</p></div>}
           <button type="button" onClick={() => { void navigator.clipboard.writeText(window.location.href).then(() => setCopied(true)).catch(() => setCopied(false)); }} className="ml-3 mt-3 inline-block rounded-lg border border-gray-600 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800">{copied ? 'Link copied' : 'Copy proposal link'}</button>
           <div className="mt-5"><button type="button" onClick={() => setShowDeclineHelp(value => !value)} className="text-sm text-gray-300 underline underline-offset-2">{showDeclineHelp ? 'Hide decline information' : 'Considering declining?'}</button></div>
           {showDeclineHelp && <div className="mt-3 rounded-lg border border-blue-700 bg-blue-950/50 p-4">
