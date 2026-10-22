@@ -28,3 +28,12 @@ Search source and schema for all writes to `points_transactions`, `points_config
 
 ## Release strategy
 First finish source inventory and schema reconciliation; then migration + server RPC + producer migration + UI + tests in reviewable changes. No deployment or historical points adjustment without explicit approval.
+
+## Follow-up source inspection (2026-10-22)
+- Code search is returning no indexed matches for points/rewards terms; a repository-wide producer inventory is **not yet complete**. Do not infer missing functionality from empty search results.
+- Inspected `src/components/Tasks/TasksView.tsx` lines 264-320. Discussion task status is updated first; a separate points insert then occurs without checking its returned error. Therefore task completion can succeed while points fail silently. The client also creates a points notification independently; if points fail, the notification may still claim points were earned.
+- Discussion task reopening clears `completed_by` and `completed_at` but contains **no corresponding points reversal** in this handler. Subsequent recompletion can insert additional awards.
+- Discussion task point fallback uses `post.points || config.task_completion_points || 10`; an explicit zero is overridden. Replace with nullish fallback when migrating to server-owned rules.
+- Regular task completion/reopening calls `complete_task_atomic`/`reopen_task_atomic`; discussion tasks do not. Move discussion completion, award, reversal, and notification into one server transaction.
+- For regular task reopening, the migration uses current `task.points` for the reversal; ensure the reversal amount comes from the actual original award ledger row if rule/task values can change.
+- No runtime implementation changes have been made by this documentation-only PR.
