@@ -1,89 +1,102 @@
+import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
-import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-
-const directory = await mkdtemp(join(tmpdir(), 'mjv-sales-'));
+const directory = await mkdtemp(join(tmpdir(), 'sales-dashboard-'));
 const fixture = `
-const params=new URLSearchParams(location.search);
-const role=params.get('role')||'admin';
-const profile={id:'self',organization_id:'org',role,is_sales_rep:params.get('rep')==='true'};
-export const useAuth=()=>({profile});
-window.rpcCalls=[];window.navActions=[];
-export const useDepartments=()=>({starredModules:Array.from({length:8},(_,i)=>({id:String(i),module_key:i===0?'sales_dashboard':'favorite_'+i,display_name:'Favorite '+i,icon:'Star'})),loading:false,hasModuleAccess:()=>true});
-export const useTaskCount=()=>2;export const useFishbowlCount=()=>3;
-const reps=[{id:'alphabetical',first_name:'Aaron',last_name:'Example'},{id:'self',first_name:'Zach',last_name:'Self'}];
-const dashboard=id=>({repId:id,repDisplayName:id==='self'?'Zach Self':'Aaron Example',monthlyTrend:[],bookedSales:{total:id==='self'?200:100,count:1,prevTotal:0,avgSale:100},pipeline:{total:50,count:1},closeRate:{wonCount:id==='self'?1:9,lostCount:1},quota:{}});
-export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:table==='profiles'?(params.has('empty')?[]:reps):[],error:null,count:0}).then(a,b);return()=>q;}});return q;},async rpc(name,args){window.rpcCalls.push({name,args});if(name==='get_sales_goal_leaderboard')return{data:{entries:[]},error:null};if(name==='get_sales_team_dashboard')return{data:{reps:params.has('partial')?[dashboard('self')]:args.p_rep_ids.map(dashboard)},error:null};await new Promise(r=>setTimeout(r,25));return{data:dashboard(args?.p_target_rep_id||'self'),error:null};}};
-`;
-const stubNames=['AnnualGoalHero','SalesKpiGrid','SalesTrendChart','SalesGoalLeaderboard','SalesAttentionList','DashboardSkeleton','HotLeadsCard','StaleLeadsCard','DeclineReasonsCard','PeriodStatsRow','RecentProposalsCard','RecentActivityCard','DailyRecap','DailySalesTotalsPanel'];
+window.calls=[];window.failSales=false;
+export const useDepartments=()=>({starredModules:Array.from({length:8},(_,i)=>({id:String(i),module_key:'favorite_'+i,display_name:'Favorite '+i,icon:'Star'})),loading:false,hasModuleAccess:()=>true});
+export const useTaskCount=()=>0;export const useFishbowlCount=()=>0;
+const now=new Date(),day=now.toISOString().slice(0,10),start=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1)).toISOString();
+const proposals=[{id:'stale-old',created_by:'rep1',proposal_number:'P-OLD',title:'Old proposal',status:'expired',created_at:'2025-01-01',valid_until:'2025-02-01',total:1200,contact:{full_name:'Old Customer'}},{id:'won',created_by:'rep1',proposal_number:'P-WON',status:'approved',created_at:start,approved_at:day,total:4500,contact:{full_name:'Won Customer'}},{id:'lost',created_by:'rep1',proposal_number:'P-LOST',status:'declined',created_at:start,declined_at:day,total:800,contact:{full_name:'Lost Customer'}},{id:'other',created_by:'rep2',proposal_number:'P-OTHER',status:'expired',created_at:'2025-01-01',valid_until:'2025-02-01',total:100,contact:{full_name:'Second Rep Customer'}}].map(p=>({...p,organization_id:'org'}));
+proposals.push(...Array.from({length:9},(_,i)=>({id:'team-win-'+i,created_by:'rep2',organization_id:'org',status:'approved',created_at:start,approved_at:day,total:100,contact:{full_name:'Team win'}})),{id:'team-loss',created_by:'rep2',organization_id:'org',status:'declined',created_at:start,declined_at:day,total:100,contact:{full_name:'Team loss'}});
+const tables={organizations:[{id:'org',timezone:'UTC'}],work_orders:[{id:'work1',organization_id:'org',customer_sales_rep_id:'rep1',work_order_number:'WO-1',title:'Finished Theater',status:'completed',type:'service',is_billable:true,is_archived:false,notes:'Installation complete',updated_at:day,actual_completion_date:day,customer_contacted:true,contact:{full_name:'Work Customer'}}],appointments:[{id:'appointment1',organization_id:'org',created_by:'rep1',appointment_date:day,start_time:'09:00:00',end_time:'10:00:00',title:'Sales Meeting',status:'scheduled',contact:{full_name:'Meeting Customer'}}],proposals,leads:[{id:'lead1',organization_id:'org',assigned_to:'rep1',created_by:'rep1',status:'claimed',priority:'urgent',contact_name:'Never Contacted',created_at:'2025-01-01',reminder_date:day}],contacts:[{id:'contact1',organization_id:'org',created_by:'rep1',full_name:'New Contact',created_at:start}],connections:[{id:'connection1',organization_id:'org',user_id:'rep1',contact_id:'contact1',connection_type:'call',connection_date:day,created_at:day,notes:'Talked about theater',contact:{full_name:'New Contact'}}],profiles:[{id:'rep1',first_name:'First',last_name:'Rep',organization_id:'org',is_sales_rep:true,is_active:true},{id:'rep2',first_name:'Second',last_name:'Rep',organization_id:'org',is_sales_rep:true,is_active:true}]};
+export const useAuth=()=>({profile:{id:'rep1',organization_id:'org',is_sales_rep:!new URLSearchParams(location.search).has('nonrep'),role:new URLSearchParams(location.search).get('role')||'sales_manager'},user:{id:'rep1'}});
+export const supabase={from(table){let filters=[],range=null,head=false,one=false;const q={select(c,opts){head=!!opts?.head;return q},eq(k,v){filters.push([k,v]);return q},in(){return q},or(){return q},is(){return q},gt(){return q},lt(){return q},lte(){return q},gte(){return q},order(){return q},limit(){return q},range(a,b){range=[a,b];return q},single(){one=true;return q},maybeSingle(){one=true;return q},insert(rows){tables[table]=[...(tables[table]||[]),...rows.map((r,i)=>({...r,id:'todo-'+i}))];return q},update(){return q},then(resolve,reject){window.calls.push(['query',table,filters]);let rows=(tables[table]||[]).filter(r=>filters.every(([k,v])=>k.includes('.')||r[k]===undefined||r[k]===v));if(range)rows=rows.slice(range[0],range[1]+1);return Promise.resolve({data:head?null:one?rows[0]||null:rows,count:rows.length,error:window.failSales&&table==='proposals'?{message:'Test query unavailable'}:null}).then(resolve,reject)}};return q},rpc:async(name,args)=>(window.calls.push(['rpc',name,args]),{data:name==='get_sales_goal_leaderboard'?{leaderboard:[]}: {repId:args?.p_target_rep_id||'rep1',repDisplayName:args?.p_target_rep_id==='rep2'?'Second Rep':'First Rep',quota:{annualQuota:100000,monthlyQuota:8333,quotaStartDate:now.getFullYear()+'-01-01',quotaEndDate:now.getFullYear()+'-12-31',quotaElapsedPct:50,hasQuota:true},bookedSales:{total:0,count:0,avgSale:0,prevTotal:0,prevCount:0},pipeline:{total:0,count:0},closeRate:{pct:0,wonCount:0,lostCount:0,prevPct:0,prevWonCount:0,prevLostCount:0},monthlyTrend:[],runRate90Day:0},error:null})};`;
+const source = `import React from 'react';import{createRoot}from'react-dom/client';import{SalesDashboardPage}from'./src/components/SalesDashboard/SalesDashboardPage';import{QuickAccessNavigation}from'./src/components/Layout/QuickAccessNavigation';createRoot(document.getElementById('root')).render(<div><div className="p-3"><QuickAccessNavigation activeModule="sales_dashboard" onModuleChange={key=>window.calls.push(['favorite',key])}/></div><SalesDashboardPage onProposalClick={id=>window.calls.push(['proposal',id])} onOpenRecord={r=>window.calls.push(['record',r.kind,r.id])} onNavigateToTab={(tab,id)=>window.calls.push(['navigate',tab,id])}/></div>);`;
 let browser;
-const server=createServer(async(req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,file)));});
+const server = createServer(async(req,res)=>{const name=req.url.includes('app.js')?'app.js':req.url.includes('style.css')?'style.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,name)));});
 try {
- await build({stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import {SalesDashboardPage} from './src/components/SalesDashboard/SalesDashboardPage';import {QuickAccessNavigation} from './src/components/Layout/QuickAccessNavigation';createRoot(document.getElementById('root')).render(<div><div className="p-3"><QuickAccessNavigation activeModule="sales_dashboard" onModuleChange={key=>window.navActions.push(key)}/></div><SalesDashboardPage/></div>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){
- b.onResolve({filter:/\/supabase$|\/AuthContext$|\/DepartmentContext$|\/useTaskCount$|\/useFishbowlCount$/},()=>({path:'fixture',namespace:'fixture'}));
- b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js'}));
- b.onResolve({filter:/salesDashboardCalculations$/},()=>({path:'calculations',namespace:'calculations'}));
- b.onLoad({filter:/.*/,namespace:'calculations'},()=>({contents:'export const computeGoalProgress=()=>({});export const computeAttentionItems=()=>[];',loader:'js'}));
- b.onResolve({filter:new RegExp('/('+stubNames.join('|')+')$')},args=>({path:args.path.split('/').at(-1),namespace:'stub'}));
- b.onLoad({filter:/.*/,namespace:'stub'},args=>({contents:'export const '+args.path+'=()=>null;',loader:'js'}));
- }}]});
- const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));
- await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
- await writeFile(join(directory,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>');
- await new Promise(r=>server.listen(0,'127.0.0.1',r));
- browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
- const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
- const url='http://127.0.0.1:'+server.address().port;
- const teamEnabled=(await readFile('src/components/SalesDashboard/SalesDashboardPage.tsx','utf8')).includes('SalesTeamOverview');
- for(const width of [320,390,768,1440]){
-  await page.setViewportSize({width,height:900});
-  for(const role of ['sales','service_manager','admin','manager','sales_manager']){
-   await page.goto(url+'?role='+role+'&rep=true');
-   await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
-   assert.equal(await page.evaluate(()=>window.rpcCalls.some(c=>c.args?.p_target_rep_id==='alphabetical')),false);
-   if(!['admin','manager','sales_manager'].includes(role))assert.equal(await page.getByRole('combobox').count(),0);
-   else {
-    await page.getByRole('combobox',{name:'Salesperson'}).selectOption('alphabetical');
-    await page.getByText('Viewing: Aaron Example',{exact:true}).waitFor();
-    if(teamEnabled){await page.getByRole('button',{name:'All sales reps',exact:true}).click();await page.getByRole('button',{name:'My dashboard',exact:true}).click();}
-    else await page.getByRole('combobox',{name:'Salesperson'}).selectOption('self');
-    await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
-   }
-   const favorites=page.getByRole('navigation',{name:'Bookmarked pages'});
-   assert.equal(await favorites.getByRole('button').count(),8);
-   await favorites.getByRole('button',{name:'Favorite 7',exact:true}).click();
-   assert.equal(await page.evaluate(()=>window.navActions.at(-1)),'favorite_7');
-   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,role+' '+width+' overflow');
+  await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/^\.\/supabase$|lib\/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useTaskCount$|hooks\/useFishbowlCount$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
+  const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
+  await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><body style="background:#111827"><div id="root"></div><script src="app.js"></script></body>');
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
+  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  for(const width of [320,390,768,1440]) {
+    await page.setViewportSize({width,height:1000});await page.goto('http://127.0.0.1:'+server.address().port);
+    await page.getByRole('heading',{name:'My Results & Activity'}).waitFor();
+    const favorites=page.getByRole('navigation',{name:'Bookmarked pages'});assert.equal(await favorites.getByRole('button').count(),8);
+    await favorites.getByRole('button',{name:'Favorite 7',exact:true}).click();assert.ok((await page.evaluate(()=>window.calls)).some(c=>c[0]==='favorite'&&c[1]==='favorite_7'));
+
+    assert.equal(await page.locator('select').filter({has:page.locator('option[value="rep2"]')}).inputValue(), 'rep1');
+    for(const name of ['Daily Recap','Overview','Pipeline','Proposals','Activity']) assert.equal(await page.getByRole('button',{name,exact:true}).count(),1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.getByRole('button',{name:/^Ready to Bill/}).click();
+    await page.getByRole('button',{name:/WO-1/}).click();
+    assert.ok((await page.evaluate(()=>window.calls)).some(c=>c[0]==='navigate'&&c[1]==='work_orders'&&c[2]==='work1'));
+    await page.getByRole('button',{name:'Back to daily recap'}).click();
+    await page.getByRole('button',{name:/^Appointments Today/}).click();
+    await page.getByRole('button',{name:/Sales Meeting/}).click();
+    await page.getByRole('heading',{name:'Sales Meeting',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Back to list'}).click();
+    await page.getByRole('button',{name:'Back to daily recap'}).click();
+    await page.screenshot({path:'/tmp/sales-dashboard-'+width+'.png',fullPage:true});
+    await page.getByRole('button',{name:/^Stale Proposals/}).click();
+    await page.getByRole('heading',{name:'Stale Proposals (1)'}).waitFor();
+    await page.getByRole('button',{name:/P-OLD/}).click();
+    assert.ok((await page.evaluate(()=>window.calls)).some(c=>c[0]==='proposal'&&c[1]==='stale-old'));
+    await page.getByRole('button',{name:'Back to dashboard'}).click();
+    await page.getByRole('button',{name:/^Won Proposals/}).click();await page.getByRole('button',{name:/P-WON/}).click();
+    await page.getByRole('button',{name:'Back to dashboard'}).click();
+    await page.getByRole('button',{name:/^Contacts Added/}).click();await page.getByRole('button',{name:/New Contact/}).click();
+    assert.ok((await page.evaluate(()=>window.calls)).some(c=>c[0]==='record'&&c[1]==='contact'&&c[2]==='contact1'));
+    await page.getByRole('button',{name:'Back to dashboard'}).click();
+    await page.getByRole('button',{name:/^Connections Logged/}).click();await page.getByRole('button',{name:/call New Contact/}).click();await page.getByText('Talked about theater',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Back to list'}).click();await page.getByRole('button',{name:'Back to dashboard'}).click();
+    await page.getByLabel('Reporting period').selectOption('year');
+    await page.getByRole('button',{name:'Overview',exact:true}).click();
+    await page.getByRole('heading',{name:'Annual Sales Goal',exact:true}).waitFor();
+    await page.getByRole('button',{name:/^Close Rate/}).click();await page.getByRole('heading',{name:'Closed Proposals (2)'}).waitFor();
+    await page.getByRole('button',{name:'Back to dashboard'}).click();
+    await page.getByRole('combobox').filter({has:page.locator('option[value="rep2"]')}).selectOption('rep2');
+    await page.getByText('Viewing: Second Rep',{exact:true}).waitFor();
+    assert.equal((await page.evaluate(()=>window.calls)).filter(c=>c[0]==='query'&&c[1]==='profiles'&&c[2].some(f=>f[0]==='is_sales_rep')).length,1, 'Changing reps must not refetch the selector');
+    await page.getByRole('button',{name:/^Stale Proposals/}).first().click();await page.getByRole('button',{name:/P-OTHER/}).waitFor();assert.equal(await page.getByRole('button',{name:/P-OLD/}).count(),0);
+    await page.getByLabel('Search sales records').fill('missing');await page.getByText('No matching records.',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Back to dashboard'}).click();
+    await page.evaluate(()=>window.failSales=true);await page.getByRole('button',{name:'Refresh',exact:true}).click();await page.getByText('Failed to load dashboard',{exact:true}).waitFor();
   }
+  await page.goto('http://127.0.0.1:'+server.address().port+'/?role=sales_rep');
+  await page.getByRole('heading',{name:'My Results & Activity'}).waitFor();
+  assert.equal(await page.locator('option[value="rep2"]').count(),0);
+  await page.getByRole('button',{name:/^Stale Proposals/}).first().click();
+  await page.getByRole('button',{name:/P-OLD/}).waitFor();
+  assert.equal(await page.getByRole('button',{name:/P-OTHER/}).count(),0);
+  await page.goto('http://127.0.0.1:'+server.address().port+'/?role=admin&nonrep=1');
+  await page.getByRole('heading',{name:'Sales Results & Activity'}).waitFor();
+  const repFilter = page.locator('select').filter({has:page.locator('option[value="rep2"]')});
+  assert.equal(await repFilter.inputValue(),'');
+  await page.locator('p').filter({hasText:/^All sales$/}).waitFor();
+  assert.match(await page.getByRole('button',{name:/^Close Rate/}).innerText(),/83.3%/);
+  assert.equal((await page.evaluate(()=>window.calls)).some(c=>c[0]==='rpc'&&c[1]==='get_my_sales_dashboard'),false);
+  await page.getByRole('button',{name:/^Stale Proposals/}).first().click();
+  await page.getByRole('button',{name:/P-OLD/}).waitFor();
+  await page.getByRole('button',{name:/P-OTHER/}).waitFor();
+  await page.getByRole('button',{name:'Back to dashboard'}).click();
+  await repFilter.selectOption('rep2');
+  await page.getByText('Viewing: Second Rep',{exact:true}).waitFor();
+  await repFilter.selectOption('');
+  await page.getByRole('heading',{name:'Sales Results & Activity'}).waitFor();
   for(const role of ['sales','tech','finance']) {
-   await page.goto(url+'?role='+role);
-   await page.getByText('You do not have access to the Sales Dashboard.',{exact:true}).waitFor();
-   assert.equal(await page.evaluate(()=>window.rpcCalls.length),0);
+    await page.goto('http://127.0.0.1:'+server.address().port+'/?role='+role+'&nonrep=1');
+    await page.getByText('You do not have access to the Sales Dashboard.',{exact:true}).waitFor();
+    assert.equal((await page.evaluate(()=>window.calls)).length,0);
   }
-  await page.goto(url+'?role=manager');
-  if(teamEnabled){
-   await page.getByRole('heading',{name:'Salespeople (2)',exact:true}).waitFor();
-   assert.ok((await page.locator('body').innerText()).includes('83.3%'));
-   await page.getByRole('button',{name:/Aaron Example/}).click();await page.getByText('Viewing: Aaron Example',{exact:true}).waitFor();
-   await page.getByRole('button',{name:'All sales reps',exact:true}).click();await page.getByRole('heading',{name:'Salespeople (2)',exact:true}).waitFor();
-  } else {
-   await page.getByText(/Select a salesperson to view/).waitFor();
-   assert.equal(await page.evaluate(()=>window.rpcCalls.some(c=>c.name==='get_my_sales_dashboard')),false);
-   await page.getByRole('combobox').selectOption('alphabetical');await page.getByText('Viewing: Aaron Example',{exact:true}).waitFor();
-   await page.getByRole('combobox').selectOption('');await page.getByText(/Select a salesperson to view/).waitFor();
-   assert.equal(await page.getByText('Viewing: Aaron Example',{exact:true}).count(),0);
-  }
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  console.log('PASS '+width+'px: rep defaults, management selection/reset, responsive controls, all bookmarks reachable'+(teamEnabled?', team return and weighted totals':''));
- }
- if(teamEnabled){
-  await page.goto(url+'?role=manager&empty=true');await page.getByText('No active sales reps found.').waitFor();
-  assert.equal(await page.evaluate(()=>window.rpcCalls.some(c=>c.name==='get_sales_team_dashboard')),false);
-  await page.goto(url+'?role=manager&partial=true');await page.getByRole('alert').waitFor();assert.equal(await page.getByText(/^Booked sales/).count(),0);
- }
- assert.deepEqual(errors,[]);
-} finally {await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}
+  assert.deepEqual(errors,[]);
+  await page.screenshot({path:'/tmp/sales-dashboard.png',fullPage:true});
+  console.log('PASS: phone/desktop counts, lists, direct proposal/contact/connection access, preserved tabs, periods, rep switching, search, and query-error visibility.');
+} finally { await browser?.close();server.close();await rm(directory,{recursive:true,force:true}); }

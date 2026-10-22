@@ -170,11 +170,12 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
         productName: p.name || p.manufacturer_model_number || '',
         modelNumber: p.manufacturer_model_number || null,
         sku: p.sku || null,
-
+        upc: p.upc || null,
         category: taxonomy.categoryName || null,
         subcategory: taxonomy.subcategoryName || null,
         inventoryType: p.inventory_type || null,
         itemColor: p.item_color || null,
+        itemSize: p.item_size || null,
         manufacturerName: p.manufacturers?.name || null,
         vendorName: taxonomy.vendorName || null,
         imageUrl: p.image_url || p.thumbnail_url || null,

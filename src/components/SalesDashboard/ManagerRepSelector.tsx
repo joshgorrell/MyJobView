@@ -6,8 +6,6 @@ interface ManagerRepSelectorProps {
   selectedRepId: string | null;
   onSelectRep: (repId: string | null) => void;
   orgId: string;
-  currentUserId?: string;
-  currentUserIsSalesRep?: boolean;
 }
 
 interface RepOption {
@@ -15,7 +13,7 @@ interface RepOption {
   name: string;
 }
 
-export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId, currentUserId, currentUserIsSalesRep = false }: ManagerRepSelectorProps) {
+export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId }: ManagerRepSelectorProps) {
   const [reps, setReps] = useState<RepOption[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,11 +72,11 @@ export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId, currentU
       <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
       <select
         aria-label="Salesperson"
-        value={selectedRepId ?? (currentUserIsSalesRep ? currentUserId ?? '' : '')}
+        value={selectedRepId || ''}
         onChange={(e) => onSelectRep(e.target.value || null)}
         className="min-w-0 max-w-[190px] sm:max-w-none px-2 sm:px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
       >
-        {!currentUserIsSalesRep && <option value="">Select sales rep</option>}
+        <option value="">All sales</option>
         {reps.map((rep) => (
           <option key={rep.id} value={rep.id}>
             {rep.name}

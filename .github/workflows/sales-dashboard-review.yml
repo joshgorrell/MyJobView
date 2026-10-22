@@ -4,7 +4,9 @@ on:
     branches: [main]
     paths:
       - 'src/components/SalesDashboard/**'
-      - 'src/hooks/useSalesDashboard.ts'
+      - 'src/hooks/useSalesDashboard*.ts'
+      - 'src/lib/salesDashboard*.ts'
+      - 'src/lib/companySalesDashboard.ts'
       - 'src/lib/permissionCatalog.ts'
       - 'src/components/Layout/QuickAccessNavigation.tsx'
       - 'tests/sales-dashboard/**'
@@ -12,7 +14,7 @@ on:
 permissions:
   contents: read
 jobs:
-  dashboard:
+  sales-dashboard-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,8 +27,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run build
+      - run: node tests/sales-dashboard/records.mjs
+      - run: node tests/sales-dashboard/pagination.mjs
+      - run: node tests/sales-dashboard/rep-default.mjs
+      - run: node tests/sales-dashboard/company.mjs
+      - run: node tests/sales-dashboard/company-queries.mjs
       - run: node tests/sales-dashboard/runtime.mjs
+      - run: npm run build
       - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --with-deps chromium
       - run: node tests/sales-dashboard/browser.mjs

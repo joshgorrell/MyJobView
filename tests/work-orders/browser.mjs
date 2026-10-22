@@ -115,7 +115,9 @@ try {
       await page.goto(`http://127.0.0.1:5187?theme=${theme}`);
       const dialog = page.getByRole("dialog");
       await dialog.waitFor();
-      await page.getByText("Customer", { exact: true }).first().waitFor();
+      // Wait for the selected customer's name in the form, rather than the
+      // first generic Customer match anywhere on the page.
+      await dialog.locator('p').filter({ hasText: /^Customer$/ }).waitFor();
       const type = page
         .locator("select")
         .filter({ has: page.locator('option[value="type-service"]') })
@@ -139,7 +141,7 @@ try {
       const fieldCount = await dialog.locator("input,select,textarea").count();
       await page.goto(`http://127.0.0.1:5187?service&theme=${theme}`);
       await page.getByRole("dialog").waitFor();
-      await page.getByText("Customer", { exact: true }).first().waitFor();
+      await page.getByRole('dialog').locator('p').filter({ hasText: /^Customer$/ }).waitFor();
       assert.ok(
         (await page.locator('select option[value="type-project"]').count()) > 0,
         "Service origin can select project type",
