@@ -8,6 +8,7 @@ SELECT c.id AS contact_id,
        c.contact_type,
        c.assigned_to AS assigned_rep_id,
        c.office_id,
+       CASE WHEN c.organization_id IS NULL THEN 'missing_organization' ELSE NULL END AS organization_issue,
        CASE
          WHEN c.assigned_to IS NULL THEN 'missing_rep'
          WHEN p.id IS NULL THEN 'rep_not_found'
@@ -24,7 +25,7 @@ FROM public.contacts c
 LEFT JOIN public.profiles p ON p.id = c.assigned_to
 LEFT JOIN public.company_offices o ON o.id = c.office_id
 WHERE c.contact_type IN ('person', 'business')
-  AND (c.assigned_to IS NULL OR c.office_id IS NULL
+  AND (c.organization_id IS NULL OR c.assigned_to IS NULL OR c.office_id IS NULL
        OR p.organization_id IS DISTINCT FROM c.organization_id
        OR o.organization_id IS DISTINCT FROM c.organization_id);
 
@@ -32,7 +33,7 @@ WHERE c.contact_type IN ('person', 'business')
 REVOKE ALL ON public.customer_assignment_audit FROM PUBLIC, anon, authenticated;
 -- The view uses invoker security; only privileged database operators should query it.
 -- Run as database administrator:
--- SELECT rep_issue, office_issue, count(*) FROM public.customer_assignment_audit
--- GROUP BY rep_issue, office_issue ORDER BY count(*) DESC;
+-- SELECT organization_issue, rep_issue, office_issue, count(*) FROM public.customer_assignment_audit
+-- GROUP BY organization_issue, rep_issue, office_issue ORDER BY count(*) DESC;
 -- Once the view returns zero rows:
 -- ALTER TABLE public.contacts VALIDATE CONSTRAINT contacts_customer_rep_office_required;
