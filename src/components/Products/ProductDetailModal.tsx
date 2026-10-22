@@ -40,6 +40,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
   const [previewUrl, setPreviewUrl] = useState('');
   const [photoError, setPhotoError] = useState('');
   const [savingPhoto, setSavingPhoto] = useState(false);
+  const [accessoryCount, setAccessoryCount] = useState(0);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -169,12 +170,11 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
         productName: p.name || p.manufacturer_model_number || '',
         modelNumber: p.manufacturer_model_number || null,
         sku: p.sku || null,
-        upc: p.upc || null,
+
         category: taxonomy.categoryName || null,
         subcategory: taxonomy.subcategoryName || null,
         inventoryType: p.inventory_type || null,
         itemColor: p.item_color || null,
-        itemSize: p.item_size || null,
         manufacturerName: p.manufacturers?.name || null,
         vendorName: taxonomy.vendorName || null,
         imageUrl: p.image_url || p.thumbnail_url || null,
@@ -207,6 +207,11 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
     }
   }
 
+  useEffect(() => {
+    if (!productId) return;
+    supabase.from('product_accessories').select('id', { count: 'exact', head: true }).eq('parent_product_id', productId).then(({ count }) => setAccessoryCount(count ?? 0));
+  }, [productId]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -222,7 +227,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-6xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92dvh] min-h-0">
+      <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-[70vh] sm:min-h-[480px] sm:max-h-[90dvh] min-h-0">
         {/* Header */}
         <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
@@ -236,7 +241,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
           </div>
           <div className="contents">
             <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
-              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: 'Accessories', history: 'History' })[tab]}</button>)}
+              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
@@ -245,15 +250,18 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-gray-50/50">
+        <div className="flex-1 min-h-0 overflow-y-auto sm:overflow-hidden p-4 sm:p-6 bg-gray-50/50">
           {activeTab === 'overview' ? (
             <>
               <CatalogProductOverview data={panelData} />
               <div className="mt-3"><ProductAccessories productId={productId} readOnly summaryOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} /></div>
-              {canEdit && <button type="button" onClick={() => setPhotoOpen(true)} className="mt-2 text-xs text-blue-700">Change photo</button>}
               {photoOpen && canEdit && (
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3" onPaste={e => {
                   const file = Array.from(e.clipboardData.files).find(item => item.type.startsWith('image/'));
+                  if (!file) {
+                    const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
+                    if (item) { e.preventDefault(); const f = item.getAsFile(); if (f) selectFile(f); return; }
+                  }
                   if (file) { e.preventDefault(); selectFile(file); }
                 }}>
                   <div className="flex items-center justify-between gap-3">
@@ -282,7 +290,10 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
                     <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) selectFile(file); e.target.value = ''; }} />
                   </div>
                   <input type="url" aria-label="Image URL" value={photoUrl} onChange={e => { setPhotoUrl(e.target.value); setPhotoFile(null); }} placeholder="Paste image address here" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" />
-                  <p className="text-xs text-gray-500">Image search opens a new tab. Copy the image address and paste it here, or paste an image directly into this box.</p>
+                  <div tabIndex={0} role="textbox" aria-label="Paste image here" className="w-full rounded-lg border-2 border-dashed border-blue-300 bg-white px-3 py-4 text-center text-xs text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-text outline-none">
+                    Click here, then paste (Ctrl+V) an image
+                  </div>
+                  <p className="text-xs text-gray-500">Image search opens a new tab. Copy the image address and paste it above, or paste an image directly into the box.</p>
                   {(previewUrl || photoUrl) && <img src={previewUrl || photoUrl} alt="Selected photo preview" className="h-28 max-w-full rounded-lg border border-gray-200 bg-white object-contain" onError={() => setPhotoError('This image could not be previewed. Check the address or choose another image.')} />}
                   {photoError && <p role="alert" className="text-xs text-red-700">{photoError}</p>}
                   <div className="flex justify-end gap-2"><button type="button" onClick={() => setPhotoOpen(false)} className="px-3 py-2 text-xs text-gray-600">Cancel</button>
