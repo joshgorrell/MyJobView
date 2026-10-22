@@ -382,9 +382,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }).catch(() => {});
         }, 0);
 
-        // Update activity every 5 minutes
+        // A visible, unattended tab is not evidence of work. Only send a
+        // heartbeat when the user interacted recently while the tab was visible.
+        // Do not collect keys, pointer coordinates, or interaction content.
+        let lastInteractionAt = 0;
+        const noteInteraction = () => {
+          if (document.visibilityState === 'visible') lastInteractionAt = Date.now();
+        };
+        const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
+        interactionEvents.forEach(event => document.addEventListener(event, noteInteraction, { passive: true }));
+        (window as any).__sessionInteractionCleanup = () => {
+          interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
+        };
+
         const activityInterval = setInterval(async () => {
-          if (document.visibilityState === 'visible') {
+          if (document.visibilityState === 'visible' && Date.now() - lastInteractionAt <= 5 * 60 * 1000) {
             try {
               await supabase.rpc('update_session_activity', {
                 p_user_id: userId,
@@ -422,6 +434,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function cleanupSessionTracking() {
+    if ((window as any).__sessionInteractionCleanup) {
+      (window as any).__sessionInteractionCleanup();
+      delete (window as any).__sessionInteractionCleanup;
+    }
     // Clear intervals and event listeners
     if ((window as any).__activityInterval) {
       clearInterval((window as any).__activityInterval);
