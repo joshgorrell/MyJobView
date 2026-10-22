@@ -12,7 +12,9 @@ const params=new URLSearchParams(location.search);
 const role=params.get('role')||'admin';
 const profile={id:'self',organization_id:'org',role,is_sales_rep:params.get('rep')==='true'};
 export const useAuth=()=>({profile});
-window.rpcCalls=[];
+window.rpcCalls=[];window.navActions=[];
+export const useDepartments=()=>({starredModules:Array.from({length:8},(_,i)=>({id:String(i),module_key:i===0?'sales_dashboard':'favorite_'+i,display_name:'Favorite '+i,icon:'Star'})),loading:false,hasModuleAccess:()=>true});
+export const useTaskCount=()=>2;export const useFishbowlCount=()=>3;
 const reps=[{id:'alphabetical',first_name:'Aaron',last_name:'Example'},{id:'self',first_name:'Zach',last_name:'Self'}];
 const dashboard=id=>({repId:id,repDisplayName:id==='self'?'Zach Self':'Aaron Example',monthlyTrend:[],bookedSales:{total:id==='self'?200:100,count:1,prevTotal:0,avgSale:100},pipeline:{total:50,count:1},closeRate:{wonCount:id==='self'?1:9,lostCount:1},quota:{}});
 export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:table==='profiles'?(params.has('empty')?[]:reps):[],error:null,count:0}).then(a,b);return()=>q;}});return q;},async rpc(name,args){window.rpcCalls.push({name,args});if(name==='get_sales_goal_leaderboard')return{data:{entries:[]},error:null};if(name==='get_sales_team_dashboard')return{data:{reps:params.has('partial')?[dashboard('self')]:args.p_rep_ids.map(dashboard)},error:null};await new Promise(r=>setTimeout(r,25));return{data:dashboard(args?.p_target_rep_id||'self'),error:null};}};
@@ -21,8 +23,8 @@ const stubNames=['AnnualGoalHero','SalesKpiGrid','SalesTrendChart','SalesGoalLea
 let browser;
 const server=createServer(async(req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,file)));});
 try {
- await build({stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import {SalesDashboardPage} from './src/components/SalesDashboard/SalesDashboardPage';createRoot(document.getElementById('root')).render(<SalesDashboardPage/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){
- b.onResolve({filter:/\/supabase$|\/AuthContext$/},()=>({path:'fixture',namespace:'fixture'}));
+ await build({stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import {SalesDashboardPage} from './src/components/SalesDashboard/SalesDashboardPage';import {QuickAccessNavigation} from './src/components/Layout/QuickAccessNavigation';createRoot(document.getElementById('root')).render(<div><div className="p-3"><QuickAccessNavigation activeModule="sales_dashboard" onModuleChange={key=>window.navActions.push(key)}/></div><SalesDashboardPage/></div>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){
+ b.onResolve({filter:/\/supabase$|\/AuthContext$|\/DepartmentContext$|\/useTaskCount$|\/useFishbowlCount$/},()=>({path:'fixture',namespace:'fixture'}));
  b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js'}));
  b.onResolve({filter:/salesDashboardCalculations$/},()=>({path:'calculations',namespace:'calculations'}));
  b.onLoad({filter:/.*/,namespace:'calculations'},()=>({contents:'export const computeGoalProgress=()=>({});export const computeAttentionItems=()=>[];',loader:'js'}));
@@ -51,6 +53,10 @@ try {
     else await page.getByRole('combobox',{name:'Salesperson'}).selectOption('self');
     await page.locator('p').filter({hasText:/^Zach Self$/}).waitFor();
    }
+   const favorites=page.getByRole('navigation',{name:'Bookmarked pages'});
+   assert.equal(await favorites.getByRole('button').count(),8);
+   await favorites.getByRole('button',{name:'Favorite 7',exact:true}).click();
+   assert.equal(await page.evaluate(()=>window.navActions.at(-1)),'favorite_7');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,role+' '+width+' overflow');
   }
   for(const role of ['sales','tech','finance']) {
@@ -72,7 +78,7 @@ try {
    assert.equal(await page.getByText('Viewing: Aaron Example',{exact:true}).count(),0);
   }
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  console.log('PASS '+width+'px: rep defaults, management selection/reset, responsive controls'+(teamEnabled?', team return and weighted totals':''));
+  console.log('PASS '+width+'px: rep defaults, management selection/reset, responsive controls, all bookmarks reachable'+(teamEnabled?', team return and weighted totals':''));
  }
  if(teamEnabled){
   await page.goto(url+'?role=manager&empty=true');await page.getByText('No active sales reps found.').waitFor();
