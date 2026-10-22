@@ -2,6 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { MapPin, Plus, Edit2, Trash2, Save, X, Home, Building2, Wifi, Coffee, Shield, Smartphone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -17,6 +18,7 @@ interface IPNickname {
   session_count: number;
   total_time_seconds: number;
   is_trusted: boolean;
+  organization_id: string;
 }
 
 const PRESET_NICKNAMES = [
@@ -39,6 +41,7 @@ const ICON_MAP: { [key: string]: any } = {
 };
 
 export function IPNicknameManager() {
+  const { profile } = useAuth();
   const [ipNicknames, setIpNicknames] = useState<IPNickname[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,13 +58,15 @@ export function IPNicknameManager() {
 
   useEffect(() => {
     loadIPNicknames();
-  }, []);
+  }, [profile?.organization_id]);
 
   async function loadIPNicknames() {
     try {
+      if (!profile?.organization_id) return;
       const { data, error } = await supabase
         .from('ip_nicknames')
         .select('*')
+        .eq('organization_id', profile.organization_id)
         .order('last_seen', { ascending: false });
 
       if (error) throw error;
@@ -75,6 +80,7 @@ export function IPNicknameManager() {
 
   async function handleSave() {
     try {
+      if (!profile?.organization_id) throw new Error('Organization unavailable');
       if (editingId) {
         const { error } = await supabase
           .from('ip_nicknames')
@@ -85,13 +91,15 @@ export function IPNicknameManager() {
             icon: formData.icon,
             is_trusted: formData.is_trusted,
           })
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .eq('organization_id', profile.organization_id);
 
         if (error) throw error;
       } else if (addingNew) {
         const { error } = await supabase
           .from('ip_nicknames')
           .insert({
+            organization_id: profile.organization_id,
             ip_address: formData.ip_address,
             nickname: formData.nickname,
             description: formData.description,
@@ -115,10 +123,12 @@ export function IPNicknameManager() {
 
   async function handleDelete(id: string) {
     try {
+      if (!profile?.organization_id) throw new Error('Organization unavailable');
       const { error } = await supabase
         .from('ip_nicknames')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', profile.organization_id);
 
       if (error) throw error;
       loadIPNicknames();
