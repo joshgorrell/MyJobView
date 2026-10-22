@@ -219,6 +219,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [comment, setComment] = useState('');
   const [declineReason, setDeclineReason] = useState('');
   const [declineNotes, setDeclineNotes] = useState('');
+  const [declinePromiseAcknowledged, setDeclinePromiseAcknowledged] = useState(false);
   const [activeDecisionForm, setActiveDecisionForm] = useState<'changes' | 'decline' | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
@@ -591,6 +592,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   async function handleDecline() {
     if (previewMode) return;
     if (!proposal) return;
+    if (!declinePromiseAcknowledged) {
+      notify('Please review Our Promise before declining.', { theme: 'blue', tone: 'warning' });
+      return;
+    }
     if (!declineReason) {
       notify('Please select a reason for declining this proposal.', { theme: 'blue', tone: 'warning' });
       return;
@@ -1263,7 +1268,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="decline_clicked"
-                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                       aria-expanded={activeDecisionForm === 'decline'}
                       aria-controls="proposal-decline-form"
                       disabled={previewMode}
@@ -1338,7 +1343,16 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   <XCircle className="w-4 h-4" />
                   Decline This Proposal
                 </h3>
-                <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>
+                {!declinePromiseAcknowledged && (
+                  <div data-engagement-section="promise" className="rounded-xl border border-blue-200 bg-blue-50 p-4 mb-4 space-y-3">
+                    <p className="text-sm font-bold text-blue-950">Before you decide — Our Promise</p>
+                    <p className="text-sm text-blue-900">We want your project to be exactly right. Changes are easy, and we are happy to adjust the design, equipment, or scope to fit your needs. We also stand behind our best-price policy. Please give us a chance to make this perfect for you.</p>
+                    <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
+                    <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => setDeclinePromiseAcknowledged(true)} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
+                  </div>
+                )}
+                {declinePromiseAcknowledged && <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>}
+                {declinePromiseAcknowledged && <>
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></label>
                   <select
@@ -1377,12 +1391,13 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   </button>
                   <button
                     onClick={handleDecline}
-                    disabled={previewMode || submitting || !declineReason || declineReason === 'open'}
+                    disabled={previewMode || submitting || !declinePromiseAcknowledged || !declineReason || declineReason === 'open'}
                     className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50 font-bold text-sm transition-colors"
                   >
                     {submitting ? 'Submitting...' : 'Confirm Decline'}
                   </button>
                 </div>
+                </>}
               </div>
             )}
 
