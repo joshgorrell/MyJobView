@@ -19,6 +19,7 @@ import { RecentActivityCard } from './RecentActivityCard';
 import { RefreshCw, AlertCircle, LayoutDashboard, FileText, Activity, BarChart3, Sunrise } from 'lucide-react';
 import { DailyRecap } from './DailyRecap';
 import { DailySalesTotalsPanel } from './DailySalesTotalsPanel';
+import { SalesTeamOverview } from './SalesTeamOverview';
 
 export interface SalesRepAIContext {
   repId: string;
@@ -56,12 +57,14 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('daily_recap');
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
+  const [teamView, setTeamView] = useState(false);
 
   const isManager = profile?.role
     ? ['admin', 'manager', 'sales_manager'].includes(profile.role)
     : false;
 
-  const effectiveRepId = isManager
+  const showTeamView = isManager && (teamView || (!profile?.is_sales_rep && !selectedRepId));
+  const effectiveRepId = showTeamView ? null : isManager
     ? (selectedRepId || profile?.id || null)
     : (profile?.id || null);
 
@@ -75,7 +78,11 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
 
   useEffect(() => {
-    if (!onRepContextChange || !data) return;
+    if (!onRepContextChange) return;
+    if (!data) {
+      onRepContextChange(null);
+      return;
+    }
 
     const goal = computeGoalProgress(data);
     const currentMonth = data.monthlyTrend[0]?.total ?? 0;
@@ -124,6 +131,18 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     if (onNavigateToTab) onNavigateToTab('sales_activity');
   }, [onNavigateToTab]);
 
+  if (showTeamView && profile?.organization_id) {
+    return (
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-lg font-semibold text-white">Sales Dashboard</h1>
+          {profile.is_sales_rep && <button type="button" onClick={() => { setSelectedRepId(null); setTeamView(false); }} className="rounded-lg border border-gray-600 px-3 py-2 text-sm text-white">My dashboard</button>}
+        </div>
+        <SalesTeamOverview orgId={profile.organization_id} onSelectRep={(id) => { setSelectedRepId(id); setTeamView(false); }} />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
@@ -171,7 +190,8 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {isManager && profile?.organization_id && <button type="button" onClick={() => setTeamView(true)} className="rounded-lg border border-gray-600 px-3 py-2 text-xs sm:text-sm text-white hover:bg-gray-700">All sales reps</button>}
           {isManager && profile?.organization_id && (
             <ManagerRepSelector
               selectedRepId={selectedRepId}
