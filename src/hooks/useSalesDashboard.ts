@@ -49,6 +49,8 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
 
     async function load() {
       if (!repId) {
+        setData(null);
+        setError(null);
         setLoading(false);
         return;
       }
@@ -90,7 +92,12 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
     };
   }, [repId, isManagerView, refreshKey]);
 
-  return { data, loading, error, refresh };
+  return {
+    data: repId && data?.repId === repId ? data : null,
+    loading: repId ? loading || (!!data && data.repId !== repId) : false,
+    error: repId ? error : null,
+    refresh,
+  };
 }
 
 export function useSalesLeaderboard(enabled = true): {
@@ -110,7 +117,12 @@ export function useSalesLeaderboard(enabled = true): {
     let cancelled = false;
 
     async function load() {
-      if (!enabled) return;
+      if (!enabled) {
+        setData(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
 
@@ -144,7 +156,7 @@ export function useSalesLeaderboard(enabled = true): {
     };
   }, [refreshKey, enabled]);
 
-  return { data, loading, error, refresh };
+  return { data: enabled ? data : null, loading: enabled && loading, error: enabled ? error : null, refresh };
 }
 
 export { REASON_LABELS };

@@ -9,7 +9,7 @@ export function ManualJobTimeRequests() {
   const [busy,setBusy] = useState<string|null>(null);
   async function load() {
     const {data,error} = await supabase.from('manual_job_time_requests')
-      .select('*,employee:profiles!technician_id(full_name),project:projects(name,project_number)')
+      .select('*,employee:profiles!technician_id(full_name),project:projects(name,project_number),customer:contacts(full_name),work_order:work_orders(work_order_number,title,type)')
       .eq('status','pending').order('created_at');
     if(error) setError(error.message); else setRequests(data || []);
   }
@@ -37,7 +37,7 @@ export function ManualJobTimeRequests() {
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {!requests.length && !error && <p className="text-sm text-secondary">No requests awaiting review.</p>}
     {requests.map(r=><div key={r.id} className="rounded-lg border border-subtle p-3 space-y-2">
-      <p className="text-sm font-semibold text-primary">{r.employee?.full_name} · {r.project?.project_number} · {r.project?.name}</p>
+      <p className="text-sm font-semibold text-primary">{r.employee?.full_name} · {r.customer?.full_name} · {r.work_order ? (r.work_order.type === 'project' ? 'Project Work Order' : 'Service') : r.project_id ? 'Project' : 'Customer Activity'} · {r.work_order?.work_order_number || r.project?.project_number} · {r.work_order?.title || r.project?.name || r.activity_type?.replace(/_/g,' ')}</p>
       <p className="text-sm text-secondary">{r.entry_date} · {formatTimeInTimezone(r.clock_in,timezone)}–{formatTimeInTimezone(r.clock_out,timezone)} · {((Date.parse(r.clock_out)-Date.parse(r.clock_in))/3600000-r.break_minutes/60).toFixed(2)} hours</p>
       <p className="text-sm text-primary">{r.reason}</p>
       {editing && editing.id===r.id ? <form className="space-y-3" onSubmit={e=>{e.preventDefault();void review(r.id,'approve');}}>

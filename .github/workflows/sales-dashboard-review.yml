@@ -1,4 +1,4 @@
-name: Sales dashboard review
+name: Sales Dashboard review
 on:
   pull_request:
     branches: [main]
@@ -6,6 +6,9 @@ on:
       - 'src/components/SalesDashboard/**'
       - 'src/hooks/useSalesDashboard*.ts'
       - 'src/lib/salesDashboard*.ts'
+      - 'src/lib/companySalesDashboard.ts'
+      - 'src/lib/permissionCatalog.ts'
+      - 'src/components/Layout/QuickAccessNavigation.tsx'
       - 'tests/sales-dashboard/**'
       - '.github/workflows/sales-dashboard-review.yml'
 permissions:
@@ -13,7 +16,7 @@ permissions:
 jobs:
   sales-dashboard-regressions:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -29,6 +32,8 @@ jobs:
       - run: node tests/sales-dashboard/rep-default.mjs
       - run: node tests/sales-dashboard/company.mjs
       - run: node tests/sales-dashboard/company-queries.mjs
+      - run: node tests/sales-dashboard/runtime.mjs
       - run: npm run build
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --with-deps chromium
       - run: node tests/sales-dashboard/browser.mjs

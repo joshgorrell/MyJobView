@@ -74,6 +74,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
   const { repId: effectiveRepId, canSelectRep: isManager, allSales } = salesDashboardScope(profile, selectedRepId);
   const isManagerView = isManager && effectiveRepId !== null && effectiveRepId !== profile?.id;
+  const canViewDashboard = isManager || profile?.is_sales_rep === true;
 
   const { data: repData, loading: repLoading, error: repError, refresh: refreshBase } = useSalesDashboard({
     repId: effectiveRepId,
@@ -120,7 +121,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
     if (record.kind === 'proposal' && onProposalClick) { onProposalClick(record.id); return; }
     onOpenRecord?.({ ...record, id: record.recordId || record.id });
   }, [onOpenRecord, onProposalClick]);
-  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard(activeTab === 'overview');
+  const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard(canViewDashboard && activeTab === 'overview');
 
   useEffect(() => {
     if (!onRepContextChange) return;
@@ -171,7 +172,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             {loading ? 'Loading sales data…' : isManagerView ? `Viewing: ${data?.repDisplayName}` : data?.repDisplayName}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isManager && profile?.organization_id && (
             <ManagerRepSelector
               selectedRepId={effectiveRepId}
@@ -190,6 +191,10 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
         </div>
       </div>
   );
+
+  if (!canViewDashboard) {
+    return <p className="px-4 py-6 text-sm text-gray-300">You do not have access to the Sales Dashboard.</p>;
+  }
 
   if (loading || records.loading) {
     return (

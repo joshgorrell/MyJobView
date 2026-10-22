@@ -6,4 +6,5 @@ const rows=Array.from({length:1201},(_,id)=>({id}));const pages=[];
 assert.equal((await readAllSalesRows(()=>({order(){return this},range(a,b){pages.push([a,b]);return Promise.resolve({data:rows.slice(a,b+1),error:null})}}))).length,1201);
 assert.deepEqual(pages,[[0,499],[500,999],[1000,1499]]);
 await assert.rejects(readAllSalesRows(()=>({order(){return this},range(){return Promise.resolve({data:null,error:new Error('Denied')})}})),/Denied/);
+await assert.rejects(readAllSalesRows(()=>({order(){return this},range(){return Promise.resolve({data:null,error:null})}})),/Incomplete sales data/);
 console.log('PASS: full pagination beyond the API row cap; failed queries do not become zero counts.');

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 const built = await build({ entryPoints: ['src/lib/salesDashboardRecords.ts'], bundle: true, format: 'esm', write: false });
 const { buildSalesLists, isStaleProposal, recordCount, recordTotal } = await import('data:text/javascript;base64,' + Buffer.from(built.outputFiles[0].text).toString('base64'));
-const now = new Date('2026-10-21T12:00:00');
+const now = new Date('2026-10-21T12:00:00Z');
 const quota = { quotaStartDate: '2026-01-01', quotaEndDate: '2026-12-31' };
 const proposal = (id, status, extra = {}) => ({ id, status, created_at: '2026-09-01T12:00:00Z', total: 100, ...extra });
 const source = { proposals: [

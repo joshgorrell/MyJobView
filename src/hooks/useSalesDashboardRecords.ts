@@ -9,7 +9,8 @@ export async function readAllSalesRows(query: () => any): Promise<any[]> {
   for (let offset = 0; ; offset += 500) {
     const result = await query().order('id').range(offset, offset + 499);
     if (result.error) throw result.error;
-    const page = result.data || [];
+    if (!Array.isArray(result.data)) throw new Error('Incomplete sales data returned. Please refresh.');
+    const page = result.data;
     rows.push(...page);
     if (page.length < 500) return rows;
   }
@@ -34,6 +35,10 @@ export function useSalesDashboardRecords(repId: string | null, organizationId: s
       readAllSalesRows(() => forRep(scoped('sales_monthly_stats', 'id,user_id,year,month,total_sales,sales_order_count'), 'user_id')),
       readAllSalesRows(() => forRep(scoped('scheduled_connection_occurrences', 'id,prospect_id,scheduled_date,contact:contacts!scheduled_connection_occurrences_prospect_id_fkey(full_name,company_name),schedule:scheduled_connections!inner(created_by_user_id,default_notes)'), 'schedule.created_by_user_id').eq('is_completed', false).eq('is_skipped', false)),
     ]).then(([timezone, proposals, leads, contacts, connections, orders, months, occurrences]) => {
+      const numericFields = ['total', 'estimated_value', 'contract_total', 'total_sales', 'sales_order_count'];
+      if ([...proposals, ...leads, ...orders, ...months].some(row => numericFields.some(key => row[key] != null && !Number.isFinite(Number(row[key]))))) {
+        throw new Error('Sales data contains an invalid amount. Please review the source records.');
+      }
       if (!cancelled) setState({ source: { proposals, leads: leads.map(l => ({ ...l, next_follow_up: l.reminder_date })), contacts: contacts.map(c => ({ ...c, createdByRep: (allSales || c.created_by === repId), assignedToRep: (allSales || c.assigned_to === repId) })), connections, orders, months, occurrences, timezone }, loading: false, error: null, scope });
     }).catch(error => { if (!cancelled) setState({ source: null, loading: false, error: error.message || 'Unable to load sales records', scope }); });
     return () => { cancelled = true; };
