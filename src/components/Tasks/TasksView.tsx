@@ -288,20 +288,29 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
           const postPoints = (task as any)._discussionPost?.points ?? pointsConfig?.task_completion_points ?? 10;
 
-          await supabase.from('points_transactions').insert([{
-            user_id: profile.id,
-            points_amount: postPoints,
-            transaction_type: 'task_completion',
-            reference_id: task.id,
-            description: `Completed task: ${task.title.substring(0, 50)}...`,
-          }]);
+          if (postPoints > 0) {
+            const { error: pointsError } = await supabase.from('points_transactions').insert([{
+              user_id: profile.id,
+              points_amount: postPoints,
+              transaction_type: 'task_completion',
+              reference_id: task.id,
+              description: `Completed task: ${task.title.substring(0, 50)}...`,
+            }]);
 
-          await supabase.from('notifications').insert([{
-            user_id: profile.id,
-            type: 'points_earned',
-            title: `+${postPoints} Points!`,
-            body: `You earned ${postPoints} points for completing a task`,
-          }]);
+            if (pointsError) {
+              // Completion has already been saved. Do not claim that points were awarded.
+              console.error('Discussion task completed, but points award failed:', pointsError);
+              notify('Assignment completed, but points could not be awarded. Please contact an administrator.', { theme: 'cyan', tone: 'error' });
+            } else {
+              const { error: notificationError } = await supabase.from('notifications').insert([{
+                user_id: profile.id,
+                type: 'points_earned',
+                title: `+${postPoints} Points!`,
+                body: `You earned ${postPoints} points for completing a task`,
+              }]);
+              if (notificationError) console.error('Failed to send points notification:', notificationError);
+            }
+          }
         }
       } else {
         // Regular tasks complete atomically in the database so only the first
