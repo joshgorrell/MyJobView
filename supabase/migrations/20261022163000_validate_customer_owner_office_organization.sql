@@ -3,7 +3,7 @@
 CREATE OR REPLACE FUNCTION public.validate_customer_owner_office()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
 DECLARE
@@ -44,3 +44,6 @@ CREATE TRIGGER validate_customer_owner_office_trigger
 --   AND (c.assigned_to IS NULL OR c.office_id IS NULL OR
 --        p.organization_id IS DISTINCT FROM c.organization_id OR
 --        o.organization_id IS DISTINCT FROM c.organization_id);
+
+-- Trigger functions should not be directly callable through the API.
+REVOKE ALL ON FUNCTION public.validate_customer_owner_office() FROM PUBLIC, anon, authenticated;
