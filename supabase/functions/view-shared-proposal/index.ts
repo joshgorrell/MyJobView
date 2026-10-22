@@ -19,6 +19,11 @@ Deno.serve(async req => {
       .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
     if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
+    // A newly published portal revision invalidates an older shared document link.
+    // The sender must explicitly issue a link for the current revision.
+    if (Number(link.portal_version) !== Number(proposal.current_portal_version ?? 1)) {
+      return json({ error: 'This proposal has been revised. Please request the latest link.' }, 410);
+    }
     // Approval and link viewing use the same stored submission expiration. Resubmission resets expires_at.
     if (!proposal.sent_at || !Number.isFinite(Date.parse(proposal.sent_at)) ||
       (!proposal.expires_at || !Number.isFinite(Date.parse(proposal.expires_at)) || Date.now() >= Date.parse(proposal.expires_at))) {
