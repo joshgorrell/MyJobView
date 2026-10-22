@@ -71,3 +71,5 @@ Before merge, require latest-head CI, apply/verify migrations and deploy the
 updated document function with JWT verification enabled. Record production
 verification separately; tests alone are not deployment evidence. Purchasing CI
 uses the same bounded headless browser setup as the already-reviewed workflows.
+
+Builder consumer audit: Model/Alias and ordering SKU have separate controls in both PDF settings views. Template apply/save preserves independent item color, installed amount and labor amount flags. Saving an existing template changes display settings without rewriting legacy company/creator/scope/default metadata; new copies bind the current organization/company. Company saves require administrators in both UI and handler. Actual builder handler regression coverage exercises these paths.
