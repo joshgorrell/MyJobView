@@ -16,6 +16,7 @@ type Project = { id: string; name: string; project_number: string | null };
 export function TestTuneProjectAdjustments() {
   const [items, setItems] = useState<Adjustment[]>([]);
   const [projects, setProjects] = useState<Record<string, Project>>({});
+  const [requestedTaskIds, setRequestedTaskIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -24,18 +25,24 @@ export function TestTuneProjectAdjustments() {
   useEffect(() => {
     let active = true;
     async function load() {
-      const [tasks, projectRows] = await Promise.all([
+      const [tasks, projectRows, requestRows] = await Promise.all([
         supabase.from('project_tasks')
           .select('id,project_id,title,status,source,visibility,customer_description,legacy_punchlist_id')
           .eq('visibility', 'customer_visible'),
         supabase.from('projects').select('id,name,project_number'),
+        supabase.from('service_requests').select('id,status,work_order_id').eq('source_type', 'punchlist'),
       ]);
       if (!active) return;
-      if (tasks.error || projectRows.error) {
-        setError((tasks.error || projectRows.error)!.message);
+      if (tasks.error || projectRows.error || requestRows.error) {
+        setError((tasks.error || projectRows.error || requestRows.error)!.message);
         return;
       }
-      setItems((tasks.data || []).filter(task => !task.legacy_punchlist_id));
+      const modern = (tasks.data || []).filter(task => !task.legacy_punchlist_id);
+      setItems(modern);
+      // The request RPC links project tasks through work-order tasks once scheduled.
+      // Until a canonical task-to-request lookup is available, do not guess request state.
+      setRequestedTaskIds(new Set());
+      void requestRows;
       setProjects(Object.fromEntries((projectRows.data || []).map(project => [project.id, project])));
       setError('');
     }
