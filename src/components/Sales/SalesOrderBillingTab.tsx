@@ -759,7 +759,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
       )}
 
       {/* ─── Summary Cards ─── */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard label="Total Invoiced" value={totalInvoiced} icon={Receipt} />
         <SummaryCard label="Total Paid" value={totalPaid} icon={CheckCircle} color="green" />
         <SummaryCard label="Outstanding" value={totalOutstanding} icon={AlertCircle} color={totalOutstanding > 0 ? 'amber' : 'green'} />
@@ -780,7 +780,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
 
       {/* ─── Billing Progress ─── */}
       {fullContractWithCOs > 0 && (
-        <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+        <div className="bg-surface rounded-lg border border-subtle p-4">
           <div className="flex items-center justify-between mb-2 text-xs text-gray-500">
             <span>Billing Progress</span>
             <span>
@@ -859,7 +859,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
         {loading ? (
           <div className="text-center py-8 text-gray-500 text-sm">Loading invoices...</div>
         ) : displayedInvoices.length === 0 && activeInvoices.length === 0 ? (
-          <div className="bg-gray-900/30 rounded-xl border border-gray-700/30 p-8 text-center">
+        <div className="bg-surface rounded-lg border border-subtle p-4">
             <Receipt className="w-10 h-10 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">No invoices created yet.</p>
             <button
@@ -891,10 +891,10 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                   key={inv.id}
                   className={`rounded-xl border transition-colors overflow-hidden ${
                     isVoided
-                      ? 'bg-gray-900/30 border-gray-700/30 opacity-50'
+                      ? 'bg-surface border-subtle opacity-50'
                       : isCreditMemo
                       ? 'bg-red-950/20 border-red-800/40 hover:border-red-600/60 cursor-pointer group'
-                      : 'bg-gray-900/50 border-gray-700/50 hover:border-gray-500 cursor-pointer group'
+                      : 'bg-surface border-subtle hover:border-strong cursor-pointer group'
                   }`}
                   onClick={() => !isVoided && setViewingInvoiceId(inv.id)}
                 >
@@ -1132,7 +1132,7 @@ function SummaryCard({ label, value, icon: Icon, color, subLabel }: {
 }) {
   const textColor = color === 'green' ? 'text-green-400' : color === 'amber' ? 'text-amber-400' : color === 'blue' ? 'text-blue-400' : 'text-white';
   return (
-    <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-3.5">
+    <div className="bg-surface rounded-lg border border-subtle p-3.5">
       <div className="flex items-center gap-1.5 mb-1.5">
         <Icon className={`w-3.5 h-3.5 ${textColor}`} />
         <span className="text-xs text-gray-500 leading-tight">{label}</span>

@@ -715,7 +715,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
               </span>
             )}
           </div>
-          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden">
+          <div className="bg-surface rounded-xl border border-subtle overflow-hidden">
             {/* Mobile card view */}
             <div className="md:hidden divide-y divide-gray-700/40">
               {laborBreakdown.map((row, i) => {
@@ -1029,7 +1029,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             <p className="text-gray-600 text-xs mt-1">Parts logged by techs on work orders will appear here for billing decisions</p>
           </div>
         ) : (
-          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden">
+          <div className="bg-surface rounded-xl border border-subtle overflow-hidden">
             {/* Mobile card view */}
             <div className="md:hidden divide-y divide-gray-700/40">
               {visibleParts.map(p => (
@@ -1218,7 +1218,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             {workOrders
               .filter(w => w.notes || w.description)
               .map(wo => (
-                <div key={wo.id} className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+                <div key={wo.id} className="bg-surface rounded-xl border border-subtle p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <StickyNote className="w-3.5 h-3.5 text-gray-600" />
                     <span className="text-xs font-mono text-gray-500">{wo.work_order_number}</span>
@@ -1251,7 +1251,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             </button>
           )}
         </div>
-        <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+        <div className="bg-surface rounded-xl border border-subtle p-4">
           {editingNotes ? (
             <div className="space-y-3">
               <textarea
@@ -1548,7 +1548,7 @@ function WorkOrderCard({ wo, soldHours: _soldHours, fieldShare, onClick }: { wo:
   return (
     <div
       onClick={onClick}
-      className={`bg-gray-900/50 rounded-xl border border-gray-700/50 p-4 transition-colors ${onClick ? 'cursor-pointer hover:border-blue-500/50 hover:bg-gray-800/40' : 'hover:border-gray-600'}`}
+      className={`bg-surface rounded-xl border border-subtle p-4 transition-colors ${onClick ? 'cursor-pointer hover:border-blue-500/50 hover:bg-gray-800/40' : 'hover:border-gray-600'}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -1733,7 +1733,7 @@ function HourStat({ icon: Icon, label, value, sub, color }: {
     : color === 'red' ? 'text-red-600'
     : 'text-gray-600';
   return (
-    <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+    <div className="bg-surface rounded-xl border border-subtle p-4">
       <div className="flex items-center gap-2 mb-2">
         <Icon className={`w-4 h-4 ${iconColor}`} />
         <span className="text-xs text-gray-500">{label}</span>
