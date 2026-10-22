@@ -1373,8 +1373,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </h3>
                 {!declinePromiseAcknowledged && (
                   <div data-engagement-section="promise" className="rounded-xl border border-blue-200 bg-blue-50 p-4 mb-4 space-y-3">
-                    <p className="text-sm font-bold text-blue-950">Before you decide — Our Promise</p>
-                    <p className="text-sm text-blue-900">We can easily tweak your proposal to get it just right. And we guarantee the best price against any competitor for the same scope of work. We won't be undersold! Before you decline, would you like us to make an adjustment?</p>
+                    <p className="text-sm font-bold text-blue-950">The Best Price. Guaranteed.</p>
+                    <p className="text-sm text-blue-900">We want your proposal to be the perfect fit. Changes are easy, and we guarantee the best price against any competitor for the same scope of work. If you've received a better quote, give us the opportunity to match or beat it. Would you like us to make an adjustment?</p>
                     <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_changes'); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
                     <button type="button" data-engagement-action="decline_to_approval_clicked" onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_approval'); handleApprove(); }} disabled={previewMode || submitting} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50">Actually, I'd Like to Approve</button>
                     {(repContact?.email || repContact?.phone) && <div className="flex flex-wrap justify-center gap-3 text-sm">
