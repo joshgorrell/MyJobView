@@ -1346,7 +1346,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 {!declinePromiseAcknowledged && (
                   <div data-engagement-section="promise" className="rounded-xl border border-blue-200 bg-blue-50 p-4 mb-4 space-y-3">
                     <p className="text-sm font-bold text-blue-950">Before you decide — Our Promise</p>
-                    <p className="text-sm text-blue-900">We can easily tweak your proposal to get it just right. And we promise our best price for the same scope of work. Before you decline, would you like us to make an adjustment?</p>
+                    <p className="text-sm text-blue-900">We can easily tweak your proposal to get it just right. And we guarantee the best price against any competitor for the same scope of work. We won't be undersold! Before you decline, would you like us to make an adjustment?</p>
                     <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
                     <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => setDeclinePromiseAcknowledged(true)} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
                   </div>
