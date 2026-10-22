@@ -218,6 +218,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState('');
   const [declineReason, setDeclineReason] = useState('');
+  const [declineNotes, setDeclineNotes] = useState('');
   const [activeDecisionForm, setActiveDecisionForm] = useState<'changes' | 'decline' | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
@@ -603,7 +604,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
         .update({
           status: 'declined',
           decline_reason: declineReason,
-          decline_notes: comment.trim() || null,
+          decline_notes: declineNotes.trim() || null,
           declined_at: new Date().toISOString(),
           declined_by: 'customer',
           updated_at: new Date().toISOString()
@@ -616,7 +617,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       const { error: activityError } = await supabase.from('proposal_activity').insert({
         proposal_id: proposalId,
         activity_type: 'declined',
-        metadata: { reason: declineReason, notes: comment.trim() || null, by: 'customer' },
+        metadata: { reason: declineReason, notes: declineNotes.trim() || null, by: 'customer' },
       });
       if (activityError) console.warn('Proposal decline activity could not be recorded', activityError);
 
@@ -1247,7 +1248,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="change_request_clicked"
-                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'changes' ? null : 'changes'); setDeclineReason(''); setComment(''); }}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'changes' ? null : 'changes'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
@@ -1258,7 +1259,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="decline_clicked"
-                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclineReason(''); setComment(''); }}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
@@ -1354,8 +1355,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 <div className="mb-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Additional comments <span className="text-gray-400">(optional)</span></label>
                   <textarea
-                    value={comment === 'open' ? '' : comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    value={declineNotes}
+                    onChange={(e) => setDeclineNotes(e.target.value)}
                     placeholder="Any additional details..."
                     rows={3}
                     className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-400 focus:border-transparent text-sm resize-none"
@@ -1363,7 +1364,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setActiveDecisionForm(null); setDeclineReason(''); setComment(''); }}
+                    onClick={() => { setActiveDecisionForm(null); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 font-medium text-sm transition-colors"
                   >
                     Cancel
