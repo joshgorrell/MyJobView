@@ -104,6 +104,18 @@ export function UserSessionsDashboard() {
     const classification = known?.icon === 'building-2' && known.is_trusted ? 'Office' : known && ['home', 'coffee', 'wifi'].includes(known.icon) ? 'Remote' : 'Unknown';
     return { name: known?.nickname || 'Unlabeled network', classification };
   }
+  function sessionCoverage(rows: Session[]): number {
+    const windows = rows.map(s => [Date.parse(s.session_start), Date.parse(s.session_end || s.last_activity)] as const)
+      .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+      .sort((a, b) => a[0] - b[0]);
+    let total = 0;
+    let latestEnd = 0;
+    for (const [start, end] of windows) {
+      total += Math.max(0, end - Math.max(start, latestEnd));
+      latestEnd = Math.max(latestEnd, end);
+    }
+    return total;
+  }
   function SessionRow({ session: s }: { session: Session }) {
     return <div className="grid gap-2 border-t border-subtle py-3 sm:grid-cols-[1fr_auto]">
       <div className="min-w-0"><p className="text-sm font-medium break-words">{nickname(s) || deviceLabel(s)}</p><p className="text-xs text-muted">{new Date(s.session_start).toLocaleString()} · Last activity {ago(s.last_activity)}</p>
