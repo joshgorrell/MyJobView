@@ -220,6 +220,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [declineReason, setDeclineReason] = useState('');
   const [declineNotes, setDeclineNotes] = useState('');
   const [declinePromiseAcknowledged, setDeclinePromiseAcknowledged] = useState(false);
+  const [repContact, setRepContact] = useState<{ name: string; email: string | null; phone: string | null } | null>(null);
   const [activeDecisionForm, setActiveDecisionForm] = useState<'changes' | 'decline' | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
@@ -344,6 +345,14 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       if (proposalRes.data) {
         setProposal(proposalRes.data);
+        setRepContact(null);
+        if (proposalRes.data.created_by) {
+          void supabase.from('profiles').select('full_name,email,phone').eq('id', proposalRes.data.created_by).maybeSingle()
+            .then(({ data, error }) => {
+              if (error) { console.warn('Sales representative contact unavailable', error); return; }
+              if (data) setRepContact({ name: data.full_name || 'Your representative', email: data.email || null, phone: data.phone || null });
+            });
+        }
         setRooms(roomsRes.data || []);
         setLineItems(itemsRes.data || []);
 
@@ -1357,6 +1366,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     <p className="text-sm text-blue-900">We can easily tweak your proposal to get it just right. And we guarantee the best price against any competitor for the same scope of work. We won't be undersold! Before you decline, would you like us to make an adjustment?</p>
                     <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_changes'); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
                     <button type="button" data-engagement-action="decline_to_approval_clicked" onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_approval'); handleApprove(); }} disabled={previewMode || submitting} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50">Actually, I'd Like to Approve</button>
+                    {(repContact?.email || repContact?.phone) && <div className="flex flex-wrap justify-center gap-3 text-sm">
+                      {repContact.phone && <a href={`tel:${repContact.phone.replace(/[^+\\d]/g, '')}`} data-engagement-action="decline_rep_call_clicked" className="font-semibold text-blue-800 underline underline-offset-2">Call {repContact.name}</a>}
+                      {repContact.email && <a href={`mailto:${repContact.email}?subject=${encodeURIComponent('Question about proposal ' + proposal.proposal_number)}`} data-engagement-action="decline_rep_email_clicked" className="font-semibold text-blue-800 underline underline-offset-2">Email {repContact.name}</a>}
+                    </div>}
                     <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => { setDeclinePromiseAcknowledged(true); recordDecisionStep('decline_acknowledged'); }} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
                   </div>
                 )}
