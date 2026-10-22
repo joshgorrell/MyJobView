@@ -666,33 +666,23 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                       </div>
                     </div>
 
-                    {/* Badge row: priority + status + source — compact, limited to 3 */}
-                    <div className="flex items-center gap-1 flex-wrap mb-1">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(request.priority)}`}>
-                        {getPriorityIcon(request.priority)}
-                        {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                    {/* Compact status strip: keep routine metadata in expanded details. */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1 text-xs">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${getStatusColor(request.status)}`}>
                         {request.status === 'needs_more_info' && <AlertTriangle className="w-3 h-3" />}
                         {getStatusLabel(request.status)}
                       </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        request.request_type === 'project'
-                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                          : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        {request.request_type === 'project' ? <Briefcase className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                        {request.request_type === 'project' ? 'Project' : 'Service'}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getSourceTypeColor(request.source_type)}`}>
-                        {getSourceTypeIcon(request.source_type)}
-                        {getSourceTypeLabel(request.source_type)}
-                      </span>
-                      {request.customer_contact_confirmed_at && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                          <PhoneCall className="w-3 h-3" />
-                          Contacted
+                      {request.priority !== 'normal' && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border ${getPriorityColor(request.priority)}`}>
+                          {getPriorityIcon(request.priority)}
+                          {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
                         </span>
+                      )}
+                      <span className="text-muted">{request.request_type === 'project' ? 'Project' : 'Service'}</span>
+                      {request.source_type === 'punchlist' && <span className="text-muted">· Test &amp; Tune</span>}
+                      {request.customer_contact_confirmed_at && <span className="text-emerald-400">· Contacted</span>}
+                      {expandedRequest === request.id && (
+                        <span className="text-muted">· {getSourceTypeLabel(request.source_type)}</span>
                       )}
                     </div>
 
