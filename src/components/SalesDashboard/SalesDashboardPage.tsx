@@ -75,7 +75,11 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const { data: leaderboardData, loading: leaderboardLoading } = useSalesLeaderboard();
 
   useEffect(() => {
-    if (!onRepContextChange || !data) return;
+    if (!onRepContextChange) return;
+    if (!data) {
+      onRepContextChange(null);
+      return;
+    }
 
     const goal = computeGoalProgress(data);
     const currentMonth = data.monthlyTrend[0]?.total ?? 0;
@@ -181,7 +185,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
             {isManagerView ? `Viewing: ${data.repDisplayName}` : data.repDisplayName}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isManager && profile?.organization_id && (
             <ManagerRepSelector
               selectedRepId={selectedRepId}

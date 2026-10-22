@@ -55,6 +55,8 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
 
     async function load() {
       if (!repId) {
+        setData(null);
+        setError(null);
         setLoading(false);
         return;
       }
@@ -320,7 +322,13 @@ export function useSalesDashboard({ repId, isManagerView }: UseSalesDashboardOpt
     };
   }, [repId, isManagerView, refreshKey]);
 
-  return { data, loading, error, refresh };
+  // Never render the previous salesperson while a selection changes.
+  return {
+    data: repId && data?.repId === repId ? data : null,
+    loading: repId ? loading || (!!data && data.repId !== repId) : false,
+    error: repId ? error : null,
+    refresh,
+  };
 }
 
 export function useSalesLeaderboard(): {
