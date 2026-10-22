@@ -11,7 +11,8 @@ DECLARE
   v_rep uuid;
   v_booked timestamptz;
 BEGIN
-  IF lower(COALESCE(NEW.status,'')) IN ('planning','pending','pending_deposit','cancelled','voided') THEN
+  IF lower(COALESCE(NEW.status,'')) NOT IN ('active','complete','closed')
+     OR (TG_OP='UPDATE' AND lower(COALESCE(OLD.status,'')) IN ('active','complete','closed')) THEN
     RETURN NEW;
   END IF;
 
@@ -24,7 +25,14 @@ BEGIN
     RAISE EXCEPTION 'Sales Order credit requires an organization';
   END IF;
 
-  v_rep := NEW.sales_rep_id;
+  -- Credit the customer portfolio owner at booking, not necessarily the
+  -- employee who created the order. Validate tenant and sales designation.
+  SELECT c.assigned_to INTO v_rep FROM public.contacts c
+    WHERE c.id=NEW.contact_id AND c.organization_id=v_org;
+  IF v_rep IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.profiles p WHERE p.id=v_rep
+      AND p.organization_id=v_org AND p.is_sales_rep=true
+  ) THEN v_rep:=NULL; END IF;
   v_booked := COALESCE(NEW.booked_at, NEW.created_at, now());
 
   -- Initial booking only. Corrections/reversals are intentionally handled by
@@ -36,7 +44,7 @@ BEGIN
   VALUES (
     v_org, v_rep, NEW.contact_id, 'sales_order',
     NEW.id, 'sales_order:booked:' || NEW.id::text, v_booked,
-    COALESCE(NEW.contract_total,0), 'sales_order_rep_at_booking'
+    COALESCE(NEW.contract_total,0), CASE WHEN v_rep IS NULL THEN 'customer_unassigned_at_booking' ELSE 'customer_owner_at_booking' END
   )
   ON CONFLICT (organization_id, source_event_key) DO NOTHING;
   RETURN NEW;
