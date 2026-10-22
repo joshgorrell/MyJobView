@@ -36,7 +36,7 @@ export function TestTuneProjectAdjustments() {
         setError((tasks.error || projectRows.error)!.message);
         return;
       }
-      setItems((tasks.data || []).filter(task => !task.legacy_punchlist_id));
+      setItems((tasks.data || []).filter(task => !task.legacy_punchlist_id && task.status === 'open' && !submittedThisSession.has(task.id)));
       setProjects(Object.fromEntries((projectRows.data || []).map(project => [project.id, project])));
       setError('');
     }
@@ -62,19 +62,21 @@ export function TestTuneProjectAdjustments() {
         p_submission_id: crypto.randomUUID(),
       });
       if (failure) throw failure;
-      setSubmittedThisSession(previous => new Set([...previous, ...selectedItems.map(item => item.id)]));
+      const submittedIds = new Set(selectedItems.map(item => item.id));
+      setSubmittedThisSession(previous => new Set([...previous, ...submittedIds]));
+      setItems(previous => previous.filter(item => !submittedIds.has(item.id)));
       setSelected([]);
-      setNotice('Adjustments submitted to the Work Order Request Queue. These items cannot be submitted again until you leave or refresh this page.');
+      setNotice('Submitted adjustments moved to Service Requests. Remaining adjustments stay here.');
     } catch (failure) {
       const message = (failure as { message?: string }).message || 'Could not submit adjustments.';
       setError(/already requested/i.test(message) ? 'One or more adjustments have already been requested. No new request was created; refresh the project to review the existing request.' : message);
     } finally { setSubmitting(false); }
   }
-  const visible = items.filter(item => {
+  const visible = items.filter(item => !submittedThisSession.has(item.id) && item.status === 'open' && (() => {
     const project = projects[item.project_id];
     return [item.title, item.customer_description, project?.name, project?.project_number]
       .some(value => value?.toLowerCase().includes(search.toLowerCase()));
-  });
+  })());
   return (
     <section className="rounded-lg border border-subtle bg-surface p-3 space-y-3" aria-label="Project Test and Tune adjustments">
       <div className="flex flex-wrap items-center justify-between gap-2">
