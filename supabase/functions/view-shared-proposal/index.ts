@@ -29,8 +29,24 @@ Deno.serve(async req => {
       (!proposal.expires_at || !Number.isFinite(Date.parse(proposal.expires_at)) || Date.now() >= Date.parse(proposal.expires_at))) {
       return json({ error: 'This proposal viewing period has expired. Please request a resubmission.' }, 410);
     }
+    // Read-only scope preview: explicitly select customer-facing fields, never internal
+    // costs, labor rates, hidden items, contact details, or staff-only notes.
+    const [roomsResult, itemsResult] = await Promise.all([
+      db.from('proposal_rooms').select('id,name,description,show_scope,sort_order')
+        .eq('proposal_id', proposal.id).order('sort_order'),
+      db.from('proposal_line_items').select('id,room_id,description,quantity,sort_order')
+        .eq('proposal_id', proposal.id).eq('is_hidden', false).order('sort_order'),
+    ]);
+    if (roomsResult.error || itemsResult.error) return json({ error: 'Unable to load proposal scope' }, 500);
+    const rooms = (roomsResult.data ?? []).map(room => ({
+      id: room.id, name: room.name,
+      description: room.show_scope ? room.description : null,
+    }));
+    const items = (itemsResult.data ?? []).map(item => ({
+      id: item.id, roomId: item.room_id, description: item.description, quantity: item.quantity,
+    }));
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
-    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at } });
+    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at }, scope: { rooms, items } });
   } catch (error) {
     console.error('Proposal share validation failed', error);
     return json({ error: 'Unable to validate link' }, 500);
