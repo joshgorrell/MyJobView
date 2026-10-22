@@ -346,10 +346,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       if (proposalRes.data) {
         setProposal(proposalRes.data);
         setRepContact(null);
-        if (proposalRes.data.created_by) {
-          void supabase.from('profiles').select('full_name,email,phone').eq('id', proposalRes.data.created_by).maybeSingle()
-            .then(({ data, error }) => {
-              if (error) { console.warn('Sales representative contact unavailable', error); return; }
+        if (proposalRes.data.contact_id) {
+          void supabase.from('contacts').select('assigned_to').eq('id', proposalRes.data.contact_id).maybeSingle()
+            .then(async ({ data: contact, error: ownerError }) => {
+              if (ownerError || !contact?.assigned_to) return;
+              const { data, error } = await supabase.from('profiles').select('full_name,email,phone').eq('id', contact.assigned_to).maybeSingle();
+              if (error) { console.warn('Assigned sales representative contact unavailable', error); return; }
               if (data) setRepContact({ name: data.full_name || 'Your representative', email: data.email || null, phone: data.phone || null });
             });
         }
@@ -667,14 +669,21 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       let threadId = existingThread?.id;
 
+      const { data: customerOwner } = proposal.contact_id
+        ? await supabase.from('contacts').select('assigned_to').eq('id', proposal.contact_id).maybeSingle()
+        : { data: null };
+      const assignedRepId = customerOwner?.assigned_to || null;
+      // Customer ownership is authoritative; do not silently route to proposal creator.
+      if (!assignedRepId) throw new Error('Customer has no assigned sales representative');
+
       // Preserve the thread's existing assigned representative. The proposal creator
       // is only a legacy fallback and must never override an existing assignment.
-      if (threadId && !existingThread?.assigned_sales_rep_id && proposal.created_by) {
+      if (threadId && existingThread?.assigned_sales_rep_id !== assignedRepId) {
         const { error: assignmentError } = await supabase
           .from('message_threads')
-          .update({ assigned_sales_rep_id: proposal.created_by })
+          .update({ assigned_sales_rep_id: assignedRepId })
           .eq('id', threadId)
-          .is('assigned_sales_rep_id', null);
+          .eq('proposal_id', proposalId);
         if (assignmentError) console.warn('Proposal thread rep assignment could not be updated', assignmentError);
       }
 
@@ -694,7 +703,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               context_id: proposalId,
               proposal_id: proposalId,
               contact_id: proposalData.contact_id,
-              assigned_sales_rep_id: proposalData.created_by,
+              assigned_sales_rep_id: assignedRepId,
               visibility: 'public',
               created_by: proposalData.contact_id,
             })
