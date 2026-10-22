@@ -29,7 +29,7 @@ BEGIN
   END LOOP;
   IF v_total>p_seconds THEN RETURN false; END IF;
   FOR v_key,v_value IN SELECT * FROM jsonb_each(p_clicks) LOOP
-    IF v_key NOT IN ('download_clicked','approval_clicked','payment_clicked','question_clicked','change_request_clicked','decline_clicked','decline_to_changes_clicked','decline_to_approval_clicked','decline_continue_clicked','video_opened','video_played')
+    IF v_key NOT IN ('download_clicked','approval_clicked','payment_clicked','question_clicked','change_request_clicked','decline_clicked','decline_to_changes_clicked','decline_to_approval_clicked','decline_rep_call_clicked','decline_rep_email_clicked','decline_continue_clicked','video_opened','video_played')
       OR jsonb_typeof(v_value)<>'number' OR v_value::text !~ '^\\d{1,5}$' THEN RETURN false; END IF;
     v_count=v_value::text::integer; IF v_count>10000 THEN RETURN false; END IF;
     v_clicks=v_clicks||jsonb_build_object(v_key,greatest(v_count,coalesce((v_row.metadata->'engagement'->'clicks'->>v_key)::integer,0)));
