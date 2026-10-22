@@ -600,8 +600,8 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                 </div>
               )}
 
-              <div className="p-3">
-                <div className="flex items-start gap-3">
+              <div className="px-3 py-2">
+                <div className="flex items-start gap-2">
                   {/* Multi-select checkbox — only shown on open status queue tab */}
                   {activeTab === 'queue' && (
                     <div className="flex-shrink-0 pt-1 w-5">
@@ -633,7 +633,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                     onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
                   >
                     {/* Top row: customer name + timestamp + desktop Convert button */}
-                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1.5">
+                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1">
                       {request.contact_id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
@@ -667,7 +667,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                     </div>
 
                     {/* Badge row: priority + status + source — compact, limited to 3 */}
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    <div className="flex items-center gap-1 flex-wrap mb-1">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(request.priority)}`}>
                         {getPriorityIcon(request.priority)}
                         {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
@@ -697,7 +697,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                     </div>
 
                     {/* Description preview */}
-                    <div className="text-sm text-muted break-words line-clamp-2 mb-1.5">{request.job_description}</div>
+                    <div className="text-sm text-muted break-words line-clamp-1 mb-1">{request.job_description}</div>
 
                     {/* Meta row + mobile Convert button */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
