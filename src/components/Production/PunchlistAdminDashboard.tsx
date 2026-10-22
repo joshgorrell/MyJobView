@@ -1,4 +1,4 @@
-import { ProjectPunchlistWorkspace, PlaceLegacyPunchlist } from './ProjectPunchlistWorkspace';
+import { PlaceLegacyPunchlist } from './ProjectPunchlistWorkspace';
 import { punchlistDescription, punchlistList, canSchedulePunchlist, canRequestPunchlist } from '../../lib/punchlist';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -103,7 +103,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   const [batchMode, setBatchMode] = useState<'request' | 'schedule'>('request');
   const [scheduleQueue, setScheduleQueue] = useState<ServiceRequestContext[]>([]);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'projects' | 'punchlist' | 'customers'>('projects');
+  const [activeTab, setActiveTab] = useState<'punchlist' | 'customers'>('punchlist');
   const [openInviteCount, setOpenInviteCount] = useState(0);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [showHelp, setShowHelp] = useState(false);
@@ -358,17 +358,17 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
   return (
     <div className="space-y-2 sm:space-y-4 px-1 sm:px-0">
-      <div className="flex justify-end"><a href="/service-requests" className="inline-flex min-h-10 items-center rounded-lg border border-subtle px-3 py-2 text-sm text-info hover:underline">Service Requests →</a></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h1 className="text-lg font-semibold">Test &amp; Tune</h1><a href="/service-requests" className="inline-flex min-h-10 items-center rounded-lg border border-subtle px-3 py-2 text-sm text-info hover:underline">Service Requests →</a></div>
       <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2 min-w-0">
-        <select aria-label="Punchlist page" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'projects' | 'punchlist' | 'customers'))}
+        <select aria-label="Test and Tune view" value={activeTab} onChange={e => changeView(() => setActiveTab(e.target.value as 'punchlist' | 'customers'))}
           className="shrink-0 min-h-11 max-w-[180px] text-xs bg-surface border border-subtle rounded-lg text-primary px-1.5">
-          <option value="projects">Project Punchlist</option><option value="punchlist">Earlier Items</option><option value="customers">Customers</option>
+          <option value="punchlist">Adjustments</option><option value="customers">Customers &amp; Access</option>
         </select>
         {activeTab === 'punchlist' && (<>
           <button type="button" aria-expanded={showMobileFilters} aria-controls="punchlist-mobile-filters" onClick={() => setShowMobileFilters(value => !value)} className="sm:hidden min-h-11 px-3 rounded-lg border border-subtle text-primary">Filters</button>
           <div className="relative order-last sm:order-none basis-full sm:basis-auto sm:flex-1 min-w-0">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
-            <input aria-label="Search punchlist items" value={searchQuery} onChange={e => changeView(() => setSearchQuery(e.target.value))} placeholder="Search…"
+            <input aria-label="Search Test and Tune adjustments" value={searchQuery} onChange={e => changeView(() => setSearchQuery(e.target.value))} placeholder="Search…"
               className="w-full min-h-11 pl-7 pr-2 text-base bg-surface border border-subtle rounded-lg text-primary" />
           </div>
           <div id="punchlist-mobile-filters" className={`${showMobileFilters ? 'grid' : 'hidden'} sm:flex order-last sm:order-none grid-cols-2 gap-2 basis-full sm:basis-auto min-w-0`}>
@@ -680,7 +680,6 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         </>
       )}
 
-      {activeTab === 'projects' && <ProjectPunchlistWorkspace/>}
 
       {/* Customers Tab Content */}
       {activeTab === 'customers' && (
