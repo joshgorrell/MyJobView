@@ -50,6 +50,7 @@ export function TestTuneProjectAdjustments() {
   const selectedProject = selectedItems[0]?.project_id;
   async function submitSelected() {
     if (!selectedProject || submitting || selectedItems.length !== selected.length || selectedItems.some(item => item.project_id !== selectedProject)) return;
+    if (!window.confirm(`Submit ${selectedItems.length} adjustment(s) to Service Requests for scheduling? Unsubmitted items remain only in Test & Tune.`)) return;
     setSubmitting(true);
     setError('');
     setNotice('');
@@ -61,9 +62,10 @@ export function TestTuneProjectAdjustments() {
       });
       if (failure) throw failure;
       setSelected([]);
-      setNotice('Adjustments submitted to the Work Order Request Queue.');
+      setNotice('Adjustments submitted to the Work Order Request Queue. Already-submitted items cannot be requested again.');
     } catch (failure) {
-      setError((failure as { message?: string }).message || 'Could not submit adjustments.');
+      const message = (failure as { message?: string }).message || 'Could not submit adjustments.';
+      setError(/already requested/i.test(message) ? 'One or more adjustments have already been requested. No new request was created; refresh the project to review the existing request.' : message);
     } finally { setSubmitting(false); }
   }
   const visible = items.filter(item => {
