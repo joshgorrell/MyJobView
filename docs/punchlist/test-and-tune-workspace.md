@@ -21,6 +21,16 @@
 - Service Request detail for a Test & Tune-origin request shows a Test & Tune source label and deep link back to the originating customer/project Test & Tune history.
 - A deep link must preserve the target customer/project and item context; authorization and organization boundaries apply at both ends.
 
+## Required two-way page navigation
+- The **Test & Tune** page header provides **Service Requests**, opening the existing Service Requests page with its T&T-origin filter preselected.
+- The **Service Requests** page header provides **Test & Tune**, opening the staff Test & Tune dashboard. This navigation is available even if the selected service request is not T&T-related, subject to module permission.
+- Every submitted T&T task displays a clickable canonical service request number. Open the **specific request detail**, not just the queue. If multiple tasks share a request, they all point to the same request.
+- Every T&T-origin service request detail displays a visible **View Test & Tune** link to the originating customer and project. Preselect the related submitted tasks while still showing other accumulated, unsubmitted customer adjustments for context.
+- Preserve customer ID, project ID, request ID, and selected task IDs in route state or stable deep-link query parameters; support browser back/forward and page reload. Never use a customer name alone as a lookup key.
+- On a missing/deleted target or revoked permission, show a useful unavailable/access-denied state rather than sending staff to an unrelated customer's record.
+- Service Requests remains the sole formal request queue; Test & Tune remains the adjustment overview. Neither page duplicates or silently edits the other's underlying records.
+- Test desktop/mobile links and permissions in both directions, including a customer with multiple projects and a single request containing multiple tasks.
+
 ## Acceptance criteria
 1. Existing project Punchlist editing, sharing and technician task handling work unchanged inside Projects.
 2. Service Request list retains normal service requests and Test & Tune requests without duplication.
