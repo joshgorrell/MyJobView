@@ -51,6 +51,8 @@ Deno.serve(async req => {
       .select('assigned_to').eq('id', proposal.contact_id)
       .eq('organization_id', link.organization_id).maybeSingle() : { data: null };
     const repId = owner?.assigned_to;
+    // A proposal without an assigned customer owner must not silently fall back
+    // to the author or a different employee. Staff must repair the assignment.
     let representative: { name: string; email: string | null; phone: string | null } | null = null;
     if (repId) {
       const { data: profile } = await db.from('profiles')
@@ -62,7 +64,7 @@ Deno.serve(async req => {
       };
     }
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
-    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at }, scope: { rooms, items }, representative });
+    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at }, scope: { rooms, items }, representative, actionsAvailable: false });
   } catch (error) {
     console.error('Proposal share validation failed', error);
     return json({ error: 'Unable to validate link' }, 500);
