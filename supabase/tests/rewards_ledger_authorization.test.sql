@@ -13,9 +13,11 @@ SELECT ok(NOT has_table_privilege('authenticated','public.reward_redemptions','U
 SELECT ok(NOT has_table_privilege('authenticated','public.reward_redemptions','DELETE'), 'authenticated cannot delete redemptions');
 SELECT ok(NOT has_table_privilege('anon','public.points_transactions','INSERT'), 'anon cannot insert points');
 SELECT ok(NOT has_table_privilege('anon','public.reward_redemptions','INSERT'), 'anon cannot insert redemptions');
-SELECT throws_ok($$SET LOCAL ROLE authenticated; INSERT INTO public.points_transactions(user_id,points_amount,transaction_type,description) VALUES (gen_random_uuid(),1000,'admin_adjustment','unauthorized');$$,'42501',NULL,'direct points write rejected');
+SET LOCAL ROLE authenticated;
+SELECT throws_ok($INSERT INTO public.points_transactions(user_id,points_amount,transaction_type,description) VALUES (gen_random_uuid(),1000,'admin_adjustment','unauthorized')$,'42501',NULL,'direct points write rejected');
 RESET ROLE;
-SELECT throws_ok($$SET LOCAL ROLE authenticated; DELETE FROM public.reward_redemptions WHERE false;$$,'42501',NULL,'direct redemption delete rejected');
+SET LOCAL ROLE authenticated;
+SELECT throws_ok($DELETE FROM public.reward_redemptions WHERE false$,'42501',NULL,'direct redemption delete rejected');
 RESET ROLE;
 SELECT * FROM finish();
 ROLLBACK;
