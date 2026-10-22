@@ -51,7 +51,7 @@ export function UserSessionsDashboard() {
       const [users, names, locations] = await Promise.all([
         supabase.from('profiles').select('id, full_name, email, role, is_active').eq('organization_id', org).order('full_name'),
         supabase.from('device_nicknames').select('id, device_signature, nickname').eq('organization_id', org),
-        supabase.from('ip_nicknames').select('ip_address, nickname, icon, is_trusted'),
+        supabase.from('ip_nicknames').select('ip_address, nickname, icon, is_trusted').eq('organization_id', org),
       ]);
       if (users.error) throw users.error;
       if (names.error) throw names.error;
