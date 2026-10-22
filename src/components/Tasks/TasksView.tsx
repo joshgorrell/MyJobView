@@ -286,7 +286,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
             .select('task_completion_points')
             .single();
 
-          const postPoints = (task as any)._discussionPost?.points || pointsConfig?.task_completion_points || 10;
+          const postPoints = (task as any)._discussionPost?.points ?? pointsConfig?.task_completion_points ?? 10;
 
           await supabase.from('points_transactions').insert([{
             user_id: profile.id,
