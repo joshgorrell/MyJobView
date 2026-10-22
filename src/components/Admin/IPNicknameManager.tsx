@@ -93,6 +93,7 @@ export function IPNicknameManager() {
             icon: formData.icon,
             is_trusted: formData.is_trusted,
             location_classification: formData.location_classification,
+            location_classification: formData.location_classification,
           })
           .eq('id', editingId)
           .eq('organization_id', profile.organization_id);
@@ -283,6 +284,11 @@ export function IPNicknameManager() {
               />
             </div>
 
+            <label className="block text-sm font-medium text-gray-700">Network classification
+              <select value={formData.location_classification} onChange={e => setFormData({ ...formData, location_classification: e.target.value as 'office' | 'remote' | 'unknown' })} className="mt-1 block w-full rounded border border-gray-300 p-2">
+                <option value="unknown">Unknown</option><option value="office">Office</option><option value="remote">Remote</option>
+              </select>
+            </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
