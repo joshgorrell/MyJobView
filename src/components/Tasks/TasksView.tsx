@@ -266,42 +266,13 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       const newStatus = task.status === 'completed' ? 'pending' : 'completed';
 
       if (isDiscussionTask) {
-        // Handle discussion post task
-        const updateData: any = {
-          is_completed: newStatus === 'completed',
-          completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-          completed_by: newStatus === 'completed' ? profile?.id : null
-        };
-
-        const { error } = await supabase
-          .from('discussion_posts')
-          .update(updateData)
-          .eq('id', task.id);
-
+        // Database transaction owns completion, points, reversals and notifications.
+        const { error } = await supabase.rpc('set_discussion_task_completion', {
+          p_post_id: task.id,
+          p_complete: newStatus === 'completed'
+        });
         if (error) throw error;
-
-        if (newStatus === 'completed' && profile) {
-          const { data: pointsConfig } = await supabase
-            .from('points_configuration')
-            .select('task_completion_points')
-            .single();
-
-          const postPoints = (task as any)._discussionPost?.points ?? pointsConfig?.task_completion_points ?? 10;
-
-          if (postPoints > 0) {
-            const { error: pointsError } = await supabase.from('points_transactions').insert([{
-              user_id: profile.id,
-              points_amount: postPoints,
-              transaction_type: 'task_completion',
-              reference_id: task.id,
-              description: `Completed task: ${task.title.substring(0, 50)}...`,
-            }]);
-
-            if (pointsError) {
-              // Completion has already been saved. Do not claim that points were awarded.
-              console.error('Discussion task completed, but points award failed:', pointsError);
-              notify('Assignment completed, but points could not be awarded. Please contact an administrator.', { theme: 'cyan', tone: 'error' });
-            } else {
+      } else {
               const { error: notificationError } = await supabase.from('notifications').insert([{
                 user_id: profile.id,
                 type: 'points_earned',
