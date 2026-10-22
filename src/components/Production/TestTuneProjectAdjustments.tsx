@@ -18,6 +18,9 @@ export function TestTuneProjectAdjustments() {
   const [projects, setProjects] = useState<Record<string, Project>>({});
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [notice, setNotice] = useState('');
   useEffect(() => {
     let active = true;
     async function load() {
@@ -43,6 +46,26 @@ export function TestTuneProjectAdjustments() {
     return () => { active = false; void supabase.removeChannel(subscription); };
   }, []);
 
+  const selectedItems = items.filter(item => selected.includes(item.id));
+  const selectedProject = selectedItems[0]?.project_id;
+  async function submitSelected() {
+    if (!selectedProject || submitting || selectedItems.some(item => item.project_id !== selectedProject)) return;
+    setSubmitting(true);
+    setError('');
+    setNotice('');
+    try {
+      const { error: failure } = await supabase.rpc('request_project_punchlist_visit', {
+        p_project_id: selectedProject,
+        p_task_ids: selectedItems.map(item => item.id),
+        p_submission_id: crypto.randomUUID(),
+      });
+      if (failure) throw failure;
+      setSelected([]);
+      setNotice('Adjustments submitted to the Work Order Request Queue.');
+    } catch (failure) {
+      setError((failure as { message?: string }).message || 'Could not submit adjustments.');
+    } finally { setSubmitting(false); }
+  }
   const visible = items.filter(item => {
     const project = projects[item.project_id];
     return [item.title, item.customer_description, project?.name, project?.project_number]
@@ -53,15 +76,17 @@ export function TestTuneProjectAdjustments() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-primary">Project adjustments</h2>
-          <p className="text-xs text-muted">Customer-visible project items not already in the earlier adjustment list. Manage and submit these from their project until unified request status is available here.</p>
+          <p className="text-xs text-muted">Customer-visible project items not already in the earlier adjustment list. Select adjustments from the same project to request service, or open the project for full task history.</p>
         </div>
         <input aria-label="Search project adjustments" className="min-h-10 rounded-md border border-subtle bg-canvas px-3 text-sm text-primary" placeholder="Find an adjustment" value={search} onChange={event => setSearch(event.target.value)} />
       </div>
+      {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected from one project</span><button type="button" disabled={submitting} onClick={() => void submitSelected()} className="min-h-10 rounded-md bg-blue-600 px-3 font-semibold text-white disabled:opacity-50">{submitting ? 'Submitting…' : 'Request service'}</button><button type="button" onClick={() => setSelected([])} className="min-h-10 px-2 text-muted">Clear</button></div>}
+      {notice && <p role="status" className="text-sm text-emerald-400">{notice}</p>}
       {error && <p role="alert" className="text-sm text-red-400">Could not load project adjustments: {error}</p>}
       {!error && visible.length === 0 && <p className="text-sm text-muted">No matching project adjustments.</p>}
       <div className="divide-y divide-subtle">
         {visible.map(item => (
-          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">\n            <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected.includes(item.id)} disabled={submitting || Boolean(selectedProject && selectedProject !== item.project_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />
             <div className="min-w-0">
               <div className="font-medium text-primary">{item.customer_description || item.title}</div>
               <div className="text-xs text-muted">{projects[item.project_id]?.name || 'Project'} · {item.status}</div>
