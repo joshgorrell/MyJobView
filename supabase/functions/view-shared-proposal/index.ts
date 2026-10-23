@@ -16,9 +16,9 @@ Deno.serve(async req => {
       .eq('token_hash', hash).maybeSingle();
     if (linkError || !link || link.revoked_at || (link.expires_at && Date.parse(link.expires_at) <= Date.now())) return json({ error: 'Invalid or expired link' }, 404);
     const { data: proposal, error: proposalError } = await db.from('proposals')
-      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at')
+      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at,is_active_revision,is_portal_visible')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
-    if (proposalError || !proposal || !['sent', 'viewed', 'portal', 'approved', 'approved_pending_action'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
+    if (proposalError || !proposal || !proposal.is_active_revision || !proposal.is_portal_visible || !['sent', 'viewed', 'portal', 'approved', 'approved_pending_action'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
     // A newly published portal revision invalidates an older shared document link.
     // The sender must explicitly issue a link for the current revision.
     if (Number(link.portal_version) !== Number(proposal.current_portal_version ?? 1)) {

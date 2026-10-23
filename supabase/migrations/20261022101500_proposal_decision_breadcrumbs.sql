@@ -7,8 +7,8 @@ RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 BEGIN
   IF p_step IS NULL OR p_step NOT IN ('decline_started','decline_to_changes','decline_to_approval','decline_acknowledged','decline_cancelled','change_request_submitted')
      OR NOT private.proposal_engagement_customer(p_proposal_id) THEN RETURN false; END IF;
-  INSERT INTO public.proposal_activity(proposal_id,activity_type,viewer_user_id,metadata)
-  VALUES(p_proposal_id,'decision_step',auth.uid(),jsonb_build_object('step',p_step,'source','customer_portal'));
+  INSERT INTO public.proposal_activity(organization_id,proposal_id,activity_type,viewer_user_id,portal_version_number,metadata)
+  SELECT p.organization_id,p.id,'decision_step',auth.uid(),p.current_portal_version,jsonb_build_object('step',p_step,'source','customer_portal') FROM public.proposals p WHERE p.id=p_proposal_id;
   RETURN true;
 END $$;
 REVOKE ALL ON FUNCTION public.record_proposal_decision_step(uuid,text) FROM PUBLIC,anon;

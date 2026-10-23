@@ -58,6 +58,8 @@ const seed=async(n, overrides={})=>{
 };
 const decide=(proposal,action,details={},request=id(900),version=2)=>scalar('select submit_customer_proposal_decision($1,$2,$3,$4,$5)',[proposal,version,request,action,JSON.stringify(details)]);
 let proposal=await seed(100);
+assert.equal(await scalar("select record_proposal_decision_step($1,'decline_started')",[proposal]),true);
+assert.equal(await scalar("select record_proposal_decision_step($1,NULL)",[proposal]),false);
 let receipt=await decide(proposal,'approve',{method:'payment'});assert.equal(receipt.status,'approved');assert.ok(receipt.sales_order_id);assert.ok(receipt.deposit_invoice_id);
 assert.deepEqual(await decide(proposal,'approve',{method:'payment'}),receipt,'Retry returns the original result');
 await denied('select submit_customer_proposal_decision($1,2,$2,\'decline\',$3)',[proposal,id(900),JSON.stringify({reason:'other',promise_acknowledged:true})]);
