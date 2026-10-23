@@ -20,8 +20,9 @@ export const getOrganizationTimezone=async()=> 'America/Chicago';
 window.requests=[];window.fail=false;
 const roster=[{id:'a',name:'Ada Carter'},{id:'b',name:'Ben Wilson'},{id:'c',name:'Casey Miller'}];
 const bundle={timezone:'America/Chicago',roster,configs:roster.map(p=>({profile_id:p.id,compensation_type:'hourly',expected_weekly_hours:40,effective_from:'2026-01-01',work_days:null})),mappings:roster.flatMap((p,i)=>[{profile_id:p.id,source:'ipoint',external_employee_id:p.name},{profile_id:p.id,source:'quickbooks_time',external_employee_id:String(i+1)}]),sources:[{source:'ipoint',native_from:'2026-10-21'},{source:'quickbooks_time',native_from:'2026-10-21'}],holidays:[],snapshots:[],native_jobs:[],native_payroll:[],project_snapshot:null,native_projects:[],latest_job_day:'2026-10-22',latest_payroll_day:'2026-10-22'};
-for(let day=12;day<=22;day++) { const date='2026-10-'+day; bundle.snapshots.push({kind:'technician',day:date,payload:{records:[{technician:roster[0].name,job_hours:7.41666666667},{technician:roster[1].name,job_hours:9}]}},{kind:'payroll',day:date,payload:{records:[{user_id:1,worked_hours:8,leave_hours:0,unknown_hours:0,flags:[]},{user_id:2,worked_hours:12,leave_hours:0,unknown_hours:0,flags:[]}]}}); if(day>=21)for(const [i,p]of roster.slice(0,2).entries()){bundle.native_jobs.push({profile_id:p.id,day:date,hours:i?9:7.41666666667});bundle.native_payroll.push({profile_id:p.id,day:date,hours:i?12:8,leave_hours:0,needs_review:false});} }
-const entries=[{id:'entry-1',technician_id:'a',entry_date:'2026-10-22',clock_in:'2026-10-22T13:00:00Z',clock_out:'2026-10-22T20:25:00Z',total_hours:7.416666666667,notes:'Completed installation and customer walkthrough.',work_order_id:'wo-1',project_id:'project-1',contact_id:'contact-1',work_order:{title:'Living room installation',work_order_number:'WO-1042'},project:{name:'Home theater'},contact:{full_name:'Sample Customer',company_name:''}}];
+for(let day=12;day<=22;day++) { const date='2026-10-'+day; bundle.snapshots.push({kind:'technician',day:date,payload:{records:[{technician:roster[0].name,job_hours:7.41666666667},{technician:roster[1].name,job_hours:9}]}},{kind:'payroll',day:date,payload:{records:[{user_id:1,worked_hours:8,leave_hours:0,unknown_hours:0,flags:[]},{user_id:2,worked_hours:12,leave_hours:0,unknown_hours:0,flags:[]}]}}); if(day>=21)for(const [i,p]of roster.slice(0,2).entries()){bundle.native_jobs.push({profile_id:p.id,day:date,hours:i?9:7.41666666667,shop_hours:i?1:0.25,training_hours:i?1:0.25});bundle.native_payroll.push({profile_id:p.id,day:date,hours:i?12:8,leave_hours:0,needs_review:false});} }
+const entries=[{entry_type:'work_order',id:'entry-1',technician_id:'a',entry_date:'2026-10-22',clock_in:'2026-10-22T13:00:00Z',clock_out:'2026-10-22T20:25:00Z',total_hours:7.416666666667,notes:'Completed installation and customer walkthrough.',work_order_id:'wo-1',project_id:'project-1',contact_id:'contact-1',work_order:{title:'Living room installation',work_order_number:'WO-1042'},project:{name:'Home theater'},contact:{full_name:'Sample Customer',company_name:''}}];
+entries.push(...['shop_time','training'].map((type,i)=>({id:'internal-'+i,entry_type:type,technician_id:'a',entry_date:'2026-10-22',clock_in:'2026-10-22T20:30:00Z',clock_out:'2026-10-22T20:45:00Z',total_hours:0.25,notes:'Recorded internal time',work_order_id:null,project_id:null,contact_id:null,work_order:null,project:null,contact:null})));
 export const supabase={auth:{onAuthStateChange(){}},rpc(name,args){window.requests.push({name,args});return{abortSignal:async()=>{await new Promise(r=>setTimeout(r,80));return{data:bundle,error:window.fail?{message:'Test report unavailable'}:null};}};},from(table){const filters={};let offset=0;const q={select(){return q;},eq(k,v){filters[k]=v;return q;},in(){return q;},gte(){return q;},lte(){return q;},or(){return q;},not(){return q;},order(){return q;},range(from){offset=from;return q;},abortSignal(){return q;},then(resolve,reject){window.requests.push({table,filters});let data=table==='profiles'?roster.map(p=>({id:p.id,full_name:p.name,employment_type:'hourly'})):table==='time_entries'?entries:table==='daily_clock_entries'?[{id:'clock',technician_id:'a',entry_date:'2026-10-22',total_hours:8,status:'clocked_out',leave_type:null}]:[];return Promise.resolve({data:offset?[]:data,error:null}).then(resolve,reject);}};return q;}};
 `;
 const source = `import React from 'react';import{createRoot}from'react-dom/client';import Stats from './src/components/Production/TechProductionStats';document.documentElement.dataset.theme=new URLSearchParams(location.search).get('theme')||'light';createRoot(document.getElementById('root')).render(<div className="theme-workspace min-h-screen bg-elevated"><Stats/></div>);`;
@@ -112,7 +113,7 @@ try {
         1,
       );
       assert.ok(
-        !/payroll|bonus|travel|leave balance|needs review/i.test(
+        !/bonus|travel paid|leave balance|needs review|availability|available work hours/i.test(
           await page.locator("body").innerText(),
         ),
       );
@@ -154,7 +155,7 @@ try {
       await page
         .getByRole("heading", { name: "Ada Carter", exact: true })
         .waitFor();
-      await page.getByText("Loading job entries…", { exact: true }).waitFor({ state: "hidden" });
+      await page.getByText("Loading time entries…", { exact: true }).waitFor({ state: "hidden" });
       await page.locator("summary").filter({ hasText: "Oct 22, 2026" }).click();
       await page
         .getByRole("heading", { name: "Living room installation" })
@@ -165,7 +166,15 @@ try {
           .getAttribute("href"),
         /workOrderId=wo-1/,
       );
-      assert.ok((await page.locator("body").innerText()).includes("7h 25m"));
+      const detailText=await page.locator("body").innerText();
+      assert.ok(detailText.includes("7h 25m"));
+      assert.ok(detailText.includes("Payroll Clock Hours"));
+      assert.ok(detailText.includes("Shop Time"));
+      assert.ok(detailText.includes("Training Time"));
+      assert.ok(detailText.includes("Unaccounted Time"));
+      assert.ok(!detailText.includes("Assumed availability"));
+      await page.getByRole("heading", {name:"Shop Time",exact:true}).waitFor();
+      await page.getByRole("heading", {name:"Training Time",exact:true}).waitFor();
       assert.ok(!(await page.locator("body").innerText()).includes("7.416666"));
       await page.locator("summary").filter({ hasText: "Oct 20, 2026" }).click();
       await page
@@ -185,6 +194,9 @@ try {
       await page.emulateMedia({ media: "print" });
       assert.equal(await page.locator(".tech-stats-print").isVisible(), true);
       assert.equal(await page.locator("#root").isVisible(), false);
+      const printed=await page.locator(".tech-stats-print").innerText();
+      assert.ok(printed.includes("Payroll") && printed.includes("Training") && printed.includes("Unaccounted"));
+      assert.ok(!printed.includes("Assumed availability"));
       await page.emulateMedia({ media: "screen" });
       await page.getByRole("button", { name: "All technicians" }).click();
       assert.equal(

@@ -132,3 +132,29 @@ assert.equal(
 console.log(
   "Production model: weighted utilization, rankings, ties, unknowns, prior dates and duration formatting passed.",
 );
+
+// Salaried production must use actual clock records rather than scheduled capacity.
+const nativeBundle = {...bundle, configs:[{profile_id:'a',compensation_type:'salary',expected_weekly_hours:40,work_days:null,effective_from:'2026-01-01'}],
+  sources:[{source:'ipoint',native_from:'2026-01-01'},{source:'quickbooks_time',native_from:'2026-01-01'}],
+  native_jobs:[{profile_id:'a',day:'2026-10-20',hours:6,shop_hours:1,training_hours:0.5}],
+  native_payroll:[{profile_id:'a',day:'2026-10-20',hours:10,leave_hours:2,needs_review:false}]};
+const nativeRow=()=>model.productionReport(nativeBundle,'2026-10-20','2026-10-20','2026-10-22').rows[0];
+assert.equal(nativeRow().payroll,10);assert.equal(nativeRow().utilization,60);
+assert.equal(nativeRow().shop,1);assert.equal(nativeRow().training,0.5);assert.equal(nativeRow().unaccounted,2.5);
+assert.equal(labor.laborHistory(nativeBundle,'a','2026-10-20','2026-10-20','2026-10-22')[0].payroll,6,'legacy payroll dashboard schedule behavior stays intact');
+nativeBundle.configs=[];assert.equal(nativeRow().utilization,60,'actual clocks do not require salary configuration');
+nativeBundle.native_payroll=[];assert.equal(nativeRow().payroll,null);assert.equal(nativeRow().unaccounted,null);
+nativeBundle.native_payroll=[{profile_id:'a',day:'2026-10-20',hours:8,leave_hours:0,needs_review:false}];
+nativeBundle.native_jobs[0].hours=0;assert.equal(nativeRow().utilization,0);assert.equal(nativeRow().unaccounted,6.5);
+nativeBundle.native_jobs[0].hours=9;assert.equal(nativeRow().excess,2.5);assert.equal(nativeRow().unaccounted,0);assert.equal(nativeRow().utilization,null);
+nativeBundle.native_jobs[0].hours=6;nativeBundle.native_jobs[0].review_flags=['Incomplete or unapproved time entries'];assert.equal(nativeRow().unaccounted,null);
+delete nativeBundle.native_jobs[0].review_flags;delete nativeBundle.native_jobs[0].shop_hours;
+assert.equal(nativeRow().shop,null);assert.equal(nativeRow().unaccounted,null,'missing categories never become invented shop time');
+const historicalRow=model.productionReport({...bundle,configs:[{profile_id:'a',compensation_type:'salary',expected_weekly_hours:40,effective_from:'2026-01-01'}]},'2026-10-20','2026-10-20','2026-10-22').rows[0];
+assert.equal(historicalRow.payroll,4,'imported actual worked hours apply to salaries');assert.equal(historicalRow.shop,null);assert.equal(historicalRow.unaccounted,null);
+console.log('Actual clock breakdown: salary/hourly actuals, leave exclusion, missing clocks/categories, shop/training, zero job days and excess reconciliation passed.');
+
+nativeBundle.native_jobs=[{profile_id:'a',day:'2026-10-20',hours:6,shop_hours:1,training_hours:0}, {profile_id:'a',day:'2026-10-21',hours:7,shop_hours:2,training_hours:0}];
+nativeBundle.native_payroll=[{profile_id:'a',day:'2026-10-20',hours:8,leave_hours:0,needs_review:false},{profile_id:'a',day:'2026-10-21',hours:8,leave_hours:0,needs_review:false}];
+const twoDays=model.productionReport(nativeBundle,'2026-10-20','2026-10-21','2026-10-22').rows[0];
+assert.equal(twoDays.unaccounted,1);assert.equal(twoDays.excess,1,'excess on one date must not cancel an unaccounted gap on another');

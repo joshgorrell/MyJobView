@@ -33,6 +33,7 @@ import {
   productionReport,
   rankProduction,
   reportPeriod,
+  summarizeProduction,
   shiftDay,
   type ProductionRow,
 } from "../../lib/techProduction";
@@ -136,7 +137,7 @@ function ProductionTrend({
       {
         day: string;
         job: number | null;
-        matchedAvailable: number;
+        matchedPayroll: number;
         matchedJob: number;
       }
     >();
@@ -149,19 +150,19 @@ function ProductionTrend({
         month = months.get(key) ?? {
           day: key,
           job: null,
-          matchedAvailable: 0,
+          matchedPayroll: 0,
           matchedJob: 0,
         };
       if (row.job !== null) month.job = (month.job ?? 0) + row.job;
-      month.matchedAvailable += row.matchedAvailable;
+      month.matchedPayroll += row.matchedPayroll;
       month.matchedJob += row.matchedJob;
       months.set(key, month);
     }
     return [...months.values()].map((month) => ({
       ...month,
       utilization:
-        month.matchedAvailable > 0
-          ? (month.matchedJob / month.matchedAvailable) * 100
+        month.matchedPayroll > 0
+          ? (month.matchedJob / month.matchedPayroll) * 100
           : null,
     }));
   }, [data, grouping]);
@@ -557,7 +558,7 @@ export default function TechProductionStats() {
             {visibleBundle.latest_job_day
               ? dateLabel(visibleBundle.latest_job_day)
               : "unavailable"}{" "}
-            · Availability through{" "}
+            · Payroll clock through{" "}
             {visibleBundle.latest_payroll_day
               ? dateLabel(visibleBundle.latest_payroll_day)
               : "unavailable"}
@@ -576,25 +577,26 @@ export default function TechProductionStats() {
             <>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 <Metric
-                  label="Job hours"
+                  label="Job Hours"
                   value={duration(report.job)}
                   icon={Clock}
                   note="Recorded production for the selected dates"
                 />
                 <Metric
-                  label="Available work hours"
-                  value={duration(report.available)}
+                  label="Payroll Clock Hours"
+                  value={duration(report.payroll)}
                   icon={Users}
-                  note="Work time used to measure utilization"
+                  note="Actual daily clock time, excluding leave"
                 />
                 <Metric
                   wide
                   label="Team utilization"
                   value={percentage(report.utilization)}
                   icon={TrendingUp}
-                  note="Job hours ÷ available hours on matched dates"
+                  note="Job hours ÷ payroll clock hours on matched dates"
                 />
               </div>
+              <ClockBreakdown summary={report} />
               <div className={`${panel} p-4 sm:p-6`}>
                 <div className="flex gap-2 items-center mb-5">
                   <TrendingUp size={19} className="text-teal-600" />
@@ -672,6 +674,9 @@ export default function TechProductionStats() {
                             percent={sort === "utilization"}
                           />
                         </div>
+                        <span className="text-xs text-secondary block mt-1">
+                          Payroll clock: {duration(row.payroll)}
+                        </span>
                         <span className="sm:hidden text-xs text-secondary block mt-1">
                           {duration(row.job)} on jobs ·{" "}
                           {percentage(row.utilization)} utilized
@@ -714,11 +719,13 @@ export default function TechProductionStats() {
             </>
           )}
           <p className="text-xs text-secondary leading-relaxed">
-            Utilization describes recorded time on jobs. Time outside jobs can
-            include loading, meetings, training, and other work. Missing data
-            stays unavailable; assumed schedules remain labeled.{" "}
-            {duration(report.matchedAvailable)} of {duration(report.available)}{" "}
-            available work hours have comparable job data.
+            Utilization compares recorded job hours with actual payroll clock
+            hours, including salaried technicians. Leave is excluded; schedules
+            are never substituted. {duration(report.matchedPayroll)} of{" "}
+            {duration(report.payroll)} payroll clock hours have comparable job
+            data. Shop and training use recorded entries only. Missing category
+            data stays missing; overlapping or excess entries are flagged for
+            reconciliation.
           </p>
         </>
       )}
@@ -824,7 +831,7 @@ function TechnicianDetail({
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <Metric
-          label="Job hours"
+          label="Job Hours"
           value={duration(person.job)}
           icon={Clock}
           note="Recorded production in this period"
@@ -837,12 +844,13 @@ function TechnicianDetail({
         />
         <Metric
           wide
-          label="Time outside jobs"
-          value={duration(person.outside)}
+          label="Payroll Clock Hours"
+          value={duration(person.payroll)}
           icon={Users}
-          note="Matched work hours outside recorded job time"
+          note="Actual daily clock time, excluding leave"
         />
       </div>
+      <ClockBreakdown summary={person} />
       <div className={`${panel} p-4 sm:p-6`}>
         <h2 className="font-semibold text-lg mb-2">Production trend</h2>
         <Change
@@ -856,14 +864,12 @@ function TechnicianDetail({
         <div className="p-4 sm:p-6 border-b border-subtle">
           <h2 className="font-semibold text-xl">Daily activity</h2>
           <p className="text-sm text-secondary mt-2">
-            Expand a day to see its recorded jobs and time entries.
-            {person.assumed
-              ? " Available hours include assumed schedules."
-              : ""}
+            Expand a day to see its recorded jobs, shop time and training.
+            Payroll clock hours use actual records for everyone.
           </p>
           {loading && (
             <p role="status" className="text-xs text-secondary mt-2">
-              Loading job entries…
+              Loading time entries…
             </p>
           )}
           {error && (
@@ -891,11 +897,9 @@ function TechnicianDetail({
                     {dateLabel(day.day)}
                   </span>
                   <span className="text-xs text-secondary block mt-1">
-                    {day.assumed
-                      ? "Assumed availability"
-                      : day.jobSource === "MJV"
-                        ? "MJV activity"
-                        : "Historical production"}
+                    {day.jobSource === "MJV"
+                      ? "MJV activity"
+                      : "Historical production"}
                   </span>
                 </div>
                 <div className="text-right">
@@ -917,12 +921,34 @@ function TechnicianDetail({
               </summary>
               <div className="px-4 sm:px-6 pb-5 space-y-3">
                 <p className="text-xs text-secondary">
-                  Available work time: {duration(day.payroll)}
-                  {day.assumed ? " · assumed schedule" : ""}.{" "}
+                  Payroll clock: {duration(day.payroll)} · Shop:{" "}
+                  {duration(day.shop)} · Training: {duration(day.training)} ·
+                  Unaccounted: {duration(day.unaccounted)}.{" "}
                   {day.efficiency === null
                     ? "Comparable time is unavailable for this date."
                     : ""}
                 </p>
+                {!day.clockDataComplete &&
+                  day.job !== null &&
+                  day.payroll !== null && (
+                    <p className="text-xs text-secondary">
+                      Clock records are incomplete or flagged; utilization and
+                      reconciliation are withheld for this date.
+                    </p>
+                  )}
+                {day.excess !== null && day.excess > 0 && (
+                  <p className="text-sm text-amber-600">
+                    Recorded job, shop and training time exceeds payroll clock
+                    time by {duration(day.excess)}. Check for overlapping or
+                    incorrect entries.
+                  </p>
+                )}
+                {(day.shop === null || day.training === null) && (
+                  <p className="text-xs text-secondary">
+                    Shop/training breakdown missing for this date; unaccounted
+                    time cannot be calculated.
+                  </p>
+                )}
                 {day.jobSource !== "MJV" && historicalTiming.has(day.day) && (
                   <p className="text-sm text-secondary">
                     First job: {historicalTiming.get(day.day)!.first} · Last
@@ -944,10 +970,14 @@ function TechnicianDetail({
                     <div className="flex flex-wrap justify-between gap-3">
                       <div>
                         <h3 className="font-semibold text-sm">
-                          {entry.work_order?.title ||
-                            entry.project?.name ||
-                            entry.contact?.full_name ||
-                            "Customer activity"}
+                          {entry.entry_type === "shop_time"
+                            ? "Shop Time"
+                            : entry.entry_type === "training"
+                              ? "Training Time"
+                              : entry.work_order?.title ||
+                                entry.project?.name ||
+                                entry.contact?.full_name ||
+                                "Customer activity"}
                         </h3>
                         <p className="text-xs text-secondary mt-1">
                           {[
@@ -1011,7 +1041,8 @@ function TechnicianDetail({
                   !byDay.get(day.day)?.length &&
                   day.jobSource === "MJV" && (
                     <p className="text-sm text-secondary">
-                      No completed job entries are available for this day.
+                      No completed job, shop or training entries are recorded
+                      for this day.
                     </p>
                   )}
               </div>
@@ -1027,19 +1058,58 @@ function TechnicianDetail({
     </div>
   );
 }
+function ClockBreakdown({
+  summary,
+}: {
+  summary: ReturnType<typeof summarizeProduction>;
+}) {
+  return (
+    <div className={`${panel} p-4 sm:p-6 space-y-4`}>
+      <h2 className="text-lg font-semibold">Payroll clock breakdown</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {(
+          [
+            ["Job Hours", summary.job],
+            ["Shop Time", summary.shop],
+            ["Training Time", summary.training],
+            ["Unaccounted Time", summary.unaccounted],
+          ] as const
+        ).map(([label, hours]) => (
+          <div key={label}>
+            <p className="text-xs text-secondary">{label}</p>
+            {label !== "Job Hours" &&
+              hours !== null &&
+              (label === "Unaccounted Time"
+                ? summary.reconciliationDays
+                : summary.categoryDays) < summary.clockDays && (
+                <span className="text-xs text-amber-600">Partial total</span>
+              )}
+            <p className="text-xl font-semibold tabular-nums mt-1">
+              {duration(hours)}
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-secondary">
+        Shop/training recorded on {summary.categoryDays} technician dates;
+        unaccounted time covers {summary.reconciliationDays} of{" "}
+        {summary.clockDays} payroll clock dates. Missing categories show —.
+        Unaccounted time = payroll clock − jobs − shop − training, calculated
+        per date.
+      </p>
+      {(summary.excess ?? 0) > 0 && (
+        <p className="text-sm text-amber-600">
+          Recorded categories exceed payroll clock time by{" "}
+          {duration(summary.excess)} across affected dates. Check for
+          overlapping or incorrect entries.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function productionSummary(day: ProductionRow["history"][number]) {
-  return {
-    job: day.job,
-    available: day.payroll,
-    utilization: day.efficiency,
-    matchedAvailable: day.matchedPayroll,
-    matchedJob: day.matchedJob,
-    matchedDays: day.matched ? 1 : 0,
-    assumed: day.assumed,
-    outside: day.matched
-      ? Math.max(0, day.matchedPayroll - day.matchedJob)
-      : null,
-  };
+  return summarizeProduction([day]);
 }
 
 function ProductionPrintReport({
@@ -1055,7 +1125,7 @@ function ProductionPrintReport({
 }) {
   return createPortal(
     <div className="tech-stats-print">
-      <style>{`.tech-stats-print { display: none; } @media print { @page { size: letter portrait; margin: .5in; } body > *:not(.tech-stats-print) { display: none !important; } .tech-stats-print { display: block !important; color: #111827; background: white; font: 10pt Arial, sans-serif; } .tech-stats-print h1 { font-size: 22pt; margin-bottom: 8pt; } .tech-stats-print p { margin: 8pt 0; } .tech-stats-print table { width: 100%; border-collapse: collapse; margin-top: 20pt; } .tech-stats-print th, .tech-stats-print td { padding: 8pt 5pt; text-align: left; border-bottom: 1px solid #ddd; } .tech-stats-print tr { break-inside: avoid; } .tech-stats-print thead { display: table-header-group; } }`}</style>
+      <style>{`.tech-stats-print { display: none; } @media print { @page { size: letter portrait; margin: .5in; } body > *:not(.tech-stats-print) { display: none !important; } .tech-stats-print { display: block !important; color: #111827; background: white; font: 9pt Arial, sans-serif; } .tech-stats-print h1 { font-size: 22pt; margin-bottom: 8pt; } .tech-stats-print p { margin: 8pt 0; } .tech-stats-print table { width: 100%; border-collapse: collapse; margin-top: 20pt; } .tech-stats-print th, .tech-stats-print td { padding: 7pt 3pt; overflow-wrap: anywhere; text-align: left; border-bottom: 1px solid #ddd; } .tech-stats-print tr { break-inside: avoid; } .tech-stats-print thead { display: table-header-group; } }`}</style>
       <h1>
         {person
           ? person.name + " · Production"
@@ -1068,8 +1138,25 @@ function ProductionPrintReport({
         <thead>
           <tr>
             {(person
-              ? ["Date", "Job hours", "Available hours", "Utilization"]
-              : ["Rank", "Technician", "Job hours", "Utilization"]
+              ? [
+                  "Date",
+                  "Payroll",
+                  "Jobs",
+                  "Shop",
+                  "Training",
+                  "Unaccounted",
+                  "Utilization",
+                ]
+              : [
+                  "Rank",
+                  "Technician",
+                  "Payroll",
+                  "Jobs",
+                  "Shop",
+                  "Training",
+                  "Unaccounted",
+                  "Utilization",
+                ]
             ).map((label) => (
               <th key={label}>{label}</th>
             ))}
@@ -1079,12 +1166,15 @@ function ProductionPrintReport({
           {person
             ? person.history.map((day) => (
                 <tr key={day.day}>
-                  <td>
-                    {dateLabel(day.day)}
-                    {day.assumed ? " *" : ""}
-                  </td>
-                  <td>{duration(day.job)}</td>
+                  <td>{dateLabel(day.day)}</td>
                   <td>{duration(day.payroll)}</td>
+                  <td>{duration(day.job)}</td>
+                  <td>{duration(day.shop)}</td>
+                  <td>{duration(day.training)}</td>
+                  <td>
+                    {duration(day.unaccounted)}
+                    {(day.excess ?? 0) > 0 ? " *" : ""}
+                  </td>
                   <td>{percentage(day.efficiency)}</td>
                 </tr>
               ))
@@ -1092,15 +1182,24 @@ function ProductionPrintReport({
                 <tr key={row.id}>
                   <td>{row.rank ?? "—"}</td>
                   <td>{row.name}</td>
+                  <td>{duration(row.payroll)}</td>
                   <td>{duration(row.job)}</td>
+                  <td>{duration(row.shop)}</td>
+                  <td>{duration(row.training)}</td>
+                  <td>
+                    {duration(row.unaccounted)}
+                    {(row.excess ?? 0) > 0 ? " *" : ""}
+                  </td>
                   <td>{percentage(row.utilization)}</td>
                 </tr>
               ))}
         </tbody>
       </table>
       <p>
-        Utilization uses matched job and available work hours. — means
-        unavailable. * Assumed availability.
+        Utilization = job hours ÷ actual payroll clock hours on matched dates.
+        Leave excluded. — means missing data. Shop/training and unaccounted
+        totals cover recorded, comparable dates only. * Recorded categories
+        exceed payroll clock hours; reconciliation needed.
       </p>
     </div>,
     document.body,

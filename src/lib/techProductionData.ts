@@ -40,7 +40,6 @@ export async function loadProduction(
   );
   const cached = reports.get(key);
   if (!refresh && cached && Date.now() - cached.at < 60000) return cached.data;
-  let bundle: LaborBundle;
   // The production RPC enforces Tech Stats authorization and organization isolation.
   // All authorized viewers must receive the same report rather than a native-only fallback.
   const { data, error } = await supabase
@@ -48,7 +47,7 @@ export async function loadProduction(
     .abortSignal(signal);
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Production report is unavailable");
-  bundle = data as LaborBundle;
+  const bundle = data as LaborBundle;
   if (signal.aborted || sessionGeneration !== cacheGeneration)
     throw new Error("Report request cancelled");
   if (reports.size >= 6) reports.delete(reports.keys().next().value!);
@@ -57,6 +56,7 @@ export async function loadProduction(
 }
 export type JobEntry = {
   id: string;
+  entry_type: string;
   entry_date: string;
   clock_in: string;
   clock_out: string | null;
@@ -81,13 +81,19 @@ export async function loadProductionEntries(
       supabase
         .from("time_entries")
         .select(
-          "id, entry_date, clock_in, clock_out, total_hours, notes, work_order_id, project_id, contact_id, work_order:work_orders!work_order_id(title, work_order_number), project:projects!project_id(name), contact:contacts!contact_id(full_name, company_name)",
+          "id, entry_type, entry_date, clock_in, clock_out, total_hours, notes, work_order_id, project_id, contact_id, work_order:work_orders!work_order_id(title, work_order_number), project:projects!project_id(name), contact:contacts!contact_id(full_name, company_name)",
         )
         .eq("organization_id", organization)
         .eq("technician_id", technician)
         .gte("entry_date", start)
         .lte("entry_date", end)
-        .in("entry_type", ["work_order", "project", "customer_activity"])
+        .in("entry_type", [
+          "work_order",
+          "project",
+          "customer_activity",
+          "shop_time",
+          "training",
+        ])
         .eq("status", "approved")
         .not("clock_out", "is", null)
         .order("entry_date", { ascending: false })
