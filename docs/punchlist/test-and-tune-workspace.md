@@ -42,8 +42,16 @@
 7. Disposable Test & Tune test records may be cleared only after confirming their dependencies; no production data is deleted.
 8. Validate permissions, 90-day boundaries, multi-project customers, cross-tenant isolation and tests before merge.
 
-## Current implementation gap
-`src/components/Production/PunchlistAdminDashboard.tsx` currently defaults to Project Punchlist and exposes Earlier Items and Customers; it is not yet a dedicated Test & Tune view. `src/components/Projects/ProjectTasksList.tsx` already queues individual project-task visits through `request_project_punchlist_visit`; staff multi-item Test & Tune submission and cross-page deep links need implementation and regression testing. This document records approved requirements, not a completed implementation.
+## Implementation (2026-10-23)
+The standalone workspace now lists explicitly marked adjustments grouped by customer and project. Ordinary project Punchlist editing remains in Projects and Sales Orders. Active projects remain visible with zero adjustments; expired or suspended projects retain unresolved adjustments and history but cannot create or submit new complimentary items. Exception review is required; this release does not silently extend entitlement.
+
+A database transaction locks the project and selected task rows, creates one request and its canonical task links, and writes an immutable receipt with actor, source, timestamp and exact task IDs. Repeated identical submissions return the original request; reusing a key with a different payload fails. Submitted tasks remain history even after a request closes. Internal notes never enter the customer projection.
+
+Customer submission updates appear in the portal, with a customer-controlled preference. These confirmations contain only the count and submission date; they do not send email or SMS. Existing scheduling communication remains separate.
+
+Both page shortcuts honor module access. Request-specific history links preserve customer, project and request IDs. Polling, focus refresh and realtime subscriptions reload persisted state. No records are deleted by the rollout.
+
+The deployed database was missing the main-branch prerequisite `20261019180250_project_punchlist_and_vip_service.sql`; rollout must include that prerequisite before the new workspace migration. Keep this PR draft until local regressions, real PostgreSQL concurrency, CI and deployment checks pass.
 
 ## Submission and persistence contract (2026-10-22)
 - Submitting three of five adjustments creates one formal request containing those three and leaves exactly two in Test & Tune.

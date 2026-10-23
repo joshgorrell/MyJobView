@@ -76,6 +76,8 @@ export interface RecentProposal {
 
 export interface RecentActivityItem {
   id: string;
+  recordId?: string;
+  recordKind?: 'proposal' | 'lead' | 'connection' | 'contact' | 'order' | 'source';
   type: 'connection' | 'lead_created' | 'proposal_created';
   createdAt: string;
   title: string;

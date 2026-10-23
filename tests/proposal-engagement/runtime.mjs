@@ -20,4 +20,18 @@ const summary=summarizeEngagement([
 {activity_type:'downloaded',duration_seconds:500,metadata:null}
 ]);
 assert.equal(summary.activeSeconds,72); assert.equal(summary.legacySeconds,100); assert.equal(summary.verifiedViewers,1); assert.equal(summary.sections.pricing,71); assert.equal(summary.trackedVisits,2);
+const reconsideration=new ProposalAttention(0);
+reconsideration.setPresence(0,true,true);
+reconsideration.click(100,'decline_clicked');
+reconsideration.click(200,'decline_to_changes_clicked');
+reconsideration.click(300,'decline_clicked');
+reconsideration.click(400,'decline_to_approval_clicked');
+reconsideration.click(500,'decline_clicked');
+reconsideration.click(600,'decline_continue_clicked');
+const reconsiderationSummary=summarizeEngagement([{activity_type:'viewed',duration_seconds:0,metadata:{engagement:{trackingVersion:1,sections:{promise:1},clicks:reconsideration.snapshot().clicks}}}]);
+assert.equal(reconsiderationSummary.clicks.decline_clicked,3);
+assert.equal(reconsiderationSummary.clicks.decline_to_changes_clicked,1);
+assert.equal(reconsiderationSummary.clicks.decline_to_approval_clicked,1);
+assert.equal(reconsiderationSummary.clicks.decline_continue_clicked,1);
+assert.equal(reconsiderationSummary.sections.promise,1);
 console.log('Proposal attention: idle, hidden/focus, suspension, section attribution, click semantics, and legacy separation pass');

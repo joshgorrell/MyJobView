@@ -1,3 +1,4 @@
+import { useDepartments } from '../../contexts/DepartmentContext';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { ListTodo, BarChart3, Inbox, Plus } from 'lucide-react';
 
@@ -27,6 +28,7 @@ interface ServiceRequestConsoleProps {
 }
 
 export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps) {
+  const { hasModuleAccess } = useDepartments();
   const [requestId, setRequestId] = useState(() => new URLSearchParams(window.location.search).get('serviceRequestId'));
   useEffect(() => {
     const update = () => setRequestId(new URLSearchParams(window.location.search).get('serviceRequestId'));
@@ -41,7 +43,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-2 sm:space-y-4">
-      <div className="flex justify-end"><a href="/test-and-tune" className="inline-flex min-h-10 items-center rounded-lg border border-subtle px-3 py-2 text-sm text-info hover:underline">Test &amp; Tune →</a></div>
+      {hasModuleAccess('punchlist') && <div className="flex justify-end"><a href="/test-and-tune" className="inline-flex min-h-10 items-center rounded-lg border border-subtle px-3 py-2 text-sm text-info hover:underline">Test &amp; Tune →</a></div>}
       <div className="flex items-center gap-1 min-w-0 max-w-full pb-1">
         {TABS.map(tab => {
           const Icon = tab.icon;

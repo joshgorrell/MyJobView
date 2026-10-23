@@ -1,3 +1,4 @@
+import { CustomerTimeTimer } from '../Technician/CustomerTimeTimer';
 import { MyJobTimeView } from '../Technician/MyJobTimeView';
 import { createPortal } from 'react-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -67,6 +68,7 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
         {tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`min-h-14 min-w-0 rounded-lg flex flex-col items-center justify-center gap-1 text-[11px] sm:text-sm transition-colors ${tab === key ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:bg-surface'}`}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
       {tab === 'work' && <>
+        <CustomerTimeTimer onChanged={load} />
         {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.clockAccess === 'mobile' ? <MobileClockRedirect /> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <div className="rounded-2xl border border-subtle bg-elevated p-4"><p className="font-semibold">Ready for your next job?</p><p className="text-sm text-secondary mt-1">Your configuration does not require a daily clock. Record job time below.</p></div>}
         <div className="flex items-center justify-between"><div><h3 className="font-semibold text-primary">Today’s Jobs</h3><p className="text-xs text-secondary">{day}</p></div><button onClick={load} disabled={loading} aria-label="Refresh today’s work" className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-elevated"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
         {error && <p role="alert" className="text-red-600">{error}</p>}
@@ -78,7 +80,7 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
           <WorkOrderTimeControl workOrderId={job.id} assignedTo={profile?.id || null} onChanged={load} />
         </section>)}
         <div className="grid sm:grid-cols-2 gap-2 border-t border-subtle pt-4">
-          {policy.ready && <button onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-3 py-3 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Manual Job Time</button>}
+          {policy.ready && <button onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-3 py-3 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Job Time</button>}
           {settings && (settings.shop_time_request_enabled || settings.training_time_request_enabled) && <button onClick={() => setRequest('internal')} className="min-h-11 rounded-xl border border-subtle px-3 py-3 text-sm">Request Shop / Training Time</button>}
         </div>
       </>}

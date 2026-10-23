@@ -696,68 +696,11 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   async function autoClockOutSingleEntry(entry: PendingAutoClockOut) {
     setProcessingClockOut(entry.id);
     try {
-      // will_clock_out_at is already a full timestamp from the view
-      const clockOutTime = new Date(entry.will_clock_out_at).toISOString();
-
-      // Update the clock entry
-      const { error: updateError } = await supabase
-        .from('daily_clock_entries')
-        .update({
-          clock_out: clockOutTime,
-          status: 'clocked_out',
-          admin_adjusted: true,
-          adjustment_reason: 'Auto-clocked out by admin: User forgot to clock out'
-        })
-        .eq('id', entry.id);
-
-      if (updateError) throw updateError;
-
-      const { data: settings } = await supabase
-        .from('organizations')
-        .select('forgot_clock_out_penalty_points')
-        .limit(1)
-        .maybeSingle();
-
-      const penaltyPoints = settings?.forgot_clock_out_penalty_points || -15;
-
-      // Create reward log entry with penalty
-      await supabase
-        .from('clock_in_rewards_log')
-        .insert({
-          technician_id: entry.technician_id,
-          daily_clock_entry_id: entry.id,
-          event_type: 'forgot_clock_out',
-          points_awarded: penaltyPoints,
-          minutes_delta: null,
-          scheduled_time: null,
-          actual_time: null
-        });
-
-      // Apply points penalty - fetch current points first
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('points_earned')
-        .eq('id', entry.technician_id)
-        .single();
-
-      const currentPoints = profileData?.points_earned || 0;
-      await supabase
-        .from('profiles')
-        .update({
-          points_earned: currentPoints + penaltyPoints
-        })
-        .eq('id', entry.technician_id);
-
-      // Create notification
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: entry.technician_id,
-          type: 'system',
-          title: 'Auto Clock-Out Applied',
-          body: `You were automatically clocked out at ${formatTime12Hour(clockOutTime, orgTimezone)} because you forgot to clock out on ${formatLocalDate(entry.entry_date)}. Points penalty: ${penaltyPoints} points.`,
-          related_id: entry.id
-        });
+      const { error } = await supabase.rpc('admin_forgotten_clock_out', {
+        p_entry_id: entry.id,
+        p_clock_out: new Date(entry.will_clock_out_at).toISOString(),
+      });
+      if (error) throw error;
 
       Promise.all([loadEntries(), loadAlerts(), checkPendingAutoClockOuts()]);
     } catch (error) {

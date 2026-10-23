@@ -376,7 +376,7 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
   const [uploading, setUploading] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [photoCaption, setPhotoCaption] = useState('');
-  const [photoPoints, setPhotoPoints] = useState(1);
+  const [photoPoints, setPhotoPoints] = useState(0);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [contacts, setContacts] = useState<Array<{ id: string; full_name: string }>>([]);
@@ -408,11 +408,12 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
       const { data, error } = await supabase
         .from('company_settings')
         .select('photo_upload_points')
-        .single();
+        .eq('organization_id', profile?.organization_id)
+        .maybeSingle();
 
       if (error) throw error;
-      if (data?.photo_upload_points) {
-        setPhotoPoints(data.photo_upload_points);
+      if (data) {
+        setPhotoPoints(data.photo_upload_points ?? 0);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -747,15 +748,8 @@ export function JobPhotosGallery({ initialShowUpload = false, modalOnly = false,
 
         if (insertError) throw insertError;
 
-        try {
-          await supabase.rpc('award_points', {
-            p_user_id: profile.id,
-            p_points: photoPoints,
-            p_reason: isVideo ? 'Uploaded job video' : 'Uploaded job photo'
-          });
-        } catch (err) {
-          console.error('Error awarding points:', err);
-        }
+        // The saved media row awards points atomically on the server.
+
       }
 
       if (selectedPaparazziRequestId) {

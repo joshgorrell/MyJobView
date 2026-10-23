@@ -322,42 +322,16 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
     }
   }
 
-  function getSourceTypeIcon(sourceType: string) {
-    switch (sourceType) {
-      case 'punchlist':
-        return <ListTodo className="w-4 h-4" />;
-      case 'staff_form':
-        return <ClipboardList className="w-4 h-4" />;
-      case 'customer_portal':
-        return <User className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  }
-
   function getSourceTypeLabel(sourceType: string) {
     switch (sourceType) {
       case 'punchlist':
-        return 'Punchlist';
+        return 'Test & Tune';
       case 'staff_form':
         return 'Staff Form';
       case 'customer_portal':
         return 'Customer Portal';
       default:
         return 'Other';
-    }
-  }
-
-  function getSourceTypeColor(sourceType: string) {
-    switch (sourceType) {
-      case 'punchlist':
-        return 'text-teal-400 bg-teal-500/10 border-teal-500/20';
-      case 'staff_form':
-        return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      case 'customer_portal':
-        return 'text-green-400 bg-green-500/10 border-green-500/20';
-      default:
-        return 'text-muted bg-elevated border-strong';
     }
   }
 
@@ -681,6 +655,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                       <span className="text-muted">{request.request_type === 'project' ? 'Project' : 'Service'}</span>
                       {request.source_type === 'punchlist' && <span className="text-muted">· Test &amp; Tune</span>}
                       {request.customer_contact_confirmed_at && <span className="text-emerald-400">· Contacted</span>}
+                      {expandedRequest === request.id && request.source_type === 'punchlist' && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
                       {expandedRequest === request.id && (
                         <span className="text-muted">· {getSourceTypeLabel(request.source_type)}</span>
                       )}

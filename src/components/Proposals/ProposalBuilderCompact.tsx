@@ -484,6 +484,7 @@ function FilterModal({
 export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateToSalesOrder, targetRoomIds: _externalTargetRoomIds, onTargetRoomsChange: _onTargetRoomsChange, isStandalone = false, onProposalIdChange, aiPrefillRooms, changeOrderId, onCORefresh, autoOpenQA = false, autoThreadId = null }: ProposalBuilderCompactProps) {
   const isCoMode = !!changeOrderId;
   const { profile } = useAuth();
+  const canManageCompanyTemplates = ['admin', 'owner', 'super_admin'].includes(profile?.role || '');
   const [proposal, setProposal] = useState<any>(null);
   const [proposalSettings, setProposalSettings] = useState<any>(null);
   const [rooms, setRooms] = useState<RoomWithItems[]>([]);
@@ -646,8 +647,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     showUnitPrice: true,
     showLinePrice: true,
     showSKU: true,
+    showModelNumber: false,
     showManufacturer: true,
-    showColor: true,
+    showColor: false,
     showAreaTotals: true,
     showInstalledPrice: true,
     showLaborPerLine: true,
@@ -964,11 +966,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       showUnitPrice: template.show_unit_price ?? true,
       showLinePrice: template.show_line_item_total ?? true,
       showSKU: template.show_sku ?? true,
+      showModelNumber: template.show_model_number ?? false,
       showManufacturer: template.show_manufacturer ?? true,
-      showColor: template.color_scheme !== 'grayscale',
+      showColor: template.show_item_color ?? false,
       showAreaTotals: template.show_area_subtotals ?? true,
-      showInstalledPrice: template.show_labor_total ?? true,
-      showLaborPerLine: template.show_labor_hours ?? true,
+      showInstalledPrice: template.show_installed_price ?? true,
+      showLaborPerLine: template.show_labor_total ?? false,
       separatePartsLabor: template.show_labor_separate_from_parts ?? false,
       showSalesTax: template.show_tax_breakdown ?? true,
       showAccessories: (template.max_product_images ?? 0) > 0,
@@ -1006,15 +1009,20 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
   }
 
   async function saveAsTemplate() {
-    if (!newTemplateName.trim() || !profile?.id) return;
+    if (!newTemplateName.trim() || !profile?.id || !profile.organization_id) return;
+    if (!newTemplateIsPersonal && !canManageCompanyTemplates) {
+      notify('Only administrators can save company-wide templates', { theme: 'violet', tone: 'error' });
+      return;
+    }
 
     try {
       setSavingTemplate(true);
 
-      // Get company_id from company_settings (single-tenant system)
+      // New copies belong to the current organization; existing ownership stays immutable.
       const { data: companyData, error: companyError } = await supabase
         .from('company_settings')
         .select('id')
+        .eq('organization_id', profile.organization_id)
         .single();
 
       if (companyError) throw companyError;
@@ -1022,10 +1030,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       const templateData = {
         name: newTemplateName.trim(),
         description: newTemplateDescription.trim() || null,
-        is_personal: newTemplateIsPersonal,
-        created_by: profile.id,
-        company_id: companyData.id,
-        is_default: false,
 
         // Map display options to template fields - using actual pdfDisplayOptions state
         show_company_logo: true,
@@ -1042,7 +1046,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         show_line_item_description: pdfDisplayOptions.showDescription,
         show_manufacturer: pdfDisplayOptions.showManufacturer,
         show_sku: pdfDisplayOptions.showSKU,
-        show_model_number: pdfDisplayOptions.showSKU,
+        show_model_number: pdfDisplayOptions.showModelNumber,
+        show_item_color: pdfDisplayOptions.showColor,
+        show_installed_price: pdfDisplayOptions.showInstalledPrice && !pdfDisplayOptions.hideAllPrices,
         show_quantity: !pdfDisplayOptions.hideAllPrices,
         show_unit_price: pdfDisplayOptions.showUnitPrice && !pdfDisplayOptions.hideAllPrices,
         show_line_item_total: pdfDisplayOptions.showLinePrice && !pdfDisplayOptions.hideAllPrices,
@@ -1055,9 +1061,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         group_by_area: true,
 
         show_labor_phase: false,
-        show_labor_hours: pdfDisplayOptions.showLaborPerLine,
+        show_labor_hours: false,
         show_labor_rate: false,
-        show_labor_total: pdfDisplayOptions.showInstalledPrice && !pdfDisplayOptions.hideAllPrices,
+        show_labor_total: pdfDisplayOptions.showLaborPerLine && !pdfDisplayOptions.hideAllPrices,
         show_labor_separate_from_parts: pdfDisplayOptions.separatePartsLabor,
 
         show_tax_breakdown: pdfDisplayOptions.showSalesTax && !pdfDisplayOptions.hideAllPrices,
@@ -1087,7 +1093,6 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         show_acceptance_section: true,
 
         page_size: 'letter',
-        color_scheme: pdfDisplayOptions.showColor ? 'default' : 'grayscale',
         font_family: 'sans-serif',
         show_page_numbers: true,
         show_watermark: false,
@@ -1103,7 +1108,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       };
 
       // Check if we're editing an existing template
-      const isEditing = selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId && t.created_by === profile?.id);
+      const isEditing = selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId && t.created_by === profile?.id && (t.is_personal || canManageCompanyTemplates) && t.is_personal === newTemplateIsPersonal);
 
       if (isEditing) {
         // Update existing template
@@ -1118,7 +1123,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         // Insert new template
         const { error } = await supabase
           .from('proposal_report_templates')
-          .insert(templateData);
+          .insert({ ...templateData, organization_id: profile.organization_id, created_by: profile.id, company_id: companyData.id, color_scheme: 'default', is_personal: newTemplateIsPersonal, is_default: false });
 
         if (error) throw error;
         notify('Template saved successfully!', { theme: 'violet', tone: 'success' });
@@ -5222,6 +5227,22 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
                       <input
                         type="checkbox"
+                        checked={pdfDisplayOptions.showModelNumber}
+                        onChange={(e) => setPdfDisplayOptions(prev => ({
+                          ...prev,
+                          showModelNumber: e.target.checked
+                        }))}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-primary">Model/Alias</div>
+                        <div className="text-xs text-muted mt-0.5">Show internal product model or alias</div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-3 p-3 rounded-lg bg-elevated border border-strong hover:bg-gray-650 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
                         checked={pdfDisplayOptions.showSKU}
                         onChange={(e) => setPdfDisplayOptions(prev => ({
                           ...prev,
@@ -5230,8 +5251,8 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         className="mt-0.5"
                       />
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-primary">SKU / Model</div>
-                        <div className="text-xs text-muted mt-0.5">Show product SKU/model number</div>
+                        <div className="text-sm font-medium text-primary">Ordering SKU</div>
+                        <div className="text-xs text-muted mt-0.5">Show manufacturer/distributor ordering code</div>
                       </div>
                     </label>
 
@@ -5595,7 +5616,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
       {/* Save Template Modal */}
       {showSaveTemplateModal && (() => {
-        const isEditing = selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId && t.created_by === profile?.id);
+        const isEditing = selectedTemplateId && pdfTemplates.find(t => t.id === selectedTemplateId && t.created_by === profile?.id && (t.is_personal || canManageCompanyTemplates));
         const editingTemplate = isEditing ? pdfTemplates.find(t => t.id === selectedTemplateId) : null;
 
         // Pre-populate form when opening for edit
@@ -5610,11 +5631,12 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             showDescription: editingTemplate.show_line_item_description ?? true,
             showManufacturer: editingTemplate.show_manufacturer ?? true,
             showSKU: editingTemplate.show_sku ?? true,
-            showColor: editingTemplate.color_scheme !== 'grayscale',
+            showModelNumber: editingTemplate.show_model_number ?? false,
+            showColor: editingTemplate.show_item_color ?? false,
             showUnitPrice: editingTemplate.show_unit_price ?? true,
             showLinePrice: editingTemplate.show_line_item_total ?? true,
-            showInstalledPrice: editingTemplate.show_labor_total ?? true,
-            showLaborPerLine: editingTemplate.show_labor_hours ?? false,
+            showInstalledPrice: editingTemplate.show_installed_price ?? true,
+            showLaborPerLine: editingTemplate.show_labor_total ?? false,
             showRoomScope: editingTemplate.show_area_descriptions ?? true,
             showAreaTotals: editingTemplate.show_area_subtotals ?? true,
             separatePartsLabor: editingTemplate.show_labor_separate_from_parts ?? false,
@@ -5683,13 +5705,14 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     <input
                       type="checkbox"
                       checked={!newTemplateIsPersonal}
+                      disabled={!canManageCompanyTemplates}
                       onChange={(e) => setNewTemplateIsPersonal(!e.target.checked)}
                       className="mt-1"
                     />
                     <div>
                       <div className="text-sm font-medium text-primary">Make this a company-wide template</div>
                       <div className="text-xs text-muted mt-1">
-                        All team members will be able to use this template. Otherwise, only you can use it.
+                        Administrators can share company templates. Personal templates are available only to their creator.
                       </div>
                     </div>
                   </label>
@@ -5724,11 +5747,21 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                     <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
                       <input
                         type="checkbox"
+                        checked={pdfDisplayOptions.showModelNumber}
+                        onChange={(e) => setPdfDisplayOptions({...pdfDisplayOptions, showModelNumber: e.target.checked})}
+                        className="mt-1"
+                      />
+                      <div className="text-sm text-gray-200">Show Model/Alias</div>
+                    </label>
+
+                    <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
+                      <input
+                        type="checkbox"
                         checked={pdfDisplayOptions.showSKU}
                         onChange={(e) => setPdfDisplayOptions({...pdfDisplayOptions, showSKU: e.target.checked})}
                         className="mt-1"
                       />
-                      <div className="text-sm text-gray-200">Show SKU/Model</div>
+                      <div className="text-sm text-gray-200">Show Ordering SKU</div>
                     </label>
 
                     <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">
@@ -5778,7 +5811,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                         onChange={(e) => setPdfDisplayOptions({...pdfDisplayOptions, showLaborPerLine: e.target.checked})}
                         className="mt-1"
                       />
-                      <div className="text-sm text-gray-200">Show Labor Hours</div>
+                      <div className="text-sm text-gray-200">Show Labor Per Line</div>
                     </label>
 
                     <label className="flex items-start gap-3 cursor-pointer p-3 bg-elevated rounded-lg hover:bg-gray-650">

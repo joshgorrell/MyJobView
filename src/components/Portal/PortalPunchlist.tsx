@@ -31,6 +31,8 @@ interface Service {
   photos: string[];
 }
 interface Support {
+  submission_updates_enabled?: boolean;
+  submission_updates?: Array<{ request_id: string; project_id: string; item_count: number; submitted_at: string }>;
   organization_id: string;
   vip_service_access: boolean;
   projects: Project[];
@@ -157,6 +159,16 @@ export function PortalPunchlist({
     setSelected([]);
     visitSubmission.current = crypto.randomUUID();
   }, [projectId]);
+  async function updateSubmissionPreference(enabled: boolean) {
+    if (preview || busy || !contactId) return;
+    setBusy(true);
+    try {
+      const { error: failure } = await supabase.rpc('set_test_tune_submission_updates', { p_contact_id: contactId, p_enabled: enabled });
+      if (failure) throw failure;
+      await load();
+    } catch (failure) { setError((failure as Error).message); }
+    finally { setBusy(false); }
+  }
   async function uploadPhotos() {
     if (!data) return [];
     for (let i = uploaded.current.length; i < files.length; i++) {
@@ -304,6 +316,8 @@ export function PortalPunchlist({
           Refresh
         </button>
       </div>
+      {data?.submission_updates_enabled !== undefined && <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={data.submission_updates_enabled} disabled={preview || busy} onChange={e => void updateSubmissionPreference(e.target.checked)} />Show Test &amp; Tune submission updates in my portal</label>}
+      {!!data?.submission_updates?.length && <details className="rounded-xl border p-3"><summary>Service request updates ({data.submission_updates.length})</summary><ul className="space-y-2 pt-2">{data.submission_updates.map(update => <li key={update.request_id} className="text-sm">Your service request for {update.item_count} adjustment{update.item_count === 1 ? '' : 's'} was submitted on {new Date(update.submitted_at).toLocaleDateString()}. Our team will arrange scheduling.</li>)}</ul></details>}
       {loading && <p>Loading your items…</p>}
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 text-red-700 p-3">

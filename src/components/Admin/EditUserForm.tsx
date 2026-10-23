@@ -21,6 +21,7 @@ import {
   UserCircle,
   Clock,
   AlertCircle,
+  Radio,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
@@ -161,6 +162,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     can_edit_contact_assignments: (user as any).can_edit_contact_assignments ?? false,
     can_create_work_orders: (user as any).can_create_work_orders ?? false,
     can_edit_products: (user as any).can_edit_products ?? false,
+    can_manage_monitoring_services: (user as any).can_manage_monitoring_services ?? (user.role === 'admin'),
     can_see_all_review_requests: (user as any).can_see_all_review_requests ?? false,
     can_request_google_reviews: (user as any).can_request_google_reviews ?? true,
     can_view_customer_feedback: (user as any).can_view_customer_feedback ?? ((user as any).can_see_all_review_requests ?? false),
@@ -660,6 +662,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         can_edit_contact_assignments: formData.can_edit_contact_assignments,
         can_create_work_orders: formData.can_create_work_orders,
         can_edit_products: formData.can_edit_products,
+        can_manage_monitoring_services: formData.can_manage_monitoring_services,
         can_see_all_review_requests: formData.can_see_all_review_requests,
         can_request_google_reviews: formData.can_request_google_reviews,
         can_view_customer_feedback: formData.can_view_customer_feedback,
@@ -1267,6 +1270,12 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         icon: Shield,
                         label: 'Can Edit Products',
                         desc: 'Add, edit, and delete products in the catalog',
+                      },
+                      {
+                        key: 'can_manage_monitoring_services',
+                        icon: Radio,
+                        label: 'Manage Monitoring Services',
+                        desc: 'Add, edit, activate, and delete security monitoring services',
                       },
                       {
                         key: 'can_edit_contacts',

@@ -6,6 +6,11 @@ export const ENGAGEMENT_ACTIONS = {
   question_clicked: 'Questions opened',
   change_request_clicked: 'Change request opened',
   decline_clicked: 'Decline opened',
+  decline_to_changes_clicked: 'Chose changes after viewing Our Promise',
+  decline_to_approval_clicked: 'Chose approval after viewing Our Promise',
+  decline_rep_call_clicked: 'Called representative from decline reminder',
+  decline_rep_email_clicked: 'Emailed representative from decline reminder',
+  decline_continue_clicked: 'Acknowledged Our Promise and continued declining',
   video_opened: 'Video opened',
   video_played: 'Video played',
 } as const;
@@ -59,7 +64,7 @@ export class ProposalAttention {
 
 export function sectionLabel(key: string, rooms: Record<string, string>): string {
   if (key.startsWith('room:')) return rooms[key.slice(5)] || 'Room / area';
-  return ({ scope: 'Scope', pricing: 'Pricing', actions: 'Approval and questions', notes: 'Additional notes', video: 'Proposal video' } as Record<string, string>)[key] || 'Proposal';
+  return ({ scope: 'Scope', pricing: 'Pricing', actions: 'Approval and questions', notes: 'Additional notes', promise: 'Our Promise', video: 'Proposal video' } as Record<string, string>)[key] || 'Proposal';
 }
 
 export interface ProposalEngagementRow {

@@ -1,0 +1,52 @@
+name: Rewards integrity
+on:
+  pull_request:
+    paths:
+      - 'src/components/Rewards/**'
+      - 'src/components/Admin/PointsAndRewards.tsx'
+      - 'src/components/Tasks/**'
+      - 'src/components/Feed/**'
+      - 'src/components/Production/**'
+      - 'src/components/Dispatch/TimeClockHistory.tsx'
+      - 'supabase/migrations/**'
+      - 'tests/rewards/**'
+      - 'package*.json'
+      - '.github/workflows/rewards-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rewards:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: rewards-ci-only
+          POSTGRES_DB: rewards_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      REWARDS_DATABASE_URL: postgres://postgres:rewards-ci-only@localhost:5432/rewards_test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm install --no-save --package-lock=false pg@8.16.3 playwright@1.55.1
+      - run: npm run test:rewards && node tests/rewards/concurrency.mjs
+      - name: Install and verify headless Chromium
+        timeout-minutes: 5
+        run: |
+          npx playwright install --only-shell chromium
+          node --input-type=module -e 'import {chromium} from "playwright";const b=await chromium.launch();await b.close();'
+      - run: npm run test:rewards:browser

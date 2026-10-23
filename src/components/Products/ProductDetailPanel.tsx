@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import {
   Package, DollarSign, Wrench, Upload, Pencil, ExternalLink,
-  FileText, Video, Building2, Tag, Hash, Ruler, Palette, Gift
+  FileText, Video, Building2, Tag, Hash, Palette, Gift
 } from 'lucide-react';
 
 export interface ProductDetailPanelData {
@@ -151,9 +151,9 @@ export default function ProductDetailPanel({
                   <Pencil className="w-3 h-3 text-gray-600" />
                 </button>
               )}
-              {!isEdit && onRequestImage && <button type="button" onClick={onRequestImage}
-                className="absolute bottom-1 right-1 rounded-md bg-white border border-gray-200 shadow px-2 py-1 text-xs font-medium text-gray-500 hover:bg-blue-50">
-                Change photo
+              {!isEdit && onRequestImage && <button type="button" onClick={onRequestImage} aria-label="Change photo"
+                className="absolute bottom-1 right-1 w-7 h-7 bg-white hover:bg-gray-50 rounded-md flex items-center justify-center shadow border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil className="w-3 h-3 text-gray-600" />
               </button>}
             </div>
           ) : (
@@ -183,19 +183,13 @@ export default function ProductDetailPanel({
             {data.manufacturerName && <InfoRow label="Mfr" value={data.manufacturerName} />}
             {data.modelNumber && <InfoRow label="Model" value={data.modelNumber} />}
             {data.vendorName && <InfoRow label="Vendor" value={data.vendorName} />}
-            {data.sku && data.sku !== data.modelNumber && <InfoRow label="SKU" value={data.sku} />}
+            {data.sku && data.sku !== data.modelNumber && <InfoRow label="Ordering SKU" value={data.sku} />}
             {data.upc && <InfoRow label="UPC" value={data.upc} />}
             {data.msrp && data.msrp > 0 && <InfoRow label="MSRP" value={formatCurrency(data.msrp)} />}
             {data.itemColor && (
               <div className="flex items-baseline gap-1 py-1">
                 <Palette className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                 <span className="text-xs text-gray-700 truncate">{data.itemColor}</span>
-              </div>
-            )}
-            {data.itemSize && (
-              <div className="flex items-baseline gap-1 py-1">
-                <Ruler className="w-2.5 h-2.5 text-gray-400 shrink-0" />
-                <span className="text-xs text-gray-700">{data.itemSize}</span>
               </div>
             )}
 

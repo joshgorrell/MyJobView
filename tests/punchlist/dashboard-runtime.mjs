@@ -7,7 +7,7 @@ function harness(path, globals = {}, imports = {}) {
   const values = [], deps = [], effects = [];
   const hook = () => { assert.ok(rendering, 'Hooks must run during render, never inside effects'); return cursor++; };
   const react = { lazy: () => "Scheduler", Suspense: "Suspense",
-    useState(initial) { const i = hook(); if (!(i in values)) values[i] = initial; return [values[i], value => { values[i] = typeof value === 'function' ? value(values[i]) : value; }]; },
+    useState(initial) { const i = hook(); if (!(i in values)) values[i] = typeof initial === 'function' ? initial() : initial; return [values[i], value => { values[i] = typeof value === 'function' ? value(values[i]) : value; }]; },
     useRef(initial) { const i = hook(); return values[i] ||= {current: initial}; },
     useCallback(fn, next) { const i = hook(); if (!deps[i] || next.some((v,j) => v !== deps[i][j])) { deps[i] = next; values[i] = fn; } return values[i]; },
     useId() { return `test-${hook()}`; },
@@ -24,48 +24,25 @@ function harness(path, globals = {}, imports = {}) {
 function nodes(tree) { if (!tree || typeof tree !== 'object') return []; if (Array.isArray(tree)) return tree.flatMap(nodes); return [tree,...nodes(tree.props?.children)]; }
 function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); if (!tree || typeof tree !== 'object') return tree == null ? '' : String(tree); return text(tree.props?.children); }
 
-const library={exports:{}};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/punchlist.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:library,exports:library.exports});
-const rows=[['old','a','Alpha','2026-10-01','draft'],['new','b','Beta','2026-10-05','draft'],['second','a','Alpha','2026-10-03','draft'],['requested','a','Alpha','2026-10-02','requested']].map(([id,contact_id,name,created_at,status])=>({id,contact_id,created_at,status,title:id,details:id+' item',contact:{full_name:name,email:name+'@example.com',phone:'123'},service_request_id:status==='requested'?'existing':null,service_request:status==='requested'?{status:'open',work_order_id:null}:null}));
-const requests={existing:{id:'existing',contact_id:'a',status:'open'}};
-const calls=[];
-const supabase={channel:()=>({on(){return this;},subscribe:()=>({unsubscribe(){}})}),from(table){let id;const q={select:()=>q,order:()=>q,eq:(k,v)=>{id=v;return q;},single:async()=>({data:requests[id],error:null}),then:resolve=>Promise.resolve({data:rows,error:null}).then(resolve)};return q;},rpc:async(name,args)=>{calls.push([name,args]);const id='sr-'+args.p_contact_id;requests[id]={id,contact_id:args.p_contact_id,status:'open',work_order_id:null};return{data:id,error:null};}};
-const toast={warning:msg=>calls.push(['warning',msg]),error:msg=>calls.push(['error',msg]),success(){}};
-const h=harness('src/components/Production/PunchlistAdminDashboard.tsx',{}, {
- '../../lib/punchlist':library.exports,'./ProjectPunchlistWorkspace':{ProjectPunchlistWorkspace:'ProjectWorkspace',PlaceLegacyPunchlist:'PlaceLegacy'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile:{id:'admin'},loading:false})},
- '../Shared/Toast':{useToast:()=>toast},'../../hooks/usePunchlistUnseenCount':{markPunchlistSeen(){}},'./PunchlistInviteManager':{PunchlistInviteManager:'Invites'},'../Portal/PunchlistTaskDetailModal':{PunchlistTaskDetailModal:'Details'},'../Shared/ContactQuickViewModal':{ContactQuickViewModal:'Contact'},
-});
-let tree=h.render({},'PunchlistAdminDashboard');for(const effect of h.effects.splice(0))effect();await new Promise(r=>setTimeout(r,0));tree=h.render({},'PunchlistAdminDashboard');
-const boxes=()=>nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox');
-const button=(name)=>nodes(tree).find(n=>n.type==='button'&&(n.props['aria-label']===name||text(n)===name));
-const control=name=>nodes(tree).find(n=>n.props?.['aria-label']===name);
-const render=()=>{tree=h.render({},'PunchlistAdminDashboard');};
-control('Punchlist page').props.onChange({target:{value:'punchlist'}});render();
-assert.deepEqual(boxes().map(n=>n.props['aria-label']),['Select new item','Select second item','Select requested item','Select old item']);
-assert.equal(button('Select all visible items for this customer').props.disabled,true);
-boxes()[1].props.onChange();render();assert.equal(boxes()[0].props.disabled,true);
-button('Select all visible items for this customer').props.onClick();render();assert.equal(boxes().filter(n=>n.props.checked).length,3);
-assert.equal(button('Request Service').props.disabled,true);
-button('Clear selection').props.onClick();render();assert.equal(boxes()[0].props.disabled,false);
-control('Punchlist order').props.onChange({target:{value:'customer'}});render();assert.equal(boxes()[0].props['aria-label'],'Select second item');
-control('Search punchlist items').props.onChange({target:{value:'Beta'}});render();assert.equal(boxes().length,1);
-boxes()[0].props.onChange();render();assert.equal(button('Request Service').props.disabled,false);
-button('Request Service').props.onClick();render();let batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.tasks.length,1);assert.equal(batch.props.tasks[0].contact_id,'b');
-// Exercise the actual nested batch component by using its captured function in a hook renderer.
-let completed=false,scheduled;
-function runBatch(props){const source=fs.readFileSync('src/components/Production/PunchlistAdminDashboard.tsx','utf8')+'\nexport {BatchRequestModal};';
- const original=fs.readFileSync;fs.readFileSync=(path,...args)=>path==='batch.tsx'?source:original(path,...args);try{return harness('batch.tsx',{}, {'../../lib/punchlist':library.exports,'./ProjectPunchlistWorkspace':{ProjectPunchlistWorkspace:'ProjectWorkspace',PlaceLegacyPunchlist:'PlaceLegacy'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{},'../Shared/Toast':{useToast:()=>toast},'../../hooks/usePunchlistUnseenCount':{},'./PunchlistInviteManager':{},'../Portal/PunchlistTaskDetailModal':{},'../Shared/ContactQuickViewModal':{}}).render(props,'BatchRequestModal');}finally{fs.readFileSync=original;}}
-let batchTree=runBatch({tasks:[rows[1]],mode:'request',onSuccess:()=>{completed=true;},onClose(){},onSchedule(){throw Error('Request Service must hand off to the queue without opening the scheduler');}});
-assert.ok(text(batchTree).includes('Your service manager will assign a technician and schedule the work.'));
-await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Request Service (1)').props.onClick();assert.ok(completed);assert.deepEqual(Array.from(calls.find(c=>c[0]==='request_punchlist_service')[1].p_task_ids),['new']);
-batchTree=runBatch({tasks:[rows[3]],mode:'schedule',onSuccess(){},onClose(){},onSchedule:requests=>{scheduled=requests;}});
-await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Continue to Schedule').props.onClick();assert.equal(scheduled[0].id,'existing');assert.equal(calls.filter(c=>c[0]==='request_punchlist_service').length,1);
-batchTree=runBatch({tasks:[rows[0],rows[1]],mode:'schedule',onSuccess(){},onClose(){},onSchedule(){throw Error('Mixed customers must not schedule');}});
-await nodes(batchTree).find(n=>n.type==='button'&&text(n)==='Continue to Schedule').props.onClick();assert.ok(calls.some(c=>c[0]==='error'&&c[1].includes('one customer')));
-console.log('Newest/customer/search, visible selection, customer lock, request grouping, existing-request scheduling, and mixed-customer guard passed.');
-batch.props.onClose();render();button('new item').props.onClick();render();
-let detail=nodes(tree).find(n=>n.type==='Details');assert.ok(detail.props.onSchedule);detail.props.onSchedule();render();
-batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.mode,'schedule');assert.equal(batch.props.tasks.length,1);assert.equal(batch.props.tasks[0].id,'new');
-batch.props.onClose();render();button('new item').props.onClick();render();detail=nodes(tree).find(n=>n.type==='Details');detail.props.onRequestService();render();
-batch=nodes(tree).find(n=>typeof n.type==='function'&&n.type.name==='BatchRequestModal');assert.equal(batch.props.mode,'request');assert.equal(batch.props.tasks.length,1);
-console.log('Dashboard detail actions open the existing flow for exactly the chosen item.');
+const projects=[{id:'p1',contact_id:'c1',customer:'Alpha',name:'Living room',number:'P1',can_submit:true,end_date:'2026-12-01',tasks:['a','b','c','d','e'].map(id=>({id,title:id,customer_description:id,visibility:'customer_visible',status:'open',request_id:null}))},{id:'p2',contact_id:'c1',customer:'Alpha',name:'Other project',can_submit:true,tasks:[{id:'other',title:'Other project',status:'open',request_id:null}]},{id:'p3',contact_id:'c2',customer:'Expired',name:'Old project',can_submit:false,tasks:[{id:'expired',title:'Expired adjustment',status:'open',request_id:null}]}];
+const calls=[],listeners={};let fail=true;
+const supabase={rpc:async(name,args)=>{if(name==='get_test_tune_workspace')return {data:JSON.parse(JSON.stringify(projects)),error:null};calls.push([name,args]);if(fail){fail=false;return {error:{message:'Network response lost'}};}for(const p of projects)for(const t of p.tasks)if(args.p_task_ids.includes(t.id))t.request_id='req1';return {data:'req1',error:null};},channel:()=>({on(){return this;},subscribe(){return this;}}),removeChannel(){}};
+const window={location:{search:'',href:'https://example.com/test-and-tune'},setInterval:()=>1,clearInterval(){},addEventListener:(n,f)=>listeners[n]=f,removeEventListener(){},history:{pushState(){}}};
+const document={visibilityState:'visible',addEventListener(){},removeEventListener(){}};
+const globals={window,document,URL,URLSearchParams,crypto:{randomUUID:()=>`submission-${calls.length}`}};
+function make(){return harness('src/components/Production/TestTuneProjectAdjustments.tsx',globals,{'../../lib/supabase':{supabase}});}
+const h=make();let tree;
+const render=()=>tree=h.render({},'TestTuneProjectAdjustments');
+const find=label=>nodes(tree).find(n=>n.props?.['aria-label']===label);
+const button=label=>nodes(tree).find(n=>n.type==='button'&&text(n)===label);
+render();for(const effect of h.effects.splice(0))effect();await new Promise(r=>setTimeout(r,0));render();
+assert.equal(find('Select Expired adjustment').props.disabled,true);
+for(const id of ['a','b','c']){find(`Select ${id}`).props.onChange({target:{checked:true}});render();}
+assert.equal(find('Select Other project').props.disabled,true,'Selection locks to project even for the same customer');
+button('Request service').props.onClick();await new Promise(r=>setTimeout(r,0));render();assert.ok(text(tree).includes('Network response lost'));
+button('Request service').props.onClick();await new Promise(r=>setTimeout(r,0));render();
+assert.deepEqual(Array.from(calls[1][1].p_task_ids),['a','b','c']);assert.equal(calls[0][1].p_submission_id,calls[1][1].p_submission_id,'Ambiguous retries retain idempotency reference');
+assert.ok(!find('Select a'));assert.ok(find('Select d'));assert.ok(find('Select e'));
+const originalRoute= listeners.popstate;const fresh=make();fresh.render({},'TestTuneProjectAdjustments');for(const effect of fresh.effects.splice(0))effect();await new Promise(r=>setTimeout(r,0));const reloaded=fresh.render({},'TestTuneProjectAdjustments');assert.ok(!nodes(reloaded).some(n=>n.props?.['aria-label']==='Select a'),'Fresh device uses persisted links, not session state');
+window.location.search='?projectId=missing&contactId=c1';originalRoute();render();assert.ok(text(tree).includes('unavailable or you no longer have access'));
+console.log('PASS: exactly three of five, project lock, expired block, stable retry key, persisted reload and unavailable route context.');

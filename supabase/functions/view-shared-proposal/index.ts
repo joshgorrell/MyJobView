@@ -16,16 +16,21 @@ Deno.serve(async req => {
       .eq('token_hash', hash).maybeSingle();
     if (linkError || !link || link.revoked_at || (link.expires_at && Date.parse(link.expires_at) <= Date.now())) return json({ error: 'Invalid or expired link' }, 404);
     const { data: proposal, error: proposalError } = await db.from('proposals')
-      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at')
+      .select('id,organization_id,proposal_number,title,status,total,current_portal_version,expires_at,sent_at,is_active_revision,is_portal_visible')
       .eq('id', link.proposal_id).eq('organization_id', link.organization_id).maybeSingle();
-    if (proposalError || !proposal || !['sent', 'portal', 'approved', 'accepted'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
+    if (proposalError || !proposal || !proposal.is_active_revision || !proposal.is_portal_visible || !['sent', 'viewed', 'portal', 'approved', 'approved_pending_action'].includes(proposal.status)) return json({ error: 'This proposal link is no longer valid' }, 410);
+    // A newly published portal revision invalidates an older shared document link.
+    // The sender must explicitly issue a link for the current revision.
+    if (Number(link.portal_version) !== Number(proposal.current_portal_version ?? 1)) {
+      return json({ error: 'This proposal has been revised. Please request the latest link.' }, 410);
+    }
     // Approval and link viewing use the same stored submission expiration. Resubmission resets expires_at.
     if (!proposal.sent_at || !Number.isFinite(Date.parse(proposal.sent_at)) ||
       (!proposal.expires_at || !Number.isFinite(Date.parse(proposal.expires_at)) || Date.now() >= Date.parse(proposal.expires_at))) {
       return json({ error: 'This proposal viewing period has expired. Please request a resubmission.' }, 410);
     }
     // Deliberately limited projection: never return contacts, internal notes, pricing details or other tenant data.
-    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at } });
+    return json({ proposal: { id: proposal.id, number: proposal.proposal_number, title: proposal.title, status: proposal.status, total: proposal.total, expiresAt: proposal.expires_at }, actionsAvailable: false });
   } catch (error) {
     console.error('Proposal share validation failed', error);
     return json({ error: 'Unable to validate link' }, 500);
