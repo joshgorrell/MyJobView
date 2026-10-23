@@ -67,7 +67,7 @@ BEGIN
       SELECT technician_id AS profile_id, entry_date AS day, sum(total_hours) AS hours FROM public.time_entries
       WHERE organization_id = org AND entry_date BETWEEN p_start AND p_end AND status = 'approved' AND clock_out IS NOT NULL
         AND COALESCE(entry_type, 'work_order') IN ('work_order', 'project', 'customer_activity') GROUP BY technician_id, entry_date) j), '[]'::jsonb),
-    'native_payroll', COALESCE((SELECT jsonb_agg(to_jsonb(c)) FROM (
+    'native_payroll', COALESCE((SELECT jsonb_agg(jsonb_build_object('profile_id', c.profile_id, 'day', c.day, 'hours', c.hours, 'leave_hours', c.leave_hours, 'needs_review', c.needs_review)) FROM (
       SELECT technician_id AS profile_id, entry_date AS day, sum(CASE WHEN leave_type IS NULL THEN total_hours ELSE 0 END) AS hours,
         sum(CASE WHEN leave_type IS NOT NULL THEN total_hours ELSE 0 END) AS leave_hours,
         bool_or(status NOT IN ('clocked_out', 'approved') OR total_hours IS NULL OR total_hours < 0) AS needs_review
