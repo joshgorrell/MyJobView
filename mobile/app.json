@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MyJobView",
-    "slug": "field-ops-mobile",
+    "slug": "myjobview",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
