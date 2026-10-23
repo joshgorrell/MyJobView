@@ -45,4 +45,9 @@ assert.ok(guardPosition > 0 && sessionRpcPosition > guardPosition,
 assert.match(auth, /trackingGeneration !== sessionTrackingGenerationRef\.current/);
 assert.match(auth, /sessionTrackingGenerationRef\.current\+\+/);
 
+assert.ok(auth.includes('Customer portal accounts may not have a staff profile'), 'Portal users without staff profiles must receive the idle guard');
+const legacyUi = await readFile('src/components/Admin/UserSessionsViewerEnhanced.tsx', 'utf8');
+assert.ok(legacyUi.includes('Legacy daily logout (read-only)'), 'Legacy daily logout settings must be labeled read-only');
+assert.ok(legacyUi.includes('aria-label="Legacy daily logout is read-only"'), 'Legacy schedule toggle must be disabled');
+assert.ok(legacyUi.includes('Read-only Legacy Schedule'), 'Legacy save button must be disabled');
 console.log('60-minute timeout, five-minute warning, reload eligibility and idle-dialog contract pass');
