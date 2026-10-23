@@ -109,6 +109,15 @@ export function UserSessionsDashboard() {
       timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(new Date(value));
   }
+  function dailySessions(userId: string): [string, Session[]][] {
+    const groups = new Map<string, Session[]>();
+    for (const session of sessions) {
+      if (session.user_id !== userId || Date.parse(session.last_activity) < Date.now() - 7 * 86400000) continue;
+      const day = centralDate(session.session_start);
+      groups.set(day, [...(groups.get(day) || []), session]);
+    }
+    return [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }
   function sessionCoverage(rows: Session[]): number {
     const cutoff = Date.now() - 7 * 86400000;
     const windows = rows.map(s => [Math.max(cutoff, Date.parse(s.session_start)), Math.min(Date.now(), Date.parse(s.session_end || s.last_activity))] as const)
