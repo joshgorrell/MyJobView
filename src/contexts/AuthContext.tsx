@@ -395,23 +395,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
         };
 
-        // One-hour inactivity logout. Background tabs cannot observe interaction
-        // elsewhere in the browser, so recheck on focus before expiring.
+        // Inactivity is based on interactions within MJV, not other browser tabs.
+        // Persist across reloads and tabs in this browser to prevent timer resets.
+        const idleKey = 'mjv-last-interaction';
         const inactivityLimitMs = 60 * 60 * 1000;
-        let lastAppInteractionAt = Date.now();
-        const trackIdleInteraction = () => { lastAppInteractionAt = Date.now(); };
+        const warningMs = 55 * 60 * 1000;
+        const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || Date.now();
+        const trackIdleInteraction = () => {
+          localStorage.setItem(idleKey, String(Date.now()));
+          document.getElementById('mjv-idle-warning')?.remove();
+        };
+        if (!localStorage.getItem(idleKey)) trackIdleInteraction();
         interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
         const idleCheck = setInterval(() => {
-          if (document.visibilityState !== 'visible') return;
-          if (Date.now() - lastAppInteractionAt >= inactivityLimitMs) {
+          const idleMs = Date.now() - readLastInteraction();
+          if (idleMs >= inactivityLimitMs) {
             clearInterval(idleCheck);
+            document.getElementById('mjv-idle-warning')?.remove();
             void supabase.auth.signOut();
+          } else if (idleMs >= warningMs && !document.getElementById('mjv-idle-warning')) {
+            const warning = document.createElement('div');
+            warning.id = 'mjv-idle-warning';
+            warning.setAttribute('role', 'alertdialog');
+            warning.setAttribute('aria-label', 'Session expiring');
+            warning.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;background:#1f2937;color:white;padding:18px;border-radius:10px;box-shadow:0 8px 24px #0005;max-width:320px';
+            warning.textContent = 'Your MyJobView session will expire after 60 minutes of inactivity. ';
+            const stay = document.createElement('button');
+            stay.textContent = 'Stay signed in';
+            stay.style.cssText = 'display:block;margin-top:12px;background:white;color:#111827;padding:8px 12px;border-radius:6px';
+            stay.onclick = trackIdleInteraction;
+            warning.appendChild(stay);
+            document.body.appendChild(warning);
           }
-        }, 30 * 1000);
+        }, 15 * 1000);
         const priorCleanup = (window as any).__sessionInteractionCleanup;
         (window as any).__sessionInteractionCleanup = () => {
           priorCleanup?.();
           clearInterval(idleCheck);
+          document.getElementById('mjv-idle-warning')?.remove();
           interactionEvents.forEach(event => document.removeEventListener(event, trackIdleInteraction));
         };
 
