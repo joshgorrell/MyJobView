@@ -55,7 +55,7 @@
     "test:proposal-engagement:browser": "node tests/proposal-engagement/browser.mjs && node tests/proposal-engagement/activity-link-browser.mjs && node tests/proposal-engagement/weekly-flow-browser.mjs",
     "test:punchlist:handoff": "node tests/punchlist/visit-handoff-database.mjs && node tests/punchlist/test-tune-scheduler.mjs",
     "test:punchlist:handoff:browser": "npm run build && node tests/punchlist/visit-checklist-browser.mjs",
-    "test:sessions": "node tests/sessions/runtime.mjs && node tests/sessions/database.mjs && node tests/sessions/inactivity.mjs",
+    "test:sessions": "node tests/sessions/runtime.mjs && node tests/sessions/database.mjs && node tests/sessions/inactivity.mjs && node tests/sessions/force-logout.mjs",
     "test:pto": "node tests/pto/database.mjs && node tests/pto/browser.mjs",
     "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs && node tests/labor-dashboard/timing.mjs && node tests/labor-dashboard/tech-stats-entry.mjs && node tests/labor-dashboard/team-utilization.mjs",
     "test:proposal-promise": "node tests/proposals/promise.mjs",
