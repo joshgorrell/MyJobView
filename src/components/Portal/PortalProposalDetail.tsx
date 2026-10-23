@@ -217,8 +217,14 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const declineRequestId = useRef(crypto.randomUUID());
+  const changeRequestId = useRef(crypto.randomUUID());
   const [comment, setComment] = useState('');
   const [declineReason, setDeclineReason] = useState('');
+  const [declineNotes, setDeclineNotes] = useState('');
+  const [declinePromiseAcknowledged, setDeclinePromiseAcknowledged] = useState(false);
+  const [repContact, setRepContact] = useState<{ name: string; email: string | null; phone: string | null; phone_kind?: 'office' | 'rep' } | null>(null);
+  const [activeDecisionForm, setActiveDecisionForm] = useState<'changes' | 'decline' | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
@@ -276,6 +282,23 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       setMessagesByContext(hasMsg);
       setUnreadByContext(unread);
     } catch {}
+  }
+
+  async function downloadProposal() {
+    if (previewMode) return;
+    const documentWindow = window.open('', '_blank');
+    if (!documentWindow) { notify('Please allow a new window to print or save your proposal as PDF.', { theme: 'blue', tone: 'warning' }); return; }
+    documentWindow.opener = null;
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
+      if (error || typeof data !== 'string') throw error || new Error('Proposal document unavailable');
+      documentWindow.document.open(); documentWindow.document.write(data); documentWindow.document.close();
+      documentWindow.focus(); documentWindow.print();
+      await trackProposalDownload();
+    } catch (error) {
+      documentWindow.close();
+      notify('Unable to prepare the proposal document. Please retry.', { theme: 'blue', tone: 'error' });
+    }
   }
 
   async function trackProposalDownload() {
@@ -344,6 +367,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       if (proposalRes.data) {
         setProposal(proposalRes.data);
+        setRepContact(null);
+        void supabase.rpc('get_customer_proposal_representative', { p_proposal_id: proposalId })
+          .then(({ data, error }) => { if (!error && data) setRepContact(data); });
         setRooms(roomsRes.data || []);
         setLineItems(itemsRes.data || []);
 
@@ -573,9 +599,19 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     }
   }
 
+  function recordDecisionStep(step: 'decline_started' | 'decline_to_changes' | 'decline_to_approval' | 'decline_acknowledged' | 'decline_cancelled' | 'change_request_submitted') {
+    if (previewMode) return;
+    void supabase.rpc('record_proposal_decision_step', { p_proposal_id: proposalId, p_step: step })
+      .then(({ error, data }) => { if (error || data !== true) console.warn('Proposal decision breadcrumb was not recorded', error); });
+  }
+
   async function handleDecline() {
     if (previewMode) return;
     if (!proposal) return;
+    if (!declinePromiseAcknowledged) {
+      notify('Please review Our Promise before declining.', { theme: 'blue', tone: 'warning' });
+      return;
+    }
     if (!declineReason) {
       notify('Please select a reason for declining this proposal.', { theme: 'blue', tone: 'warning' });
       return;
@@ -584,27 +620,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('proposals')
-        .update({
-          status: 'declined',
-          decline_reason: declineReason,
-          decline_notes: comment.trim() || null,
-          declined_at: new Date().toISOString(),
-          declined_by: 'customer',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', proposalId);
-
-      if (error) throw error;
-
-      // Log activity
-      const { error: activityError } = await supabase.from('proposal_activity').insert({
-        proposal_id: proposalId,
-        activity_type: 'declined',
-        metadata: { reason: declineReason, notes: comment.trim() || null, by: 'customer' },
+      const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+        p_proposal_id: proposalId, p_expected_version: proposal.current_portal_version ?? 0,
+        p_request_id: declineRequestId.current, p_action: 'decline',
+        p_details: { reason: declineReason, notes: declineNotes.trim(), promise_acknowledged: declinePromiseAcknowledged },
       });
-      if (activityError) console.warn('Proposal decline activity could not be recorded', activityError);
+      if (error || data?.status !== 'declined') throw error || new Error('Decline was not recorded');
 
       notify('Proposal declined. We will be in touch shortly.', { theme: 'blue', tone: 'info' });
       onBack();
@@ -622,68 +643,20 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
     setSubmitting(true);
     try {
-      // Find or create the proposal message thread
-      let { data: existingThread } = await supabase
-        .from('message_threads')
-        .select('id')
-        .eq('proposal_id', proposalId)
-        .eq('context_type', 'proposal')
-        .maybeSingle();
-
-      let threadId = existingThread?.id;
-
-      if (!threadId) {
-        const { data: proposalData } = await supabase
-          .from('proposals')
-          .select('proposal_number, created_by, contact_id')
-          .eq('id', proposalId)
-          .single();
-
-        if (proposalData) {
-          const { data: newThread, error: createError } = await supabase
-            .from('message_threads')
-            .insert({
-              subject: `Q&A: Proposal ${proposalData.proposal_number}`,
-              context_type: 'proposal',
-              context_id: proposalId,
-              proposal_id: proposalId,
-              contact_id: proposalData.contact_id,
-              assigned_sales_rep_id: proposalData.created_by,
-              visibility: 'public',
-              created_by: proposalData.contact_id,
-            })
-            .select('id')
-            .single();
-
-          if (createError) throw createError;
-          threadId = newThread?.id;
-        }
-      }
-
-      if (!threadId) throw new Error('Could not find or create message thread');
-
-      const { error: msgError } = await supabase
-        .from('messages')
-        .insert({
-          thread_id: threadId,
-          author_id: proposal.contact_id || null,
-          author_name: proposal.contact_name || 'Customer',
-          author_type: 'customer',
-          body: comment.trim(),
-          is_internal: false,
-          is_read: false,
-          context_room_id: null,
-          context_line_item_id: null,
-          context_label: null,
-        });
-
-      if (msgError) throw msgError;
-
+      const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+        p_proposal_id: proposalId, p_expected_version: proposal.current_portal_version ?? 0,
+        p_request_id: changeRequestId.current, p_action: 'request_changes', p_details: { message: comment.trim() },
+      });
+      if (error || !data?.thread_id) throw error || new Error('Change request was not recorded');
+      changeRequestId.current = crypto.randomUUID();
       setComment('');
+      setActiveDecisionForm(null);
+      setDeclinePromiseAcknowledged(false);
       setShowQA(true);
+      notify('Your change request was sent to the proposal conversation.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error submitting change request:', error);
-      notify('Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
+      notify(error instanceof Error && /representative|route this request/.test(error.message) ? error.message : 'Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -851,7 +824,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             </div>
             <button
               data-engagement-action="download_clicked"
-              onClick={trackProposalDownload}
+              aria-label="Download PDF"
+              disabled={previewMode}
+              onClick={downloadProposal}
               className="flex items-center gap-2 px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px] flex-shrink-0"
             >
               <Download className="w-4 h-4" />
@@ -1209,6 +1184,14 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
               )}
 
+              {repContact && <section aria-label="Your representative" className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm">
+                <p className="font-semibold text-gray-900 break-words">Your representative: {repContact.name}</p>
+                <div className="mt-3 flex flex-wrap gap-4">
+                  {repContact.phone && <a className="text-blue-700 underline" href={`tel:${repContact.phone.replace(/[^+0-9]/g, '')}`}>{repContact.phone_kind === 'office' ? 'Call the office' : 'Call your representative'}</a>}
+                  {repContact.email && <a className="text-blue-700 underline" href={`mailto:${repContact.email}`}>Email your representative</a>}
+                </div>
+              </section>}
+
               {/* Action Buttons */}
               <div data-engagement-section="actions" className="space-y-3">
                 <button
@@ -1236,7 +1219,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="change_request_clicked"
-                      onClick={() => setComment(comment ? '' : 'open')}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'changes' ? null : 'changes'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                      aria-expanded={activeDecisionForm === 'changes'}
+                      aria-controls="proposal-change-request-form"
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
@@ -1247,7 +1232,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
                     <button
                       data-engagement-action="decline_clicked"
-                      onClick={() => setDeclineReason(declineReason ? '' : 'open')}
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); recordDecisionStep(activeDecisionForm === 'decline' ? 'decline_cancelled' : 'decline_started'); }}
+                      aria-expanded={activeDecisionForm === 'decline'}
+                      aria-controls="proposal-decline-form"
                       disabled={previewMode}
                       title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
@@ -1290,8 +1277,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             </div>
 
             {/* Request Changes / Comments Section */}
-            {comment && comment !== '' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            {activeDecisionForm === 'changes' && (
+              <div id="proposal-change-request-form" role="region" aria-label="Request proposal changes" className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Request Changes / Questions
@@ -1314,13 +1301,27 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             )}
 
             {/* Decline Section */}
-            {declineReason && (
-              <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
+            {activeDecisionForm === 'decline' && (
+              <div id="proposal-decline-form" role="region" aria-label="Decline proposal" className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
                   <XCircle className="w-4 h-4" />
                   Decline This Proposal
                 </h3>
-                <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>
+                {!declinePromiseAcknowledged && (
+                  <div data-engagement-section="promise" className="rounded-xl border border-blue-200 bg-blue-50 p-4 mb-4 space-y-3">
+                    <p className="text-sm font-bold text-blue-950">The Best Price. Guaranteed.</p>
+                    <p className="text-sm text-blue-900">We want your proposal to be the perfect fit. Changes are easy, and we guarantee the best price against any competitor for the same scope of work. If you've received a better quote, give us the opportunity to match or beat it. Would you like us to make an adjustment?</p>
+                    <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_changes'); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
+                    <button type="button" data-engagement-action="decline_to_approval_clicked" onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_approval'); handleApprove(); }} disabled={previewMode || submitting} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50">Actually, I'd Like to Approve</button>
+                    {(repContact?.email || repContact?.phone) && <div className="flex flex-wrap justify-center gap-3 text-sm">
+                      {repContact.phone && <a href={`tel:${repContact.phone.replace(/[^+0-9]/g, '')}`} data-engagement-action="decline_rep_call_clicked" className="font-semibold text-blue-800 underline underline-offset-2">{repContact.phone_kind === 'office' ? 'Call the office' : `Call ${repContact.name}`}</a>}
+                      {repContact.email && <a href={`mailto:${repContact.email}?subject=${encodeURIComponent('Question about proposal ' + proposal.proposal_number)}`} data-engagement-action="decline_rep_email_clicked" className="font-semibold text-blue-800 underline underline-offset-2">Email {repContact.name}</a>}
+                    </div>}
+                    <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => { setDeclinePromiseAcknowledged(true); recordDecisionStep('decline_acknowledged'); }} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
+                  </div>
+                )}
+                {declinePromiseAcknowledged && <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>}
+                {declinePromiseAcknowledged && <>
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></label>
                   <select
@@ -1343,8 +1344,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 <div className="mb-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Additional comments <span className="text-gray-400">(optional)</span></label>
                   <textarea
-                    value={comment === 'open' ? '' : comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    value={declineNotes}
+                    onChange={(e) => setDeclineNotes(e.target.value)}
                     placeholder="Any additional details..."
                     rows={3}
                     className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-400 focus:border-transparent text-sm resize-none"
@@ -1352,19 +1353,20 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setDeclineReason(''); setComment(''); }}
+                    onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 font-medium text-sm transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleDecline}
-                    disabled={previewMode || submitting || !declineReason || declineReason === 'open'}
+                    disabled={previewMode || submitting || !declinePromiseAcknowledged || !declineReason || declineReason === 'open'}
                     className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50 font-bold text-sm transition-colors"
                   >
                     {submitting ? 'Submitting...' : 'Confirm Decline'}
                   </button>
                 </div>
+                </>}
               </div>
             )}
 

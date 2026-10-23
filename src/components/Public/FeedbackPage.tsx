@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2, X, Sparkles } from 'lucide-react';
+import { CheckCircle, Star, ThumbsUp, Meh, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 
 type Rating = 'excellent' | 'good' | 'okay' | 'needs_attention';
 type Phase = 'rating' | 'comment' | 'positive' | 'negative' | 'submitting' | 'error';
