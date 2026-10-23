@@ -51,7 +51,7 @@ Customer submission updates appear in the portal, with a customer-controlled pre
 
 Both page shortcuts honor module access. Request-specific history links preserve customer, project and request IDs. Polling, focus refresh and realtime subscriptions reload persisted state. No records are deleted by the rollout.
 
-The live rollout includes the previously missing main-branch prerequisite `20261019180250_project_punchlist_and_vip_service.sql`, the workspace migration `20261023105139_test_tune_atomic_workspace.sql`, and the policy-helper grant correction `20261023114348_test_tune_policy_helper_access.sql`. Each migration is recorded with its exact repository source; no previous history was rewritten. Live authenticated staff can load the workspace and underlying task rows. Anonymous execution and direct receipt writes are denied. The existing 20 project tasks and one project were preserved; no service requests or submission receipts were created during rollout.
+The live rollout includes the previously missing main-branch prerequisite `20261019180250_project_punchlist_and_vip_service.sql`, the workspace migration `20261023105139_test_tune_atomic_workspace.sql`, the policy-helper grant correction `20261023114348_test_tune_policy_helper_access.sql`, and request-origin correction `20261023115340_test_tune_request_origin.sql`. Each migration is recorded with its exact repository source; no previous history was rewritten. Live authenticated staff can load the workspace and underlying task rows. Anonymous execution and direct receipt writes are denied. The existing 20 project tasks and one project were preserved; no service requests or submission receipts were created during rollout.
 
 Real PostgreSQL 17 authorization and concurrent handoff tests passed in CI. Local build/typecheck, phone/desktop workspace and portal/project browsers, and scoped regressions passed. The final integrated head must still pass every triggered CI workflow before merge. Frontend publication in Bolt is separate.
 
@@ -63,3 +63,5 @@ Security advisor comparison: ten added findings are intentional authenticated SE
 - The authoritative database transaction must create the request, associate all selected adjustment IDs, record the submitting actor, and mark those adjustments as requested atomically; rollback on failure.
 - Never create placeholder service requests for unsubmitted adjustments.
 - No blanket deletion of existing records: first identify Test & Tune test-only records and check foreign-key references and production relationships.
+
+Ordinary in-project Punchlist visits retain their own source, description and audit identity. They do not receive T&T history links or submission updates. Mixed ordinary/T&T task batches are rejected before any request is created.

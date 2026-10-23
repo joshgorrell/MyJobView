@@ -57,6 +57,7 @@ const migration=(await readdir('supabase/migrations')).find(n=>n.endsWith('_proj
 await db.exec(await readFile(`supabase/migrations/${migration}`,'utf8'));
 await db.exec(await readFile('supabase/migrations/20261023105139_test_tune_atomic_workspace.sql','utf8'));
 await db.exec(await readFile('supabase/migrations/20261023114348_test_tune_policy_helper_access.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261023115340_test_tune_request_origin.sql','utf8'));
 assert.equal((await db.query("SELECT has_function_privilege('anon','private.punchlist_staff_identity(uuid)','execute') allowed")).rows[0].allowed,false);
 async function as(n,contact=null,org=1){await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SELECT set_config('test.org','${id(org)}',false);SELECT set_config('test.jwt','${JSON.stringify(contact?{app_metadata:{is_portal_user:true,contact_id:id(contact),organization_id:id(org)}}:{})}',false);SET ROLE authenticated;`);}
 async function owner(sql){await db.exec('RESET ROLE');return (await db.query(sql)).rows;}
@@ -160,6 +161,14 @@ await db.query(`SELECT set_test_tune_submission_updates('${id(31)}',false)`);ass
 await reject(`SELECT set_test_tune_submission_updates('${id(30)}',false)`,/Not authorized/);
 await as(10);await db.query(`UPDATE project_tasks SET is_test_and_tune=false WHERE id='${adjustmentIds[4]}'`);
 assert.equal((await db.query(`SELECT is_test_and_tune FROM project_tasks WHERE id='${adjustmentIds[4]}'`)).rows[0].is_test_and_tune,true,'Existing adjustments cannot bypass expiry by clearing their T&T marker');
+assert.equal((await owner(`SELECT is_test_and_tune FROM service_requests WHERE id='${batch}'`))[0].is_test_and_tune,true);
+await as(10);const ordinary=(await db.query(`INSERT INTO project_tasks(project_id,organization_id,title,visibility,customer_description) VALUES('${id(52)}','${id(1)}','Ordinary project task','customer_visible','Ordinary shared task') RETURNING id`)).rows[0].id;
+await reject(`SELECT request_project_punchlist_visit('${id(52)}',ARRAY['${ordinary}'::uuid,'${adjustmentIds[4]}'::uuid],'${id(310)}')`,/separately from ordinary/);
+const ordinaryRequest=(await db.query(`SELECT request_project_punchlist_visit('${id(52)}',ARRAY['${ordinary}'::uuid],'${id(311)}') id`)).rows[0].id;
+assert.equal((await owner(`SELECT is_test_and_tune FROM service_requests WHERE id='${ordinaryRequest}'`))[0].is_test_and_tune,false);
+assert.equal((await owner(`SELECT source FROM test_tune_submissions WHERE request_id='${ordinaryRequest}'`))[0].source,'project_punchlist');
+await as(91,31);await db.query(`SELECT set_test_tune_submission_updates('${id(31)}',true)`);assert.equal((await support(31)).submission_updates.length,1,'Ordinary scope visits do not create T&T customer updates');
+console.log('PASS: ordinary project visits retain their own origin and mixed scope cannot be mislabeled.');
 console.log('PASS: 3-of-5 atomic handoff, immutable audit, request-history exclusion, retry mismatch, mixed-project and module/org/portal guards.');
 
 await db.close();

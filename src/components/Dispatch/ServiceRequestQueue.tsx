@@ -44,6 +44,7 @@ interface ServiceRequest {
   id: string;
   created_at: string;
   request_type: 'service' | 'project' | null;
+  is_test_and_tune?: boolean;
   project_id: string | null;
   projects?: { id: string; name: string; project_number: string } | null;
   customer_name: string;
@@ -324,7 +325,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
   function getSourceTypeLabel(sourceType: string) {
     switch (sourceType) {
       case 'punchlist':
-        return 'Test & Tune';
+        return 'Project Punchlist';
       case 'staff_form':
         return 'Staff Form';
       case 'customer_portal':
@@ -652,9 +653,9 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                         </span>
                       )}
                       <span className="text-muted">{request.request_type === 'project' ? 'Project' : 'Service'}</span>
-                      {request.source_type === 'punchlist' && <span className="text-muted">· Test &amp; Tune</span>}
+                      {request.is_test_and_tune && <span className="text-muted">· Test &amp; Tune</span>}
                       {request.customer_contact_confirmed_at && <span className="text-emerald-400">· Contacted</span>}
-                      {expandedRequest === request.id && canViewTestTune && request.source_type === 'punchlist' && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
+                      {expandedRequest === request.id && canViewTestTune && request.is_test_and_tune && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
                       {expandedRequest === request.id && (
                         <span className="text-muted">· {getSourceTypeLabel(request.source_type)}</span>
                       )}
