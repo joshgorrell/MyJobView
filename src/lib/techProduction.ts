@@ -47,28 +47,78 @@ export function priorPeriod(start: string, end: string) {
   const days = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
   return [shiftDay(start, -days), shiftDay(start, -1)];
 }
-export function summarizeProduction(history: LaborDay[]) {
+export type ProductionDay = LaborDay & {
+  shop: number | null;
+  training: number | null;
+  unaccounted: number | null;
+  excess: number | null;
+};
+export function productionHistory(
+  bundle: LaborBundle,
+  id: string,
+  start: string,
+  end: string,
+  asOf: string,
+): ProductionDay[] {
+  const nativeDays = new Map(
+    bundle.native_jobs
+      .filter((row) => row.profile_id === id)
+      .map((row) => [row.day, row]),
+  );
+  return laborHistory(bundle, id, start, end, asOf, true).map((day) => {
+    // Imported daily totals do not contain shop/training clocks. Never infer categories from the gap.
+    const native =
+      day.jobSource === "MJV" ? nativeDays.get(day.day) : undefined;
+    const shop = native?.shop_hours ?? null;
+    const training = native?.training_hours ?? null;
+    const reconciled =
+      day.clockDataComplete &&
+      day.payroll! >= 0 &&
+      shop !== null &&
+      training !== null &&
+      shop >= 0 &&
+      training >= 0;
+    const difference = reconciled
+      ? day.payroll! - day.job! - shop! - training!
+      : null;
+    return {
+      ...day,
+      shop,
+      training,
+      unaccounted:
+        difference === null
+          ? null
+          : Math.max(0, Math.abs(difference) < 0.000001 ? 0 : difference),
+      excess:
+        difference === null
+          ? null
+          : Math.max(0, Math.abs(difference) < 0.000001 ? 0 : -difference),
+    };
+  });
+}
+export function summarizeProduction(history: ProductionDay[]) {
   const summary = laborSummary(history);
+  const total = (key: "shop" | "training" | "unaccounted" | "excess") =>
+    history.some((day) => day[key] !== null)
+      ? history.reduce((sum, day) => sum + (day[key] ?? 0), 0)
+      : null;
   return {
     job: summary.job,
-    available: summary.payroll,
+    payroll: summary.payroll,
     utilization: summary.efficiency,
     matchedJob: summary.matchedJob,
-    matchedAvailable: summary.matchedPayroll,
+    matchedPayroll: summary.matchedPayroll,
     matchedDays: summary.matchedDays,
-    assumed: history.some((day) => day.assumed),
-    // Missing coverage stays unknown; it never becomes wasted time.
-    outside:
-      summary.matchedPayroll > 0
-        ? history.reduce(
-            (sum, day) =>
-              sum +
-              (day.matched
-                ? Math.max(0, day.matchedPayroll - day.matchedJob)
-                : 0),
-            0,
-          )
-        : null,
+    shop: total("shop"),
+    training: total("training"),
+    unaccounted: total("unaccounted"),
+    excess: total("excess"),
+    clockDays: history.filter((day) => day.payroll !== null).length,
+    categoryDays: history.filter(
+      (day) => day.shop !== null && day.training !== null,
+    ).length,
+    reconciliationDays: history.filter((day) => day.unaccounted !== null)
+      .length,
   };
 }
 export function productionReport(
@@ -79,13 +129,13 @@ export function productionReport(
 ) {
   const [priorStart, priorEnd] = priorPeriod(start, end);
   const rows = bundle.roster.map((person) => {
-    const history = laborHistory(bundle, person.id, start, end, asOf);
+    const history = productionHistory(bundle, person.id, start, end, asOf);
     const previous = summarizeProduction(
-      laborHistory(bundle, person.id, priorStart, priorEnd, asOf),
+      productionHistory(bundle, person.id, priorStart, priorEnd, asOf),
     );
     return { ...person, history, ...summarizeProduction(history), previous };
   });
-  const historyByDay = new Map<string, LaborDay[]>();
+  const historyByDay = new Map<string, ProductionDay[]>();
   for (const row of rows)
     for (const day of row.history) {
       const group = historyByDay.get(day.day) ?? [];
@@ -95,22 +145,10 @@ export function productionReport(
   const trend = [...historyByDay]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, history]) => ({ day, ...summarizeProduction(history) }));
-  const job = rows.some((r) => r.job !== null)
-    ? rows.reduce((sum, r) => sum + (r.job ?? 0), 0)
-    : null;
-  const available = rows.some((r) => r.available !== null)
-    ? rows.reduce((sum, r) => sum + (r.available ?? 0), 0)
-    : null;
-  const matchedAvailable = rows.reduce((sum, r) => sum + r.matchedAvailable, 0);
-  const matchedJob = rows.reduce((sum, r) => sum + r.matchedJob, 0);
   return {
     rows,
     trend,
-    job,
-    available,
-    matchedAvailable,
-    utilization:
-      matchedAvailable > 0 ? (matchedJob / matchedAvailable) * 100 : null,
+    ...summarizeProduction(rows.flatMap((row) => row.history)),
   };
 }
 export type ProductionRow = ReturnType<typeof productionReport>["rows"][number];

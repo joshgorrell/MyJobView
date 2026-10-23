@@ -32,7 +32,7 @@ export type LaborBundle = {
   project_snapshot: LaborBundle["snapshots"][number] | null;
   latest_job_day: string | null;
   latest_payroll_day: string | null;
-  native_jobs: { profile_id: string; day: string; hours: number }[];
+  native_jobs: { profile_id: string; day: string; hours: number; shop_hours?: number; training_hours?: number; review_flags?: string[] }[];
   native_payroll: {
     profile_id: string;
     day: string;
@@ -62,6 +62,7 @@ export type LaborDay = {
   matchedJob: number;
   matchedPayroll: number;
   matched: boolean;
+  clockDataComplete?: boolean;
 };
 const week = [
   "sunday",
@@ -101,6 +102,7 @@ export function laborHistory(
   start: string,
   end: string,
   asOf: string,
+  actualPayroll = false,
 ): LaborDay[] {
   if (
     !validLaborDay(start) ||
@@ -157,7 +159,7 @@ export function laborHistory(
       unknown = p ? n(payNative ? 0 : p.unknown_hours) : null;
     flags.push(...(j?.review_flags ?? []), ...(p?.flags ?? []));
     if (p?.needs_review) flags.push("Open or unreviewed payroll clock entry");
-    const assumed = cfg?.compensation_type === "salary";
+    const assumed = !actualPayroll && cfg?.compensation_type === "salary";
     const workdays = cfg?.work_days?.length
       ? cfg.work_days
       : ["monday", "tuesday", "wednesday", "thursday", "friday"];
@@ -177,7 +179,7 @@ export function laborHistory(
       : p
         ? n(payNative ? p.hours : p.worked_hours)
         : null;
-    if (!cfg)
+    if (!actualPayroll && !cfg)
       flags.push("Employee payroll configuration missing for this date");
     if (job === null && ((payroll ?? 0) > 0 || (!p && workday)))
       flags.push("Job report or entry missing");
@@ -191,7 +193,7 @@ export function laborHistory(
     if (!assumed && workday && payroll === 0 && leave === 0)
       flags.push("No payroll or leave record; review attendance");
     const sourceClean =
-      !!cfg &&
+      (actualPayroll || !!cfg) &&
       !!p &&
       job !== null &&
       job >= 0 &&
@@ -229,6 +231,7 @@ export function laborHistory(
           : "QuickBooks Time",
       flags: [...new Set(flags)],
       matched,
+      clockDataComplete: sourceClean,
       matchedJob: matched ? job! : 0,
       matchedPayroll: matched ? payroll! : 0,
       efficiency: matched && payroll! > 0 ? (job! / payroll!) * 100 : null,
