@@ -124,7 +124,7 @@ export default function LaborDashboard() {
     start <= end &&
     Date.parse(end) - Date.parse(start) <= 1830 * 86400000;
   const load = useCallback(async () => {
-    if (!profile?.organization_id || !valid) return;
+    if (permissionsLoading || !hasModuleAccess("tech_stats") || !profile?.organization_id || !valid) return;
     const request = ++generation.current;
     controller.current?.abort();
     const abort = new AbortController();
@@ -154,7 +154,7 @@ export default function LaborDashboard() {
       clearTimeout(timeout);
       if (request === generation.current) setLoading(false);
     }
-  }, [profile?.organization_id, start, end, valid, timezone]);
+  }, [profile?.organization_id, start, end, valid, timezone, permissionsLoading, hasModuleAccess]);
   useEffect(() => {
     void load();
     const refresh=()=>{if(document.visibilityState==='visible')void load();};
