@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 // production-reporting path as an administrator, without opening the
 // separate payroll/labor administration API.
 const loader = readFileSync("src/lib/techProductionData.ts", "utf8");
-const rpc = readFileSync("supabase/migrations/20261023114939_tech_production_report.sql", "utf8");
+const rpc = readFileSync("supabase/migrations/20261023190000_tech_production_permission_access.sql", "utf8");
 
 assert.match(loader, /rpc\(["']get_tech_production["']/);
 assert.doesNotMatch(
@@ -29,4 +29,8 @@ assert.doesNotMatch(
   /jsonb_agg\(to_jsonb\(s\)\)/,
   "Do not expose raw imported snapshots",
 );
+assert.match(rpc, /override_type = 'revoke'/, "Revokes must be enforced");
+assert.match(rpc, /override_type = 'grant'/, "Grants must be supported");
+assert.match(rpc, /role_module_access/, "Role grants must be supported");
+assert.match(rpc, /organization_id = org/, "Organization isolation required");
 console.log("Tech Stats authorization contract passed.");
