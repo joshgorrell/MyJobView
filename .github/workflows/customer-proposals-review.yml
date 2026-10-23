@@ -54,9 +54,26 @@ jobs:
         timeout-minutes: 5
         run: npx playwright install --only-shell chromium
       - run: npm run test:customer-proposals:browser && node tests/proposals/preview-browser.mjs
-      - name: Install WebKit
-        timeout-minutes: 5
-        run: npx playwright install --with-deps webkit
+  webkit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.55.1-noble
+      options: --init
+    env:
+      CUSTOMER_BROWSER: webkit
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
+      - run: npm run build
+      - name: Verify preinstalled WebKit
+        run: node --input-type=module -e 'import {webkit} from "playwright"; const browser = await webkit.launch(); await browser.close();'
       - run: npm run test:customer-proposals:browser
-        env:
-          CUSTOMER_BROWSER: webkit

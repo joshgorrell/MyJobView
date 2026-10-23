@@ -1,13 +1,13 @@
 import {PGlite} from '@electric-sql/pglite';
 import {readFile,readdir} from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const db=new PGlite();const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+let db;if(process.env.PROJECT_SUPPORT_DATABASE_URL){const {Client}=await import('pg');const client=new Client({connectionString:process.env.PROJECT_SUPPORT_DATABASE_URL});await client.connect();db={exec:q=>client.query(q),query:(q,p)=>client.query(q,p),close:()=>client.end()};}else db=new PGlite();const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE SCHEMA auth;CREATE SCHEMA private;CREATE SCHEMA storage;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid',true),'')::uuid$$;
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql AS $$SELECT coalesce(nullif(current_setting('test.jwt',true),''),'{}')::jsonb$$;
-CREATE FUNCTION public.flow_has_module_access(text) RETURNS boolean LANGUAGE sql AS $$SELECT true$$;
+CREATE FUNCTION public.flow_has_module_access(text) RETURNS boolean LANGUAGE sql AS $$SELECT coalesce(current_setting('test.module',true),'true')='true'$$;
 CREATE FUNCTION public.get_user_org_id() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.org',true),'')::uuid$$;
-CREATE TABLE organizations(id uuid PRIMARY KEY);
+CREATE TABLE organizations(id uuid PRIMARY KEY);CREATE TABLE department_modules(module_key text,display_name text);
 CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,role text,full_name text,contact_id uuid,is_active boolean DEFAULT true);
 CREATE TABLE contacts(id uuid PRIMARY KEY,organization_id uuid,full_name text,company_name text,phone text,email text,street_address text,city text,state text,zip_code text);
 CREATE TABLE projects(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,name text,project_number text,substantial_completion_date date);
@@ -21,7 +21,7 @@ CREATE TABLE task_photos(id uuid,task_id uuid,organization_id uuid,photo_url tex
 CREATE TABLE task_history(id uuid,organization_id uuid,notes text);
 CREATE TABLE work_order_task_updates(id uuid,organization_id uuid,work_order_id uuid,work_order_task_id uuid,project_task_id uuid,technician_id uuid,disposition text,notes text,created_at timestamptz,completes_project_task boolean);
 CREATE TABLE work_order_task_completions(id uuid,organization_id uuid,work_order_id uuid,work_order_task_id uuid,project_task_id uuid,technician_id uuid,notes text,completed_at timestamptz,created_at timestamptz,actual_hours numeric);
-CREATE TABLE service_requests(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid NOT NULL,contact_id uuid,customer_name text NOT NULL,customer_phone text,customer_email text,job_location_address text NOT NULL,job_location_city text,job_location_state text,job_location_zip text,job_description text NOT NULL,billable_type text NOT NULL CHECK(billable_type IN('billable','warranty')),billable_by text NOT NULL CHECK(billable_by IN('admin','dispatch')),priority text,status text,source_type text CHECK(source_type IN('customer_portal','punchlist','staff_form','other')),request_type text DEFAULT 'service' CHECK(request_type IN('service','project')),project_id uuid,work_order_id uuid,notes text,created_at timestamptz DEFAULT now());
+CREATE TABLE service_requests(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),organization_id uuid NOT NULL,contact_id uuid,customer_name text NOT NULL,customer_phone text,customer_email text,job_location_address text NOT NULL,job_location_city text,job_location_state text,job_location_zip text,job_description text NOT NULL,billable_type text NOT NULL CHECK(billable_type IN('billable','warranty')),billable_by text NOT NULL CHECK(billable_by IN('admin','dispatch')),priority text,status text,source_type text CHECK(source_type IN('customer_portal','punchlist','staff_form','other')),created_by uuid,request_type text DEFAULT 'service' CHECK(request_type IN('service','project')),project_id uuid,work_order_id uuid,notes text,created_at timestamptz DEFAULT now());
 CREATE TABLE work_orders(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,project_id uuid,assigned_to uuid,creation_request_id uuid,status text);
 CREATE TABLE work_order_tasks(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,organization_id uuid,assigned_to uuid,project_task_id uuid,title text,description text,estimated_hours numeric,status text,sort_order int);
 CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -52,13 +52,18 @@ const moduleFix=await readFile('supabase/migrations/20261019135137_punchlist_fix
 for(const [name,source] of [['punchlist_staff_identity',corrective],['punchlist_portal_identity',corrective],['punchlist_staff_access',moduleFix]]){
  const functionSql=source.match(new RegExp(`CREATE OR REPLACE FUNCTION private\\.${name}\\([\\s\\S]*?\\$\\$;`))[0];await db.exec(functionSql);
 }
+await db.exec('REVOKE ALL ON FUNCTION private.punchlist_staff_identity(uuid) FROM PUBLIC,anon,authenticated');
 const migration=(await readdir('supabase/migrations')).find(n=>n.endsWith('_project_punchlist_and_vip_service.sql'));
 await db.exec(await readFile(`supabase/migrations/${migration}`,'utf8'));
+await db.exec(await readFile('supabase/migrations/20261023105139_test_tune_atomic_workspace.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261023114348_test_tune_policy_helper_access.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261023115340_test_tune_request_origin.sql','utf8'));
+assert.equal((await db.query("SELECT has_function_privilege('anon','private.punchlist_staff_identity(uuid)','execute') allowed")).rows[0].allowed,false);
 async function as(n,contact=null,org=1){await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SELECT set_config('test.org','${id(org)}',false);SELECT set_config('test.jwt','${JSON.stringify(contact?{app_metadata:{is_portal_user:true,contact_id:id(contact),organization_id:id(org)}}:{})}',false);SET ROLE authenticated;`);}
 async function owner(sql){await db.exec('RESET ROLE');return (await db.query(sql)).rows;}
 async function support(contact=30){return (await db.query(`SELECT get_customer_support('${id(contact)}') data`)).rows[0].data;}
 async function reject(sql,pattern){await assert.rejects(db.query(sql),pattern);}
-await as(10);assert.equal((await db.query('SELECT get_punchlist_unseen_count(NULL) n')).rows[0].n,2,'Mapped legacy records counted only once');
+await as(10);assert.equal((await db.query('SELECT get_punchlist_unseen_count(NULL)::int n')).rows[0].n,2,'Mapped legacy records counted only once');
 await as(90,30);await reject('SELECT get_punchlist_unseen_count(NULL)',/Not authorized/);let state=await support();assert.equal(state.projects.length,3,'Current, expired and final-day projects visible, pre-completion hidden');assert.equal(state.vip_service_access,true);assert.equal(state.projects.find(p=>p.id===id(50)).days_remaining,88);assert.equal(state.projects.find(p=>p.id===id(55)).days_remaining,0);assert.equal(state.projects.find(p=>p.id===id(51)).days_remaining,0);assert.equal(state.projects.find(p=>p.id===id(51)).can_submit,false);assert.equal(state.projects.find(p=>p.id===id(55)).can_submit,true);
 assert.ok(!JSON.stringify(state).includes('SECRET'));assert.equal((await db.query('SELECT * FROM project_tasks')).rows.length,0,'Raw rows hidden even from portal profiles with same org');
 for(const table of ['task_photos','task_history','project_task_activity','service_requests'])assert.equal((await db.query(`SELECT * FROM ${table}`)).rows.length,0);
@@ -120,4 +125,50 @@ await owner(`UPDATE work_orders SET status='completed' WHERE id='${id(151)}'`);a
 await as(10);assert.equal((await db.query('SELECT * FROM project_tasks')).rows.length>0,true);
 await owner(`SELECT set_config('test.uid','',false)`);await db.exec('SET ROLE anon');await reject(`SELECT get_customer_support('${id(30)}')`,/permission denied/);
 console.log('PASS: project access dates, private projections and REST guards, cross-customer/org isolation, legacy placement, canonical visit links, paid/comped VIP, expiry/history, idempotence, and private photos.');
+
+// Workspace contract: no ordinary project scope, exactly selected tasks persist.
+await as(10);
+const adjustmentIds=[];
+for(let n=0;n<5;n++)adjustmentIds.push((await db.query(`SELECT add_test_tune_adjustment('${id(52)}','Internal ${n}','Safe adjustment ${n}') id`)).rows[0].id);
+let workspace=(await db.query('SELECT get_test_tune_workspace() data')).rows[0].data;
+assert.equal(workspace.find(p=>p.id===id(52)).tasks.filter(t=>adjustmentIds.includes(t.id)).length,5);
+assert.ok(!JSON.stringify(workspace).includes('SECRET INTERNAL TITLE'),'Ordinary project task stays in project');
+const selected=adjustmentIds.slice(0,3),selection=`ARRAY[${selected.map(x=>`'${x}'::uuid`).join(',')}]`;
+const batchSql=`SELECT request_project_punchlist_visit('${id(52)}',${selection},'${id(300)}') id`;
+const batch=(await db.query(batchSql)).rows[0].id;
+assert.equal((await db.query(batchSql)).rows[0].id,batch);
+assert.equal((await db.query(`SELECT count(*)::int n FROM project_punchlist_requests WHERE request_id='${batch}'`)).rows[0].n,3);
+assert.deepEqual((await db.query(`SELECT task_ids,actor_id,actor_type,project_id,contact_id FROM test_tune_submissions WHERE request_id='${batch}'`)).rows[0],{task_ids:[...selected].sort(),actor_id:id(10),actor_type:'staff',project_id:id(52),contact_id:id(31)});
+workspace=(await db.query('SELECT get_test_tune_workspace() data')).rows[0].data;
+assert.equal(workspace.find(p=>p.id===id(52)).tasks.filter(t=>adjustmentIds.includes(t.id)&&!t.request_id).length,2);
+await reject(`SELECT request_project_punchlist_visit('${id(52)}',ARRAY['${adjustmentIds[3]}'::uuid],'${id(300)}')`,/different selection/);
+await reject(`SELECT request_project_punchlist_visit('${id(52)}',${selection},'${id(301)}')`,/already requested/);
+await reject(`SELECT request_project_punchlist_visit('${id(50)}',ARRAY['${adjustmentIds[3]}'::uuid],'${id(302)}')`,/Invalid item/);
+await reject(`SELECT add_test_tune_adjustment('${id(51)}','Expired','Safe')`,/exception review/);
+await db.exec("SELECT set_config('test.module','false',false)");
+await reject('SELECT get_test_tune_workspace()',/Not authorized/);
+await reject(batchSql,/Not authorized/);
+await db.exec("SELECT set_config('test.module','true',false)");
+await as(11,null,2);await reject(`SELECT request_project_punchlist_visit('${id(52)}',${selection},'${id(300)}')`,/Not authorized/);
+await as(91,31);await reject('SELECT get_test_tune_workspace()',/Not authorized/);
+await reject(`SELECT add_test_tune_adjustment('${id(52)}','Bypass','Safe')`,/Not authorized/);
+await owner(`UPDATE service_requests SET status='closed' WHERE id='${batch}'`);
+await as(10);workspace=(await db.query('SELECT get_test_tune_workspace() data')).rows[0].data;
+assert.equal(workspace.find(p=>p.id===id(52)).tasks.filter(t=>adjustmentIds.includes(t.id)&&!t.request_id).length,2,'Closed requests do not reappear as unsubmitted');
+await reject(`INSERT INTO test_tune_submissions(request_id) VALUES(gen_random_uuid())`,/permission denied/);
+await as(91,31);let customerState=await support(31);assert.equal(customerState.submission_updates.length,1);assert.equal(customerState.submission_updates[0].item_count,3);assert.ok(!JSON.stringify(customerState.submission_updates).includes('Internal'));
+await db.query(`SELECT set_test_tune_submission_updates('${id(31)}',false)`);assert.equal((await support(31)).submission_updates.length,0);
+await reject(`SELECT set_test_tune_submission_updates('${id(30)}',false)`,/Not authorized/);
+await as(10);await db.query(`UPDATE project_tasks SET is_test_and_tune=false WHERE id='${adjustmentIds[4]}'`);
+assert.equal((await db.query(`SELECT is_test_and_tune FROM project_tasks WHERE id='${adjustmentIds[4]}'`)).rows[0].is_test_and_tune,true,'Existing adjustments cannot bypass expiry by clearing their T&T marker');
+assert.equal((await owner(`SELECT is_test_and_tune FROM service_requests WHERE id='${batch}'`))[0].is_test_and_tune,true);
+await as(10);const ordinary=(await db.query(`INSERT INTO project_tasks(project_id,organization_id,title,visibility,customer_description) VALUES('${id(52)}','${id(1)}','Ordinary project task','customer_visible','Ordinary shared task') RETURNING id`)).rows[0].id;
+await reject(`SELECT request_project_punchlist_visit('${id(52)}',ARRAY['${ordinary}'::uuid,'${adjustmentIds[4]}'::uuid],'${id(310)}')`,/separately from ordinary/);
+const ordinaryRequest=(await db.query(`SELECT request_project_punchlist_visit('${id(52)}',ARRAY['${ordinary}'::uuid],'${id(311)}') id`)).rows[0].id;
+assert.equal((await owner(`SELECT is_test_and_tune FROM service_requests WHERE id='${ordinaryRequest}'`))[0].is_test_and_tune,false);
+assert.equal((await owner(`SELECT source FROM test_tune_submissions WHERE request_id='${ordinaryRequest}'`))[0].source,'project_punchlist');
+await as(91,31);await db.query(`SELECT set_test_tune_submission_updates('${id(31)}',true)`);assert.equal((await support(31)).submission_updates.length,1,'Ordinary scope visits do not create T&T customer updates');
+console.log('PASS: ordinary project visits retain their own origin and mixed scope cannot be mislabeled.');
+console.log('PASS: 3-of-5 atomic handoff, immutable audit, request-history exclusion, retry mismatch, mixed-project and module/org/portal guards.');
+
 await db.close();

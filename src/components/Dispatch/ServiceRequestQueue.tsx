@@ -29,7 +29,6 @@ import {
   DollarSign,
   Paperclip,
   UserPlus,
-  ListTodo,
   ClipboardList,
   MessageSquareWarning,
   RotateCcw,
@@ -45,6 +44,7 @@ interface ServiceRequest {
   id: string;
   created_at: string;
   request_type: 'service' | 'project' | null;
+  is_test_and_tune?: boolean;
   project_id: string | null;
   projects?: { id: string; name: string; project_number: string } | null;
   customer_name: string;
@@ -104,7 +104,7 @@ interface Technician {
   role: string;
 }
 
-export function ServiceRequestQueue({ requestId }: { requestId?: string | null }) {
+export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { requestId?: string | null; canViewTestTune?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
@@ -322,42 +322,16 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
     }
   }
 
-  function getSourceTypeIcon(sourceType: string) {
-    switch (sourceType) {
-      case 'punchlist':
-        return <ListTodo className="w-4 h-4" />;
-      case 'staff_form':
-        return <ClipboardList className="w-4 h-4" />;
-      case 'customer_portal':
-        return <User className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  }
-
   function getSourceTypeLabel(sourceType: string) {
     switch (sourceType) {
       case 'punchlist':
-        return 'Punchlist';
+        return 'Project Punchlist';
       case 'staff_form':
         return 'Staff Form';
       case 'customer_portal':
         return 'Customer Portal';
       default:
         return 'Other';
-    }
-  }
-
-  function getSourceTypeColor(sourceType: string) {
-    switch (sourceType) {
-      case 'punchlist':
-        return 'text-teal-400 bg-teal-500/10 border-teal-500/20';
-      case 'staff_form':
-        return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      case 'customer_portal':
-        return 'text-green-400 bg-green-500/10 border-green-500/20';
-      default:
-        return 'text-muted bg-elevated border-strong';
     }
   }
 
@@ -600,8 +574,8 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                 </div>
               )}
 
-              <div className="p-3">
-                <div className="flex items-start gap-3">
+              <div className="px-3 py-2">
+                <div className="flex items-start gap-2">
                   {/* Multi-select checkbox — only shown on open status queue tab */}
                   {activeTab === 'queue' && (
                     <div className="flex-shrink-0 pt-1 w-5">
@@ -633,7 +607,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                     onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
                   >
                     {/* Top row: customer name + timestamp + desktop Convert button */}
-                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1.5">
+                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1">
                       {request.contact_id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
@@ -666,38 +640,29 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                       </div>
                     </div>
 
-                    {/* Badge row: priority + status + source — compact, limited to 3 */}
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(request.priority)}`}>
-                        {getPriorityIcon(request.priority)}
-                        {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                    {/* Compact status strip: keep routine metadata in expanded details. */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1 text-xs">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${getStatusColor(request.status)}`}>
                         {request.status === 'needs_more_info' && <AlertTriangle className="w-3 h-3" />}
                         {getStatusLabel(request.status)}
                       </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        request.request_type === 'project'
-                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                          : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        {request.request_type === 'project' ? <Briefcase className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                        {request.request_type === 'project' ? 'Project' : 'Service'}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getSourceTypeColor(request.source_type)}`}>
-                        {getSourceTypeIcon(request.source_type)}
-                        {getSourceTypeLabel(request.source_type)}
-                      </span>
-                      {request.customer_contact_confirmed_at && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                          <PhoneCall className="w-3 h-3" />
-                          Contacted
+                      {request.priority !== 'normal' && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border ${getPriorityColor(request.priority)}`}>
+                          {getPriorityIcon(request.priority)}
+                          {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
                         </span>
+                      )}
+                      <span className="text-muted">{request.request_type === 'project' ? 'Project' : 'Service'}</span>
+                      {request.is_test_and_tune && <span className="text-muted">· Test &amp; Tune</span>}
+                      {request.customer_contact_confirmed_at && <span className="text-emerald-400">· Contacted</span>}
+                      {expandedRequest === request.id && canViewTestTune && request.is_test_and_tune && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
+                      {expandedRequest === request.id && (
+                        <span className="text-muted">· {getSourceTypeLabel(request.source_type)}</span>
                       )}
                     </div>
 
                     {/* Description preview */}
-                    <div className="text-sm text-muted break-words line-clamp-2 mb-1.5">{request.job_description}</div>
+                    <div className="text-sm text-muted break-words line-clamp-1 mb-1">{request.job_description}</div>
 
                     {/* Meta row + mobile Convert button */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
