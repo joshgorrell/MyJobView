@@ -1,4 +1,5 @@
 import { WeeklyProposalActivity } from './WeeklyProposalActivity';
+import { ServiceRequestFlowDetail } from './ServiceRequestFlowDetail';
 import { proposalActivityPath } from '../../lib/proposalActivityLinks';
 import { Fragment, ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, HelpCircle, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
@@ -230,7 +231,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
               {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           </div>
-          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{eventKind(event)} · {event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small>{event.event_type === 'proposal_activity_weekly' && <WeeklyProposalActivity reportId={event.source_id} />}<div className="flow-links">{event.thread_id && canMessageCustomers && <button onClick={() => { setThreadId(event.thread_id!); setView('messages'); setMessageFilter('customer'); }}>Read full conversation</button>}{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
+          {open && <div className="flow-detail" id={`flow-detail-${event.id}`}><strong>{eventKind(event)} · {event.summary}</strong><p>{[event.customer_name, event.project_name, event.work_order_number && `WO ${event.work_order_number}`, event.location_name].filter(Boolean).join(' · ')}</p>{event.preview ? <p className="flow-detail-body">{event.preview}</p> : event.details && <p className="flow-detail-body">{event.details}</p>}<small>{event.actor_name} · {new Date(event.created_at).toLocaleString()} · Viewed</small>{event.event_type === 'proposal_activity_weekly' && <WeeklyProposalActivity reportId={event.source_id} />}{event.source_table === 'service_requests' && <ServiceRequestFlowDetail requestId={event.source_id} />}<div className="flow-links">{event.thread_id && canMessageCustomers && <button onClick={() => { setThreadId(event.thread_id!); setView('messages'); setMessageFilter('customer'); }}>Read full conversation</button>}{links(event).map(link => <a key={link.label} href={link.url}>{link.label} ↗</a>)}</div></div>}
         </Fragment>;
       })}
     </div>
