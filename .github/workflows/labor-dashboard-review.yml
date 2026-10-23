@@ -31,6 +31,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:labor-dashboard
+      - run: node tests/labor-dashboard/tech-stats-access-contract.mjs
       - run: node tests/navigation/workspace-routes.mjs
       - run: node tests/workspace-consolidation/runtime.mjs
       - run: npm run build
