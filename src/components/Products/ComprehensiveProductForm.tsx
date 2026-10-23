@@ -49,6 +49,7 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
   const [autoSearchTriggered, setAutoSearchTriggered] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
   const [formData, setFormData] = useState({
     // Basic Info
     manufacturer_id: '',
@@ -408,12 +409,12 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                 {/* Model Number */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Manufacturer Model Number
+                    Model / Alias
                   </label>
                   <input
                     type="text"
                     value={formData.manufacturer_model_number}
-                    onChange={(e) => setFormData({ ...formData, manufacturer_model_number: e.target.value })}
+                    onChange={(e) => { const model = e.target.value; setFormData(prev => ({ ...prev, manufacturer_model_number: model, sku: !productId && !skuManuallyEdited ? model : prev.sku })); }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     placeholder="MFG-123-ABC"
                   />
@@ -488,14 +489,14 @@ export default function ComprehensiveProductForm({ productId, onClose, onSave }:
                 {/* SKU */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SKU
+                    Ordering SKU
                   </label>
                   <input
                     type="text"
                     value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    onChange={(e) => { setSkuManuallyEdited(true); setFormData(prev => ({ ...prev, sku: e.target.value })); }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    placeholder="Internal SKU"
+                    placeholder="Manufacturer / distributor ordering SKU"
                   />
                 </div>
 

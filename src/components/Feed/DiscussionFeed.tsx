@@ -272,46 +272,11 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
         return;
       }
 
-      // Get points configuration
-      const { data: pointsConfig } = await supabase
-        .from('points_configuration')
-        .select('task_completion_points, question_answer_points')
-        .single();
-
-      const postPoints = post.post_type === 'task'
-        ? (pointsConfig?.task_completion_points || 10)
-        : (pointsConfig?.question_answer_points || 5);
-
-      await offlineSupabaseUpdate('discussion_posts', {
-        is_completed: true,
-        completed_by: profile.id,
-        completed_at: new Date().toISOString(),
-      }, post.id);
-
-      // Create points transaction
-      await supabase.from('points_transactions').insert([{
-        user_id: profile.id,
-        points_amount: postPoints,
-        transaction_type: post.post_type === 'task' ? 'task_completion' : 'question_answer',
-        reference_id: post.id,
-        description: `${post.post_type === 'task' ? 'Completed task' : 'Answered question'}: ${post.content.substring(0, 50)}...`,
-      }]);
-
-      await supabase.from('notifications').insert([{
-        user_id: profile.id,
-        type: 'points_earned',
-        title: `+${postPoints} Points!`,
-        body: `You earned ${postPoints} points for ${post.post_type === 'task' ? 'completing a task' : 'answering a question'}`,
-      }]);
-
-      if (post.user_id !== profile.id) {
-        await supabase.from('notifications').insert([{
-          user_id: post.user_id,
-          type: post.post_type === 'task' ? 'task_completed' : 'question_answered',
-          title: post.post_type === 'task' ? 'Task Completed' : 'Question Answered',
-          body: `${profile.full_name} ${post.post_type === 'task' ? 'completed' : 'answered'} your ${post.post_type}`,
-        }]);
-      }
+      const { error } = await supabase.rpc('set_discussion_task_completion', {
+        p_post_id: post.id,
+        p_complete: true,
+      });
+      if (error) throw error;
 
       loadPosts();
     } catch (error) {

@@ -14,7 +14,7 @@ BEGIN
     OR octet_length(p_sections::text)>20000 OR octet_length(p_clicks::text)>2000 THEN RETURN false; END IF;
   IF p_seconds<coalesce(v_row.duration_seconds,0) THEN RETURN true; END IF;
   FOR v_key,v_value IN SELECT * FROM jsonb_each(p_sections) LOOP
-    IF jsonb_typeof(v_value)<>'number' OR v_value::text !~ '^\\d{1,5}$' THEN RETURN false; END IF;
+    IF jsonb_typeof(v_value)<>'number' OR v_value::text !~ '^[0-9]{1,5}$' THEN RETURN false; END IF;
     v_count=v_value::text::integer;
     IF v_count>p_seconds THEN RETURN false; END IF;
     IF v_key NOT IN ('scope','pricing','actions','notes','video','promise') AND NOT EXISTS(
@@ -30,7 +30,7 @@ BEGIN
   IF v_total>p_seconds THEN RETURN false; END IF;
   FOR v_key,v_value IN SELECT * FROM jsonb_each(p_clicks) LOOP
     IF v_key NOT IN ('download_clicked','approval_clicked','payment_clicked','question_clicked','change_request_clicked','decline_clicked','decline_to_changes_clicked','decline_to_approval_clicked','decline_rep_call_clicked','decline_rep_email_clicked','decline_continue_clicked','video_opened','video_played')
-      OR jsonb_typeof(v_value)<>'number' OR v_value::text !~ '^\\d{1,5}$' THEN RETURN false; END IF;
+      OR jsonb_typeof(v_value)<>'number' OR v_value::text !~ '^[0-9]{1,5}$' THEN RETURN false; END IF;
     v_count=v_value::text::integer; IF v_count>10000 THEN RETURN false; END IF;
     v_clicks=v_clicks||jsonb_build_object(v_key,greatest(v_count,coalesce((v_row.metadata->'engagement'->'clicks'->>v_key)::integer,0)));
   END LOOP;

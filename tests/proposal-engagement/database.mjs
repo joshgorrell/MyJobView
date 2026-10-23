@@ -29,6 +29,7 @@ INSERT INTO proposal_rooms VALUES('${id(50)}','${id(40)}','Home Theater'),('${id
 `);
 await db.exec(await readFile(new URL('../../supabase/migrations/20260216193744_enhance_proposal_activity_tracking_with_device_info.sql',import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../../supabase/migrations/20261012130517_proposal_engagement_sessions.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../../supabase/migrations/20261022100000_proposal_reconsideration_engagement.sql',import.meta.url),'utf8'));
 async function as(n, role='authenticated') { await db.exec(`RESET ROLE; SET test.uid='${n ? id(n) : ''}'; SET ROLE ${role}`); }
 async function start(proposal, visit) { return (await db.query(`SELECT public.start_proposal_engagement('${id(proposal)}','${id(visit)}') id`)).rows[0].id; }
 async function report(activity,seconds,sections={},clicks={}) { return (await db.query('SELECT public.report_proposal_engagement($1,$2,$3,$4) ok',[activity,seconds,JSON.stringify(sections),JSON.stringify(clicks)])).rows[0].ok; }

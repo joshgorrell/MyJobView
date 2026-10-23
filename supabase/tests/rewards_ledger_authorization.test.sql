@@ -1,0 +1,23 @@
+-- pgTAP regression: run with supabase test db after migrations.
+BEGIN;
+SELECT plan(14);
+SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid='public.points_transactions'::regclass), 'points ledger has RLS');
+SELECT ok((SELECT relrowsecurity FROM pg_class WHERE oid='public.reward_redemptions'::regclass), 'redemptions have RLS');
+SELECT ok(has_table_privilege('authenticated','public.points_transactions','SELECT'), 'authenticated may read points subject to RLS');
+SELECT ok(has_table_privilege('authenticated','public.reward_redemptions','SELECT'), 'authenticated may read redemptions subject to RLS');
+SELECT ok(NOT has_table_privilege('authenticated','public.points_transactions','INSERT'), 'authenticated cannot insert points');
+SELECT ok(NOT has_table_privilege('authenticated','public.points_transactions','UPDATE'), 'authenticated cannot update points');
+SELECT ok(NOT has_table_privilege('authenticated','public.points_transactions','DELETE'), 'authenticated cannot delete points');
+SELECT ok(NOT has_table_privilege('authenticated','public.reward_redemptions','INSERT'), 'authenticated cannot insert redemptions');
+SELECT ok(NOT has_table_privilege('authenticated','public.reward_redemptions','UPDATE'), 'authenticated cannot update redemptions');
+SELECT ok(NOT has_table_privilege('authenticated','public.reward_redemptions','DELETE'), 'authenticated cannot delete redemptions');
+SELECT ok(NOT has_table_privilege('anon','public.points_transactions','INSERT'), 'anon cannot insert points');
+SELECT ok(NOT has_table_privilege('anon','public.reward_redemptions','INSERT'), 'anon cannot insert redemptions');
+SET LOCAL ROLE authenticated;
+SELECT throws_ok('INSERT INTO public.points_transactions DEFAULT VALUES', '42501', 'permission denied for table points_transactions', 'direct points write rejected');
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT throws_ok('DELETE FROM public.reward_redemptions WHERE false', '42501', 'permission denied for table reward_redemptions', 'direct redemption delete rejected');
+RESET ROLE;
+SELECT * FROM finish();
+ROLLBACK;

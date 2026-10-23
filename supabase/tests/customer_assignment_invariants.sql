@@ -1,30 +1,7 @@
--- Run against a disposable database with the customer-assignment migrations applied.
--- This is a read-only audit: failures signal invalid customer ownership.
-DO $$
-DECLARE broken_count bigint;
-BEGIN
-  SELECT count(*) INTO broken_count
-  FROM public.contacts c
-  LEFT JOIN public.profiles p ON p.id = c.assigned_to
-  LEFT JOIN public.company_offices o ON o.id = c.office_id
-  WHERE c.contact_type IN ('person', 'business')
-    AND (c.organization_id IS NULL OR c.assigned_to IS NULL OR c.office_id IS NULL OR
-         p.organization_id IS DISTINCT FROM c.organization_id OR
-         o.organization_id IS DISTINCT FROM c.organization_id);
-  IF broken_count > 0 THEN
-    RAISE EXCEPTION '% customers have missing or invalid representative/office assignments; remediation required', broken_count;
-  END IF;
-END $$;
-
--- Require a validated constraint, not merely a matching constraint name.
+-- Read-only rollout audit: every customer must have a valid representative and office.
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.contacts'::regclass
-      AND conname = 'contacts_customer_rep_office_required'
-      AND convalidated = true
-  ) THEN
-    RAISE EXCEPTION 'Customer assignment constraint missing or not validated';
-  END IF;
+ IF EXISTS(SELECT 1 FROM public.customer_assignment_audit) THEN RAISE EXCEPTION 'Invalid customer assignment';END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.contacts'::regclass AND conname='contacts_customer_rep_office_required' AND convalidated) THEN RAISE EXCEPTION 'Customer assignment constraint not validated';END IF;
 END $$;
+SELECT organization_issue,rep_issue,office_issue,count(*) FROM public.customer_assignment_audit GROUP BY organization_issue,rep_issue,office_issue;

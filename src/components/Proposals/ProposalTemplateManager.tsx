@@ -239,13 +239,14 @@ export default function ProposalTemplateManager() {
   const [saving, setSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
-  const canManage = profile?.role === 'admin' || profile?.role === 'manager';
+  // Company templates are administrator-owned; managers may create personal templates.
+  const canManageCompanyTemplates = !!profile && ['admin', 'owner', 'super_admin'].includes(profile.role);
   const canEditSelected = selectedTemplate && (
-    !selectedTemplate.is_personal || selectedTemplate.created_by === profile?.id
-  ) && (selectedTemplate.is_personal || canManage);
+    selectedTemplate.is_personal ? selectedTemplate.created_by === profile?.id : canManageCompanyTemplates
+  );
   const canDeleteSelected = selectedTemplate && (
     (selectedTemplate.is_personal && selectedTemplate.created_by === profile?.id) ||
-    (!selectedTemplate.is_personal && profile?.role === 'admin')
+    (!selectedTemplate.is_personal && canManageCompanyTemplates)
   );
 
   const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
@@ -375,9 +376,9 @@ export default function ProposalTemplateManager() {
   async function handleCreate(newTemplate: Partial<ReportTemplate>) {
     if (!profile) return;
 
-    // Validate: only admins/sales managers can create company-wide templates
-    if (!newTemplate.is_personal && !canManage) {
-      notify('Only admins and sales managers can create company-wide templates', { theme: 'violet', tone: 'info' });
+    // Company templates require administrator authorization on the server too.
+    if (!newTemplate.is_personal && !canManageCompanyTemplates) {
+      notify('Only administrators can create company-wide templates', { theme: 'violet', tone: 'info' });
       return;
     }
 
@@ -386,9 +387,10 @@ export default function ProposalTemplateManager() {
       const { data, error } = await supabase
         .from('proposal_report_templates')
         .insert({
+          ...newTemplate,
           company_id: companySettings?.id,
-          created_by: profile.id,
-          ...newTemplate
+          organization_id: profile.organization_id,
+          created_by: profile.id
         })
         .select()
         .single();
@@ -451,20 +453,12 @@ export default function ProposalTemplateManager() {
   }
 
   async function handleSetDefault() {
-    if (!selectedTemplate || !canManage || !profile) return;
+    if (!selectedTemplate || !canManageCompanyTemplates || !profile) return;
 
     try {
-      // Unset all defaults for this company
-      await supabase
-        .from('proposal_report_templates')
-        .update({ is_default: false })
-        .eq('company_id', companySettings?.id);
-
-      // Set this one as default
-      const { error } = await supabase
-        .from('proposal_report_templates')
-        .update({ is_default: true })
-        .eq('id', selectedTemplate.id);
+      const { error } = await supabase.rpc('set_company_proposal_template_default', {
+        p_template_id: selectedTemplate.id,
+      });
 
       if (error) throw error;
 
@@ -762,7 +756,7 @@ export default function ProposalTemplateManager() {
                       </>
                     ) : (
                       <>
-                        {!selectedTemplate.is_default && !selectedTemplate.is_personal && canManage && (
+                        {!selectedTemplate.is_default && !selectedTemplate.is_personal && canManageCompanyTemplates && (
                           <button
                             onClick={handleSetDefault}
                             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -940,18 +934,18 @@ export default function ProposalTemplateManager() {
                         <div className="text-sm text-gray-600">Only you can see and use this template</div>
                       </div>
                     </label>
-                    <label className={`flex items-start gap-3 p-3 border rounded-lg ${canManage ? 'border-gray-300 cursor-pointer hover:bg-gray-50' : 'border-gray-200 bg-gray-50 cursor-not-allowed'} transition-colors`}>
+                    <label className={`flex items-start gap-3 p-3 border rounded-lg ${canManageCompanyTemplates ? 'border-gray-300 cursor-pointer hover:bg-gray-50' : 'border-gray-200 bg-gray-50 cursor-not-allowed'} transition-colors`}>
                       <input
                         type="radio"
                         name="is_personal"
                         value="false"
-                        disabled={!canManage}
+                        disabled={!canManageCompanyTemplates}
                         className="mt-1"
                       />
                       <div>
-                        <div className={`font-medium ${canManage ? 'text-gray-900' : 'text-gray-500'}`}>Company-Wide Template</div>
-                        <div className={`text-sm ${canManage ? 'text-gray-600' : 'text-gray-400'}`}>
-                          {canManage ? 'Everyone in your company can use this template' : 'Only admins and sales managers can create company-wide templates'}
+                        <div className={`font-medium ${canManageCompanyTemplates ? 'text-gray-900' : 'text-gray-500'}`}>Company-Wide Template</div>
+                        <div className={`text-sm ${canManageCompanyTemplates ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {canManageCompanyTemplates ? 'Everyone in your company can use this template' : 'Only administrators can create company-wide templates'}
                         </div>
                       </div>
                     </label>

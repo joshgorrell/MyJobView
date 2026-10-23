@@ -1,3 +1,4 @@
+import { proposalLineAmounts } from '../../../supabase/functions/_shared/proposalLineAmounts';
 import { ProposalPromise } from './ProposalPromise';
 import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
@@ -148,7 +149,7 @@ interface LineItem {
   is_hidden: boolean;
   parent_item_id: string | null;
   product_id: string | null;
-  products: { image_url: string | null; item_color?: string | null; sku?: string | null } | null;
+  products: { image_url: string | null; item_color?: string | null; sku?: string | null; manufacturer_model_number?: string | null } | null;
 }
 
 interface ReportTemplate {
@@ -216,6 +217,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const declineRequestId = useRef(crypto.randomUUID());
+  const changeRequestId = useRef(crypto.randomUUID());
   const [comment, setComment] = useState('');
   const [declineReason, setDeclineReason] = useState('');
   const [declineNotes, setDeclineNotes] = useState('');
@@ -226,6 +229,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [showQA, setShowQA] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [animate, setAnimate] = useState(false);
+  const [templateLoadError, setTemplateLoadError] = useState('');
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [recordings, setRecordings] = useState<ProposalRecording[]>([]);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
@@ -280,6 +284,23 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     } catch {}
   }
 
+  async function downloadProposal() {
+    if (previewMode) return;
+    const documentWindow = window.open('', '_blank');
+    if (!documentWindow) { notify('Please allow a new window to print or save your proposal as PDF.', { theme: 'blue', tone: 'warning' }); return; }
+    documentWindow.opener = null;
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
+      if (error || typeof data !== 'string') throw error || new Error('Proposal document unavailable');
+      documentWindow.document.open(); documentWindow.document.write(data); documentWindow.document.close();
+      documentWindow.focus(); documentWindow.print();
+      await trackProposalDownload();
+    } catch (error) {
+      documentWindow.close();
+      notify('Unable to prepare the proposal document. Please retry.', { theme: 'blue', tone: 'error' });
+    }
+  }
+
   async function trackProposalDownload() {
     if (previewMode) return;
     try {
@@ -317,6 +338,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function loadProposalDetails() {
+    setTemplateLoadError('');
     try {
       const [proposalRes, roomsRes, itemsRes] = await Promise.all([
         supabase
@@ -334,7 +356,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .order('sort_order'),
         supabase
           .from('proposal_line_items')
-          .select('*, products(image_url,item_color,sku)')
+          .select('*, products(image_url,item_color,sku,manufacturer_model_number)')
           .eq('proposal_id', proposalId)
           .order('sort_order'),
       ]);
@@ -346,15 +368,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       if (proposalRes.data) {
         setProposal(proposalRes.data);
         setRepContact(null);
-        if (proposalRes.data.contact_id) {
-          void supabase.from('contacts').select('assigned_to').eq('id', proposalRes.data.contact_id).maybeSingle()
-            .then(async ({ data: contact, error: ownerError }) => {
-              if (ownerError || !contact?.assigned_to) return;
-              const { data, error } = await supabase.from('profiles').select('full_name,email,phone').eq('id', contact.assigned_to).maybeSingle();
-              if (error) { console.warn('Assigned sales representative contact unavailable', error); return; }
-              if (data) setRepContact({ name: data.full_name || 'Your representative', email: data.email || null, phone: data.phone || null });
-            });
-        }
+        void supabase.rpc('get_customer_proposal_representative', { p_proposal_id: proposalId })
+          .then(({ data, error }) => { if (!error && data) setRepContact(data); });
         setRooms(roomsRes.data || []);
         setLineItems(itemsRes.data || []);
 
@@ -373,15 +388,18 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             });
         }
 
-        // Load template settings — use override ID (from sales order) if provided, else fall back to proposal's own template
+        // Resolve only this authorized proposal's template, including a valid order override.
         const effectiveTemplateId = templateOverrideId !== undefined ? templateOverrideId : proposalRes.data.report_template_id;
-        if (effectiveTemplateId) {
-          const { data: templateData, error: templateError } = await supabase
-            .from('proposal_report_templates')
-            .select('*')
-            .eq('id', effectiveTemplateId)
-            .maybeSingle();
-
+        {
+          const { data: resolved, error: templateError } = await supabase.rpc('get_proposal_display_template', {
+            p_proposal_id: proposalId,
+            p_template_id: effectiveTemplateId ?? null,
+          });
+          if (templateError) {
+            setTemplateLoadError('The proposal display settings could not be loaded. Please retry.');
+            return;
+          }
+          const templateData = resolved?.template;
           if (!templateError && templateData) {
             setTemplate(templateData);
           } else {
@@ -407,25 +425,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               show_product_images: true,
             });
           }
-        } else {
-          // No template assigned, show everything
-          setTemplate({
-            show_quantity: true,
-            show_unit_price: true,
-            show_line_item_total: true,
-            show_manufacturer: true,
-            show_sku: true,
-            show_model_number: true,
-            show_labor_hours: true,
-            show_labor_rate: true,
-            show_labor_total: true,
-            show_area_descriptions: true,
-            show_area_subtotals: true,
-            show_tax_breakdown: true,
-            show_accepted_payment_methods: true,
-            show_payment_instructions: true,
-            show_product_images: true,
-          });
         }
 
         if (proposalRes.data.contacts) {
@@ -621,27 +620,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('proposals')
-        .update({
-          status: 'declined',
-          decline_reason: declineReason,
-          decline_notes: declineNotes.trim() || null,
-          declined_at: new Date().toISOString(),
-          declined_by: 'customer',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', proposalId);
-
-      if (error) throw error;
-
-      // Log activity
-      const { error: activityError } = await supabase.from('proposal_activity').insert({
-        proposal_id: proposalId,
-        activity_type: 'declined',
-        metadata: { reason: declineReason, notes: declineNotes.trim() || null, by: 'customer' },
+      const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+        p_proposal_id: proposalId, p_expected_version: proposal.current_portal_version ?? 0,
+        p_request_id: declineRequestId.current, p_action: 'decline',
+        p_details: { reason: declineReason, notes: declineNotes.trim(), promise_acknowledged: declinePromiseAcknowledged },
       });
-      if (activityError) console.warn('Proposal decline activity could not be recorded', activityError);
+      if (error || data?.status !== 'declined') throw error || new Error('Decline was not recorded');
 
       notify('Proposal declined. We will be in touch shortly.', { theme: 'blue', tone: 'info' });
       onBack();
@@ -659,81 +643,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
     setSubmitting(true);
     try {
-      // Find or create the proposal message thread
-      let { data: existingThread } = await supabase
-        .from('message_threads')
-        .select('id, assigned_sales_rep_id')
-        .eq('proposal_id', proposalId)
-        .eq('context_type', 'proposal')
-        .maybeSingle();
-
-      let threadId = existingThread?.id;
-
-      const { data: customerOwner } = proposal.contact_id
-        ? await supabase.from('contacts').select('assigned_to').eq('id', proposal.contact_id).maybeSingle()
-        : { data: null };
-      const assignedRepId = customerOwner?.assigned_to || null;
-      // Customer ownership is authoritative; do not silently route to proposal creator.
-      if (!assignedRepId) throw new Error('Your customer record needs a sales representative assigned before we can route this request. Please contact our office.');
-
-      // Customer ownership is authoritative, including for legacy proposal threads.
-      if (threadId && existingThread?.assigned_sales_rep_id !== assignedRepId) {
-        const { error: assignmentError } = await supabase
-          .from('message_threads')
-          .update({ assigned_sales_rep_id: assignedRepId })
-          .eq('id', threadId)
-          .eq('proposal_id', proposalId);
-        if (assignmentError) throw new Error('Unable to route your request to your assigned representative. Please try again or contact our office.');
-      }
-
-      if (!threadId) {
-        const { data: proposalData } = await supabase
-          .from('proposals')
-          .select('proposal_number, created_by, contact_id')
-          .eq('id', proposalId)
-          .single();
-
-        if (proposalData) {
-          const { data: newThread, error: createError } = await supabase
-            .from('message_threads')
-            .insert({
-              subject: `Q&A: Proposal ${proposalData.proposal_number}`,
-              context_type: 'proposal',
-              context_id: proposalId,
-              proposal_id: proposalId,
-              contact_id: proposalData.contact_id,
-              assigned_sales_rep_id: assignedRepId,
-              visibility: 'public',
-              created_by: proposalData.contact_id,
-            })
-            .select('id')
-            .single();
-
-          if (createError) throw createError;
-          threadId = newThread?.id;
-        }
-      }
-
-      if (!threadId) throw new Error('Could not find or create message thread');
-
-      const { error: msgError } = await supabase
-        .from('messages')
-        .insert({
-          thread_id: threadId,
-          author_id: proposal.contact_id || null,
-          author_name: proposal.contact_name || 'Customer',
-          author_type: 'customer',
-          body: comment.trim(),
-          is_internal: false,
-          is_read: false,
-          context_room_id: null,
-          context_line_item_id: null,
-          context_label: null,
-        });
-
-      if (msgError) throw msgError;
-
-      recordDecisionStep('change_request_submitted');
+      const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+        p_proposal_id: proposalId, p_expected_version: proposal.current_portal_version ?? 0,
+        p_request_id: changeRequestId.current, p_action: 'request_changes', p_details: { message: comment.trim() },
+      });
+      if (error || !data?.thread_id) throw error || new Error('Change request was not recorded');
+      changeRequestId.current = crypto.randomUUID();
       setComment('');
       setActiveDecisionForm(null);
       setDeclinePromiseAcknowledged(false);
@@ -757,6 +672,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       </div>
     );
   }
+
+  if (templateLoadError) return <div role="alert" className="p-6 text-center">{templateLoadError}<button type="button" onClick={loadProposalDetails} className="ml-3 underline">Retry</button></div>;
 
   if (!proposal) {
     return (
@@ -907,7 +824,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             </div>
             <button
               data-engagement-action="download_clicked"
-              onClick={trackProposalDownload}
+              aria-label="Download PDF"
+              disabled={previewMode}
+              onClick={downloadProposal}
               className="flex items-center gap-2 px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px] flex-shrink-0"
             >
               <Download className="w-4 h-4" />
@@ -1065,9 +984,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               <td className="py-4">
-                                <div className="flex items-center gap-2">
+                                <div className="min-w-0 space-y-1 break-words">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
-                                  {(template?.show_sku || template?.show_model_number) && item.products?.sku && <p className="mt-1 text-xs text-gray-500">{template?.show_model_number ? 'Model' : 'SKU'}: {item.products.sku}</p>}
+                                  {template?.show_model_number && item.products?.manufacturer_model_number && <p className="mt-1 text-xs text-gray-500">Model: {item.products.manufacturer_model_number}</p>}
+                                  {template?.show_sku && item.products?.sku && <p className="mt-1 text-xs text-gray-500">SKU: {item.products.sku}</p>}
                                 </div>
                                 {template?.show_item_color && item.products?.item_color && <p className="mt-1 text-xs text-gray-500">Color: {item.products.item_color}</p>}
                               </td>
@@ -1080,7 +1000,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               {template?.show_installed_price !== false && !hideCostsOverride && (
-                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency((item.line_total || 0) + (item.labor_total || ((item.labor_hours || 0) * (item.labor_rate || 0))) )}</td>
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency(proposalLineAmounts(item).installed )}</td>
                               )}
                               {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
@@ -1263,6 +1183,14 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   <span>Valid until: {new Date(proposal.valid_until).toLocaleDateString()}</span>
                 </div>
               )}
+
+              {repContact && <section aria-label="Your representative" className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm">
+                <p className="font-semibold text-gray-900 break-words">Your representative: {repContact.name}</p>
+                <div className="mt-3 flex flex-wrap gap-4">
+                  {repContact.phone && <a className="text-blue-700 underline" href={`tel:${repContact.phone.replace(/[^+0-9]/g, '')}`}>Call your representative</a>}
+                  {repContact.email && <a className="text-blue-700 underline" href={`mailto:${repContact.email}`}>Email your representative</a>}
+                </div>
+              </section>}
 
               {/* Action Buttons */}
               <div data-engagement-section="actions" className="space-y-3">

@@ -337,20 +337,98 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
   return (
     <div className="space-y-0">
       <div className="bg-surface rounded-t-lg border border-subtle border-b-0 px-4 sm:px-5 pt-3 pb-3">
-        {/* Single compact row: back | title + status + meta | total + actions */}
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Back / close */}
+        {/* Phone layout: stacked rows */}
+        <div className="sm:hidden space-y-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={isStandalone ? () => window.close() : onBack}
+              className="flex items-center gap-1 text-xs text-muted hover:text-secondary transition-colors flex-shrink-0"
+            >
+              {isStandalone ? <X className="w-3.5 h-3.5" /> : <ArrowLeft className="w-3.5 h-3.5" />}
+              <span>{isStandalone ? 'Close' : 'Back'}</span>
+            </button>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border flex-shrink-0 ${cfg.color}`}>
+              <StatusIcon className="w-3 h-3" />
+              <span>{cfg.label}</span>
+            </span>
+            <div className="flex-1" />
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {order.test_tune_status === 'active' && (
+                <span className="flex items-center gap-1 px-1.5 py-1 text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-700/40 rounded-lg">
+                  <Award className="w-3 h-3" />T&amp;T
+                </span>
+              )}
+              {order.test_tune_status === 'paused' && (
+                <span className="flex items-center gap-1 px-1.5 py-1 text-xs text-warning bg-yellow-500/10 border border-yellow-700/40 rounded-lg">
+                  <Award className="w-3 h-3" />T&amp;T
+                </span>
+              )}
+              {(order.status === 'active' || order.status === 'planning') && isAdmin && (
+                <button
+                  onClick={() => setShowCompleteModal(true)}
+                  className="flex items-center gap-1 px-2 py-1.5 text-xs text-success bg-green-500/10 border border-green-700/50 rounded-lg transition-colors font-medium"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => setShowRevertModal(true)}
+                  className="flex items-center gap-1 px-2 py-1.5 text-muted hover:text-attention border border-subtle rounded-lg transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-start justify-between gap-3 min-w-0">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base font-bold text-primary leading-tight truncate">
+                {order.proposal?.title || `SO #${order.order_number}`}
+              </h1>
+              <div className="flex items-center gap-2 text-xs text-muted mt-0.5 flex-wrap">
+                <span className="font-medium">SO #{order.order_number}</span>
+                {order.proposal?.proposal_number && <span>Prop #{order.proposal.proposal_number}</span>}
+                {order.contact?.full_name && (
+                  <span className="flex items-center gap-0.5">
+                    <User className="w-3 h-3" />
+                    {order.contact.full_name}
+                  </span>
+                )}
+                <span className="flex items-center gap-0.5">
+                  <Calendar className="w-3 h-3" />
+                  {new Date(order.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <div className="flex-shrink-0 text-right">
+              <div className="text-[10px] text-muted leading-none mb-0.5">
+                {totalChangeAmount !== 0 ? 'Adjusted Total' : 'Contract Total'}
+              </div>
+              <div className="text-base font-bold text-primary tabular-nums leading-none">
+                ${adjustedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              {totalChangeAmount !== 0 && (
+                <div className={`text-[10px] mt-0.5 leading-none ${totalChangeAmount > 0 ? 'text-success' : 'text-danger'}`}>
+                  {totalChangeAmount > 0 ? '+' : ''}${totalChangeAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} COs
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop/tablet layout: single compact row */}
+        <div className="hidden sm:flex items-center gap-3 min-w-0">
           <button
             onClick={isStandalone ? () => window.close() : onBack}
             className="flex items-center gap-1 text-xs text-muted hover:text-secondary transition-colors flex-shrink-0"
           >
             {isStandalone ? <X className="w-3.5 h-3.5" /> : <ArrowLeft className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{isStandalone ? 'Close' : 'Back'}</span>
+            <span>{isStandalone ? 'Close' : 'Back'}</span>
           </button>
 
           <div className="w-px h-4 bg-elevated flex-shrink-0" />
 
-          {/* Title + status + meta stacked */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-lg font-bold text-primary leading-tight">
@@ -377,7 +455,6 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
             </div>
           </div>
 
-          {/* Total */}
           <div className="flex-shrink-0 text-right">
             <div className="text-[10px] text-muted leading-none mb-0.5">
               {totalChangeAmount !== 0 ? 'Adjusted Total' : 'Contract Total'}
@@ -392,15 +469,14 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
             )}
           </div>
 
-          {/* Action badges + buttons */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {order.test_tune_status === 'active' && (
-              <span className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-700/40 rounded-lg">
+              <span className="flex items-center gap-1 px-2 py-1 text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-700/40 rounded-lg">
                 <Award className="w-3 h-3" />T&amp;T
               </span>
             )}
             {order.test_tune_status === 'paused' && (
-              <span className="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-warning bg-yellow-500/10 border border-yellow-700/40 rounded-lg">
+              <span className="flex items-center gap-1 px-2 py-1 text-xs text-warning bg-yellow-500/10 border border-yellow-700/40 rounded-lg">
                 <Award className="w-3 h-3" />T&amp;T
               </span>
             )}
@@ -410,7 +486,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-success hover:text-success bg-green-500/10 hover:bg-green-500/20 border border-green-700/50 hover:border-green-600 rounded-lg transition-colors font-medium"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Complete</span>
+                <span>Complete</span>
               </button>
             )}
             {isAdmin && (
@@ -419,7 +495,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
                 className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-muted hover:text-attention hover:border-orange-700/50 border border-subtle rounded-lg transition-colors"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span className="hidden sm:inline">Revert</span>
+                <span>Revert</span>
               </button>
             )}
           </div>
@@ -428,7 +504,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
       </div>
 
       {['active', 'paused', 'completed'].includes(order.test_tune_status ?? '') && (
-        <div className="bg-surface border-x border-subtle px-4 sm:px-6 py-3 sm:py-4">
+        <div className="bg-surface border-x border-subtle px-4 sm:px-6 py-3 sm:py-4 rounded-lg">
           <TestTuneStatusPanel
             salesOrderId={orderId}
             salesOrderStatus={order.status}
@@ -437,8 +513,8 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         </div>
       )}
 
-      <div className="bg-surface/50 border-x border-subtle px-1 relative">
-        <div className="flex gap-0.5 overflow-x-auto scrollbar-hide pb-px">
+      <div className="bg-surface/50 border-x border-subtle relative group/tabs">
+        <div className="flex gap-0.5 overflow-x-auto scrollbar-hide px-1 pb-px">
           {tabs.map(tab => {
             const Icon = tab.icon;
             return (
@@ -455,7 +531,11 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">{tab.label}</span>
                 {tab.badge && (
-                  <span className="ml-0.5 px-1.5 py-0.5 bg-elevated text-secondary rounded-full text-xs leading-none">
+                  <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-xs leading-none font-semibold ${
+                    activeTab === tab.id
+                      ? 'bg-blue-500/20 text-info'
+                      : 'bg-elevated text-secondary'
+                  }`}>
                     {tab.badge}
                   </span>
                 )}
@@ -463,9 +543,10 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
             );
           })}
         </div>
+        <div className="absolute right-0 top-0 bottom-px w-8 bg-gradient-to-l from-surface/50 to-transparent pointer-events-none opacity-0 group-hover/tabs:opacity-100 transition-opacity" />
       </div>
 
-      <div className="bg-surface rounded-b-lg border border-subtle border-t-0 p-3 sm:p-6">
+      <div className="bg-surface rounded-b-lg border border-subtle border-t-0 p-3 sm:p-6 overflow-hidden">
         <ErrorBoundary
           key={activeTab}
           fallback={(error) => (
@@ -539,7 +620,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
       {showRevertModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-surface border border-subtle rounded-xl w-full max-w-full sm:max-w-md shadow-2xl">
+          <div className="bg-surface border border-subtle rounded-xl w-full max-w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-subtle">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-orange-500/20 rounded-lg flex items-center justify-center">

@@ -35,6 +35,7 @@ export interface Profile {
   can_view_prospects?: boolean;
   can_edit_contacts?: boolean;
   can_edit_products?: boolean;
+  can_manage_monitoring_services?: boolean;
   can_edit_contact_assignments?: boolean;
   can_delete_invoices?: boolean;
   can_create_purchase_orders?: boolean;

@@ -13,6 +13,7 @@ SELECT c.id AS contact_id,
          WHEN c.assigned_to IS NULL THEN 'missing_rep'
          WHEN p.id IS NULL THEN 'rep_not_found'
          WHEN p.organization_id IS DISTINCT FROM c.organization_id THEN 'rep_wrong_organization'
+         WHEN p.is_active IS NOT TRUE OR p.role IN ('portal_user','customer') THEN 'rep_inactive_or_customer'
          ELSE NULL
        END AS rep_issue,
        CASE
@@ -27,7 +28,7 @@ LEFT JOIN public.company_offices o ON o.id = c.office_id
 WHERE c.contact_type IN ('person', 'business')
   AND (c.organization_id IS NULL OR c.assigned_to IS NULL OR c.office_id IS NULL
        OR p.organization_id IS DISTINCT FROM c.organization_id
-       OR o.organization_id IS DISTINCT FROM c.organization_id);
+       OR o.organization_id IS DISTINCT FROM c.organization_id OR p.is_active IS NOT TRUE OR p.role IN ('portal_user','customer'));
 
 -- This is an internal audit, not a customer-facing API endpoint.
 REVOKE ALL ON public.customer_assignment_audit FROM PUBLIC, anon, authenticated;

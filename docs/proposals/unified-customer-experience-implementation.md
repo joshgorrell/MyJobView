@@ -1,33 +1,51 @@
-# Unified customer proposal experience — implementation guardrails
+# Customer proposal decisions — PR #258
 
-Status: implementation in progress; **do not merge until end-to-end tests pass**.
+Integrated main through 28cba011 (including merged #248). The emailed shared-link
+entrypoint validates the token/revocation/revision/deadline, then verified signed-in
+customers use the same PortalProposalDetail viewer as portal links. Anonymous
+visitors retain the limited summary and a customer sign-in link. Possessing a token
+alone never authorizes a decision or exposes private document fields.
 
-## Non-regression requirements
-- Preserve all existing proposal templates, settings, document attachments, PDFs, acceptance methods (including purchase orders), signature requirements, deposit rules, invoice workflows, revisions, expiration/reactivation, Q&A, and Lost Opportunities automations.
-- Use one customer-facing proposal viewer for emailed share links and portal links, with consistent branding, scope, pricing, and actions on desktop, iPad, and iPhone.
-- Do not expose private proposal content by replacing token access with an unauthenticated database query. Verify authorization for all decision mutations server-side.
-- Do not conflate acceptance with payment. Accepted proposal remains approved if customer chooses to pay later or checkout fails. Track deposit separately.
-- Decline must collect a reason and use the canonical loss-feedback workflow, preserving existing follow-up suppression and manual entry.
-- Request changes must preserve messages and mark a formal follow-up state without mutating accepted versions.
-- Resolve the actual customer-owning sales rep, not necessarily proposal.created_by. Notify that rep for approval, decline, and changes; provide click-to-call and click-to-email.
-- Keep proposal history and immutable accepted version evidence. Make submissions idempotent.
+Approve, decline and formal change requests use one customer-authorized SQL RPC.
+It checks ownership, active account, visible active revision, deadline, expected
+portal version and configured acceptance method. Proposal row locks and request
+receipts make retries/concurrent approvals idempotent. Private evidence captures
+the reviewed proposal, settings, template, rooms and lines. Customer direct writes
+to proposal financial/status fields are rejected. Existing staff workflows remain.
 
-## Confirmed code audit findings (2026-10-22)
-- `src/components/Portal/SharedProposalPage.tsx` is currently read-only and does not render the full scope or actions.
-- `src/components/Portal/PortalProposalDetail.tsx` contains approve/decline/change buttons, with inline change and decline sections.
-- Its change handler inserts a message but does not change proposal status.
-- Its decline handler directly updates `proposals`, whereas `src/components/Proposals/DeclineProposalModal.tsx` invokes `record_proposal_decline`.
-- `src/components/Portal/ProposalApprovalModal.tsx` updates status to approved and supports deposit invoices, but deposit-required copy implies payment is needed to finalize approval.
-- Customer proposal detail has no observed `tel:` or `mailto:` rep links.
+Approval uses the existing sales-order/project/deposit trigger. Fixed removed
+jobsite-field references and invalid notification columns/types against the actual
+live schema; notifications use the assigned customer owner. Approval remains
+recorded when a deposit is unpaid or checkout is closed/blocked. PO acceptance
+requires its number, and failed PO uploads stop submission. Deposit invoices are
+refreshed after approval. Customer declines and staff entries share the canonical
+loss-feedback implementation, including confirmed portal feedback and existing
+in-person staff feedback. No test sends real customer messages or payments.
 
-## Delivery sequence
-1. Trace share-link token security, portal routing, RLS and notification/payment triggers.
-2. Introduce shared viewer without weakening access controls or removing existing PDF/theme capabilities.
-3. Centralize decision mutations and state transitions, including loss feedback and change-request tracking.
-4. Separate deposit checkout from acceptance and add deposit-later follow-up.
-5. Add assigned-rep contact actions and verified notifications.
-6. Polish iPhone-first action area and responsive scope sections; keep identical labels and sequence on all devices.
-7. Test email share link and portal paths on iPhone Safari, iPad Safari, desktop Chrome/Safari/Edge; exercise approval with deposit now/later, declined payment, decline reasons, request changes, versioning, expired links, and duplicate clicks.
+Formal changes persist a follow-up timestamp/version and a public conversation
+message. Conversation creation is server-authorized and always routes to the
+assigned customer rep, including previously misassigned threads. The viewer shows
+rep call/email links, the concise Our Promise reconsideration choices and separate
+decline notes. The PDF control opens the existing authorized printable document
+adapter; existing template/model/SKU/price display options are retained.
 
-## Merge gate
-No merge until the full proposal can be reviewed and acted on through both link types, all prior acceptance and template functionality remains intact, server-side authorization is verified, and regression tests pass.
+## Verification
+
+Meaningful regression suites exercise actual SQL and the actual React/edge
+handlers. CI includes PostgreSQL 17, concurrent approval retries, Deno checking,
+full build/typecheck, engagement/template regressions, preview side-effect guards,
+and Chromium/WebKit responsive customer flows. Browser-engine testing is not a
+claim of physical iOS device testing. Validation results belong in the PR body.
+
+## Ownership remediation
+
+On October 23, the owner explicitly instructed that customers without a rep be
+assigned to Josh Gorrell for now. The live transaction assigned 407 Electronic Life
+person/business customers to the uniquely resolved active Josh Gorrell profile in
+their organization. Existing representative assignments and all offices were
+verified unchanged. Future manual reassignment remains available.
+
+The migrations now require complete assignments without legacy exceptions. The
+customer audit must return zero invalid records and the check constraint must be
+validated before rollout. New customers and ownership changes require an active
+internal representative and an office in the customer's organization.

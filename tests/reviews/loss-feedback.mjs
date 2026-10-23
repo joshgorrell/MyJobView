@@ -130,13 +130,14 @@ assert.equal(rows.find((r) => r.id === "r3").valueKnown, false);
 assert.equal(rows.find((r) => r.id === "active").status, "declined");
 assert.equal(rows.find((r) => r.id === "active").canRecord, false);
 const id = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
+for (const declineActorType of ['text', 'uuid']) {
 const db = new PGlite();
 await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;CREATE SCHEMA auth;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid',true),'')::uuid$$;
 CREATE TABLE organizations(id uuid PRIMARY KEY,subdomain text);CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,is_active boolean,role text);
 CREATE FUNCTION get_user_org_id() RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $$SELECT organization_id FROM profiles WHERE id=auth.uid()$$;
 CREATE FUNCTION flow_has_module_access(text) RETURNS boolean LANGUAGE sql AS $$SELECT coalesce(current_setting('test.access',true),'true')='true'$$;
-CREATE TABLE proposals(id uuid PRIMARY KEY,organization_id uuid,created_by uuid,status text,declined_at timestamptz,auto_archived boolean DEFAULT false,decline_reason text,decline_notes text,declined_by text);
+CREATE TABLE proposals(id uuid PRIMARY KEY,organization_id uuid,created_by uuid,status text,declined_at timestamptz,auto_archived boolean DEFAULT false,decline_reason text,decline_notes text,declined_by ${declineActorType});
 CREATE TABLE lost_review_tokens(request_id uuid PRIMARY KEY,token_hash text);CREATE TABLE lost_review_details(request_id uuid PRIMARY KEY);CREATE TABLE lost_review_responses(request_id uuid PRIMARY KEY);
 CREATE TABLE company_settings(organization_id uuid,auto_review_followup_enabled boolean,auto_review_followup_days integer DEFAULT 14);
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;GRANT SELECT ON profiles,proposals TO authenticated;GRANT UPDATE ON proposals TO authenticated;
@@ -152,6 +153,7 @@ await db.exec(
     "utf8",
   ),
 );
+await db.exec(await readFile(new URL('../../supabase/migrations/20261022153811_compatible_decline_actor.sql', import.meta.url), 'utf8'));
 const settings = (
   await db.query("select * from company_settings order by organization_id")
 ).rows;
@@ -285,6 +287,7 @@ assert.equal(
   ).rows[0].recorded_by,
   id(11),
 );
+assert.equal((await db.query('select declined_by from proposals where id=$1', [id(40)])).rows[0].declined_by, declineActorType === 'uuid' ? id(11) : 'rep');
 await db.exec("RESET ROLE;SET ROLE anon");
 await assert.rejects(db.query("select * from proposal_loss_feedback"));
 await assert.rejects(
@@ -296,6 +299,7 @@ await assert.rejects(
   ]),
 );
 await db.close();
+}
 console.log(
   "Loss reporting, source priority, deduplication, dates, immutable history, tenant/rep/module isolation, atomic declines and archived outcomes passed.",
 );

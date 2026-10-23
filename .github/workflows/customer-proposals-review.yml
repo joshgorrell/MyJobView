@@ -1,0 +1,61 @@
+name: Customer proposal decisions
+on:
+  pull_request:
+    paths:
+      - 'src/components/Portal/**'
+      - 'src/components/Proposals/ProposalQA.tsx'
+      - 'src/components/Proposals/ProposalActivityPanel.tsx'
+      - 'src/lib/proposalEngagement.ts'
+      - 'supabase/functions/view-shared-proposal/**'
+      - 'supabase/migrations/*customer*'
+      - 'supabase/migrations/*proposal_decision*'
+      - 'supabase/migrations/*proposal_reconsideration*'
+      - 'tests/customer-proposals/**'
+      - 'tests/proposal-engagement/**'
+      - '.github/workflows/customer-proposals-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  decisions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: customer-ci-only
+          POSTGRES_DB: customer_proposals_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CUSTOMER_DATABASE_URL: postgres://postgres:customer-ci-only@localhost:5432/customer_proposals_test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Check shared edge endpoint
+        timeout-minutes: 5
+        run: npx --yes deno@2.5.6 check --no-config supabase/functions/view-shared-proposal/index.ts
+      - run: npm install --no-save --package-lock=false pg@8.16.3 playwright@1.55.1
+      - run: npm run test:customer-proposals && node tests/customer-proposals/concurrency.mjs
+      - run: npm run test:proposal-engagement && npm run test:proposal-templates
+      - name: Install Chromium
+        timeout-minutes: 5
+        run: npx playwright install --only-shell chromium
+      - run: npm run test:customer-proposals:browser && node tests/proposals/preview-browser.mjs
+      - name: Install WebKit
+        timeout-minutes: 5
+        run: npx playwright install --with-deps webkit
+      - run: npm run test:customer-proposals:browser
+        env:
+          CUSTOMER_BROWSER: webkit

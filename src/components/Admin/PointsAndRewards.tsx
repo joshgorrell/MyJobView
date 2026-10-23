@@ -78,7 +78,7 @@ export function PointsAndRewards() {
   async function loadData() {
     try {
       const [configResult, rewardsResult, redemptionsResult, companySettings] = await Promise.all([
-        supabase.from('points_configuration').select('*').single(),
+        supabase.from('points_configuration').select('*').eq('organization_id', profile?.organization_id).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('rewards_catalog').select('*').order('created_at', { ascending: false }),
         supabase
           .from('reward_redemptions')
@@ -91,17 +91,20 @@ export function PointsAndRewards() {
         supabase.from('company_settings').select('id, photo_upload_points').eq('organization_id', profile?.organization_id).maybeSingle(),
       ]);
 
+      for (const result of [configResult, rewardsResult, redemptionsResult, companySettings]) {
+        if (result.error) throw result.error;
+      }
       if (configResult.data) {
         setPointsConfig(configResult.data);
         setPointsForm({
           task_completion_points: configResult.data.task_completion_points,
           question_answer_points: configResult.data.question_answer_points,
-          contact_created_points: configResult.data.contact_created_points || 5,
-          connection_logged_points: configResult.data.connection_logged_points || 10,
-          lead_created_points: configResult.data.lead_created_points || 20,
-          lead_claimed_points: configResult.data.lead_claimed_points || 15,
-          lead_converted_points: configResult.data.lead_converted_points || 50,
-          manual_entry_points_loss: configResult.data.manual_entry_points_loss || 10,
+          contact_created_points: configResult.data.contact_created_points ?? 5,
+          connection_logged_points: configResult.data.connection_logged_points ?? 10,
+          lead_created_points: configResult.data.lead_created_points ?? 20,
+          lead_claimed_points: configResult.data.lead_claimed_points ?? 15,
+          lead_converted_points: configResult.data.lead_converted_points ?? 50,
+          manual_entry_points_loss: configResult.data.manual_entry_points_loss ?? 10,
         });
       }
 
@@ -122,28 +125,32 @@ export function PointsAndRewards() {
     try {
       // Save points configuration
       if (pointsConfig) {
-        await supabase
+        const { error } = await supabase
           .from('points_configuration')
           .update(pointsForm)
           .eq('id', pointsConfig.id);
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from('points_configuration')
-          .insert([{ ...pointsForm, company_id: profile?.id }]);
+          .insert([{ ...pointsForm, company_id: profile?.id, organization_id: profile?.organization_id }]);
+        if (error) throw error;
       }
 
       // Save photo upload points to company settings
-      const { data: settings } = await supabase
+      const { data: settings, error: settingsError } = await supabase
         .from('company_settings')
         .select('id')
         .eq('organization_id', profile?.organization_id)
         .maybeSingle();
 
+      if (settingsError) throw settingsError;
       if (settings?.id) {
-        await supabase
+        const { error } = await supabase
           .from('company_settings')
           .update({ photo_upload_points: photoUploadPoints })
           .eq('id', settings.id);
+        if (error) throw error;
       }
 
       notify('Points configuration saved!', { theme: 'blue', tone: 'success' });
@@ -157,14 +164,16 @@ export function PointsAndRewards() {
   async function saveReward() {
     try {
       if (editingReward) {
-        await supabase
+        const { error } = await supabase
           .from('rewards_catalog')
           .update(rewardForm)
           .eq('id', editingReward.id);
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from('rewards_catalog')
-          .insert([{ ...rewardForm, company_id: profile?.id }]);
+          .insert([{ ...rewardForm, company_id: profile?.id, organization_id: profile?.organization_id }]);
+        if (error) throw error;
       }
 
       setShowRewardForm(false);
@@ -186,7 +195,8 @@ export function PointsAndRewards() {
 
   async function deleteReward(id: string) {
     try {
-      await supabase.from('rewards_catalog').delete().eq('id', id);
+      const { error } = await supabase.from('rewards_catalog').update({ available: false }).eq('id', id);
+      if (error) throw error;
       loadData();
     } catch (error) {
       console.error('Error deleting reward:', error);
@@ -196,13 +206,11 @@ export function PointsAndRewards() {
 
   async function updateRedemptionStatus(id: string, status: string) {
     try {
-      await supabase
-        .from('reward_redemptions')
-        .update({
-          status,
-          fulfilled_at: status === 'fulfilled' ? new Date().toISOString() : null,
-        })
-        .eq('id', id);
+      const { error } = await supabase.rpc('set_reward_redemption_status', {
+        p_redemption_id: id,
+        p_status: status,
+      });
+      if (error) throw error;
 
       loadData();
     } catch (error) {
@@ -653,10 +661,10 @@ export function PointsAndRewards() {
 
       <ConfirmModal
         isOpen={confirmDeleteId !== null}
-        title="Delete Reward"
-        message="Are you sure you want to delete this reward?"
+        title="Archive Reward"
+        message="Are you sure you want to archive this reward?"
         variant="danger"
-        confirmLabel="Delete"
+        confirmLabel="Archive"
         onConfirm={() => {
           if (confirmDeleteId) deleteReward(confirmDeleteId);
           setConfirmDeleteId(null);

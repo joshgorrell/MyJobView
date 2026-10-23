@@ -1,3 +1,4 @@
+import type { SalesListKey } from '../../lib/salesDashboardRecords';
 import { SalesKpiCard } from './SalesKpiCard';
 import {
   computeCurrentPaceKpi,
@@ -9,9 +10,10 @@ import type { SalesDashboardResult } from '../../lib/salesDashboardTypes';
 
 interface SalesKpiGridProps {
   data: SalesDashboardResult;
+  onSelect?: (key: SalesListKey) => void;
 }
 
-export function SalesKpiGrid({ data }: SalesKpiGridProps) {
+export function SalesKpiGrid({ data, onSelect }: SalesKpiGridProps) {
   const cards = [
     { data: computeCurrentPaceKpi(data), color: 'blue' },
     { data: computeSalesBookedKpi(data), color: 'green' },
@@ -22,7 +24,7 @@ export function SalesKpiGrid({ data }: SalesKpiGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card, i) => (
-        <SalesKpiCard key={i} data={card.data} accentColor={card.color} />
+        <SalesKpiCard onClick={() => onSelect?.((['runRate', 'booked', 'pipeline', 'closed'] as SalesListKey[])[i])} key={i} data={card.data} accentColor={card.color} />
       ))}
     </div>
   );
