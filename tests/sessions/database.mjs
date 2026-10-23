@@ -55,8 +55,8 @@ assert.equal((await db.query('SELECT is_active FROM public.user_sessions WHERE i
 await db.exec('RESET ROLE');
 const locationEdge = await readFile('supabase/functions/session-location/index.ts', 'utf8');
 assert.match(locationEdge, /SUPABASE_SERVICE_ROLE_KEY/);
-assert.match(locationEdge, /supabase\\.auth\\.getUser\\(\\)/);
-assert.match(locationEdge, /\\.eq\\('user_id', user\\.id\\)/);
+assert.ok(locationEdge.includes('supabase.auth.getUser()'));
+assert.ok(locationEdge.includes(".eq('user_id', user.id)"));
 
 console.log('Database: repeat visits deduplicate, identical computers stay separate, users and tenants stay separate, nicknames survive new sessions, expired sessions resume and anonymous calls fail');
 await db.close();
