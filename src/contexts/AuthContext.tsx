@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const recoveryVerifiedRef = useRef(false);
   const [isPortalUser, setIsPortalUser] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const sessionTrackingGenerationRef = useRef(0);
 
   // Refs mirror the state values so the onAuthStateChange closure (which
   // is created once on mount) can read the *current* profile/loading state
@@ -359,6 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function startSessionTracking(userId: string) {
     try {
       cleanupSessionTracking();
+      const trackingGeneration = ++sessionTrackingGenerationRef.current;
 
       const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
       // Always install idle enforcement before session analytics. An analytics
@@ -492,6 +494,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         p_device_vendor: deviceInfo.deviceVendor
       });
 
+      // Another login, tab transition, or sign-out may have superseded this RPC.
+      if (trackingGeneration !== sessionTrackingGenerationRef.current) return;
       if (error) {
         return;
       }
@@ -560,6 +564,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function cleanupSessionTracking() {
+    sessionTrackingGenerationRef.current++;
     if ((window as any).__sessionInteractionCleanup) {
       (window as any).__sessionInteractionCleanup();
       delete (window as any).__sessionInteractionCleanup;
