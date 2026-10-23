@@ -18,6 +18,8 @@ function harness(path, globals = {}, imports = {}) {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText, {
     module, exports:module.exports, console, ...globals,
     require(name) {
+      if (name.endsWith('/ContactLogModal')) return {ContactLogModal:'ContactLogModal'};
+      if (name.endsWith('/ContactLogHistory')) return {ContactLogHistory:'ContactLogHistory'};
       if (name.endsWith('/SupportPhotos')) return {SupportPhotos:'SupportPhotos'};
       if (name.endsWith('/SupportRequestItems')) return {SupportRequestItems:'SupportRequestItems'};
       if (name.endsWith('.css')) return {};
