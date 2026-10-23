@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useDepartments } from "../../../contexts/DepartmentContext";
 import TeamUtilization from './TeamUtilization';
 import {
   laborHistory,
@@ -48,6 +49,7 @@ function lastDay(zone = "America/Chicago") {
 }
 export default function LaborDashboard() {
   const { profile } = useAuth();
+  const { hasModuleAccess, loading: permissionsLoading } = useDepartments();
   const [mode, setMode] = useState("day"),
     [anchor, setAnchor] = useState(() => lastDay()),
     [rangeStart, setRangeStart] = useState(
@@ -245,12 +247,8 @@ export default function LaborDashboard() {
       : null;
   const latestJob = bundle?.latest_job_day ?? "No import",
     latestPayroll = bundle?.latest_payroll_day ?? "No import";
-  if (profile?.role !== "admin")
-    return (
-      <p className="p-6">
-        Labor reporting requires organization administrator access.
-      </p>
-    );
+  if (permissionsLoading) return <p role="status">Loading report permissions…</p>;
+  if (!hasModuleAccess("tech_stats")) return <p role="alert">You do not have permission to view Tech Stats.</p>;
   return (
     <section className="space-y-6 p-4 sm:p-6">
       <header className="flex flex-wrap justify-between items-start gap-4">
@@ -267,13 +265,13 @@ export default function LaborDashboard() {
             · {bundle?.timezone ?? "America/Chicago"}
           </p>
         </div>
-        <button
+        {profile?.role === "admin" && <button
           className="border border-subtle rounded-lg p-2 text-primary flex gap-2 items-center"
           onClick={() => setSettings(!settings)}
         >
           <Settings size={16} />
           Data sources
-        </button>
+        </button>}
       </header>
       <div className="flex flex-wrap gap-3 items-center bg-surface border border-subtle p-3 rounded-xl">
         <select
@@ -354,7 +352,7 @@ export default function LaborDashboard() {
           {bundle && " Showing the last successful report."}
         </div>
       )}
-      {settings && (
+      {settings && profile?.role === "admin" && (
         <div className="bg-surface border border-subtle rounded-xl p-4 space-y-4">
           <h2 className="font-semibold text-primary">Import controls</h2>
           <p className="text-sm text-secondary">

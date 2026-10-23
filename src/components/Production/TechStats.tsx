@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { TechEfficiencyChart } from './TechEfficiencyChart';
 import { TechAdvisorTab } from './TechAdvisorTab';
 import {useAuth} from '../../contexts/AuthContext';
+import { useDepartments } from '../../contexts/DepartmentContext';
 import LaborDashboard from './LaborDashboard/LaborDashboard';
 import {
   Clock,
@@ -196,11 +197,10 @@ interface TechStatsProps {
 
 export function TechStats({ onNavigate }: TechStatsProps) {
   const {profile,loading}=useAuth();
+  const {hasModuleAccess,loading:permissionsLoading}=useDepartments();
   const [view,setView]=useState<'performance'|'activity'>('performance');
-  if(loading)return <p role="status">Loading Tech Stats…</p>;
-  // Imported payroll/financial reporting retains its established admin gate.
-  // Other staff keep the existing native activity view and its permissions.
-  if(profile?.role!=='admin')return <NativeTechActivity onNavigate={onNavigate}/>;
+  if(loading || permissionsLoading)return <p role="status">Loading Tech Stats…</p>;
+  if (!hasModuleAccess('tech_stats')) return <p role="alert">You do not have permission to view Tech Stats.</p>;
   return <div className="space-y-5">
     <nav aria-label="Tech Stats views" className="flex flex-wrap gap-2 border-b border-subtle pb-3">
       <button aria-current={view==='performance'?'page':undefined} onClick={()=>setView('performance')} className={'rounded-lg px-4 py-2 text-sm '+(view==='performance'?'bg-blue-600 text-white':'bg-surface text-primary border border-subtle')}>Performance</button>
