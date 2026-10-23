@@ -45,7 +45,7 @@ assert.equal(emails.length,0,'Preview must never send');
 role='employee'; authenticatedEmail='other@example.com'; assert.equal((await call()).status,403);
 assert.equal((await call({variant:'sales'})).body.reply_to,'aaron@example.com');
 permission=false; assert.equal((await call({variant:'sales'})).status,403);
-role='admin'; assert.equal((await call()).status,403, 'Other admins cannot send Josh’s owner email'); authenticatedEmail='josh@electroniclife.com'; tenant='other'; assert.equal((await call()).status,400);
+role='admin'; assert.equal((await call()).status,403, 'Other admins cannot send Josh’s owner email'); authenticatedEmail='josh@electroniclife.com'; tenant='other'; assert.equal((await call()).status,403, 'Owner identity is restricted to Electronic Life');
 tenant='elife'; status='approved'; assert.equal((await call()).status,400);
 status='sent'; sentAt=null; assert.equal((await call()).status,400);
 sentAt='2026-10-01'; moduleAccess=false; assert.equal((await call()).status,403);

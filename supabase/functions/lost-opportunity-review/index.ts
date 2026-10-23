@@ -430,6 +430,9 @@ Deno.serve(async (req) => {
         .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
       if (!rep) return json({ error: "Could not find the salesperson for this proposal. They may have been removed." }, 400);
       const owner = b.variant === "owner";
+      if (owner && (organization.subdomain !== "elife" || user.email?.toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the authorized owner can send from the owner identity." }, 403);
+      }
       const sender = { owner, name: owner ? "Josh Gorrell" : [rep.first_name, rep.last_name].filter(Boolean).join(" "),
         email: owner ? "josh@electroniclife.com" : rep.email,
         photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };

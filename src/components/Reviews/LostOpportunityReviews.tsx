@@ -66,6 +66,7 @@ export default function LostOpportunityReviews(
   const [contact, setContact] = useState<Contact | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposal, setProposal] = useState("");
+  const [recipientMode, setRecipientMode] = useState<"customer" | "proposal">("customer");
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
@@ -281,6 +282,7 @@ export default function LostOpportunityReviews(
   }
   async function send(e: React.FormEvent) {
     e.preventDefault();
+    if (!preview || busy) return;
     if (
       await action({
         action: "create",
@@ -344,7 +346,7 @@ export default function LostOpportunityReviews(
       (v.title || "").toLowerCase().includes(historySearchLower))
   );
   const input =
-    "block w-full rounded-lg border border-gray-600 bg-gray-900 text-gray-100 p-3 mt-2";
+    "block w-full rounded-lg border border-gray-600 bg-gray-900 text-gray-100 px-3 py-2 mt-1";
   function formatDateTime(iso: string | null): string | null {
     if (!iso) return null;
     const d = new Date(iso);
@@ -389,21 +391,11 @@ export default function LostOpportunityReviews(
     );
   }
   return (
-    <section className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-      <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <TrendingDown className="mt-1 h-6 w-6 text-blue-400" />
-          <div>
-            <h2 className="text-lg font-semibold text-white">
-              Lost Opportunities
-            </h2>
-            <p className="text-gray-400 text-sm mt-0.5">
-              Learn why we lost and earn another chance. Customer feedback is
-              visible only to users with submission viewing permission.
-            </p>
-          </div>
-        </div>
-
+    <section className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
+      <div className="flex items-center gap-2 px-1">
+        <TrendingDown className="h-5 w-5 shrink-0 text-blue-400" />
+        <h2 className="text-lg font-semibold text-white">Lost Opportunities</h2>
+        <span className="hidden text-sm text-gray-400 sm:inline">· Learn why we lost and earn another chance.</span>
       </div>
       {error && !expandedReview && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
@@ -421,13 +413,23 @@ export default function LostOpportunityReviews(
       {canSend && createOpen && (
         <form
           onSubmit={send}
-          className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4"
+          className="bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4 space-y-3"
         >
           <div className="flex justify-end">
             <button type="button" onClick={() => setCreateOpen(false)} className="text-sm text-gray-400 hover:text-white">Hide form</button>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <button key={variant} type="button" disabled={busy} onClick={() => { setSenderVariant(variant); setPreview(null); }} className={`cursor-pointer rounded-xl border px-3 py-2 text-left transition ${senderVariant === variant ? "border-blue-500 bg-blue-950/40" : "border-gray-600 hover:border-gray-400"}`} aria-pressed={senderVariant === variant}><div className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</div><p className="mt-0.5 text-xs text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from the company owner with their signature and reply-to address."}</p></button>)}</div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Choose recipient method">
+            {(["customer", "proposal"] as const).map(mode => (
+              <button key={mode} type="button" aria-pressed={recipientMode === mode}
+                onClick={() => setRecipientMode(mode)}
+                className={`min-h-10 rounded-lg border px-3 py-2 text-sm ${recipientMode === mode ? "border-blue-500 bg-blue-950/40 text-blue-200" : "border-gray-600 text-gray-300"}`}>
+                {mode === "customer" ? "Select Customer" : "Link a Proposal"}
+              </button>
+            ))}
+          </div>
           <label className="block text-gray-200">
-            Customer (required)<input
+            {recipientMode === "proposal" ? "Find proposal customer (required)" : "Select Customer (required)"}<input
               value={contact
                 ? contact.contact_name || contact.company_name
                 : search}
@@ -465,8 +467,8 @@ export default function LostOpportunityReviews(
                 "Add an email address to this customer before sending."}
             </p>
           )}
-          <label className="block text-gray-200">
-            Proposal (optional)<select
+          {(recipientMode === "proposal" || contact) && <label className="block text-gray-200">
+            {recipientMode === "proposal" ? "Link a Proposal" : "Proposal (optional)"}<select
               value={proposal}
               disabled={!contact}
               onChange={(e) => {
@@ -484,9 +486,8 @@ export default function LostOpportunityReviews(
                 </option>
               ))}
             </select>
-          </label>
+          </label>}
           {!proposal && <label className="block text-gray-200">Opportunity Name (required for manual entry)<input required maxLength={200} value={name} onChange={(e) => opportunity(e.target.value)} placeholder="e.g. Home Theater Installation" className={input} /></label>}
-          <div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <button key={variant} type="button" disabled={busy} onClick={() => { setSenderVariant(variant); setPreview(null); }} className={`cursor-pointer rounded-xl border p-4 text-left transition ${senderVariant === variant ? "border-blue-500 bg-blue-950/40" : "border-gray-600 hover:border-gray-400"}`} aria-pressed={senderVariant === variant}><div className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</div><p className="mt-1 text-sm text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from the company owner with their signature and reply-to address."}</p></button>)}</div>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
               required
@@ -499,9 +500,6 @@ export default function LostOpportunityReviews(
               className={input}
             />
           </label>
-          <p className="text-sm text-gray-400">
-            Use Preview Email to see the personalized message before sending.
-          </p>
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
@@ -511,12 +509,7 @@ export default function LostOpportunityReviews(
           >
             {previewing ? "Loading Preview…" : "Preview Email"}
           </button>
-          <button
-            disabled={busy || !canSend || !contact?.email || !title.trim()}
-            className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 text-white disabled:opacity-50"
-          >
-            {busy ? "Sending…" : "Send Lost Opportunity Review"}
-          </button>
+
         </form>
       )}
       <ReviewStatsRow stats={lostStats} />
@@ -556,9 +549,13 @@ export default function LostOpportunityReviews(
             <div className="min-h-0 flex-1 overflow-auto bg-white" role="region" aria-label="Full email preview" tabIndex={0}>
               <FullEmailPreview title="Lost Opportunity email preview" html={preview.html} />
             </div>
-            <p className="shrink-0 p-3 text-sm text-gray-400">
-              Scroll to see the entire email, including its buttons and footer. Preview only—no email has been sent.
-            </p>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-gray-700 p-3">
+              <p className="text-xs text-gray-400">Preview only — no email has been sent.</p>
+              <div className="flex gap-2">
+                <button type="button" disabled={busy} onClick={() => setPreview(null)} className="min-h-11 rounded-lg border border-gray-600 px-4 py-2 text-gray-200">Back to Form</button>
+                <button type="button" disabled={busy} onClick={() => void send({ preventDefault() {} } as React.FormEvent)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Sending…" : "Send This Email"}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
