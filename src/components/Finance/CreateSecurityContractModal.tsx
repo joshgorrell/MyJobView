@@ -298,9 +298,9 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   }
 
   return (
-    <div className="security-onboarding-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
+    <div className="security-onboarding-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-none sm:rounded-lg shadow-2xl w-full max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col min-h-0">
+        <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
           <button
             onClick={onClose}
@@ -318,7 +318,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-6 space-y-4 sm:space-y-6">
           <SecurityVisibilityGuide />
             {prefill && (
               <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -380,7 +380,8 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                 />
               </div>
 
-              <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+              {(searchTerm.trim() || contactSearchLoading) && !selectedContact && (
+              <div className="border border-gray-300 rounded-lg max-h-48 sm:max-h-64 overflow-y-auto">
                 {contactSearchLoading ? (
                   <div className="p-4 text-center text-gray-500">Searching...</div>
                 ) : filteredContacts.length === 0 ? (
@@ -440,6 +441,8 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                   })
                 )}
               </div>
+
+              )}
 
               {showNewContactForm && (
                 <div className="mt-3 p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg space-y-3 sm:space-y-4">
@@ -719,21 +722,21 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Agreement Term <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                 {SECURITY_INITIAL_TERMS.map((months) => (
                   <button
                     key={months}
                     type="button"
                     onClick={() => setTermMonths(months)}
                     aria-pressed={termMonths === months}
-                    className={`px-2 sm:px-4 py-3 text-center rounded-lg border-2 transition-all ${
+                    className={`px-1 sm:px-4 py-2 sm:py-3 text-center rounded-lg border-2 transition-all text-sm sm:text-base ${
                       termMonths === months
                         ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
                         : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                     }`}
                   >
-                    {months}<br/>
-                    <span className="text-xs">months</span>
+                    {months}<span className="sr-only"> months</span><br/>
+                    <span aria-hidden="true" className="text-[10px] sm:text-xs">mo</span>
                   </button>
                 ))}
               </div>
@@ -1027,7 +1030,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
               <p className="mt-1 text-xs text-gray-500">Delivery address only; this override is not displayed on the customer form. Leave blank to use the customer's email on file.</p>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <div className="sticky bottom-0 z-10 flex gap-3 py-3 px-1 bg-white border-t border-gray-200 shadow-[0_-6px_14px_-12px_rgba(0,0,0,0.4)]">
               <button
                 type="button"
                 onClick={onClose}

@@ -7,6 +7,9 @@ export default function PrintSecurityOnboardingForm({ onClose }: { onClose: () =
   const [templates, setTemplates] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [template, setTemplate] = useState('');
+  const [contactId, setContactId] = useState('');
+  const [contactQuery, setContactQuery] = useState('');
+  const [contacts, setContacts] = useState<{id:string;full_name:string|null;email:string|null}[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [term, setTerm] = useState(36);
   const [price, setPrice] = useState('');
@@ -29,6 +32,17 @@ export default function PrintSecurityOnboardingForm({ onClose }: { onClose: () =
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   })(); }, []);
+  useEffect(() => {
+    if (!contactQuery.trim()) { setContacts([]); return; }
+    let active = true;
+    const timer = setTimeout(async () => {
+      const term = contactQuery.trim().replace(/[%_,()]/g, '');
+      if (!term) return;
+      const { data } = await supabase.from('contacts').select('id,full_name,email').or(`full_name.ilike.%${term}%,email.ilike.%${term}%`).limit(15);
+      if (active) setContacts(data || []);
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [contactQuery]);
   async function print(e: React.FormEvent) {
     e.preventDefault();
     const tab = window.open('', '_blank');
@@ -40,7 +54,7 @@ export default function PrintSecurityOnboardingForm({ onClose }: { onClose: () =
       if (!session) throw new Error('Please sign in to print this form.');
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-blank-contract-form`, {
         method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ template_id: template, service_ids: selected, term_months: term, price_override: price || null }),
+        body: JSON.stringify({ template_id: template, contact_id: contactId || null, service_ids: selected, term_months: term, price_override: price || null }),
       });
       if (!response.ok) { const result = await response.json().catch(() => null); throw new Error(result?.error || 'The printable form could not be loaded.'); }
       tab.document.open(); tab.document.write(await response.text()); tab.document.close();
@@ -54,6 +68,8 @@ export default function PrintSecurityOnboardingForm({ onClose }: { onClose: () =
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {loading ? <p role="status">Loading form options...</p> : <>
         <label className="block">Agreement template<select aria-label="Agreement template" required value={template} onChange={e => setTemplate(e.target.value)} className="block w-full border rounded p-2"><option value="">Choose a template</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <div className="space-y-2"><label className="block">Customer (optional — prefill paper form)<input type="search" value={contactQuery} onChange={e => { setContactQuery(e.target.value); setContactId(''); }} placeholder="Search customer name or email" className="block w-full border rounded p-2" /></label>
+          {contactId ? <p className="text-sm text-green-700">Customer selected for prefill.</p> : contactQuery.trim() && <div className="max-h-36 overflow-y-auto border rounded">{contacts.map(c => <button type="button" key={c.id} className="block w-full text-left p-2 hover:bg-gray-100" onClick={() => { setContactId(c.id); setContactQuery(c.full_name || c.email || 'Selected customer'); setContacts([]); }}>{c.full_name || 'Unnamed'} {c.email ? '(' + c.email + ')' : ''}</button>)}</div>}</div>
         <label className="block">Initial term<select aria-label="Initial term" value={term} onChange={e => setTerm(Number(e.target.value))} className="block w-full border rounded p-2">{SECURITY_INITIAL_TERMS.map(n => <option key={n} value={n}>{n} months</option>)}</select></label>
         <fieldset><legend>Monitoring services</legend>{services.map(s => <label key={s.id} className="flex gap-2 py-1"><input type="checkbox" checked={selected.includes(s.id)} onChange={e => setSelected(e.target.checked ? [...selected, s.id] : selected.filter(id => id !== s.id))} />{s.name} (${Number(s.monthly_price).toFixed(2)}/month)</label>)}</fieldset>
         <label className="block">Monthly price override (optional)<input aria-label="Monthly price override" type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="block w-full border rounded p-2" /></label>
