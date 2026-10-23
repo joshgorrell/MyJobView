@@ -261,6 +261,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
+    // Explicit login begins a new idle window, even after an earlier expired session.
+    localStorage.setItem(`mjv-last-interaction:${data.user.id}`, String(Date.now()));
+
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect_to');
     if (redirectTo && isValidReturnHost(redirectTo)) {
