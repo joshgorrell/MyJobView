@@ -9,7 +9,7 @@ const React={useState(initial){const i=cursor++;if(!(i in values))values[i]=type
 const jsx=(type,props)=>({type,props});const component=load('src/components/Production/LaborDashboard/LaborDashboard.tsx',name=>{if(name==='react')return React;if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};if(name==='lucide-react'||name==='recharts')return new Proxy({},{get:(_,k)=>k});if(name.endsWith('/supabase'))return{supabase};if(name.endsWith('/AuthContext'))return{useAuth:()=>({profile})};if(name.endsWith('/laborDashboard'))return model;if(name.endsWith('/TeamUtilization'))return{default:'TeamUtilization'};throw Error(name);}).default;
 const nodes=t=>Array.isArray(t)?t.flatMap(nodes):t&&typeof t==='object'?[t,...nodes(t.props?.children)]:[];
 const text=t=>Array.isArray(t)?t.map(text).join(''):t&&typeof t==='object'?text(t.props?.children):t==null?'':String(t);
-const render=()=>{cursor=0;return component();};const settle=async()=>{effects.splice(0).forEach(fn=>fn());for(let i=0;i<20;i++)await Promise.resolve();};
+const render=(props)=>{cursor=0;return component(props);};const settle=async()=>{effects.splice(0).forEach(fn=>fn());for(let i=0;i<20;i++)await Promise.resolve();};
 let tree=render();await settle();tree=render();await settle();tree=render();
 assert.equal(requests[0].name,'get_labor_dashboard');assert.equal(requests[0].args.p_end,'2026-10-12','Tech Stats defaults to the previous weekday');assert.ok(text(tree).includes('75.00%'));
 nodes(tree).find(n=>n.type==='button'&&text(n)==='Hourly').props.onClick();tree=render();assert.ok(nodes(tree).some(n=>n.props?.role==='dialog'));assert.ok(text(tree).includes('Hourly · Time history'));assert.ok(text(tree).includes('Project'));
@@ -18,5 +18,6 @@ nodes(tree).find(n=>n.props?.['aria-label']==='Rank technicians by').props.onCha
 nodes(tree).find(n=>n.type==='button'&&text(n)==='Data sources').props.onClick();tree=render();nodes(tree).find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:false}});await settle();assert.equal(writes.at(-1).table,'labor_import_sources');assert.equal(writes.at(-1).changes.enabled,false);
 tree=render();nodes(tree).find(n=>n.type==='textarea').props.onChange({target:{value:'2026-12-25'}});tree=render();await nodes(tree).find(n=>n.type==='button'&&text(n)==='Save holidays').props.onClick();await settle();assert.equal(writes.at(-1).table,'labor_dashboard_calendars');assert.deepEqual(Array.from(writes.at(-1).changes.holidays),['2026-12-25']);
 assert.equal(writes.some(w=>['time_entries','daily_clock_entries','payroll_time_segments'].includes(w.table)),false);
+tree=render({controlsOnly:true});assert.ok(text(tree).includes('Historical imports & availability calendar'));assert.ok(!text(tree).includes('Technician ranking'));
 profile.role='tech';tree=render();assert.ok(text(tree).includes('administrator access'));assert.ok(!text(tree).includes('75.00%'));
 console.log('Labor UI: period boundary, ranking switch, technician drilldown, source disabling, holiday save and administrator gate passed.');

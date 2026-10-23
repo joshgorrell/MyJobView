@@ -24,4 +24,32 @@ await db.exec(`SET ROLE authenticated;SELECT set_config('test.uid','${id(11)}',f
 await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);assert.equal((await db.query('SELECT * FROM external_labor_snapshots')).rows.length,0);assert.equal((await db.query(`UPDATE labor_import_sources SET enabled=false WHERE organization_id='${id(1)}' RETURNING source`)).rows.length,0);
 await db.exec(`SELECT set_config('test.uid','${id(10)}',false)`);assert.equal((await db.query('SELECT * FROM external_labor_snapshots')).rows.length,1);const b=(await db.query("SELECT get_labor_dashboard('2026-01-01','2026-01-31') AS b")).rows[0].b;assert.equal(b.snapshots.length,1);assert.equal(b.snapshots[0].payload.records[0].job_hours,7);
 await db.exec('RESET ROLE');await db.exec(`INSERT INTO projects VALUES('${id(100)}','Native project','active',NULL,'${id(1)}');INSERT INTO time_entries(organization_id,project_id,total_hours,status,entry_date) VALUES('${id(1)}','${id(100)}',5,'approved',CURRENT_DATE-1),('${id(1)}','${id(100)}',99,'approved',CURRENT_DATE+5);SET ROLE authenticated;SELECT set_config('test.uid','${id(10)}',false)`);const current=(await db.query("SELECT get_labor_dashboard(CURRENT_DATE-30,CURRENT_DATE+30) AS b")).rows[0].b;assert.equal(current.native_projects[0].hours_used,5);
+await db.exec('RESET ROLE');
+await db.exec(`ALTER TABLE employee_payroll_configs ADD COLUMN compensation_type text, ADD COLUMN expected_weekly_hours numeric, ADD COLUMN work_days text[];
+ALTER TABLE time_entries ADD COLUMN clock_out timestamptz;
+INSERT INTO employees VALUES('${id(101)}','${id(11)}','${id(1)}','2026-01-01');
+INSERT INTO employee_payroll_configs VALUES('${id(101)}','${id(1)}','2026-01-01',NULL,'hourly',40,NULL);
+INSERT INTO labor_dashboard_roster(organization_id,profile_id) VALUES('${id(1)}','${id(11)}');
+INSERT INTO time_entries(technician_id,entry_date,total_hours,organization_id,status,entry_type,clock_out) VALUES
+('${id(11)}','2026-01-02',2,'${id(1)}','approved','customer_activity','2026-01-02T18:00Z'),
+('${id(11)}','2026-01-02',50,'${id(1)}','draft','work_order','2026-01-02T18:00Z'),
+('${id(11)}','2026-01-02',99,'${id(2)}','approved','work_order','2026-01-02T18:00Z');`);
+await db.exec(await readFile('supabase/migrations/20261023114939_tech_production_report.sql','utf8'));
+await db.exec(`SET ROLE authenticated;SELECT set_config('test.uid','${id(10)}',false)`);
+const production=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(production.project_snapshot,null);assert.equal(production.native_projects.length,0);
+assert.equal(production.snapshots[0].payload.records[0].job_hours,7);
+assert.equal(production.native_jobs[0].hours,2,'only completed approved production in the current organization');
+assert.equal(production.configs[0].expected_weekly_hours,40);
+assert.equal(production.configs[0].employee_id,undefined,'only production availability configuration is returned');
+assert.equal(production.sources[0].enabled,undefined,'no source controls in the production feed');
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-02-01','2026-01-01')"),/Invalid date range/);
+await db.exec(`SELECT set_config('test.uid','${id(11)}',false)`);
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/administrator access/);
+await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);
+const isolated=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(isolated.roster.length,0);assert.equal(isolated.snapshots.length,0);assert.equal(isolated.native_jobs[0].hours,99);
+await db.exec("RESET ROLE;SET ROLE anon");
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/permission denied/);
+console.log('Production RPC: small projection, customer production, completed records, organization isolation and historical admin boundary passed.');
 await db.close();console.log('Labor storage: idempotence, correction history, atomic rejection, disabling/cutover, credential isolation and cross-tenant access passed.');

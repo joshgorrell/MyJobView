@@ -2,7 +2,7 @@ import { notify } from '../../lib/feedback';
 import { PTOManagement } from './PTOManagement';
 import { canManageTimeOff } from '../../lib/timeOff';
 import { TimeReviewPanel } from './Payroll/TimeReviewPanel';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,8 @@ import PayrollApprovalPanel from './Payroll/PayrollApprovalPanel';
 import PayrollCorrectionsPanel from './Payroll/PayrollCorrectionsPanel';
 import PayrollReconciliationPanel from './Payroll/PayrollReconciliationPanel';
 import { AttendanceAllocationSummary } from './Payroll/AttendanceAllocationSummary';
+
+const LaborImportControls = lazy(() => import('../Production/LaborDashboard/LaborDashboard'));
 
 interface PendingAutoClockOut {
   id: string;
@@ -132,7 +134,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [confirmRunAutoClockOut, setConfirmRunAutoClockOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'review' | 'payroll' | 'timeoff'>(initialTab || (admin ? 'settings' : 'timeoff'));
+  const [activeTab, setActiveTab] = useState<'settings' | 'review' | 'payroll' | 'timeoff' | 'imports'>(initialTab || (admin ? 'settings' : 'timeoff'));
   const [selectedPayPeriodId, setSelectedPayPeriodId] = useState<string | null>(null);
   const [payrollRefreshKey, setPayrollRefreshKey] = useState(0);
 
@@ -509,7 +511,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
   if (loading) {
     return (
       <div className="flex flex-col gap-4 items-center justify-center h-64">
-        {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open labor dashboard</button>}
+        {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open Tech Stats</button>}
         <div className="text-gray-500">Loading settings...</div>
       </div>
     );
@@ -529,7 +531,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
         </div>
       </div>
 
-      {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open labor dashboard</button>}
+      {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open Tech Stats</button>}
       {/* Tab Navigation */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200">
         {admin && <button
@@ -555,9 +557,11 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
           <DollarSign className="w-4 h-4 inline mr-1.5" />
           Payroll & Jurisdiction
         </button>}
+        {admin && <button onClick={()=>setActiveTab('imports')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='imports'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Historical Imports</button>}
         {canManageTimeOff(profile?.role) && <button onClick={()=>setActiveTab('timeoff')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='timeoff'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Time Off</button>}
       </div>
 
+      {admin && activeTab==='imports' && <Suspense fallback={<p role="status">Loading import settings…</p>}><LaborImportControls controlsOnly/></Suspense>}
       {activeTab==='timeoff' && canManageTimeOff(profile?.role) && <PTOManagement/>}
       {admin && activeTab==='review' && <TimeReviewPanel onPayroll={()=>setActiveTab('payroll')}/>}
       {admin && activeTab === 'settings' && (
