@@ -34,8 +34,24 @@ await db.exec('set role anon'); await assert.rejects(()=>start(101),/permission 
 // A browser may close only its own session; direct table writes are blocked.
 await db.exec('GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_sessions TO authenticated;');
 await db.exec(await readFile('supabase/migrations/20261023124000_secure_browser_session_writes.sql', 'utf8'));
+await db.exec(await readFile('supabase/migrations/20261023124500_secure_legacy_start_user_session.sql', 'utf8'));
 await user(1);
 await db.exec('SET ROLE authenticated');
+// The legacy SECURITY DEFINER RPC must not let a caller impersonate a coworker
+// or write a session into another organization.
+await assert.rejects(
+  () => db.query('SELECT public.start_user_session($1)', [
+    '00000000-0000-4000-8000-000000000002'
+  ]),
+  /Cannot start another user session/
+);
+await assert.rejects(
+  () => db.query('SELECT public.start_user_session($1, p_organization_id => $2)', [
+    '00000000-0000-4000-8000-000000000001',
+    '00000000-0000-4000-8000-000000000020'
+  ]),
+  /Session organization mismatch/
+);
 await assert.rejects(
   () => db.query('UPDATE public.user_sessions SET is_active=false WHERE id=$1', [other]),
   /permission denied/i
