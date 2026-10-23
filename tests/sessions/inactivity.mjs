@@ -50,4 +50,10 @@ const legacyUi = await readFile('src/components/Admin/UserSessionsViewerEnhanced
 assert.ok(legacyUi.includes('Legacy daily logout (read-only)'), 'Legacy daily logout settings must be labeled read-only');
 assert.ok(legacyUi.includes('aria-label="Legacy daily logout is read-only"'), 'Legacy schedule toggle must be disabled');
 assert.ok(legacyUi.includes('Read-only Legacy Schedule'), 'Legacy save button must be disabled');
+const ipMigration = await readFile('supabase/migrations/20261022220000_ip_location_classification.sql', 'utf8');
+assert.match(ipMigration, /CREATE POLICY ip_nicknames_admin_update/);
+assert.match(ipMigration, /p\.role IN \('admin', 'superadmin'\)/);
+const sessionMigration = await readFile('supabase/migrations/20261023124000_secure_browser_session_writes.sql', 'utf8');
+assert.match(sessionMigration, /REVOKE INSERT, UPDATE, DELETE, TRUNCATE\s+ON public\.session_logout_schedule/);
+assert.match(sessionMigration, /DROP POLICY IF EXISTS "Admins can update session logout schedule"/);
 console.log('60-minute timeout, five-minute warning, reload eligibility and idle-dialog contract pass');
