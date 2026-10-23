@@ -49,12 +49,23 @@ Deno.serve(async (req: Request) => {
     }
 
     let contract: any;
+    let requestedContactId: string | null = null;
     if (!contractId) {
       if (req.method !== 'POST') return new Response(JSON.stringify({error:'Choose a template and services'}), {status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
       const payload = await req.json();
+      requestedContactId = typeof payload.contact_id === 'string' ? payload.contact_id : null;
       const {data,error} = await supabaseClient.rpc('staff_security_onboarding', {p_action:'print_form',p_id:null,p_payload:payload});
       if (error) return new Response(JSON.stringify({error:error.message}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
       contract = data;
+      if (requestedContactId) {
+        const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('organization_id').eq('id', user.id).single();
+        if (profileError || !profile?.organization_id) throw new Error('Organization access required');
+        const { data: contact, error: contactError } = await supabaseClient.from('contacts')
+          .select('id,full_name,email,phone,street_address,city,state,zip_code,organization_id')
+          .eq('id', requestedContactId).eq('organization_id', profile.organization_id).single();
+        if (contactError || !contact) return new Response(JSON.stringify({error:'Customer not found or not accessible'}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
+        contract = { ...contract, contact, personalInfo: { ...contract.personalInfo, full_name: contact.full_name, email: contact.email, phone: contact.phone }, propertyInfo: { ...contract.propertyInfo, address_line1: contact.street_address, city: contact.city, state: contact.state, zip_code: contact.zip_code } };
+      }
     } else {
       const {data:review,error} = await supabaseClient.rpc('staff_security_onboarding', {p_action:'get',p_id:contractId});
       if (error) return new Response(JSON.stringify({error:'Security onboarding permission required'}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
