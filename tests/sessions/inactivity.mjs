@@ -33,4 +33,11 @@ assert.match(auth, /document\.addEventListener\(event, trackIdleInteraction/);
 assert.match(auth, /window\.addEventListener\('focus', checkIdle\)/);
 assert.match(auth, /document\.addEventListener\('visibilitychange', checkIdle\)/);
 assert.doesNotMatch(auth, /'mousemove'/);
+const guardPosition = auth.indexOf('const idleCheck = setInterval(checkIdle, 1000)');
+const sessionRpcPosition = auth.indexOf("supabase.rpc('start_browser_session'");
+assert.ok(guardPosition > 0 && sessionRpcPosition > guardPosition,
+  'Idle guard must install before analytics RPC so a tracking failure cannot disable logout');
+assert.match(auth, /trackingGeneration !== sessionTrackingGenerationRef\.current/);
+assert.match(auth, /sessionTrackingGenerationRef\.current\+\+/);
+
 console.log('60-minute timeout, five-minute warning, reload eligibility and idle-dialog contract pass');
