@@ -1,9 +1,9 @@
 export type LaborSource = {
   source: "ipoint" | "quickbooks_time";
-  enabled: boolean;
+  enabled?: boolean;
   native_from: string | null;
-  last_success_at: string | null;
-  last_error: string | null;
+  last_success_at?: string | null;
+  last_error?: string | null;
 };
 export type LaborBundle = {
   timezone: string;
@@ -109,9 +109,14 @@ export function laborHistory(
     Date.parse(end) - Date.parse(start) > 1830 * 86400000
   )
     return [];
-  const mapping = (source: string) =>
-    b.mappings.find((m) => m.profile_id === id && m.source === source)
-      ?.external_employee_id;
+  // Index once per technician/report instead of scanning snapshots for every day.
+  // Reverse copies retain the original first-match behavior for duplicate keys.
+  const personMappings = new Map(b.mappings.filter(m => m.profile_id === id)
+    .reverse().map(m => [m.source, m.external_employee_id]));
+  const mapping = (source: string) => personMappings.get(source);
+  const snapshots = new Map([...b.snapshots].reverse().map(s => [s.kind + ':' + s.day, s]));
+  const jobs = new Map(b.native_jobs.filter(j => j.profile_id === id).reverse().map(j => [j.day, j]));
+  const clocks = new Map(b.native_payroll.filter(p => p.profile_id === id).reverse().map(p => [p.day, p]));
   const native = (source: string, day: string) => {
     const cutoff = b.sources.find((s) => s.source === source)?.native_from;
     return !!cutoff && day >= cutoff;
@@ -138,14 +143,12 @@ export function laborHistory(
     const jobNative = native("ipoint", day),
       payNative = native("quickbooks_time", day);
     const j = jobNative
-      ? b.native_jobs.find((j) => j.profile_id === id && j.day === day)
-      : b.snapshots
-          .find((s) => s.kind === "technician" && s.day === day)
+      ? jobs.get(day)
+      : snapshots.get("technician:" + day)
           ?.payload.records.find((r) => r.technician === mapping("ipoint"));
     const p = payNative
-      ? b.native_payroll.find((p) => p.profile_id === id && p.day === day)
-      : b.snapshots
-          .find((s) => s.kind === "payroll" && s.day === day)
+      ? clocks.get(day)
+      : snapshots.get("payroll:" + day)
           ?.payload.records.find(
             (r) => String(r.user_id) === mapping("quickbooks_time"),
           );

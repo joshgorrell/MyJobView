@@ -57,7 +57,7 @@
     "test:punchlist:handoff:browser": "npm run build && node tests/punchlist/visit-checklist-browser.mjs",
     "test:sessions": "node tests/sessions/runtime.mjs && node tests/sessions/database.mjs",
     "test:pto": "node tests/pto/database.mjs && node tests/pto/browser.mjs",
-    "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs && node tests/labor-dashboard/timing.mjs && node tests/labor-dashboard/tech-stats-entry.mjs && node tests/labor-dashboard/team-utilization.mjs",
+    "test:labor-dashboard": "node tests/labor-dashboard/database.mjs && node tests/labor-dashboard/reporting.mjs && node tests/labor-dashboard/edge.mjs && node tests/labor-dashboard/runtime.mjs && node tests/labor-dashboard/timing.mjs && node tests/labor-dashboard/tech-stats-entry.mjs && node tests/labor-dashboard/team-utilization.mjs && node tests/labor-dashboard/production-model.mjs && node tests/labor-dashboard/production-data.mjs",
     "test:proposal-promise": "node tests/proposals/promise.mjs",
     "test:proposal-promise:browser": "node tests/proposals/promise.mjs && npm run build && node tests/proposals/promise-browser.mjs",
     "test:proposal-sharing": "node tests/proposals/share-link-contract.mjs",
@@ -77,7 +77,8 @@
     "test:proposal-templates": "node tests/proposal-templates/database.mjs && node tests/proposal-templates/document.mjs && node tests/proposals/promise.mjs && node tests/proposal-templates/purchasing-model.mjs && node tests/proposal-templates/builder-settings.mjs",
     "test:proposal-templates:browser": "node tests/proposal-templates/browser.mjs",
     "test:customer-proposals": "node tests/customer-proposals/database.mjs && node tests/customer-proposals/shared-link.mjs",
-    "test:customer-proposals:browser": "node tests/customer-proposals/browser.mjs"
+    "test:customer-proposals:browser": "node tests/customer-proposals/browser.mjs",
+    "test:tech-stats:browser": "npm run build && node tests/labor-dashboard/production-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
