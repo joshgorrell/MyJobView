@@ -8,4 +8,5 @@ let tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type==='Verifie
 nodes(tree).find(n=>n.type==='button'&&n.props.children==='Native MJV activity & travel').props.onClick();tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type?.name==='NativeTechActivity'));
 profile.role='service_manager';view='performance';tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type==='VerifiedPerformance'));
 permitted=false;tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.props?.role==='alert'));assert.ok(!nodes(tree).some(n=>n.type==='VerifiedPerformance'));
-console.log('Tech Stats: authorized service manager and admin can open performance; denied users cannot.');
+permitted=true;profile.role='tech';tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type==='VerifiedPerformance'));
+console.log('Tech Stats: permission grants control performance for admin, service manager, and technician; revoked access denies the view.');
