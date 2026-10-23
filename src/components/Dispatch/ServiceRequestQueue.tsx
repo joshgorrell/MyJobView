@@ -39,6 +39,8 @@ import {
 } from 'lucide-react';
 import { ServiceRequestForm } from '../Service/ServiceRequestForm';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
+import { ContactLogModal } from '../Shared/ContactLogModal';
+import { ContactLogHistory } from '../Shared/ContactLogHistory';
 
 interface ServiceRequest {
   id: string;
@@ -123,6 +125,8 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
   const [showCombineModal, setShowCombineModal] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
+  const [contactLogTarget, setContactLogTarget] = useState<ServiceRequest | null>(null);
+  const [contactLogRevision, setContactLogRevision] = useState(0);
 
   const isManager = profile?.role === 'admin' ||
     String(profile?.role) === 'service_manager' ||
@@ -822,6 +826,9 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                           </div>
                         </div>
 
+                        <div className="flex justify-end"><button type="button" onClick={e => { e.stopPropagation(); setContactLogTarget(request); }} className="rounded-lg bg-elevated px-3 py-2 text-xs font-medium text-primary">Log Contact / Note</button></div>
+                        <ContactLogHistory serviceRequestId={request.id} refreshKey={contactLogRevision} />
+
                         {/* Action buttons — full-width row at bottom of expanded section */}
                         {!['closed', 'cancelled'].includes(request.status) && <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
                           <button
@@ -970,6 +977,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
         }}
         onCancel={() => setConfirmCancelId(null)}
       />
+      {contactLogTarget && <ContactLogModal serviceRequestId={contactLogTarget.id} customerName={contactLogTarget.customer_name} onClose={() => setContactLogTarget(null)} onSaved={() => { setContactLogRevision(n => n + 1); void loadRequests(); }} />}
       {quickViewContactId && (
         <ContactQuickViewModal
           contactId={quickViewContactId}
