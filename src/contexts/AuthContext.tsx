@@ -6,6 +6,7 @@ import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
 import { browserInstallationId } from '../lib/sessionDevices';
 import { isValidReturnHost } from '../lib/crossDomainAuth';
+import { MJV_IDLE_TIMEOUT_MS, MJV_IDLE_WARNING_MS, remainingIdleMs, mayResetOnReload } from '../lib/sessionInactivity';
 
 interface AuthContextType {
   user: User | null;
@@ -26,6 +27,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// A navigation reload should only be counted once, even if tracking restarts on tab focus.
+let reloadActivityHandled = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -40,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const recoveryVerifiedRef = useRef(false);
   const [isPortalUser, setIsPortalUser] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const sessionTrackingGenerationRef = useRef(0);
 
   // Refs mirror the state values so the onAuthStateChange closure (which
   // is created once on mount) can read the *current* profile/loading state
@@ -176,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         setLoadingProfile(false);
         if (!portalUser) await supabase.auth.signOut();
+        else void startSessionTracking(userId).catch(() => {});
         return;
       }
 
@@ -185,6 +191,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           clearTimeout(timeoutId);
           setLoading(false);
           setLoadingProfile(false);
+          // Customer portal accounts may not have a staff profile. Enforce the
+          // same idle timeout even when session analytics cannot be recorded.
+          void startSessionTracking(userId).catch(() => {});
           return;
         }
         console.error('Profile not found for user:', userId);
@@ -257,6 +266,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'Please enable cookies and site data in your browser settings.'
       );
     }
+
+    // Explicit login begins a new idle window, even after an earlier expired session.
+    localStorage.setItem(`mjv-last-interaction:${data.user.id}`, String(Date.now()));
 
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect_to');
@@ -352,6 +364,145 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function startSessionTracking(userId: string) {
     try {
       cleanupSessionTracking();
+      const trackingGeneration = ++sessionTrackingGenerationRef.current;
+
+      const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
+      // Always install idle enforcement before session analytics. An analytics
+      // RPC failure must never disable the logout security policy.
+        // Inactivity is based on interactions within MJV, not other browser tabs.
+        // Persist across reloads and tabs in this browser to prevent timer resets.
+        const idleKey = `mjv-last-interaction:${userId}`;
+        const inactivityLimitMs = MJV_IDLE_TIMEOUT_MS;
+        const warningMs = MJV_IDLE_TIMEOUT_MS - MJV_IDLE_WARNING_MS;
+        const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || 0;
+        const dismissWarning = () => document.getElementById('mjv-idle-warning')?.remove();
+        let idleSigningOut = false;
+        const expireSession = () => {
+          if (idleSigningOut) return;
+          idleSigningOut = true;
+          dismissWarning();
+          void (async () => {
+            try {
+              const sessionId = (window as any).__currentSessionId as string | undefined;
+              if (sessionId) {
+                // Best-effort session-history close. Never let a stalled network
+                // request prevent the local authentication logout.
+                await Promise.race([
+                  supabase.rpc('end_user_session', { p_user_id: userId, p_session_id: sessionId }),
+                  new Promise(resolve => setTimeout(resolve, 1500)),
+                ]);
+              }
+            } catch (error) {
+              console.error('Could not close idle session record:', error);
+            } finally {
+              await supabase.auth.signOut();
+            }
+          })();
+        };
+        const recordIdleInteraction = () => {
+          if (idleSigningOut) return;
+          if (remainingIdleMs(readLastInteraction()) === 0) {
+            expireSession();
+            return;
+          }
+          localStorage.setItem(idleKey, String(Date.now()));
+          dismissWarning();
+        };
+        const trackIdleInteraction = (event: Event) => {
+          // Do not dismiss the modal on pointerdown/keydown before the
+          // Log Out Now button can receive its click or keyboard activation.
+          if ((event.target as Element | null)?.closest?.('#mjv-idle-logout')) return;
+          if (event.isTrusted) recordIdleInteraction();
+        };
+        const previousActivity = readLastInteraction();
+        if (!previousActivity) localStorage.setItem(idleKey, String(Date.now()));
+        // Navigation Timing identifies reloads but cannot distinguish a manual
+        // browser refresh from an automatic one. Never revive an expired session.
+        if (!reloadActivityHandled) {
+          reloadActivityHandled = true;
+          const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+          if (mayResetOnReload(navigation?.type, previousActivity, Date.now(), document.visibilityState === 'visible')) {
+            recordIdleInteraction();
+          }
+        }
+        interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
+
+        const showWarning = () => {
+          if (document.getElementById('mjv-idle-warning')) return;
+          const overlay = document.createElement('div');
+          overlay.id = 'mjv-idle-warning';
+          overlay.setAttribute('role', 'alertdialog');
+          overlay.setAttribute('aria-modal', 'true');
+          overlay.setAttribute('aria-labelledby', 'mjv-idle-title');
+          overlay.setAttribute('aria-describedby', 'mjv-idle-description');
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.65);padding:16px';
+          const box = document.createElement('div');
+          box.style.cssText = 'width:min(100%,440px);border-radius:16px;background:var(--background,#fff);color:var(--foreground,#111827);padding:28px;box-shadow:0 24px 70px rgba(0,0,0,.35);text-align:center';
+          const title = document.createElement('h2');
+          title.id = 'mjv-idle-title';
+          title.textContent = 'Your session is about to expire';
+          title.style.cssText = 'font-size:22px;font-weight:700;margin:0 0 12px';
+          const description = document.createElement('p');
+          description.id = 'mjv-idle-description';
+          description.textContent = 'You have been inactive in MyJobView. Interact anywhere in MJV to stay signed in. Unsaved changes may be lost if your session expires.';
+          description.style.cssText = 'font-size:14px;line-height:1.6;margin:0 0 18px';
+          const countdown = document.createElement('p');
+          countdown.id = 'mjv-idle-countdown';
+          countdown.setAttribute('aria-live', 'off');
+          countdown.style.cssText = 'font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;margin:0 0 20px';
+          const stay = document.createElement('button');
+          stay.type = 'button';
+          stay.textContent = 'Stay Signed In';
+          stay.style.cssText = 'background:#2563eb;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:600;cursor:pointer;margin:4px';
+          stay.addEventListener('click', recordIdleInteraction);
+          const logout = document.createElement('button');
+          logout.id = 'mjv-idle-logout';
+          logout.type = 'button';
+          logout.textContent = 'Log Out Now';
+          logout.style.cssText = 'background:transparent;color:inherit;border:1px solid #9ca3af;border-radius:8px;padding:12px 18px;cursor:pointer;margin:4px';
+          logout.addEventListener('click', expireSession);
+          box.append(title, description, countdown, stay, logout);
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+          // Pointer, touch, keyboard and wheel interactions are already
+          // handled by the document listeners, including clicks on this modal.
+          stay.focus();
+        };
+        const checkIdle = () => {
+          if (idleSigningOut) return;
+          const remainingMs = remainingIdleMs(readLastInteraction());
+          if (remainingMs <= 0) {
+            expireSession();
+          } else if (remainingMs <= inactivityLimitMs - warningMs) {
+            showWarning();
+            const countdown = document.getElementById('mjv-idle-countdown');
+            if (countdown) {
+              const seconds = Math.ceil(remainingMs / 1000);
+              countdown.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} remaining`;
+            }
+          } else {
+            dismissWarning();
+          }
+        };
+        const idleCheck = setInterval(checkIdle, 1000);
+        // Timers are throttled while a laptop sleeps or MJV is backgrounded.
+        // Check immediately on return; do not reset idle time on focus.
+        window.addEventListener('focus', checkIdle);
+        document.addEventListener('visibilitychange', checkIdle);
+        checkIdle();
+        const priorCleanup = (window as any).__sessionInteractionCleanup;
+        (window as any).__sessionInteractionCleanup = () => {
+          priorCleanup?.();
+          clearInterval(idleCheck);
+          window.removeEventListener('focus', checkIdle);
+          document.removeEventListener('visibilitychange', checkIdle);
+          document.getElementById('mjv-idle-warning')?.remove();
+          interactionEvents.forEach(event => document.removeEventListener(event, trackIdleInteraction));
+        };
+
+      if (idleSigningOut) return;
+
+
 
       const deviceInfo = parseUserAgent(navigator.userAgent, navigator.maxTouchPoints);
 
@@ -367,6 +518,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         p_device_vendor: deviceInfo.deviceVendor
       });
 
+      // Another login, tab transition, or sign-out may have superseded this RPC.
+      if (trackingGeneration !== sessionTrackingGenerationRef.current) return;
       if (error) {
         return;
       }
@@ -382,9 +535,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }).catch(() => {});
         }, 0);
 
-        // Update activity every 5 minutes
+        // A visible, unattended tab is not evidence of work. Only send a
+        // heartbeat when the user interacted recently while the tab was visible.
+        // Do not collect keys, pointer coordinates, or interaction content.
+        let lastInteractionAt = 0;
+        const noteInteraction = () => {
+          if (document.visibilityState === 'visible') lastInteractionAt = Date.now();
+        };
+        interactionEvents.forEach(event => document.addEventListener(event, noteInteraction, { passive: true }));
+        const idleCleanup = (window as any).__sessionInteractionCleanup;
+        (window as any).__sessionInteractionCleanup = () => {
+          idleCleanup?.();
+          interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
+        };
+
         const activityInterval = setInterval(async () => {
-          if (document.visibilityState === 'visible') {
+          if (document.visibilityState === 'visible' && Date.now() - lastInteractionAt <= 5 * 60 * 1000) {
             try {
               await supabase.rpc('update_session_activity', {
                 p_user_id: userId,
@@ -422,6 +588,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function cleanupSessionTracking() {
+    sessionTrackingGenerationRef.current++;
+    if ((window as any).__sessionInteractionCleanup) {
+      (window as any).__sessionInteractionCleanup();
+      delete (window as any).__sessionInteractionCleanup;
+    }
     // Clear intervals and event listeners
     if ((window as any).__activityInterval) {
       clearInterval((window as any).__activityInterval);

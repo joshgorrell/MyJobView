@@ -400,6 +400,12 @@ Deno.serve(async (req) => {
       const isAdmin = ["admin", "owner", "super_admin"].includes(profile.role);
       if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
       if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
+      // The owner variant represents Josh personally and cannot be sent under
+      // his identity by other administrators or staff with review permissions.
+      if (b.variant === "owner" &&
+          (!isAdmin || user.email?.trim().toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the owner may send the owner follow-up." }, 403);
+      }
 
       const mode = b.recipient_mode || (b.proposal_id ? "proposal" : b.contact_id ? "customer" : "manual");
       if (!["proposal", "customer", "manual"].includes(mode)) return json({ error: "Choose a recipient." }, 400);
@@ -426,6 +432,9 @@ Deno.serve(async (req) => {
       if (!settings) return json({ error: "Company settings are not configured. Set up company email before sending follow-ups." }, 400);
       const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).maybeSingle());
       if (!organization) return json({ error: "Organization not found." }, 400);
+      if (b.variant === "owner" && organization.subdomain !== "elife") {
+        return json({ error: "Owner follow-up is not configured for this organization." }, 403);
+      }
       const rep = await checked(await admin.from("profiles").select("id,first_name,last_name,email,is_active")
         .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
       if (!rep) return json({ error: "Could not find the salesperson for this proposal. They may have been removed." }, 400);

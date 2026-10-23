@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey, X-Session-Logout-Secret',
 };
 
 Deno.serve(async (req: Request) => {
@@ -25,8 +25,19 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const isScheduled = body?.scheduled === true;
+    let manualOrgId: string | null = null;
 
-    if (!isScheduled) {
+    if (isScheduled) {
+      // Scheduled calls must prove possession of a server-side secret. A request
+      // body flag is not authorization and must never bypass authentication.
+      const expected = Deno.env.get('SESSION_LOGOUT_CRON_SECRET');
+      const supplied = req.headers.get('x-session-logout-secret');
+      if (!expected || !supplied || supplied !== expected) {
+        return new Response(JSON.stringify({ success: false, message: 'Unauthorized scheduled request' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
         return new Response(
@@ -47,22 +58,26 @@ Deno.serve(async (req: Request) => {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, organization_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!profile || !['admin', 'superadmin'].includes(profile.role)) {
+      if (!profile || !profile.organization_id || !['admin', 'superadmin'].includes(profile.role)) {
         return new Response(
           JSON.stringify({ success: false, message: 'Forbidden: Admin access required' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      // A company administrator must not revoke another company's sessions.
+      manualOrgId = profile.organization_id;
     }
 
-    const { data: activeSessions, error: sessionsError } = await supabase
+    let sessionsQuery = supabase
       .from('user_sessions')
-      .select('user_id, id')
+      .select('user_id, id, organization_id')
       .eq('is_active', true);
+    if (manualOrgId) sessionsQuery = sessionsQuery.eq('organization_id', manualOrgId);
+    const { data: activeSessions, error: sessionsError } = await sessionsQuery;
 
     if (sessionsError) {
       throw new Error(`Failed to fetch active sessions: ${sessionsError.message}`);
@@ -87,42 +102,59 @@ Deno.serve(async (req: Request) => {
     }
 
     const now = new Date().toISOString();
-    const { error: updateError } = await supabase
+    let closeQuery = supabase
       .from('user_sessions')
       .update({
         is_active: false,
         session_end: now,
       })
       .eq('is_active', true);
+    if (manualOrgId) closeQuery = closeQuery.eq('organization_id', manualOrgId);
+    const { error: updateError } = await closeQuery;
 
     if (updateError) {
       console.error('Failed to update session records:', updateError.message);
     }
 
     const sessionsClosedCount = activeSessions?.length || 0;
+    const completed = revokeErrors.length === 0 && !updateError;
 
-    await supabase.rpc('record_scheduled_logout_run', {
-      sessions_closed: sessionsClosedCount,
-    }).catch((e: any) => console.error('Failed to record logout run:', e));
+    if (isScheduled) {
+      await supabase.rpc('record_scheduled_logout_run', {
+        sessions_closed: sessionsClosedCount,
+      }).catch((e: any) => console.error('Failed to record logout run:', e));
+    }
 
-    await supabase.from('session_cleanup_log').insert({
-      sessions_closed: sessionsClosedCount,
-      success: revokeErrors.length === 0,
-      error_message: revokeErrors.length > 0 ? revokeErrors.join('; ') : null,
-    }).catch((e: any) => console.error('Failed to write cleanup log:', e));
+    // The log requires an organization_id. For an authorized scheduled global
+    // logout, emit a separate record per affected organization, never NULL.
+    const orgIds = manualOrgId
+      ? [manualOrgId]
+      : [...new Set((activeSessions || []).map((s: any) => s.organization_id).filter(Boolean))];
+    for (const orgId of orgIds) {
+      const countForOrg = manualOrgId
+        ? sessionsClosedCount
+        : (activeSessions || []).filter((s: any) => s.organization_id === orgId).length;
+      const { error: logError } = await supabase.from('session_cleanup_log').insert({
+        organization_id: orgId,
+        sessions_closed: countForOrg,
+        success: completed,
+        error_message: revokeErrors.length > 0 ? revokeErrors.join('; ') : null,
+      });
+      if (logError) console.error('Failed to write cleanup log:', logError.message);
+    }
 
     console.log(`Force logout complete: ${revokedCount} users signed out, ${sessionsClosedCount} sessions closed`);
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: completed,
         users_signed_out: revokedCount,
         sessions_closed: sessionsClosedCount,
         errors: revokeErrors.length > 0 ? revokeErrors : undefined,
         executed_at: now,
         message: `Successfully logged out ${revokedCount} user(s) and closed ${sessionsClosedCount} session(s).`,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: completed ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
