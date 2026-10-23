@@ -12,6 +12,7 @@
 - Customer portal accounts without a staff profile now install the idle guard; the session analytics RPC can fail without disabling it.
 - The legacy daily logout configuration is read-only in the admin UI. The session-write migration also removes browser/API INSERT/UPDATE/DELETE rights to `session_logout_schedule`; production retirement still requires a coordinated SQL change after app verification.
 - IP nickname Office/Remote/Unknown classifications may only be created, edited or deleted by organization admins. Same-organization read access remains.
+- Session-history reads are restricted to the session owner or an administrator in the same organization; ordinary same-organization staff must not read coworkers' device/IP history. Validate this RLS change against real staff, admin, portal, and cross-tenant tokens in staging.
 - Production's existing Supabase preview branches were observed in `MIGRATIONS_FAILED` status on 2026-10-23. None has been established as a clean staging target for this PR. Do not apply the new migrations directly to production as a substitute for staging tests.
 - GitHub CI verifies code/build and static contracts but cannot prove the deployment ordering or JWT authorization boundary.
 
