@@ -360,48 +360,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       cleanupSessionTracking();
 
-      const deviceInfo = parseUserAgent(navigator.userAgent, navigator.maxTouchPoints);
-
-      const { data, error } = await supabase.rpc('start_browser_session', {
-        p_browser_id: browserInstallationId(),
-        p_user_agent: navigator.userAgent,
-        p_device_type: deviceInfo.deviceType,
-        p_browser_name: deviceInfo.browserName,
-        p_browser_version: deviceInfo.browserVersion,
-        p_os_name: deviceInfo.osName,
-        p_os_version: deviceInfo.osVersion,
-        p_device_model: deviceInfo.deviceModel,
-        p_device_vendor: deviceInfo.deviceVendor
-      });
-
-      if (error) {
-        return;
-      }
-
-      if (data) {
-        setCurrentSessionId(data);
-
-        // Resolve public IP + approximate city/state/country server-side.
-        // This intentionally does not request browser GPS/location permission.
-        setTimeout(() => {
-          supabase.functions.invoke('session-location', {
-            body: { session_id: data },
-          }).catch(() => {});
-        }, 0);
-
-        // A visible, unattended tab is not evidence of work. Only send a
-        // heartbeat when the user interacted recently while the tab was visible.
-        // Do not collect keys, pointer coordinates, or interaction content.
-        let lastInteractionAt = 0;
-        const noteInteraction = () => {
-          if (document.visibilityState === 'visible') lastInteractionAt = Date.now();
-        };
-        const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
-        interactionEvents.forEach(event => document.addEventListener(event, noteInteraction, { passive: true }));
-        (window as any).__sessionInteractionCleanup = () => {
-          interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
-        };
-
+      const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
+      // Always install idle enforcement before session analytics. An analytics
+      // RPC failure must never disable the logout security policy.
         // Inactivity is based on interactions within MJV, not other browser tabs.
         // Persist across reloads and tabs in this browser to prevent timer resets.
         const idleKey = `mjv-last-interaction:${userId}`;
@@ -511,6 +472,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           document.removeEventListener('visibilitychange', checkIdle);
           document.getElementById('mjv-idle-warning')?.remove();
           interactionEvents.forEach(event => document.removeEventListener(event, trackIdleInteraction));
+        };
+
+      if (idleSigningOut) return;
+
+
+
+      const deviceInfo = parseUserAgent(navigator.userAgent, navigator.maxTouchPoints);
+
+      const { data, error } = await supabase.rpc('start_browser_session', {
+        p_browser_id: browserInstallationId(),
+        p_user_agent: navigator.userAgent,
+        p_device_type: deviceInfo.deviceType,
+        p_browser_name: deviceInfo.browserName,
+        p_browser_version: deviceInfo.browserVersion,
+        p_os_name: deviceInfo.osName,
+        p_os_version: deviceInfo.osVersion,
+        p_device_model: deviceInfo.deviceModel,
+        p_device_vendor: deviceInfo.deviceVendor
+      });
+
+      if (error) {
+        return;
+      }
+
+      if (data) {
+        setCurrentSessionId(data);
+
+        // Resolve public IP + approximate city/state/country server-side.
+        // This intentionally does not request browser GPS/location permission.
+        setTimeout(() => {
+          supabase.functions.invoke('session-location', {
+            body: { session_id: data },
+          }).catch(() => {});
+        }, 0);
+
+        // A visible, unattended tab is not evidence of work. Only send a
+        // heartbeat when the user interacted recently while the tab was visible.
+        // Do not collect keys, pointer coordinates, or interaction content.
+        let lastInteractionAt = 0;
+        const noteInteraction = () => {
+          if (document.visibilityState === 'visible') lastInteractionAt = Date.now();
+        };
+        interactionEvents.forEach(event => document.addEventListener(event, noteInteraction, { passive: true }));
+        const idleCleanup = (window as any).__sessionInteractionCleanup;
+        (window as any).__sessionInteractionCleanup = () => {
+          idleCleanup?.();
+          interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
         };
 
         const activityInterval = setInterval(async () => {
