@@ -73,10 +73,10 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     } catch (failure) { setError((failure as Error).message); }
     finally { saving.current = false; setBusy(false); }
   }
-  const projectId = context.get('projectId'), contactId = context.get('contactId'), taskId = context.get('taskId'), requestId = context.get('serviceRequestId');
+  const projectId = context.get('projectId'), contactId = context.get('contactId'), taskId = context.get('taskId'), requestId = context.get('serviceRequestId'), taskStatus = context.get('tuneStatus');
   const scoped = projects.filter(p => (!projectId || p.id === projectId) && (!contactId || p.contact_id === contactId));
-  const visible = scoped.map(p => ({ ...p, tasks: p.tasks.filter(t => (history || (!t.request_id && t.status === 'open')) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId)) }))
-    .filter(p => (p.can_submit || p.tasks.length > 0 || history) && [p.customer, p.name, p.number, ...p.tasks.map(t => t.customer_description || t.title)].some(v => v?.toLowerCase().includes(search.toLowerCase())));
+  const visible = scoped.map(p => ({ ...p, tasks: p.tasks.filter(t => (history || (!t.request_id && t.status === 'open')) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && (!taskStatus || taskStatus === 'all' || (taskStatus === 'requested' ? Boolean(t.request_id) : t.status === taskStatus))) }))
+    .filter(p => (!taskStatus || taskStatus === 'all' || p.tasks.length > 0) && (p.can_submit || p.tasks.length > 0 || history) && [p.customer, p.name, p.number, ...p.tasks.map(t => t.customer_description || t.title)].some(v => v?.toLowerCase().includes(search.toLowerCase())));
   return <section className="min-w-0 space-y-3" aria-label="Test and Tune adjustments">
     <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2">
       <input aria-label="Search Test and Tune adjustments" value={search} onChange={e => setSearch(e.target.value)} placeholder="Find customer, project or adjustment" className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-3 text-primary" />
@@ -94,7 +94,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     <div className="divide-y divide-subtle rounded-lg border border-subtle">
       {visible.map(p => <article key={p.id} className="min-w-0 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2"><div className="min-w-0"><h2 className="break-words font-medium text-primary">{p.customer} · {p.name}</h2><p className="text-xs text-muted">{p.number} · {p.can_submit ? `Test & Tune through ${p.end_date}` : 'Expired or suspended · exception review required'}</p></div><a href={`/projects?projectId=${encodeURIComponent(p.id)}`} className="min-h-11 inline-flex items-center text-sm text-info">Open project →</a></div>
-        {!p.tasks.length && <p className="text-sm text-muted">No unsubmitted adjustments.</p>}
+        {!p.tasks.length && <p className="text-sm text-muted">No matching adjustments.</p>}
         {p.tasks.map(t => <div key={t.id} className="flex items-start gap-3 py-2 text-sm">
           {!t.request_id && t.status === 'open' && <input className="mt-1 h-5 w-5 shrink-0" type="checkbox" aria-label={`Select ${t.customer_description || t.title}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}
           <div className="min-w-0 flex-1 break-words"><p className="text-primary">{t.customer_description || t.title}</p><span className="text-xs text-muted">{t.visibility === 'internal' ? 'Internal' : 'Customer visible'} · {t.request_id ? 'Requested' : t.status}</span></div>

@@ -18,6 +18,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
     <select aria-label="Test and Tune view" value={view} onChange={e => setView(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-3 text-primary">
       <option value="adjustments">Adjustments</option><option value="access">Customers &amp; Access</option>
     </select>
-    {view === 'adjustments' ? <TestTuneProjectAdjustments canViewServiceRequests={hasModuleAccess('service_requests')} /> : <PunchlistInviteManager onOpenSalesOrder={onOpenSalesOrder} />}
+    {view === 'adjustments' ? <TestTuneProjectAdjustments canViewServiceRequests={hasModuleAccess('service_requests')} /> : <PunchlistInviteManager onOpenSalesOrder={onOpenSalesOrder} onViewCustomerTasks={(contactId, _name, status) => {
+      const params = new URLSearchParams({ contactId, history: '1', tuneStatus: status });
+      window.location.assign(`/test-and-tune?${params}`);
+    }} />}
   </div>;
 }
