@@ -56,4 +56,9 @@ assert.match(ipMigration, /p\.role IN \('admin', 'superadmin'\)/);
 const sessionMigration = await readFile('supabase/migrations/20261023124000_secure_browser_session_writes.sql', 'utf8');
 assert.match(sessionMigration, /REVOKE INSERT, UPDATE, DELETE, TRUNCATE\s+ON public\.session_logout_schedule/);
 assert.match(sessionMigration, /DROP POLICY IF EXISTS "Admins can update session logout schedule"/);
+assert.match(sessionMigration, /DROP POLICY IF EXISTS user_sessions_select_same_org/);
+assert.match(sessionMigration, /CREATE POLICY user_sessions_select_owner_or_org_admin/);
+assert.match(sessionMigration, /user_id = \\(SELECT auth\\.uid\\(\\)\\)/);
+assert.match(sessionMigration, /p\\.role IN \\('admin', 'superadmin'\\)/);
+
 console.log('60-minute timeout, five-minute warning, reload eligibility and idle-dialog contract pass');
