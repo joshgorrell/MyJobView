@@ -29,7 +29,6 @@ import {
   DollarSign,
   Paperclip,
   UserPlus,
-  ListTodo,
   ClipboardList,
   MessageSquareWarning,
   RotateCcw,
