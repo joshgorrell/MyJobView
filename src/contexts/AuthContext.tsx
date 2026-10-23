@@ -397,20 +397,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Inactivity is based on interactions within MJV, not other browser tabs.
         // Persist across reloads and tabs in this browser to prevent timer resets.
-        const idleKey = 'mjv-last-interaction';
+        const idleKey = `mjv-last-interaction:${userId}`;
         const inactivityLimitMs = 60 * 60 * 1000;
         const warningMs = 55 * 60 * 1000;
-        const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || Date.now();
+        const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || 0;
         const trackIdleInteraction = () => {
           localStorage.setItem(idleKey, String(Date.now()));
           document.getElementById('mjv-idle-warning')?.remove();
         };
         if (!localStorage.getItem(idleKey)) trackIdleInteraction();
         interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
-        const idleCheck = setInterval(() => {
+        const checkIdle = () => {
           const idleMs = Date.now() - readLastInteraction();
           if (idleMs >= inactivityLimitMs) {
-            clearInterval(idleCheck);
             document.getElementById('mjv-idle-warning')?.remove();
             void supabase.auth.signOut();
           } else if (idleMs >= warningMs && !document.getElementById('mjv-idle-warning')) {
@@ -427,11 +426,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             warning.appendChild(stay);
             document.body.appendChild(warning);
           }
-        }, 15 * 1000);
+        };
+        const idleCheck = setInterval(checkIdle, 15 * 1000);
+        // Timers are throttled while a laptop sleeps or MJV is backgrounded.
+        // Check immediately on return; do not reset idle time on focus.
+        window.addEventListener('focus', checkIdle);
+        document.addEventListener('visibilitychange', checkIdle);
+        checkIdle();
         const priorCleanup = (window as any).__sessionInteractionCleanup;
         (window as any).__sessionInteractionCleanup = () => {
           priorCleanup?.();
           clearInterval(idleCheck);
+          window.removeEventListener('focus', checkIdle);
+          document.removeEventListener('visibilitychange', checkIdle);
           document.getElementById('mjv-idle-warning')?.remove();
           interactionEvents.forEach(event => document.removeEventListener(event, trackIdleInteraction));
         };
