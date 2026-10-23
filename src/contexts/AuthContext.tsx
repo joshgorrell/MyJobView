@@ -6,6 +6,7 @@ import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
 import { browserInstallationId } from '../lib/sessionDevices';
 import { isValidReturnHost } from '../lib/crossDomainAuth';
+import { MJV_IDLE_TIMEOUT_MS, MJV_IDLE_WARNING_MS, remainingIdleMs, mayResetOnReload } from '../lib/sessionInactivity';
 
 interface AuthContextType {
   user: User | null;
@@ -404,8 +405,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Inactivity is based on interactions within MJV, not other browser tabs.
         // Persist across reloads and tabs in this browser to prevent timer resets.
         const idleKey = `mjv-last-interaction:${userId}`;
-        const inactivityLimitMs = 60 * 60 * 1000;
-        const warningMs = 55 * 60 * 1000;
+        const inactivityLimitMs = MJV_IDLE_TIMEOUT_MS;
+        const warningMs = MJV_IDLE_TIMEOUT_MS - MJV_IDLE_WARNING_MS;
         const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || 0;
         const dismissWarning = () => document.getElementById('mjv-idle-warning')?.remove();
         let idleSigningOut = false;
@@ -417,7 +418,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         const recordIdleInteraction = () => {
           if (idleSigningOut) return;
-          if (Date.now() - readLastInteraction() >= inactivityLimitMs) {
+          if (remainingIdleMs(readLastInteraction()) === 0) {
             expireSession();
             return;
           }
@@ -434,10 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!reloadActivityHandled) {
           reloadActivityHandled = true;
           const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-          if (navigation?.type === 'reload' &&
-              previousActivity > 0 &&
-              Date.now() - previousActivity < inactivityLimitMs &&
-              document.visibilityState === 'visible') {
+          if (mayResetOnReload(navigation?.type, previousActivity, Date.now(), document.visibilityState === 'visible')) {
             recordIdleInteraction();
           }
         }
@@ -485,7 +483,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         const checkIdle = () => {
           if (idleSigningOut) return;
-          const remainingMs = inactivityLimitMs - (Date.now() - readLastInteraction());
+          const remainingMs = remainingIdleMs(readLastInteraction());
           if (remainingMs <= 0) {
             expireSession();
           } else if (remainingMs <= inactivityLimitMs - warningMs) {
