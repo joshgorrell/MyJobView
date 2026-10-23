@@ -433,7 +433,7 @@ Deno.serve(async (req) => {
       const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).maybeSingle());
       if (!organization) return json({ error: "Organization not found." }, 400);
       if (b.variant === "owner" && organization.subdomain !== "elife") {
-        return json({ error: "Owner follow-up is not configured for this organization." }, 400);
+        return json({ error: "Owner follow-up is not configured for this organization." }, 403);
       }
       const rep = await checked(await admin.from("profiles").select("id,first_name,last_name,email,is_active")
         .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
