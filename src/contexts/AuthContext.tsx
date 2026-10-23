@@ -181,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         setLoadingProfile(false);
         if (!portalUser) await supabase.auth.signOut();
+        else void startSessionTracking(userId).catch(() => {});
         return;
       }
 
