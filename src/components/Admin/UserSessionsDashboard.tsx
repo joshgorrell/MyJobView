@@ -199,9 +199,9 @@ export function UserSessionsDashboard() {
         </label>
         {workUserId && <div className="mt-4 space-y-2">
           <div aria-label="Session activity by Central date" className="space-y-1">
-            {dailySessions(workUserId).map(([day, rows]) => <div key={day} className="rounded border border-subtle p-2 text-sm">{day} (Central): {rows.length} session(s) started</div>)}
+            {dailySessions(workUserId).map(([day, milliseconds, count]) => <div key={day} className="rounded border border-subtle p-2 text-sm">{day} (Central): {Math.round(milliseconds / 60000)} minutes of session coverage · {count} session interval(s)</div>)}
           </div>
-          <p className="text-xs text-muted">Days group session starts; cross-midnight sessions may span more than one day. Daily duration totals are withheld until intervals are split at midnight.</p>
+          <p className="text-xs text-muted">Session intervals are divided at Central midnight and overlapping browsers are counted once. Session coverage is not verified work time.</p>
           <p className="rounded-lg bg-canvas p-3 text-sm">Recorded session window coverage, with overlapping browsers counted once: <strong>{Math.round(sessionCoverage(sessions.filter(s => s.user_id === workUserId && Date.parse(s.last_activity) >= Date.now() - 7 * 86400000)) / 60000)} minutes</strong>. This is not verified work time.</p>
           {sessions.filter(s => s.user_id === workUserId && Date.parse(s.session_start) >= Date.now() - 7 * 86400000).sort((a, b) => Date.parse(b.session_start) - Date.parse(a.session_start)).map(s => <div key={s.id} className="rounded-lg border border-subtle p-3">
             <p className="font-medium">{new Date(s.session_start).toLocaleDateString()}</p>
