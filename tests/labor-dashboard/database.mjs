@@ -35,6 +35,14 @@ INSERT INTO time_entries(technician_id,entry_date,total_hours,organization_id,st
 ('${id(11)}','2026-01-02',50,'${id(1)}','draft','work_order','2026-01-02T18:00Z'),
 ('${id(11)}','2026-01-02',99,'${id(2)}','approved','work_order','2026-01-02T18:00Z');`);
 await db.exec(await readFile('supabase/migrations/20261023114939_tech_production_report.sql','utf8'));
+await db.exec(`ALTER TABLE profiles ADD COLUMN role_id uuid;
+CREATE TABLE department_modules(id uuid PRIMARY KEY,module_key text,is_active boolean);
+CREATE TABLE role_module_access(role_id uuid,module_id uuid,has_access boolean);
+CREATE TABLE user_permission_overrides(user_id uuid,module_id uuid,override_type text);
+INSERT INTO department_modules VALUES('${id(301)}','tech_stats',true);
+UPDATE profiles SET role_id='${id(401)}' WHERE id='${id(11)}';
+INSERT INTO role_module_access VALUES('${id(401)}','${id(301)}',true);`);
+await db.exec(await readFile('supabase/migrations/20261023190000_tech_production_permission_access.sql','utf8'));
 await db.exec(`SET ROLE authenticated;SELECT set_config('test.uid','${id(10)}',false)`);
 const production=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
 assert.equal(production.project_snapshot,null);assert.equal(production.native_projects.length,0);
@@ -45,11 +53,17 @@ assert.equal(production.configs[0].employee_id,undefined,'only production availa
 assert.equal(production.sources[0].enabled,undefined,'no source controls in the production feed');
 await assert.rejects(()=>db.query("SELECT get_tech_production('2026-02-01','2026-01-01')"),/Invalid date range/);
 await db.exec(`SELECT set_config('test.uid','${id(11)}',false)`);
-await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/administrator access/);
+const managerReport=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(managerReport.snapshots[0].payload.records[0].job_hours,7,'role-granted staff see imported history');
+await db.exec(`INSERT INTO user_permission_overrides VALUES('${id(11)}','${id(301)}','revoke')`);
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/Tech Stats access denied/);
+await db.exec(`UPDATE user_permission_overrides SET override_type='grant' WHERE user_id='${id(11)}'; UPDATE role_module_access SET has_access=false WHERE role_id='${id(401)}'`);
+const granted=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(granted.snapshots.length,1,'user grant overrides missing role grant');
 await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);
 const isolated=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
 assert.equal(isolated.roster.length,0);assert.equal(isolated.snapshots.length,0);assert.equal(isolated.native_jobs[0].hours,99);
 await db.exec("RESET ROLE;SET ROLE anon");
 await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/permission denied/);
-console.log('Production RPC: small projection, customer production, completed records, organization isolation and historical admin boundary passed.');
+console.log('Production RPC: small projection, customer production, completed records, organization isolation and effective Tech Stats permission boundary passed.');
 await db.close();console.log('Labor storage: idempotence, correction history, atomic rejection, disabling/cutover, credential isolation and cross-tenant access passed.');
