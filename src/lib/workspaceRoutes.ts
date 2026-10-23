@@ -92,7 +92,7 @@ const pages = [
   "vip-plans",
   "work_orders",
 ];
-const overrides: Record<string, string> = { feed: '/flow', calendar: '/schedule', punchlist: '/project-punchlist', security_onboarding: '/security-setup' };
+const overrides: Record<string, string> = { feed: '/flow', calendar: '/schedule', punchlist: '/test-and-tune', security_onboarding: '/security-setup' };
 export function workspacePath(page: string): string | null {
   const resolved = resolveLegacyPage(page);
   if (resolved.startsWith('settings_')) return '/settings/' + resolved.slice(9).replace(/_/g, '-');
@@ -104,6 +104,7 @@ export function workspacePage(pathname: string): string | null {
     const section = path.slice(10);
     if (/^[a-z]+(?:-[a-z]+)*$/.test(section)) return 'settings_' + section.replace(/-/g, '_');
   }
+  if (path === '/project-punchlist') return 'punchlist'; // Backward-compatible staff bookmark
   return pages.find(page => workspacePath(page) === path) || null;
 }
 export function pageFromLocation(location: Pick<URL, 'pathname' | 'search'>, fallback = 'feed'): string {
@@ -117,7 +118,7 @@ export function workspaceUrl(location: URL, page: string): string | null {
   const next = new URL(location);
   next.pathname = path;
   next.searchParams.delete('tab');
-  if (!['service_requests', 'service_request_analytics'].includes(resolveLegacyPage(page))) next.searchParams.delete('serviceRequestId');
+  if (!['service_requests', 'service_request_analytics', 'punchlist'].includes(resolveLegacyPage(page))) next.searchParams.delete('serviceRequestId');
   return next.pathname + next.search + next.hash;
 }
 export function isPortalProposalRoute(pathname: string, search: string, portalUser: boolean, impersonating: boolean): boolean {
