@@ -1,6 +1,6 @@
 process.on('uncaughtException', e => { console.error(e.message,e.code,e.where); process.exit(1); });
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 let db;
 if (process.env.CUSTOMER_DATABASE_URL) { const { Client } = await import('pg'); const client = new Client({ connectionString: process.env.CUSTOMER_DATABASE_URL }); await client.connect(); db = { exec: q => client.query(q), query: (q,p) => client.query(q,p), close: () => client.end() }; }
@@ -10,14 +10,16 @@ const org=id(1), other=id(2), rep=id(10), creator=id(11), portal=id(12), strange
 const read = p => readFile(p,'utf8');
 await db.exec(`CREATE ROLE authenticated;CREATE ROLE anon;CREATE ROLE service_role;CREATE SCHEMA auth;CREATE SCHEMA private;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid',true),'')::uuid$$;
-CREATE TABLE organizations(id uuid PRIMARY KEY); CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,role text,is_active boolean,full_name text,email text,phone text);
-CREATE TABLE company_settings(id uuid PRIMARY KEY,organization_id uuid);CREATE TABLE company_offices(id uuid PRIMARY KEY,organization_id uuid);
+CREATE TABLE organizations(id uuid PRIMARY KEY); CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,role text,is_active boolean,full_name text,email text);
+CREATE TABLE company_settings(id uuid PRIMARY KEY,organization_id uuid);CREATE TABLE company_offices(id uuid PRIMARY KEY,organization_id uuid,phone text);
 CREATE FUNCTION get_user_org_id() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$SELECT organization_id FROM profiles WHERE id=auth.uid()$$;
 CREATE FUNCTION flow_has_module_access(text) RETURNS boolean LANGUAGE sql AS $$SELECT true$$;
 CREATE FUNCTION generate_sales_order_number(text) RETURNS text LANGUAGE sql AS $$SELECT 'SO-'||gen_random_uuid()::text$$;
 CREATE FUNCTION generate_invoice_number() RETURNS text LANGUAGE sql AS $$SELECT 'INV-'||gen_random_uuid()::text$$;
 CREATE FUNCTION get_next_project_number() RETURNS text LANGUAGE sql AS $$SELECT 'PROJECT-'||gen_random_uuid()::text$$;
 `);
+const appliedBundle=await read('supabase/migrations/20261023100312_customer_proposals_verified_rollout.sql');
+for(const filename of await readdir('supabase/rollouts/customer-proposals')) assert.ok(appliedBundle.includes(await read('supabase/rollouts/customer-proposals/'+filename)), 'Applied bundle contains exact tested source '+filename);
 const columns=JSON.parse(await read('tests/customer-proposals/live-column-contract.json'));
 for (const [table, fields] of Object.entries(columns)) {
   const defs=fields.map(f=>`"${f.name}" ${f.type==='ARRAY'?'text[]':f.type}${f.nullable==='NO'?' NOT NULL':''}${f.default?' DEFAULT '+f.default:''}${f.name==='id'?' PRIMARY KEY':''}`);
@@ -31,20 +33,21 @@ ALTER TABLE proposal_loss_feedback ADD CONSTRAINT proposal_loss_feedback_source_
 ALTER TABLE notifications ADD CONSTRAINT notification_contract CHECK(type IN ('proposal','proposal_approval','message','invoice'));
 GRANT USAGE ON SCHEMA public,auth,private TO authenticated,anon;GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 INSERT INTO organizations VALUES('${org}'),('${other}');
-INSERT INTO profiles VALUES('${rep}','${org}','sales',true,'Customer owner','owner@example.com','5551234'),('${creator}','${org}','admin',true,'Proposal author',NULL,NULL),('${portal}','${org}','portal_user',true,'Customer',NULL,NULL),('${stranger}','${other}','portal_user',true,'Other customer',NULL,NULL),('${inactive}','${org}','portal_user',false,'Inactive',NULL,NULL);
-INSERT INTO company_settings VALUES('${company}','${org}');INSERT INTO company_offices VALUES('${office}','${org}'),('${id(31)}','${other}');
+INSERT INTO profiles VALUES('${rep}','${org}','sales',true,'Customer owner','owner@example.com'),('${creator}','${org}','admin',true,'Proposal author',NULL),('${portal}','${org}','portal_user',true,'Customer',NULL),('${stranger}','${other}','portal_user',true,'Other customer',NULL),('${inactive}','${org}','portal_user',false,'Inactive',NULL);
+INSERT INTO company_settings VALUES('${company}','${org}');INSERT INTO company_offices VALUES('${office}','${org}','5551234'),('${id(31)}','${other}',NULL);
 INSERT INTO contacts(id,contact_name,username,office_id,assigned_to,portal_user_id,organization_id) VALUES('${customer}','Customer','customer','${office}','${rep}','${portal}','${org}'),('${legacy}','Legacy owner missing','legacy','${office}',NULL,NULL,'${org}');
 `);
 await db.exec(await read('supabase/migrations/20261022181427_secure_proposal_template_ownership_and_display.sql'));
-const required=await read('supabase/migrations/20261022160000_require_customer_rep_and_office.sql');
+const required=await read('supabase/rollouts/customer-proposals/20261022160000_require_customer_rep_and_office.sql');
 await assert.rejects(()=>db.exec(required),'Unassigned historical customer must be repaired before rollout');
 await db.query('update contacts set assigned_to=$1 where id=$2',[rep,legacy]);
-for (const suffix of ['160000_require_customer_rep_and_office','163000_validate_customer_owner_office_organization','170000_customer_assignment_audit']) await db.exec(await read(`supabase/migrations/20261022${suffix}.sql`));
+for (const suffix of ['160000_require_customer_rep_and_office','163000_validate_customer_owner_office_organization','170000_customer_assignment_audit']) await db.exec(await read(`supabase/rollouts/customer-proposals/20261022${suffix}.sql`));
 // Reuse the real prior engagement ownership predicate; the new migration extends only its allowlist.
 const prior=await read('supabase/migrations/20261012130517_proposal_engagement_sessions.sql');const start=prior.indexOf('CREATE FUNCTION private.proposal_engagement_customer('),end=prior.indexOf('$$;',start)+3;await db.exec(prior.slice(start,end));
-await db.exec(await read('supabase/migrations/20261022100000_proposal_reconsideration_engagement.sql'));
-await db.exec(await read('supabase/migrations/20261022101500_proposal_decision_breadcrumbs.sql'));
-await db.exec(await read('supabase/migrations/20261022190730_customer_proposal_decisions.sql'));
+await db.exec(await read('supabase/rollouts/customer-proposals/20261022100000_proposal_reconsideration_engagement.sql'));
+await db.exec(await read('supabase/rollouts/customer-proposals/20261022101500_proposal_decision_breadcrumbs.sql'));
+await db.exec(await read('supabase/rollouts/customer-proposals/20261022190730_customer_proposal_decisions.sql'));
+await db.exec(await read('supabase/migrations/20261023103044_customer_representative_office_contact.sql'));
 await db.exec('CREATE TRIGGER approval BEFORE UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION handle_unified_proposal_approval(); CREATE TRIGGER pending AFTER UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION notify_pending_deposit(); CREATE TRIGGER deposit AFTER UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION notify_deposit_completed();');
 const scalar=async(q,p=[])=>Object.values((await db.query(q,p)).rows[0])[0];
 const as=async actor=>db.exec(`RESET ROLE;SELECT set_config('test.uid','${actor??''}',false);SET ROLE authenticated`);
@@ -58,6 +61,7 @@ const seed=async(n, overrides={})=>{
 };
 const decide=(proposal,action,details={},request=id(900),version=2)=>scalar('select submit_customer_proposal_decision($1,$2,$3,$4,$5)',[proposal,version,request,action,JSON.stringify(details)]);
 let proposal=await seed(100);
+const contactCard=await scalar('select get_customer_proposal_representative($1)',[proposal]);assert.equal(contactCard.phone,'5551234');assert.equal(contactCard.phone_kind,'office');assert.equal(contactCard.email,'owner@example.com');
 assert.equal(await scalar("select record_proposal_decision_step($1,'decline_started')",[proposal]),true);
 assert.equal(await scalar("select record_proposal_decision_step($1,NULL)",[proposal]),false);
 let receipt=await decide(proposal,'approve',{method:'payment'});assert.equal(receipt.status,'approved');assert.ok(receipt.sales_order_id);assert.ok(receipt.deposit_invoice_id);

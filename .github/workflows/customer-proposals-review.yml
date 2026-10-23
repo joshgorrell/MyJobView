@@ -8,6 +8,7 @@ on:
       - 'src/lib/proposalEngagement.ts'
       - 'supabase/functions/view-shared-proposal/**'
       - 'supabase/migrations/*customer*'
+      - 'supabase/rollouts/customer-proposals/**'
       - 'supabase/migrations/*proposal_decision*'
       - 'supabase/migrations/*proposal_reconsideration*'
       - 'tests/customer-proposals/**'

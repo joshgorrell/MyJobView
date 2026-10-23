@@ -49,3 +49,11 @@ The migrations now require complete assignments without legacy exceptions. The
 customer audit must return zero invalid records and the check constraint must be
 validated before rollout. New customers and ownership changes require an active
 internal representative and an office in the customer's organization.
+
+## Migration packaging
+
+Production applied one atomic migration, `20261023100312_customer_proposals_verified_rollout`.
+Its exact SQL is committed as the migration file, matching the production ledger.
+The six component scripts live under `supabase/rollouts/customer-proposals` for
+isolated regression fixtures; they must not be applied as separate migrations.
+Tests verify that every component is included exactly in the applied bundle.
