@@ -40,6 +40,17 @@ BEGIN
 END;
 $$;
 
+-- The old global midnight schedule is retired only during the coordinated
+-- cutover. Remove browser/API write access now so nobody can re-enable it.
+-- The deployment owner can still disable it transactionally via SQL after
+-- the replacement application has been verified.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+ON public.session_logout_schedule FROM anon, authenticated;
+DROP POLICY IF EXISTS "Admins can insert session logout schedule"
+ON public.session_logout_schedule;
+DROP POLICY IF EXISTS "Admins can update session logout schedule"
+ON public.session_logout_schedule;
+
 REVOKE ALL ON FUNCTION public.end_user_session(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.end_user_session(uuid, uuid) TO authenticated;
 
