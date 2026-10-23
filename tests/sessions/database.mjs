@@ -29,5 +29,34 @@ assert.notEqual(await start(101),next);
 await db.query("select set_config('request.jwt.claim.sub','',false)");
 await assert.rejects(()=>start(101),/Authentication/);
 await db.exec('set role anon'); await assert.rejects(()=>start(101),/permission denied/); await db.exec('reset role');
+// A browser may close only its own session; direct table writes are blocked.
+await db.exec('GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_sessions TO authenticated;');
+await db.exec(await readFile('supabase/migrations/20261023124000_secure_browser_session_writes.sql', 'utf8'));
+await user(1);
+await db.exec('SET ROLE authenticated');
+await assert.rejects(
+  () => db.query('UPDATE public.user_sessions SET is_active=false WHERE id=$1', [other]),
+  /permission denied/i
+);
+await assert.rejects(
+  () => db.query('SELECT public.end_user_session($1,$2)', [
+    '00000000-0000-4000-8000-000000000002', other
+  ]),
+  /Cannot end another user session/
+);
+await db.query('SELECT public.end_user_session($1,$2)', [
+  '00000000-0000-4000-8000-000000000001', other
+]);
+assert.equal((await db.query('SELECT is_active FROM public.user_sessions WHERE id=$1', [other])).rows[0].is_active, true);
+await db.query('SELECT public.end_user_session($1,$2)', [
+  '00000000-0000-4000-8000-000000000001', second
+]);
+assert.equal((await db.query('SELECT is_active FROM public.user_sessions WHERE id=$1', [second])).rows[0].is_active, false);
+await db.exec('RESET ROLE');
+const locationEdge = await readFile('supabase/functions/session-location/index.ts', 'utf8');
+assert.match(locationEdge, /SUPABASE_SERVICE_ROLE_KEY/);
+assert.match(locationEdge, /supabase\\.auth\\.getUser\\(\\)/);
+assert.match(locationEdge, /\\.eq\\('user_id', user\\.id\\)/);
+
 console.log('Database: repeat visits deduplicate, identical computers stay separate, users and tenants stay separate, nicknames survive new sessions, expired sessions resume and anonymous calls fail');
 await db.close();
