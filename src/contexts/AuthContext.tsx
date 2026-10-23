@@ -407,18 +407,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const inactivityLimitMs = 60 * 60 * 1000;
         const warningMs = 55 * 60 * 1000;
         const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || 0;
+        const dismissWarning = () => document.getElementById('mjv-idle-warning')?.remove();
+        let idleSigningOut = false;
+        const expireSession = () => {
+          if (idleSigningOut) return;
+          idleSigningOut = true;
+          dismissWarning();
+          void supabase.auth.signOut();
+        };
         const recordIdleInteraction = () => {
+          if (idleSigningOut) return;
+          if (Date.now() - readLastInteraction() >= inactivityLimitMs) {
+            expireSession();
+            return;
+          }
           localStorage.setItem(idleKey, String(Date.now()));
-          document.getElementById('mjv-idle-warning')?.remove();
+          dismissWarning();
         };
         const trackIdleInteraction = (event: Event) => {
           if (event.isTrusted) recordIdleInteraction();
         };
         const previousActivity = readLastInteraction();
-        if (!previousActivity) recordIdleInteraction();
-        // Navigation Timing identifies a reload (including browser toolbar/F5).
-        // It cannot distinguish user-triggered reloads from programmatic reloads.
-        // Never let a reload revive an already expired session.
+        if (!previousActivity) localStorage.setItem(idleKey, String(Date.now()));
+        // Navigation Timing identifies reloads but cannot distinguish a manual
+        // browser refresh from an automatic one. Never revive an expired session.
         if (!reloadActivityHandled) {
           reloadActivityHandled = true;
           const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
@@ -430,27 +442,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
         interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
+
+        const showWarning = () => {
+          if (document.getElementById('mjv-idle-warning')) return;
+          const overlay = document.createElement('div');
+          overlay.id = 'mjv-idle-warning';
+          overlay.setAttribute('role', 'alertdialog');
+          overlay.setAttribute('aria-modal', 'true');
+          overlay.setAttribute('aria-labelledby', 'mjv-idle-title');
+          overlay.setAttribute('aria-describedby', 'mjv-idle-description');
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.65);padding:16px';
+          const box = document.createElement('div');
+          box.style.cssText = 'width:min(100%,440px);border-radius:16px;background:var(--background,#fff);color:var(--foreground,#111827);padding:28px;box-shadow:0 24px 70px rgba(0,0,0,.35);text-align:center';
+          const title = document.createElement('h2');
+          title.id = 'mjv-idle-title';
+          title.textContent = 'Your session is about to expire';
+          title.style.cssText = 'font-size:22px;font-weight:700;margin:0 0 12px';
+          const description = document.createElement('p');
+          description.id = 'mjv-idle-description';
+          description.textContent = 'You have been inactive in MyJobView. Interact anywhere in MJV to stay signed in. Unsaved changes may be lost if your session expires.';
+          description.style.cssText = 'font-size:14px;line-height:1.6;margin:0 0 18px';
+          const countdown = document.createElement('p');
+          countdown.id = 'mjv-idle-countdown';
+          countdown.setAttribute('aria-live', 'off');
+          countdown.style.cssText = 'font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;margin:0 0 20px';
+          const stay = document.createElement('button');
+          stay.type = 'button';
+          stay.textContent = 'Stay Signed In';
+          stay.style.cssText = 'background:#2563eb;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:600;cursor:pointer;margin:4px';
+          stay.addEventListener('click', recordIdleInteraction);
+          const logout = document.createElement('button');
+          logout.type = 'button';
+          logout.textContent = 'Log Out Now';
+          logout.style.cssText = 'background:transparent;color:inherit;border:1px solid #9ca3af;border-radius:8px;padding:12px 18px;cursor:pointer;margin:4px';
+          logout.addEventListener('click', expireSession);
+          box.append(title, description, countdown, stay, logout);
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+          // Pointer, touch, keyboard and wheel interactions are already
+          // handled by the document listeners, including clicks on this modal.
+          stay.focus();
+        };
         const checkIdle = () => {
-          const idleMs = Date.now() - readLastInteraction();
-          if (idleMs >= inactivityLimitMs) {
-            document.getElementById('mjv-idle-warning')?.remove();
-            void supabase.auth.signOut();
-          } else if (idleMs >= warningMs && !document.getElementById('mjv-idle-warning')) {
-            const warning = document.createElement('div');
-            warning.id = 'mjv-idle-warning';
-            warning.setAttribute('role', 'alertdialog');
-            warning.setAttribute('aria-label', 'Session expiring');
-            warning.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;background:#1f2937;color:white;padding:18px;border-radius:10px;box-shadow:0 8px 24px #0005;max-width:320px';
-            warning.textContent = 'Your MyJobView session will expire after 60 minutes of inactivity. ';
-            const stay = document.createElement('button');
-            stay.textContent = 'Stay signed in';
-            stay.style.cssText = 'display:block;margin-top:12px;background:white;color:#111827;padding:8px 12px;border-radius:6px';
-            stay.onclick = recordIdleInteraction;
-            warning.appendChild(stay);
-            document.body.appendChild(warning);
+          if (idleSigningOut) return;
+          const remainingMs = inactivityLimitMs - (Date.now() - readLastInteraction());
+          if (remainingMs <= 0) {
+            expireSession();
+          } else if (remainingMs <= inactivityLimitMs - warningMs) {
+            showWarning();
+            const countdown = document.getElementById('mjv-idle-countdown');
+            if (countdown) {
+              const seconds = Math.ceil(remainingMs / 1000);
+              countdown.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} remaining`;
+            }
+          } else {
+            dismissWarning();
           }
         };
-        const idleCheck = setInterval(checkIdle, 15 * 1000);
+        const idleCheck = setInterval(checkIdle, 1000);
         // Timers are throttled while a laptop sleeps or MJV is backgrounded.
         // Check immediately on return; do not reset idle time on focus.
         window.addEventListener('focus', checkIdle);
