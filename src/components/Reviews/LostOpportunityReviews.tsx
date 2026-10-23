@@ -416,6 +416,7 @@ export default function LostOpportunityReviews(
           <div className="flex justify-end">
             <button type="button" onClick={() => setCreateOpen(false)} className="text-sm text-gray-400 hover:text-white">Hide form</button>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <button key={variant} type="button" disabled={busy} onClick={() => { setSenderVariant(variant); setPreview(null); }} className={`cursor-pointer rounded-xl border px-3 py-2 text-left transition ${senderVariant === variant ? "border-blue-500 bg-blue-950/40" : "border-gray-600 hover:border-gray-400"}`} aria-pressed={senderVariant === variant}><div className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</div><p className="mt-0.5 text-xs text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from the company owner with their signature and reply-to address."}</p></button>)}</div>
           <label className="block text-gray-200">
             Customer (required)<input
               value={contact
@@ -476,7 +477,6 @@ export default function LostOpportunityReviews(
             </select>
           </label>
           {!proposal && <label className="block text-gray-200">Opportunity Name (required for manual entry)<input required maxLength={200} value={name} onChange={(e) => opportunity(e.target.value)} placeholder="e.g. Home Theater Installation" className={input} /></label>}
-          <div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <button key={variant} type="button" disabled={busy} onClick={() => { setSenderVariant(variant); setPreview(null); }} className={`cursor-pointer rounded-xl border p-4 text-left transition ${senderVariant === variant ? "border-blue-500 bg-blue-950/40" : "border-gray-600 hover:border-gray-400"}`} aria-pressed={senderVariant === variant}><div className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</div><p className="mt-1 text-sm text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from the company owner with their signature and reply-to address."}</p></button>)}</div>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
               required
