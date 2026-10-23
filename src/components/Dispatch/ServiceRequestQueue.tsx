@@ -977,7 +977,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
         }}
         onCancel={() => setConfirmCancelId(null)}
       />
-      {contactLogTarget && <ContactLogModal serviceRequestId={contactLogTarget.id} customerName={contactLogTarget.customer_name} onClose={() => setContactLogTarget(null)} onSaved={() => { setContactLogRevision(n => n + 1); void loadRequests(); }} />}
+      {contactLogTarget && <ContactLogModal serviceRequestId={contactLogTarget.id} customerName={contactLogTarget.customer_name} onClose={() => setContactLogTarget(null)} onSaved={() => { setContactLogRevision(n => n + 1); void loadData(); }} />}
       {quickViewContactId && (
         <ContactQuickViewModal
           contactId={quickViewContactId}

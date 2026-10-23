@@ -37,7 +37,8 @@ function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); i
 
 const profile={id:'manager',role:'service_manager'};
 const requests=[{id:'one',customer_name:'Customer With A Very Long Name',contact_id:'c1',created_at:'2026-10-05',status:'open',job_description:'Pool sound needs attention',source_type:'punchlist',priority:'normal',billable_type:'warranty',created_by:'manager',profiles:{full_name:'Long Staff Name'},attachments:[],requested_tech_ids:[]},{id:'two',customer_name:'Other Customer',contact_id:'c2',created_at:'2026-10-05',status:'open',job_description:'Check audio',source_type:'staff_form',priority:'normal',billable_type:'billable',created_by:'manager',attachments:[],requested_tech_ids:[]}];
-const supabase={channel:()=>({on(){return this;},subscribe(){return{unsubscribe(){}};}}),from(table){const q={select:()=>q,eq:()=>q,not:()=>q,order:()=>q,then:resolve=>Promise.resolve({data:table==='service_requests'?requests:[],error:null}).then(resolve)};return q;}};
+let requestLoads=0;
+const supabase={channel:()=>({on(){return this;},subscribe(){return{unsubscribe(){}};}}),from(table){if(table==='service_requests')requestLoads++;const q={select:()=>q,eq:()=>q,not:()=>q,order:()=>q,then:resolve=>Promise.resolve({data:table==='service_requests'?requests:[],error:null}).then(resolve)};return q;}};
 const h=harness('src/components/Dispatch/ServiceRequestQueue.tsx',{alert:msg=>{throw Error(msg);}}, {
  '../../lib/dispatchNotifications':{notifyTechJobAssigned(){}},'../Production/WorkOrderSchedulePicker':{WorkOrderSchedulePicker:'Calendar'},'../Shared/QuickActionModal':{QuickActionModal:'Modal'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile,loading:false})},'../Production/CreateWorkOrderModal':{CreateWorkOrderModal:'Scheduler'},'../ui/ConfirmModal':{default:'Confirm'},'../Service/ServiceRequestForm':{ServiceRequestForm:'RequestForm'},'../Shared/ContactQuickViewModal':{ContactQuickViewModal:'Contact'},
 });
@@ -45,6 +46,13 @@ let tree=h.render({},'ServiceRequestQueue');for(const effect of h.effects.splice
 const button=name=>nodes(tree).find(n=>n.type==='button'&&(n.props['aria-label']===name||text(n)===name));
 assert.equal(nodes(tree).filter(n=>n.props?.['data-testid']?.startsWith('service-request-')).length,2);
 button('Expand request').props.onClick({stopPropagation(){}});render();assert.ok(text(tree).includes('Full Description'));assert.ok(button('Collapse request'));assert.ok(button('Schedule Work Order'));
+button('Log Contact / Note').props.onClick({stopPropagation(){}});render();
+const contactLog=nodes(tree).find(n=>n.type==='ContactLogModal');
+const priorLoads=requestLoads;
+contactLog.props.onSaved();await new Promise(resolve=>setTimeout(resolve,0));render();
+assert.equal(requestLoads,priorLoads+1,'Saving a contact log refreshes the queue');
+assert.equal(nodes(tree).find(n=>n.type==='ContactLogHistory').props.refreshKey,1,'Saving also refreshes the expanded contact history');
+contactLog.props.onClose();render();
 button('Schedule Work Order').props.onClick({stopPropagation(){}});render();let scheduler=nodes(tree).find(n=>n.type==='Scheduler');assert.equal(scheduler.props.serviceRequest.id,'one');assert.equal(scheduler.props.serviceRequest.contact_id,'c1');scheduler.props.onClose();render();
 button('Collapse request').props.onClick({stopPropagation(){}});render();
 const checkboxes=()=>nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox');checkboxes()[0].props.onChange({stopPropagation(){}});render();assert.equal(checkboxes().length,1,'Other customer must not be selectable for a combined work order');
