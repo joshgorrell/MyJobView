@@ -48,6 +48,7 @@ await db.exec(await read('supabase/rollouts/customer-proposals/20261022100000_pr
 await db.exec(await read('supabase/rollouts/customer-proposals/20261022101500_proposal_decision_breadcrumbs.sql'));
 await db.exec(await read('supabase/rollouts/customer-proposals/20261022190730_customer_proposal_decisions.sql'));
 await db.exec(await read('supabase/migrations/20261023103044_customer_representative_office_contact.sql'));
+await db.exec(await read('supabase/migrations/20261023103445_customer_proposal_account_organization.sql'));
 await db.exec('CREATE TRIGGER approval BEFORE UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION handle_unified_proposal_approval(); CREATE TRIGGER pending AFTER UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION notify_pending_deposit(); CREATE TRIGGER deposit AFTER UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION notify_deposit_completed();');
 const scalar=async(q,p=[])=>Object.values((await db.query(q,p)).rows[0])[0];
 const as=async actor=>db.exec(`RESET ROLE;SELECT set_config('test.uid','${actor??''}',false);SET ROLE authenticated`);
@@ -92,6 +93,7 @@ await as(portal);
 await db.exec('RESET ROLE');await db.query('update contacts set notes=\'Ordinary edit\' where id=$1',[legacy]);
 await denied('update contacts set assigned_to=$1 where id=$2',[stranger,legacy]);await db.query('update contacts set assigned_to=$1 where id=$2',[rep,legacy]);
 await denied('update contacts set assigned_to=NULL where id=$1',[legacy]);await denied('update contacts set office_id=$1 where id=$2',[id(31),legacy]);
+await db.exec('RESET ROLE');await db.query('update contacts set portal_user_id=$1 where id=$2',[stranger,customer]);await as(stranger);await denied('select ensure_customer_proposal_thread($1)',[proposal]);await db.exec('RESET ROLE');await db.query('update contacts set portal_user_id=$1 where id=$2',[portal,customer]);
 await denied('insert into contacts(contact_name,username,office_id,organization_id)values(\'Unassigned\',\'new\',$1,$2)',[office,org]);
 proposal=await seed(104,{expires_at:'2020-01-01'});await assert.rejects(()=>decide(proposal,'approve',{method:'payment'}));
 proposal=await seed(105,{is_active_revision:false});await assert.rejects(()=>decide(proposal,'approve',{method:'payment'}));

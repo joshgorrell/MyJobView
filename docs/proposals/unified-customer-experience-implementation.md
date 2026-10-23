@@ -25,7 +25,7 @@ in-person staff feedback. No test sends real customer messages or payments.
 Formal changes persist a follow-up timestamp/version and a public conversation
 message. Conversation creation is server-authorized and always routes to the
 assigned customer rep, including previously misassigned threads. The viewer shows
-rep call/email links, the concise Our Promise reconsideration choices and separate
+assigned-rep email and clearly labelled office-call links, the concise Our Promise reconsideration choices and separate
 decline notes. The PDF control opens the existing authorized printable document
 adapter; existing template/model/SKU/price display options are retained.
 
@@ -52,8 +52,10 @@ internal representative and an office in the customer's organization.
 
 ## Migration packaging
 
-Production applied one atomic migration, `20261023100312_customer_proposals_verified_rollout`.
+Production applied the primary atomic migration, `20261023100312_customer_proposals_verified_rollout`.
 Its exact SQL is committed as the migration file, matching the production ledger.
 The six component scripts live under `supabase/rollouts/customer-proposals` for
 isolated regression fixtures; they must not be applied as separate migrations.
 Tests verify that every component is included exactly in the applied bundle.
+
+Two subsequent corrections are recorded independently: `20261023103044` uses the actual office phone schema, and `20261023103445` verifies that an existing customer account belongs to the proposal organization. Both exact applied sources are committed.
