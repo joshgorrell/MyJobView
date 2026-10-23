@@ -66,6 +66,7 @@ export default function LostOpportunityReviews(
   const [contact, setContact] = useState<Contact | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposal, setProposal] = useState("");
+  const [recipientMode, setRecipientMode] = useState<"customer" | "proposal">("customer");
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
@@ -417,8 +418,17 @@ export default function LostOpportunityReviews(
             <button type="button" onClick={() => setCreateOpen(false)} className="text-sm text-gray-400 hover:text-white">Hide form</button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <button key={variant} type="button" disabled={busy} onClick={() => { setSenderVariant(variant); setPreview(null); }} className={`cursor-pointer rounded-xl border px-3 py-2 text-left transition ${senderVariant === variant ? "border-blue-500 bg-blue-950/40" : "border-gray-600 hover:border-gray-400"}`} aria-pressed={senderVariant === variant}><div className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</div><p className="mt-0.5 text-xs text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from the company owner with their signature and reply-to address."}</p></button>)}</div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Choose recipient method">
+            {(["customer", "proposal"] as const).map(mode => (
+              <button key={mode} type="button" aria-pressed={recipientMode === mode}
+                onClick={() => setRecipientMode(mode)}
+                className={`min-h-10 rounded-lg border px-3 py-2 text-sm ${recipientMode === mode ? "border-blue-500 bg-blue-950/40 text-blue-200" : "border-gray-600 text-gray-300"}`}>
+                {mode === "customer" ? "Select Customer" : "Link a Proposal"}
+              </button>
+            ))}
+          </div>
           <label className="block text-gray-200">
-            Customer (required)<input
+            {recipientMode === "proposal" ? "Find proposal customer (required)" : "Select Customer (required)"}<input
               value={contact
                 ? contact.contact_name || contact.company_name
                 : search}
@@ -456,8 +466,8 @@ export default function LostOpportunityReviews(
                 "Add an email address to this customer before sending."}
             </p>
           )}
-          <label className="block text-gray-200">
-            Proposal (optional)<select
+          {(recipientMode === "proposal" || contact) && <label className="block text-gray-200">
+            {recipientMode === "proposal" ? "Link a Proposal" : "Proposal (optional)"}<select
               value={proposal}
               disabled={!contact}
               onChange={(e) => {
@@ -475,7 +485,7 @@ export default function LostOpportunityReviews(
                 </option>
               ))}
             </select>
-          </label>
+          </label>}
           {!proposal && <label className="block text-gray-200">Opportunity Name (required for manual entry)<input required maxLength={200} value={name} onChange={(e) => opportunity(e.target.value)} placeholder="e.g. Home Theater Installation" className={input} /></label>}
           <label className="block text-gray-200">
             Review Title / Email Subject<input
@@ -489,9 +499,6 @@ export default function LostOpportunityReviews(
               className={input}
             />
           </label>
-          <p className="text-sm text-gray-400">
-            Use Preview Email to see the personalized message before sending.
-          </p>
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
