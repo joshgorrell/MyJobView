@@ -60,6 +60,14 @@ target 'MyJobView' do
       :mac_catalyst_enabled => false
     )
 
+    # Keep all CocoaPods targets compatible with the minimum iOS version
+    # required by the Xcode version used for EAS production builds.
+    installer.pods_project.targets.each do |pod_target|
+      pod_target.build_configurations.each do |configuration|
+        configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
+
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.
     installer.target_installation_results.pod_target_installation_results
