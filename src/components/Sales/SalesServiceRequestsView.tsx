@@ -172,7 +172,12 @@ export function SalesServiceRequestsView() {
         .order('created_at', { ascending: false });
 
       if (!isManager) {
-        query = query.eq('created_by', profile!.id);
+        const { data: ownedContacts, error: ownershipError } = await supabase.from('contacts').select('id').eq('assigned_to', profile!.id).eq('organization_id', profile!.organization_id);
+        if (ownershipError) throw ownershipError;
+        const ownedIds = (ownedContacts || []).map(contact => contact.id);
+        query = ownedIds.length
+          ? query.or(`created_by.eq.${profile!.id},contact_id.in.(${ownedIds.join(',')})`)
+          : query.eq('created_by', profile!.id);
       }
 
       if (filterStatus !== 'all') {
