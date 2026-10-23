@@ -25,6 +25,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const isScheduled = body?.scheduled === true;
+    let manualOrgId: string | null = null;
 
     if (isScheduled) {
       // Scheduled calls must prove possession of a server-side secret. A request
@@ -57,22 +58,26 @@ Deno.serve(async (req: Request) => {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, organization_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!profile || !['admin', 'superadmin'].includes(profile.role)) {
+      if (!profile || !profile.organization_id || !['admin', 'superadmin'].includes(profile.role)) {
         return new Response(
           JSON.stringify({ success: false, message: 'Forbidden: Admin access required' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      // A company administrator must not revoke another company's sessions.
+      manualOrgId = profile.organization_id;
     }
 
-    const { data: activeSessions, error: sessionsError } = await supabase
+    let sessionsQuery = supabase
       .from('user_sessions')
       .select('user_id, id')
       .eq('is_active', true);
+    if (manualOrgId) sessionsQuery = sessionsQuery.eq('organization_id', manualOrgId);
+    const { data: activeSessions, error: sessionsError } = await sessionsQuery;
 
     if (sessionsError) {
       throw new Error(`Failed to fetch active sessions: ${sessionsError.message}`);
@@ -97,13 +102,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const now = new Date().toISOString();
-    const { error: updateError } = await supabase
+    let closeQuery = supabase
       .from('user_sessions')
       .update({
         is_active: false,
         session_end: now,
       })
       .eq('is_active', true);
+    if (manualOrgId) closeQuery = closeQuery.eq('organization_id', manualOrgId);
+    const { error: updateError } = await closeQuery;
 
     if (updateError) {
       console.error('Failed to update session records:', updateError.message);
@@ -112,12 +119,15 @@ Deno.serve(async (req: Request) => {
     const sessionsClosedCount = activeSessions?.length || 0;
     const completed = revokeErrors.length === 0 && !updateError;
 
-    await supabase.rpc('record_scheduled_logout_run', {
-      sessions_closed: sessionsClosedCount,
-    }).catch((e: any) => console.error('Failed to record logout run:', e));
+    if (isScheduled) {
+      await supabase.rpc('record_scheduled_logout_run', {
+        sessions_closed: sessionsClosedCount,
+      }).catch((e: any) => console.error('Failed to record logout run:', e));
+    }
 
     await supabase.from('session_cleanup_log').insert({
       sessions_closed: sessionsClosedCount,
+      organization_id: manualOrgId,
       success: completed,
       error_message: revokeErrors.length > 0 ? revokeErrors.join('; ') : null,
     }).catch((e: any) => console.error('Failed to write cleanup log:', e));
