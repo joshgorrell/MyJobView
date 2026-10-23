@@ -83,7 +83,7 @@ CREATE POLICY "Anyone can insert pipeline stages"
 CREATE POLICY "Anyone can update pipeline stages"
   ON pipeline_stages FOR UPDATE
   TO anon, authenticated
-  USING (true);
+  USING (true)
   WITH CHECK (true);
 
 
@@ -113,7 +113,7 @@ CREATE POLICY "Anyone can insert customers"
 CREATE POLICY "Anyone can update customers"
   ON customers FOR UPDATE
   TO anon, authenticated
-  USING (true);
+  USING (true)
   WITH CHECK (true);
 
 
