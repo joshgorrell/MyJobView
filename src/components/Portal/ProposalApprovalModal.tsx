@@ -65,9 +65,8 @@ export function ProposalApprovalModal({
       setRequireDeposit(proposal?.require_deposit ?? true);
       setDepositAmount(proposal?.deposit_amount_due ?? 0);
 
-      const methods = proposal?.acceptance_methods ||
-                     (proposal?.proposal_settings as any)?.acceptance_methods ||
-                     ['payment'];
+      const settings = Array.isArray(proposal.proposal_settings) ? proposal.proposal_settings[0] : proposal.proposal_settings;
+      const methods = proposal.acceptance_methods ?? settings?.acceptance_methods ?? ['payment'];
       setAcceptanceMethods(methods);
 
       if (methods.length === 1) {

@@ -72,6 +72,7 @@ await db.query('update proposals set deposit_paid=true where id=$1',[proposal]);
 assert.equal(await scalar("select user_id from notifications where title='Deposit Payment Received'"),rep);
 await as(portal);await denied('update proposals set total=1 where id=$1',[proposal]);await denied('select * from private.proposal_customer_decisions');
 proposal=await seed(101,{acceptance_methods:['purchase_order']});await assert.rejects(()=>decide(proposal,'approve',{method:'payment'}));await assert.rejects(()=>decide(proposal,'approve',{method:'purchase_order'}));
+await assert.rejects(()=>decide(proposal,'approve',{method:'purchase_order',po_number:'PO-99',po_document_url:'javascript:alert(1)'}));
 receipt=await decide(proposal,'approve',{method:'purchase_order',po_number:'PO-99'});assert.equal(receipt.deposit_invoice_id,null);
 proposal=await seed(102);await assert.rejects(()=>decide(proposal,'decline',{reason:'other'}));
 receipt=await decide(proposal,'decline',{reason:'price_too_high',notes:'Budget',promise_acknowledged:true});assert.equal(receipt.status,'declined');

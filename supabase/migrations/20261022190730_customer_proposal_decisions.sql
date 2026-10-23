@@ -374,6 +374,7 @@ BEGIN
   SELECT coalesce(p.acceptance_methods,s.acceptance_methods,ARRAY['payment']) INTO allowed FROM (SELECT 1) dummy LEFT JOIN public.proposal_settings s ON s.proposal_id=p.id AND s.organization_id=p.organization_id;
   IF method IS NULL OR method NOT IN ('payment','purchase_order') OR NOT method=ANY(allowed) THEN RAISE EXCEPTION 'Acceptance method not allowed';END IF;
   IF method='purchase_order' AND nullif(trim(p_details->>'po_number'),'') IS NULL THEN RAISE EXCEPTION 'Purchase Order number is required';END IF;
+  IF nullif(p_details->>'po_document_url','') IS NOT NULL AND p_details->>'po_document_url' !~ '^https://[^[:space:]]+$' THEN RAISE EXCEPTION 'Purchase order document must use HTTPS';END IF;
   IF length(coalesce(p_details->>'po_number',''))>200 OR length(coalesce(p_details->>'po_document_url',''))>2000 THEN RAISE EXCEPTION 'Invalid purchase order details';END IF;
   UPDATE public.proposals SET status='approved',approved_by=auth.uid(),approved_at=now(),approval_completed_at=now(),accepted_via_method=method,
    purchase_order_number=CASE WHEN method='purchase_order' THEN trim(p_details->>'po_number') ELSE purchase_order_number END,
