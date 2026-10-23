@@ -228,13 +228,13 @@ try {
     .getByRole("heading", { name: "Technician rankings", exact: true })
     .waitFor();
   assert.equal(
-    await staff.evaluate(() => window.requests.filter((r) => r.name).length),
-    0,
-    "staff never calls historical RPC",
+    await staff.evaluate(() => window.requests.filter((r) => r.name === "get_tech_production").length),
+    1,
+    "authorized staff use the same permission-checked production RPC",
   );
   await staff.close();
   console.log(
-    "Production browser: mobile/desktop, light/dark, ranking order, search, job links, clean duration, historical limitations, print, invalid dates and staff access passed. Screenshots: " +
+    "Production browser: mobile/desktop, light/dark, ranking order, search, job links, clean duration, historical limitations, print, invalid dates and shared permission-checked staff reporting passed. Screenshots: " +
       screenshots,
   );
 } finally {
