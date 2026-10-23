@@ -30,10 +30,10 @@ assert.match(auth, /role', 'alertdialog'/);
 assert.match(auth, /setInterval\(checkIdle, 1000\)/);
 assert.match(auth, /remainingIdleMs\(readLastInteraction\(\)\)/);
 assert.match(auth, /document\.addEventListener\(event, trackIdleInteraction/);
-assert.match(auth, /closest\\?\\.\\('#mjv-idle-logout'\\)/,
+assert.ok(auth.includes("closest?.('#mjv-idle-logout')"),
   'Log Out Now must be exempt from generic activity dismissal');
-assert.match(auth, /logout\\.id = 'mjv-idle-logout'/);
-assert.match(auth, /logout\\.addEventListener\\('click', expireSession\\)/);
+assert.ok(auth.includes("logout.id = 'mjv-idle-logout'"));
+assert.ok(auth.includes("logout.addEventListener('click', expireSession)"));
 assert.match(auth, /window\.addEventListener\('focus', checkIdle\)/);
 assert.match(auth, /document\.addEventListener\('visibilitychange', checkIdle\)/);
 assert.doesNotMatch(auth, /'mousemove'/);
