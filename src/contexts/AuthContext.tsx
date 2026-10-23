@@ -389,6 +389,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dismissWarning();
         };
         const trackIdleInteraction = (event: Event) => {
+          // Do not dismiss the modal on pointerdown/keydown before the
+          // Log Out Now button can receive its click or keyboard activation.
+          if ((event.target as Element | null)?.closest?.('#mjv-idle-logout')) return;
           if (event.isTrusted) recordIdleInteraction();
         };
         const previousActivity = readLastInteraction();
@@ -433,6 +436,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           stay.style.cssText = 'background:#2563eb;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:600;cursor:pointer;margin:4px';
           stay.addEventListener('click', recordIdleInteraction);
           const logout = document.createElement('button');
+          logout.id = 'mjv-idle-logout';
           logout.type = 'button';
           logout.textContent = 'Log Out Now';
           logout.style.cssText = 'background:transparent;color:inherit;border:1px solid #9ca3af;border-radius:8px;padding:12px 18px;cursor:pointer;margin:4px';
