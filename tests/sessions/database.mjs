@@ -53,6 +53,22 @@ await db.query('SELECT public.end_user_session($1,$2)', [
 ]);
 assert.equal((await db.query('SELECT is_active FROM public.user_sessions WHERE id=$1', [second])).rows[0].is_active, false);
 await db.exec('RESET ROLE');
+// IP location classification must default to Unknown and reject untrusted labels.
+await db.exec(`CREATE TABLE public.ip_nicknames (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL,
+  ip_address text NOT NULL
+);`);
+await db.exec(await readFile('supabase/migrations/20261022220000_ip_location_classification.sql', 'utf8'));
+await db.query('INSERT INTO public.ip_nicknames (organization_id, ip_address) VALUES ($1,$2)', [
+  '00000000-0000-4000-8000-000000000010', '203.0.113.20'
+]);
+assert.equal((await db.query('SELECT location_classification FROM public.ip_nicknames')).rows[0].location_classification, 'unknown');
+await assert.rejects(
+  () => db.query("UPDATE public.ip_nicknames SET location_classification='on_site'"),
+  /ip_nicknames_location_classification_check/
+);
+
 const locationEdge = await readFile('supabase/functions/session-location/index.ts', 'utf8');
 assert.match(locationEdge, /SUPABASE_SERVICE_ROLE_KEY/);
 assert.ok(locationEdge.includes('supabase.auth.getUser()'));
