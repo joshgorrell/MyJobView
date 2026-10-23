@@ -104,6 +104,11 @@ export function UserSessionsDashboard() {
     const classification = known?.location_classification === 'office' ? 'Office' : known?.location_classification === 'remote' ? 'Remote' : 'Unknown';
     return { name: known?.nickname || 'Unlabeled network', classification };
   }
+  function centralDate(value: string): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(value));
+  }
   function sessionCoverage(rows: Session[]): number {
     const cutoff = Date.now() - 7 * 86400000;
     const windows = rows.map(s => [Math.max(cutoff, Date.parse(s.session_start)), Math.min(Date.now(), Date.parse(s.session_end || s.last_activity))] as const)
