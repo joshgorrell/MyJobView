@@ -7,6 +7,27 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.user_sessions FROM anon, authe
 DROP POLICY IF EXISTS user_sessions_update_same_org ON public.user_sessions;
 DROP POLICY IF EXISTS user_sessions_insert_same_org ON public.user_sessions;
 
+-- Session history contains IP and device information. Employees may see
+-- their own sessions; only their organization's administrators may inspect
+-- other employees' sessions. A same-org employee alone is not sufficient.
+DROP POLICY IF EXISTS user_sessions_select_same_org ON public.user_sessions;
+DROP POLICY IF EXISTS user_sessions_select_owner_or_org_admin ON public.user_sessions;
+CREATE POLICY user_sessions_select_owner_or_org_admin
+ON public.user_sessions FOR SELECT TO authenticated
+USING (
+  user_id = (SELECT auth.uid())
+  OR (
+    organization_id = (SELECT public.get_user_org_id())
+    AND EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid())
+        AND p.organization_id = user_sessions.organization_id
+        AND p.role IN ('admin', 'superadmin')
+    )
+  )
+);
+
+
 CREATE OR REPLACE FUNCTION public.end_user_session(
   p_user_id uuid DEFAULT NULL,
   p_session_id uuid DEFAULT NULL
