@@ -68,7 +68,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
       {activeTab === 'intake' && <button type="button" onClick={() => setManualOpen(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"><Plus className="h-4 w-4" /> New Intake</button>}
       <Suspense fallback={<TabFallback />}>
         {activeTab === 'intake' && manualOpen && <ManualIntake serviceOnly={manualTestOnly} onClose={() => setManualOpen(false)} onCreated={() => { setManualOpen(false); setQueueRevision(value => value + 1); setActiveTab('queue'); }} />}
-        {activeTab === 'queue' && <ServiceRequestQueue key={`${queueRevision}:${requestId || 'queue'}`} requestId={requestId} />}
+        {activeTab === 'queue' && <ServiceRequestQueue key={`${queueRevision}:${requestId || 'queue'}`} requestId={requestId} canViewTestTune={hasModuleAccess('punchlist')} />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
         {activeTab === 'intake' && !manualTestOnly && <SmartIntakeHistory />}
         {activeTab === 'intake' && manualTestOnly && <p className="text-sm text-gray-400">Manual Service Request testing is enabled. Automated email and SMS intake are not active.</p>}

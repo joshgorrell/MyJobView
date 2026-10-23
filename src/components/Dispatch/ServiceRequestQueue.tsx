@@ -103,7 +103,7 @@ interface Technician {
   role: string;
 }
 
-export function ServiceRequestQueue({ requestId }: { requestId?: string | null }) {
+export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { requestId?: string | null; canViewTestTune?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
@@ -654,7 +654,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                       <span className="text-muted">{request.request_type === 'project' ? 'Project' : 'Service'}</span>
                       {request.source_type === 'punchlist' && <span className="text-muted">· Test &amp; Tune</span>}
                       {request.customer_contact_confirmed_at && <span className="text-emerald-400">· Contacted</span>}
-                      {expandedRequest === request.id && request.source_type === 'punchlist' && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
+                      {expandedRequest === request.id && canViewTestTune && request.source_type === 'punchlist' && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
                       {expandedRequest === request.id && (
                         <span className="text-muted">· {getSourceTypeLabel(request.source_type)}</span>
                       )}
