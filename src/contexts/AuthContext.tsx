@@ -190,6 +190,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           clearTimeout(timeoutId);
           setLoading(false);
           setLoadingProfile(false);
+          // Customer portal accounts may not have a staff profile. Enforce the
+          // same idle timeout even when session analytics cannot be recorded.
+          void startSessionTracking(userId).catch(() => {});
           return;
         }
         console.error('Profile not found for user:', userId);
