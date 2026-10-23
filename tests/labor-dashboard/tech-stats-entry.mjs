@@ -1,10 +1,11 @@
 import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';import assert from 'node:assert/strict';
-let view='performance';const profile={role:'admin'};
+let view='performance';const profile={role:'admin'};let permitted=true;
 const jsx=(type,props)=>({type,props});
 const m={exports:{}};const code=ts.transpileModule(fs.readFileSync('src/components/Production/TechStats.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText;
-vm.runInNewContext(code,{module:m,exports:m.exports,Date,Set,Intl,require(name){if(name==='react')return{useState:()=>[view,x=>view=x]};if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};if(name.endsWith('/AuthContext'))return{useAuth:()=>({profile,loading:false})};if(name.endsWith('/LaborDashboard'))return{default:'VerifiedPerformance'};return new Proxy({},{get:(_,k)=>k});}});
+vm.runInNewContext(code,{module:m,exports:m.exports,Date,Set,Intl,require(name){if(name==='react')return{useState:()=>[view,x=>view=x]};if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};if(name.endsWith('/AuthContext'))return{useAuth:()=>({profile,loading:false})};if(name.endsWith('/DepartmentContext'))return{useDepartments:()=>({hasModuleAccess:()=>permitted,loading:false})};if(name.endsWith('/LaborDashboard'))return{default:'VerifiedPerformance'};return new Proxy({},{get:(_,k)=>k});}});
 const nodes=t=>Array.isArray(t)?t.flatMap(nodes):t&&typeof t==='object'?[t,...nodes(t.props?.children)]:[];
 let tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type==='VerifiedPerformance'));assert.ok(!nodes(tree).some(n=>n.type?.name==='NativeTechActivity'));
 nodes(tree).find(n=>n.type==='button'&&n.props.children==='Native MJV activity & travel').props.onClick();tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type?.name==='NativeTechActivity'));
-profile.role='tech';view='performance';tree=m.exports.TechStats({});assert.equal(tree.type.name,'NativeTechActivity');assert.ok(!nodes(tree).some(n=>n.type==='VerifiedPerformance'));
-console.log('Tech Stats: administrator defaults to verified feed; native activity/travel retained; no payroll access expansion to staff.');
+profile.role='service_manager';view='performance';tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.type==='VerifiedPerformance'));
+permitted=false;tree=m.exports.TechStats({});assert.ok(nodes(tree).some(n=>n.props?.role==='alert'));assert.ok(!nodes(tree).some(n=>n.type==='VerifiedPerformance'));
+console.log('Tech Stats: authorized service manager and admin can open performance; denied users cannot.');
