@@ -154,6 +154,13 @@ export function ProposalQA({
         return;
       }
 
+      if (isPortal) {
+        const { data, error } = await supabase.rpc('ensure_customer_proposal_thread', { p_proposal_id: proposalId });
+        if (error || !data) throw error || new Error('Unable to route the proposal conversation');
+        setThreadId(data);
+        return;
+      }
+
       let { data: existingThread, error: threadError } = await supabase
         .from('message_threads')
         .select('id')

@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, CreditCard, FileText, Upload, CheckCircle, AlertCircle, ArrowRight, ArrowLeft, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -19,6 +19,10 @@ export function ProposalApprovalModal({
   onClose,
   onSuccess
 }: ProposalApprovalModalProps) {
+  const approvalRequestId = useRef(crypto.randomUUID());
+  const [proposalVersion, setProposalVersion] = useState<number | null>(null);
+  const [proposalOrganizationId, setProposalOrganizationId] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [requireDeposit, setRequireDeposit] = useState(false);
@@ -43,24 +47,26 @@ export function ProposalApprovalModal({
       const { data: proposal, error: propError } = await supabase
         .from('proposals')
         .select(`
+          current_portal_version, organization_id,
           deposit_amount_due,
           acceptance_methods,
           require_deposit,
-          proposal_settings:proposal_settings_id (
+          proposal_settings (
             acceptance_methods
           )
         `)
         .eq('id', proposalId)
         .maybeSingle();
 
-      if (propError) throw propError;
+      if (propError || !proposal) throw propError || new Error('Proposal unavailable');
+      setProposalVersion(proposal.current_portal_version ?? 0);
+      setProposalOrganizationId(proposal.organization_id);
 
       setRequireDeposit(proposal?.require_deposit ?? true);
       setDepositAmount(proposal?.deposit_amount_due ?? 0);
 
-      const methods = proposal?.acceptance_methods ||
-                     (proposal?.proposal_settings as any)?.acceptance_methods ||
-                     ['payment'];
+      const settings = Array.isArray(proposal.proposal_settings) ? proposal.proposal_settings[0] : proposal.proposal_settings;
+      const methods = proposal.acceptance_methods ?? settings?.acceptance_methods ?? ['payment'];
       setAcceptanceMethods(methods);
 
       if (methods.length === 1) {
@@ -86,6 +92,7 @@ export function ProposalApprovalModal({
         setDepositInvoiceStatus(invoice.status);
       }
     } catch (error) {
+      setSettingsError(true);
       console.error('Error loading proposal settings:', error);
     } finally {
       setLoading(false);
@@ -120,45 +127,33 @@ export function ProposalApprovalModal({
   }
 
   async function approveProposal(method: Method, poNumber?: string, poDocUrl?: string) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) throw new Error('Not authenticated');
-
-    const updateData: any = {
-      status: 'approved',
-      approved_by: session.user.id,
-      approval_completed_at: new Date().toISOString(),
-      accepted_via_method: method,
-      updated_at: new Date().toISOString()
-    };
-
-    if (method === 'purchase_order') {
-      if (poNumber?.trim()) {
-        updateData.purchase_order_number = poNumber.trim();
-      }
-      if (poDocUrl) {
-        updateData.po_document_url = poDocUrl;
-      }
+    if (proposalVersion === null || settingsError) throw new Error('Proposal settings unavailable');
+    const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+      p_proposal_id: proposalId, p_expected_version: proposalVersion, p_request_id: approvalRequestId.current,
+      p_action: 'approve', p_details: { method, po_number: poNumber?.trim() || null, po_document_url: poDocUrl || null },
+    });
+    if (error || data?.status !== 'approved') throw error || new Error('Approval was not recorded');
+    let invoice = null;
+    if (data.deposit_invoice_id) {
+      const { data: currentInvoice } = await supabase.from('invoices').select('id,qbo_invoice_id,status')
+        .eq('id', data.deposit_invoice_id).eq('proposal_id', proposalId).maybeSingle();
+      invoice = currentInvoice;
+      if (invoice) { setDepositInvoiceId(invoice.id); setDepositInvoiceStatus(invoice.status); setDepositInvoiceQboId(invoice.qbo_invoice_id); }
     }
-
-    const { error } = await supabase
-      .from('proposals')
-      .update(updateData)
-      .eq('id', proposalId);
-
-    if (error) throw error;
+    return invoice;
   }
 
   async function handlePaymentApproval() {
     setSubmitting(true);
     try {
-      await approveProposal('payment');
+      const invoice = await approveProposal('payment');
 
       let msg: string;
       if (!requireDeposit) {
         msg = 'Your proposal has been approved! A sales order has been created and is ready for scheduling. Your sales representative has been notified.';
-      } else if (depositInvoiceId && depositInvoiceStatus === 'submitted' && depositInvoiceQboId) {
+      } else if (invoice && ['submitted', 'sent'].includes(invoice.status) && invoice.qbo_invoice_id) {
         msg = 'Your proposal has been approved! Click the button below to pay your deposit now. Once your deposit is confirmed, your order will be ready for scheduling.';
-      } else if (depositInvoiceId && depositInvoiceStatus === 'paid') {
+      } else if (invoice?.status === 'paid') {
         msg = 'Your proposal has been approved and your deposit has been received. Your order is ready for scheduling!';
       } else {
         msg = 'Your approval has been received! Your sales representative will send you a deposit invoice shortly. You can pay it from the Invoices tab in your portal. Once your deposit is confirmed, your order will be ready for scheduling.';
@@ -175,12 +170,14 @@ export function ProposalApprovalModal({
   }
 
   async function handlePurchaseOrderApprove() {
+    if (!purchaseOrderNumber.trim()) { notify('Please enter your purchase order number', { theme: 'blue', tone: 'warning' }); return; }
     setSubmitting(true);
     try {
       let poDocUrl: string | undefined;
       if (poFile) {
         const url = await handleFileUpload(poFile);
-        if (url) poDocUrl = url;
+        if (!url) throw new Error('PO document upload failed');
+        poDocUrl = url;
       }
 
       await approveProposal('purchase_order', purchaseOrderNumber, poDocUrl);
@@ -207,6 +204,8 @@ export function ProposalApprovalModal({
       setStep('purchase_order');
     }
   }
+
+  if (settingsError) return <div role="alert" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="rounded-xl bg-white p-6 text-gray-900"><p>Unable to load approval settings. Please close and try again.</p><button onClick={onClose} className="mt-4 rounded-lg border px-4 py-2">Close</button></div></div>;
 
   if (loading) {
     return (
@@ -267,10 +266,10 @@ export function ProposalApprovalModal({
               {requireDeposit && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm font-medium text-amber-900 mb-1">
-                    Deposit Required: ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    Deposit Due: ${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-xs text-amber-700">
-                    Complete your deposit payment to finalize approval. Your order will be ready for scheduling once the deposit is confirmed.
+                    Your approval is recorded separately from your deposit payment. You can pay when the invoice is available; scheduling may depend on receiving the deposit.
                   </p>
                 </div>
               )}
@@ -297,11 +296,11 @@ export function ProposalApprovalModal({
                         <p className={`font-medium ${
                           selectedMethod === 'payment' ? 'text-blue-900' : 'text-gray-900'
                         }`}>
-                          {requireDeposit ? 'Pay Deposit & Approve' : 'Approve Proposal'}
+                          Approve Proposal
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
                           {requireDeposit
-                            ? `Pay your $${depositAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} deposit now to finalize approval`
+                            ? `Approve this proposal now; you can pay the deposit when the invoice is available`
                             : 'Approve this proposal and create a sales order'}
                         </p>
                       </div>
@@ -310,7 +309,7 @@ export function ProposalApprovalModal({
                   </button>
                 )}
 
-                {acceptanceMethods.includes('purchase_order') && !requireDeposit && (
+                {acceptanceMethods.includes('purchase_order') && (
                   <button
                     onClick={() => handleMethodSelect('purchase_order')}
                     className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
@@ -349,11 +348,11 @@ export function ProposalApprovalModal({
                   <CreditCard className="w-7 h-7 text-blue-600" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">
-                  {requireDeposit ? 'Pay Your Deposit' : 'Confirm Approval'}
+                  Confirm Approval
                 </h3>
                 <p className="text-sm text-gray-500">
                   {requireDeposit
-                    ? 'Click below to open the secure payment window and complete your deposit.'
+                    ? 'Approve the proposal first. If your deposit invoice is available, you can choose to pay it immediately or later.'
                     : 'Click below to approve this proposal and create your sales order.'}
                 </p>
               </div>
@@ -406,7 +405,7 @@ export function ProposalApprovalModal({
                   ) : (
                     <>
                       <CheckCircle className="w-4 h-4" />
-                      {requireDeposit ? 'Approve Proposal' : 'Approve Proposal'}
+                      Approve Proposal
                     </>
                   )}
                 </button>
@@ -423,20 +422,20 @@ export function ProposalApprovalModal({
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Purchase Order</h3>
                 <p className="text-sm text-gray-500">
-                  Provide your PO number now or later to complete the approval.
+                  Enter your purchase order number to approve this proposal.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Purchase Order Number (Optional)
+                    Purchase Order Number
                   </label>
                   <input
                     type="text"
                     value={purchaseOrderNumber}
                     onChange={(e) => setPurchaseOrderNumber(e.target.value)}
-                    placeholder="Enter PO number (can be added later)"
+                    placeholder="Enter PO number"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -503,12 +502,13 @@ export function ProposalApprovalModal({
               <h3 className="text-lg font-bold text-gray-900 mb-2">Proposal Approved!</h3>
               <p className="text-sm text-gray-600 max-w-sm mx-auto">{successMessage}</p>
 
-              {requireDeposit && depositInvoiceId && depositInvoiceStatus === 'sent' && depositInvoiceQboId && (
+              {requireDeposit && depositInvoiceId && ['sent', 'submitted'].includes(depositInvoiceStatus || '') && depositInvoiceQboId && (
                 <button
                   onClick={async () => {
                     const { data: settings } = await supabase
                       .from('company_settings')
                       .select('qbo_realm_id')
+                      .eq('organization_id', proposalOrganizationId)
                       .maybeSingle();
                     if (settings?.qbo_realm_id) {
                       window.open(`https://app.qbo.intuit.com/app/paynow?invoiceId=${depositInvoiceQboId}`, '_blank');
@@ -525,7 +525,7 @@ export function ProposalApprovalModal({
                 onClick={onSuccess}
                 className="mt-4 px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
-                Done
+                {requireDeposit ? 'Done — Pay Later' : 'Done'}
               </button>
             </div>
           )}

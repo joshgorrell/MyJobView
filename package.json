@@ -75,7 +75,9 @@
     "test:rewards": "node tests/rewards/database.mjs",
     "test:rewards:browser": "node tests/rewards/browser.mjs",
     "test:proposal-templates": "node tests/proposal-templates/database.mjs && node tests/proposal-templates/document.mjs && node tests/proposals/promise.mjs && node tests/proposal-templates/purchasing-model.mjs && node tests/proposal-templates/builder-settings.mjs",
-    "test:proposal-templates:browser": "node tests/proposal-templates/browser.mjs"
+    "test:proposal-templates:browser": "node tests/proposal-templates/browser.mjs",
+    "test:customer-proposals": "node tests/customer-proposals/database.mjs && node tests/customer-proposals/shared-link.mjs",
+    "test:customer-proposals:browser": "node tests/customer-proposals/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
