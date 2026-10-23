@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS pipeline_stages (
   order_index integer NOT NULL,
   color text NOT NULL DEFAULT '#3b82f6',
   created_at timestamptz DEFAULT now()
-)
+);
 
 
 
@@ -53,15 +53,15 @@ CREATE TABLE IF NOT EXISTS customers (
   notes text DEFAULT '',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
-)
+);
 
 
 
 -- Enable RLS
-ALTER TABLE pipeline_stages ENABLE ROW LEVEL SECURITY
+ALTER TABLE pipeline_stages ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 
 
 
@@ -69,29 +69,29 @@ ALTER TABLE customers ENABLE ROW LEVEL SECURITY
 CREATE POLICY "Anyone can view pipeline stages"
   ON pipeline_stages FOR SELECT
   TO anon, authenticated
-  USING (true)
+  USING (true);
 
 
 
 CREATE POLICY "Anyone can insert pipeline stages"
   ON pipeline_stages FOR INSERT
   TO anon, authenticated
-  WITH CHECK (true)
+  WITH CHECK (true);
 
 
 
 CREATE POLICY "Anyone can update pipeline stages"
   ON pipeline_stages FOR UPDATE
   TO anon, authenticated
-  USING (true)
-  WITH CHECK (true)
+  USING (true);
+  WITH CHECK (true);
 
 
 
 CREATE POLICY "Anyone can delete pipeline stages"
   ON pipeline_stages FOR DELETE
   TO anon, authenticated
-  USING (true)
+  USING (true);
 
 
 
@@ -99,29 +99,29 @@ CREATE POLICY "Anyone can delete pipeline stages"
 CREATE POLICY "Anyone can view customers"
   ON customers FOR SELECT
   TO anon, authenticated
-  USING (true)
+  USING (true);
 
 
 
 CREATE POLICY "Anyone can insert customers"
   ON customers FOR INSERT
   TO anon, authenticated
-  WITH CHECK (true)
+  WITH CHECK (true);
 
 
 
 CREATE POLICY "Anyone can update customers"
   ON customers FOR UPDATE
   TO anon, authenticated
-  USING (true)
-  WITH CHECK (true)
+  USING (true);
+  WITH CHECK (true);
 
 
 
 CREATE POLICY "Anyone can delete customers"
   ON customers FOR DELETE
   TO anon, authenticated
-  USING (true)
+  USING (true);
 
 
 
@@ -133,6 +133,6 @@ INSERT INTO pipeline_stages (name, order_index, color) VALUES
   ('Negotiation', 4, '#f59e0b'),
   ('Closed Won', 5, '#10b981'),
   ('Closed Lost', 6, '#ef4444')
-ON CONFLICT DO NOTHING
+ON CONFLICT DO NOTHING;
 
 
