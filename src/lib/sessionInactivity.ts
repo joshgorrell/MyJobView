@@ -3,7 +3,7 @@ export const MJV_IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 export const MJV_IDLE_WARNING_MS = 5 * 60 * 1000;
 
 export function remainingIdleMs(lastInteractionAt: number, now = Date.now()): number {
-  if (!Number.isFinite(lastInteractionAt) || lastInteractionAt <= 0) return 0;
+  if (!Number.isFinite(lastInteractionAt) || lastInteractionAt <= 0 || lastInteractionAt > now) return 0;
   return Math.max(0, MJV_IDLE_TIMEOUT_MS - (now - lastInteractionAt));
 }
 
