@@ -55,9 +55,13 @@ await assert.rejects(()=>db.query("SELECT get_tech_production('2026-02-01','2026
 await db.exec(`SELECT set_config('test.uid','${id(11)}',false)`);
 const managerReport=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
 assert.equal(managerReport.snapshots[0].payload.records[0].job_hours,7,'role-granted staff see imported history');
+await db.exec('RESET ROLE');
 await db.exec(`INSERT INTO user_permission_overrides VALUES('${id(11)}','${id(301)}','revoke')`);
+await db.exec('SET ROLE authenticated');
 await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/Tech Stats access denied/);
+await db.exec('RESET ROLE');
 await db.exec(`UPDATE user_permission_overrides SET override_type='grant' WHERE user_id='${id(11)}'; UPDATE role_module_access SET has_access=false WHERE role_id='${id(401)}'`);
+await db.exec('SET ROLE authenticated');
 const granted=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
 assert.equal(granted.snapshots.length,1,'user grant overrides missing role grant');
 await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);
