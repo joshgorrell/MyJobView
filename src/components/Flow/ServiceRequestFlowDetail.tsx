@@ -31,6 +31,5 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {!request.work_order && <p>Not yet scheduled</p>}
     <p><strong>Contact history</strong></p>
     {activities.length ? <div className="space-y-1">{activities.map(activity => <p key={activity.id}><small>{new Date(activity.created_at).toLocaleString()} · {activity.logged_by_name}</small> — {activity.notes}</p>)}</div> : <p>No contact notes recorded yet.</p>}
-    <a href={`/service-requests?serviceRequestId=${encodeURIComponent(request.id)}`}>Open service request ↗</a>
   </div>;
 }
