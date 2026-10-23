@@ -20,6 +20,7 @@ assert.equal(remainingIdleMs(at(59), now), 60_000);
 assert.equal(remainingIdleMs(at(60), now), 0);
 assert.equal(remainingIdleMs(at(75), now), 0);
 assert.equal(remainingIdleMs(0, now), 0);
+assert.equal(remainingIdleMs(now + 60_000, now), 0);
 assert.equal(mayResetOnReload('reload', at(59), now, true), true);
 assert.equal(mayResetOnReload('reload', at(60), now, true), false);
 assert.equal(mayResetOnReload('reload', at(59), now, false), false);
