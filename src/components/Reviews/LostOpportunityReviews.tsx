@@ -282,6 +282,7 @@ export default function LostOpportunityReviews(
   }
   async function send(e: React.FormEvent) {
     e.preventDefault();
+    if (!preview || busy) return;
     if (
       await action({
         action: "create",
@@ -508,12 +509,7 @@ export default function LostOpportunityReviews(
           >
             {previewing ? "Loading Preview…" : "Preview Email"}
           </button>
-          <button
-            disabled={busy || !canSend || !contact?.email || !title.trim()}
-            className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-3 text-white disabled:opacity-50"
-          >
-            {busy ? "Sending…" : "Send Lost Opportunity Review"}
-          </button>
+
         </form>
       )}
       <ReviewStatsRow stats={lostStats} />
@@ -553,9 +549,13 @@ export default function LostOpportunityReviews(
             <div className="min-h-0 flex-1 overflow-auto bg-white" role="region" aria-label="Full email preview" tabIndex={0}>
               <FullEmailPreview title="Lost Opportunity email preview" html={preview.html} />
             </div>
-            <p className="shrink-0 p-3 text-sm text-gray-400">
-              Scroll to see the entire email, including its buttons and footer. Preview only—no email has been sent.
-            </p>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-gray-700 p-3">
+              <p className="text-xs text-gray-400">Preview only — no email has been sent.</p>
+              <div className="flex gap-2">
+                <button type="button" disabled={busy} onClick={() => setPreview(null)} className="min-h-11 rounded-lg border border-gray-600 px-4 py-2 text-gray-200">Back to Form</button>
+                <button type="button" disabled={busy} onClick={() => void send({ preventDefault() {} } as React.FormEvent)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Sending…" : "Send This Email"}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
