@@ -1,15 +1,6 @@
 import { supabase } from "./supabase";
-import { getOrganizationTimezone } from "./timezoneUtils";
 import type { LaborBundle } from "./laborDashboard";
 
-type NativeEntry = {
-  id: string;
-  technician_id: string;
-  entry_date: string;
-  total_hours: number | string | null;
-  leave_type?: string | null;
-  status?: string | null;
-};
 type Identity = { id: string; organization_id: string; role: string };
 // In-memory only, bounded, and keyed by the complete viewer identity. No report survives sign-out.
 let cacheGeneration = 0;
