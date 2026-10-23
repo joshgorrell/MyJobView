@@ -52,7 +52,7 @@ interface Review {
   manual_resend_history?: {sent_at:string;sent_by:string}[];
 }
 export default function LostOpportunityReviews(
-  { showCreate = false }: { showCreate?: boolean },
+  { showCreate = true }: { showCreate?: boolean },
 ) {
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -403,9 +403,7 @@ export default function LostOpportunityReviews(
             </p>
           </div>
         </div>
-        <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {canSend && <button type="button" onClick={() => setCreateOpen(value => !value)} aria-expanded={createOpen} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">{createOpen ? "Hide Feedback Form" : "Send Feedback Form"}</button>}
-        </div>
+
       </div>
       {error && !expandedReview && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
@@ -417,11 +415,17 @@ export default function LostOpportunityReviews(
           {notice}
         </p>
       )}
+      {canSend && !createOpen && (
+        <button type="button" onClick={() => setCreateOpen(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">Show Feedback Form</button>
+      )}
       {canSend && createOpen && (
         <form
           onSubmit={send}
           className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4"
         >
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setCreateOpen(false)} className="text-sm text-gray-400 hover:text-white">Hide form</button>
+          </div>
           <label className="block text-gray-200">
             Customer (required)<input
               value={contact
