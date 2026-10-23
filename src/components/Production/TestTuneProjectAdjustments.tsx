@@ -3,11 +3,12 @@ import { supabase } from '../../lib/supabase';
 
 type Adjustment = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null };
 type Project = { id: string; contact_id: string; name: string; number: string | null; customer: string; can_submit: boolean; end_date: string; tasks: Adjustment[] };
-export function TestTuneProjectAdjustments() {
+export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: { canViewServiceRequests?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [history, setHistory] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -57,7 +58,8 @@ export function TestTuneProjectAdjustments() {
       setNotice('Selected adjustments moved to Service Requests.');
       await load();
       // The persisted request remains reachable without navigating away from unselected items.
-      setNotice(`Submitted. Request ${data} is ready in Service Requests.`);
+      setLastRequestId(data);
+      setNotice('Submitted. Your service request is ready for scheduling.');
     } catch (failure) { setError((failure as Error).message || 'Submission failed. Retry uses the same submission reference.'); }
     finally { saving.current = false; setBusy(false); }
   }
@@ -86,6 +88,7 @@ export function TestTuneProjectAdjustments() {
     {notice && <p role="status" className="break-words text-sm text-secondary">{notice}</p>}
     {(projectId || contactId) && !loading && !error && scoped.length === 0 && <p role="alert">This customer or project is unavailable or you no longer have access.</p>}
     {(taskId || requestId) && !loading && !error && !visible.some(p => p.tasks.length) && <p role="alert">This adjustment or request is unavailable in the selected project.</p>}
+    {lastRequestId && canViewServiceRequests && <a href={`/service-requests?serviceRequestId=${encodeURIComponent(lastRequestId)}`} className="inline-flex min-h-11 items-center text-sm text-info">View service request →</a>}
     {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected · {selectedProject?.customer}</span><button disabled={busy || !selectedProject?.can_submit} onClick={() => void submit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Request service'}</button><button disabled={busy} onClick={() => setSelected([])} className="min-h-11 px-3 text-info">Clear selection</button></div>}
     {!loading && !error && !visible.length && <p className="text-sm text-muted">No matching Test &amp; Tune projects.</p>}
     <div className="divide-y divide-subtle rounded-lg border border-subtle">
@@ -95,7 +98,7 @@ export function TestTuneProjectAdjustments() {
         {p.tasks.map(t => <div key={t.id} className="flex items-start gap-3 py-2 text-sm">
           {!t.request_id && t.status === 'open' && <input className="mt-1 h-5 w-5 shrink-0" type="checkbox" aria-label={`Select ${t.customer_description || t.title}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}
           <div className="min-w-0 flex-1 break-words"><p className="text-primary">{t.customer_description || t.title}</p><span className="text-xs text-muted">{t.visibility === 'internal' ? 'Internal' : 'Customer visible'} · {t.request_id ? 'Requested' : t.status}</span></div>
-          {t.request_id && <a className="text-info" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id)}`}>View request →</a>}
+          {t.request_id && canViewServiceRequests && <a className="text-info" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id)}`}>View request →</a>}
         </div>)}
       </article>)}
     </div>

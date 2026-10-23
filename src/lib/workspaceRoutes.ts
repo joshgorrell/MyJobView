@@ -118,7 +118,7 @@ export function workspaceUrl(location: URL, page: string): string | null {
   const next = new URL(location);
   next.pathname = path;
   next.searchParams.delete('tab');
-  if (!['service_requests', 'service_request_analytics'].includes(resolveLegacyPage(page))) next.searchParams.delete('serviceRequestId');
+  if (!['service_requests', 'service_request_analytics', 'punchlist'].includes(resolveLegacyPage(page))) next.searchParams.delete('serviceRequestId');
   return next.pathname + next.search + next.hash;
 }
 export function isPortalProposalRoute(pathname: string, search: string, portalUser: boolean, impersonating: boolean): boolean {

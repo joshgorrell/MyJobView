@@ -51,7 +51,11 @@ Customer submission updates appear in the portal, with a customer-controlled pre
 
 Both page shortcuts honor module access. Request-specific history links preserve customer, project and request IDs. Polling, focus refresh and realtime subscriptions reload persisted state. No records are deleted by the rollout.
 
-The deployed database was missing the main-branch prerequisite `20261019180250_project_punchlist_and_vip_service.sql`; rollout must include that prerequisite before the new workspace migration. Keep this PR draft until local regressions, real PostgreSQL concurrency, CI and deployment checks pass.
+The live rollout includes the previously missing main-branch prerequisite `20261019180250_project_punchlist_and_vip_service.sql`, the workspace migration `20261023105139_test_tune_atomic_workspace.sql`, and the policy-helper grant correction `20261023114348_test_tune_policy_helper_access.sql`. Each migration is recorded with its exact repository source; no previous history was rewritten. Live authenticated staff can load the workspace and underlying task rows. Anonymous execution and direct receipt writes are denied. The existing 20 project tasks and one project were preserved; no service requests or submission receipts were created during rollout.
+
+Real PostgreSQL 17 authorization and concurrent handoff tests passed in CI. Local build/typecheck, phone/desktop workspace and portal/project browsers, and scoped regressions passed. The final integrated head must still pass every triggered CI workflow before merge. Frontend publication in Bolt is separate.
+
+Security advisor comparison: ten added findings are intentional authenticated SECURITY DEFINER entry points, reviewed for explicit active staff/customer identity, organization/ownership/entitlement checks, fixed search paths and revoked anonymous execution. No new anonymous-executable entry points or unprotected tables were introduced; anonymous execution of the existing comped-membership function was removed.
 
 ## Submission and persistence contract (2026-10-22)
 - Submitting three of five adjustments creates one formal request containing those three and leaves exactly two in Test & Tune.

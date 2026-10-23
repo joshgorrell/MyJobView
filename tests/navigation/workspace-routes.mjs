@@ -19,3 +19,6 @@ console.log('Workspace route resolution, legacy links, record/hash retention, an
 
 assert.equal(workspacePage('/project-punchlist'),'punchlist','Old staff bookmarks remain valid');
 assert.equal(workspacePage('/test-and-tune'),'punchlist');
+
+const testTuneLink=new URL('https://elife.myjobview.com/test-and-tune?projectId=project&contactId=customer&serviceRequestId=request&history=1');
+assert.equal(workspaceUrl(testTuneLink,'punchlist'),'/test-and-tune?projectId=project&contactId=customer&serviceRequestId=request&history=1','App URL normalization preserves Test & Tune request history context');

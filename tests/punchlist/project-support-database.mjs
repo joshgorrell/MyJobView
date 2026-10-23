@@ -52,9 +52,12 @@ const moduleFix=await readFile('supabase/migrations/20261019135137_punchlist_fix
 for(const [name,source] of [['punchlist_staff_identity',corrective],['punchlist_portal_identity',corrective],['punchlist_staff_access',moduleFix]]){
  const functionSql=source.match(new RegExp(`CREATE OR REPLACE FUNCTION private\\.${name}\\([\\s\\S]*?\\$\\$;`))[0];await db.exec(functionSql);
 }
+await db.exec('REVOKE ALL ON FUNCTION private.punchlist_staff_identity(uuid) FROM PUBLIC,anon,authenticated');
 const migration=(await readdir('supabase/migrations')).find(n=>n.endsWith('_project_punchlist_and_vip_service.sql'));
 await db.exec(await readFile(`supabase/migrations/${migration}`,'utf8'));
 await db.exec(await readFile('supabase/migrations/20261023105139_test_tune_atomic_workspace.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261023114348_test_tune_policy_helper_access.sql','utf8'));
+assert.equal((await db.query("SELECT has_function_privilege('anon','private.punchlist_staff_identity(uuid)','execute') allowed")).rows[0].allowed,false);
 async function as(n,contact=null,org=1){await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SELECT set_config('test.org','${id(org)}',false);SELECT set_config('test.jwt','${JSON.stringify(contact?{app_metadata:{is_portal_user:true,contact_id:id(contact),organization_id:id(org)}}:{})}',false);SET ROLE authenticated;`);}
 async function owner(sql){await db.exec('RESET ROLE');return (await db.query(sql)).rows;}
 async function support(contact=30){return (await db.query(`SELECT get_customer_support('${id(contact)}') data`)).rows[0].data;}

@@ -31,7 +31,7 @@ for(const width of [375,390,1280]){
  assert.equal(await page.getByRole('checkbox',{name:'Select Expired adjustment',exact:true}).isDisabled(),true);
  for(const id of ['a','b','c'])await page.getByRole('checkbox',{name:'Select Adjustment '+id,exact:true}).check();
  assert.equal(await page.getByRole('checkbox',{name:'Select Other project',exact:true}).isDisabled(),true);
- await page.getByRole('button',{name:'Request service',exact:true}).click();await page.getByRole('status').filter({hasText:'ready in Service Requests'}).waitFor();
+ await page.getByRole('button',{name:'Request service',exact:true}).click();await page.getByRole('status').filter({hasText:'ready for scheduling'}).waitFor();
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).count(),0);
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).count(),1);
  const calls=await page.evaluate(()=>window.calls);assert.deepEqual(calls.find(c=>c[0]==='request_project_punchlist_visit')[1].p_task_ids,['a','b','c']);
