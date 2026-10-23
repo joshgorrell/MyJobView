@@ -44,7 +44,15 @@ Deno.serve(async (req) => {
       // IP is still useful even when optional geolocation is unavailable.
     }
 
-    const { error } = await supabase
+    // Browser clients cannot write user_sessions directly. This function
+    // verifies the caller with Supabase Auth, then updates ONLY that user's
+    // session with a server-only service-role client.
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) throw new Error('Session location service unavailable');
+    const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: updated, error } = await admin
       .from('user_sessions')
       .update({
         ip_address: ip,
@@ -52,8 +60,11 @@ Deno.serve(async (req) => {
         location_updated_at: new Date().toISOString(),
       })
       .eq('id', session_id)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select('id')
+      .maybeSingle();
     if (error) throw error;
+    if (!updated) throw new Error('Session not found for authenticated user');
 
     return new Response(JSON.stringify({ ok: true, ...location }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
