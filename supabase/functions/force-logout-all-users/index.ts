@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
 
     let sessionsQuery = supabase
       .from('user_sessions')
-      .select('user_id, id')
+      .select('user_id, id, organization_id')
       .eq('is_active', true);
     if (manualOrgId) sessionsQuery = sessionsQuery.eq('organization_id', manualOrgId);
     const { data: activeSessions, error: sessionsError } = await sessionsQuery;
@@ -125,12 +125,23 @@ Deno.serve(async (req: Request) => {
       }).catch((e: any) => console.error('Failed to record logout run:', e));
     }
 
-    await supabase.from('session_cleanup_log').insert({
-      sessions_closed: sessionsClosedCount,
-      organization_id: manualOrgId,
-      success: completed,
-      error_message: revokeErrors.length > 0 ? revokeErrors.join('; ') : null,
-    }).catch((e: any) => console.error('Failed to write cleanup log:', e));
+    // The log requires an organization_id. For an authorized scheduled global
+    // logout, emit a separate record per affected organization, never NULL.
+    const orgIds = manualOrgId
+      ? [manualOrgId]
+      : [...new Set((activeSessions || []).map((s: any) => s.organization_id).filter(Boolean))];
+    for (const orgId of orgIds) {
+      const countForOrg = manualOrgId
+        ? sessionsClosedCount
+        : (activeSessions || []).filter((s: any) => s.organization_id === orgId).length;
+      const { error: logError } = await supabase.from('session_cleanup_log').insert({
+        organization_id: orgId,
+        sessions_closed: countForOrg,
+        success: completed,
+        error_message: revokeErrors.length > 0 ? revokeErrors.join('; ') : null,
+      });
+      if (logError) console.error('Failed to write cleanup log:', logError.message);
+    }
 
     console.log(`Force logout complete: ${revokedCount} users signed out, ${sessionsClosedCount} sessions closed`);
 
