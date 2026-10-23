@@ -26,6 +26,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// A navigation reload should only be counted once, even if tracking restarts on tab focus.
+let reloadActivityHandled = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -401,11 +404,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const inactivityLimitMs = 60 * 60 * 1000;
         const warningMs = 55 * 60 * 1000;
         const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || 0;
-        const trackIdleInteraction = () => {
+        const recordIdleInteraction = () => {
           localStorage.setItem(idleKey, String(Date.now()));
           document.getElementById('mjv-idle-warning')?.remove();
         };
-        if (!localStorage.getItem(idleKey)) trackIdleInteraction();
+        const trackIdleInteraction = (event: Event) => {
+          if (event.isTrusted) recordIdleInteraction();
+        };
+        const previousActivity = readLastInteraction();
+        if (!previousActivity) recordIdleInteraction();
+        // Navigation Timing identifies a reload (including browser toolbar/F5).
+        // It cannot distinguish user-triggered reloads from programmatic reloads.
+        // Never let a reload revive an already expired session.
+        if (!reloadActivityHandled) {
+          reloadActivityHandled = true;
+          const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+          if (navigation?.type === 'reload' &&
+              previousActivity > 0 &&
+              Date.now() - previousActivity < inactivityLimitMs &&
+              document.visibilityState === 'visible') {
+            recordIdleInteraction();
+          }
+        }
         interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
         const checkIdle = () => {
           const idleMs = Date.now() - readLastInteraction();
@@ -422,7 +442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const stay = document.createElement('button');
             stay.textContent = 'Stay signed in';
             stay.style.cssText = 'display:block;margin-top:12px;background:white;color:#111827;padding:8px 12px;border-radius:6px';
-            stay.onclick = trackIdleInteraction;
+            stay.onclick = recordIdleInteraction;
             warning.appendChild(stay);
             document.body.appendChild(warning);
           }
