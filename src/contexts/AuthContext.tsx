@@ -377,7 +377,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (idleSigningOut) return;
           idleSigningOut = true;
           dismissWarning();
-          void supabase.auth.signOut();
+          void (async () => {
+            try {
+              const sessionId = (window as any).__currentSessionId as string | undefined;
+              if (sessionId) {
+                // Best-effort session-history close. Never let a stalled network
+                // request prevent the local authentication logout.
+                await Promise.race([
+                  supabase.rpc('end_user_session', { p_user_id: userId, p_session_id: sessionId }),
+                  new Promise(resolve => setTimeout(resolve, 1500)),
+                ]);
+              }
+            } catch (error) {
+              console.error('Could not close idle session record:', error);
+            } finally {
+              await supabase.auth.signOut();
+            }
+          })();
         };
         const recordIdleInteraction = () => {
           if (idleSigningOut) return;
