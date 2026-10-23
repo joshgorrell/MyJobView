@@ -395,6 +395,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
         };
 
+        // One-hour inactivity logout. Background tabs cannot observe interaction
+        // elsewhere in the browser, so recheck on focus before expiring.
+        const inactivityLimitMs = 60 * 60 * 1000;
+        let lastAppInteractionAt = Date.now();
+        const trackIdleInteraction = () => { lastAppInteractionAt = Date.now(); };
+        interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
+        const idleCheck = setInterval(() => {
+          if (document.visibilityState !== 'visible') return;
+          if (Date.now() - lastAppInteractionAt >= inactivityLimitMs) {
+            clearInterval(idleCheck);
+            void supabase.auth.signOut();
+          }
+        }, 30 * 1000);
+        const priorCleanup = (window as any).__sessionInteractionCleanup;
+        (window as any).__sessionInteractionCleanup = () => {
+          priorCleanup?.();
+          clearInterval(idleCheck);
+          interactionEvents.forEach(event => document.removeEventListener(event, trackIdleInteraction));
+        };
+
         const activityInterval = setInterval(async () => {
           if (document.visibilityState === 'visible' && Date.now() - lastInteractionAt <= 5 * 60 * 1000) {
             try {
