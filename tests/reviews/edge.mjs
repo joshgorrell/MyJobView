@@ -52,7 +52,7 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); emails.push(JSON.parse(options.body)); return new Response('{}', { status: sendFail?502:200 }); };
 globalThis.__lostDeps = { tokenFor, sendSystemEmail:init=>fetch('https://api.resend.com/emails',init), validateAssessment, createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
 const source = (await readFile(new URL('../../supabase/functions/lost-opportunity-review/index.ts', import.meta.url), 'utf8')).replace(/^import[^;]+;\n/gm, '');
-await moduleFrom(`const {tokenFor,sendSystemEmail,validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
+await moduleFrom(`const {sendSystemEmail,validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
 const Deno={env:{get:key=>key==='RESEND_API_KEY'?'test-key':key==='SUPABASE_SERVICE_ROLE_KEY'?'test-secret':''},serve:handler=>{globalThis.__lostHandler=handler;}};
 ${source}`);
 async function call(body) { const r = await globalThis.__lostHandler(new Request('https://test.example', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, body: await r.json() }; }
