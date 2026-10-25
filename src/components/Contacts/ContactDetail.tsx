@@ -3362,7 +3362,7 @@ interface AccountCredit {
 function ContactAccountCredits({ contactId }: { contactId: string }) {
   const [credits, setCredits] = useState<AccountCredit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -3397,8 +3397,6 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
   const otherCredits = credits.filter(c => c.status !== 'open' || Number(c.amount_remaining) <= 0);
   const totalAvailable = openCredits.reduce((sum, credit) => sum + Number(credit.amount_remaining || 0), 0);
 
-  if (credits.length === 0) return <section className="border-t border-gray-200 pt-6"><h3 className="text-sm font-semibold text-gray-900">Credit History</h3><p className="text-sm text-gray-500 mt-2">No customer credits recorded.</p></section>;
-
   function fmt(n: number) {
     return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
@@ -3409,7 +3407,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
     <div className="border-t border-gray-200 pt-6">
       <h3 className="text-xs sm:text-sm font-medium text-gray-700 uppercase tracking-wide pb-2 border-b border-gray-200 mb-3 flex items-center gap-2">
         <DollarSign className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-green-600" />
-        Account Credits
+        Credit History & Open Credits
         <span className={`ml-auto text-sm font-bold normal-case tracking-normal ${totalAvailable > 0 ? 'text-red-700' : 'text-gray-600'}`}>
           ${fmt(totalAvailable)} available
         </span>
@@ -3452,7 +3450,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
                 )}
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-base font-bold text-red-700">${fmt(credit.amount)}</div>
+                <div className="text-base font-bold text-gray-700">${fmt(credit.amount)}</div>
                 <div className="text-xs text-gray-400">original</div>
               </div>
             </div>
