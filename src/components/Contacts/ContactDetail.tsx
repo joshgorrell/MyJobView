@@ -3362,7 +3362,7 @@ interface AccountCredit {
 function ContactAccountCredits({ contactId }: { contactId: string }) {
   const [credits, setCredits] = useState<AccountCredit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -3393,7 +3393,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
   const otherCredits = credits.filter(c => c.status !== 'open');
   const totalAvailable = openCredits.reduce((s, c) => s + (c.amount_remaining || 0), 0);
 
-  if (credits.length === 0) return null;
+  if (credits.length === 0) return <section className="border-t border-gray-200 pt-6"><h3 className="text-sm font-semibold text-gray-900">Credit History</h3><p className="text-sm text-gray-500 mt-2">No customer credits recorded.</p></section>;
 
   function fmt(n: number) {
     return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
