@@ -3403,18 +3403,16 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
     return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  const displayedOther = showAll ? otherCredits : [];
+  const displayedOther = otherCredits;
 
   return (
     <div className="border-t border-gray-200 pt-6">
       <h3 className="text-xs sm:text-sm font-medium text-gray-700 uppercase tracking-wide pb-2 border-b border-gray-200 mb-3 flex items-center gap-2">
         <DollarSign className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-green-600" />
         Account Credits
-        {totalAvailable > 0 && (
-          <span className="ml-auto text-sm font-semibold text-red-700 font-bold normal-case tracking-normal">
-            ${fmt(totalAvailable)} available
-          </span>
-        )}
+        <span className={`ml-auto text-sm font-bold normal-case tracking-normal ${totalAvailable > 0 ? 'text-red-700' : 'text-gray-600'}`}>
+          ${fmt(totalAvailable)} available
+        </span>
       </h3>
 
       {openCredits.length === 0 && (
@@ -3422,6 +3420,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
       )}
 
       <div className="space-y-2">
+        {credits.length === 0 && <p className="text-sm text-gray-500">No credit history recorded.</p>}
         {openCredits.map(credit => (
           <div key={credit.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
             <div className="flex items-start justify-between gap-2">
@@ -3459,15 +3458,6 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
             </div>
           </div>
         ))}
-
-        {otherCredits.length > 0 && (
-          <button
-            onClick={() => setShowAll(v => !v)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-1"
-          >
-            {showAll ? 'Hide' : `Show ${otherCredits.length} applied/voided credit${otherCredits.length > 1 ? 's' : ''}`}
-          </button>
-        )}
 
         {displayedOther.map(credit => (
           <div key={credit.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 opacity-70">
@@ -3528,7 +3518,7 @@ function ContactPaymentsCredits({ contactId }: { contactId: string }) {
     return () => { cancelled = true; };
   }, [contactId]);
   return <div className="space-y-6">
-    <ContactAccountCredits contactId={contactId} />
+    <ContactAccountCredits key={contactId} contactId={contactId} />
     <section className="border-t border-gray-200 pt-5">
       <h3 className="font-semibold text-gray-900 mb-3">Payment History</h3>
       {loading ? <p className="text-sm text-gray-500">Loading payments…</p>
