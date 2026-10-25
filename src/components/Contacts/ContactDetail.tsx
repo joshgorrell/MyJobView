@@ -122,7 +122,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [portalAccessEnabled, setPortalAccessEnabled] = useState((contact as any).portal_access_enabled || false);
   const [punchlistExpirationEmailsEnabled, setPunchlistExpirationEmailsEnabled] = useState((contact as any).punchlist_expiration_emails_enabled !== false);
   const [savingPunchlistExpirationEmails, setSavingPunchlistExpirationEmails] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow' | 'payments_credits'>('overview');
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
@@ -1278,6 +1278,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                 Overview
               </div>
             </button>
+            <button onClick={() => setActiveTab('payments_credits')} className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'payments_credits' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}><span className="flex items-center gap-2"><DollarSign className="w-4 h-4" />Payments &amp; Credits</span></button>
             <button
               onClick={() => setActiveTab('history')}
               className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation whitespace-nowrap ${
@@ -1336,7 +1337,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         </div>
 
         <div className="p-4 sm:p-6">
-          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'overview' ? (
+          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'payments_credits' ? (<ContactPaymentsCredits contactId={contact.id} />) : activeTab === 'overview' ? (
             <div className="space-y-4">
               {/* Quick Actions */}
               <div className="pb-3 border-b border-gray-200">
@@ -2106,7 +2107,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                     <p className="text-xs text-gray-500">Tax Status</p>
                     {(contact as any).is_tax_exempt ? (
                       <div>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Exempt</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-red-800">Exempt</span>
                         {(contact as any).tax_exemption_reason && (
                           <p className="text-xs text-gray-700 mt-1">{(contact as any).tax_exemption_reason}</p>
                         )}
@@ -2435,8 +2436,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
             )}
           </div>
 
-          {/* Account Credits */}
-          <ContactAccountCredits contactId={contact.id} />
+
 
           {/* Mentions & Hashtags */}
           <div className="border-t border-gray-200 pt-6">
@@ -3407,7 +3407,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
         <DollarSign className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-green-600" />
         Account Credits
         {totalAvailable > 0 && (
-          <span className="ml-auto text-sm font-semibold text-green-700 normal-case tracking-normal">
+          <span className="ml-auto text-sm font-semibold text-red-700 font-bold normal-case tracking-normal">
             ${fmt(totalAvailable)} available
           </span>
         )}
@@ -3449,7 +3449,7 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
                 )}
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-base font-bold text-green-700">${fmt(credit.amount)}</div>
+                <div className="text-base font-bold text-red-700">${fmt(credit.amount)}</div>
                 <div className="text-xs text-gray-400">original</div>
               </div>
             </div>
@@ -3492,4 +3492,51 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
       </div>
     </div>
   );
+}
+
+
+function ContactPaymentsCredits({ contactId }: { contactId: string }) {
+  const [payments, setPayments] = useState<Array<{id: string; invoice_id: string; amount: number; payment_date: string; payment_method: string | null; reference_number: string | null}>>([]);
+  const [invoices, setInvoices] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(false);
+      const inv = await supabase.from('invoices').select('id, invoice_number').eq('contact_id', contactId);
+      if (cancelled) return;
+      if (inv.error) { setError(true); setLoading(false); return; }
+      const rows = inv.data || [];
+      setInvoices(Object.fromEntries(rows.map(row => [row.id, row.invoice_number])));
+      if (!rows.length) { setPayments([]); setLoading(false); return; }
+      const result = await supabase.from('invoice_payments')
+        .select('id, invoice_id, amount, payment_date, payment_method, reference_number')
+        .in('invoice_id', rows.map(row => row.id))
+        .order('payment_date', { ascending: false });
+      if (cancelled) return;
+      if (result.error) setError(true);
+      else setPayments(result.data || []);
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [contactId]);
+  return <div className="space-y-6">
+    <ContactAccountCredits contactId={contactId} />
+    <section className="border-t border-gray-200 pt-5">
+      <h3 className="font-semibold text-gray-900 mb-3">Payment History</h3>
+      {loading ? <p className="text-sm text-gray-500">Loading payments…</p>
+        : error ? <p role="alert" className="text-sm text-red-700">Unable to load payment history.</p>
+        : payments.length === 0 ? <p className="text-sm text-gray-500">No invoice payments recorded.</p>
+        : <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+          {payments.map(payment => <div key={payment.id} className="p-3 flex flex-wrap items-center justify-between gap-2">
+            <div><div className="text-sm font-medium text-gray-900">{new Date(payment.payment_date + 'T12:00:00').toLocaleDateString()} · Invoice #{invoices[payment.invoice_id] || '—'}</div>
+              <div className="text-xs text-gray-500">{payment.payment_method || 'Payment'}{payment.reference_number ? ` · ${payment.reference_number}` : ''}</div></div>
+            <strong className="text-sm text-gray-900">{formatCurrency(Number(payment.amount))}</strong>
+          </div>)}
+        </div>}
+    </section>
+  </div>;
 }
