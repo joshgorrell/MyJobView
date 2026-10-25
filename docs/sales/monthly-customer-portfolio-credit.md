@@ -47,3 +47,12 @@ This is a performance-credit metric, **not** a commission calculation. Never der
 
 ## Merge dependency
 PR #255 and PR #256 are separate UI changes. This ledger/permission work must be implemented, tested and reconciled with both before the combined monthly competition is called complete.
+
+## Admin void after deposit — approved business rule (2026-10-25)
+- Company policy: no cash refunds. If a customer cancels after a deposit, only an authorized admin may void the original Sales Order and retain the funds as **unapplied customer credit**; ordinary users cannot cancel the funded order.
+- Voiding the Sales Order posts a **full negative sales-performance reversal** against the original credited salesperson, in the void month. Preserve original sale and reversal as immutable, linked events; never silently delete history.
+- Unapplied customer credit, retained deposit, or movement of funds into customer credit **never creates sales-performance credit**. No partial Sales Order cancellation.
+- New qualifying service/retail invoices or approved Sales Orders earn fresh sales-performance credit according to their own attribution and posting rules, even when settled using existing customer credit. Do not double-count project invoices.
+- Applying existing customer credit is **not new cash received** and must not itself trigger another funds-received commission. Any prior commission paid on the original deposit must be handled explicitly under the separate commission policy; never infer commission from sales-performance reversals.
+- Require reason, authorization, accounting linkage, customer-credit balance reconciliation, idempotent void handling, and audit trail. Do not implement an automatic cash refund.
+- Before implementation verify existing Sales Order void statuses, deposit/payment allocation and customer-credit accounting schema. Never equate marking an order void with successfully transferring the deposit to customer credit.
