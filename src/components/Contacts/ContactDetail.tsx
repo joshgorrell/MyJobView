@@ -3497,10 +3497,19 @@ function ContactPaymentsCredits({ contactId }: { contactId: string }) {
     async function load() {
       setLoading(true);
       setError(false);
-      const inv = await supabase.from('invoices').select('id, invoice_number').eq('contact_id', contactId);
-      if (cancelled) return;
-      if (inv.error) { setError(true); setLoading(false); return; }
-      const rows = inv.data || [];
+      const rows: Array<{ id: string; invoice_number: string }> = [];
+      for (let page = 0; ; page += 1) {
+        const inv = await supabase.from('invoices')
+          .select('id, invoice_number')
+          .eq('contact_id', contactId)
+          .order('id', { ascending: true })
+          .range(page * 500, page * 500 + 499);
+        if (cancelled) return;
+        if (inv.error) { setError(true); setLoading(false); return; }
+        const batch = inv.data || [];
+        rows.push(...batch);
+        if (batch.length < 500) break;
+      }
       setInvoices(Object.fromEntries(rows.map(row => [row.id, row.invoice_number])));
       if (!rows.length) { setPayments([]); setLoading(false); return; }
       // Supabase PostgREST limits IN-list size and returns at most 1,000 rows
