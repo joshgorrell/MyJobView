@@ -3503,13 +3503,29 @@ function ContactPaymentsCredits({ contactId }: { contactId: string }) {
       const rows = inv.data || [];
       setInvoices(Object.fromEntries(rows.map(row => [row.id, row.invoice_number])));
       if (!rows.length) { setPayments([]); setLoading(false); return; }
-      const result = await supabase.from('payments')
-        .select('id, invoice_id, amount, payment_date, payment_method, reference_number')
-        .in('invoice_id', rows.map(row => row.id))
-        .order('payment_date', { ascending: false });
+      // Supabase PostgREST limits IN-list size and returns at most 1,000 rows
+      // by default. Fetch in bounded batches so older payments aren't hidden.
+      const invoiceIds = rows.map(row => row.id);
+      const allPayments: typeof payments = [];
+      for (let offset = 0; offset < invoiceIds.length; offset += 100) {
+        const ids = invoiceIds.slice(offset, offset + 100);
+        for (let page = 0; ; page += 1) {
+          const result = await supabase.from('payments')
+            .select('id, invoice_id, amount, payment_date, payment_method, reference_number')
+            .in('invoice_id', ids)
+            .order('payment_date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(page * 500, page * 500 + 499);
+          if (cancelled) return;
+          if (result.error) { setError(true); setLoading(false); return; }
+          const batch = result.data || [];
+          allPayments.push(...batch);
+          if (batch.length < 500) break;
+        }
+      }
       if (cancelled) return;
-      if (result.error) setError(true);
-      else setPayments(result.data || []);
+      allPayments.sort((a, b) => b.payment_date.localeCompare(a.payment_date) || b.id.localeCompare(a.id));
+      setPayments(allPayments);
       setLoading(false);
     }
     load();
