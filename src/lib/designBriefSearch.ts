@@ -15,7 +15,7 @@ export async function searchBriefCustomers(client: SupabaseClient, organizationI
   const contactFields = ['full_name', 'contact_name', 'first_name', 'last_name', 'company_name'];
   const leadFields = ['contact_name', 'company_name'];
   let contactsQuery = client.from('contacts')
-    .select('id, contact_name, first_name, last_name, full_name, company_name, city, state, contact_type, is_prospect, tax_rate, tax_environment, tax_project_type')
+    .select('id, contact_name, first_name, last_name, full_name, company_name, city, state, contact_type, is_prospect')
     .eq('organization_id', organizationId);
   let leadsQuery = client.from('leads').select('id, contact_name, company_name')
     .eq('organization_id', organizationId);
