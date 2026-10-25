@@ -1,5 +1,6 @@
 -- Booked Sales Order credit posting. Preserve attribution at the booking event.
--- Do not credit drafts/planning or cancelled/voided orders.
+-- Customer commitment is a sale even when deposit, PO or installation is pending.
+-- Payment receipt never controls sales-credit timing.
 CREATE OR REPLACE FUNCTION public.capture_booked_sales_order_credit()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -11,8 +12,9 @@ DECLARE
   v_rep uuid;
   v_booked timestamptz;
 BEGIN
-  IF lower(COALESCE(NEW.status,'')) NOT IN ('active','complete','closed')
-     OR (TG_OP='UPDATE' AND lower(COALESCE(OLD.status,'')) IN ('active','complete','closed')) THEN
+  IF lower(COALESCE(NEW.status,'')) NOT IN ('pending_deposit','pending_po','planning','active','complete','closed')
+     OR (TG_OP='UPDATE' AND lower(COALESCE(OLD.status,'')) IN ('pending_deposit','pending_po','planning','active','complete','closed'))
+     OR NEW.proposal_id IS NULL THEN
     RETURN NEW;
   END IF;
 
@@ -33,7 +35,13 @@ BEGIN
     SELECT 1 FROM public.profiles p WHERE p.id=v_rep
       AND p.organization_id=v_org AND p.is_sales_rep=true
   ) THEN v_rep:=NULL; END IF;
-  v_booked := COALESCE(NEW.booked_at, NEW.created_at, now());
+  -- A linked approved proposal provides the commitment signal. An unlinked
+  -- manually entered planning order is not automatically treated as sold.
+  IF NOT EXISTS (SELECT 1 FROM public.proposals p WHERE p.id=NEW.proposal_id
+                 AND lower(COALESCE(p.status,'')) IN ('approved','accepted')) THEN
+    RETURN NEW;
+  END IF;
+  v_booked := COALESCE(NEW.booked_at, now());
 
   -- Initial booking only. Corrections/reversals are intentionally handled by
   -- the later adjustment engine, not by mutating the original credited event.
@@ -55,7 +63,7 @@ REVOKE ALL ON FUNCTION public.capture_booked_sales_order_credit() FROM PUBLIC, a
 
 DROP TRIGGER IF EXISTS capture_booked_sales_order_credit ON public.sales_orders;
 CREATE TRIGGER capture_booked_sales_order_credit
-AFTER INSERT OR UPDATE OF status ON public.sales_orders
+AFTER INSERT OR UPDATE OF status, proposal_id ON public.sales_orders
 FOR EACH ROW EXECUTE FUNCTION public.capture_booked_sales_order_credit();
 
 -- No automatic historical backfill: old records require status/date audit.
