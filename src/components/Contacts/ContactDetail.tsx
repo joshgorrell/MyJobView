@@ -3368,7 +3368,8 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
     async function load() {
       setLoading(true);
       try {
-        const { data } = await supabase
+        setLoadError(false);
+        const { data, error } = await supabase
           .from('customer_account_credits')
           .select(`
             id, amount, amount_applied, amount_remaining, status, notes, created_at,
@@ -3378,8 +3379,10 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
           `)
           .eq('contact_id', contactId)
           .order('created_at', { ascending: false }).overrideTypes<AccountCredit[], { merge: false }>();
+        if (error) throw error;
         setCredits((data as AccountCredit[]) || []);
       } catch {
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -3387,11 +3390,12 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
     load();
   }, [contactId]);
 
-  if (loading) return null;
+  if (loading) return <p className="text-sm text-gray-500">Loading customer credits…</p>;
+  if (loadError) return <p role="alert" className="text-sm text-red-700">Unable to load customer credits.</p>;
 
-  const openCredits = credits.filter(c => c.status === 'open');
-  const otherCredits = credits.filter(c => c.status !== 'open');
-  const totalAvailable = openCredits.reduce((s, c) => s + (c.amount_remaining || 0), 0);
+  const openCredits = credits.filter(c => c.status === 'open' && Number(c.amount_remaining) > 0);
+  const otherCredits = credits.filter(c => c.status !== 'open' || Number(c.amount_remaining) <= 0);
+  const totalAvailable = openCredits.reduce((sum, credit) => sum + Number(credit.amount_remaining || 0), 0);
 
   if (credits.length === 0) return <section className="border-t border-gray-200 pt-6"><h3 className="text-sm font-semibold text-gray-900">Credit History</h3><p className="text-sm text-gray-500 mt-2">No customer credits recorded.</p></section>;
 
@@ -3511,7 +3515,7 @@ function ContactPaymentsCredits({ contactId }: { contactId: string }) {
       const rows = inv.data || [];
       setInvoices(Object.fromEntries(rows.map(row => [row.id, row.invoice_number])));
       if (!rows.length) { setPayments([]); setLoading(false); return; }
-      const result = await supabase.from('invoice_payments')
+      const result = await supabase.from('payments')
         .select('id, invoice_id, amount, payment_date, payment_method, reference_number')
         .in('invoice_id', rows.map(row => row.id))
         .order('payment_date', { ascending: false });
