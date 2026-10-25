@@ -1,0 +1,64 @@
+name: Repair Expo SDK 54 mobile dependencies
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/ios-expo54-upgrade-20261023
+    paths:
+      - .github/workflows/repair-expo54-mobile.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-expo54-mobile
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'joshgorrell/MyJobView' && github.ref == 'refs/heads/fix/ios-expo54-upgrade-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Align Expo SDK 54 packages and regenerate lockfile
+        working-directory: mobile
+        run: |
+          npm install --no-audit --no-fund
+          CI=1 npx expo install --fix --npm
+          npm install --package-lock-only --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          CI=1 npx expo-doctor
+      - name: Verify package and lockfile root consistency
+        working-directory: mobile
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8')).packages[''];
+          for (const key of ['dependencies', 'devDependencies']) {
+            for (const [name, version] of Object.entries(pkg[key] || {})) {
+              if (lock[key]?.[name] !== version) throw new Error(`${key} mismatch: ${name}`);
+            }
+          }
+          console.log('Package manifest and lockfile root are aligned.');
+          NODE
+      - name: Commit verified dependency changes to PR branch
+        run: |
+          git add mobile/package.json mobile/package-lock.json
+          if git diff --cached --quiet; then
+            echo 'No dependency changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(mobile): align Expo SDK 54 dependencies and lockfile'
+          git push origin HEAD:fix/ios-expo54-upgrade-20261023
