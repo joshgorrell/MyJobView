@@ -1026,8 +1026,8 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                 }`}
               >
                 <CalendarClock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Logout Schedule</span>
-                <span className="sm:hidden">Schedule</span>
+                <span className="hidden sm:inline">Session Security</span>
+                <span className="sm:hidden">Security</span>
                 {schedule?.enabled && (
                   <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-green-400" />
                 )}
@@ -1777,8 +1777,8 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                   <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
                     <div className="text-sm text-blue-800">
-                      <p className="font-medium mb-1">How scheduled logout works</p>
-                      <p>When enabled, all user sessions will be forcibly terminated at the configured time each day. This revokes active authentication tokens so users must log back in. Useful for enforcing end-of-day security policies or daily session resets.</p>
+                      <p className="font-medium mb-1">Legacy daily logout (read-only)</p>
+                      <p>The legacy midnight schedule is being retired in a coordinated rollout of the 60-minute MJV inactivity policy. These legacy settings are read-only and cannot be re-enabled from this page. Manual administrator logout remains available below.</p>
                     </div>
                   </div>
 
@@ -1786,7 +1786,7 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                     <div className="space-y-5">
                       <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                         <Settings className="w-4 h-4 text-gray-500" />
-                        Schedule Configuration
+                        Legacy Schedule Configuration
                       </h3>
 
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -1795,6 +1795,8 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                           <p className="text-sm text-gray-500 mt-0.5">Automatically log out all users at the scheduled time</p>
                         </div>
                         <button
+                          disabled
+                          aria-label="Legacy daily logout is read-only"
                           onClick={() => setEditEnabled(!editEnabled)}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
                         >
@@ -1807,6 +1809,7 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                         <input
                           type="time"
                           value={editTime}
+                          disabled
                           onChange={(e) => setEditTime(e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
@@ -1821,6 +1824,7 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                         <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
                         <select
                           value={editTimezone}
+                          disabled
                           onChange={(e) => setEditTimezone(e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         >
@@ -1836,6 +1840,7 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
                         <input
                           type="text"
                           value={editLabel}
+                          disabled
                           onChange={(e) => setEditLabel(e.target.value)}
                           placeholder="e.g. End of business day logout"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
@@ -1858,13 +1863,13 @@ export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?:
 
                       <button
                         onClick={saveSchedule}
-                        disabled={scheduleSaving}
+                        disabled
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
                       >
                         {scheduleSaving ? (
                           <><RotateCcw className="w-4 h-4 animate-spin" /> Saving...</>
                         ) : (
-                          <><CheckCircle className="w-4 h-4" /> Save Schedule</>
+                          <><CheckCircle className="w-4 h-4" /> Read-only Legacy Schedule</>
                         )}
                       </button>
                     </div>

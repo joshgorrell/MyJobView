@@ -2,6 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { MapPin, Plus, Edit2, Trash2, Save, X, Home, Building2, Wifi, Coffee, Shield, Smartphone } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -17,6 +18,8 @@ interface IPNickname {
   session_count: number;
   total_time_seconds: number;
   is_trusted: boolean;
+  organization_id: string;
+  location_classification: 'office' | 'remote' | 'unknown';
 }
 
 const PRESET_NICKNAMES = [
@@ -39,6 +42,7 @@ const ICON_MAP: { [key: string]: any } = {
 };
 
 export function IPNicknameManager() {
+  const { profile } = useAuth();
   const [ipNicknames, setIpNicknames] = useState<IPNickname[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,17 +55,20 @@ export function IPNicknameManager() {
     color: '#3B82F6',
     icon: 'map-pin',
     is_trusted: true,
+    location_classification: 'unknown' as 'office' | 'remote' | 'unknown',
   });
 
   useEffect(() => {
     loadIPNicknames();
-  }, []);
+  }, [profile?.organization_id]);
 
   async function loadIPNicknames() {
     try {
+      if (!profile?.organization_id) return;
       const { data, error } = await supabase
         .from('ip_nicknames')
         .select('*')
+        .eq('organization_id', profile.organization_id)
         .order('last_seen', { ascending: false });
 
       if (error) throw error;
@@ -75,6 +82,7 @@ export function IPNicknameManager() {
 
   async function handleSave() {
     try {
+      if (!profile?.organization_id) throw new Error('Organization unavailable');
       if (editingId) {
         const { error } = await supabase
           .from('ip_nicknames')
@@ -84,20 +92,24 @@ export function IPNicknameManager() {
             color: formData.color,
             icon: formData.icon,
             is_trusted: formData.is_trusted,
+            location_classification: formData.location_classification,
           })
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .eq('organization_id', profile.organization_id);
 
         if (error) throw error;
       } else if (addingNew) {
         const { error } = await supabase
           .from('ip_nicknames')
           .insert({
+            organization_id: profile.organization_id,
             ip_address: formData.ip_address,
             nickname: formData.nickname,
             description: formData.description,
             color: formData.color,
             icon: formData.icon,
             is_trusted: formData.is_trusted,
+            location_classification: formData.location_classification,
           });
 
         if (error) throw error;
@@ -115,10 +127,12 @@ export function IPNicknameManager() {
 
   async function handleDelete(id: string) {
     try {
+      if (!profile?.organization_id) throw new Error('Organization unavailable');
       const { error } = await supabase
         .from('ip_nicknames')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', profile.organization_id);
 
       if (error) throw error;
       loadIPNicknames();
@@ -137,6 +151,7 @@ export function IPNicknameManager() {
       color: ipNickname.color,
       icon: ipNickname.icon,
       is_trusted: ipNickname.is_trusted,
+      location_classification: ipNickname.location_classification || 'unknown',
     });
   }
 
@@ -159,6 +174,7 @@ export function IPNicknameManager() {
       color: '#3B82F6',
       icon: 'map-pin',
       is_trusted: true,
+      location_classification: 'unknown',
     });
   }
 
@@ -268,6 +284,11 @@ export function IPNicknameManager() {
               />
             </div>
 
+            <label className="block text-sm font-medium text-gray-700">Network classification
+              <select value={formData.location_classification} onChange={e => setFormData({ ...formData, location_classification: e.target.value as 'office' | 'remote' | 'unknown' })} className="mt-1 block w-full rounded border border-gray-300 p-2">
+                <option value="unknown">Unknown</option><option value="office">Office</option><option value="remote">Remote</option>
+              </select>
+            </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -375,7 +396,12 @@ export function IPNicknameManager() {
                               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
                               placeholder="Description"
                             />
-                            <div className="flex items-center gap-2">
+                            <label className="block text-sm">Network classification
+              <select value={formData.location_classification} onChange={e => setFormData({ ...formData, location_classification: e.target.value as 'office' | 'remote' | 'unknown' })} className="ml-2 rounded border p-2">
+                <option value="unknown">Unknown</option><option value="office">Office</option><option value="remote">Remote</option>
+              </select>
+            </label>
+            <div className="flex items-center gap-2">
                               <input
                                 type="color"
                                 value={formData.color}

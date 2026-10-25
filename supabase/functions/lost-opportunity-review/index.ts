@@ -401,6 +401,13 @@ Deno.serve(async (req) => {
       if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
       if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
 
+      // The owner variant represents Josh personally and cannot be sent under
+      // his identity by other administrators or staff with review permissions.
+      if (b.variant === "owner" &&
+          (!isAdmin || user.email?.trim().toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the owner may send the owner follow-up." }, 403);
+      }
+
       const mode = b.recipient_mode || (b.proposal_id ? "proposal" : b.contact_id ? "customer" : "manual");
       if (!["proposal", "customer", "manual"].includes(mode)) return json({ error: "Choose a recipient." }, 400);
       let proposal: any = null;
