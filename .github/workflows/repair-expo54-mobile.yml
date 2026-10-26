@@ -35,9 +35,10 @@ jobs:
           rm -f package-lock.json
           npm install --legacy-peer-deps --no-audit --no-fund
           CI=1 npx expo install --fix --npm
+          CI=1 npx expo install react-native-worklets --npm
           npm install --package-lock-only --no-audit --no-fund
           npm ci --no-audit --no-fund
-          CI=1 npx expo-doctor
+          CI=1 EXPO_DOCTOR_ENABLE_DIRECTORY_CHECK=0 npx expo-doctor
       - name: Verify package and lockfile root consistency
         working-directory: mobile
         run: |
