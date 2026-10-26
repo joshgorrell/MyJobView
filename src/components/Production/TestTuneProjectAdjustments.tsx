@@ -108,7 +108,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
               <td className="max-w-[520px] p-3 align-top">
                 <div className="relative">
                   <button type="button" aria-label={`Preview ${description}`} className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
-                  <div role="tooltip" className="pointer-events-none invisible absolute left-0 top-full z-30 mt-2 w-[min(360px,80vw)] rounded-lg border border-subtle bg-surface p-4 text-sm text-primary opacity-0 shadow-xl transition-opacity delay-300 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                  <div role="tooltip" className="pointer-events-auto invisible absolute left-0 top-full z-30 mt-2 w-[min(360px,80vw)] rounded-lg border border-subtle bg-surface p-4 text-sm text-primary opacity-0 shadow-xl transition-opacity delay-300 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
                     <p className="font-semibold">{t.title}</p><p className="mt-1 break-words">{description}</p>
                     {Boolean(t.photos?.length) && <div className="mt-2"><SupportPhotos paths={t.photos || []} /></div>}
                     <p className="mt-2 text-xs text-muted">{p.customer} · {p.name}</p>
