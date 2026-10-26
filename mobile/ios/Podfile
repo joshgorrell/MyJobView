@@ -57,6 +57,17 @@ target 'MyJobView' do
       end
     end
 
+    # Xcode 26's Clang rejects compile-time fmt format strings in this
+    # React Native dependency. Use fmt's runtime formatting path for this pod.
+    installer.pods_project.targets.each do |pod_target|
+      next unless pod_target.name == 'fmt'
+      pod_target.build_configurations.each do |build_config|
+        definitions = build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+        definitions = definitions.split(' ') if definitions.is_a?(String)
+        build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = (definitions + ['FMT_USE_CONSTEVAL=0']).uniq
+      end
+    end
+
     # This is necessary for Xcode 14, because it signs resource bundles by default
     # when building for devices.
     installer.target_installation_results.pod_target_installation_results
