@@ -32,7 +32,8 @@ jobs:
       - name: Align Expo SDK 54 packages and regenerate lockfile
         working-directory: mobile
         run: |
-          npm install --no-audit --no-fund
+          rm -f package-lock.json
+          npm install --package-lock-only --legacy-peer-deps --no-audit --no-fund
           CI=1 npx expo install --fix --npm
           npm install --package-lock-only --no-audit --no-fund
           npm ci --no-audit --no-fund
