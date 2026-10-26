@@ -270,3 +270,6 @@
 }
 .workspace-shell:has(main > .flow-workspace.flow-messaging) { height:100dvh; min-height:0; }
 .workspace-shell main:has(> .flow-workspace.flow-messaging) { overflow:hidden; }
+
+.conversation-start { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; max-width:680px; margin-inline:auto; width:100%; overflow:hidden; }
+.flow-messaging .flow-content > .flow-message-filters { padding-bottom:6px; }

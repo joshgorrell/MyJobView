@@ -10,8 +10,8 @@ import { coworkerRecipientKey, sendCoworkerReply } from './coworkerConversations
 import { parseHashtags, resolveMentions } from '../../lib/username';
 
 type Recipient = { id: string; name: string };
-export function NewTeamMessage({ scope, threads, canTeam, canCustomer, onCustomer, onClose, onSent }: {
-  scope: FlowScope; threads: EnrichedThread[]; canTeam: boolean; canCustomer: boolean;
+export function NewTeamMessage({ inline = false, scope, threads, canTeam, canCustomer, onCustomer, onClose, onSent }: {
+  inline?: boolean; scope: FlowScope; threads: EnrichedThread[]; canTeam: boolean; canCustomer: boolean;
   onCustomer: () => void; onClose: () => void; onSent: (id: string) => Promise<void>;
 }) {
   const { profile } = useAuth();
@@ -82,8 +82,7 @@ export function NewTeamMessage({ scope, threads, canTeam, canCustomer, onCustome
       await onSent(sentId);
     } else { busy.current = false; setSending(false); }
   }
-  return createPortal(<QuickActionModal title="New message" icon={<MessageSquare className="w-5 h-5" />} onClose={() => { if (!busy.current) onClose(); }} scrollBody={false}>
-    <form onSubmit={send} className="team-message-form flex min-h-0 flex-1 flex-col text-primary">
+  const form = <form onSubmit={send} className="team-message-form flex min-h-0 flex-1 flex-col text-primary">
       <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Message recipients">
           {canTeam && (['direct', 'department', 'company'] as const).map(value => <button key={value} type="button" aria-pressed={kind === value} disabled={sending} onClick={() => { setKind(value); setSelected([]); setSearch(''); }} className={`min-h-11 rounded-lg px-3 text-sm ${kind === value ? 'bg-blue-600 text-white' : 'bg-elevated text-primary'}`}>{value === 'direct' ? 'People' : value === 'department' ? 'Departments' : 'Everyone'}</button>)}
@@ -91,17 +90,18 @@ export function NewTeamMessage({ scope, threads, canTeam, canCustomer, onCustome
         </div>
         {canTeam && kind !== 'company' && <>
           <label className="block text-sm font-medium" htmlFor="team-recipient-search">To</label>
-          <input id="team-recipient-search" autoFocus type="search" value={search} disabled={sending} onChange={e => setSearch(e.target.value)} placeholder={kind === 'direct' ? 'Search people by name…' : 'Search departments…'} className="w-full rounded-lg border border-subtle bg-canvas p-2 text-base" />
+          <input id="team-recipient-search" autoFocus={!inline} type="search" value={search} disabled={sending} onChange={e => setSearch(e.target.value)} placeholder={kind === 'direct' ? 'Search people by name…' : 'Search departments…'} className="w-full rounded-lg border border-subtle bg-canvas p-2 text-base" />
           {!!selected.length && <div className="flex flex-wrap gap-2">{selected.map(p => <button type="button" key={p.id} disabled={sending} onClick={() => setSelected(selected.filter(r => r.id !== p.id))} aria-label={`Remove ${p.name}`} className="rounded-full bg-blue-100 px-3 py-2 text-sm text-blue-800">{p.name} ×</button>)}</div>}
-          <div className="max-h-36 overflow-y-auto rounded-lg border border-subtle" aria-label="Recipient results">
+          {(!inline || !selected.length || !!search) && <div className="max-h-36 overflow-y-auto rounded-lg border border-subtle" aria-label="Recipient results">
             {loading ? <p className="p-3 text-sm">Loading recipients…</p> : choices.length ? choices.map(p => <button type="button" key={p.id} disabled={sending} aria-pressed={selected.some(r => r.id === p.id)} onClick={() => { setSelected(kind === 'department' ? [p] : selected.some(r => r.id === p.id) ? selected.filter(r => r.id !== p.id) : [...selected, p]); }} className={`block w-full min-h-11 px-3 py-2 text-left text-sm ${selected.some(r => r.id === p.id) ? 'bg-blue-100 text-blue-800' : 'hover:bg-elevated'}`}>{p.name}</button>) : <p className="p-3 text-sm text-secondary">No matching recipients.</p>}
-          </div>
+          </div>}
         </>}
         {canTeam && kind === 'company' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">This message will be visible to everyone in the company with Flow access.</p>}
         {canTeam && <label className="block text-sm font-medium">Message<textarea value={body} disabled={sending} onChange={e => setBody(e.target.value)} rows={3} placeholder="Type your message…" className="mt-2 block w-full resize-none rounded-lg border border-subtle bg-canvas p-3 text-base" /></label>}
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       </div>
       {canTeam && <div className="shrink-0 border-t border-subtle p-3 flex justify-end"><button type="submit" disabled={sending || loading || !body.trim() || (kind !== 'company' && !selected.length)} className="flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-white disabled:opacity-50"><Send size={18} />{sending ? 'Sending…' : 'Send'}</button></div>}
-    </form>
-  </QuickActionModal>, document.body);
+    </form>;
+  if (inline) return form;
+  return createPortal(<QuickActionModal title="New message" icon={<MessageSquare className="w-5 h-5" />} onClose={() => { if (!busy.current) onClose(); }} scrollBody={false}>{form}</QuickActionModal>, document.body);
 }

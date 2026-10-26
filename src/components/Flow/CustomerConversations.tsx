@@ -193,6 +193,7 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
 
   const loadThreads = useCallback(async () => {
     if (!profile?.organization_id) {
+      setLoadError('Your company could not be identified. Reload the page to try again.');
       setLoading(false);
       return;
     }
@@ -331,7 +332,7 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
       return enriched;
     } catch (error) {
       console.error('Error loading threads:', error);
-      if (version === loadVersion.current) { setLoadError('Unable to load conversations. Please try again.'); setThreads([]); }
+      if (version === loadVersion.current) { setLoadError('Unable to load conversations. Please try again.'); }
     } finally {
       if (version === loadVersion.current) setLoading(false);
     }
@@ -642,6 +643,26 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
     return matchesSearch;
   });
 
+  async function openSentTeamMessage(id: string) {
+    setShowTeamComposer(false); setSearchQuery('');
+    const loaded = await loadThreads();
+    const thread = loaded?.find(t => t.source === 'coworker' && (t.id === id || t.root_ids?.includes(id)));
+    if (thread) {
+      followLatest.current = true;
+      setSelectedThread(thread);
+      if (activeThreadId.current === thread.id) await loadMessages(thread.id, thread.source);
+    }
+  }
+  // Only select automatically on a wide inbox. Narrow screens start with the list.
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (loading || loadError || selectedThread || openThreadId || autoSelected.current) return;
+    if (filteredThreads.length && (conversationSize.ref.current?.clientWidth || 0) > 700) {
+      autoSelected.current = true;
+      setSelectedThread(filteredThreads[0]);
+    }
+  }, [loading, loadError, threads, selectedThread, openThreadId, conversationType, unreadOnly]);
+
   const stats = {
     total: threads.length,
     unanswered: threads.filter(t => t.source !== 'coworker' && !!t.last_customer_message_at && (!t.last_rep_response_at || t.last_customer_message_at > t.last_rep_response_at)).length,
@@ -685,6 +706,13 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
       </div>}
 
       <div ref={conversationSize.ref} style={fitScreen ? undefined : { height: conversationSize.height }} className={`conversation-workspace ${selectedThread ? 'conversation-workspace--selected' : ''} min-h-0 min-w-0 flex gap-2`}>
+        {threads.length === 0 ? <div className="conversation-start bg-surface rounded-lg border border-subtle">
+          {loadError ? <div className="p-5 text-center"><h2 className="text-lg font-semibold">Conversations are unavailable</h2><p className="mt-2 text-sm text-secondary">Try loading your messages again.</p><button type="button" onClick={() => void loadThreads()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Reload conversations</button></div> : <>
+            <div className="shrink-0 px-4 pt-4"><h2 className="text-lg font-semibold text-primary">Start a conversation</h2><p className="mt-1 text-sm text-secondary">{includeCoworkers ? 'Choose a person or department, then write your message.' : 'Start a customer conversation.'}</p></div>
+            {!showTeamComposer && !showNewThread && <NewTeamMessage inline scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={includeCoworkers} canCustomer={includeCustomers}
+              onClose={() => {}} onCustomer={() => setShowNewThread(true)} onSent={openSentTeamMessage} />}
+          </>}
+        </div> : <>
         {/* Threads List */}
         <div className={`conversation-list flex min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
           <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
@@ -747,7 +775,8 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
             {filteredThreads.length === 0 ? (
               <div className="p-6 text-center text-secondary">
                 <MessageSquare className="w-10 h-10 mx-auto mb-2 text-muted" />
-                <p className="text-sm">No message threads found</p>
+                <p className="text-sm">{searchQuery ? 'No conversations match your search.' : unreadOnly ? 'You’re caught up. No unread conversations.' : 'No conversations in this view.'}</p>
+                {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Clear search</button>}
               </div>
             ) : (
               <div className="divide-y divide-border-subtle">
@@ -1095,25 +1124,18 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
             <div className="flex-1 flex items-center justify-center text-secondary">
               <div className="text-center">
                 <MessageSquare className="w-14 h-14 mx-auto mb-3 text-muted" />
-                <p className="text-sm">Select a thread to view messages</p>
+                <p className="text-sm">{filteredThreads.length ? 'Open a conversation or start a new message.' : searchQuery ? 'Try another name or clear your search.' : 'Start a new message to keep the conversation going.'}</p>
+                <button type="button" onClick={() => setShowTeamComposer(true)} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Start a new message</button>
               </div>
             </div>
           )}
         </div>
+        </>}
       </div>
 
       {showTeamComposer && <NewTeamMessage scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={includeCoworkers} canCustomer={includeCustomers}
         onClose={() => setShowTeamComposer(false)} onCustomer={() => { setShowTeamComposer(false); setShowNewThread(true); }}
-        onSent={async id => {
-          setShowTeamComposer(false); setSearchQuery('');
-          const loaded = await loadThreads();
-          const thread = loaded?.find(t => t.source === 'coworker' && (t.id === id || t.root_ids?.includes(id)));
-          if (thread) {
-            followLatest.current = true;
-            setSelectedThread(thread);
-            if (activeThreadId.current === thread.id) await loadMessages(thread.id, thread.source);
-          }
-        }} />}
+        onSent={openSentTeamMessage} />}
       {/* New Thread Modal */}
       {showNewThread && (
         <QuickActionModal title="New Message" subtitle="Start a customer conversation or add an internal customer note"
