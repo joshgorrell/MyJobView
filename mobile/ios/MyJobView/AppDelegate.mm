@@ -27,12 +27,9 @@
   }
 
   self.window = reactWindow;
-  if (reactWindow.rootViewController == nil) {
-    UIViewController *rootViewController = [appDelegate createRootViewController];
-    if (rootViewController != nil) {
-      reactWindow.rootViewController = rootViewController;
-    }
-  }
+  // React Native root controller must be initialized by the Expo factory.
+  // Do not invoke createRootViewController here: the legacy wrapper may
+  // have no bound factory at scene connection time.
   [reactWindow makeKeyAndVisible];
 }
 
