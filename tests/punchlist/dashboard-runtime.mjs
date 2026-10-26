@@ -24,10 +24,10 @@ function harness(path, globals = {}, imports = {}) {
 function nodes(tree) { if (!tree || typeof tree !== 'object') return []; if (Array.isArray(tree)) return tree.flatMap(nodes); return [tree,...nodes(tree.props?.children)]; }
 function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); if (!tree || typeof tree !== 'object') return tree == null ? '' : String(tree); return text(tree.props?.children); }
 
-const projects=[{id:'p1',contact_id:'c1',customer:'Alpha',name:'Living room',number:'P1',can_submit:true,end_date:'2026-12-01',tasks:['a','b','c','d','e'].map(id=>({id,title:id,customer_description:id,visibility:'customer_visible',status:'open',request_id:null}))},{id:'p2',contact_id:'c1',customer:'Alpha',name:'Other project',can_submit:true,tasks:[{id:'other',title:'Other project',status:'open',request_id:null}]},{id:'p3',contact_id:'c2',customer:'Expired',name:'Old project',can_submit:false,tasks:[{id:'expired',title:'Expired adjustment',status:'open',request_id:null}]}];
+const projects=[{id:'p1',contact_id:'c1',customer:'Alpha',name:'Living room',number:'P1',can_submit:true,end_date:'2026-12-01',tasks:['a','b','c','d','e'].map(id=>({id,title:id,customer_description:id,visibility:'customer_visible',status:'open',request_id:null,photos:id==='a'?['org/contact/photo.jpg']:[]}))},{id:'p2',contact_id:'c1',customer:'Alpha',name:'Other project',can_submit:true,tasks:[{id:'other',title:'Other project',status:'open',request_id:null}]},{id:'p3',contact_id:'c2',customer:'Expired',name:'Old project',can_submit:false,tasks:[{id:'expired',title:'Expired adjustment',status:'open',request_id:null}]}];
 const calls=[],listeners={};let fail=true;
 const supabase={rpc:async(name,args)=>{if(name==='get_test_tune_workspace')return {data:JSON.parse(JSON.stringify(projects)),error:null};calls.push([name,args]);if(fail){fail=false;return {error:{message:'Network response lost'}};}for(const p of projects)for(const t of p.tasks)if(args.p_task_ids.includes(t.id))t.request_id='req1';return {data:'req1',error:null};},channel:()=>({on(){return this;},subscribe(){return this;}}),removeChannel(){}};
-const window={location:{search:'',href:'https://example.com/test-and-tune'},setInterval:()=>1,clearInterval(){},addEventListener:(n,f)=>listeners[n]=f,removeEventListener(){},history:{pushState(){}}};
+const window={innerWidth:1024,innerHeight:768,location:{search:'',href:'https://example.com/test-and-tune'},setInterval:()=>1,clearInterval(){},addEventListener:(n,f)=>listeners[n]=f,removeEventListener(){},history:{pushState(){}}};
 const document={visibilityState:'visible',addEventListener(){},removeEventListener(){}};
 const globals={window,document,URL,URLSearchParams,crypto:{randomUUID:()=>`submission-${calls.length}`}};
 function make(){return harness('src/components/Production/TestTuneProjectAdjustments.tsx',globals,{'../../lib/supabase':{supabase},'../Shared/SupportPhotos':{SupportPhotos:()=>null}});}
@@ -36,6 +36,14 @@ const render=()=>tree=h.render({},'TestTuneProjectAdjustments');
 const find=label=>nodes(tree).find(n=>n.props?.['aria-label']===label);
 const button=label=>nodes(tree).find(n=>n.type==='button'&&text(n)===label);
 render();for(const effect of h.effects.splice(0))effect();await new Promise(r=>setTimeout(r,0));render();
+const previewTarget={getBoundingClientRect:()=>({left:120,bottom:130})};
+find('Preview a').props.onClick({currentTarget:previewTarget});
+render();
+assert.ok(nodes(tree).some(n=>n.props?.role==='dialog'),'Preview opens as a fixed-position dialog outside the scroll table');
+assert.ok(nodes(tree).some(n=>n.props?.paths?.includes('org/contact/photo.jpg')),'Staff preview receives attached customer photos');
+find('Close punchlist preview').props.onClick();
+render();
+assert.ok(!nodes(tree).some(n=>n.props?.role==='dialog'),'Preview can be dismissed');
 assert.equal(find('Select Expired adjustment').props.disabled,true);
 for(const id of ['a','b','c']){find(`Select ${id}`).props.onChange({target:{checked:true}});render();}
 assert.equal(find('Select Other project').props.disabled,true,'Selection locks to project even for the same customer');
