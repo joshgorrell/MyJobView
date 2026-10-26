@@ -1,0 +1,55 @@
+name: Validate Expo SDK 54 iOS native project
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/ios-expo54-upgrade-20261023
+    paths:
+      - mobile/ios/**
+      - mobile/package.json
+      - mobile/package-lock.json
+      - mobile/app.json
+      - mobile/eas.json
+      - .github/workflows/validate-expo54-ios.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-pods:
+    if: github.repository == 'joshgorrell/MyJobView'
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          pod --version
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify Expo package compatibility
+        run: CI=1 npx expo install --check
+      - name: Install CocoaPods for checked-in iOS project
+        run: |
+          cd ios
+          pod install --repo-update
+      - name: Compile iOS simulator without signing
+        run: |
+          xcodebuild -workspace ios/MyJobView.xcworkspace -scheme MyJobView -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > /tmp/myjobview-ios-build.log 2>&1 || { grep -n -E -C 5 '(^| )error:|fatal error:|file not found|no member named|use of undeclared identifier' /tmp/myjobview-ios-build.log | tail -n 160 || true; tail -n 35 /tmp/myjobview-ios-build.log; exit 1; }
+      - name: Upload iOS build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo54-ios-build-diagnostics
+          path: /tmp/myjobview-ios-build.log
+          if-no-files-found: ignore
