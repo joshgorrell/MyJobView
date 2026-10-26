@@ -7,20 +7,20 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "image": "latest",
+        "image": "macos-sequoia-15.5-xcode-16.4",
         "resourceClass": "m-medium"
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
-        "image": "latest",
+        "image": "macos-sequoia-15.5-xcode-16.4",
         "simulator": true
       }
     },
     "production": {
       "ios": {
-        "image": "latest",
+        "image": "macos-sequoia-15.5-xcode-16.4",
         "resourceClass": "m-medium"
       }
     }
