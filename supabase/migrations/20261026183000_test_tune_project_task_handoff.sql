@@ -12,7 +12,7 @@ BEGIN
      AND (OLD.substantial_completion_date IS NULL OR OLD.substantial_completion_date IS DISTINCT FROM NEW.substantial_completion_date) THEN
     UPDATE public.project_tasks t
        SET is_test_and_tune = true,
-           visibility = 'internal',
+           visibility = 'internal'
      WHERE t.project_id = NEW.id
        AND t.organization_id = NEW.organization_id
        AND t.status = 'open'
@@ -32,7 +32,7 @@ FOR EACH ROW EXECUTE FUNCTION private.handoff_project_punchlist_to_test_tune();
 -- existing Test & Tune items or their public/private visibility.
 UPDATE public.project_tasks t
    SET is_test_and_tune = true,
-       visibility = 'internal',
+       visibility = 'internal'
   FROM public.projects p
  WHERE p.id = t.project_id
    AND p.organization_id = t.organization_id
