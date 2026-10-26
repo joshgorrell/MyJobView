@@ -1,8 +1,8 @@
--- Retain atomic submission receipts and locking while excluding removed drafts.
+-- Preserve the latest atomic request origin classification and reject removed drafts.
 BEGIN;
 CREATE OR REPLACE FUNCTION public.request_project_punchlist_visit(p_project_id uuid,p_task_ids uuid[],p_submission_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE p public.projects; c public.contacts; result uuid; ids uuid[]; portal boolean; receipt public.test_tune_submissions; prior public.service_requests;
+DECLARE p public.projects; c public.contacts; result uuid; ids uuid[]; portal boolean; receipt public.test_tune_submissions; prior public.service_requests; all_tune boolean; any_tune boolean;
 BEGIN
  SELECT * INTO p FROM public.projects WHERE id=p_project_id FOR UPDATE;
  IF p.id IS NULL THEN RAISE EXCEPTION 'Project not found'; END IF;
@@ -26,9 +26,11 @@ BEGIN
  PERFORM 1 FROM public.project_tasks WHERE id=ANY(ids) ORDER BY id FOR UPDATE;
  IF (SELECT count(*) FROM public.project_tasks t WHERE t.id=ANY(ids) AND t.project_id=p.id AND t.organization_id=p.organization_id AND t.status='open' AND t.customer_draft_removed_at IS NULL
  AND (NOT portal OR (t.visibility='customer_visible' AND nullif(btrim(t.customer_description),'') IS NOT NULL)))<>cardinality(ids) THEN RAISE EXCEPTION 'Invalid item selection' USING ERRCODE='42501'; END IF;
+ SELECT bool_and(is_test_and_tune),bool_or(is_test_and_tune) INTO all_tune,any_tune FROM public.project_tasks WHERE id=ANY(ids);
+ IF any_tune AND NOT all_tune THEN RAISE EXCEPTION 'Select Test & Tune adjustments separately from ordinary project scope'; END IF;
  -- Ordinary in-project scope can still request billable visits after T&T expires.
  -- Complimentary adjustment requests cannot bypass the entitlement gate as staff.
- IF (portal OR EXISTS(SELECT 1 FROM public.project_tasks WHERE id=ANY(ids) AND is_test_and_tune)) AND NOT private.project_punchlist_open(p.id) THEN
+ IF (portal OR any_tune) AND NOT private.project_punchlist_open(p.id) THEN
   RAISE EXCEPTION 'Project Punchlist is now view-only; Test & Tune exception review required' USING ERRCODE='42501';
  END IF;
  IF EXISTS(SELECT 1 FROM public.project_punchlist_requests WHERE task_id=ANY(ids))
@@ -36,12 +38,12 @@ BEGIN
  OR EXISTS(SELECT 1 FROM public.work_order_tasks t JOIN public.work_orders w ON w.id=t.work_order_id WHERE t.project_task_id=ANY(ids) AND w.status NOT IN ('completed','cancelled') AND t.status NOT IN ('completed','cancelled')) THEN RAISE EXCEPTION 'An item is already requested or assigned. Refresh the list.'; END IF;
  SELECT * INTO c FROM public.contacts WHERE id=p.contact_id AND organization_id=p.organization_id;
  IF c.id IS NULL THEN RAISE EXCEPTION 'Project customer unavailable' USING ERRCODE='42501'; END IF;
- INSERT INTO public.service_requests(organization_id,contact_id,customer_name,customer_phone,customer_email,job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,priority,status,source_type,request_type,project_id,portal_submission_id,created_by)
+ INSERT INTO public.service_requests(organization_id,contact_id,customer_name,customer_phone,customer_email,job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,priority,status,source_type,request_type,project_id,portal_submission_id,created_by,is_test_and_tune)
  VALUES(p.organization_id,p.contact_id,coalesce(c.full_name,c.company_name,'Customer'),c.phone,c.email,coalesce(c.street_address,''),c.city,c.state,c.zip_code,
- 'Test & Tune visit ('||cardinality(ids)||' items) — '||p.name,'billable','admin','normal','open','punchlist','project',p.id,p_submission_id,CASE WHEN portal THEN NULL ELSE auth.uid() END) RETURNING id INTO result;
+ (CASE WHEN all_tune THEN 'Test & Tune visit (' ELSE 'Project Punchlist visit (' END)||cardinality(ids)||' items) — '||p.name,'billable','admin','normal','open','punchlist','project',p.id,p_submission_id,CASE WHEN portal THEN NULL ELSE auth.uid() END,all_tune) RETURNING id INTO result;
  INSERT INTO public.project_punchlist_requests(request_id,task_id,organization_id) SELECT result,x,p.organization_id FROM unnest(ids) x;
- INSERT INTO public.test_tune_submissions(request_id,organization_id,project_id,contact_id,submission_id,task_ids,actor_id,actor_type)
- VALUES(result,p.organization_id,p.id,p.contact_id,p_submission_id,ids,auth.uid(),CASE WHEN portal THEN 'customer' ELSE 'staff' END);
+ INSERT INTO public.test_tune_submissions(request_id,organization_id,project_id,contact_id,submission_id,task_ids,actor_id,actor_type,source)
+ VALUES(result,p.organization_id,p.id,p.contact_id,p_submission_id,ids,auth.uid(),CASE WHEN portal THEN 'customer' ELSE 'staff' END,CASE WHEN all_tune THEN 'test_and_tune' ELSE 'project_punchlist' END);
  RETURN result;
 END; $$;
 COMMIT;
