@@ -28,7 +28,8 @@ CREATE TRIGGER handoff_project_punchlist_to_test_tune
 AFTER UPDATE OF substantial_completion_date ON public.projects
 FOR EACH ROW EXECUTE FUNCTION private.handoff_project_punchlist_to_test_tune();
 
--- Backfill previously completed projects. This intentionally does not rewrite
+-- Backfill only projects still within their 90-day Test & Tune period.
+-- Previously expired projects are not reactivated. This intentionally does not rewrite
 -- existing Test & Tune items or their public/private visibility.
 UPDATE public.project_tasks t
    SET is_test_and_tune = true,
@@ -38,6 +39,7 @@ UPDATE public.project_tasks t
    AND p.organization_id = t.organization_id
    AND p.substantial_completion_date IS NOT NULL
    AND p.substantial_completion_date <= CURRENT_DATE
+   AND p.substantial_completion_date + 90 >= CURRENT_DATE
    AND t.status = 'open'
    AND NOT t.is_test_and_tune;
 
