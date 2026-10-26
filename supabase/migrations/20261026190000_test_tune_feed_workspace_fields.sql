@@ -1,5 +1,6 @@
 -- Expose source, timestamps and canonical request status in the staff-only Test & Tune workspace.
 BEGIN;
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS customer_draft_removed_at timestamptz;
 CREATE OR REPLACE FUNCTION public.get_test_tune_workspace()
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
 DECLARE org uuid; result jsonb;
