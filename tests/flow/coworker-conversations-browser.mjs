@@ -40,10 +40,10 @@ try {
  const filters=()=>page.getByRole('group',{name:'Message filters'});
  for(const width of[320,375,768,1280]){
   await page.setViewportSize({width,height:900});await page.goto(url);await messages();
-  await page.getByRole('heading',{name:'Customer question',exact:true}).waitFor();await page.getByRole('heading',{name:'Install follow-up',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Customer question',exact:true}).waitFor();await page.getByRole('heading',{name:'Jesse',exact:true}).waitFor();
   assert.equal(await page.locator('.conversation-workspace').count(),1,'All messages share one inbox');assert.equal(await page.locator('.flow-column-head').count(),0);
   await filters().getByRole('button',{name:'Coworkers',exact:true}).click();await page.getByRole('heading',{name:'Coworker conversations',exact:true}).waitFor();
-  await page.getByRole('heading',{name:'Install follow-up',exact:true}).click();await page.getByText('Ready for the next visit',{exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Jesse',exact:true}).click();await page.getByText('Ready for the next visit',{exact:true}).waitFor();
   assert.equal(await page.getByRole('heading',{name:'Customer question',exact:true}).count(),0);
   assert.equal(await page.getByRole('checkbox').count(),0,'Coworker replies have no customer-note toggle');assert.equal(await page.getByTitle('Attach image').count(),0);
   const reply=page.getByPlaceholder('Reply… Type @ to mention a teammate');await reply.fill('Coworker reply '+width);await page.getByTitle('Send message').click();await page.getByText('Coworker reply '+width,{exact:true}).waitFor();
@@ -54,12 +54,12 @@ try {
   const other=await page.getByText('Install follow-up',{exact:true}).last().evaluate(e=>e.parentElement.parentElement.parentElement.className);assert.match(other,/justify-start/);
   await page.screenshot({path:'/tmp/mjv-coworker-conversation-'+width+'.png'});
   await reply.fill('Draft for Jesse');await filters().getByRole('button',{name:'Customer',exact:true}).click();await page.getByRole('heading',{name:'Customer conversations',exact:true}).waitFor();await page.getByRole('heading',{name:'Customer question',exact:true}).click();await page.getByText('Adjust the TV',{exact:true}).waitFor();assert.equal(await page.getByPlaceholder('Type your message…').inputValue(),'','Coworker drafts never follow a customer thread');
-  await filters().getByRole('button',{name:'Unread',exact:true}).click();if(await page.getByRole('button',{name:'Back to conversations',exact:true}).isVisible())await page.getByRole('button',{name:'Back to conversations',exact:true}).click();await page.getByRole('heading',{name:'Department update',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Install follow-up',exact:true}).count(),0,'Read coworker thread leaves Unread list');
+  await filters().getByRole('button',{name:'Unread',exact:true}).click();if(await page.getByRole('button',{name:'Back to conversations',exact:true}).isVisible())await page.getByRole('button',{name:'Back to conversations',exact:true}).click();await page.getByRole('heading',{name:'Department update',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Jesse',exact:true}).count(),0,'Read coworker thread leaves Unread list');
   await page.screenshot({path:'/tmp/mjv-coworker-inbox-'+width+'.png'});
  }
  await page.goto(url);await messages();await filters().getByRole('button',{name:'Coworkers',exact:true}).click();await page.getByRole('heading',{name:'Department update',exact:true}).click();await page.getByTitle('Open discussion actions').waitFor();assert.equal(await page.getByTitle('Open discussion actions').getAttribute('href'),'?tab=feed&postId=r3','Task/question actions remain accessible');
- await page.goto(url+'?noCustomer');await messages();await page.getByRole('heading',{name:'Install follow-up',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.queries.some(q=>q.table==='message_threads')),false,'No customer reads without permission');
+ await page.goto(url+'?noCustomer');await messages();await page.getByRole('heading',{name:'Jesse',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.queries.some(q=>q.table==='message_threads')),false,'No customer reads without permission');
  await page.goto(url+'?noCoworker');await messages();await page.getByRole('heading',{name:'Customer question',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.queries.some(q=>q.table==='discussion_posts')),false,'No coworker reads without permission');
- await page.goto(url+'?scoped');await messages();await page.getByRole('heading',{name:'Install follow-up',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Company update',exact:true}).count(),0,'Scoped inbox excludes unrelated conversations');
+ await page.goto(url+'?scoped');await messages();await page.getByRole('heading',{name:'Jesse',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Everyone',exact:true}).count(),0,'Scoped inbox excludes unrelated conversations');
  assert.deepEqual(errors,[]);console.log('PASS: Shared All/Customer/Coworkers/Unread inbox, 320/375/768/1280px, coworker reply routing, personal unread state, sender alignment, draft isolation, scope and module access.');
 } finally {await browser?.close();server.close();await rm(dir,{recursive:true,force:true});}

@@ -1,3 +1,4 @@
+import { NewTeamMessage } from './NewTeamMessage';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
@@ -19,6 +20,8 @@ interface Contact {
 
 export interface CustomerConversationsProps {
   hideFilters?: boolean;
+  fitScreen?: boolean;
+  newMessageRequested?: number;
   conversationType?: 'all' | 'customer' | 'coworkers';
   includeCustomers?: boolean;
   includeCoworkers?: boolean;
@@ -85,7 +88,7 @@ function formatTime(dateString: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function CustomerConversations({ hideFilters = false, unreadOnly = false, conversationType = 'customer', includeCustomers = true, includeCoworkers = false, createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
+export function CustomerConversations({ fitScreen = false, newMessageRequested = 0, hideFilters = false, unreadOnly = false, conversationType = 'customer', includeCustomers = true, includeCoworkers = false, createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const loadVersion = useRef(0);
   const loadHistoryVersion = useRef(0);
@@ -105,12 +108,16 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   const messageInput = useRef<HTMLTextAreaElement>(null);
   const { tag: messageTag, choices: messageChoices } = useFlowTags(newMessage, messageCursor, profile?.organization_id || undefined);
   const [showNewThread, setShowNewThread] = useState(false);
+  const [showTeamComposer, setShowTeamComposer] = useState(false);
+  useEffect(() => { if (newMessageRequested) setShowTeamComposer(true); }, [newMessageRequested]);
   useEffect(() => {
     if (createRequested) { setShowNewThread(true); onCreateOpened?.(); }
   }, [createRequested, onCreateOpened]);
   const [loading, setLoading] = useState(true);
-  const conversationSize = useConversationHeight(!authLoading && !loading);
+  const conversationSize = useConversationHeight(!fitScreen && !authLoading && !loading);
   const historyRef = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const scrollThread = useRef<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -376,6 +383,8 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   useEffect(() => {
     setMessages([]); setNewMessage(''); setPendingAttachment(null); setReplyContextLabel(null);
     setIsInternal(selectedThread?.visibility === 'internal');
+  }, [selectedThread?.id, selectedThread?.source]);
+  useEffect(() => {
     if (!selectedThread) return;
     let cancelled = false;
     const reload = async () => { if (!cancelled) await loadMessages(selectedThread.id, selectedThread.source); };
@@ -385,13 +394,13 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       .on('postgres_changes', { event: '*', schema: 'public', table, filter: table === 'messages' ? `thread_id=eq.${selectedThread.id}` : `organization_id=eq.${profile?.organization_id}` }, () => void reload()).subscribe();
     const timer = window.setInterval(() => void reload(), 30000);
     return () => { cancelled = true; loadHistoryVersion.current++; window.clearInterval(timer); void supabase.removeChannel(channel); };
-  }, [selectedThread?.id, selectedThread?.source]);
+  }, [selectedThread?.id, selectedThread?.source, selectedThread?.root_ids?.join(',')]);
 
   const openedRequest = useRef<string | null>(null);
   // Auto-select thread when openThreadId is provided
   useEffect(() => {
     if (openThreadId && threads.length > 0 && openedRequest.current !== openThreadId) {
-      const thread = threads.find(t => t.id === openThreadId);
+      const thread = threads.find(t => t.id === openThreadId || t.root_ids?.includes(openThreadId));
       if (thread) {
         openedRequest.current = openThreadId;
         setSelectedThread(thread);
@@ -403,7 +412,10 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   // Scroll to bottom and mark as read
   useEffect(() => {
     const history = historyRef.current;
-    history?.scrollTo({ top: history.scrollHeight, behavior: 'smooth' });
+    const key = selectedThread ? `${selectedThread.source || 'customer'}:${selectedThread.id}` : null;
+    if (history && (scrollThread.current !== key || followLatest.current)) history.scrollTo({ top: history.scrollHeight, behavior: 'auto' });
+    if (scrollThread.current !== key) followLatest.current = true;
+    scrollThread.current = key;
     if (selectedThread && messages.length > 0) {
       markMessagesAsRead();
     }
@@ -413,7 +425,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
     const version = ++loadHistoryVersion.current;
     try {
       if (source === 'coworker' && profile?.organization_id) {
-        const loaded = await loadCoworkerMessages(profile.organization_id, profile.id, threadId);
+        const loaded = await loadCoworkerMessages(profile.organization_id, profile.id, threadId, selectedThread?.root_ids);
         if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setMessages(loaded);
         return;
       }
@@ -513,6 +525,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
       }
 
       if (activeThreadId.current === selectedThread.id) {
+        followLatest.current = true;
         setNewMessage('');
         setIsInternal(selectedThread.visibility === 'internal');
         setPendingAttachment(null);
@@ -647,11 +660,11 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
   }
 
   return (
-    <div className="customer-conversations w-full min-w-0 px-1 sm:px-3 py-1 sm:py-2">
+    <div className={`customer-conversations w-full min-w-0 px-1 sm:px-3 py-1 sm:py-2 ${fitScreen ? 'customer-conversations--fit' : ''}`}>
       {loadError && <div role="alert" className="p-2 text-sm text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }} className="underline">Retry</button></div>}
-      {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId) && <p role="alert" className="p-2 text-sm text-secondary">This conversation is unavailable or you do not have access.</p>}
+      {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId || t.root_ids?.includes(openThreadId)) && <p role="alert" className="p-2 text-sm text-secondary">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar — compact inline strip */}
-      <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} items-center gap-3 sm:gap-4 mb-1.5 px-0.5`}>
+      {!hideFilters && <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} items-center gap-3 sm:gap-4 mb-1.5 px-0.5`}>
         <div className="flex items-center gap-1.5">
           <MessageSquare className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
           <span className="text-sm font-bold text-primary">{stats.total}</span>
@@ -669,11 +682,11 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
           <span className="text-sm font-bold text-red-600">{stats.unread}</span>
           <span className="text-xs text-secondary">unread</span>
         </div>
-      </div>
+      </div>}
 
-      <div ref={conversationSize.ref} style={{ height: conversationSize.height }} className="conversation-workspace min-h-0 min-w-0 flex flex-col md:flex-row gap-2 md:gap-3">
+      <div ref={conversationSize.ref} style={fitScreen ? undefined : { height: conversationSize.height }} className={`conversation-workspace ${selectedThread ? 'conversation-workspace--selected' : ''} min-h-0 min-w-0 flex gap-2`}>
         {/* Threads List */}
-        <div className={`${selectedThread ? 'hidden md:flex' : 'flex'} w-full md:w-[34%] md:max-w-88 shrink-0 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
+        <div className={`conversation-list flex min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
           <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm sm:text-base font-semibold text-primary flex items-center gap-2">
@@ -818,7 +831,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
 
         {/* Messages Panel */}
-        <div className={`${selectedThread ? 'flex' : 'hidden md:flex'} flex-1 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col overflow-hidden`}>
+        <div className={`conversation-panel flex flex-1 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col overflow-hidden`}>
           {selectedThread ? (
             <>
               <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
@@ -826,7 +839,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                   <button
                     aria-label="Back to conversations"
                     onClick={() => setSelectedThread(null)}
-                    className="md:hidden p-1.5 hover:bg-elevated active:bg-surface rounded-lg touch-manipulation"
+                    className="conversation-back p-1.5 hover:bg-elevated active:bg-surface rounded-lg touch-manipulation"
                   >
                     <ArrowLeft className="w-5 h-5 text-secondary" />
                   </button>
@@ -850,7 +863,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                 </div>
               </div>
 
-              <div ref={historyRef} className="conversation-history flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3 space-y-2">
+              <div ref={historyRef} onScroll={e => { const el = e.currentTarget; followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64; }} className="conversation-history flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3 space-y-2">
                 {messages.map((message) => {
                   const isOwnMessage = message.author_id === profile?.id || (selectedThread.source !== 'coworker' && message.author_type === 'staff');
 
@@ -1057,7 +1070,7 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
                     onKeyDown={(e) => {
                       if (staffChoices.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); setMentionHighlight(i => (i + (e.key === 'ArrowDown' ? 1 : staffChoices.length - 1)) % staffChoices.length); return; }
                       if (staffChoices.length && (e.key === 'Enter' || e.key === 'Tab')) { e.preventDefault(); chooseMessageMention(staffChoices[Math.min(mentionHighlight, staffChoices.length - 1)]); return; }
-                      if (e.key === 'Enter' && !e.shiftKey && window.innerWidth >= 640) {
+                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
                         e.preventDefault();
                         handleSendMessage();
                       }
@@ -1089,6 +1102,14 @@ export function CustomerConversations({ hideFilters = false, unreadOnly = false,
         </div>
       </div>
 
+      {showTeamComposer && <NewTeamMessage scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={includeCoworkers} canCustomer={includeCustomers}
+        onClose={() => setShowTeamComposer(false)} onCustomer={() => { setShowTeamComposer(false); setShowNewThread(true); }}
+        onSent={async id => {
+          setShowTeamComposer(false); setSearchQuery('');
+          const loaded = await loadThreads();
+          const thread = loaded?.find(t => t.source === 'coworker' && (t.id === id || t.root_ids?.includes(id)));
+          if (thread) setSelectedThread(thread);
+        }} />}
       {/* New Thread Modal */}
       {showNewThread && (
         <QuickActionModal title="New Message" subtitle="Start a customer conversation or add an internal customer note"

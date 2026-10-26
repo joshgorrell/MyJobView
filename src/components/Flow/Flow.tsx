@@ -1,3 +1,4 @@
+import { useConversationHeight } from './useConversationHeight';
 import { WeeklyProposalActivity } from './WeeklyProposalActivity';
 import { ServiceRequestFlowDetail } from './ServiceRequestFlowDetail';
 import { proposalActivityPath } from '../../lib/proposalActivityLinks';
@@ -52,6 +53,8 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const scoped = !!(contactId || projectId || workOrderId);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
   const [view, setView] = useState<FlowView>(initialTaskView || (!hasModuleAccess('feed') && !hasModuleAccess('messages') && !!tasksContent) ? 'tasks' : conversationProps.openThreadId ? 'messages' : 'all');
+  const workspaceSize = useConversationHeight(view === 'messages' && !scoped);
+  const [messageRequest, setMessageRequest] = useState(0);
   const [messageFilter, setMessageFilter] = useState<MessageFilter>('all');
   const [threadId, setThreadId] = useState<string | null>(null);
   const canMessageCustomers = hasModuleAccess('messages');
@@ -160,11 +163,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
-  return <div className={scoped?'flow-embedded':'flow-workspace'}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
+  return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
-      {canPost && <div className="flow-heading-actions">
-        <button className="flow-primary flow-create-action" aria-label="Create in Flow" title="Create in Flow" aria-haspopup="dialog" aria-expanded={createMode!==null} aria-controls={`${controlId}-create-options`}
-          onClick={() => setCreateMode('choose')}><Plus size={20} /></button>
+      {(canPost || (view === 'messages' && (canMessageCustomers || hasModuleAccess('feed')))) && <div className="flow-heading-actions">
+        <button className={`flow-primary ${view === 'messages' ? 'flow-new-message' : 'flow-create-action'}`} aria-label={view === 'messages' ? 'New message' : 'Create in Flow'} title={view === 'messages' ? 'New message' : 'Create in Flow'} aria-haspopup="dialog" aria-expanded={createMode!==null} aria-controls={`${controlId}-create-options`}
+          onClick={() => { if (view === 'messages') { setMessageFilter('all'); setMessageRequest(n => n + 1); } else setCreateMode('choose'); }}><Plus size={20} />{view === 'messages' && <span>New message</span>}</button>
       </div>}
     </header>
     {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
@@ -200,11 +203,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       {!projectId && !workOrderId && <button onClick={() => setPickingTarget(!pickingTarget)} aria-expanded={pickingTarget}>Choose customer / job</button>}
       {pickingTarget && <div className="flow-picker-slot"><FlowTargetPicker contactId={contactId} onSelect={t => { setTarget(t); setPickingTarget(false); }} /></div>}
     </div>}
-    {view !== 'tasks' && !!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
+    {view !== 'tasks' && view !== 'messages' && !!chips.length && <div className="flow-chips">{chips.map((chip, i) => <button key={i} onClick={chip.clear}>{chip.label}<X size={12} /></button>)}</div>}
     {view === 'messages' && messageFilter === 'customer' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
     {view === 'messages' && messageFilter === 'coworkers' && !hasModuleAccess('feed') && <p>You do not have coworker messaging access.</p>}
     {(view === 'messages' && (canMessageCustomers || hasModuleAccess('feed'))) && <div className="flow-customer-inbox">
-      <CustomerConversations conversationType={messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'} includeCustomers={canMessageCustomers} includeCoworkers={hasModuleAccess('feed')} unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
+      <CustomerConversations fitScreen={!scoped} newMessageRequested={messageRequest} conversationType={messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'} includeCustomers={canMessageCustomers} includeCoworkers={hasModuleAccess('feed')} unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
         onThreadSelected={id => { setThreadId(id); conversationProps.onThreadSelected?.(id); }} />
     </div>}
     {(view !== 'tasks' && view !== 'messages') && <>
