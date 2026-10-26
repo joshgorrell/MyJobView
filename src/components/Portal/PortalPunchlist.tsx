@@ -249,6 +249,18 @@ export function PortalPunchlist({
     } catch (failure) { setError((failure as Error).message || "Unable to update item."); }
     finally { writing.current = false; setBusy(false); }
   }
+  async function removeDraftItem(itemId: string) {
+    if (writing.current || preview || !(await requestConfirmation("Remove this unsubmitted punchlist item?"))) return;
+    writing.current = true; setBusy(true); setError("");
+    try {
+      const { error: failure } = await supabase.rpc("remove_customer_punchlist_draft", { p_project_id: projectId, p_task_id: itemId });
+      if (failure) throw failure;
+      setSelected(current => current.filter(id => id !== itemId));
+      if (editingId === itemId) setEditingId(null);
+      setMessage("Punchlist item removed."); await load();
+    } catch (failure) { setError((failure as Error).message || "Unable to remove item."); }
+    finally { writing.current = false; setBusy(false); }
+  }
   async function requestVisit() {
     if (writing.current || !selected.length || preview) return;
     writing.current = true;
@@ -447,6 +459,7 @@ export function PortalPunchlist({
                         <div className="flex gap-2"><button type="button" disabled={busy || !editingText.trim()} onClick={() => void saveDraftEdit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white">Save</button><button type="button" disabled={busy} onClick={() => setEditingId(null)} className="min-h-11 px-3">Cancel</button></div>
                       </div> : <button type="button" disabled={busy} onClick={() => { setEditingId(item.id); setEditingText(item.description); }} className="min-h-11 text-sm text-blue-700 underline">Edit item</button>
                     )}
+                    {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && <button type="button" disabled={busy} onClick={() => void removeDraftItem(item.id)} className="min-h-11 text-sm text-red-700 underline">Remove item</button>}
                     <SupportPhotos paths={item.photos} />
                     {item.legacy_photos
                       ?.filter((url) => /^https:\/\//i.test(url))
