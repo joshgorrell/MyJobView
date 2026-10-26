@@ -1108,7 +1108,11 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
           setShowTeamComposer(false); setSearchQuery('');
           const loaded = await loadThreads();
           const thread = loaded?.find(t => t.source === 'coworker' && (t.id === id || t.root_ids?.includes(id)));
-          if (thread) setSelectedThread(thread);
+          if (thread) {
+            followLatest.current = true;
+            setSelectedThread(thread);
+            if (activeThreadId.current === thread.id) await loadMessages(thread.id, thread.source);
+          }
         }} />}
       {/* New Thread Modal */}
       {showNewThread && (
