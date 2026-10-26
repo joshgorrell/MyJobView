@@ -92,16 +92,35 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {lastRequestId && canViewServiceRequests && <a href={`/service-requests?serviceRequestId=${encodeURIComponent(lastRequestId)}`} className="inline-flex min-h-11 items-center text-sm text-info">View service request →</a>}
     {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected · {selectedProject?.customer}</span><button disabled={busy || !selectedProject?.can_submit} onClick={() => void submit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Request service'}</button><button disabled={busy} onClick={() => setSelected([])} className="min-h-11 px-3 text-info">Clear selection</button></div>}
     {!loading && !error && !visible.length && <p className="text-sm text-muted">No matching Test &amp; Tune projects.</p>}
-    <div className="divide-y divide-subtle rounded-lg border border-subtle">
-      {visible.map(p => <article key={p.id} className="min-w-0 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2"><div className="min-w-0"><h2 className="break-words font-medium text-primary">{p.customer} · {p.name}</h2><p className="text-xs text-muted">{p.number} · {p.can_submit ? `Test & Tune through ${p.end_date}` : 'Expired or suspended · exception review required'}</p></div><a href={`/projects?projectId=${encodeURIComponent(p.id)}`} className="min-h-11 inline-flex items-center text-sm text-info">Open project →</a></div>
-        {!p.tasks.length && <p className="text-sm text-muted">No matching punchlist items.</p>}
-        {p.tasks.map(t => <div key={t.id} className="flex items-start gap-3 py-2 text-sm">
-          {!t.request_id && t.status === 'open' && <input className="mt-1 h-5 w-5 shrink-0" type="checkbox" aria-label={`Select ${t.customer_description || t.title}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}
-          <div className="min-w-0 flex-1 break-words"><p className="text-primary">{t.customer_description || t.title}</p><span className="text-xs text-muted">{t.visibility === 'internal' ? 'Internal' : 'Customer visible'} · {t.request_id ? 'Requested' : t.status}</span></div>
-          {t.request_id && canViewServiceRequests && <a className="text-info" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id)}`}>View request →</a>}
-        </div>)}
-      </article>)}
+    <div className="overflow-x-auto rounded-lg border border-subtle">
+      <table className="w-full min-w-[680px] text-left text-sm">
+        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th><th className="p-3">Details</th></tr></thead>
+        <tbody className="divide-y divide-subtle">
+          {visible.flatMap(p => p.tasks.map(t => {
+            const description = t.customer_description || t.title;
+            const requested = Boolean(t.request_id);
+            const status = requested ? 'Service requested' : t.status === 'open' ? 'Not submitted' : t.status;
+            return <tr key={t.id} className="group relative hover:bg-surface/70 focus-within:bg-surface/70">
+              <td className="p-3 align-top">{!requested && t.status === 'open' && <input className="h-5 w-5" type="checkbox" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}</td>
+              <td className="p-3 align-top"><a className="font-medium text-primary hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>{p.customer}</a><div className="text-xs text-muted">{p.name}</div></td>
+              <td className="max-w-[520px] p-3 align-top">
+                <div className="relative">
+                  <button type="button" aria-label={`Preview ${description}`} className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
+                  <div role="tooltip" className="pointer-events-none invisible absolute left-0 top-full z-30 mt-2 w-[min(360px,80vw)] rounded-lg border border-subtle bg-surface p-4 text-sm text-primary opacity-0 shadow-xl transition-opacity delay-300 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                    <p className="font-semibold">{t.title}</p><p className="mt-1 break-words">{description}</p>
+                    <p className="mt-2 text-xs text-muted">{p.customer} · {p.name}</p>
+                    <p className="mt-1 text-xs text-muted">{t.visibility === 'internal' ? 'Private' : 'Public'} · {status}</p>
+                    {requested && canViewServiceRequests && <span className="mt-2 block text-xs text-info">Service request linked — open from Details</span>}
+                  </div>
+                </div>
+              </td>
+              <td className="p-3 align-top"><span role="img" aria-label={t.visibility === 'internal' ? 'Private' : 'Public'} title={t.visibility === 'internal' ? 'Private' : 'Public'}>{t.visibility === 'internal' ? '🔒' : '👁️'}</span></td>
+              <td className="p-3 align-top"><span title={status} aria-label={status} className="whitespace-nowrap">{requested ? '📤' : t.status === 'completed' ? '✅' : '🕒'} <span className="sr-only">{status}</span></span></td>
+              <td className="p-3 align-top">{requested && canViewServiceRequests ? <a className="whitespace-nowrap text-info hover:underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id!)}`}>View request →</a> : <a className="whitespace-nowrap text-info hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>View project →</a>}</td>
+            </tr>;
+          }))}
+        </tbody>
+      </table>
     </div>
     <details className="rounded-lg border border-subtle p-3"><summary className="min-h-11 cursor-pointer text-sm text-info">Add punchlist item</summary>
       <div className="grid gap-2 pt-2">
