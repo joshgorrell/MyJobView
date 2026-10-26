@@ -199,22 +199,6 @@
 
 .flow-customer-inbox{min-width:0;color:rgb(var(--text-primary))}.flow-customer-inbox input,.flow-customer-inbox textarea,.flow-customer-inbox select{min-width:0}
 
-/* Conversation workspace — responsive layout for iPhone/iPad/desktop */
-.conversation-workspace{min-height:0;min-width:0}
-@media(max-width:640px){
-  .conversation-workspace{gap:0}
-  .conversation-workspace>div{border-radius:8px}
-  /* On mobile, when a thread is selected the list is hidden so the message panel gets full height */
-  .conversation-workspace>div:first-child{flex:1}
-}
-@media(min-width:641px) and (max-width:1024px){
-  /* iPad — slightly narrower thread list to give messages more room */
-  .conversation-workspace>div:first-child{flex:0 0 36%;max-width:340px}
-}
-@media(min-width:1025px){
-  .conversation-workspace>div:first-child{flex:0 0 32%;max-width:360px}
-}
-
 .flow .flow-view-tabs button{color:var(--flow-secondary)}
 .flow .flow-view-tabs button.flow-selected{color:var(--flow-accent)}
 
@@ -254,3 +238,35 @@
 .flow-followups{padding:16px;display:grid;gap:14px}.flow-followups article{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--flow-line);padding:12px 0}.flow-followups article>div{min-width:0;overflow-wrap:anywhere}.flow-followups time,.flow-followups p{color:var(--flow-secondary)}
 @container(max-width:700px){.flow-column-head{display:none}.flow .flow-row-main{grid-template-columns:minmax(0,1fr) 72px 16px;grid-template-rows:auto auto;gap:2px 6px}.flow-row-main time{grid-column:2;grid-row:1;text-align:right}.flow-context{grid-column:1;grid-row:1;font-size:11px}.flow-summary{grid-column:1/3;grid-row:2}.flow-actor{display:none}.flow-row-main>svg{grid-column:3;grid-row:1/3;align-self:center}.flow-detail{padding:12px}.flow .flow-toolbar{flex-wrap:wrap}}
 @media(max-width:640px){.flow-create-grid,.flow-form-grid{grid-template-columns:1fr}.flow-create-grid,.flow-interaction-form{padding:16px}.flow-followups article{align-items:flex-start}}
+
+/* Messages owns the available viewport; only inbox/history scroll. */
+.flow-messaging { min-height:0; display:flex; flex-direction:column; }
+.flow-messaging > .flow { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.flow-messaging .flow-subtitle,.flow-messaging .flow-footnote { display:none; }
+.flow-messaging .flow-heading { padding-block:8px; }
+.flow-messaging .flow-heading h2 { margin:0; }
+.flow-messaging .flow-toolbar { padding-bottom:4px; }
+.flow-messaging .flow-new-message { min-height:44px; padding-inline:12px; }
+.flow-messaging .flow-content { flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.flow-messaging .flow-message-filters { flex-shrink:0; padding:0 10px 4px; margin:0; }
+.flow-messaging .flow-message-filters button { min-height:36px; }
+.flow-messaging .flow-customer-inbox { flex:1; min-height:0; display:flex; flex-direction:column; }
+.customer-conversations { container-type:inline-size; }
+.customer-conversations--fit { flex:1; min-height:0; display:flex; flex-direction:column; }
+.customer-conversations--fit .conversation-workspace { flex:1; }
+.conversation-workspace { min-height:0; min-width:0; flex-direction:row; }
+.conversation-list { flex:0 0 32%; max-width:360px; }
+.conversation-panel { min-width:0; }
+.conversation-back { display:none; }
+.conversation-history { overscroll-behavior:contain; overflow-wrap:anywhere; }
+.conversation-reply { padding-bottom:max(10px,env(safe-area-inset-bottom)); }
+@container (max-width:700px) {
+  .conversation-workspace { gap:0; }
+  .conversation-list { flex:1; width:100%; max-width:none; }
+  .conversation-panel { display:none; }
+  .conversation-workspace--selected .conversation-list { display:none; }
+  .conversation-workspace--selected .conversation-panel { display:flex; }
+  .conversation-back { display:inline-flex; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
+}
+.workspace-shell:has(main > .flow-workspace.flow-messaging) { height:100dvh; min-height:0; }
+.workspace-shell main:has(> .flow-workspace.flow-messaging) { overflow:hidden; }
