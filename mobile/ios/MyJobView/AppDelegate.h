@@ -4,4 +4,6 @@
 
 @interface AppDelegate : EXAppDelegateWrapper
 
+@property (nonatomic, strong, nullable) UIWindow *window;
+
 @end
