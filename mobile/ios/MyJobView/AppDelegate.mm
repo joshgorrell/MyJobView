@@ -3,6 +3,31 @@
 #import <React/RCTBundleURLProvider.h>
 #import <React/RCTLinkingManager.h>
 
+// iOS 27 requires UIScene adoption. Keep the React Native/Expo AppDelegate
+// bootstrap intact and attach its window to the scene once UIKit creates it.
+@interface MJVSceneDelegate : UIResponder <UIWindowSceneDelegate>
+@property (nonatomic, strong) UIWindow *window;
+@end
+
+@implementation MJVSceneDelegate
+
+- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
+{
+  if (![scene isKindOfClass:[UIWindowScene class]]) {
+    return;
+  }
+
+  AppDelegate *appDelegate = (AppDelegate *)UIApplication.sharedApplication.delegate;
+  UIWindow *reactWindow = appDelegate.window;
+  if (reactWindow != nil) {
+    reactWindow.windowScene = (UIWindowScene *)scene;
+    self.window = reactWindow;
+    [reactWindow makeKeyAndVisible];
+  }
+}
+
+@end
+
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
