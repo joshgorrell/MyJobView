@@ -1,3 +1,5 @@
+-- Shared draft-removal flag must exist before edit RPC references it.
+ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS customer_draft_removed_at timestamptz;
 -- Customer edits only their own unrequested, open punchlist item.
 CREATE OR REPLACE FUNCTION public.update_customer_punchlist_draft(p_project_id uuid,p_task_id uuid,p_description text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
