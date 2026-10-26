@@ -16,7 +16,7 @@ BEGIN
  'service_status',(SELECT s.status FROM public.project_punchlist_requests r JOIN public.service_requests s ON s.id=r.request_id WHERE r.task_id=t.id AND r.organization_id=org AND s.organization_id=org ORDER BY s.created_at DESC LIMIT 1),
  'request_id',(SELECT r.request_id FROM public.project_punchlist_requests r JOIN public.service_requests s ON s.id=r.request_id
  WHERE r.task_id=t.id AND r.organization_id=org AND s.organization_id=org ORDER BY s.created_at DESC,r.request_id LIMIT 1)) ORDER BY t.updated_at DESC NULLS LAST,t.created_at DESC,t.id)
- FROM public.project_tasks t WHERE t.project_id=p.id AND t.organization_id=org AND t.is_test_and_tune),'[]')) row_data
+ FROM public.project_tasks t WHERE t.project_id=p.id AND t.organization_id=org AND t.is_test_and_tune AND t.customer_draft_removed_at IS NULL),'[]')) row_data
  FROM public.projects p JOIN public.contacts c ON c.id=p.contact_id AND c.organization_id=p.organization_id
  WHERE p.organization_id=org AND p.substantial_completion_date<=CURRENT_DATE
  ) projects;
