@@ -1,0 +1,28 @@
+name: Generate MJV iOS branding
+on:
+  push:
+    paths:
+      - 'scripts/generate_mjv_branding.py'
+      - '.github/workflows/generate-mjv-branding.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Pillow
+      - run: python scripts/generate_mjv_branding.py
+      - name: Commit regenerated iOS branding assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/assets/icon.png mobile/assets/splash.png mobile/ios/MyJobView/Images.xcassets
+          if ! git diff --cached --quiet; then
+            git commit -m "style(ios): use official MJV icon and glowing dark splash"
+            git push
+          fi
