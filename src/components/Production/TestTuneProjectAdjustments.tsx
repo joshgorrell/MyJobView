@@ -15,6 +15,28 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const [visibilityFilter, setVisibilityFilter] = useState('all');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<{ id: string; top: number; left: number } | null>(null);
+  const previewCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelPreviewClose() {
+    if (previewCloseTimer.current !== null) { clearTimeout(previewCloseTimer.current); previewCloseTimer.current = null; }
+  }
+  function closePreviewSoon() {
+    cancelPreviewClose();
+    previewCloseTimer.current = setTimeout(() => setPreview(null), 220);
+  }
+  function showPreview(id: string, element: HTMLElement) {
+    cancelPreviewClose();
+    const rect = element.getBoundingClientRect();
+    setPreview({ id, top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 320)), left: Math.max(8, Math.min(rect.left, window.innerWidth - 380)) });
+  }
+  useEffect(() => {
+    if (!preview) return;
+    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreview(null); };
+    window.addEventListener('keydown', dismiss);
+    return () => window.removeEventListener('keydown', dismiss);
+  }, [preview]);
+  useEffect(() => () => cancelPreviewClose(), []);
+
   const [draft, setDraft] = useState({ project: '', title: '', description: '', visible: true });
   const submission = useRef<{ key: string; id: string } | null>(null);
   const saving = useRef(false);
@@ -107,14 +129,13 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
               <td className="whitespace-nowrap p-3 align-top text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : "—"}</td><td className="p-3 align-top"><a className="font-medium text-primary hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>{p.customer}</a><div className="text-xs text-muted">{p.name}</div></td>
               <td className="max-w-[520px] p-3 align-top">
                 <div className="relative">
-                  <button type="button" aria-label={`Preview ${description}`} className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
-                  <div role="tooltip" className="pointer-events-auto invisible absolute left-0 top-full z-30 mt-2 w-[min(360px,80vw)] rounded-lg border border-subtle bg-surface p-4 text-sm text-primary opacity-0 shadow-xl transition-opacity delay-300 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-                    <p className="font-semibold">{t.title}</p><p className="mt-1 break-words">{description}</p>
-                    {Boolean(t.photos?.length) && <div className="mt-2"><SupportPhotos paths={t.photos || []} /></div>}
-                    <p className="mt-2 text-xs text-muted">{p.customer} · {p.name}</p>
-                    <p className="mt-1 text-xs text-muted">{t.visibility === 'internal' ? 'Private' : 'Public'} · {status}</p>
-                    {requested && canViewServiceRequests && <span className="mt-2 block text-xs text-info">Service request linked — open from Details</span>}
-                  </div>
+                  <button type="button" aria-label={`Preview ${description}`}
+                    aria-expanded={preview?.id === t.id}
+                    onMouseEnter={event => showPreview(t.id, event.currentTarget)}
+                    onMouseLeave={closePreviewSoon}
+                    onFocus={event => showPreview(t.id, event.currentTarget)}
+                    onClick={event => showPreview(t.id, event.currentTarget)}
+                    className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
                 </div>
               </td>
               <td className="p-3 align-top"><span role="img" aria-label={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'} title={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'}>{t.source === 'customer' ? '👤' : t.source === 'manual' ? '🛠️' : '📋'}</span></td><td className="p-3 align-top"><span role="img" aria-label={t.visibility === 'internal' ? 'Private' : 'Public'} title={t.visibility === 'internal' ? 'Private' : 'Public'}>{t.visibility === 'internal' ? '🔒' : '👁️'}</span></td>
@@ -125,6 +146,25 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </tbody>
       </table>
     </div>
+    {preview && (() => {
+      const match = rows.find(({ t }) => t.id === preview.id);
+      if (!match) return null;
+      const { p, t } = match;
+      const requested = Boolean(t.request_id);
+      const status = requested ? (['closed', 'completed'].includes(t.service_status || '') ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
+      return <div role="dialog" aria-label={`Punchlist preview: ${t.title}`}
+        style={{ top: preview.top, left: preview.left }}
+        onMouseEnter={cancelPreviewClose} onMouseLeave={closePreviewSoon}
+        className="fixed z-[100] max-h-[70vh] w-[min(360px,calc(100vw-16px))] overflow-y-auto rounded-lg border border-subtle bg-surface p-4 text-sm text-primary shadow-2xl">
+        <div className="flex items-start justify-between gap-3"><p className="font-semibold">{t.title}</p>
+          <button type="button" aria-label="Close punchlist preview" onClick={() => setPreview(null)} className="min-h-9 min-w-9 rounded border border-subtle">×</button></div>
+        <p className="mt-1 whitespace-pre-wrap break-words">{t.customer_description || t.title}</p>
+        {Boolean(t.photos?.length) && <div className="mt-2"><SupportPhotos paths={t.photos || []} /></div>}
+        <p className="mt-2 text-xs text-muted">{p.customer} · {p.name}</p>
+        <p className="mt-1 text-xs text-muted">{t.visibility === 'internal' ? 'Private' : 'Public'} · {status}</p>
+        {requested && canViewServiceRequests && <a className="mt-2 block text-info underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id!)}`}>View service request →</a>}
+      </div>;
+    })()}
     <details className="rounded-lg border border-subtle p-3"><summary className="min-h-11 cursor-pointer text-sm text-info">Add punchlist item</summary>
       <div className="grid gap-2 pt-2">
         <select aria-label="Punchlist project" value={draft.project} onChange={e => setDraft({ ...draft, project: e.target.value })} className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="">Choose customer and project</option>{scoped.filter(p => p.can_submit).map(p => <option key={p.id} value={p.id}>{p.customer} · {p.name}</option>)}</select>
