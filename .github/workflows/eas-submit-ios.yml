@@ -21,9 +21,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install EAS CLI
         run: npm install --global eas-cli
+      - name: Install mobile dependencies for Expo config resolution
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
       - name: Verify Expo credentials
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
