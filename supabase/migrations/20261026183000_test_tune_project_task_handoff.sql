@@ -1,6 +1,7 @@
 -- Preserve canonical project task IDs when substantial completion begins Test & Tune.
 -- Only open tasks become Test & Tune; historical completed tasks stay in project history.
 -- Existing Test & Tune tasks retain their visibility and history.
+-- Keep customer_description intact as historical task content; private visibility prevents portal disclosure.
 BEGIN;
 
 CREATE OR REPLACE FUNCTION private.handoff_project_punchlist_to_test_tune()
@@ -12,7 +13,6 @@ BEGIN
     UPDATE public.project_tasks t
        SET is_test_and_tune = true,
            visibility = 'internal',
-           customer_description = NULL
      WHERE t.project_id = NEW.id
        AND t.organization_id = NEW.organization_id
        AND t.status = 'open'
@@ -33,7 +33,6 @@ FOR EACH ROW EXECUTE FUNCTION private.handoff_project_punchlist_to_test_tune();
 UPDATE public.project_tasks t
    SET is_test_and_tune = true,
        visibility = 'internal',
-       customer_description = NULL
   FROM public.projects p
  WHERE p.id = t.project_id
    AND p.organization_id = t.organization_id
