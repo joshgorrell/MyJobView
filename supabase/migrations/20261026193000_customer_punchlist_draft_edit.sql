@@ -8,7 +8,7 @@ BEGIN
  THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  IF NOT private.project_punchlist_open(p.id) THEN RAISE EXCEPTION 'Punchlist is view-only' USING ERRCODE='42501'; END IF;
  IF nullif(btrim(p_description),'') IS NULL OR length(p_description)>10000 THEN RAISE EXCEPTION 'Enter a description (up to 10,000 characters)'; END IF;
- UPDATE public.project_tasks t SET title=btrim(p_description),customer_description=btrim(p_description)
+ UPDATE public.project_tasks t SET title=btrim(p_description),customer_description=btrim(p_description),updated_at=now()
  WHERE t.id=p_task_id AND t.project_id=p.id AND t.organization_id=p.organization_id
  AND t.created_by_contact_id=p.contact_id AND t.source='customer' AND t.status='open'
  AND t.customer_draft_removed_at IS NULL
