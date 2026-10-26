@@ -33,7 +33,7 @@ jobs:
         working-directory: mobile
         run: |
           rm -f package-lock.json
-          npm install --package-lock-only --legacy-peer-deps --no-audit --no-fund
+          npm install --legacy-peer-deps --no-audit --no-fund
           CI=1 npx expo install --fix --npm
           npm install --package-lock-only --no-audit --no-fund
           npm ci --no-audit --no-fund
