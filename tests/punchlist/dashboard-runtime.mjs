@@ -30,7 +30,7 @@ const supabase={rpc:async(name,args)=>{if(name==='get_test_tune_workspace')retur
 const window={location:{search:'',href:'https://example.com/test-and-tune'},setInterval:()=>1,clearInterval(){},addEventListener:(n,f)=>listeners[n]=f,removeEventListener(){},history:{pushState(){}}};
 const document={visibilityState:'visible',addEventListener(){},removeEventListener(){}};
 const globals={window,document,URL,URLSearchParams,crypto:{randomUUID:()=>`submission-${calls.length}`}};
-function make(){return harness('src/components/Production/TestTuneProjectAdjustments.tsx',globals,{'../../lib/supabase':{supabase}});}
+function make(){return harness('src/components/Production/TestTuneProjectAdjustments.tsx',globals,{'../../lib/supabase':{supabase},'../Shared/SupportPhotos':{SupportPhotos:()=>null}});}
 const h=make();let tree;
 const render=()=>tree=h.render({},'TestTuneProjectAdjustments');
 const find=label=>nodes(tree).find(n=>n.props?.['aria-label']===label);
