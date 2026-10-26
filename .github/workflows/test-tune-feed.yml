@@ -1,0 +1,30 @@
+name: Test and Tune feed validation
+on:
+  pull_request:
+    paths:
+      - 'src/components/Production/TestTuneProjectAdjustments.tsx'
+      - 'src/components/Portal/PortalPunchlist.tsx'
+      - 'supabase/migrations/20261026*.sql'
+      - 'tests/punchlist/**'
+      - 'package.json'
+      - '.github/workflows/test-tune-feed.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Test migration contracts
+        run: npm run test:test-tune-feed
+      - name: Run punchlist regression suite
+        run: npm run test:punchlist
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
