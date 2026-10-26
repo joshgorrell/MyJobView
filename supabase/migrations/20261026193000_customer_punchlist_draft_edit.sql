@@ -11,6 +11,7 @@ BEGIN
  UPDATE public.project_tasks t SET title=btrim(p_description),customer_description=btrim(p_description)
  WHERE t.id=p_task_id AND t.project_id=p.id AND t.organization_id=p.organization_id
  AND t.created_by_contact_id=p.contact_id AND t.source='customer' AND t.status='open'
+ AND t.customer_draft_removed_at IS NULL
  AND NOT EXISTS (SELECT 1 FROM public.project_punchlist_requests r WHERE r.task_id=t.id)
  AND NOT EXISTS (SELECT 1 FROM public.work_order_tasks w WHERE w.project_task_id=t.id);
  IF NOT FOUND THEN RAISE EXCEPTION 'Item was submitted or is no longer editable'; END IF;
