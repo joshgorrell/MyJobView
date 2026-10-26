@@ -249,6 +249,36 @@ export function PortalPunchlist({
     } catch (failure) { setError((failure as Error).message || "Unable to update item."); }
     finally { writing.current = false; setBusy(false); }
   }
+  async function addDraftPhotos(itemId: string, newFiles: File[]) {
+    if (!data || !contactId || !newFiles.length || busy || writing.current || preview) return;
+    const project = data.projects.find(p => p.id === projectId);
+    const item = project?.tasks.find(t => t.id === itemId);
+    if (!item || (item.photos?.length || 0) + newFiles.length > 10 ||
+        newFiles.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
+      setError('Use up to 10 total JPG, PNG or WebP photos, each under 10 MB.');
+      return;
+    }
+    writing.current = true; setBusy(true); setError('');
+    try {
+      const batch = crypto.randomUUID();
+      const paths: string[] = [];
+      for (let index = 0; index < newFiles.length; index++) {
+        const file = newFiles[index];
+        const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+        const path = `${data.organization_id}/${contactId}/${batch}/${index}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from('portal-support').upload(path, file, { upsert: false });
+        if (uploadError) throw uploadError;
+        paths.push(path);
+      }
+      const { error: failure } = await supabase.rpc('add_customer_punchlist_draft_photos', {
+        p_project_id: projectId, p_task_id: itemId, p_photos: paths,
+      });
+      if (failure) throw failure;
+      setMessage('Photos added to your punchlist item.');
+      await load();
+    } catch (failure) { setError((failure as Error).message || 'Unable to add photos.'); }
+    finally { writing.current = false; setBusy(false); }
+  }
   async function removeDraftItem(itemId: string) {
     if (writing.current || preview || !(await requestConfirmation("Remove this unsubmitted punchlist item?"))) return;
     writing.current = true; setBusy(true); setError("");
@@ -460,6 +490,17 @@ export function PortalPunchlist({
                       </div> : <button type="button" disabled={busy} onClick={() => { setEditingId(item.id); setEditingText(item.description); }} className="min-h-11 text-sm text-blue-700 underline">Edit item</button>
                     )}
                     {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && <button type="button" disabled={busy} onClick={() => void removeDraftItem(item.id)} className="min-h-11 text-sm text-red-700 underline">Remove item</button>}
+                    {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && (
+                      <label className="block text-sm text-blue-700">
+                        Add photos (up to 10 total)
+                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || (item.photos?.length || 0) >= 10}
+                          className="mt-1 block w-full text-sm" onChange={event => {
+                            const chosen = Array.from(event.currentTarget.files || []);
+                            event.currentTarget.value = '';
+                            void addDraftPhotos(item.id, chosen);
+                          }} />
+                      </label>
+                    )}
                     <SupportPhotos paths={item.photos} />
                     {item.legacy_photos
                       ?.filter((url) => /^https:\/\//i.test(url))
