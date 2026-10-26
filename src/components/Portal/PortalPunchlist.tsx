@@ -98,6 +98,8 @@ export function PortalPunchlist({
   const [address, setAddress] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const [message, setMessage] = useState("");
   const generation = useRef(0);
   const writing = useRef(false);
@@ -220,7 +222,7 @@ export function PortalPunchlist({
       submission.current = crypto.randomUUID();
       setMessage(
         view === "projects"
-          ? "Item added. Select items and request a visit when ready."
+          ? "Item added. Select items and request service when ready."
           : "Service request submitted. Our team will contact you to arrange service.",
       );
       await load();
@@ -233,6 +235,19 @@ export function PortalPunchlist({
       writing.current = false;
       setBusy(false);
     }
+  }
+  async function saveDraftEdit() {
+    if (!editingId || !editingText.trim() || writing.current || preview) return;
+    writing.current = true; setBusy(true); setError("");
+    try {
+      const { error: failure } = await supabase.rpc("update_customer_punchlist_draft", {
+        p_project_id: projectId, p_task_id: editingId, p_description: editingText.trim(),
+      });
+      if (failure) throw failure;
+      setEditingId(null); setEditingText(""); setMessage("Punchlist item updated.");
+      await load();
+    } catch (failure) { setError((failure as Error).message || "Unable to update item."); }
+    finally { writing.current = false; setBusy(false); }
   }
   async function requestVisit() {
     if (writing.current || !selected.length || preview) return;
@@ -283,7 +298,7 @@ export function PortalPunchlist({
       <div>
         <h1 className="text-xl font-bold">Punchlist & Service Requests</h1>
         <p className="text-sm text-gray-600">
-          Project adjustments and ongoing VIP support.
+          Project punchlist and ongoing VIP support.
         </p>
       </div>
       {preview && (
@@ -426,6 +441,12 @@ export function PortalPunchlist({
                         ? "Added by you"
                         : "Shared by our team"}
                     </p>
+                    {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && (
+                      editingId === item.id ? <div className="space-y-2">
+                        <textarea aria-label="Edit punchlist description" value={editingText} onChange={e => setEditingText(e.target.value)} maxLength={10000} className="w-full min-h-24 rounded-lg border p-2" />
+                        <div className="flex gap-2"><button type="button" disabled={busy || !editingText.trim()} onClick={() => void saveDraftEdit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white">Save</button><button type="button" disabled={busy} onClick={() => setEditingId(null)} className="min-h-11 px-3">Cancel</button></div>
+                      </div> : <button type="button" disabled={busy} onClick={() => { setEditingId(item.id); setEditingText(item.description); }} className="min-h-11 text-sm text-blue-700 underline">Edit item</button>
+                    )}
                     <SupportPhotos paths={item.photos} />
                     {item.legacy_photos
                       ?.filter((url) => /^https:\/\//i.test(url))
