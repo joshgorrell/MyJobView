@@ -13,7 +13,7 @@ BEGIN
  'customer',coalesce(c.full_name,c.company_name,'Customer'),'end_date',p.substantial_completion_date+90,
  'can_submit',private.project_punchlist_open(p.id),
  'tasks',coalesce((SELECT jsonb_agg(jsonb_build_object('id',t.id,'title',t.title,
- 'customer_description',t.customer_description,'visibility',t.visibility,'status',t.status,'source',t.source,'created_at',t.created_at,'updated_at',t.updated_at,
+ 'customer_description',t.customer_description,'photos',coalesce((SELECT jsonb_agg(f.storage_path ORDER BY f.created_at) FROM public.portal_support_photos f WHERE f.task_id=t.id AND f.organization_id=org),'[]'::jsonb),'visibility',t.visibility,'status',t.status,'source',t.source,'created_at',t.created_at,'updated_at',t.updated_at,
  'service_status',(SELECT s.status FROM public.project_punchlist_requests r JOIN public.service_requests s ON s.id=r.request_id WHERE r.task_id=t.id AND r.organization_id=org AND s.organization_id=org ORDER BY s.created_at DESC LIMIT 1),
  'request_id',(SELECT r.request_id FROM public.project_punchlist_requests r JOIN public.service_requests s ON s.id=r.request_id
  WHERE r.task_id=t.id AND r.organization_id=org AND s.organization_id=org ORDER BY s.created_at DESC,r.request_id LIMIT 1)) ORDER BY t.updated_at DESC NULLS LAST,t.created_at DESC,t.id)
