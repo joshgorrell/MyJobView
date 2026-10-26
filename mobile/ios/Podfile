@@ -62,9 +62,9 @@ target 'MyJobView' do
     installer.pods_project.targets.each do |pod_target|
       next unless pod_target.name == 'fmt'
       pod_target.build_configurations.each do |build_config|
-        definitions = build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
-        definitions = definitions.split(' ') if definitions.is_a?(String)
-        build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = (definitions + ['FMT_USE_CONSTEVAL=0']).uniq
+        # fmt's bundled version fails consteval checks under Xcode 26 in C++20.
+        # Compile this pod in C++17, leaving React Native's other pods unchanged.
+        build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
       end
     end
 
