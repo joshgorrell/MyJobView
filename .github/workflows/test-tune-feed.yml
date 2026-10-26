@@ -28,3 +28,9 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Staff responsive browser test
+        run: npm run test:punchlist:browser
+      - name: Customer portal browser test
+        run: npm run test:project-support:browser
