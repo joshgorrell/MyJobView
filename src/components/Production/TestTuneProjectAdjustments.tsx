@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { SupportPhotos } from '../Shared/SupportPhotos';
 
-type Adjustment = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null; source?: string; created_at?: string; updated_at?: string; service_status?: string | null };
+type Adjustment = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null; source?: string; created_at?: string; updated_at?: string; service_status?: string | null; photos?: string[] };
 type Project = { id: string; contact_id: string; name: string; number: string | null; customer: string; can_submit: boolean; end_date: string; tasks: Adjustment[] };
 export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: { canViewServiceRequests?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -109,6 +110,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
                   <button type="button" aria-label={`Preview ${description}`} className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
                   <div role="tooltip" className="pointer-events-none invisible absolute left-0 top-full z-30 mt-2 w-[min(360px,80vw)] rounded-lg border border-subtle bg-surface p-4 text-sm text-primary opacity-0 shadow-xl transition-opacity delay-300 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
                     <p className="font-semibold">{t.title}</p><p className="mt-1 break-words">{description}</p>
+                    {Boolean(t.photos?.length) && <div className="mt-2"><SupportPhotos paths={t.photos || []} /></div>}
                     <p className="mt-2 text-xs text-muted">{p.customer} · {p.name}</p>
                     <p className="mt-1 text-xs text-muted">{t.visibility === 'internal' ? 'Private' : 'Public'} · {status}</p>
                     {requested && canViewServiceRequests && <span className="mt-2 block text-xs text-info">Service request linked — open from Details</span>}
