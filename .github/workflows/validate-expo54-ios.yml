@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - fix/ios-expo54-upgrade-20261023
+      - fix/ios27-scene-lifecycle-20261026
     paths:
       - mobile/ios/**
       - mobile/package.json
