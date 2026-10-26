@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-type Adjustment = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null };
+type Adjustment = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null; source?: string; created_at?: string; updated_at?: string; service_status?: string | null };
 type Project = { id: string; contact_id: string; name: string; number: string | null; customer: string; can_submit: boolean; end_date: string; tasks: Adjustment[] };
 export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: { canViewServiceRequests?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -78,6 +78,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const scoped = projects.filter(p => (!projectId || p.id === projectId) && (!contactId || p.contact_id === contactId));
   const visible = scoped.map(p => ({ ...p, tasks: p.tasks.filter(t => (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (statusFilter === 'all' || (statusFilter === 'requested' ? Boolean(t.request_id) : statusFilter === 'unsubmitted' ? !t.request_id && t.status === 'open' : t.status === statusFilter)) && (!taskStatus || taskStatus === 'all' || (taskStatus === 'requested' ? Boolean(t.request_id) : t.status === taskStatus))) }))
     .filter(p => p.tasks.length > 0 && p.tasks.some(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))));
+  const rows = visible.flatMap(p => p.tasks.filter(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(t => ({ p, t }))).sort((a, b) => Date.parse(b.t.updated_at || b.t.created_at || '') - Date.parse(a.t.updated_at || a.t.created_at || ''));
   return <section className="min-w-0 space-y-3" aria-label="Test and Tune punchlist feed">
     <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2">
       <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search punchlist descriptions, customers or projects" className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-3 text-primary" />
@@ -94,15 +95,15 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {!loading && !error && !visible.length && <p className="text-sm text-muted">No matching Test &amp; Tune projects.</p>}
     <div className="overflow-x-auto rounded-lg border border-subtle">
       <table className="w-full min-w-[680px] text-left text-sm">
-        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th><th className="p-3">Details</th></tr></thead>
+        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th><th className="p-3">Details</th></tr></thead>
         <tbody className="divide-y divide-subtle">
-          {visible.flatMap(p => p.tasks.map(t => {
+          {rows.map(({ p, t }) => {
             const description = t.customer_description || t.title;
             const requested = Boolean(t.request_id);
-            const status = requested ? 'Service requested' : t.status === 'open' ? 'Not submitted' : t.status;
+            const status = requested ? (t.service_status === 'closed' || t.service_status === 'completed' ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
             return <tr key={t.id} className="group relative hover:bg-surface/70 focus-within:bg-surface/70">
               <td className="p-3 align-top">{!requested && t.status === 'open' && <input className="h-5 w-5" type="checkbox" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}</td>
-              <td className="p-3 align-top"><a className="font-medium text-primary hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>{p.customer}</a><div className="text-xs text-muted">{p.name}</div></td>
+              <td className="whitespace-nowrap p-3 align-top text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : "—"}</td><td className="p-3 align-top"><a className="font-medium text-primary hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>{p.customer}</a><div className="text-xs text-muted">{p.name}</div></td>
               <td className="max-w-[520px] p-3 align-top">
                 <div className="relative">
                   <button type="button" aria-label={`Preview ${description}`} className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
@@ -114,11 +115,11 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
                   </div>
                 </div>
               </td>
-              <td className="p-3 align-top"><span role="img" aria-label={t.visibility === 'internal' ? 'Private' : 'Public'} title={t.visibility === 'internal' ? 'Private' : 'Public'}>{t.visibility === 'internal' ? '🔒' : '👁️'}</span></td>
-              <td className="p-3 align-top"><span title={status} aria-label={status} className="whitespace-nowrap">{requested ? '📤' : t.status === 'completed' ? '✅' : '🕒'} <span className="sr-only">{status}</span></span></td>
+              <td className="p-3 align-top"><span role="img" aria-label={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'} title={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'}>{t.source === 'customer' ? '👤' : t.source === 'manual' ? '🛠️' : '📋'}</span></td><td className="p-3 align-top"><span role="img" aria-label={t.visibility === 'internal' ? 'Private' : 'Public'} title={t.visibility === 'internal' ? 'Private' : 'Public'}>{t.visibility === 'internal' ? '🔒' : '👁️'}</span></td>
+              <td className="p-3 align-top"><span title={status} aria-label={status} className="whitespace-nowrap">{status === 'Completed' ? '✅' : status === 'Scheduled' ? '📅' : requested ? '📤' : '🕒'} <span className="sr-only">{status}</span></span></td>
               <td className="p-3 align-top">{requested && canViewServiceRequests ? <a className="whitespace-nowrap text-info hover:underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id!)}`}>View request →</a> : <a className="whitespace-nowrap text-info hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>View project →</a>}</td>
             </tr>;
-          }))}
+          })}
         </tbody>
       </table>
     </div>
