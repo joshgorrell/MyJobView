@@ -252,7 +252,7 @@ export function PortalPunchlist({
       if (failure) throw failure;
       setSelected([]);
       visitSubmission.current = crypto.randomUUID();
-      setMessage("Visit requested. Our team will arrange scheduling.");
+      setMessage("Service requested. Our team will arrange scheduling.");
       await load();
     } catch (failure) {
       setError(
@@ -317,7 +317,7 @@ export function PortalPunchlist({
         </button>
       </div>
       {data?.submission_updates_enabled !== undefined && <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={data.submission_updates_enabled} disabled={preview || busy} onChange={e => void updateSubmissionPreference(e.target.checked)} />Show Test &amp; Tune submission updates in my portal</label>}
-      {!!data?.submission_updates?.length && <details className="rounded-xl border p-3"><summary>Service request updates ({data.submission_updates.length})</summary><ul className="space-y-2 pt-2">{data.submission_updates.map(update => <li key={update.request_id} className="text-sm">Your service request for {update.item_count} adjustment{update.item_count === 1 ? '' : 's'} was submitted on {new Date(update.submitted_at).toLocaleDateString()}. Our team will arrange scheduling.</li>)}</ul></details>}
+      {!!data?.submission_updates?.length && <details className="rounded-xl border p-3"><summary>Service request updates ({data.submission_updates.length})</summary><ul className="space-y-2 pt-2">{data.submission_updates.map(update => <li key={update.request_id} className="text-sm">Your service request for {update.item_count} punchlist item{update.item_count === 1 ? '' : 's'} was submitted on {new Date(update.submitted_at).toLocaleDateString()}. Our team will arrange scheduling.</li>)}</ul></details>}
       {loading && <p>Loading your items…</p>}
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 text-red-700 p-3">
@@ -400,7 +400,7 @@ export function PortalPunchlist({
                           <input
                             type="checkbox"
                             disabled={busy}
-                            aria-label={`Request visit for ${item.description}`}
+                            aria-label={`Select ${item.description} for service`}
                             checked={selected.includes(item.id)}
                             onChange={(e) => {
                               setSelected((current) =>
@@ -457,7 +457,7 @@ export function PortalPunchlist({
                   onClick={() => void requestVisit()}
                   className="min-h-11 rounded-xl bg-blue-600 text-white px-4 disabled:opacity-50"
                 >
-                  Request visit ({selected.length})
+                  Request Service ({selected.length})
                 </button>
               )}
             </>
