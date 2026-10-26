@@ -9,6 +9,7 @@ const draftRemoval = await migration('20261026200000_customer_punchlist_draft_re
 const portal = await migration('20261026201000_customer_support_hide_removed_drafts.sql');
 const request = await migration('20261026202000_punchlist_request_exclude_removed_drafts.sql');
 const creation = await migration('20261026203000_customer_drafts_staff_feed.sql');
+const draftPhotos = await migration('20261026204000_customer_punchlist_draft_photos.sql');
 
 assert.match(handoff, /substantial_completion_date \+ 90 >= CURRENT_DATE/);
 assert.match(handoff, /visibility = CASE WHEN t\.source = 'customer' THEN t\.visibility ELSE 'internal' END/);
@@ -28,4 +29,8 @@ assert.match(request, /t\.customer_draft_removed_at IS NULL/);
 assert.match(request, /source\)\s*VALUES\(/);
 assert.match(creation, /created_by_contact_id,status,is_test_and_tune/);
 assert.match(creation, /p\.contact_id,'open',true\)/);
+assert.match(draftPhotos, /private\.punchlist_portal_identity/);
+assert.match(draftPhotos, /existing_count\+new_count>10/);
+assert.match(draftPhotos, /customer_draft_removed_at IS NULL/);
+assert.match(workspace, /'photos',coalesce/);
 console.log('PASS: Test & Tune migration source invariants (not database execution).');
