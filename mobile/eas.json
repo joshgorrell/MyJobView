@@ -20,7 +20,7 @@
     },
     "production": {
       "ios": {
-        "image": "macos-sequoia-15.5-xcode-16.4",
+        "image": "latest",
         "resourceClass": "m-medium"
       }
     }
