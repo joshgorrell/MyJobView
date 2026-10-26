@@ -45,7 +45,7 @@ jobs:
           pod install --repo-update
       - name: Compile iOS simulator without signing
         run: |
-          xcodebuild -workspace ios/MyJobView.xcworkspace -scheme MyJobView -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > /tmp/myjobview-ios-build.log 2>&1 || { tail -n 180 /tmp/myjobview-ios-build.log; exit 1; }
+          xcodebuild -workspace ios/MyJobView.xcworkspace -scheme MyJobView -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > /tmp/myjobview-ios-build.log 2>&1 || { grep -n -E -C 5 '(^| )error:|fatal error:|file not found|no member named|use of undeclared identifier' /tmp/myjobview-ios-build.log | tail -n 160 || true; tail -n 35 /tmp/myjobview-ios-build.log; exit 1; }
       - name: Upload iOS build diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
