@@ -19,11 +19,21 @@
 
   AppDelegate *appDelegate = (AppDelegate *)UIApplication.sharedApplication.delegate;
   UIWindow *reactWindow = appDelegate.window;
-  if (reactWindow != nil) {
+  if (reactWindow == nil) {
+    reactWindow = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
+    appDelegate.window = reactWindow;
+  } else {
     reactWindow.windowScene = (UIWindowScene *)scene;
-    self.window = reactWindow;
-    [reactWindow makeKeyAndVisible];
   }
+
+  self.window = reactWindow;
+  if (reactWindow.rootViewController == nil) {
+    UIViewController *rootViewController = [appDelegate createRootViewController];
+    if (rootViewController != nil) {
+      reactWindow.rootViewController = rootViewController;
+    }
+  }
+  [reactWindow makeKeyAndVisible];
 }
 
 @end
