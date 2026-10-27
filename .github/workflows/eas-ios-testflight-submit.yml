@@ -1,0 +1,65 @@
+name: Submit MJV iOS to TestFlight (EAS)
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Full EAS build ID for the already-succeeded iOS build 1.0.0 (6)'
+        required: true
+        type: string
+      confirm_submit:
+        description: 'I confirm this build should be submitted to Apple TestFlight'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: mjv-ios-testflight-submit
+  cancel-in-progress: false
+jobs:
+  submit-ios:
+    if: ${{ inputs.confirm_submit }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Expo token exists
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::Missing EXPO_TOKEN secret"; exit 1; }
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest
+      - name: Verify Expo authentication
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas whoami
+      - name: Validate selected EAS build is iOS 1.0.0 (6) and finished
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ inputs.build_id }}
+        run: |
+          eas build:view "$BUILD_ID" --json --non-interactive > /tmp/mjv-build.json
+          node - <<'JS'
+          const b = require('/tmp/mjv-build.json');
+          console.log('Selected build:', JSON.stringify({id:b.id, platform:b.platform, status:b.status, appVersion:b.appVersion, buildNumber:b.buildNumber, profile:b.buildProfile}));
+          if (b.platform !== 'IOS' || b.status !== 'FINISHED' || b.appVersion !== '1.0.0' || String(b.buildNumber) !== '6') {
+            console.error('Refusing submission: selected build must be FINISHED iOS version 1.0.0 (6).');
+            process.exit(1);
+          }
+          JS
+      - name: Submit existing build to App Store Connect / TestFlight
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ inputs.build_id }}
+        run: eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --no-wait
