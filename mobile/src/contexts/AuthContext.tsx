@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, mobileAuthConfigurationError } from '../services/supabase';
 import { NotificationService } from '../services/NotificationService';
 import * as SecureStore from 'expo-secure-store';
 import { locationTrackingService } from '../services/LocationTrackingService';
@@ -78,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signIn(email: string, password: string) {
+    if (mobileAuthConfigurationError) throw new Error(mobileAuthConfigurationError);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
