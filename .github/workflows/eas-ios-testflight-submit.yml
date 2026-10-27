@@ -48,7 +48,19 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           BUILD_ID: ${{ inputs.build_id }}
         run: |
-          eas build:view "$BUILD_ID" --json > /tmp/mjv-build.json
+          echo "EAS CLI version: $(eas --version)"
+          echo "Checking selected build ID: $BUILD_ID"
+          set +e
+          eas build:view "$BUILD_ID" --json > /tmp/mjv-build.json 2> /tmp/mjv-build-error.log
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::error::EAS build:view failed with exit code $code. Diagnostic output follows:"
+            cat /tmp/mjv-build-error.log
+            echo "Command help:"
+            eas build:view --help || true
+            exit "$code"
+          fi
           node - <<'JS'
           const b = require('/tmp/mjv-build.json');
           console.log('Selected build:', JSON.stringify({id:b.id, platform:b.platform, status:b.status, appVersion:b.appVersion, buildNumber:b.buildNumber, profile:b.buildProfile}));
