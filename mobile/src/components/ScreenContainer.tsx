@@ -30,7 +30,7 @@ export function ScreenContainer({
 
   const baseStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: Colors.gray[100],
+    backgroundColor: '#0f172a',
     paddingTop: insets.top,
     paddingBottom: insets.bottom,
   };
@@ -82,9 +82,9 @@ export function SafeHeader({ children, style }: SafeHeaderProps) {
 const safeHeaderStyles = StyleSheet.create({
   outer: {
     width: '100%',
-    backgroundColor: Colors.white,
+    backgroundColor: '#1e293b',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[200],
+    borderBottomColor: '#334155',
   },
   inner: {
     width: '100%',
