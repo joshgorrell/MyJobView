@@ -172,7 +172,11 @@ console.log('PASS: ordinary project visits retain their own origin and mixed sco
 console.log('PASS: 3-of-5 atomic handoff, immutable audit, request-history exclusion, retry mismatch, mixed-project and module/org/portal guards.');
 
 
-/* Earlier expiration assertions intentionally move project 50 outside its service window.\n   Restore an active window for the separate draft-edit regression scenario. */\nawait owner(`UPDATE projects SET substantial_completion_date=CURRENT_DATE-2 WHERE id='${id(50)}'`);\n\n/* Exercise the Test & Tune migrations against an isolated Postgres-compatible fixture,
+/* Earlier expiration assertions intentionally move project 50 outside its service window.
+   Restore an active window for the separate draft-edit regression scenario. */
+await owner(`UPDATE projects SET substantial_completion_date=CURRENT_DATE-2 WHERE id='${id(50)}'`);
+
+/* Exercise the Test & Tune migrations against an isolated Postgres-compatible fixture,
    rather than only checking SQL source text. The production schema has updated_at already. */
 await owner('ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now()');
 for (const name of [
