@@ -111,4 +111,4 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         working-directory: mobile
-        run: eas build --platform ios --profile production --non-interactive --no-wait
+        run: eas build --platform ios --profile production --auto-submit --non-interactive --no-wait
