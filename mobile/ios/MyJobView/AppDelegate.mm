@@ -19,11 +19,18 @@
 
   AppDelegate *appDelegate = (AppDelegate *)UIApplication.sharedApplication.delegate;
   UIWindow *reactWindow = appDelegate.window;
-  if (reactWindow != nil) {
+  if (reactWindow == nil) {
+    reactWindow = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
+    appDelegate.window = reactWindow;
+  } else {
     reactWindow.windowScene = (UIWindowScene *)scene;
-    self.window = reactWindow;
-    [reactWindow makeKeyAndVisible];
   }
+
+  self.window = reactWindow;
+  // React Native root controller must be initialized by the Expo factory.
+  // Do not invoke createRootViewController here: the legacy wrapper may
+  // have no bound factory at scene connection time.
+  [reactWindow makeKeyAndVisible];
 }
 
 @end
