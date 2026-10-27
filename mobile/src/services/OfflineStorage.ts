@@ -87,6 +87,21 @@ class OfflineStorage {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS cached_daily_clock_shifts (
+        id TEXT PRIMARY KEY,
+        technician_id TEXT NOT NULL,
+        entry_date TEXT NOT NULL,
+        clock_in TEXT NOT NULL,
+        clock_out TEXT,
+        status TEXT NOT NULL,
+        office_id TEXT,
+        notes TEXT,
+        sync_state TEXT NOT NULL,
+        cached_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cached_daily_clock_shifts_tech
+        ON cached_daily_clock_shifts(technician_id, clock_in);
+
       CREATE TABLE IF NOT EXISTS pending_geofence_events (
         id TEXT PRIMARY KEY,
         job_site_id TEXT NOT NULL,
@@ -157,6 +172,51 @@ class OfflineStorage {
         breadcrumb.device_model,
         breadcrumb.os_version,
       ]
+    );
+  }
+
+  // Local shift snapshots are scoped to the signed-in technician. They are not
+  // authoritative payroll entries until the server confirms synchronization.
+  async saveLocalClockShift(shift: {
+    id: string; technician_id: string; entry_date: string; clock_in: string;
+    clock_out?: string | null; status: string; office_id?: string | null;
+    notes?: string | null; sync_state: 'synced' | 'pending' | 'conflict';
+  }) {
+    if (!this.db) await this.initialize();
+    await this.db!.runAsync(
+      `INSERT OR REPLACE INTO cached_daily_clock_shifts
+        (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, sync_state, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
+        shift.clock_out ?? null, shift.status, shift.office_id ?? null,
+        shift.notes ?? null, shift.sync_state]
+    );
+  }
+
+  async getLocalActiveClockShift(technicianId: string) {
+    if (!this.db) await this.initialize();
+    return this.db!.getFirstAsync<{
+      id: string; technician_id: string; entry_date: string; clock_in: string;
+      clock_out: string | null; status: string; office_id: string | null;
+      notes: string | null; sync_state: string;
+    }>(
+      `SELECT id, technician_id, entry_date, clock_in, clock_out, status,
+        office_id, notes, sync_state FROM cached_daily_clock_shifts
+        WHERE technician_id = ? AND clock_out IS NULL
+        ORDER BY clock_in DESC LIMIT 1`,
+      [technicianId]
+    );
+  }
+
+  async getLocalClockShift(technicianId: string, shiftId: string) {
+    if (!this.db) await this.initialize();
+    return this.db!.getFirstAsync<{
+      id: string; technician_id: string; entry_date: string; clock_in: string;
+      clock_out: string | null; status: string; office_id: string | null;
+      notes: string | null; sync_state: string;
+    }>(
+      'SELECT * FROM cached_daily_clock_shifts WHERE technician_id = ? AND id = ?',
+      [technicianId, shiftId]
     );
   }
 
