@@ -123,7 +123,7 @@ console.log('Organization dates and overnight corrections pass across UTC, Los A
 const nativeValues={profiles:{organization_id:'org',employment_type:'hourly',requires_daily_clock:true},organizations:{timezone:'America/Chicago'},employees:{id:'employee'},employee_payroll_configs:{payroll_time_basis:'work_allocation',requires_daily_clock:true},company_settings:{app_url:'https://mjv.example/app?old=1'}};
 const nativeQueries=[];
 const nativeSupabase={from(table){const q=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({data:nativeValues[table],error:null});return(...args)=>{nativeQueries.push([table,key,args]);return q;};}});return q;}};
-const native=harness('mobile/src/services/EmployeeTimeContext.ts',{'./supabase':{supabase:nativeSupabase}},{Intl}).exports;
+const native=harness('mobile/src/services/EmployeeTimeContext.ts',{'./supabase':{supabase:nativeSupabase},'./OfflineStorage':{offlineStorage:{saveEmployeeClockPolicy:async()=>{}}}},{Intl}).exports;
 assert.equal(native.workDate(new Date('2026-10-02T04:30Z'),'America/Chicago'),'2026-10-01');
 assert.equal((await native.getEmployeeTimeContext('tech')).dailyClock,false,'Job Time effective configuration wins in native');
 nativeValues.employee_payroll_configs={payroll_time_basis:'daily_clock',requires_daily_clock:true};
