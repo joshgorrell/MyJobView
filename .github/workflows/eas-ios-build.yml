@@ -28,9 +28,6 @@ jobs:
   build-ios:
     if: ${{ inputs.action == 'check' || (inputs.action == 'build' && inputs.version_counter_checked) }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
     steps:
       - name: Check Expo token exists
         env:
@@ -56,11 +53,15 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - name: Install mobile dependencies
+        working-directory: mobile
         run: npm ci
       - name: Verify mobile TypeScript
+        working-directory: mobile
         run: npx tsc --noEmit
       - name: Show EAS remote iOS build version
+        working-directory: mobile
         run: eas build:version:get --platform ios --profile production --non-interactive
       - name: Start production iOS build
         if: ${{ inputs.action == 'build' && inputs.version_counter_checked }}
+        working-directory: mobile
         run: eas build --platform ios --profile production --non-interactive --no-wait
