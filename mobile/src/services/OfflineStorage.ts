@@ -530,6 +530,25 @@ class OfflineStorage {
           }
           continue;
         }
+        // An offline-created shift may conflict with a shift started on
+        // another device. Never try to insert it over an existing open shift:
+        // preserve the local punch and flag it for manual reconciliation.
+        const { data: otherOpen, error: otherOpenError } = await supabase
+          .from('daily_clock_entries')
+          .select('id')
+          .eq('technician_id', event.technician_id)
+          .is('clock_out', null)
+          .neq('id', event.id)
+          .limit(1);
+        if (otherOpenError) throw otherOpenError;
+        if (otherOpen?.length) {
+          await this.db.runAsync(
+            "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+            [event.id, event.technician_id]
+          );
+          console.warn(`Offline shift ${event.id} conflicts with another active server shift; manual reconciliation required`);
+          continue;
+        }
         const { error } = await supabase
           .from('daily_clock_entries')
           .insert({
