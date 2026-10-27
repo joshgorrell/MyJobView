@@ -90,13 +90,16 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         // Only confirmed server shifts are marked synced. A locally pending
         // clock-out must not be silently reopened by a stale server response.
         const local = await offlineStorage.getLocalClockShift(profile.id, data.id);
-        if (local?.sync_state === 'pending' && local.clock_out) {
+        if (local?.clock_out && (local.sync_state === 'pending' || local.sync_state === 'conflict')) {
           setTodayEntry({
             id: local.id, entry_date: local.entry_date, clock_in: local.clock_in,
             clock_out: local.clock_out, total_hours: 0, break_minutes: 0,
             status: local.status, notes: local.notes,
           });
           setClockStateUnverified(true);
+          if (local.sync_state === 'conflict') {
+            Alert.alert('Time record needs review', 'Your offline clock-out conflicts with the server record. The local punch is preserved for review.');
+          }
           return;
         }
         await offlineStorage.saveLocalClockShift({
