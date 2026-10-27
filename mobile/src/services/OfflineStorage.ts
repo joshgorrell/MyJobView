@@ -239,6 +239,22 @@ class OfflineStorage {
     );
   }
 
+  // A pending or conflicting completed shift must remain visible even when
+  // the server no longer has an open shift to return.
+  async getUnresolvedClockShift(technicianId: string) {
+    if (!this.db) await this.initialize();
+    return this.db!.getFirstAsync<{
+      id: string; technician_id: string; entry_date: string; clock_in: string;
+      clock_out: string | null; status: string; office_id: string | null;
+      notes: string | null; sync_state: string;
+    }>(
+      `SELECT * FROM cached_daily_clock_shifts
+       WHERE technician_id = ? AND sync_state IN ('pending', 'conflict')
+       ORDER BY clock_in DESC LIMIT 1`,
+      [technicianId]
+    );
+  }
+
   async getLocalClockShift(technicianId: string, shiftId: string) {
     if (!this.db) await this.initialize();
     return this.db!.getFirstAsync<{
