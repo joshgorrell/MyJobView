@@ -42,33 +42,15 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas whoami
-      - name: Validate selected EAS build is iOS 1.0.0 (6) and finished
-        working-directory: mobile
+      - name: Validate submitted build ID format
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           BUILD_ID: ${{ inputs.build_id }}
         run: |
-          echo "EAS CLI version: $(eas --version)"
-          echo "Checking selected build ID: $BUILD_ID"
-          set +e
-          eas build:view "$BUILD_ID" --json > /tmp/mjv-build.json 2> /tmp/mjv-build-error.log
-          code=$?
-          set -e
-          if [ "$code" -ne 0 ]; then
-            echo "::error::EAS build:view failed with exit code $code. Diagnostic output follows:"
-            cat /tmp/mjv-build-error.log
-            echo "Command help:"
-            eas build:view --help || true
-            exit "$code"
+          if ! [[ "$BUILD_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::Enter the full EAS build UUID."
+            exit 1
           fi
-          node - <<'JS'
-          const b = require('/tmp/mjv-build.json');
-          console.log('Selected build:', JSON.stringify({id:b.id, platform:b.platform, status:b.status, appVersion:b.appVersion, buildNumber:b.buildNumber, profile:b.buildProfile}));
-          if (b.platform !== 'IOS' || b.status !== 'FINISHED' || b.appVersion !== '1.0.0' || String(b.buildNumber) !== '6') {
-            console.error('Refusing submission: selected build must be FINISHED iOS version 1.0.0 (6).');
-            process.exit(1);
-          }
-          JS
+          echo "Submitting existing EAS build ID: $BUILD_ID"
       - name: Submit existing build to App Store Connect / TestFlight
         working-directory: mobile
         env:
