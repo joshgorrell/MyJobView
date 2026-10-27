@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../theme/colors';
-import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -38,18 +38,14 @@ export default function LoginScreen() {
       console.error('Login error:', error);
       Alert.alert(
         'Login Failed',
-        error.message || 'Invalid email or password. Please try again.'
+        /Invalid path specified in request URL/i.test(error?.message || '')
+          ? 'MyJobView cannot reach its sign-in service. Please contact your administrator; your password may be correct.'
+          : (error.message || 'Unable to sign in. Please try again.')
       );
     } finally {
       setLoading(false);
     }
   }
-
-  const features = [
-    { title: 'High-Precision GPS', subtitle: '3-10 meter accuracy' },
-    { title: 'Offline Support', subtitle: 'Works without connection' },
-    { title: 'Biometric Security', subtitle: 'Face ID & fingerprint' },
-  ];
 
   return (
     <KeyboardAvoidingView
