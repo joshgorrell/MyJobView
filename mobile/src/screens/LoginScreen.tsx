@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,7 +38,7 @@ export default function LoginScreen() {
     setResetting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(address, {
-        redirectTo: 'https://elife.myjobview.com/reset-password',
+        redirectTo: 'https://elife.myjobview.com/',
       });
       if (error) throw error;
       Alert.alert('Check your email', 'If an account exists for that address, you will receive password reset instructions.');
@@ -112,8 +113,9 @@ export default function LoginScreen() {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordRow}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.passwordInput]}
                 placeholder="Enter your password"
                 placeholderTextColor={Colors.gray[400]}
                 value={password}
@@ -125,8 +127,9 @@ export default function LoginScreen() {
                 onSubmitEditing={handleLogin}
               />
               <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword(value => !value)} style={styles.passwordToggle}>
-                <Text style={styles.passwordToggleText}>{showPassword ? '◉ Hide' : '◎ Show'}</Text>
+                <Text style={styles.passwordToggleText}>{showPassword ? '◉' : '◎'}</Text>
               </TouchableOpacity>
+              </View>
             </View>
             <TouchableOpacity onPress={handleResetPassword} disabled={resetting || loading} accessibilityRole="button" style={styles.resetLink}>
               <Text style={styles.resetText}>{resetting ? 'Sending reset link…' : 'Forgot password?'}</Text>
@@ -143,6 +146,10 @@ export default function LoginScreen() {
               ) : (
                 <Text style={styles.loginButtonText}>Sign In</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://myjobview.com/')}>
+              <Text style={styles.resetText}>New to MyJobView? Get started</Text>
             </TouchableOpacity>
 
             {/* Features */}
@@ -197,8 +204,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.gray[900],
   },
-  passwordToggle: { alignSelf: 'flex-end', paddingVertical: 10, paddingHorizontal: 4 },
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordInput: { flex: 1, paddingRight: 48 },
+  passwordToggle: { position: 'absolute', right: 8, padding: 12 },
   passwordToggleText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
+  signupLink: { alignSelf: 'center', paddingVertical: 14 },
   resetLink: { alignSelf: 'flex-end', paddingVertical: 8 },
   resetText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
   loginButton: {
