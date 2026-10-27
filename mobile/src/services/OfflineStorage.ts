@@ -314,6 +314,9 @@ class OfflineStorage {
         }
       }
       if (shift.status === 'clocked_out' && existing) {
+        // A cached active shift can have been synchronized already, or it
+        // can be a new offline shift. Both need the exact original start.
+        // Never allow a client-supplied timestamp to rewrite that start.
         const cached = await tx.getFirstAsync<{ clock_in: string; sync_state: string }>(
           'SELECT clock_in, sync_state FROM cached_daily_clock_shifts WHERE id = ? AND technician_id = ?',
           [shift.id, shift.technician_id]
@@ -325,6 +328,10 @@ class OfflineStorage {
       }
       if (shift.status === 'clocked_in' && existing) {
         throw new Error('An active local shift already exists. Resolve it before clocking in again.');
+      }
+      if (shift.status === 'clocked_out' && shift.clock_out &&
+          Date.parse(shift.clock_out) > Date.now() + 60 * 1000) {
+        throw new Error('Clock-out timestamp cannot be in the future.');
       }
       if (shift.status === 'clocked_out' && (!existing || existing.id !== shift.id || !shift.clock_out)) {
         throw new Error('No matching active local shift was found for clock-out.');
