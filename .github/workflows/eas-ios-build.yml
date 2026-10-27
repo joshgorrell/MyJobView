@@ -1,0 +1,57 @@
+name: Build MJV iOS (EAS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_counter_checked:
+        description: 'Confirm EAS remote iOS build number is at least 5 (next build 6+)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mjv-ios-production-build
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    if: ${{ inputs.version_counter_checked }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Check Expo token exists
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an Expo access token as repository Actions secret EXPO_TOKEN."
+            exit 1
+          fi
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install mobile dependencies
+        run: npm ci
+      - name: Verify mobile TypeScript
+        run: npx tsc --noEmit
+      - name: Show EAS remote iOS build version
+        run: eas build:version:get --platform ios --profile production --non-interactive
+      - name: Start production iOS build
+        run: eas build --platform ios --profile production --non-interactive --no-wait
