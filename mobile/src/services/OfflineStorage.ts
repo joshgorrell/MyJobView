@@ -294,7 +294,7 @@ class OfflineStorage {
     }
     if (!shift.clock_in || !Number.isFinite(Date.parse(shift.clock_in)) ||
         (shift.clock_out && (!Number.isFinite(Date.parse(shift.clock_out)) ||
-          Date.parse(shift.clock_out) < Date.parse(shift.clock_in)))) {
+          Date.parse(shift.clock_out) <= Date.parse(shift.clock_in)))) {
       throw new Error('Invalid shift timestamps');
     }
     await this.db!.withExclusiveTransactionAsync(async tx => {
@@ -302,8 +302,36 @@ class OfflineStorage {
         'SELECT id, clock_out FROM cached_daily_clock_shifts WHERE technician_id = ? AND clock_out IS NULL LIMIT 1',
         [shift.technician_id]
       );
+      // Do not start another shift while any prior offline punch remains
+      // unconfirmed. A completed pending shift is still payroll evidence.
+      if (shift.status === 'clocked_in') {
+        const unresolved = await tx.getFirstAsync<{ id: string }>(
+          "SELECT id FROM cached_daily_clock_shifts WHERE technician_id = ? AND sync_state IN ('pending', 'conflict') LIMIT 1",
+          [shift.technician_id]
+        );
+        if (unresolved) {
+          throw new Error('A previous offline shift still needs synchronization or review.');
+        }
+      }
+      if (shift.status === 'clocked_out' && existing) {
+        // A cached active shift can have been synchronized already, or it
+        // can be a new offline shift. Both need the exact original start.
+        // Never allow a client-supplied timestamp to rewrite that start.
+        const cached = await tx.getFirstAsync<{ clock_in: string; sync_state: string }>(
+          'SELECT clock_in, sync_state FROM cached_daily_clock_shifts WHERE id = ? AND technician_id = ?',
+          [shift.id, shift.technician_id]
+        );
+        if (!cached || cached.sync_state === 'conflict' ||
+            Date.parse(cached.clock_in) !== Date.parse(shift.clock_in)) {
+          throw new Error('Clock-out cannot alter a conflicting or mismatched local shift.');
+        }
+      }
       if (shift.status === 'clocked_in' && existing) {
         throw new Error('An active local shift already exists. Resolve it before clocking in again.');
+      }
+      if (shift.status === 'clocked_out' && shift.clock_out &&
+          Date.parse(shift.clock_out) > Date.now() + 60 * 1000) {
+        throw new Error('Clock-out timestamp cannot be in the future.');
       }
       if (shift.status === 'clocked_out' && (!existing || existing.id !== shift.id || !shift.clock_out)) {
         throw new Error('No matching active local shift was found for clock-out.');
