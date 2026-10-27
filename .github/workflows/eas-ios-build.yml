@@ -66,7 +66,9 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         working-directory: mobile
         run: |
-          printf '5\\n' | eas build:version:set --platform ios --profile production
+          # EAS version:set requires an interactive TTY; a plain stdin pipe is rejected.
+          # The script utility provides a pseudo-terminal and supplies the initial value.
+          printf '5\n' | script -q -e -c 'eas build:version:set --platform ios --profile production' /dev/null
       - name: Show EAS remote iOS build version
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
