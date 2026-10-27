@@ -148,8 +148,8 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://myjobview.com/')}>
-              <Text style={styles.resetText}>New to MyJobView? Get started</Text>
+            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://elife.myjobview.com/')}>
+              <Text style={styles.resetText}>New to MyJobView? Create an account on the web</Text>
             </TouchableOpacity>
 
             {/* Features */}
