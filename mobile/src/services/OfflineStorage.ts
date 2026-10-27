@@ -457,11 +457,35 @@ class OfflineStorage {
           .maybeSingle();
         if (lookupError) throw lookupError;
         if (existing) {
-          // An identical server record means a prior attempt succeeded even
-          // if its acknowledgement was lost. Never overwrite differing data.
-          const samePunches = existing.clock_in === event.clock_in &&
-            (existing.clock_out ?? null) === (event.clock_out ?? null);
-          if (samePunches) {
+          // PostgreSQL timestamptz is returned in canonical form, which may
+          // differ from the ISO text originally persisted on the device.
+          const sameInstant = (a: string | null | undefined, b: string | null | undefined) =>
+            a == null || b == null ? a == null && b == null :
+              Number.isFinite(Date.parse(a)) && Date.parse(a) === Date.parse(b);
+          let reconciled = sameInstant(existing.clock_in, event.clock_in) &&
+            sameInstant(existing.clock_out, event.clock_out);
+          if (!reconciled && event.status === 'clocked_out' && event.clock_out &&
+              sameInstant(existing.clock_in, event.clock_in) && existing.clock_out == null &&
+              Date.parse(event.clock_out) > Date.parse(event.clock_in)) {
+            // Close only the original, still-open, unadjusted shift. The
+            // database's existing UPDATE trigger calculates payroll hours.
+            // Do not replace administrative adjustments or approved shifts.
+            const { data: closed, error: closeError } = await supabase
+              .from('daily_clock_entries')
+              .update({ clock_out: event.clock_out, status: 'clocked_out' })
+              .eq('id', event.id)
+              .eq('technician_id', event.technician_id)
+              .eq('clock_in', existing.clock_in)
+              .is('clock_out', null)
+              .eq('status', 'clocked_in')
+              .eq('admin_adjusted', false)
+              .eq('admin_reviewed', false)
+              .select('id, clock_in, clock_out');
+            if (closeError) throw closeError;
+            reconciled = !!closed?.some(row =>
+              sameInstant(row.clock_in, event.clock_in) && sameInstant(row.clock_out, event.clock_out));
+          }
+          if (reconciled) {
             await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ? AND technician_id = ?', [event.id, event.technician_id]);
             await this.db.runAsync(
               "UPDATE cached_daily_clock_shifts SET sync_state = 'synced' WHERE id = ? AND technician_id = ? AND sync_state = 'pending'",
