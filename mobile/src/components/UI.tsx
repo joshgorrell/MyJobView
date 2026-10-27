@@ -71,7 +71,9 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
     marginHorizontal: Spacing.lg,
     borderRadius: Radius.lg,
     padding: Spacing.xl,
@@ -80,7 +82,7 @@ const styles = StyleSheet.create({
   statusDot: {},
   divider: {
     height: 1,
-    backgroundColor: Colors.gray[200],
+    backgroundColor: '#334155',
     marginVertical: Spacing.md,
   },
   emptyContainer: {
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
   emptyText: {
     ...Typography.body,
     textAlign: 'center',
-    color: Colors.gray[400],
+    color: '#94a3b8',
   },
   infoRow: {
     flexDirection: 'row',

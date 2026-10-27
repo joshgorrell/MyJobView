@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.myjobview.app",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "MyJobView needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
         "NSLocationWhenInUseUsageDescription": "MyJobView needs your location while you're working to track your position and calculate travel time.",

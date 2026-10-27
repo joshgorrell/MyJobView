@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors } from '../theme/colors';
-import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -38,18 +38,14 @@ export default function LoginScreen() {
       console.error('Login error:', error);
       Alert.alert(
         'Login Failed',
-        error.message || 'Invalid email or password. Please try again.'
+        /Invalid path specified in request URL/i.test(error?.message || '')
+          ? 'MyJobView cannot reach its sign-in service. Please contact your administrator; your password may be correct.'
+          : (error.message || 'Unable to sign in. Please try again.')
       );
     } finally {
       setLoading(false);
     }
   }
-
-  const features = [
-    { title: 'High-Precision GPS', subtitle: '3-10 meter accuracy' },
-    { title: 'Offline Support', subtitle: 'Works without connection' },
-    { title: 'Biometric Security', subtitle: 'Face ID & fingerprint' },
-  ];
 
   return (
     <KeyboardAvoidingView
@@ -57,7 +53,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={[Colors.primary[600], Colors.primary[700], Colors.primary[900]]}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.gradient}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -65,7 +61,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Logo size={88} variant="light" />
             <Text style={styles.title}>MyJobView</Text>
-            <Text style={styles.subtitle}>Mobile Time Clock</Text>
+            <Text style={styles.subtitle}>Sign in with your MyJobView account</Text>
           </View>
 
           {/* Login Form */}
@@ -116,26 +112,9 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Features */}
-            <View style={styles.featuresContainer}>
-              {features.map((feature, index) => (
-                <View key={index} style={styles.featureRow}>
-                  <View style={styles.featureCheck}>
-                    <View style={styles.featureCheckInner} />
-                  </View>
-                  <View>
-                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Accurate. Reliable. Secure.</Text>
-          </View>
+
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
@@ -145,31 +124,33 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl, maxWidth: 600, alignSelf: 'center', width: '100%' },
-  header: { alignItems: 'center', marginTop: 60, gap: Spacing.md },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.lg, maxWidth: 480, alignSelf: 'center', width: '100%' },
+  header: { alignItems: 'center', marginTop: 24, gap: Spacing.md },
   title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
   subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
   formContainer: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
     borderRadius: Radius.xxl,
     padding: Spacing.xxl,
     ...Shadows.large,
   },
-  formTitle: { fontSize: 22, fontWeight: '700', color: Colors.gray[900], marginBottom: Spacing.xl },
+  formTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc', marginBottom: Spacing.xl },
   inputContainer: { marginBottom: Spacing.xl },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.gray[700], marginBottom: Spacing.sm },
+  label: { fontSize: 14, fontWeight: '600', color: '#cbd5e1', marginBottom: Spacing.sm },
   input: {
-    backgroundColor: Colors.gray[50],
+    backgroundColor: '#0f172a',
     borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderColor: '#475569',
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg + 2,
     fontSize: 16,
-    color: Colors.gray[900],
+    color: '#f8fafc',
   },
   loginButton: {
-    backgroundColor: Colors.primary[600],
+    backgroundColor: '#2563eb',
     borderRadius: Radius.md,
     paddingVertical: Spacing.lg + 4,
     alignItems: 'center',
