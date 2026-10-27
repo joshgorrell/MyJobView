@@ -111,13 +111,16 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       setTodayEntry(data);
       if (data) await loadBreaks(data.id);
       else {
-        const local = await offlineStorage.getLocalActiveClockShift(profile.id);
+        const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
+        const local = unresolved ?? await offlineStorage.getLocalActiveClockShift(profile.id);
         if (local) {
           setClockStateUnverified(true);
           setTodayEntry({ id: local.id, entry_date: local.entry_date,
-            clock_in: local.clock_in, clock_out: null, total_hours: 0,
+            clock_in: local.clock_in, clock_out: local.clock_out, total_hours: 0,
             break_minutes: 0, status: local.status, notes: local.notes });
         }
+        setBreaks([]);
+        setActiveBreak(null);
       }
     } catch (error) {
       setClockStateUnverified(true);
