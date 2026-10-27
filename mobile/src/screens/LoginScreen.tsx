@@ -89,7 +89,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Logo size={88} variant="light" />
             <Text style={styles.title}>MyJobView</Text>
-            <Text style={styles.subtitle}>Mobile Time Clock</Text>
+            <Text style={styles.subtitle}>Your workday. Connected.</Text>
           </View>
 
           {/* Login Form */}
@@ -149,7 +149,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://elife.myjobview.com/')}>
-              <Text style={styles.resetText}>New to MyJobView? Create an account on the web</Text>
+              <Text style={styles.resetText}>Open MyJobView on the web</Text>
             </TouchableOpacity>
 
             {/* Features */}
