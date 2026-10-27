@@ -55,6 +55,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [pendingSync, setPendingSync] = useState(0);
+  const [clockStateUnverified, setClockStateUnverified] = useState(false);
 
   useEffect(() => {
     loadTodaysClock();
@@ -77,6 +78,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     try {
       const context = await getEmployeeTimeContext(profile.id);
       setTimeContext(context);
+      setClockStateUnverified(false);
       if (!context.dailyClock) return;
       const { data, error } = await supabase
         .from('daily_clock_entries')
@@ -89,7 +91,12 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         // clock-out must not be silently reopened by a stale server response.
         const local = await offlineStorage.getLocalClockShift(profile.id, data.id);
         if (local?.sync_state === 'pending' && local.clock_out) {
-          setTodayEntry(null);
+          setTodayEntry({
+            id: local.id, entry_date: local.entry_date, clock_in: local.clock_in,
+            clock_out: local.clock_out, total_hours: 0, break_minutes: 0,
+            status: local.status, notes: local.notes,
+          });
+          setClockStateUnverified(true);
           return;
         }
         await offlineStorage.saveLocalClockShift({
@@ -100,7 +107,17 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       }
       setTodayEntry(data);
       if (data) await loadBreaks(data.id);
+      else {
+        const local = await offlineStorage.getLocalActiveClockShift(profile.id);
+        if (local) {
+          setClockStateUnverified(true);
+          setTodayEntry({ id: local.id, entry_date: local.entry_date,
+            clock_in: local.clock_in, clock_out: null, total_hours: 0,
+            break_minutes: 0, status: local.status, notes: local.notes });
+        }
+      }
     } catch (error) {
+      setClockStateUnverified(true);
       console.error('Error loading daily clock:', error);
       try {
         const local = await offlineStorage.getLocalActiveClockShift(profile.id);
@@ -149,7 +166,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
 
   async function handleClockIn() {
-    if (!profile) return;
+    if (!profile || clockStateUnverified) {
+      Alert.alert('Clock status not verified', 'Reconnect and confirm your shift status before clocking in.');
+      return;
+    }
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
     if (hasHardware && isEnrolled) {
@@ -198,6 +218,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   async function handleClockOut() {
     if (!todayEntry || !profile) return;
+    if (clockStateUnverified) {
+      Alert.alert('Connection required', 'Your shift status is not verified. Offline clock-out is not yet enabled.');
+      return;
+    }
     try { await assertNoInternalTimer(profile); }
     catch (error: any) { Alert.alert('Unable to clock out', error.message); return; }
     if (activeBreak) { Alert.alert('Active Break', 'Please end your break before clocking out'); return; }
@@ -363,6 +387,12 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </View>
       )}
 
+      {clockStateUnverified && (
+        <View style={styles.syncBanner}>
+          <Text style={styles.syncText}>Clock status unverified. Reconnect before recording a punch.</Text>
+        </View>
+      )}
+
       {/* Main Clock Card */}
       <LinearGradient colors={gradientColors} style={styles.clockCard}>
         <View style={styles.statusBadge}>
@@ -380,7 +410,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
             <Text style={styles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
@@ -412,7 +442,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               <TouchableOpacity
                 style={[styles.clockOutButton, !!activeBreak && styles.disabledButton]}
                 onPress={handleClockOut}
-                disabled={!!activeBreak}
+                disabled={!!activeBreak || clockStateUnverified}
                 activeOpacity={0.8}
               >
                 <Text style={styles.clockOutButtonText}>Clock Out</Text>
