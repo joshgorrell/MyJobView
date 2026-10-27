@@ -215,9 +215,20 @@ class OfflineStorage {
   }) {
     if (!this.db) await this.initialize();
     await this.db!.runAsync(
-      `INSERT OR REPLACE INTO cached_daily_clock_shifts
+      `INSERT INTO cached_daily_clock_shifts
         (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, sync_state, cached_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          entry_date = excluded.entry_date,
+          clock_in = excluded.clock_in,
+          clock_out = excluded.clock_out,
+          status = excluded.status,
+          office_id = excluded.office_id,
+          notes = excluded.notes,
+          sync_state = excluded.sync_state,
+          cached_at = CURRENT_TIMESTAMP
+        WHERE cached_daily_clock_shifts.sync_state = 'synced'
+          AND cached_daily_clock_shifts.technician_id = excluded.technician_id`,
       [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
         shift.clock_out ?? null, shift.status, shift.office_id ?? null,
         shift.notes ?? null, shift.sync_state]
