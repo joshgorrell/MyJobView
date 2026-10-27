@@ -87,6 +87,22 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         .is('clock_out', null).order('clock_in', { ascending: false }).limit(1).maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
       if (data) {
+        // A different locally queued shift must not disappear merely because
+        // the server returned another active shift (e.g. another device).
+        // Preserve the local evidence and require explicit reconciliation.
+        const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
+        if (unresolved && unresolved.id !== data.id) {
+          setTodayEntry({
+            id: unresolved.id, entry_date: unresolved.entry_date,
+            clock_in: unresolved.clock_in, clock_out: unresolved.clock_out,
+            total_hours: 0, break_minutes: 0, status: unresolved.status,
+            notes: unresolved.notes,
+          });
+          setClockStateUnverified(true);
+          setBreaks([]);
+          setActiveBreak(null);
+          return;
+        }
         // Only confirmed server shifts are marked synced. A locally pending
         // clock-out must not be silently reopened by a stale server response.
         const local = await offlineStorage.getLocalClockShift(profile.id, data.id);
