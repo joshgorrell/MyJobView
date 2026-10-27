@@ -519,8 +519,10 @@ class OfflineStorage {
               .eq('clock_in', existing.clock_in)
               .is('clock_out', null)
               .eq('status', 'clocked_in')
-              .eq('admin_adjusted', false)
-              .eq('admin_reviewed', false)
+              // Older records may have NULL flags; NULL is not a reviewed or
+              // adjusted shift. Explicit TRUE must still block replay.
+              .or('admin_adjusted.is.null,admin_adjusted.eq.false')
+              .or('admin_reviewed.is.null,admin_reviewed.eq.false')
               .select('id, clock_in, clock_out');
             if (closeError) throw closeError;
             reconciled = !!closed?.some(row =>
