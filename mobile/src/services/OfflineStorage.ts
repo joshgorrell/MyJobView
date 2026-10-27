@@ -251,6 +251,53 @@ class OfflineStorage {
     );
   }
 
+  // Called only after the UI has established that the device is offline.
+  // Persist shift and outbound event in one SQLite transaction to avoid
+  // losing either half of a clock operation during an app interruption.
+  async recordOfflineClockTransition(shift: {
+    id: string; technician_id: string; entry_date: string; clock_in: string;
+    clock_out?: string | null; status: 'clocked_in' | 'clocked_out';
+    office_id?: string | null; notes?: string | null;
+  }) {
+    if (!this.db) await this.initialize();
+    const policy = await this.getEmployeeClockPolicy(shift.technician_id);
+    const age = policy ? Date.now() - Date.parse(policy.fetchedAt) : Infinity;
+    if (!policy?.dailyClock || !Number.isFinite(age) || age < 0 || age > 24 * 60 * 60 * 1000) {
+      throw new Error('A recently verified daily clock policy is required before offline clocking.');
+    }
+    if (!shift.clock_in || !Number.isFinite(Date.parse(shift.clock_in)) ||
+        (shift.clock_out && (!Number.isFinite(Date.parse(shift.clock_out)) ||
+          Date.parse(shift.clock_out) < Date.parse(shift.clock_in)))) {
+      throw new Error('Invalid shift timestamps');
+    }
+    await this.db!.withExclusiveTransactionAsync(async tx => {
+      const existing = await tx.getFirstAsync<{ id: string; clock_out: string | null }>(
+        'SELECT id, clock_out FROM cached_daily_clock_shifts WHERE technician_id = ? AND clock_out IS NULL LIMIT 1',
+        [shift.technician_id]
+      );
+      if (shift.status === 'clocked_in' && existing) {
+        throw new Error('An active local shift already exists. Resolve it before clocking in again.');
+      }
+      if (shift.status === 'clocked_out' && (!existing || existing.id !== shift.id || !shift.clock_out)) {
+        throw new Error('No matching active local shift was found for clock-out.');
+      }
+      await tx.runAsync(
+        `INSERT OR REPLACE INTO pending_clock_events
+         (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
+          shift.clock_out ?? null, shift.status, shift.office_id ?? null, shift.notes ?? null]
+      );
+      await tx.runAsync(
+        `INSERT OR REPLACE INTO cached_daily_clock_shifts
+         (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, sync_state, cached_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
+        [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
+          shift.clock_out ?? null, shift.status, shift.office_id ?? null, shift.notes ?? null]
+      );
+    });
+  }
+
   async saveClockEvent(event: PendingClockEvent) {
     if (!this.db) await this.initialize();
 
