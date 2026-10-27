@@ -3,8 +3,16 @@ name: Build MJV iOS (EAS)
 on:
   workflow_dispatch:
     inputs:
+      action:
+        description: 'Choose check first; build only after confirming remote iOS build number'
+        required: true
+        type: choice
+        options:
+          - check
+          - build
+        default: check
       version_counter_checked:
-        description: 'Confirm EAS remote iOS build number is at least 5 (next build 6+)'
+        description: 'For build only: I verified remote iOS build number is 5 or higher'
         required: true
         type: boolean
         default: false
@@ -18,7 +26,7 @@ concurrency:
 
 jobs:
   build-ios:
-    if: ${{ inputs.version_counter_checked }}
+    if: ${{ inputs.action == 'check' || (inputs.action == 'build' && inputs.version_counter_checked) }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,4 +62,5 @@ jobs:
       - name: Show EAS remote iOS build version
         run: eas build:version:get --platform ios --profile production --non-interactive
       - name: Start production iOS build
+        if: ${{ inputs.action == 'build' && inputs.version_counter_checked }}
         run: eas build --platform ios --profile production --non-interactive --no-wait
