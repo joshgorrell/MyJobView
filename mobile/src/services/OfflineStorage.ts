@@ -161,7 +161,7 @@ class OfflineStorage {
   }
 
   async saveClockEvent(event: PendingClockEvent) {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) await this.initialize();
 
     await this.db.runAsync(
       `INSERT OR REPLACE INTO pending_clock_events (
@@ -279,6 +279,7 @@ class OfflineStorage {
     }
   }
   async syncPendingData() {
+    if (!this.db) await this.initialize();
     if (this.syncInProgress) {
       console.log('Sync already in progress');
       return;
@@ -309,9 +310,21 @@ class OfflineStorage {
 
     for (const event of events) {
       try {
+        // Never replay an offline clock event over an already-recorded shift.
+        // Conflicting records require explicit reconciliation, not an overwrite.
+        const { data: existing, error: lookupError } = await supabase
+          .from('daily_clock_entries')
+          .select('id, clock_in, clock_out')
+          .eq('id', event.id)
+          .maybeSingle();
+        if (lookupError) throw lookupError;
+        if (existing) {
+          console.warn(`Offline clock event ${event.id} already exists; retaining for reconciliation`);
+          continue;
+        }
         const { error } = await supabase
           .from('daily_clock_entries')
-          .upsert({
+          .insert({
             id: event.id,
             technician_id: event.technician_id,
             entry_date: event.entry_date,
