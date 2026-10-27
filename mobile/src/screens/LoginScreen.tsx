@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import { Colors } from '../theme/colors';
-import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -72,7 +72,7 @@ export default function LoginScreen() {
   const features = [
     { title: 'High-Precision GPS', subtitle: '3-10 meter accuracy' },
     { title: 'Offline Support', subtitle: 'Works without connection' },
-    { title: 'Biometric Security', subtitle: 'Face ID & fingerprint' },
+    { title: 'Secure Access', subtitle: 'Your company account' },
   ];
 
   return (
