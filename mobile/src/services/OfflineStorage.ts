@@ -428,7 +428,21 @@ class OfflineStorage {
     if (!session) return;
     const rows = await this.db.getAllAsync<{id:string;entry_id:string;technician_id:string;data_json:string}>('SELECT * FROM pending_clock_gps WHERE technician_id=?', [session.user.id]);
     for (const row of rows) {
-      const { data, error } = await supabase.from('daily_clock_entries').update(JSON.parse(row.data_json)).eq('id', row.entry_id).eq('technician_id', row.technician_id).select('id');
+      // GPS evidence must never be attached to a shift whose offline clock
+      // transition is still pending or has conflicted with the server.
+      const pending = await this.db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM pending_clock_events WHERE id = ? AND technician_id = ?',
+        [row.entry_id, row.technician_id]
+      );
+      const local = await this.db.getFirstAsync<{ sync_state: string }>(
+        'SELECT sync_state FROM cached_daily_clock_shifts WHERE id = ? AND technician_id = ?',
+        [row.entry_id, row.technician_id]
+      );
+      if (pending || (local && local.sync_state !== 'synced')) continue;
+      const { data, error } = await supabase.from('daily_clock_entries')
+        .update(JSON.parse(row.data_json))
+        .eq('id', row.entry_id).eq('technician_id', row.technician_id)
+        .select('id');
       if (!error && data?.length) await this.removeClockGps(row.id);
     }
   }
