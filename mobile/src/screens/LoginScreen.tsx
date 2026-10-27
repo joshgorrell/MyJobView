@@ -28,6 +28,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
 
   async function handleResetPassword() {
     const address = email.trim().toLowerCase();
@@ -50,7 +51,7 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       Alert.alert('Missing Information', 'Please enter your email and password');
       return;
     }
@@ -108,6 +109,8 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 keyboardType="email-address"
                 editable={!loading}
+                textContentType="username"
+                autoComplete="email"
               />
             </View>
 
@@ -121,6 +124,8 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                textContentType="password"
+                autoComplete="password"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
@@ -136,9 +141,9 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              style={[styles.loginButton, !canSubmit && styles.loginButtonDisabled]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={!canSubmit}
               activeOpacity={0.85}
             >
               {loading ? (
