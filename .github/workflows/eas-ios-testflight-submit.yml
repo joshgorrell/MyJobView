@@ -42,6 +42,9 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas whoami
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
       - name: Validate submitted build ID format
         env:
           BUILD_ID: ${{ inputs.build_id }}
