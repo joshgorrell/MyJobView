@@ -27,6 +27,19 @@ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors
 for(const width of [375,390,1280]){
  await page.setViewportSize({width,height:800});await page.goto('http://127.0.0.1:'+server.address().port);await page.evaluate(()=>localStorage.clear());await page.reload();
  await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).waitFor();
+ await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('c1');
+ assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('6')),true);
+ await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('p1');
+ assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('5')),true);
+ await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('customer');
+ assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a'}).count(),0);
+ await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('all');
+ await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('all');
+ await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('all');
+ await page.getByRole('button',{name:/Not submitted/}).click();
+ assert.equal(await page.getByRole('button',{name:/Not submitted/}).getAttribute('aria-pressed'),'true');
+ await page.getByRole('button',{name:/All items/}).click();
+
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.equal(await page.getByRole('checkbox',{name:'Select Expired adjustment',exact:true}).isDisabled(),true);
  await page.getByRole('button',{name:'Preview Adjustment a'}).click();
