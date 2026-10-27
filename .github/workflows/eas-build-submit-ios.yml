@@ -1,0 +1,48 @@
+name: Build and submit fresh iOS TestFlight binary
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/ios-auth-branding-oct27
+    paths:
+      - .github/workflows/eas-build-submit-ios.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mjv-ios-build5
+  cancel-in-progress: false
+
+jobs:
+  build-and-submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact branch commit
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
+      - name: Verify Expo authorization and build number
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::EXPO_TOKEN GitHub secret is missing"; exit 1; }
+          eas whoami
+          node -e "const a=require('./app.json');if(a.expo.ios.buildNumber!=='5')process.exit(1)"
+      - name: Build new iOS binary and automatically submit that binary
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --platform ios --profile production --non-interactive --auto-submit --wait
