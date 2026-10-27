@@ -84,11 +84,40 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         .eq('technician_id', profile.id)
         .is('clock_out', null).order('clock_in', { ascending: false }).limit(1).maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
+      if (data) {
+        // Only confirmed server shifts are marked synced. A locally pending
+        // clock-out must not be silently reopened by a stale server response.
+        const local = await offlineStorage.getLocalClockShift(profile.id, data.id);
+        if (local?.sync_state === 'pending' && local.clock_out) {
+          setTodayEntry(null);
+          return;
+        }
+        await offlineStorage.saveLocalClockShift({
+          id: data.id, technician_id: profile.id, entry_date: data.entry_date,
+          clock_in: data.clock_in, clock_out: data.clock_out, status: data.status,
+          office_id: data.office_id, notes: data.notes, sync_state: 'synced',
+        });
+      }
       setTodayEntry(data);
       if (data) await loadBreaks(data.id);
     } catch (error) {
       console.error('Error loading daily clock:', error);
-      Alert.alert('Error', 'Failed to load clock data');
+      try {
+        const local = await offlineStorage.getLocalActiveClockShift(profile.id);
+        if (local) {
+          setTodayEntry({
+            id: local.id, entry_date: local.entry_date, clock_in: local.clock_in,
+            clock_out: local.clock_out, total_hours: 0, break_minutes: 0,
+            status: local.status, notes: local.notes,
+          });
+          Alert.alert('Offline clock status', 'Showing your last locally saved shift. Clock changes still require a connection.');
+        } else {
+          Alert.alert('Connection required', 'Could not verify your current shift. Connect to the internet before clocking in or out.');
+        }
+      } catch (storageError) {
+        console.error('Unable to restore local shift:', storageError);
+        Alert.alert('Error', 'Failed to load clock data');
+      }
     } finally {
       setLoading(false);
     }
@@ -141,6 +170,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       const capture = locationTrackingService.captureHighAccuracyLocation();
       const { error } = await supabase.from('daily_clock_entries').insert(clockInData);
       if (error) throw error;
+      try {
+        await offlineStorage.saveLocalClockShift({
+          id: entryId, technician_id: profile.id, entry_date: today,
+          clock_in: now.toISOString(), clock_out: null, status: 'clocked_in',
+          office_id: profile.primary_office_id, sync_state: 'synced',
+        });
+      } catch (storageError) {
+        console.error('Server clock-in succeeded; local shift cache failed:', storageError);
+      }
       void saveNativeClockGps(entryId, profile.id, false, capture, now.toISOString()).catch(e => console.error('Clock-in GPS save pending:', e));
       try {
         await locationTrackingService.startTracking(profile.id, entryId);
@@ -182,6 +220,16 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         };
         const { error } = await supabase.from('daily_clock_entries').update(updates).eq('id', todayEntry.id);
         if (error) throw error;
+        try {
+          await offlineStorage.saveLocalClockShift({
+            id: todayEntry.id, technician_id: profile.id, entry_date: todayEntry.entry_date,
+            clock_in: todayEntry.clock_in, clock_out: now.toISOString(),
+            status: 'clocked_out', office_id: profile.primary_office_id,
+            notes: notes || null, sync_state: 'synced',
+          });
+        } catch (storageError) {
+          console.error('Server clock-out succeeded; local shift cache failed:', storageError);
+        }
         void saveNativeClockGps(todayEntry.id, profile.id, true, capture, now.toISOString()).catch(e => console.error('Clock-out GPS save pending:', e));
         try {
           await locationTrackingService.stopTracking();
