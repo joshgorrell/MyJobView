@@ -53,7 +53,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={[Colors.primary[600], Colors.primary[700], Colors.primary[900]]}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.gradient}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -129,26 +129,28 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
   subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
   formContainer: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
     borderRadius: Radius.xxl,
     padding: Spacing.xxl,
     ...Shadows.large,
   },
-  formTitle: { fontSize: 22, fontWeight: '700', color: Colors.gray[900], marginBottom: Spacing.xl },
+  formTitle: { fontSize: 22, fontWeight: '700', color: '#f8fafc', marginBottom: Spacing.xl },
   inputContainer: { marginBottom: Spacing.xl },
-  label: { fontSize: 14, fontWeight: '600', color: Colors.gray[700], marginBottom: Spacing.sm },
+  label: { fontSize: 14, fontWeight: '600', color: '#cbd5e1', marginBottom: Spacing.sm },
   input: {
-    backgroundColor: Colors.gray[50],
+    backgroundColor: '#0f172a',
     borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderColor: '#475569',
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg + 2,
     fontSize: 16,
-    color: Colors.gray[900],
+    color: '#f8fafc',
   },
   loginButton: {
-    backgroundColor: Colors.primary[600],
+    backgroundColor: '#2563eb',
     borderRadius: Radius.md,
     paddingVertical: Spacing.lg + 4,
     alignItems: 'center',
