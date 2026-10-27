@@ -356,7 +356,7 @@ class OfflineStorage {
   async saveClockEvent(event: PendingClockEvent) {
     if (!this.db) await this.initialize();
 
-    await this.db.runAsync(
+    await this.db!.runAsync(
       `INSERT OR REPLACE INTO pending_clock_events (
         id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, clock_out_photo_url
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
