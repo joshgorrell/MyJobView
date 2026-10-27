@@ -41,6 +41,10 @@ jobs:
           test -n "$EXPO_TOKEN" || { echo "::error::EXPO_TOKEN GitHub secret is missing"; exit 1; }
           eas whoami
           node -e "const fs=require('fs');const a=require('./app.json');const p=fs.readFileSync('ios/MyJobView.xcodeproj/project.pbxproj','utf8');const nums=[...p.matchAll(/CURRENT_PROJECT_VERSION\\s*=\\s*(\\d+)/g)].map(m=>m[1]);if(a.expo.ios.buildNumber!=='5'||!nums.length||nums.some(n=>n!=='5')){console.error('iOS app.json and native Xcode build numbers must all equal 5',nums);process.exit(1)}"
+      - name: Verify native Info.plist does not pin an obsolete build number
+        working-directory: mobile
+        run: |
+          node -e "const fs=require('fs');const p=fs.readFileSync('ios/MyJobView/Info.plist','utf8');if(!/<key>CFBundleVersion<\\/key>\\s*<string>\\$\\(CURRENT_PROJECT_VERSION\\)<\\/string>/.test(p)){console.error('Native Info.plist must use CURRENT_PROJECT_VERSION');process.exit(1)}"
       - name: Build new iOS binary and automatically submit that binary
         working-directory: mobile
         env:
