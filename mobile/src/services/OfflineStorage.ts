@@ -457,7 +457,23 @@ class OfflineStorage {
           .maybeSingle();
         if (lookupError) throw lookupError;
         if (existing) {
-          console.warn(`Offline clock event ${event.id} already exists; retaining for reconciliation`);
+          // An identical server record means a prior attempt succeeded even
+          // if its acknowledgement was lost. Never overwrite differing data.
+          const samePunches = existing.clock_in === event.clock_in &&
+            (existing.clock_out ?? null) === (event.clock_out ?? null);
+          if (samePunches) {
+            await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ? AND technician_id = ?', [event.id, event.technician_id]);
+            await this.db.runAsync(
+              "UPDATE cached_daily_clock_shifts SET sync_state = 'synced' WHERE id = ? AND technician_id = ? AND sync_state = 'pending'",
+              [event.id, event.technician_id]
+            );
+          } else {
+            await this.db.runAsync(
+              "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+              [event.id, event.technician_id]
+            );
+            console.warn(`Offline clock event ${event.id} differs from the server; manual reconciliation required`);
+          }
           continue;
         }
         const { error } = await supabase
@@ -478,7 +494,11 @@ class OfflineStorage {
         if (error) throw error;
 
         // Delete synced event
-        await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ?', [event.id]);
+        await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ? AND technician_id = ?', [event.id, event.technician_id]);
+        await this.db.runAsync(
+          "UPDATE cached_daily_clock_shifts SET sync_state = 'synced' WHERE id = ? AND technician_id = ? AND sync_state = 'pending'",
+          [event.id, event.technician_id]
+        );
         console.log(`Synced clock event: ${event.id}`);
       } catch (error) {
         console.error(`Failed to sync clock event ${event.id}:`, error);

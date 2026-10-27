@@ -358,7 +358,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       {pendingSync > 0 && (
         <View style={styles.syncBanner}>
           <Text style={styles.syncText}>
-            {pendingSync} location{pendingSync !== 1 ? 's' : ''} pending sync
+            {pendingSync} time or location record{pendingSync !== 1 ? 's' : ''} awaiting sync
           </Text>
         </View>
       )}
