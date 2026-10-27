@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { NotificationService } from '../services/NotificationService';
-import * as SecureStore from 'expo-secure-store';
 import { locationTrackingService } from '../services/LocationTrackingService';
 
 interface Profile {
@@ -39,6 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setLoading(false);
       }
+    }).catch(error => {
+      console.error('Failed to restore mobile session:', error);
+      setLoading(false);
     });
 
     // Listen for auth changes
@@ -85,15 +87,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error) throw error;
 
-    // Store session flag
-    await SecureStore.setItemAsync('session', 'true');
+    setSession(data.session);
   }
 
   async function signOut() {
     await locationTrackingService.stopTracking();
     await NotificationService.unregisterToken().catch(() => {});
     await supabase.auth.signOut();
-    await SecureStore.deleteItemAsync('session');
+    setSession(null);
     setProfile(null);
   }
 
