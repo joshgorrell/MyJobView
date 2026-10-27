@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabase';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
@@ -24,6 +25,28 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  async function handleResetPassword() {
+    const address = email.trim().toLowerCase();
+    if (!address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      Alert.alert('Email required', 'Enter your account email above to reset your password.');
+      return;
+    }
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: 'https://elife.myjobview.com/reset-password',
+      });
+      if (error) throw error;
+      Alert.alert('Check your email', 'If an account exists for that address, you will receive password reset instructions.');
+    } catch (error) {
+      Alert.alert('Reset unavailable', 'We could not request a password reset. Please try again later.');
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function handleLogin() {
     if (!email || !password) {
@@ -95,13 +118,19 @@ export default function LoginScreen() {
                 placeholderTextColor={Colors.gray[400]}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
                 onSubmitEditing={handleLogin}
               />
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword(value => !value)} style={styles.passwordToggle}>
+                <Text style={styles.passwordToggleText}>{showPassword ? '◉ Hide' : '◎ Show'}</Text>
+              </TouchableOpacity>
             </View>
+            <TouchableOpacity onPress={handleResetPassword} disabled={resetting || loading} accessibilityRole="button" style={styles.resetLink}>
+              <Text style={styles.resetText}>{resetting ? 'Sending reset link…' : 'Forgot password?'}</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.loginButton, loading && styles.loginButtonDisabled]}
@@ -168,6 +197,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.gray[900],
   },
+  passwordToggle: { alignSelf: 'flex-end', paddingVertical: 10, paddingHorizontal: 4 },
+  passwordToggleText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
+  resetLink: { alignSelf: 'flex-end', paddingVertical: 8 },
+  resetText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
   loginButton: {
     backgroundColor: Colors.primary[600],
     borderRadius: Radius.md,
