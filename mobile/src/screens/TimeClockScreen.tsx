@@ -2,6 +2,7 @@ import { InternalTimeCard } from '../components/InternalTimeCard';
 import { assertNoInternalTimer } from '../services/InternalTime';
 import { saveNativeClockGps } from '../services/ClockEventGps';
 import * as Crypto from 'expo-crypto';
+import NetInfo from '@react-native-community/netinfo';
 import { openMJV } from '../services/OpenMJV';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 import React, { useState, useEffect } from 'react';
@@ -140,6 +141,14 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       }
     } catch (error) {
       setClockStateUnverified(true);
+      // A previously verified payroll policy can render the clock screen
+      // offline. The transaction itself independently checks policy age.
+      try {
+        const cachedPolicy = await offlineStorage.getEmployeeClockPolicy(profile.id);
+        if (cachedPolicy) setTimeContext(cachedPolicy);
+      } catch (policyError) {
+        console.error('Offline payroll policy unavailable:', policyError);
+      }
       console.error('Error loading daily clock:', error);
       try {
         const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
@@ -192,7 +201,43 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
 
   async function handleClockIn() {
-    if (!profile || clockStateUnverified) {
+    if (!profile) return;
+    const connection = await NetInfo.fetch();
+    if (connection.isConnected === false || connection.isInternetReachable === false) {
+      // Offline clock-in is an explicit local punch, never a silent fallback
+      // from a failed online request (which may already have reached server).
+      try {
+        const policy = await offlineStorage.getEmployeeClockPolicy(profile.id);
+        if (!policy?.dailyClock || Date.now() - Date.parse(policy.fetchedAt) > 24 * 3600000) {
+          throw new Error('Connect to verify your payroll clock settings before clocking in offline.');
+        }
+        if (todayEntry || await offlineStorage.getLocalActiveClockShift(profile.id) ||
+            await offlineStorage.getUnresolvedClockShift(profile.id)) {
+          throw new Error('An existing shift needs synchronization or review before another clock-in.');
+        }
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (hasHardware && isEnrolled) {
+          const auth = await LocalAuthentication.authenticateAsync({ promptMessage: 'Authenticate to clock in offline' });
+          if (!auth.success) return;
+        }
+        const now = new Date();
+        const shift = {
+          id: Crypto.randomUUID(), technician_id: profile.id,
+          entry_date: workDate(now, policy.timezone), clock_in: now.toISOString(),
+          status: 'clocked_in' as const, office_id: profile.primary_office_id,
+        };
+        await offlineStorage.recordOfflineClockTransition(shift);
+        setTodayEntry({ ...shift, clock_out: null, total_hours: 0, break_minutes: 0, notes: null });
+        setClockStateUnverified(true); // Block unsupported offline break/out until independently verified.
+        await loadPendingSync();
+        Alert.alert('Offline clock-in saved', 'Your start time is saved on this device and will synchronize when connected. Offline clock-out and breaks are not yet available.');
+      } catch (error: any) {
+        Alert.alert('Unable to clock in offline', error.message || 'Local punch could not be saved.');
+      }
+      return;
+    }
+    if (clockStateUnverified) {
       Alert.alert('Clock status not verified', 'Reconnect and confirm your shift status before clocking in.');
       return;
     }
@@ -436,7 +481,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified && !!todayEntry} activeOpacity={0.85}>
             <Text style={styles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
