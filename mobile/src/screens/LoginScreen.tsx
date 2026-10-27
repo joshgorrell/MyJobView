@@ -65,7 +65,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Logo size={88} variant="light" />
             <Text style={styles.title}>MyJobView</Text>
-            <Text style={styles.subtitle}>Mobile Time Clock</Text>
+            <Text style={styles.subtitle}>Sign in with your MyJobView account</Text>
           </View>
 
           {/* Login Form */}
@@ -116,26 +116,9 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Features */}
-            <View style={styles.featuresContainer}>
-              {features.map((feature, index) => (
-                <View key={index} style={styles.featureRow}>
-                  <View style={styles.featureCheck}>
-                    <View style={styles.featureCheckInner} />
-                  </View>
-                  <View>
-                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Accurate. Reliable. Secure.</Text>
-          </View>
+
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
@@ -145,8 +128,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl, maxWidth: 600, alignSelf: 'center', width: '100%' },
-  header: { alignItems: 'center', marginTop: 60, gap: Spacing.md },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.lg, maxWidth: 480, alignSelf: 'center', width: '100%' },
+  header: { alignItems: 'center', marginTop: 24, gap: Spacing.md },
   title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
   subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
   formContainer: {
