@@ -513,7 +513,7 @@ class OfflineStorage {
             // Do not replace administrative adjustments or approved shifts.
             const { data: closed, error: closeError } = await supabase
               .from('daily_clock_entries')
-              .update({ clock_out: event.clock_out, status: 'clocked_out' })
+              .update({ clock_out: event.clock_out, status: 'clocked_out', notes: event.notes ?? null })
               .eq('id', event.id)
               .eq('technician_id', event.technician_id)
               .eq('clock_in', existing.clock_in)
