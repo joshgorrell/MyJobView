@@ -87,6 +87,14 @@ class OfflineStorage {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS cached_employee_clock_policy (
+        technician_id TEXT PRIMARY KEY,
+        timezone TEXT NOT NULL,
+        basis TEXT NOT NULL,
+        daily_clock INTEGER NOT NULL,
+        fetched_at TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS cached_daily_clock_shifts (
         id TEXT PRIMARY KEY,
         technician_id TEXT NOT NULL,
@@ -173,6 +181,29 @@ class OfflineStorage {
         breadcrumb.os_version,
       ]
     );
+  }
+
+  async saveEmployeeClockPolicy(technicianId: string, policy: {
+    timezone: string; basis: string; dailyClock: boolean;
+  }) {
+    if (!this.db) await this.initialize();
+    await this.db!.runAsync(
+      `INSERT OR REPLACE INTO cached_employee_clock_policy
+       (technician_id, timezone, basis, daily_clock, fetched_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [technicianId, policy.timezone, policy.basis, policy.dailyClock ? 1 : 0, new Date().toISOString()]
+    );
+  }
+
+  async getEmployeeClockPolicy(technicianId: string) {
+    if (!this.db) await this.initialize();
+    const policy = await this.db!.getFirstAsync<{
+      timezone: string; basis: string; daily_clock: number; fetched_at: string;
+    }>('SELECT timezone, basis, daily_clock, fetched_at FROM cached_employee_clock_policy WHERE technician_id = ?', [technicianId]);
+    return policy ? {
+      timezone: policy.timezone, basis: policy.basis,
+      dailyClock: policy.daily_clock === 1, fetchedAt: policy.fetched_at,
+    } : null;
   }
 
   // Local shift snapshots are scoped to the signed-in technician. They are not
