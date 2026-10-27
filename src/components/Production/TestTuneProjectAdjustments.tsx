@@ -13,6 +13,10 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [customerFilter, setCustomerFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ id: string; top: number; left: number } | null>(null);
@@ -98,14 +102,19 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     finally { saving.current = false; setBusy(false); }
   }
   const projectId = context.get('projectId'), contactId = context.get('contactId'), taskId = context.get('taskId'), requestId = context.get('serviceRequestId'), taskStatus = context.get('tuneStatus');
-  const scoped = projects.filter(p => (!projectId || p.id === projectId) && (!contactId || p.contact_id === contactId));
-  const visible = scoped.map(p => ({ ...p, tasks: p.tasks.filter(t => (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (statusFilter === 'all' || (statusFilter === 'requested' ? Boolean(t.request_id) : statusFilter === 'unsubmitted' ? !t.request_id && t.status === 'open' : statusFilter === 'completed' ? t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || '')) : t.status === statusFilter)) && (!taskStatus || taskStatus === 'all' || (taskStatus === 'requested' ? Boolean(t.request_id) : t.status === taskStatus))) }))
+  const scoped = projects.filter(p => (!projectId || p.id === projectId) && (!contactId || p.contact_id === contactId) && (customerFilter === 'all' || p.contact_id === customerFilter) && (projectFilter === 'all' || p.id === projectFilter));
+  const dateCutoff = dateFilter === 'all' ? 0 : Date.now() - Number(dateFilter) * 86400000;
+  const visible = scoped.map(p => ({ ...p, tasks: p.tasks.filter(t => (sourceFilter === 'all' || t.source === sourceFilter) && (!dateCutoff || (Date.parse(t.updated_at || t.created_at || '') || 0) >= dateCutoff) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (statusFilter === 'all' || (statusFilter === 'requested' ? Boolean(t.request_id) : statusFilter === 'unsubmitted' ? !t.request_id && t.status === 'open' : statusFilter === 'completed' ? t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || '')) : t.status === statusFilter)) && (!taskStatus || taskStatus === 'all' || (taskStatus === 'requested' ? Boolean(t.request_id) : t.status === taskStatus))) }))
     .filter(p => p.tasks.length > 0 && p.tasks.some(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))));
   const rows = visible.flatMap(p => p.tasks.filter(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(t => ({ p, t }))).sort((a, b) => (Date.parse(b.t.updated_at || b.t.created_at || '') || 0) - (Date.parse(a.t.updated_at || a.t.created_at || '') || 0));
   return <section className="min-w-0 space-y-3" aria-label="Test and Tune punchlist feed">
     <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2">
       <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search punchlist descriptions, customers or projects" className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-3 text-primary" />
       <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All statuses</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select><select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
+      <select aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
+      <select aria-label="Filter punchlist project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All projects</option>{projects.filter(p => customerFilter === 'all' || p.contact_id === customerFilter).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <select aria-label="Filter punchlist source" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="all">All sources</option><option value="customer">Customer</option><option value="manual">Employee</option><option value="proposal">Project</option></select>
+      <select aria-label="Filter punchlist date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}><option value="all">Any update date</option><option value="1">Past 24 hours</option><option value="7">Past 7 days</option><option value="30">Past 30 days</option><option value="90">Past 90 days</option></select>
       <button disabled={busy} onClick={() => void load()} className="min-h-11 px-3 text-info">Refresh</button>
     </div>
     {loading && <p role="status">Loading punchlist…</p>}
