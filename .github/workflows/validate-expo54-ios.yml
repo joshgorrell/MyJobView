@@ -7,12 +7,14 @@ on:
       - fix/ios-expo54-upgrade-20261023
       - fix/ios27-scene-lifecycle-20261026
       - fix/ios27-expo-scene-bootstrap-build4
+      - fix/ios-auth-branding-oct27
     paths:
       - mobile/ios/**
       - mobile/package.json
       - mobile/package-lock.json
       - mobile/app.json
       - mobile/eas.json
+      - mobile/src/**
       - .github/workflows/validate-expo54-ios.yml
 
 permissions:
