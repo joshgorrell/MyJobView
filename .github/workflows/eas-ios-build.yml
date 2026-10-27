@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Choose check first; build only after confirming remote iOS build number'
+        description: 'Check remote version, initialize it to 5, or launch production build'
         required: true
         type: choice
         options:
           - check
+          - initialize
           - build
         default: check
       version_counter_checked:
@@ -26,7 +27,7 @@ concurrency:
 
 jobs:
   build-ios:
-    if: ${{ inputs.action == 'check' || (inputs.action == 'build' && inputs.version_counter_checked) }}
+    if: ${{ inputs.action == 'check' || inputs.action == 'initialize' || (inputs.action == 'build' && inputs.version_counter_checked) }}
     runs-on: ubuntu-latest
     steps:
       - name: Check Expo token exists
@@ -44,7 +45,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - name: Install EAS CLI via npm
@@ -59,6 +60,13 @@ jobs:
       - name: Verify mobile TypeScript
         working-directory: mobile
         run: npx tsc --noEmit
+      - name: Initialize EAS remote iOS build number to 5
+        if: ${{ inputs.action == 'initialize' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        working-directory: mobile
+        run: |
+          printf '5\\n' | eas build:version:set --platform ios --profile production
       - name: Show EAS remote iOS build version
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
