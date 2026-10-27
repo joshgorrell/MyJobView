@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../theme/colors';
 
 interface LogoProps {
@@ -9,14 +9,11 @@ interface LogoProps {
 
 export function Logo({ size = 80, variant = 'dark' }: LogoProps) {
   const primary = variant === 'light' ? Colors.white : Colors.primary[600];
-  const accent = variant === 'light' ? 'rgba(255,255,255,0.3)' : Colors.primary[100];
+  const foreground = variant === 'light' ? Colors.primary[700] : Colors.white;
 
   return (
     <View style={[styles.container, { width: size, height: size, borderRadius: size / 2, backgroundColor: primary }]}>
-      <View style={styles.innerShape}>
-        <View style={styles.pinCircle} />
-        <View style={styles.pinStem} />
-      </View>
+      <Text accessibilityLabel="MyJobView logo" style={{ color: foreground, fontSize: size * 0.34, fontWeight: '800' }}>MJV</Text>
     </View>
   );
 }
