@@ -3,7 +3,12 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''; 
+
+// Fail with an actionable configuration error rather than sending requests to an invalid URL.
+if (!/^https:\/\/[^/]+\.supabase\.co\/?$/.test(supabaseUrl) || !supabaseAnonKey || supabaseAnonKey === 'your-anon-key-here') {
+  throw new Error('MyJobView mobile authentication is not configured. Verify the EAS production EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY values.');
+}
 
 // Custom storage for secure token persistence
 const ExpoSecureStoreAdapter = {
