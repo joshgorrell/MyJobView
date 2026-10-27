@@ -110,8 +110,13 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
 
   async function loadPendingSync() {
-    const count = await offlineStorage.getPendingBreadcrumbsCount() + await offlineStorage.getPendingClockEventsCount();
-    setPendingSync(count);
+    try {
+      await offlineStorage.initialize();
+      const count = await offlineStorage.getPendingBreadcrumbsCount() + await offlineStorage.getPendingClockEventsCount();
+      setPendingSync(count);
+    } catch (error) {
+      console.error('Unable to read pending time clock sync status:', error);
+    }
   }
 
   async function handleClockIn() {
