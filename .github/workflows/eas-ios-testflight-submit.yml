@@ -48,7 +48,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           BUILD_ID: ${{ inputs.build_id }}
         run: |
-          eas build:view "$BUILD_ID" --json --non-interactive > /tmp/mjv-build.json
+          eas build:view "$BUILD_ID" --json > /tmp/mjv-build.json
           node - <<'JS'
           const b = require('/tmp/mjv-build.json');
           console.log('Selected build:', JSON.stringify({id:b.id, platform:b.platform, status:b.status, appVersion:b.appVersion, buildNumber:b.buildNumber, profile:b.buildProfile}));
