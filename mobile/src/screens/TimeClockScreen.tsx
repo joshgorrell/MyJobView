@@ -142,7 +142,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       setClockStateUnverified(true);
       console.error('Error loading daily clock:', error);
       try {
-        const local = await offlineStorage.getLocalActiveClockShift(profile.id);
+        const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
+        const local = unresolved ?? await offlineStorage.getLocalActiveClockShift(profile.id);
+        setBreaks([]);
+        setActiveBreak(null);
         if (local) {
           setTodayEntry({
             id: local.id, entry_date: local.entry_date, clock_in: local.clock_in,
@@ -151,6 +154,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           });
           Alert.alert('Offline clock status', 'Showing your last locally saved shift. Clock changes still require a connection.');
         } else {
+          setTodayEntry(null);
           Alert.alert('Connection required', 'Could not verify your current shift. Connect to the internet before clocking in or out.');
         }
       } catch (storageError) {
