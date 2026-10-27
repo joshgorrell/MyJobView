@@ -1,13 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import * as SecureStore from 'expo-secure-store';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from './src/contexts/AuthContext';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { OfflineProvider } from './src/contexts/OfflineContext';
-import { NotificationService } from './src/services/NotificationService';
 
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -20,97 +18,34 @@ import TimeHistoryScreen from './src/screens/TimeHistoryScreen';
 
 const Stack = createNativeStackNavigator();
 
+function AppNavigation() {
+  const { session, loading } = useAuth();
+  if (loading) return null;
+  return (
+    <NavigationContainer>
+      <StatusBar style="auto" />
+      <Stack.Navigator>
+        {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
+          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="TimeClock" component={TimeClockScreen} />
+          <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} />
+          <Stack.Screen name="WorkOrderDetail" component={WorkOrderDetailScreen} />
+          <Stack.Screen name="LocationHistory" component={LocationHistoryScreen} />
+          <Stack.Screen name="TimeHistory" component={TimeHistoryScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+        </>}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    async function prepare() {
-      try {
-        await NotificationService.initialize();
-        const session = await SecureStore.getItemAsync('session');
-        if (session) {
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        console.error('Error preparing app:', error);
-      } finally {
-        setIsReady(true);
-      }
-    }
-
-    prepare();
-  }, []);
-
-  if (!isReady) {
-    return null; // Or loading screen
-  }
-
   return (
     <SafeAreaProvider>
       <AuthProvider>
         <OfflineProvider>
           <LocationProvider>
-            <NavigationContainer>
-            <StatusBar style="auto" />
-            <Stack.Navigator
-              screenOptions={{
-                headerStyle: {
-                  backgroundColor: '#2563eb',
-                },
-                headerTintColor: '#fff',
-                headerTitleStyle: {
-                  fontWeight: 'bold',
-                },
-              }}
-            >
-              {!isAuthenticated ? (
-                <Stack.Screen
-                  name="Login"
-                  component={LoginScreen}
-                  options={{ headerShown: false }}
-                />
-              ) : (
-                <>
-                  <Stack.Screen
-                    name="Dashboard"
-                    component={DashboardScreen}
-                    options={{ title: 'MyJobView' }}
-                  />
-                  <Stack.Screen
-                    name="TimeClock"
-                    component={TimeClockScreen}
-                    options={{ title: 'Time Clock' }}
-                  />
-                  <Stack.Screen
-                    name="WorkOrders"
-                    component={WorkOrdersScreen}
-                    options={{ title: 'My Work Orders' }}
-                  />
-                  <Stack.Screen
-                    name="WorkOrderDetail"
-                    component={WorkOrderDetailScreen}
-                    options={{ title: 'Work Order Details' }}
-                  />
-                  <Stack.Screen
-                    name="LocationHistory"
-                    component={LocationHistoryScreen}
-                    options={{ title: 'Location History' }}
-                  />
-                  <Stack.Screen
-                    name="TimeHistory"
-                    component={TimeHistoryScreen}
-                    options={{ title: 'My Time History' }}
-                  />
-                  <Stack.Screen
-                    name="Settings"
-                    component={SettingsScreen}
-                    options={{ title: 'Settings' }}
-                  />
-                </>
-              )}
-            </Stack.Navigator>
-            </NavigationContainer>
+            <AppNavigation />
           </LocationProvider>
         </OfflineProvider>
       </AuthProvider>

@@ -16,13 +16,15 @@
       "ios": {
         "image": "macos-sequoia-15.5-xcode-16.4",
         "simulator": true
-      }
+      },
+      "environment": "preview"
     },
     "production": {
       "ios": {
         "image": "latest",
         "resourceClass": "m-medium"
-      }
+      },
+      "environment": "production"
     }
   },
   "submit": {
