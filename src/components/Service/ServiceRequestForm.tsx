@@ -751,6 +751,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       setTimeout(() => {
         if (serviceRequest?.id) {
           window.sessionStorage.setItem('mjv-new-service-request', serviceRequest.id);
+          window.dispatchEvent(new CustomEvent('mjv-service-request-created', { detail: serviceRequest.id }));
         }
         if (onSuccess) onSuccess();
         onClose();
