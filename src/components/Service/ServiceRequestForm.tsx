@@ -803,7 +803,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       successMessage="Service request created successfully."
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-3 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-3 lg:items-start">
+        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-2 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-2 lg:items-start">
           <div className="lg:col-span-2">
           <div className="space-y-2 lg:space-y-0 lg:flex lg:items-center lg:justify-between [&>div]:mb-0">
           {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
@@ -926,7 +926,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 )}
 
                 {showNewCustomer && !formData.contact_id && (
-                  <div className="bg-blue-950/40 border border-blue-700/50 rounded-lg p-3 flex items-center justify-between">
+                  <div className="bg-blue-950/40 border border-blue-700/50 rounded-lg px-3 py-1 flex items-center justify-between">
                     <span className="text-blue-400 font-medium">
                       Creating New Customer
                     </span>
@@ -959,16 +959,16 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
                   placeholder="Customer Name *"
                   required
-                  className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
+                  className="w-full px-3 py-2 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base text-primary placeholder-gray-500"
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <div className="relative">
                     <input
                       type="tel"
                       value={formData.customer_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
                       placeholder="Phone"
-                      className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
+                      className={`w-full px-3 py-2 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                         originalContact && !originalContact.phone && formData.customer_phone?.trim()
                           ? 'border-emerald-500'
                           : 'border-strong'
@@ -984,7 +984,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                       value={formData.customer_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
                       placeholder="Email"
-                      className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
+                      className={`w-full px-3 py-2 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                         originalContact && !originalContact.email && formData.customer_email?.trim()
                           ? 'border-emerald-500'
                           : 'border-strong'
@@ -1082,7 +1082,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   }));
                 }}
                 placeholder="Street Address (optional)"
-                className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
+                className={`w-full px-3 py-2 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                   originalContact && !originalContact.street_address && formData.job_location_address?.trim()
                     ? 'border-emerald-500'
                     : 'border-strong'
@@ -1200,7 +1200,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
 </details>
           </div>
-          <div className="min-w-0 space-y-2.5 lg:space-y-2 lg:border-l lg:border-subtle lg:pl-6">
+          <div className="min-w-0 space-y-2 lg:space-y-1.5 lg:border-l lg:border-subtle lg:pl-6">
             <h3 className="font-semibold text-primary">Request Details</h3>
           <div className="grid grid-cols-3 gap-2">
             <select aria-label="Request type" value={requestType} disabled className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="service">Service</option>{isEditMode&&<option value="project">Project</option>}</select>
