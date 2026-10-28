@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { Shield, Home, Building2, DollarSign, Clock, TrendingUp, RefreshCw } from 'lucide-react';
+import { Shield, Home, Building2, DollarSign, Clock, TrendingUp, RefreshCw, XCircle, Calendar } from 'lucide-react';
 
 interface ContractRow {
   id: string;
@@ -11,6 +11,8 @@ interface ContractRow {
   term_months: number | null;
   renewal_term_months: number | null;
   status: string;
+  activated_at: string | null;
+  cancelled_at: string | null;
 }
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -115,7 +117,7 @@ export default function SecurityAccountStats() {
     try {
       const { data, error } = await supabase
         .from('security_contracts')
-        .select('id, account_type, account_services, monthly_price, term_months, renewal_term_months, status')
+        .select('id, account_type, account_services, monthly_price, term_months, renewal_term_months, status, activated_at, cancelled_at')
         .in('status', ['active', 'pending_approval', 'approved', 'cancelled', 'pending_customer', 'draft']);
 
       if (error) throw error;
@@ -126,6 +128,15 @@ export default function SecurityAccountStats() {
       setLoading(false);
     }
   }
+
+  const cancelled = contracts.filter(c => c.status === 'cancelled');
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const cancelledThisMonth = cancelled.filter(c => c.cancelled_at && new Date(c.cancelled_at) >= monthStart).length;
+  const durations = cancelled.flatMap(c => c.activated_at && c.cancelled_at
+    ? [(new Date(c.cancelled_at).getTime() - new Date(c.activated_at).getTime()) / (1000 * 60 * 60 * 24 * 30)]
+    : []);
+  const averageDuration = durations.length ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length * 10) / 10 : null;
 
   const active = contracts.filter(c => c.status === 'active');
   const totalActive = active.length;
@@ -207,6 +218,13 @@ export default function SecurityAccountStats() {
         <StatCard icon={DollarSign} label="Total Monthly RMR" value={formatCurrency(totalMrr)}
           sub={`Avg ${formatCurrency(totalActive > 0 ? totalMrr / totalActive : 0)}/acct`}
           color="amber" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard icon={XCircle} label="Total Cancelled" value={cancelled.length} color="rose" />
+        <StatCard icon={Calendar} label="Cancelled This Month" value={cancelledThisMonth} color="amber" />
+        <StatCard icon={Clock} label="Avg Contract Duration" value={averageDuration === null ? '—' : `${averageDuration} mo`}
+          sub="Activated to cancelled" color="blue" />
       </div>
 
       {/* Residential vs Commercial breakdown */}
