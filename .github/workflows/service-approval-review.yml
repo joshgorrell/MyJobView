@@ -31,6 +31,7 @@ jobs:
       - run: npm ci
       - run: node tests/service-approval/database.mjs
       - run: node tests/service-approval/payment-edge.mjs
+      - run: node tests/service-approval/email-retry.mjs
       - run: npm run test:service-requests
       - run: npm run test:work-orders
       - run: npm run test:security-onboarding

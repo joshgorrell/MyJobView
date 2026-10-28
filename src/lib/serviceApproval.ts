@@ -31,8 +31,15 @@ export async function sendServiceApproval(requestId: string): Promise<void> {
   const {data,error} = await supabase.functions.invoke('send-service-approval', {body:{requestId,deliveryId}});
   if (error) {
     const detail = await error.context?.json?.().catch(() => null);
-    throw new Error(detail?.error || error.message);
+    const message = detail?.error || error.message;
+    // A revised/expired invitation needs a fresh delivery key. Keep the same key
+    // for ambiguous provider failures so a retry cannot send duplicate mail.
+    if (message.includes('Start a new invitation')) deliveries.delete(requestId);
+    throw new Error(message);
   }
-  if (!data?.success) throw new Error(data?.error || 'Request email could not be sent');
+  if (!data?.success) {
+    if (data?.error?.includes('Start a new invitation')) deliveries.delete(requestId);
+    throw new Error(data?.error || 'Request email could not be sent');
+  }
   deliveries.delete(requestId);
 }
