@@ -136,6 +136,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [showCombineModal, setShowCombineModal] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
   const [contactLogTarget, setContactLogTarget] = useState<ServiceRequest | null>(null);
   const [contactLogRevision, setContactLogRevision] = useState(0);
@@ -218,7 +219,22 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
 
       if (error) throw error;
       setRequests(data || []);
-      if (requestId && data?.length) setExpandedRequest(requestId);
+      if (requestId && data?.length) {
+        setExpandedRequest(requestId);
+        const action = new URLSearchParams(window.location.search).get('serviceRequestAction');
+        const target = (data as ServiceRequest[]).find(item => item.id === requestId);
+        if (target && !['cancelled', 'closed'].includes(target.status)) {
+          if (action === 'edit') setResubmitTarget(target);
+          if ((action === 'assign' || action === 'schedule') && !serviceApprovalPending(target)) setConvertingTo(target.id);
+          if (action === 'cancel') setConfirmCancelId(target.id);
+          if (action === 'close') setConfirmCloseId(target.id);
+        }
+        if (action) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('serviceRequestAction');
+          window.history.replaceState(window.history.state, '', url.toString());
+        }
+      }
     } catch (error) {
       console.error('Error loading service requests:', error);
       setLoadError('Unable to load the service request. Please try again.');
@@ -986,6 +1002,17 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
           setConfirmCancelId(null);
         }}
         onCancel={() => setConfirmCancelId(null)}
+      />
+      <ConfirmModal
+        isOpen={!!confirmCloseId}
+        title="Close Service Request"
+        message="Close this service request? This marks the request closed without cancelling it."
+        confirmLabel="Close Request"
+        onConfirm={() => {
+          if (confirmCloseId) void updateRequestStatus(confirmCloseId, 'closed');
+          setConfirmCloseId(null);
+        }}
+        onCancel={() => setConfirmCloseId(null)}
       />
       {contactLogTarget && <ContactLogModal serviceRequestId={contactLogTarget.id} customerName={contactLogTarget.customer_name} onClose={() => setContactLogTarget(null)} onSaved={() => { setContactLogRevision(n => n + 1); void loadData(); }} />}
       {quickViewContactId && (
