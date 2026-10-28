@@ -10,7 +10,8 @@ const directory = await mkdtemp(join(tmpdir(), 'mjv-navigation-'));
 const fixture = `
 const profile={id:'employee',organization_id:'org',full_name:'Josh Example',role:'admin'};
 export const useAuth=()=>({profile});
-export const useDepartments=()=>({mainDepartments:[],footerDepartments:[],getUserModules:()=>[],starredModules:[{id:"product",module_key:"products",display_name:"Product Catalog",icon:"Menu"},{id:"punchlist",module_key:"punchlist",display_name:"Punchlist",icon:"Menu"},{id:"reviews",module_key:"reviews",display_name:"Feedback",icon:"Star"}],loading:false});
+export const useDepartments=()=>({mainDepartments:[],footerDepartments:[],getUserModules:()=>[],hasModuleAccess:()=>true,starredModules:[{id:"product",module_key:"products",display_name:"Product Catalog",icon:"Menu"},{id:"punchlist",module_key:"punchlist",display_name:"Punchlist",icon:"Menu"},{id:"reviews",module_key:"reviews",display_name:"Feedback",icon:"Star"}],loading:false});
+export const useActivityCounts=()=>({pipeline_lead:0,test_tune:0,feedback:0,service_request:0});export const markActivitySeen=async()=>{};
 export const useTaskCount=()=>0;export const useFishbowlCount=()=>0;export const useToast=()=>({error(){},warning(){},success(){}});
 export const useEmployeeTimePolicy=()=>({dailyClock:true});
 export const getOrganizationTimezone=async()=> 'America/Chicago';
@@ -29,7 +30,7 @@ const server = createServer(async (req, res) => {
 let browser;
 try {
   await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,define:{'import.meta.env.VITE_SUPABASE_URL':'"https://fixture.test"'},format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){
-    b.onResolve({filter:/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useEmployeeTimePolicy$|hooks\/useTaskCount$|hooks\/useFishbowlCount$|Shared\/Toast$|lib\/timezoneUtils$/},()=>({path:'fixture',namespace:'fixture'}));
+    b.onResolve({filter:/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useEmployeeTimePolicy$|hooks\/useTaskCount$|hooks\/useActivityCounts$|hooks\/useFishbowlCount$|Shared\/Toast$|lib\/timezoneUtils$/},()=>({path:'fixture',namespace:'fixture'}));
     b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js',resolveDir:process.cwd()}));
     b.onResolve({filter:/ProposalFollowUps$|LostOpportunityReviews$/},()=>({path:'review-child',namespace:'review-child'}));
     b.onLoad({filter:/.*/,namespace:'review-child'},()=>({contents:'export default ()=>null;',loader:'js'}));
