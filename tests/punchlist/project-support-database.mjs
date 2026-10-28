@@ -214,6 +214,14 @@ await reject(`SELECT request_project_punchlist_visit('${id(50)}',ARRAY['${id(322
 await as(10);
 feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
 assert.equal(feed.flatMap(p=>p.tasks).some(t=>t.id===id(322)),false,'Removed draft hidden from staff feed');
+// Verify the workspace status follows completed linked work orders, but not mixed completion.
+await owner(`INSERT INTO work_orders(id,organization_id,project_id,status) VALUES ('${id(330)}','${id(1)}','${id(50)}','completed'),('${id(331)}','${id(1)}','${id(50)}','pending')`);
+await owner(`INSERT INTO work_order_tasks(work_order_id,organization_id,project_task_id,title,status) VALUES ('${id(330)}','${id(1)}','${id(320)}','First visit','completed'),('${id(331)}','${id(1)}','${id(320)}','Second visit','pending')`);
+feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
+assert.notEqual(feed.flatMap(p=>p.tasks).find(t=>t.id===id(320)).service_status,'completed','Incomplete linked work order prevents completion');
+await owner(`UPDATE work_orders SET status='completed' WHERE id='${id(331)}'`);
+feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
+assert.equal(feed.flatMap(p=>p.tasks).find(t=>t.id===id(320)).service_status,'completed','All linked work orders completed');
 console.log('PASS: eight Test & Tune migrations executed in isolated fixture; edits, photos, visibility, removal, and submitted-item guards.');
 
 await db.close();
