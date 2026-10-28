@@ -126,7 +126,7 @@ ALTER TABLE service_requests ADD PRIMARY KEY(id);
 CREATE TABLE security_payment_methods(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,payment_type text,is_active boolean,exp_year int,exp_month int,verified_at timestamptz,display_brand text,display_last4 text);
 CREATE TABLE notifications(user_id uuid,organization_id uuid,type text,title text,body text,related_id uuid);
 SELECT set_config('test.uid','${id(10)}',false);`);
-await db.exec(await readFile('supabase/migrations/20261028134305_service_customer_scheduling_approval.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261028140433_service_customer_scheduling_approval.sql','utf8'));
 await db.exec(`INSERT INTO service_requests(id,organization_id,contact_id,customer_name,customer_email,job_location_address,job_description,billable_type,billable_by,service_approval_required,service_terms)
  VALUES('${id(180)}','${id(1)}','${id(30)}','Customer','customer@example.com','123 Main','Service gate test','billable','dispatch',true,'Labor $150/hour');`);
 const beforeGate=await count('work_orders');

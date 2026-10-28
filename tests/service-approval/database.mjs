@@ -18,7 +18,7 @@ insert into profiles values('${sales}','${org}','sales',true,'Sales Rep'),('${ma
 insert into contacts values('${customer}','${org}');
 insert into security_payment_methods values('${method}','${org}','${customer}','card',true,2099,12,now(),'Visa','1234'),('${foreignMethod}','${other}','${customer}','ach',true,null,null,now(),'Bank','5678');
 `);
-await db.exec(await readFile('supabase/migrations/20261028134305_service_customer_scheduling_approval.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261028140433_service_customer_scheduling_approval.sql','utf8'));
 const who=uid=>db.exec(`select set_config('app.uid','${uid}',false)`);
 const row=async n=>(await db.query(`select * from service_requests where id='${id(n)}'`)).rows[0];
 const create=async(n,required=true)=>{await who(sales);await db.query(`insert into service_requests(id,organization_id,contact_id,customer_name,customer_email,job_description,request_type,service_approval_required,service_terms) values($1,$2,$3,'Customer','customer@example.com','Repair TV','service',$4,'Labor $150/hour; trip $75; minimum one hour')`,[id(n),org,customer,required]);};
