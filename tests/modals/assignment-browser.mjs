@@ -58,8 +58,8 @@ try {
   const confirmation=page.getByRole('dialog',{name:'Discard Draft?',exact:true});await confirmation.waitFor();
   await page.getByRole('button',{name:'Keep Draft',exact:true}).click();await page.getByRole('button',{name:'Reopen',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('autosave_task_new_support')).data.title),'Support: Needs insurance certificate');
-  await page.getByRole('button',{name:'Reopen',exact:true}).click();assert.equal(await page.getByPlaceholder('Follow up with customer').inputValue(),'Support: Needs insurance certificate');
-  assert.equal(await page.getByRole('combobox',{name:'Assign To',exact:true}).inputValue(),'Me (Staff Member)');
+  await page.getByRole('button',{name:'Reopen',exact:true}).click();await page.waitForFunction(()=>document.querySelector('input[placeholder="Follow up with customer"]')?.value==='Support: Needs insurance certificate');
+  await page.waitForFunction(()=>document.querySelector('input[role="combobox"]')?.value==='Me (Staff Member)');
   await page.getByRole('button',{name:'Cancel',exact:true}).click();await confirmation.waitFor();
   await page.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('button',{name:'Reopen',exact:true}).waitFor();
   await page.waitForTimeout(1100);assert.equal(await page.evaluate(()=>localStorage.getItem('autosave_task_new_support')),null,'Discard must cancel pending autosave');
