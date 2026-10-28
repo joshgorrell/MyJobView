@@ -46,6 +46,9 @@ export async function activeActivity(actor: InternalTimeActor): Promise<Activity
 export async function assertNoInternalTimer(actor: InternalTimeActor) {
   const entry = await activeActivity(actor);
   if (entry?.internal_session_id) throw new Error('Stop Shop Time or Training before taking a break or clocking out for the day.');
+  // Job timers use the same time_entries table but have no internal_session_id.
+  // A payroll clock-out must not leave an active job timer running.
+  if (entry) throw new Error('Stop your active job timer before taking a break or clocking out for the day.');
 }
 async function sessionFor(actor: InternalTimeActor, id: string): Promise<InternalSession> {
   const session = checked(await supabase.from('internal_time_sessions').select('*')
