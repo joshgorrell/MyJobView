@@ -25,7 +25,10 @@ export function useActivityCounts() {
       supabase.rpc('get_test_tune_workspace'),
     ]);
     // Never show inflated counts when a query fails (including before migration deployment).
-    if ([reads, baselines, leads, feedback, service, tune].some(result => result.error)) return;
+    if ([reads, baselines, leads, feedback, service, tune].some(result => result.error)) {
+      setCounts({ pipeline_lead: 0, test_tune: 0, feedback: 0, service_request: 0 });
+      return;
+    }
     const seen = new Set((reads.data || []).map(row => `${row.activity_type}:${row.activity_id}`));
     const baseline = new Map((baselines.data || []).map(row => [row.activity_type, row.started_at]));
     const areas: ActivityArea[] = ['pipeline_lead', 'test_tune', 'feedback', 'service_request'];
