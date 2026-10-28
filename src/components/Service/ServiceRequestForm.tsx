@@ -541,6 +541,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       return;
     }
 
+    if ((formData.earliest_date && formData.earliest_date < todayDate) || (formData.requested_date && formData.requested_date < todayDate)) {
+      notify('Requested scheduling dates cannot be in the past.', { theme: 'blue', tone: 'warning' });
+      return;
+    }
+
     if (formData.earliest_date && formData.requested_date && formData.earliest_date > formData.requested_date) {
       notify('Earliest date must be on or before Need By.', { theme: 'blue', tone: 'warning' });
       return;
