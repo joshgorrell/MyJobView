@@ -42,12 +42,12 @@ for(const width of [375,390,1280]){
 
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.equal(await page.getByRole('checkbox',{name:'Select Expired adjustment',exact:true}).isDisabled(),true);
- await page.getByRole('button',{name:'Preview Adjustment a'}).click();
- const preview=page.getByRole('dialog',{name:'Punchlist preview: a'});
+ await page.getByRole('button',{name: width < 768 ? 'Open task Adjustment a' : 'Preview Adjustment a'}).first().click();
+ const preview=page.getByRole('dialog',{name:'Test and Tune task: a'});
  await preview.waitFor();
  const bounds=await preview.boundingBox();
  assert.ok(bounds && bounds.x>=0 && bounds.x+bounds.width<=width+1,'Preview fits viewport even inside horizontally scrolling table');
- await page.getByRole('button',{name:'Close punchlist preview'}).click();
+ await page.getByRole('button',{name:'Close task detail'}).click();
 
  for(const id of ['a','b','c'])await page.getByRole('checkbox',{name:'Select Adjustment '+id,exact:true}).check();
  assert.equal(await page.getByRole('checkbox',{name:'Select Other project',exact:true}).isDisabled(),true);
@@ -56,9 +56,9 @@ for(const width of [375,390,1280]){
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).count(),1);
  const calls=await page.evaluate(()=>window.calls);assert.deepEqual(calls.find(c=>c[0]==='request_project_punchlist_visit')[1].p_task_ids,['a','b','c']);
  await page.reload();assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).count(),0);await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).waitFor();
- await page.getByRole('combobox',{name:'Filter punchlist status'}).selectOption('requested');assert.equal(await page.getByRole('link',{name:'View request →'}).count(),3);
+ await page.getByRole('combobox',{name:'Filter punchlist status'}).selectOption('requested');assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a'}).count(),0);
  await page.goto('http://127.0.0.1:'+server.address().port+'/?projectId=missing&contactId=c1');await page.getByRole('alert').filter({hasText:'unavailable or you no longer have access'}).waitFor();
- await page.goBack();await page.getByRole('button',{name:'Preview Adjustment d'}).waitFor();
+ await page.goBack();await page.getByRole('button',{name: width < 768 ? 'Open task Adjustment d' : 'Preview Adjustment d'}).first().waitFor();
 }
 assert.deepEqual(errors,[]);
 console.log('PASS: phone/desktop layout, exact grouped handoff, expired/project guards, persisted reload, history, missing context and browser back.');

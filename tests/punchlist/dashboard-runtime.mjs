@@ -39,11 +39,11 @@ render();for(const effect of h.effects.splice(0))effect();await new Promise(r=>s
 const previewTarget={getBoundingClientRect:()=>({left:120,bottom:130})};
 find('Preview a').props.onClick({currentTarget:previewTarget});
 render();
-assert.ok(nodes(tree).some(n=>n.props?.role==='dialog'),'Preview opens as a fixed-position dialog outside the scroll table');
-assert.ok(nodes(tree).some(n=>n.props?.paths?.includes('org/contact/photo.jpg')),'Staff preview receives attached customer photos');
-find('Close punchlist preview').props.onClick();
+assert.ok(nodes(tree).some(n=>n.props?.role==='dialog'),'Task detail opens as a dialog outside the scroll table');
+assert.ok(nodes(tree).some(n=>n.props?.paths?.includes('org/contact/photo.jpg')),'Task detail receives attached customer photos');
+find('Close task detail').props.onClick();
 render();
-assert.ok(!nodes(tree).some(n=>n.props?.role==='dialog'),'Preview can be dismissed');
+assert.ok(!nodes(tree).some(n=>n.props?.role==='dialog'),'Task detail can be dismissed');
 assert.equal(find('Select Expired adjustment').props.disabled,true);
 for(const id of ['a','b','c']){find(`Select ${id}`).props.onChange({target:{checked:true}});render();}
 assert.equal(find('Select Other project').props.disabled,true,'Selection locks to project even for the same customer');
