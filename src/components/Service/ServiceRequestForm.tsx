@@ -742,7 +742,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         if (onSuccess) onSuccess();
         onClose();
         if (serviceRequest?.id) {
-          window.sessionStorage.setItem('m j v-new-service-request'.replace(/ /g, ''), serviceRequest.id);
+          window.sessionStorage.setItem('mjv-new-service-request', serviceRequest.id);
         }
       }, 900);
     } catch (error: any) {
