@@ -129,7 +129,26 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {lastRequestId && canViewServiceRequests && <a href={`/service-requests?serviceRequestId=${encodeURIComponent(lastRequestId)}`} className="inline-flex min-h-11 items-center text-sm text-info">View service request →</a>}
     {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected · {selectedProject?.customer}</span><button disabled={busy || !selectedProject?.can_submit} onClick={() => void submit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Request service'}</button><button disabled={busy} onClick={() => setSelected([])} className="min-h-11 px-3 text-info">Clear selection</button></div>}
     {!loading && !error && !visible.length && <p className="text-sm text-muted">No matching Test &amp; Tune projects.</p>}
-    <div className="overflow-x-auto rounded-lg border border-subtle">
+    <div className="space-y-2 md:hidden" aria-label="Mobile Test and Tune tasks">
+      {rows.map(({ p, t }) => {
+        const description = t.customer_description || t.title;
+        const requested = Boolean(t.request_id);
+        const status = requested ? (['closed', 'completed'].includes(t.service_status || '') ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : t.service_status === 'cancelled' ? 'Cancelled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
+        return <article key={t.id} className="min-w-0 rounded-lg border border-subtle bg-surface p-3">
+          <div className="flex items-start gap-3">
+            {!requested && t.status === 'open' && <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}
+            <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { setPreview(null); setDetailId(t.id); }} aria-label={`Open task ${description}`}>
+              <span className="block break-words font-medium text-primary">{description}</span>
+              <span className="mt-1 block break-words text-xs text-muted">{p.customer} · {p.name}</span>
+              <span className="mt-2 block text-xs text-secondary">{status} · {t.visibility === 'internal' ? 'Private' : 'Public'} · {t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'}</span>
+              <span className="mt-1 block text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : '—'}</span>
+            </button>
+            <button type="button" className="min-h-11 shrink-0 rounded-lg px-2 text-info" aria-label={`Open task ${description}`} onClick={() => setDetailId(t.id)}>›</button>
+          </div>
+        </article>;
+      })}
+    </div>
+    <div className="hidden overflow-x-auto rounded-lg border border-subtle md:block">
       <table className="w-full min-w-[680px] text-left text-sm">
         <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th></tr></thead>
         <tbody className="divide-y divide-subtle">
