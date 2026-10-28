@@ -643,6 +643,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         if (error) throw error;
 
         if (formData.service_approval_required) await deliverApproval(editingRequest.id);
+        submissionSucceededRef.current = true;
         if (onSuccess) onSuccess();
         onClose();
         return;
