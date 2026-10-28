@@ -292,4 +292,5 @@
 /* Prioritize the conversation when the keyboard or landscape leaves little height. */
 @media(max-height:500px) {
   .flow-messaging:has(.conversation-workspace--selected) .flow-heading { display:none; }
+  .flow-messaging .conversation-start > .shrink-0 { display:none; }
 }
