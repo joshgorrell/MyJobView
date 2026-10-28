@@ -46,11 +46,16 @@ fillWithAI({priority:'critical'}); assert.equal(priority(),'normal','Unknown AI 
 fillWithAI({priority:'urgent'}); assert.equal(priority(),'urgent','Supported AI priority is applied');
 fillWithAI({priority:'high'}); assert.equal(priority(),'urgent','Invalid AI values cannot replace a chosen priority');
 const change=(label,value)=>{nodes(tree).find(n=>n.props?.['aria-label']===label).props.onChange({target:{value}});render();};
+const internalSchedulingLabel=nodes(tree).find(n=>n.type==='label'&&text(n).includes('Message to Scheduling (Internal Only)'));
+assert.ok(internalSchedulingLabel,'Scheduling notes must be visibly identified as internal');
+const schedulingMessage=nodes(tree).find(n=>n.type==='textarea'&&n.props.placeholder?.includes('Customer is out of town'));
+assert.ok(schedulingMessage,'Internal scheduling message field exists');
+schedulingMessage.props.onChange({target:{value:'INTERNAL ONLY: do not share with customer'}});render();
 change('Billing type','warranty');change('Warranty reference','Project 101');change('Warranty reason','Return visit');change('Customer contact responsibility','requester');nodes(tree).find(n=>n.type==='input'&&n.props.name==='request-scheduling'&&!n.props.checked).props.onChange();render();const earliest = new Date(); earliest.setDate(earliest.getDate() + 2);
 const needByDate = new Date(); needByDate.setDate(needByDate.getDate() + 4);
 const localDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 change('Earliest date', localDate(earliest));
 const needBy=nodes(tree).find(n=>n.type==='input'&&n.props['aria-label']==='Need by');needBy.props.onChange({target:{value:localDate(needByDate)}});render();
 await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
-const request=calls.find(c=>c[0]==='service_requests')[1];assert.equal(request.earliest_date,localDate(earliest));assert.equal(request.requested_date,localDate(needByDate));assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.warranty_reference,'Project 101');assert.equal(request.warranty_notes,'Return visit');assert.equal(request.job_location_address,'');assert.equal(request.billable_by,'assigned_sales_rep');assert.equal(request.priority,'urgent');
+const request=calls.find(c=>c[0]==='service_requests')[1];assert.equal(request.notes,'INTERNAL ONLY: do not share with customer','Internal scheduling message is persisted on service request only');assert.equal(request.earliest_date,localDate(earliest));assert.equal(request.requested_date,localDate(needByDate));assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.warranty_reference,'Project 101');assert.equal(request.warranty_notes,'Return visit');assert.equal(request.job_location_address,'');assert.equal(request.billable_by,'assigned_sales_rep');assert.equal(request.priority,'urgent');
 console.log('Fast intake submits without mandatory address and preserves scheduling/warranty context.');
