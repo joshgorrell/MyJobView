@@ -12,6 +12,19 @@ try{for(const size of [{width:320,height:568},{width:390,height:844},{width:1280
  const box=await page.getByRole('dialog').boundingBox();assert.ok(box.width<=size.width && box.height<=size.height);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow');
  await page.getByRole('button',{name:'Record Job Time',exact:true}).waitFor();
+ await page.locator('.qam-sheet').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{})));});
+ const frame=await page.getByRole('dialog').boundingBox();
+ const nav=await page.getByRole('navigation',{name:'Time Clock views'}).boundingBox();
+ for(const tab of ['Time Off','Team','History','Calendar','Today']){
+   await page.getByRole('button',{name:tab,exact:true}).click();
+   const current=await page.getByRole('dialog').boundingBox();
+   const currentNav=await page.getByRole('navigation',{name:'Time Clock views'}).boundingBox();
+   for(const key of ['x','y','width','height']){
+     assert.ok(Math.abs(current[key]-frame[key])<1,`Modal ${key} stays fixed on ${tab}`);
+     assert.ok(Math.abs(currentNav[key]-nav[key])<1,`Tabs ${key} stays fixed on ${tab}`);
+   }
+ }
+
  await page.getByRole('button',{name:'Time Off',exact:true}).click();await page.getByText('My PTO requests').waitFor();
  await page.getByRole('button',{name:'Team',exact:true}).click();await page.getByText('Approved team absences').waitFor();
  await page.getByRole('button',{name:'History',exact:true}).click();await page.getByText('Approved Job Time').waitFor();
