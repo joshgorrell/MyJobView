@@ -708,8 +708,8 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
       <div ref={conversationSize.ref} style={fitScreen ? undefined : { height: conversationSize.height }} className={`conversation-workspace ${selectedThread ? 'conversation-workspace--selected' : ''} min-h-0 min-w-0 flex gap-2`}>
         {threads.length === 0 ? <div className="conversation-start bg-surface rounded-lg border border-subtle">
           {loadError ? <div className="p-5 text-center"><h2 className="text-lg font-semibold">Conversations are unavailable</h2><p className="mt-2 text-sm text-secondary">Try loading your messages again.</p><button type="button" onClick={() => void loadThreads()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Reload conversations</button></div> : <>
-            <div className="shrink-0 px-4 pt-4"><h2 className="text-lg font-semibold text-primary">Start a conversation</h2><p className="mt-1 text-sm text-secondary">{includeCoworkers ? 'Choose a person or department, then write your message.' : 'Start a customer conversation.'}</p></div>
-            {!showTeamComposer && !showNewThread && <NewTeamMessage inline scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={includeCoworkers} canCustomer={includeCustomers}
+            <div className="shrink-0 px-4 pt-4"><h2 className="text-lg font-semibold text-primary">Start a conversation</h2><p className="mt-1 text-sm text-secondary">{showCoworkers ? 'Choose a person or department, then write your message.' : 'Start a customer conversation.'}</p></div>
+            {!showTeamComposer && !showNewThread && <NewTeamMessage inline scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={showCoworkers} canCustomer={showCustomers}
               onClose={() => {}} onCustomer={() => setShowNewThread(true)} onSent={openSentTeamMessage} />}
           </>}
         </div> : <>
@@ -1133,7 +1133,7 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
         </>}
       </div>
 
-      {showTeamComposer && <NewTeamMessage scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={includeCoworkers} canCustomer={includeCustomers}
+      {showTeamComposer && <NewTeamMessage scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={showCoworkers} canCustomer={showCustomers}
         onClose={() => setShowTeamComposer(false)} onCustomer={() => { setShowTeamComposer(false); setShowNewThread(true); }}
         onSent={openSentTeamMessage} />}
       {/* New Thread Modal */}

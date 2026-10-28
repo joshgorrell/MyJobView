@@ -891,14 +891,14 @@ function AppContent() {
         />
       )}
 
-      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
         {!isStandalone && bookmarksVisible && starredModules.length > 0 && (
           <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5">
             <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
           </div>
         )}
         <main
-          className={`min-h-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
+          className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>

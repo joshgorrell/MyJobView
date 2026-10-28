@@ -271,7 +271,7 @@
 .workspace-shell:has(main > .flow-workspace.flow-messaging) { height:100dvh; min-height:0; }
 .workspace-shell main:has(> .flow-workspace.flow-messaging) { overflow:hidden; }
 
-.conversation-start { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; max-width:680px; margin-inline:auto; width:100%; overflow:hidden; }
+.conversation-start { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; max-width:960px; margin-inline:auto; width:100%; overflow:hidden; }
 .flow-messaging .flow-content > .flow-message-filters { padding-bottom:6px; }
 
 /* Keep the inbox above workspace footers, with room for touch controls. */
@@ -292,9 +292,34 @@
 /* Prioritize the conversation when the keyboard or landscape leaves little height. */
 @media(max-height:500px) {
   .flow-messaging:has(.conversation-workspace--selected) .flow-heading { display:none; }
+  .flow-messaging:has(.conversation-workspace--selected) .flow-toolbar { display:none; }
+  .flow-messaging .conversation-back { display:inline-flex; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
   .flow-messaging .conversation-start > .shrink-0 { display:none; }
 }
 @container(max-width:340px) {
   .flow .flow-heading-actions .flow-new-message { width:44px; padding:0; flex-shrink:0; }
   .flow .flow-new-message > span { display:none; }
+}
+
+/* Keep message navigation on one row when the workspace has tablet width. */
+.flow-messaging .flow-toolbar { flex-wrap:wrap; gap:8px 16px; padding-bottom:8px; }
+.flow-messaging .flow-toolbar > .flow-message-filters { padding:0; margin:0; }
+.flow-messaging .flow-message-filters button { min-height:44px; }
+.flow-messaging .flow-toolbar > .flow-message-filters { margin-left:auto; }
+.flow-messaging .flow-customer-inbox { padding:8px 12px 12px; }
+.team-message-body > * { flex-shrink:0; }
+.team-message-body > .team-message-editor { flex-shrink:1; }
+.team-message-body > .team-message-recipients { flex-shrink:1; overscroll-behavior:contain; }
+@container(max-width:760px) {
+  .flow-messaging .flow-toolbar > .flow-message-filters { flex-basis:100%; margin-left:0; display:grid; }
+}
+@media(max-width:640px) {
+  .flow-messaging .flow-customer-inbox { padding:4px 8px 8px; }
+}
+@media(max-height:700px) {
+  .flow-messaging .conversation-start > .shrink-0 { display:none; }
+  .flow-messaging .team-message-body { padding:10px 12px; gap:8px; }
+}
+@media(max-height:600px) {
+  .team-message-body > .team-message-recipients { flex:none; overflow:visible; }
 }
