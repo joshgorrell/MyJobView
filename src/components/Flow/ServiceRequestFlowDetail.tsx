@@ -10,6 +10,12 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
   const [preferredTechNames, setPreferredTechNames] = useState<string[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
+    setRequest(null);
+    setActivities([]);
+    setPreferredTechNames([]);
+    setError('');
+  }, [requestId]);
+  useEffect(() => {
     let active = true;
     Promise.all([
       supabase.from('service_requests').select('id,customer_name,job_description,notes,priority,status,created_at,customer_contact_confirmed_at,requested_date,earliest_date,requested_tech_ids,work_order_id,work_order:work_orders!service_requests_work_order_id_fkey(id,work_order_number,status,scheduled_date)').eq('id', requestId).maybeSingle(),
