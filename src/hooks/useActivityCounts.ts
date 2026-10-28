@@ -16,16 +16,17 @@ export function useActivityCounts() {
       return;
     }
     const org = profile.organization_id;
-    const [reads, baselines, leads, feedback, service, tune] = await Promise.all([
+    const [reads, baselines, leads, feedback, lostFeedback, service, tune] = await Promise.all([
       supabase.from('activity_notification_reads').select('activity_type,activity_id').eq('user_id', profile.id),
       supabase.from('activity_notification_baselines').select('activity_type,started_at').eq('user_id', profile.id),
       supabase.from('leads').select('id,is_fishbowl,created_at').eq('organization_id', org).eq('assigned_to', profile.id),
       supabase.from('customer_satisfaction').select('id,responded_at').eq('organization_id', org).not('responded_at', 'is', null),
+      supabase.from('lost_review_details').select('request_id,response_created_at,responded_at').eq('organization_id', org).not('responded_at', 'is', null),
       supabase.from('service_requests').select('id,created_at').eq('organization_id', org),
       supabase.rpc('get_test_tune_workspace'),
     ]);
     // Never show inflated counts when a query fails (including before migration deployment).
-    if ([reads, baselines, leads, feedback, service, tune].some(result => result.error)) {
+    if ([reads, baselines, leads, feedback, lostFeedback, service, tune].some(result => result.error)) {
       setCounts({ pipeline_lead: 0, test_tune: 0, feedback: 0, service_request: 0 });
       return;
     }
@@ -54,7 +55,10 @@ export function useActivityCounts() {
     setCounts({
       pipeline_lead: count('pipeline_lead', (leads.data || []).filter(row => !row.is_fishbowl && isNew('pipeline_lead', row.created_at)).map(row => row.id)),
       test_tune: count('test_tune', customerTasks),
-      feedback: count('feedback', (feedback.data || []).filter(row => isNew('feedback', row.responded_at)).map(row => row.id)),
+      feedback: count('feedback', [
+        ...(feedback.data || []).filter(row => isNew('feedback', row.responded_at)).map(row => row.id),
+        ...(lostFeedback.data || []).filter(row => isNew('feedback', row.response_created_at || row.responded_at)).map(row => row.request_id),
+      ]),
       service_request: count('service_request', (service.data || []).filter(row => isNew('service_request', row.created_at)).map(row => row.id)),
     });
   }, [profile?.id, profile?.organization_id]);
