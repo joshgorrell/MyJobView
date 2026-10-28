@@ -59,3 +59,9 @@ const needBy=nodes(tree).find(n=>n.type==='input'&&n.props['aria-label']==='Need
 await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
 const request=calls.find(c=>c[0]==='service_requests')[1];assert.equal(request.notes,'INTERNAL ONLY: do not share with customer','Internal scheduling message is persisted on service request only');assert.equal(request.earliest_date,localDate(earliest));assert.equal(request.requested_date,localDate(needByDate));assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.warranty_reference,'Project 101');assert.equal(request.warranty_notes,'Return visit');assert.equal(request.job_location_address,'');assert.equal(request.billable_by,'assigned_sales_rep');assert.equal(request.priority,'urgent');
 console.log('Fast intake submits without mandatory address and preserves scheduling/warranty context.');
+
+// Regression: internal scheduling notes must not prefill customer-visible work-order descriptions.
+const workOrderSource=fs.readFileSync('src/components/Production/CreateWorkOrderModal.tsx','utf8');
+assert.match(workOrderSource,/notes:\s*'',\s*internal_notes:\s*serviceRequest\s*\?/,'Work-order conversion must keep scheduling notes exclusively internal');
+assert.doesNotMatch(workOrderSource,/notes:\s*serviceRequest\?\.notes/,'Scheduling notes must never populate customer-visible work-order notes');
+console.log('Service scheduling message is isolated from customer-visible work-order description.');
