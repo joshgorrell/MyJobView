@@ -806,7 +806,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
 
                         {request.notes && (
                           <div className="p-3 bg-canvas rounded-lg border border-strong">
-                            <div className="text-xs font-medium text-muted mb-1">Notes</div>
+                            <div className="text-xs font-medium text-muted mb-1">Internal scheduling message (staff only)</div>
                             <div className="text-sm text-muted whitespace-pre-wrap">{request.notes}</div>
                           </div>
                         )}

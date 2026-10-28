@@ -97,6 +97,8 @@ const MAX_PHOTOS = 3;
 export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, editingRequest, aiPrefill }: ServiceRequestFormProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
+  const submissionSucceededRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -108,6 +110,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const locationTouched = useRef(false);
   const [searching, setSearching] = useState(false);
   const [technicians, setTechnicians] = useState<{id: string; full_name: string}[]>([]);
+  const [technicianSearch, setTechnicianSearch] = useState('');
+  const localToday = new Date();
+  const todayDate = `${localToday.getFullYear()}-${String(localToday.getMonth() + 1).padStart(2, '0')}-${String(localToday.getDate()).padStart(2, '0')}`;
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const [warrantyReferences, setWarrantyReferences] = useState<string[]>([]);
   const projectLoadVersion = useRef(0);
@@ -530,9 +535,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current || submissionSucceededRef.current) return;
 
     if (!formData.customer_name.trim()) {
       notify('Please enter customer name', { theme: 'blue', tone: 'warning' });
+      return;
+    }
+
+    if ((formData.earliest_date && formData.earliest_date < todayDate) || (formData.requested_date && formData.requested_date < todayDate)) {
+      notify('Requested scheduling dates cannot be in the past.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -579,6 +590,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   }
 
   async function submitForm() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    submissionSucceededRef.current = false;
     setLoading(true);
 
     try {
@@ -637,7 +651,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
         if (error) throw error;
 
-        if (formData.service_approval_required) await deliverApproval(editingRequest.id);
+        submissionSucceededRef.current = true;
+        if (formData.service_approval_required) {
+          try {
+            await deliverApproval(editingRequest.id);
+          } catch (approvalError) {
+            console.error('Service request updated, but approval delivery failed:', approvalError);
+            notify('Service request updated, but approval delivery failed. Please retry approval from the request.', { theme: 'blue', tone: 'warning' });
+          }
+        }
         if (onSuccess) onSuccess();
         onClose();
         return;
@@ -719,7 +741,17 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         throw new Error(`Failed to create work order request: ${requestError.message}`);
       }
 
-      if (formData.service_approval_required) await deliverApproval(serviceRequest.id);
+      // The request is committed. Never allow a retry to insert a duplicate if
+      // optional follow-up work (approval email or photo upload) fails.
+      submissionSucceededRef.current = true;
+      if (formData.service_approval_required) {
+        try {
+          await deliverApproval(serviceRequest.id);
+        } catch (approvalError) {
+          console.error('Service request saved, but approval delivery failed:', approvalError);
+          notify('Service request saved, but the approval could not be delivered. Please retry approval from the request.', { theme: 'blue', tone: 'warning' });
+        }
+      }
 
       // Upload photos if any
       if (photos.length > 0 && serviceRequest?.id) {
@@ -727,29 +759,36 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         try {
           const photoPaths = await uploadPhotos(serviceRequest.id);
           if (photoPaths.length > 0) {
-            await supabase
+            const { error: attachmentError } = await supabase
               .from('service_requests')
               .update({ attachments: photoPaths })
               .eq('id', serviceRequest.id);
+            if (attachmentError) throw attachmentError;
           }
+        } catch (photoError) {
+          console.error('Service request saved, but photo upload failed:', photoError);
+          notify('Service request saved, but photos could not be attached. You can add them later.', { theme: 'blue', tone: 'warning' });
         } finally {
           setUploadingPhotos(false);
         }
       }
 
+      submissionSucceededRef.current = true;
       setShowSuccess(true);
       setTimeout(() => {
+        if (serviceRequest?.id) {
+          window.sessionStorage.setItem('mjv-new-service-request', serviceRequest.id);
+          window.dispatchEvent(new CustomEvent('mjv-service-request-created', { detail: serviceRequest.id }));
+        }
         if (onSuccess) onSuccess();
         onClose();
-        if (serviceRequest?.id) {
-          window.location.hash = `#dispatch`;
-        }
       }, 900);
     } catch (error: any) {
       console.error('Error submitting work order request:', error);
       const errorMessage = error?.message || 'Unknown error occurred';
       notify(`Failed to submit work order request: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
+      if (!submissionSucceededRef.current) submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -768,10 +807,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       scrollBody={false}
       wide
       showSuccess={showSuccess}
-      successMessage="Work Order Request Created!"
+      successMessage="Service request created successfully."
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-3 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-3 lg:items-start">
+        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-2 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-2 lg:items-start">
           <div className="lg:col-span-2">
           <div className="space-y-2 lg:space-y-0 lg:flex lg:items-center lg:justify-between [&>div]:mb-0">
           {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
@@ -873,7 +912,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-1">
                         <p className="min-w-0 truncate font-semibold text-primary">{formData.customer_name || 'Loading customer…'}</p>
-                        <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" title="Open master customer record" aria-label="Open master customer record in a new tab" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-blue-500 hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
+                        <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" title="Open master customer record" aria-label="Open master customer record in a new tab" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-blue-500 hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
                           <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         </a>
                       </div>
@@ -894,7 +933,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 )}
 
                 {showNewCustomer && !formData.contact_id && (
-                  <div className="bg-blue-950/40 border border-blue-700/50 rounded-lg p-3 flex items-center justify-between">
+                  <div className="bg-blue-950/40 border border-blue-700/50 rounded-lg px-3 py-1 flex items-center justify-between">
                     <span className="text-blue-400 font-medium">
                       Creating New Customer
                     </span>
@@ -927,16 +966,16 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
                   placeholder="Customer Name *"
                   required
-                  className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder-gray-500"
+                  className="w-full px-3 py-2 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base text-primary placeholder-gray-500"
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <div className="relative">
                     <input
                       type="tel"
                       value={formData.customer_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
                       placeholder="Phone"
-                      className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
+                      className={`w-full px-3 py-2 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                         originalContact && !originalContact.phone && formData.customer_phone?.trim()
                           ? 'border-emerald-500'
                           : 'border-strong'
@@ -952,7 +991,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                       value={formData.customer_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
                       placeholder="Email"
-                      className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
+                      className={`w-full px-3 py-2 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                         originalContact && !originalContact.email && formData.customer_email?.trim()
                           ? 'border-emerald-500'
                           : 'border-strong'
@@ -1050,7 +1089,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   }));
                 }}
                 placeholder="Street Address (optional)"
-                className={`w-full px-4 py-3 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
+                className={`w-full px-3 py-2 bg-surface border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg text-primary placeholder:text-muted ${
                   originalContact && !originalContact.street_address && formData.job_location_address?.trim()
                     ? 'border-emerald-500'
                     : 'border-strong'
@@ -1109,11 +1148,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           </div>}
           <details className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">+ Details · notes, photos</summary><div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-secondary mb-2">Additional Notes</label>
+              <label className="block text-sm font-medium text-secondary mb-2">Message to Scheduling (Internal Only)</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Any additional context for the service team..."
+                placeholder="Example: Customer is out of town until next Friday. Call to schedule after they return."
                 rows={3}
                 className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
               />
@@ -1168,19 +1207,19 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
 </details>
           </div>
-          <div className="min-w-0 space-y-2.5 lg:space-y-2 lg:border-l lg:border-subtle lg:pl-6">
+          <div className="min-w-0 space-y-2 lg:space-y-1.5 lg:border-l lg:border-subtle lg:pl-6">
             <h3 className="font-semibold text-primary">Request Details</h3>
           <div className="grid grid-cols-3 gap-2">
             <select aria-label="Request type" value={requestType} disabled className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="service">Service</option>{isEditMode&&<option value="project">Project</option>}</select>
             <select aria-label="Priority" value={formData.priority} onChange={e => setFormData(prev => ({...prev, priority: e.target.value as 'normal' | 'urgent'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="normal">Normal</option><option value="urgent">Urgent</option></select>
             <select aria-label="Billing type" value={formData.billable_type} onChange={e => setFormData(prev => ({...prev, billable_type: e.target.value as 'billable' | 'warranty'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="billable">Billable</option><option value="warranty">Warranty</option></select>
           </div>
-          {formData.billable_type === 'warranty' && <div className="grid grid-cols-2 gap-2">
-            <label className="block text-sm text-secondary col-span-2" htmlFor="request-warranty-type">Warranty for</label>
+          {formData.billable_type === 'warranty' && <div className="grid grid-cols-2 gap-1.5">
+            <label className="sr-only" htmlFor="request-warranty-type">Warranty for</label>
             <select id="request-warranty-type" value={formData.warranty_type} onChange={e => setFormData(prev => ({...prev, warranty_type: e.target.value, warranty_reference: ''}))} className="min-w-0 w-full min-h-11 bg-surface border border-strong rounded-lg text-base text-primary px-2"><option value="project">Project</option><option value="previous_service">Previous Service</option><option value="equipment">Equipment</option><option value="other">Other</option></select>
             <datalist id="service-request-warranty-references">{warrantyReferences.map(value => <option key={value} value={value} />)}</datalist>
             <input list="service-request-warranty-references" aria-label="Warranty reference" placeholder="Reference" value={formData.warranty_reference} onChange={e => setFormData(prev => ({...prev, warranty_reference: e.target.value}))} className="min-w-0 w-full px-2 py-2 bg-surface border border-strong rounded-lg text-base text-primary" />
-            <textarea rows={2} aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="col-span-2 w-full p-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+            <textarea rows={1} aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="col-span-2 w-full p-2 bg-surface border border-strong rounded-lg text-base text-primary" />
           </div>}
 <div className="space-y-2">
           {/* Billable By (Service mode only) */}
@@ -1215,7 +1254,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
 </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-2 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-1 min-w-0">
             <label className="block min-w-0 space-y-1">
               <span className="text-sm font-medium text-secondary">Customer Contact</span>
               <select aria-label="Customer contact responsibility" value={formData.customer_contact_instruction} onChange={e => setFormData(prev => ({ ...prev, customer_contact_instruction: e.target.value }))} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
@@ -1224,17 +1263,20 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <option value="requester">I will contact customer</option>
               </select>
             </label>
-            <label className="block min-w-0 space-y-1">
-              <span className="text-sm font-medium text-secondary">Preferred Technician</span>
-              <select aria-label="Preferred technician" value={formData.requested_tech_ids.length > 1 ? 'existing' : formData.requested_tech_ids[0] || ''} onChange={e => {
-                if (e.target.value !== 'existing') setFormData(prev => ({ ...prev, requested_tech_ids: e.target.value ? [e.target.value] : [] }));
-              }} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
-                <option value="">No preference</option>
-                {formData.requested_tech_ids.length > 1 && <option value="existing">Keep existing preferences</option>}
-                {formData.requested_tech_ids.length === 1 && !technicians.some(tech => tech.id === formData.requested_tech_ids[0]) && <option value={formData.requested_tech_ids[0]}>Existing preference</option>}
-                {technicians.map(tech => <option key={tech.id} value={tech.id}>{tech.full_name}</option>)}
-              </select>
-            </label>
+            <div className="min-w-0 space-y-1">
+              <label htmlFor="service-tech-search" className="block text-sm font-medium text-secondary">Preferred technicians (optional)</label>
+              <input id="service-tech-search" type="search" value={technicianSearch} onChange={e => setTechnicianSearch(e.target.value)} placeholder="Search technicians" className="w-full h-9 px-3 bg-surface border border-strong rounded-lg text-base text-primary" />
+              <div className="flex flex-wrap gap-1">
+                {formData.requested_tech_ids.map(id => {
+                  const tech = technicians.find(t => t.id === id);
+                  return <button key={id} type="button" title="Remove preferred technician" onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: prev.requested_tech_ids.filter(value => value !== id) }))} className="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-primary">{tech?.full_name || 'Technician'} ×</button>;
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2 lg:gap-1" role="group" aria-label="Preferred technician choices">
+                <button type="button" aria-pressed={formData.requested_tech_ids.length === 0} onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: [] }))} className="rounded-md border border-strong px-2 py-1 text-sm">Any available</button>
+                {technicianSearch.trim() && technicians.filter(tech => tech.full_name.toLowerCase().includes(technicianSearch.trim().toLowerCase()) && !formData.requested_tech_ids.includes(tech.id)).slice(0, 6).map(tech => <button key={tech.id} type="button" onClick={() => { setFormData(prev => ({ ...prev, requested_tech_ids: [...prev.requested_tech_ids, tech.id] })); setTechnicianSearch(''); }} className="rounded-md border border-strong px-2 py-1 text-sm">{tech.full_name} +</button>)}
+              </div>
+            </div>
             <fieldset className="min-w-0">
               <legend className="text-sm font-medium text-secondary mb-1">Scheduling</legend>
               <div className="flex gap-2">
@@ -1257,13 +1299,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             {specificDate && <div className="grid grid-cols-2 gap-3 sm:col-span-2 min-w-0">
               <label className="block min-w-0 space-y-1">
                 <span className="text-sm font-medium text-secondary">Earliest date</span>
-                <input type="date" aria-label="Earliest date" value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+                <input type="date" aria-label="Earliest date" min={todayDate} value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
               </label>
               <label className="block min-w-0 space-y-1">
                 <span className="text-sm font-medium text-secondary">Need by</span>
-                <input type="date" aria-label="Need by" value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+                <input type="date" aria-label="Need by" min={formData.earliest_date && formData.earliest_date > todayDate ? formData.earliest_date : todayDate} value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
               </label>
             </div>}
+            {specificDate && <p className="sm:col-span-2 text-xs text-muted">Requested dates are not guaranteed. Our scheduling team will confirm availability before scheduling the work order.</p>}
           </div>
           </div>
         </div>
