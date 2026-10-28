@@ -26,26 +26,31 @@ export function CustomerTimeTimer({ onChanged }: { onChanged?: () => void }) {
   const [session, setSession] = useState<any>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [now, setNow] = useState(Date.now());
   async function load() {
     if (!profile) return;
-    const { data, error } = await supabase
-      .from("customer_time_sessions")
-      .select(
-        "id,clock_in,notes,project_id,customer:contacts(full_name),project:projects(name,project_number)",
-      )
-      .eq("technician_id", profile.id)
-      .is("clock_out", null)
-      .maybeSingle();
-    if (error)
-      setError(
-        "Unable to check your customer timer. Refresh before starting more time.",
-      );
-    else {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("customer_time_sessions")
+        .select(
+          "id,clock_in,notes,project_id,customer:contacts!customer_time_sessions_contact_id_fkey(full_name),project:projects!customer_time_sessions_project_id_fkey(name,project_number)",
+        )
+        .eq("technician_id", profile.id)
+        .is("clock_out", null)
+        .maybeSingle();
+      if (error) throw error;
       setSession(data);
       setError("");
+    } catch (error) {
+      console.error("Customer timer lookup failed:", error);
+      setError("Unable to load your customer timer. Try again.");
+    } finally {
+      setLoading(false);
     }
   }
+
   useEffect(() => {
     void load();
     const tick = setInterval(() => setNow(Date.now()), 1000);
@@ -125,9 +130,13 @@ export function CustomerTimeTimer({ onChanged }: { onChanged?: () => void }) {
         </>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
+        <div className="space-y-2">
+          <p role="alert" className="text-sm text-red-600">{error}</p>
+          <button type="button" onClick={() => void load()} disabled={loading || busy}
+            className="min-h-11 rounded-lg border border-subtle px-3 py-2 text-sm font-medium disabled:opacity-50">
+            {loading ? "Checking timer…" : "Retry customer timer"}
+          </button>
+        </div>
       )}
     </section>
   );

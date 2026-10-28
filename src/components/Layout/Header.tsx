@@ -8,7 +8,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { formatRoleName } from '../../lib/utils';
 import { NotificationBell } from '../Notifications/NotificationBell';
-import { TimeButton } from './QuickClockButton';
 import { supabase } from '../../lib/supabase';
 
 interface HeaderProps {
@@ -182,7 +181,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
 
           {/* Desktop Actions */}
           <div className="hidden md:flex shrink-0 items-center gap-3">
-            <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} /><TimeButton onNavigate={onNavigate} />
+            <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} />
 
             <div className="relative" ref={createMenuRef}>
               <button
@@ -323,7 +322,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
 
           {/* Mobile Actions */}
           <div className="md:hidden ml-auto flex shrink-0 items-center gap-0 sm:gap-2">
-            <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} /><TimeButton onNavigate={onNavigate} />
+            <DailyLaunchpadButton onOpen={()=>setCommandCenterOpen(true)} />
             <NotificationBell
               onTabChange={(tab) => { onTabChange(tab); setMobileMenuOpen(false); }}
               onLeadClick={(leadId) => {
