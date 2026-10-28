@@ -120,5 +120,21 @@ await assert.rejects(create(171,[order({assigned_to:id(12),start_time:'11:30',en
 const authenticatedCreate=await create(172,[order({start_date:'2027-01-08'})]);assert.equal(authenticatedCreate.length,1,'Private trigger functions execute for authenticated callers');
 await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);
 await assert.rejects(create(173,[order()]),/organization/);await db.exec('RESET ROLE');
+// The customer gate must also reject the real individual/team/combine RPC paths atomically.
+await db.exec(`CREATE ROLE service_role;
+ALTER TABLE service_requests ADD PRIMARY KEY(id);
+CREATE TABLE security_payment_methods(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,payment_type text,is_active boolean,exp_year int,exp_month int,verified_at timestamptz,display_brand text,display_last4 text);
+CREATE TABLE notifications(user_id uuid,organization_id uuid,type text,title text,body text,related_id uuid);
+SELECT set_config('test.uid','${id(10)}',false);`);
+await db.exec(await readFile('supabase/migrations/20261028134305_service_customer_scheduling_approval.sql','utf8'));
+await db.exec(`INSERT INTO service_requests(id,organization_id,contact_id,customer_name,customer_email,job_location_address,job_description,billable_type,billable_by,service_approval_required,service_terms)
+ VALUES('${id(180)}','${id(1)}','${id(30)}','Customer','customer@example.com','123 Main','Service gate test','billable','dispatch',true,'Labor $150/hour');`);
+const beforeGate=await count('work_orders');
+const gatedCreate=()=>db.query('SELECT create_work_order_assignments($1,$2,$3)',[id(181),JSON.stringify([{work_order:order({start_date:'2027-02-01'})},{work_order:order({start_date:'2027-02-01',assigned_to:id(12)})}]),id(180)]);
+await assert.rejects(gatedCreate(),/required before scheduling/);assert.equal(await count('work_orders'),beforeGate,'No individual/team booking survives a failed customer gate');
+await assert.rejects(db.query('SELECT create_combined_work_orders($1,$2,$3,$4,$5,$6,$7,$8,NULL)',[id(182),[id(180)],[id(11)],'2027-02-01','09:00','10:00',1,'Combined gate test']),/required before scheduling/);
+assert.equal(await count('work_orders'),beforeGate,'Combine rolls back its booking on a failed customer gate');
+await db.query("SELECT staff_service_approval('waive',$1,'Known customer—approved by service manager',NULL)",[id(180)]);
+const released=await gatedCreate();assert.equal(released.rows[0].create_work_order_assignments.length,2,'Manager waiver releases the same team booking');
 console.log('Complete scheduling: required fields, active technicians, conflicts, PTO, atomic team/split/combine/recurrence, retries, tenant checks and legacy history passed.');
 await db.close();

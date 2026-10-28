@@ -118,6 +118,7 @@ const TimeClockHistory = lazy(() => import('./components/Dispatch/TimeClockHisto
 const ContractManagement = lazy(() => import('./components/Finance/ContractOnboarding'));
 const SecurityOnboarding = lazy(() => import('./components/Finance/SecurityOnboarding'));
 const FinanceDashboard = lazy(() => import('./components/Finance/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })));
+const ServiceApprovalPage = lazy(() => import('./components/Portal/ServiceApprovalPage'));
 const SecurityOnboardingPortal = lazy(() => import('./components/Portal/SecurityOnboardingPortal'));
 const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m => ({ default: m.PortalLogin })));
 const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
@@ -493,6 +494,7 @@ function AppContent() {
     '/portal',
     '/portal/dashboard',
     '/portal/security',
+    '/portal/service-approval',
     '/portal/punchlist',
     '/portal/proposals',
     '/portal/vip-membership',
@@ -550,6 +552,10 @@ function AppContent() {
         <SecurityOnboardingPortal token={token || undefined} />
       </Suspense>
     );
+  }
+
+  if (currentPath === '/portal/service-approval') {
+    return <Suspense fallback={<LoadingFallback />}><ServiceApprovalPage /></Suspense>;
   }
 
   if (currentPath === '/portal/dashboard') {

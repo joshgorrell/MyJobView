@@ -1,0 +1,42 @@
+name: Service approval review
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'supabase/**'
+      - 'tests/service-approval/**'
+      - 'tests/service-requests/**'
+      - 'tests/work-orders/**'
+      - '.github/workflows/service-approval-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Service approval and scheduling safeguards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: https://service-test.supabase.co
+      VITE_SUPABASE_ANON_KEY: test-key
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node tests/service-approval/database.mjs
+      - run: node tests/service-approval/payment-edge.mjs
+      - run: npm run test:service-requests
+      - run: npm run test:work-orders
+      - run: npm run test:security-onboarding
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
+      - run: npx playwright install --only-shell chromium
+      - run: node tests/service-approval/browser.mjs
+      - run: node tests/service-requests/intake-browser.mjs

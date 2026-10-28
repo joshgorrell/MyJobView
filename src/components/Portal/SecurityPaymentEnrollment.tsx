@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { securityPaymentRequest, type SecurityPaymentMethod } from '../../lib/securityOnboarding';
 
+type PaymentRequest = <T>(action: 'list' | 'add' | 'verify', payload?: Record<string, unknown>) => Promise<T>;
+
 interface Props {
   contractId: string; token: string; selectedId: string;
   onSelect: (method: SecurityPaymentMethod) => void;
+  request?: PaymentRequest;
+  serviceBooking?: boolean;
 }
 
-export default function SecurityPaymentEnrollment({contractId,token,selectedId,onSelect}: Props) {
+export default function SecurityPaymentEnrollment({contractId,token,selectedId,onSelect,request:customRequest,serviceBooking=false}: Props) {
+  const request: PaymentRequest = useCallback((action, payload) => customRequest ? customRequest(action, payload) : securityPaymentRequest(action, contractId, token, payload), [customRequest,contractId,token]);
   const [methods,setMethods]=useState<SecurityPaymentMethod[]>([]);
   const [environment,setEnvironment]=useState('');
   const [loading,setLoading]=useState(true);
@@ -15,31 +20,31 @@ export default function SecurityPaymentEnrollment({contractId,token,selectedId,o
   const load=useCallback(async()=>{
     setLoading(true);setError('');
     try {
-      const result=await securityPaymentRequest<{methods:SecurityPaymentMethod[];environment:string}>('list',contractId,token);
+      const result=await request<{methods:SecurityPaymentMethod[];environment:string}>('list');
       setMethods(result.methods.filter(m=>m.payment_type==='ach' || (m.exp_year && m.exp_month && new Date(m.exp_year,m.exp_month,1)>new Date())));
       setEnvironment(result.environment);
     } catch(e) {setError(e instanceof Error ? e.message : 'Unable to load payment methods');}
     finally {setLoading(false);}
-  },[contractId,token]);
+  },[request]);
   useEffect(()=>{void load();},[load]);
   return <div className="space-y-4">
-    <p className="text-sm text-gray-700">A payment method on file and automatic recurring payments are required for security monitoring. Select an existing method or securely add a card or bank account.</p>
+    <p className="text-sm text-gray-700">{serviceBooking ? 'Select an existing payment method or securely add one for your service visit. Nothing will be charged now.' : 'A payment method on file and automatic recurring payments are required for security monitoring. Select an existing method or securely add a card or bank account.'}</p>
     {environment === 'sandbox' && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Test mode: use QuickBooks sandbox card or bank details. This does not enroll a live payment method.</p>}
     {loading && <p role="status">Loading payment methods…</p>}
     {error && <div role="alert" className="bg-red-50 text-red-800 rounded-xl p-4">{error}<button onClick={()=>void load()} className="underline ml-3">Retry payment methods</button></div>}
     {methods.map(method=><button key={method.id} onClick={()=>onSelect(method)} className={`block w-full text-left border-2 p-4 rounded-xl ${selectedId===method.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
       {method.display_brand} ending {method.display_last4}{method.payment_type==='card' && <span className="text-sm text-gray-600"> · Expires {method.exp_month}/{method.exp_year}</span>}
-      {selectedId===method.id && <span className="block text-blue-900 text-sm font-semibold">Selected for AutoPay</span>}
+      {selectedId===method.id && <span className="block text-blue-900 text-sm font-semibold">{serviceBooking ? 'Selected for service visit' : 'Selected for AutoPay'}</span>}
     </button>)}
     {!loading && !error && methods.length===0 && <p className="text-gray-600">No eligible payment methods are on file.</p>}
     {!!environment && !showAdd && <button onClick={()=>setShowAdd(true)} className="px-4 py-3 bg-blue-900 text-white rounded-xl font-semibold">Add payment method</button>}
-    {showAdd && <NewMethod key={environment} environment={environment} contractId={contractId} token={token}
+    {showAdd && <NewMethod key={environment} environment={environment} request={request}
       onCancel={()=>setShowAdd(false)} onAdded={m=>{setMethods(prev=>[...prev.filter(p=>p.id!==m.id),m]);onSelect(m);setShowAdd(false);}} />}
     <p className="text-xs text-gray-600">Card and bank numbers are sent directly to QuickBooks Payments. They are never included in your saved onboarding draft. Adding a method does not charge it.</p>
   </div>;
 }
 
-function NewMethod({environment,contractId,token,onAdded,onCancel}:{environment:string;contractId:string;token:string;onAdded:(m:SecurityPaymentMethod)=>void;onCancel:()=>void}) {
+function NewMethod({environment,request,onAdded,onCancel}:{environment:string;request:PaymentRequest;onAdded:(m:SecurityPaymentMethod)=>void;onCancel:()=>void}) {
   const [type,setType]=useState<'card'|'ach'>('card');
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   async function add(event:React.FormEvent<HTMLFormElement>) {
@@ -59,7 +64,7 @@ function NewMethod({environment,contractId,token,onAdded,onCancel}:{environment:
       if (!result.value) throw new Error('QuickBooks did not return a payment token');
       // Clear sensitive fields immediately after tokenization, even if vault storage fails.
       form.reset();
-      const saved=await securityPaymentRequest<{method:SecurityPaymentMethod}>('add',contractId,token,{paymentType:type,tokenValue:result.value});
+      const saved=await request<{method:SecurityPaymentMethod}>('add',{paymentType:type,tokenValue:result.value});
       onAdded(saved.method);
     } catch(e) {setError(e instanceof Error ? e.message : 'Payment method could not be added');}
     finally {setBusy(false);}

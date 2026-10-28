@@ -18,6 +18,8 @@ function harness(path, globals = {}, imports = {}) {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText, {
     module, exports:module.exports, console, ...globals,
     require(name) {
+      if (name.endsWith('/ServiceApprovalPanel')) return {ServiceApprovalPanel:'ApprovalPanel'};
+      if (name.endsWith('/serviceApproval')) return {sendServiceApproval:async()=>{},serviceApprovalPending:r=>!!r.service_approval_required&&!r.service_waived_at&&(!r.service_accepted_at||!r.service_payment_method_id)};
       if (name.endsWith('/ContactLogModal')) return {ContactLogModal:'ContactLogModal'};
       if (name.endsWith('/ContactLogHistory')) return {ContactLogHistory:'ContactLogHistory'};
       if (name.endsWith('/SupportPhotos')) return {SupportPhotos:'SupportPhotos'};

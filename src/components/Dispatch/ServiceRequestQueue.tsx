@@ -1,3 +1,5 @@
+import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
+import { serviceApprovalPending, type ServiceApprovalFields } from '../../lib/serviceApproval';
 import { SupportRequestItems } from '../Shared/SupportRequestItems';
 import { SupportPhotos } from '../Shared/SupportPhotos';
 import { notify } from '../../lib/feedback';
@@ -42,7 +44,7 @@ import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 import { ContactLogModal } from '../Shared/ContactLogModal';
 import { ContactLogHistory } from '../Shared/ContactLogHistory';
 
-interface ServiceRequest {
+interface ServiceRequest extends ServiceApprovalFields {
   id: string;
   created_at: string;
   request_type: 'service' | 'project' | null;
@@ -162,6 +164,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
         .from('service_requests')
         .select(`
           *,
+          service_waived_by_profile:profiles!service_requests_service_waived_by_fkey (full_name),
           contacts (
             id,
             company_name,
@@ -309,8 +312,10 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
 
   function getStatusLabel(status: string) {
     switch (status) {
+      case 'pending_customer':
+        return 'Pending – Waiting on Customer';
       case 'open':
-        return 'Open';
+        return 'Ready to Schedule';
       case 'scheduled':
         return 'Scheduled';
       case 'in_progress':
@@ -346,7 +351,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
     : null;
 
   function canSelectRequest(request: ServiceRequest): boolean {
-    if (request.status !== 'open' || !request.contact_id) return false;
+    if (request.status !== 'open' || !request.contact_id || serviceApprovalPending(request)) return false;
     if (constraintContactId && request.contact_id !== constraintContactId) return false;
     const first = requests.find(item => selectedRequestIds.has(item.id));
     if (first && (request.project_id !== first.project_id || request.billable_type !== first.billable_type || [request.job_location_address,request.job_location_city,request.job_location_state,request.job_location_zip].map(value => (value || '').trim().toLowerCase()).join('|') !== [first.job_location_address,first.job_location_city,first.job_location_state,first.job_location_zip].map(value => (value || '').trim().toLowerCase()).join('|'))) return false;
@@ -634,7 +639,9 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                         {/* Convert button — only on desktop (sm+), only when collapsed */}
                         {expandedRequest !== request.id && !['closed', 'cancelled'].includes(request.status) && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
+                            disabled={serviceApprovalPending(request)}
+                            title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
                             className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap"
                           >
                             <ArrowRight className="w-3 h-3" />
@@ -691,7 +698,9 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                       {/* Convert button — only on mobile (hidden sm+), only when collapsed */}
                       {expandedRequest !== request.id && !['closed', 'cancelled'].includes(request.status) && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
+                          disabled={serviceApprovalPending(request)}
+                            title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
                           className="sm:hidden flex items-center gap-1 min-h-11 px-3 py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
                         >
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -829,10 +838,14 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                         <div className="flex justify-end"><button type="button" onClick={e => { e.stopPropagation(); setContactLogTarget(request); }} className="rounded-lg bg-elevated px-3 py-2 text-xs font-medium text-primary">Log Contact / Note</button></div>
                         <ContactLogHistory serviceRequestId={request.id} refreshKey={contactLogRevision} />
 
+                        <ServiceApprovalPanel request={request} onChanged={loadData} />
+
                         {/* Action buttons — full-width row at bottom of expanded section */}
                         {!['closed', 'cancelled'].includes(request.status) && <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
                           <button
-                            onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
+                            disabled={serviceApprovalPending(request)}
+                            title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
                             className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
                           >
                             <ArrowRight className="w-3.5 h-3.5 shrink-0" />
@@ -863,7 +876,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                             </button>
                           )}
 
-                          {(request.status === 'open' || request.status === 'scheduled' || request.status === 'needs_more_info') && (
+                          {(request.status === 'open' || request.status === 'scheduled' || request.status === 'pending_customer' || request.status === 'needs_more_info') && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmCancelId(request.id); }}
                               className="px-3 py-2.5 sm:py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"

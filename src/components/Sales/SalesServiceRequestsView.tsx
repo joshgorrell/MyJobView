@@ -1,3 +1,5 @@
+import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
+import type { ServiceApprovalFields } from '../../lib/serviceApproval';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +24,7 @@ import { ContactLogModal } from '../Shared/ContactLogModal';
 import { ContactLogHistory } from '../Shared/ContactLogHistory';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
-interface ServiceRequest {
+interface ServiceRequest extends ServiceApprovalFields {
   id: string;
   created_at: string;
   customer_name: string;
@@ -65,7 +67,8 @@ interface ServiceRequest {
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
-  { value: 'open', label: 'Open' },
+  { value: 'open', label: 'Ready to Schedule' },
+  { value: 'pending_customer', label: 'Pending – Waiting on Customer' },
   { value: 'needs_more_info', label: 'Needs More Info' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'in_progress', label: 'In Progress' },
@@ -101,7 +104,8 @@ function getStatusColor(status: string) {
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case 'open': return 'Open';
+    case 'open': return 'Ready to Schedule';
+    case 'pending_customer': return 'Pending – Waiting on Customer';
     case 'scheduled': return 'Scheduled';
     case 'in_progress': return 'In Progress';
     case 'closed': return 'Closed';
@@ -158,7 +162,8 @@ export function SalesServiceRequestsView() {
           job_description, billable_type, priority, status, notes,
           contact_id, source_type, kickback_reason, kicked_back_at,
           customer_contact_confirmed_at, customer_contact_confirmed_by,
-          work_order_id,
+          work_order_id, service_approval_required, service_terms, service_accepted_at, service_accepted_by, service_payment_method_id, service_waived_at, service_waived_by, service_waiver_reason,
+          service_waived_by_profile:profiles!service_requests_service_waived_by_fkey (full_name),
           contacts (id, company_name, full_name),
           contact_confirmed_by_profile:profiles!service_requests_customer_contact_confirmed_by_fkey (
             id, full_name
@@ -425,6 +430,7 @@ export function SalesServiceRequestsView() {
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-subtle pt-4 space-y-4">
 
+                    <ServiceApprovalPanel request={request} onChanged={loadRequests} />
                     {/* Customer contact status detail */}
                     <div className={`flex items-start gap-3 p-4 rounded-xl border ${
                       contactConfirmed
