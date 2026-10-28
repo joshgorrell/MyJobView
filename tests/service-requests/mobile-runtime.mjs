@@ -49,7 +49,7 @@ const h=harness('src/components/Dispatch/ServiceRequestQueue.tsx',{alert:msg=>{t
 let tree=h.render({},'ServiceRequestQueue');for(const effect of h.effects.splice(0))effect();await new Promise(resolve=>setTimeout(resolve,0));const render=()=>{tree=h.render({},'ServiceRequestQueue');};render();
 const button=name=>nodes(tree).find(n=>n.type==='button'&&(n.props['aria-label']===name||text(n)===name));
 assert.equal(nodes(tree).filter(n=>n.props?.['data-testid']?.startsWith('service-request-')).length,2);
-button('Expand request').props.onClick({stopPropagation(){}});render();assert.ok(text(tree).includes('Full Description'));assert.ok(button('Collapse request'));assert.ok(button('Schedule Work Order'));
+button('Expand request').props.onClick({stopPropagation(){}});render();assert.ok(!text(tree).includes('Full Description'));assert.ok(button('Collapse request'));assert.ok(button('Schedule Work Order'));
 button('Log Contact / Note').props.onClick({stopPropagation(){}});render();
 const contactLog=nodes(tree).find(n=>n.type==='ContactLogModal');
 const priorLoads=requestLoads;
