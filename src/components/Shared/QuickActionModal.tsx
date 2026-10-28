@@ -5,6 +5,7 @@ import './feedback.css';
 interface QuickActionModalProps {
   stableHeight?: boolean;
   scrollBody?: boolean;
+  wide?: boolean;
   title: string;
   subtitle?: string;
   icon: ReactNode;
@@ -20,6 +21,7 @@ interface QuickActionModalProps {
 export function QuickActionModal({
   stableHeight = false,
   scrollBody = true,
+  wide = false,
   title,
   subtitle,
   icon,
@@ -175,7 +177,7 @@ export function QuickActionModal({
       >
         <div
           className={`
-            qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl
+            qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl ${wide ? 'lg:max-w-6xl' : ''}
             rounded-t-2xl sm:rounded-xl
             shadow-2xl border-t sm:border border-subtle
             flex flex-col
