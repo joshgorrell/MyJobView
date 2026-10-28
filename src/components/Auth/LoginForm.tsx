@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lock, AlertCircle } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BrowserDiagnostics } from '../Shared/BrowserDiagnostics';
 import { isValidReturnHost } from '../../lib/crossDomainAuth';
@@ -91,7 +91,7 @@ export function LoginForm() {
             </>
           )}
           <p className="text-gray-300">
-            {isForgotPassword ? 'Reset your password' : isSignUp ? 'Create your account' : tenantLoading ? 'Sign in to your account' : `Sign in to ${dealerName}`}
+            {isForgotPassword ? 'Reset your password' : isSignUp ? 'Create your account' : 'Sign in to your account'}
           </p>
           {returnToDealer && !isForgotPassword && !isSignUp && (
             <p className="text-blue-300 text-sm mt-2">
@@ -193,16 +193,15 @@ export function LoginForm() {
           </button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-gray-700/60 text-center space-y-2">
-          <a href="/portal" className="block w-full rounded-lg border border-blue-400/40 px-4 py-3 text-sm text-blue-300 hover:bg-blue-400/10">
+        <div className="mt-6 pt-5 border-t border-gray-700/60 flex items-center justify-center gap-x-3 text-[10px] min-[360px]:text-xs sm:text-sm">
+          <a href="/portal" className="min-h-11 inline-flex items-center whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors">
             Customer Portal
           </a>
-          <div className="flex flex-wrap items-center justify-center gap-x-4">
           {!isForgotPassword && (
             <button
               type="button"
               onClick={() => setIsSignUp(!isSignUp)}
-              className="min-h-11 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              className="min-h-11 whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors"
             >
               {isSignUp ? 'Back to sign in' : 'Create an account'}
             </button>
@@ -215,19 +214,17 @@ export function LoginForm() {
               setError(null);
               setSuccess(null);
             }}
-            className="text-sm text-gray-400 hover:text-gray-300 transition-colors block w-full"
+            className="min-h-11 whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors"
           >
             Back to sign in
           </button>}
           <button
             type="button"
             onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className="min-h-11 text-sm text-gray-400 hover:text-gray-200 transition-colors inline-flex items-center justify-center gap-2"
+            className="min-h-11 whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors"
           >
-            <AlertCircle className="w-4 h-4" />
             {showDiagnostics ? 'Hide login help' : 'Login help'}
           </button>
-          </div>
         </div>
         <div className="mt-5 flex items-center justify-center gap-2 text-xs text-gray-400">
           <span>Powered by</span>

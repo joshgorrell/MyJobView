@@ -48,7 +48,7 @@ try {
     await page.goto(`http://${host}`, { waitUntil: 'domcontentloaded' });
     const dealer = !['generic', 'unknown'].includes(scenario);
     await page.getByRole('heading', { name: dealer ? 'Electronic Life' : 'MyJobView', exact: true }).waitFor();
-    await page.getByText(dealer ? 'Sign in to Electronic Life' : 'Sign in to MyJobView', { exact: true }).waitFor();
+    await page.getByText('Sign in to your account', { exact: true }).waitFor();
     await page.waitForFunction(() => [...document.images].every(img => img.complete));
     assert.equal(lookupCount, scenario === 'generic' ? 0 : 1);
     const primary = page.locator('img').first();
@@ -56,6 +56,18 @@ try {
     assert.ok(await primary.evaluate(img => img.naturalWidth > 0));
     await page.getByRole('link', { name: 'Customer Portal', exact: true }).waitFor();
     await page.getByText('Powered by', { exact: true }).waitFor();
+    for (const width of [320, 360, 390, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      const links = [
+        page.getByRole('link', { name: 'Customer Portal', exact: true }),
+        page.getByRole('button', { name: 'Create an account', exact: true }),
+        page.getByRole('button', { name: 'Login help', exact: true }),
+      ];
+      const boxes = await Promise.all(links.map(link => link.boundingBox()));
+      assert.ok(boxes.every(box => box && Math.abs(box.y - boxes[0].y) < 1), `Footer links share a row at ${width}px`);
+      assert.ok(boxes[0].x >= 0 && boxes[2].x + boxes[2].width <= width, `Footer fits at ${width}px`);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.getByRole('button', { name: 'Forgot password?', exact: true }).click();
     await page.getByRole('button', { name: 'Send Reset Link', exact: true }).waitFor();
