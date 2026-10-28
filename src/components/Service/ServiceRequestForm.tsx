@@ -739,11 +739,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
       setShowSuccess(true);
       setTimeout(() => {
-        if (onSuccess) onSuccess();
-        onClose();
         if (serviceRequest?.id) {
           window.sessionStorage.setItem('mjv-new-service-request', serviceRequest.id);
         }
+        if (onSuccess) onSuccess();
+        onClose();
       }, 900);
     } catch (error: any) {
       console.error('Error submitting work order request:', error);
@@ -873,7 +873,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-1">
                         <p className="min-w-0 truncate font-semibold text-primary">{formData.customer_name || 'Loading customer…'}</p>
-                        <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" title="Open master customer record" aria-label="Open master customer record in a new tab" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-blue-500 hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
+                        <a href={`/?tab=contacts&contactId=${encodeURIComponent(formData.contact_id)}`} target="_blank" rel="noopener noreferrer" title="Open master customer record" aria-label="Open master customer record in a new tab" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-blue-500 hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
                           <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         </a>
                       </div>
