@@ -110,6 +110,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const locationTouched = useRef(false);
   const [searching, setSearching] = useState(false);
   const [technicians, setTechnicians] = useState<{id: string; full_name: string}[]>([]);
+  const [technicianSearch, setTechnicianSearch] = useState('');
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const [warrantyReferences, setWarrantyReferences] = useState<string[]>([]);
   const projectLoadVersion = useRef(0);
@@ -1233,19 +1234,20 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 <option value="requester">I will contact customer</option>
               </select>
             </label>
-            <label className="block min-w-0 space-y-1">
-              <span className="text-sm font-medium text-secondary">Preferred Technician</span>
-              <div className="rounded-lg border border-strong bg-surface p-2 max-h-28 overflow-y-auto" aria-label="Preferred technicians">
-                <label className="flex items-center gap-2 text-sm text-primary min-h-8">
-                  <input type="checkbox" checked={formData.requested_tech_ids.length === 0} onChange={() => setFormData(prev => ({ ...prev, requested_tech_ids: [] }))} />
-                  Any available
-                </label>
-                {technicians.map(tech => <label key={tech.id} className="flex items-center gap-2 text-sm text-primary min-h-8">
-                  <input type="checkbox" checked={formData.requested_tech_ids.includes(tech.id)} onChange={e => setFormData(prev => ({ ...prev, requested_tech_ids: e.target.checked ? [...prev.requested_tech_ids, tech.id] : prev.requested_tech_ids.filter(id => id !== tech.id) }))} />
-                  {tech.full_name}
-                </label>)}
+            <div className="min-w-0 space-y-1">
+              <label htmlFor="service-tech-search" className="block text-sm font-medium text-secondary">Preferred technicians (optional)</label>
+              <input id="service-tech-search" type="search" value={technicianSearch} onChange={e => setTechnicianSearch(e.target.value)} placeholder="Search technicians" className="w-full h-10 px-3 bg-surface border border-strong rounded-lg text-base text-primary" />
+              <div className="flex flex-wrap gap-1">
+                {formData.requested_tech_ids.map(id => {
+                  const tech = technicians.find(t => t.id === id);
+                  return <button key={id} type="button" title="Remove preferred technician" onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: prev.requested_tech_ids.filter(value => value !== id) }))} className="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-primary">{tech?.full_name || 'Technician'} ×</button>;
+                })}
               </div>
-            </label>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Preferred technician choices">
+                <button type="button" aria-pressed={formData.requested_tech_ids.length === 0} onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: [] }))} className="rounded-md border border-strong px-2 py-1 text-sm">Any available</button>
+                {technicians.filter(tech => tech.full_name.toLowerCase().includes(technicianSearch.toLowerCase()) && !formData.requested_tech_ids.includes(tech.id)).map(tech => <button key={tech.id} type="button" onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: [...prev.requested_tech_ids, tech.id] }))} className="rounded-md border border-strong px-2 py-1 text-sm">{tech.full_name} +</button>)}
+              </div>
+            </div>
             <fieldset className="min-w-0">
               <legend className="text-sm font-medium text-secondary mb-1">Scheduling</legend>
               <div className="flex gap-2">
