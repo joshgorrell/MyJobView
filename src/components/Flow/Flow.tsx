@@ -2,7 +2,7 @@ import { useConversationHeight } from './useConversationHeight';
 import { WeeklyProposalActivity } from './WeeklyProposalActivity';
 import { ServiceRequestFlowDetail } from './ServiceRequestFlowDetail';
 import { proposalActivityPath } from '../../lib/proposalActivityLinks';
-import { Fragment, ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useId, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, HelpCircle, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -54,6 +54,22 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
   const [view, setView] = useState<FlowView>(initialTaskView || (!hasModuleAccess('feed') && !hasModuleAccess('messages') && !!tasksContent) ? 'tasks' : conversationProps.openThreadId ? 'messages' : 'all');
   const workspaceSize = useConversationHeight(view === 'messages' && !scoped);
+  // Preserve the outer workspace position while the tab body changes.
+  const scrollHost = useRef<HTMLElement | null>(null);
+  const savedScroll = useRef(0);
+  const changeView = (next: FlowView) => {
+    const host = scrollHost.current;
+    if (host) savedScroll.current = host.scrollTop;
+    setView(next);
+  };
+  useLayoutEffect(() => {
+    const host = scrollHost.current;
+    if (host) host.scrollTop = savedScroll.current;
+  }, [view]);
+  useEffect(() => {
+    const root = workspaceSize.ref.current;
+    scrollHost.current = root?.closest('main') ?? null;
+  }, [workspaceSize.ref]);
   const [messageRequest, setMessageRequest] = useState(0);
   const [messageFilter, setMessageFilter] = useState<MessageFilter>('all');
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -63,7 +79,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   }, [conversationProps.openThreadId, initialTaskView]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [newOnly, setNewOnly] = useState(false);
+  const [newOnly, setNewOnly] = useState(true);
   const [mentionsOnly, setMentionsOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -164,7 +180,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
   return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
-    <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : view === 'messages' ? 'Messages' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
+    <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2><span className="flow-subtitle">{scoped ? 'All communication and activity for this record' : 'Communication, customers, projects & service'} · <span title={flow.connected ? 'Live connection active; checked periodically for missed updates' : 'Checking for updates every 30 seconds'}>{flow.connected ? 'Live' : 'Auto refresh'}</span></span></div>
       {(canPost || (view === 'messages' && (canMessageCustomers || hasModuleAccess('feed')))) && <div className="flow-heading-actions">
         <button className={`flow-primary ${view === 'messages' ? 'flow-new-message' : 'flow-create-action'}`} aria-label={view === 'messages' ? 'New message' : 'Create in Flow'} title={view === 'messages' ? 'New message' : 'Create in Flow'} aria-haspopup="dialog" aria-expanded={createMode!==null} aria-controls={`${controlId}-create-options`}
           onClick={() => { if (view === 'messages') { setMessageFilter('all'); setMessageRequest(n => n + 1); } else setCreateMode('choose'); }}><Plus size={20} />{view === 'messages' && <span>New message</span>}</button>
@@ -172,8 +188,8 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     </header>
     {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
     <div className="flow-toolbar">
-      <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => setView(item.id)}>{item.label}</button>)}</div>
-      <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => setView(e.target.value as FlowView)}>{views.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+      <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => changeView(item.id)}>{item.label}</button>)}</div>
+      <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => changeView(e.target.value as FlowView)}>{views.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
       {view !== 'tasks' && view !== 'messages' && <>
       <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
