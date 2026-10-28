@@ -371,12 +371,26 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     }, 'plain-text');
   }
 
+  async function breakGpsEvidence(phase: 'start' | 'end') {
+    const attemptedAt = new Date().toISOString();
+    const location = await locationTrackingService.captureHighAccuracyLocation().catch(() => null);
+    return {
+      [phase + '_gps_attempted_at']: attemptedAt,
+      [phase + '_gps_capture_method']: location ? ((location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy') : 'failed',
+      [phase + '_latitude']: location?.coords.latitude ?? null,
+      [phase + '_longitude']: location?.coords.longitude ?? null,
+      [phase + '_gps_accuracy']: location?.coords.accuracy ?? null,
+      [phase + '_gps_captured_at']: location ? new Date(location.timestamp).toISOString() : null,
+    };
+  }
+
   async function handleStartBreak(breakType: 'lunch' | 'personal' | 'other') {
     if (!todayEntry || !profile) return;
     try {
       await assertNoInternalTimer(profile);
+      const gps = await breakGpsEvidence('start');
       const { error } = await supabase.from('daily_clock_breaks').insert({
-        id: Crypto.randomUUID(), daily_clock_entry_id: todayEntry.id, break_start: new Date().toISOString(), break_type: breakType,
+        id: Crypto.randomUUID(), daily_clock_entry_id: todayEntry.id, break_start: new Date().toISOString(), break_type: breakType, ...gps,
       });
       if (error) throw error;
       await loadBreaks(todayEntry.id);
@@ -389,7 +403,8 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   async function handleEndBreak() {
     if (!activeBreak || !todayEntry) return;
     try {
-      const { error } = await supabase.from('daily_clock_breaks').update({ break_end: new Date().toISOString() }).eq('id', activeBreak.id);
+      const gps = await breakGpsEvidence('end');
+      const { error } = await supabase.from('daily_clock_breaks').update({ break_end: new Date().toISOString(), ...gps }).eq('id', activeBreak.id);
       if (error) throw error;
       await loadBreaks(todayEntry.id);
     } catch (error) {
