@@ -196,6 +196,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const baseViews = scoped || hasModuleAccess('feed') || hasModuleAccess('messages') ? FLOW_VIEWS : [];
   const views = tasksContent && !scoped && hasModuleAccess('tasks') ? [...baseViews, { id: 'tasks' as FlowView, label: TASKS_LABEL }] : baseViews;
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter)).sort((a, b) => Number(b.source_table === 'service_requests' && b.source_id === createdRequestId) - Number(a.source_table === 'service_requests' && a.source_id === createdRequestId));
+  useEffect(() => {
+    if (!createdRequestId) return;
+    const newlyCreated = flow.events.find(event => event.source_table === 'service_requests' && event.source_id === createdRequestId);
+    if (newlyCreated) setExpanded(newlyCreated.id);
+  }, [createdRequestId, flow.events]);
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
   return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
