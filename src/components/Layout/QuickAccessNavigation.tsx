@@ -28,13 +28,15 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
   useEffect(() => {
     if (!profile?.id || !profile.organization_id || !hasModuleAccess('messages')) { setUnreadTeamMessages(0); setUnreadCustomerMessages(0); return; }
     let cancelled = false;
+    const organizationId = profile.organization_id;
+    const userId = profile.id;
     const refreshMessages = async () => {
       try {
-        const threads = await loadCoworkerThreads(profile.organization_id, profile.id, {});
+        const threads = await loadCoworkerThreads(organizationId, userId, {});
         if (!cancelled) setUnreadTeamMessages(threads.reduce((total, thread) => total + thread.unread_count, 0));
         // Customer threads already enforce their visibility through RLS.
         const { data: customerThreads, error: threadError } = await supabase.from('message_threads')
-          .select('id').eq('organization_id', profile.organization_id);
+          .select('id').eq('organization_id', organizationId);
         if (threadError) throw threadError;
         const ids = (customerThreads || []).map(thread => thread.id);
         let unread = 0;
@@ -98,6 +100,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
             (module.module_key === 'tasks' || (module.module_key === 'feed' && hasModuleAccess('tasks'))) ? taskCount :
             module.module_key === 'pipeline_board' ? activityCounts.pipeline_lead + (hasModuleAccess('fishbowl') ? fishbowlCount : 0) :
             module.module_key === 'fishbowl' ? fishbowlCount :
+            module.module_key === 'messages' ? unreadTeamMessages + unreadCustomerMessages :
             module.module_key === 'test_tune' ? activityCounts.test_tune :
             (module.module_key === 'reviews' || module.module_key === 'feedback') ? activityCounts.feedback :
             (module.module_key === 'service_requests' || module.module_key === 'sales_service_requests') ? activityCounts.service_request :
