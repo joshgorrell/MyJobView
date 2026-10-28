@@ -11,7 +11,7 @@ const fixture = `
 const profile={id:'employee',organization_id:'org',full_name:'Josh Example',role:'admin'};
 export const useAuth=()=>({profile});
 export const useDepartments=()=>({mainDepartments:[],footerDepartments:[],getUserModules:()=>[],hasModuleAccess:()=>true,starredModules:[{id:"product",module_key:"products",display_name:"Product Catalog",icon:"Menu"},{id:"punchlist",module_key:"punchlist",display_name:"Punchlist",icon:"Menu"},{id:"reviews",module_key:"reviews",display_name:"Feedback",icon:"Star"}],loading:false});
-export const useActivityCounts=()=>({pipeline_lead:0,test_tune:0,feedback:0,service_request:0});export const markActivitySeen=async()=>{};
+export const useActivityCounts=()=>({counts:{pipeline_lead:0,test_tune:0,feedback:0,service_request:0}});export const markActivitySeen=async()=>{};
 export const useTaskCount=()=>0;export const useFishbowlCount=()=>0;export const useToast=()=>({error(){},warning(){},success(){}});
 export const useEmployeeTimePolicy=()=>({dailyClock:true});
 export const getOrganizationTimezone=async()=> 'America/Chicago';
