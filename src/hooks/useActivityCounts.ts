@@ -39,13 +39,15 @@ export function useActivityCounts() {
         { onConflict: 'user_id,activity_type', ignoreDuplicates: true },
       );
       if (error) console.error('Activity baseline initialization failed:', error);
-      // A subsequent refresh reads the stored baseline; never count older items on first visit.
+      // The baseline is initialized once. Refresh promptly instead of leaving a badge
+      // at zero until the next 30-second poll. Never retry recursively on failure.
+      if (!error) window.dispatchEvent(new Event('activity:baseline-ready'));
       return;
     }
     const isNew = (area: ActivityArea, timestamp: string | null | undefined) =>
       Boolean(timestamp && Date.parse(timestamp) > Date.parse(baseline.get(area) || ''));
     const count = (area: ActivityArea, ids: string[]) =>
-      ids.filter(id => !seen.has(`${area}:${id}`)).length;
+      new Set(ids.filter(id => !seen.has(`${area}:${id}`))).size;
     const customerTasks: string[] = (tune.data || []).flatMap((project: { tasks?: { id: string; source?: string; created_at?: string }[] }) =>
       (project.tasks || []).filter(task => task.source === 'customer' && isNew('test_tune', task.created_at)).map(task => task.id)
     );
@@ -68,7 +70,8 @@ export function useActivityCounts() {
     const onFocus = () => void refresh();
     window.addEventListener('focus', onFocus);
     window.addEventListener('activity:seen', onFocus);
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); window.removeEventListener('activity:seen', onFocus); void supabase.removeChannel(channel); };
+    window.addEventListener('activity:baseline-ready', onFocus);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); window.removeEventListener('activity:seen', onFocus); window.removeEventListener('activity:baseline-ready', onFocus); void supabase.removeChannel(channel); };
   }, [refresh, profile?.id]);
 
   return { counts, refresh };
