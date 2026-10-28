@@ -1254,7 +1254,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               </div>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Preferred technician choices">
                 <button type="button" aria-pressed={formData.requested_tech_ids.length === 0} onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: [] }))} className="rounded-md border border-strong px-2 py-1 text-sm">Any available</button>
-                {technicians.filter(tech => tech.full_name.toLowerCase().includes(technicianSearch.toLowerCase()) && !formData.requested_tech_ids.includes(tech.id)).map(tech => <button key={tech.id} type="button" onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: [...prev.requested_tech_ids, tech.id] }))} className="rounded-md border border-strong px-2 py-1 text-sm">{tech.full_name} +</button>)}
+                {technicianSearch.trim() && technicians.filter(tech => tech.full_name.toLowerCase().includes(technicianSearch.trim().toLowerCase()) && !formData.requested_tech_ids.includes(tech.id)).slice(0, 6).map(tech => <button key={tech.id} type="button" onClick={() => { setFormData(prev => ({ ...prev, requested_tech_ids: [...prev.requested_tech_ids, tech.id] })); setTechnicianSearch(''); }} className="rounded-md border border-strong px-2 py-1 text-sm">{tech.full_name} +</button>)}
               </div>
             </div>
             <fieldset className="min-w-0">
