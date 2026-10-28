@@ -11,7 +11,10 @@ export function useActivityCounts() {
   });
 
   const refresh = useCallback(async () => {
-    if (!profile?.id || !profile.organization_id) return;
+    if (!profile?.id || !profile.organization_id) {
+      setCounts({ pipeline_lead: 0, test_tune: 0, feedback: 0, service_request: 0 });
+      return;
+    }
     const org = profile.organization_id;
     const [reads, baselines, leads, feedback, service, tune] = await Promise.all([
       supabase.from('activity_notification_reads').select('activity_type,activity_id').eq('user_id', profile.id),
