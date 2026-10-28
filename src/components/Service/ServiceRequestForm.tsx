@@ -651,8 +651,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
         if (error) throw error;
 
-        if (formData.service_approval_required) await deliverApproval(editingRequest.id);
         submissionSucceededRef.current = true;
+        if (formData.service_approval_required) {
+          try {
+            await deliverApproval(editingRequest.id);
+          } catch (approvalError) {
+            console.error('Service request updated, but approval delivery failed:', approvalError);
+            notify('Service request updated, but approval delivery failed. Please retry approval from the request.', { theme: 'blue', tone: 'warning' });
+          }
+        }
         if (onSuccess) onSuccess();
         onClose();
         return;
