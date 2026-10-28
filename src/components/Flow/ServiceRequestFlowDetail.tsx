@@ -43,6 +43,10 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     <p><strong>Customer contact:</strong> {request.customer_contact_confirmed_at ? 'Spoke with customer' : activities.length ? 'Contact attempted / response not confirmed' : 'No attempts logged'}</p>
     {request.work_order && <p><strong>Work order:</strong> <a href={`?tab=work_orders&workOrderId=${request.work_order.id}`}>#{request.work_order.work_order_number}</a> · {request.work_order.status}{scheduled && <> · {request.work_order.scheduled_date} </>}</p>}
     {!request.work_order && <p>Not yet scheduled</p>}
+    <div className="sm:col-span-2 flex flex-wrap gap-2 py-1">
+      <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`/service-requests?serviceRequestId=${encodeURIComponent(request.id)}`}>Open request to edit, assign, schedule or close ↗</a>
+      {request.work_order && <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=work_orders&workOrderId=${encodeURIComponent(request.work_order.id)}`}>Open work order ↗</a>}
+    </div>
     {(request.earliest_date || request.requested_date) && <p><strong>Requested dates:</strong> {[request.earliest_date, request.requested_date].filter(Boolean).join(" – ")} (not guaranteed)</p>}
     {request.requested_tech_ids?.length ? <p><strong>Preferred technicians:</strong> {preferredTechNames.length ? preferredTechNames.join(', ') : `${request.requested_tech_ids.length} requested`}</p> : null}
     <p className="sm:col-span-2"><strong>Contact history</strong></p>
