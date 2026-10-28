@@ -166,7 +166,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
             const description = t.customer_description || t.title;
             const requested = Boolean(t.request_id);
             const status = requested ? (t.service_status === 'closed' || t.service_status === 'completed' ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : t.service_status === 'cancelled' ? 'Cancelled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
-            return <tr key={t.id} onClick={() => { setPreview(null); setDetailId(t.id); }} className="group relative cursor-pointer hover:bg-surface/70 focus-within:bg-surface/70">
+            return <tr key={t.id} onClick={() => openPunchlistTask(t.id)} className="group relative cursor-pointer hover:bg-surface/70 focus-within:bg-surface/70">
               <td className="p-3 align-top">{!requested && t.status === 'open' && <input className="h-5 w-5" type="checkbox" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onClick={e => e.stopPropagation()} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}</td>
               <td className="whitespace-nowrap p-3 align-top text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : "—"}</td><td className="p-3 align-top"><span className="font-medium text-primary">{p.customer}</span><div className="text-xs text-muted">{p.name}</div></td>
               <td className="max-w-[520px] p-3 align-top">
