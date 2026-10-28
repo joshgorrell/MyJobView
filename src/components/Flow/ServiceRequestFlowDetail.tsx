@@ -50,7 +50,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {request.work_order && <p><strong>Work order:</strong> <a href={`?tab=work_orders&workOrderId=${request.work_order.id}`}>#{request.work_order.work_order_number}</a> · {request.work_order.status}{scheduled && <> · {request.work_order.scheduled_date} </>}</p>}
     {!request.work_order && <p>Not yet scheduled</p>}
     <div className="sm:col-span-2 flex flex-wrap gap-2 py-1">
-      {(['Edit', 'Assign', 'Schedule', 'Close'] as const).map(action => (
+      {(['Edit', 'Assign', 'Schedule', 'Cancel'] as const).map(action => (
         <a key={action} className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=service_requests&serviceRequestId=${encodeURIComponent(request.id)}&serviceRequestAction=${action.toLowerCase()}`}>{action} ↗</a>
       ))}
       {request.work_order && <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=work_orders&workOrderId=${encodeURIComponent(request.work_order.id)}`}>Open work order ↗</a>}
