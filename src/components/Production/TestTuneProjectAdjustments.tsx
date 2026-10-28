@@ -166,7 +166,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
                     onMouseEnter={event => showPreview(t.id, event.currentTarget)}
                     onMouseLeave={closePreviewSoon}
                     onFocus={event => showPreview(t.id, event.currentTarget)}
-                    onClick={event => { event.stopPropagation(); setDetailId(t.id); setPreview(null); }}
+                    onClick={() => { setDetailId(t.id); setPreview(null); }}
                     className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
                 </div>
               </td>
