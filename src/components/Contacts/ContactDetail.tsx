@@ -3365,29 +3365,41 @@ function ContactAccountCredits({ contactId }: { contactId: string }) {
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setLoading(true);
+      setLoadError(false);
+      const allCredits: AccountCredit[] = [];
       try {
-        setLoadError(false);
-        const { data, error } = await supabase
-          .from('customer_account_credits')
-          .select(`
-            id, amount, amount_applied, amount_remaining, status, notes, created_at,
-            sales_order_id, source_invoice_id,
-            sales_order:sales_orders(order_number),
-            source_invoice:invoices(invoice_number)
-          `)
-          .eq('contact_id', contactId)
-          .order('created_at', { ascending: false }).overrideTypes<AccountCredit[], { merge: false }>();
-        if (error) throw error;
-        setCredits((data as AccountCredit[]) || []);
+        for (let page = 0; ; page += 1) {
+          const { data, error } = await supabase
+            .from('customer_account_credits')
+            .select(`
+              id, amount, amount_applied, amount_remaining, status, notes, created_at,
+              sales_order_id, source_invoice_id,
+              sales_order:sales_orders(order_number),
+              source_invoice:invoices(invoice_number)
+            `)
+            .eq('contact_id', contactId)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .range(page * 500, page * 500 + 499)
+            .overrideTypes<AccountCredit[], { merge: false }>();
+          if (cancelled) return;
+          if (error) throw error;
+          const batch = data || [];
+          allCredits.push(...batch);
+          if (batch.length < 500) break;
+        }
+        if (!cancelled) setCredits(allCredits);
       } catch {
-        setLoadError(true);
+        if (!cancelled) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    load();
+    void load();
+    return () => { cancelled = true; };
   }, [contactId]);
 
   if (loading) return <p className="text-sm text-gray-500">Loading customer credits…</p>;
