@@ -19,6 +19,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const [dateFilter, setDateFilter] = useState('all');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ id: string; top: number; left: number } | null>(null);
   const previewCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function cancelPreviewClose() {
@@ -111,12 +112,12 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const summaryCounts = { all: summary.length, unsubmitted: summary.filter(t => !t.request_id && t.status === 'open').length, requested: summary.filter(t => Boolean(t.request_id)).length, completed: summary.filter(t => t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || ''))).length };
   return <section className="min-w-0 space-y-3" aria-label="Test and Tune punchlist feed">
     <div data-testid="punchlist-toolbar" className="flex flex-wrap items-center gap-2">
-      <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search punchlist descriptions, customers or projects" className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-3 text-primary" />
-      <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All statuses</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select><select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
-      <select aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
-      <select aria-label="Filter punchlist project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All projects</option>{projects.filter(p => customerFilter === 'all' || p.contact_id === customerFilter).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-      <select aria-label="Filter punchlist source" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="all">All sources</option><option value="customer">Customer</option><option value="manual">Employee</option><option value="proposal">Project</option></select>
-      <select aria-label="Filter punchlist date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}><option value="all">Any update date</option><option value="1">Past 24 hours</option><option value="7">Past 7 days</option><option value="30">Past 30 days</option><option value="90">Past 90 days</option></select>
+      <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search punchlist descriptions, customers or projects" className="min-h-11 w-full min-w-0 flex-1 basis-full rounded-lg xl:basis-48 border border-subtle bg-surface px-3 text-primary" />
+      <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All statuses</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select><select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
+      <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
+      <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All projects</option>{projects.filter(p => customerFilter === 'all' || p.contact_id === customerFilter).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[130px]" aria-label="Filter punchlist source" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="all">All sources</option><option value="customer">Customer</option><option value="manual">Employee</option><option value="proposal">Project</option></select>
+      <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[150px]" aria-label="Filter punchlist date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}><option value="all">Any update date</option><option value="1">Past 24 hours</option><option value="7">Past 7 days</option><option value="30">Past 30 days</option><option value="90">Past 90 days</option></select>
       <button disabled={busy} onClick={() => void load()} className="min-h-11 px-3 text-info">Refresh</button>
     </div>
     <div className="flex flex-wrap gap-2" aria-label="Punchlist summary filters">{([{ key: 'all', label: 'All items' }, { key: 'unsubmitted', label: 'Not submitted' }, { key: 'requested', label: 'Service requested' }, { key: 'completed', label: 'Completed' }] as const).map(item => <button key={item.key} type="button" aria-pressed={statusFilter === item.key} onClick={() => setStatusFilter(item.key)} className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${statusFilter === item.key ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary'}`}><strong>{summaryCounts[item.key]}</strong> {item.label}</button>)}</div>
@@ -130,15 +131,15 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {!loading && !error && !visible.length && <p className="text-sm text-muted">No matching Test &amp; Tune projects.</p>}
     <div className="overflow-x-auto rounded-lg border border-subtle">
       <table className="w-full min-w-[680px] text-left text-sm">
-        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th><th className="p-3">Details</th></tr></thead>
+        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th></tr></thead>
         <tbody className="divide-y divide-subtle">
           {rows.map(({ p, t }) => {
             const description = t.customer_description || t.title;
             const requested = Boolean(t.request_id);
             const status = requested ? (t.service_status === 'closed' || t.service_status === 'completed' ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : t.service_status === 'cancelled' ? 'Cancelled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
-            return <tr key={t.id} className="group relative hover:bg-surface/70 focus-within:bg-surface/70">
-              <td className="p-3 align-top">{!requested && t.status === 'open' && <input className="h-5 w-5" type="checkbox" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}</td>
-              <td className="whitespace-nowrap p-3 align-top text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : "—"}</td><td className="p-3 align-top"><a className="font-medium text-primary hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>{p.customer}</a><div className="text-xs text-muted">{p.name}</div></td>
+            return <tr key={t.id} onClick={() => { setPreview(null); setDetailId(t.id); }} className="group relative cursor-pointer hover:bg-surface/70 focus-within:bg-surface/70">
+              <td className="p-3 align-top">{!requested && t.status === 'open' && <input className="h-5 w-5" type="checkbox" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onClick={e => e.stopPropagation()} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}</td>
+              <td className="whitespace-nowrap p-3 align-top text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : "—"}</td><td className="p-3 align-top"><span className="font-medium text-primary">{p.customer}</span><div className="text-xs text-muted">{p.name}</div></td>
               <td className="max-w-[520px] p-3 align-top">
                 <div className="relative">
                   <button type="button" aria-label={`Preview ${description}`}
@@ -146,18 +147,33 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
                     onMouseEnter={event => showPreview(t.id, event.currentTarget)}
                     onMouseLeave={closePreviewSoon}
                     onFocus={event => showPreview(t.id, event.currentTarget)}
-                    onClick={event => showPreview(t.id, event.currentTarget)}
+                    onClick={event => { event.stopPropagation(); setDetailId(t.id); setPreview(null); }}
                     className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
                 </div>
               </td>
               <td className="p-3 align-top"><span role="img" aria-label={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'} title={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'}>{t.source === 'customer' ? '👤' : t.source === 'manual' ? '🛠️' : '📋'}</span></td><td className="p-3 align-top"><span role="img" aria-label={t.visibility === 'internal' ? 'Private' : 'Public'} title={t.visibility === 'internal' ? 'Private' : 'Public'}>{t.visibility === 'internal' ? '🔒' : '👁️'}</span></td>
               <td className="p-3 align-top"><span title={status} aria-label={status} className="whitespace-nowrap">{status === 'Completed' ? '✅' : status === 'Scheduled' ? '📅' : status === 'Cancelled' ? '🚫' : requested ? '📤' : '🕒'} <span className="sr-only">{status}</span></span></td>
-              <td className="p-3 align-top">{requested && canViewServiceRequests ? <a className="whitespace-nowrap text-info hover:underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id!)}`}>View request →</a> : <a className="whitespace-nowrap text-info hover:underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>View project →</a>}</td>
+              
             </tr>;
           })}
         </tbody>
       </table>
     </div>
+    {detailId && (() => {
+      const match = projects.flatMap(p => p.tasks.map(t => ({ p, t }))).find(({ t }) => t.id === detailId);
+      if (!match) return null;
+      const { p, t } = match;
+      return <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-6" onMouseDown={event => { if (event.target === event.currentTarget) setDetailId(null); }}>
+        <section role="dialog" aria-modal="true" aria-label={`Test and Tune task: ${t.title}`} className="max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-xl border border-subtle bg-surface p-4 text-primary shadow-2xl sm:p-6">
+          <div className="flex items-start justify-between gap-3"><h2 className="break-words text-lg font-semibold">{t.title}</h2><button type="button" aria-label="Close task detail" className="min-h-11 min-w-11 rounded-lg border border-subtle" onClick={() => setDetailId(null)}>×</button></div>
+          <p className="mt-2 text-sm text-muted">{p.customer} · {p.name}</p>
+          <p className="mt-4 whitespace-pre-wrap break-words">{t.customer_description || t.title}</p>
+          {Boolean(t.photos?.length) && <div className="mt-4"><SupportPhotos paths={t.photos || []} /></div>}
+          <p className="mt-4 text-sm text-secondary">{t.visibility === 'internal' ? 'Private' : 'Public'} · {t.service_status || t.status}</p>
+          <div className="mt-5 flex flex-wrap gap-3"><a className="inline-flex min-h-11 items-center text-info underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>Open project →</a>{t.request_id && canViewServiceRequests && <a className="inline-flex min-h-11 items-center text-info underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id)}`}>Open service request →</a>}</div>
+        </section>
+      </div>;
+    })()}
     {preview && (() => {
       const match = rows.find(({ t }) => t.id === preview.id);
       if (!match) return null;
