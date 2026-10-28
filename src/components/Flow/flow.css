@@ -289,3 +289,7 @@
   .flow-messaging .flow-message-filters { display:flex; }
   .flow-messaging .flow-message-filters button { padding-inline:16px; }
 }
+/* Prioritize the conversation when the keyboard or landscape leaves little height. */
+@media(max-height:500px) {
+  .flow-messaging:has(.conversation-workspace--selected) .flow-heading { display:none; }
+}

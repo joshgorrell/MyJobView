@@ -92,7 +92,7 @@ try {
   await page.setViewportSize({width,height:400});
   await page.waitForTimeout(150);
   const send=await page.getByTitle('Send message').boundingBox();
-  assert.ok(send.y>=0 && send.y+send.height<=400,'Composer stays within reduced viewport at '+width);
+  assert.ok(send.y>=0 && send.y+send.height<=400,'Composer stays within reduced viewport at '+width+' '+JSON.stringify(send));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight+1),false,'No outer vertical scrolling');
   await page.screenshot({path:'/tmp/mjv-composer-viewport-'+width+'.png'});
  }
