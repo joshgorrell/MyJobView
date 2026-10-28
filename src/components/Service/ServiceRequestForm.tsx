@@ -535,6 +535,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current || submissionSucceededRef.current) return;
 
     if (!formData.customer_name.trim()) {
       notify('Please enter customer name', { theme: 'blue', tone: 'warning' });
