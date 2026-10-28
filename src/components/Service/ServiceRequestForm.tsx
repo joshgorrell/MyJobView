@@ -98,6 +98,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const submittingRef = useRef(false);
+  const submissionSucceededRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -582,6 +583,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   async function submitForm() {
     if (submittingRef.current) return;
     submittingRef.current = true;
+    submissionSucceededRef.current = false;
     setLoading(true);
 
     try {
@@ -740,8 +742,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         }
       }
 
+      submissionSucceededRef.current = true;
       setShowSuccess(true);
-      submittingRef.current = true;
       setTimeout(() => {
         if (serviceRequest?.id) {
           window.sessionStorage.setItem('mjv-new-service-request', serviceRequest.id);
@@ -754,7 +756,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       const errorMessage = error?.message || 'Unknown error occurred';
       notify(`Failed to submit work order request: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
-      if (!showSuccess && !window.sessionStorage.getItem('mjv-new-service-request')) submittingRef.current = false;
+      if (!submissionSucceededRef.current) submittingRef.current = false;
       setLoading(false);
     }
   }
