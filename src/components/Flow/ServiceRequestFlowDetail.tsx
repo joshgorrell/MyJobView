@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
 type ContactActivity = { id: string; notes: string; logged_by_name: string; created_at: string };
-type RequestDetail = { id: string; customer_name: string; job_description: string; notes: string | null; priority: string; status: string; created_at: string; customer_contact_confirmed_at: string | null; requested_date: string | null; earliest_date: string | null; requested_tech_ids: string[] | null; work_order_id: string | null; work_order: { id: string; work_order_number: string; status: string; scheduled_date: string | null; scheduled_start_time?: string | null } | null };
+type RequestDetail = { id: string; contact_id: string | null; customer_name: string; job_description: string; notes: string | null; priority: string; status: string; created_at: string; customer_contact_confirmed_at: string | null; requested_date: string | null; earliest_date: string | null; requested_tech_ids: string[] | null; work_order_id: string | null; work_order: { id: string; work_order_number: string; status: string; scheduled_date: string | null; scheduled_start_time?: string | null } | null };
 
 export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
   const [request, setRequest] = useState<RequestDetail | null>(null);
@@ -18,7 +18,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
   useEffect(() => {
     let active = true;
     Promise.all([
-      supabase.from('service_requests').select('id,customer_name,job_description,notes,priority,status,created_at,customer_contact_confirmed_at,requested_date,earliest_date,requested_tech_ids,work_order_id,work_order:work_orders!service_requests_work_order_id_fkey(id,work_order_number,status,scheduled_date)').eq('id', requestId).maybeSingle(),
+      supabase.from('service_requests').select('id,contact_id,customer_name,job_description,notes,priority,status,created_at,customer_contact_confirmed_at,requested_date,earliest_date,requested_tech_ids,work_order_id,work_order:work_orders!service_requests_work_order_id_fkey(id,work_order_number,status,scheduled_date)').eq('id', requestId).maybeSingle(),
       supabase.from('customer_contact_log').select('id,notes,logged_by_name,created_at').eq('service_request_id', requestId).order('created_at', { ascending: false }).limit(30),
     ]).then(([details, log]) => {
       if (!active) return;
@@ -42,7 +42,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
   if (!request) return <p>Loading service request details…</p>;
   const scheduled = request.work_order && !['cancelled'].includes(request.work_order.status) && !!request.work_order.scheduled_date;
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm leading-snug">
-    <p><strong>Customer:</strong> {request.customer_name}</p>
+    <p><strong>Customer:</strong> {request.contact_id ? <a className="text-info hover:underline" href={`?tab=contacts&contactId=${encodeURIComponent(request.contact_id)}`} aria-label={`Open ${request.customer_name} customer record`}>{request.customer_name} ↗</a> : request.customer_name}</p>
     <p><strong>Priority:</strong> {request.priority}</p>
     <p className="sm:col-span-2"><strong>Work requested:</strong> {request.job_description}</p>
     <p><strong>Request:</strong> {request.status.replace(/_/g, ' ')} · Opened {new Date(request.created_at).toLocaleDateString()}</p>
