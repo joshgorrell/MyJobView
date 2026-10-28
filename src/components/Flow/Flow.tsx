@@ -80,6 +80,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(true);
+  const [createdRequestId] = useState(() => !scoped ? window.sessionStorage.getItem('mjv-new-service-request') : null);
   const [mentionsOnly, setMentionsOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -116,6 +117,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     };
   }, [scope, target, focusUpdateId, debouncedSearch, newOnly, mentionsOnly, todayOnly, category, kind, office, actor, location, from, to]);
   const flow = useFlow(filters);
+  useEffect(() => { if (createdRequestId) { void flow.refresh(); window.sessionStorage.removeItem('mjv-new-service-request'); } }, [createdRequestId]);
   const scopeModule = workOrderId ? 'work_orders' : projectId ? 'projects' : contactId ? 'contacts' : null;
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
   useEffect(() => {
@@ -176,7 +178,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   }
   const baseViews = scoped || hasModuleAccess('feed') || hasModuleAccess('messages') ? FLOW_VIEWS : [];
   const views = tasksContent && !scoped && hasModuleAccess('tasks') ? [...baseViews, { id: 'tasks' as FlowView, label: TASKS_LABEL }] : baseViews;
-  const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
+  const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter)).sort((a, b) => Number(b.source_table === 'service_requests' && b.source_id === createdRequestId) - Number(a.source_table === 'service_requests' && a.source_id === createdRequestId));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
   const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
   return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
@@ -240,7 +242,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
         const job = event.work_order_number ? `WO ${event.work_order_number}` : event.project_name;
         return <Fragment key={event.id}>
           {showDay && <h3 className="flow-day">{group}</h3>}
-          <div className={`flow-row ${event.viewed ? '' : 'flow-row--new'} ${open ? 'flow-row--open' : ''}`}>
+          <div className={`flow-row ${event.viewed ? '' : 'flow-row--new'} ${open ? 'flow-row--open' : ''} ${event.source_table === 'service_requests' && event.source_id === createdRequestId ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}>
             <button className="flow-read-toggle" aria-label={event.viewed ? 'Mark as new' : 'Mark as viewed'} title={event.viewed ? 'Viewed — mark as new' : 'New — mark as viewed'} onClick={() => void flow.markViewed([event.id], !event.viewed)}>{event.viewed ? <Check size={13} /> : <span className="flow-dot" />}</button>
             <button className="flow-row-main" aria-expanded={open} aria-controls={`flow-detail-${event.id}`} title={`${event.summary}${event.preview ? '\n' + event.preview : event.details ? '\n' + event.details : ''}`} onClick={() => { setExpanded(open ? null : event.id); if (!open && !event.viewed) void flow.markViewed([event.id]); }}>
               <time dateTime={event.created_at} title={new Date(event.created_at).toLocaleString()}>{new Date(event.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time>
