@@ -766,12 +766,18 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
       scrollBody={false}
+      wide
       showSuccess={showSuccess}
       successMessage="Work Order Request Created!"
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 space-y-2.5">
+        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-3 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-3 lg:items-start">
+          <div className="lg:col-span-2">
+          <div className="space-y-2 lg:space-y-0 lg:flex lg:items-center lg:justify-between [&>div]:mb-0">
           {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
+
+          {!isEditMode&&<p className="text-sm text-secondary">For remaining project work, use the <a href="/?tab=punchlist" target="_blank" rel="noopener noreferrer" className="text-info underline">Project Punchlist</a>.</p>}
+          </div>
 
           {/* Kickback reason banner (edit mode only) */}
           {isEditMode && editingRequest?.kickback_reason && (
@@ -784,8 +790,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </div>
           )}
 
+          </div>
+          <div className="min-w-0 space-y-2.5">
           {/* Customer Section */}
-          <div className="space-y-3">
+          <div className="space-y-3 lg:space-y-2">
             <h3 className="font-semibold text-primary flex items-center gap-2">
               <User className="w-5 h-5" />
               Customer
@@ -912,7 +920,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                   </div>
                 )}
 
-                {(!formData.contact_id || showCustomerDetails) && <div className="space-y-3">
+                {(!formData.contact_id || showCustomerDetails) && <div className="space-y-3 lg:space-y-2">
                 <input
                   type="text"
                   value={formData.customer_name}
@@ -962,7 +970,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
           {/* Project Selector (Project mode only) */}
           {requestType === 'project' && formData.contact_id && !isEditMode && (
-            <div className="space-y-3 border-t border-subtle pt-4">
+            <div className="space-y-3 lg:space-y-2 border-t border-subtle pt-4">
               <h3 className="font-semibold text-primary flex items-center gap-2">
                 <Briefcase className="w-5 h-5" />
                 Project
@@ -1000,7 +1008,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
 <details className="border-t border-subtle pt-2"><summary className="min-h-11 cursor-pointer text-sm text-secondary">{formData.job_location_address || '+ Location (optional)'}</summary>
           {/* Location Section */}
-          <div className="space-y-3">
+          <div className="space-y-3 lg:space-y-2">
             <h3 className="font-semibold text-primary flex items-center gap-2">
               <MapPin className="w-5 h-5" />
               Job Location
@@ -1026,7 +1034,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 </button>
               </div>
             )}
-            {(!formData.contact_id || showAddressFields || !formData.job_location_address) && <div className="space-y-3">
+            {(!formData.contact_id || showAddressFields || !formData.job_location_address) && <div className="space-y-3 lg:space-y-2">
             <div className="relative">
               <AddressAutocomplete
                 value={formData.job_location_address}
@@ -1080,7 +1088,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
 </details>
           {/* Job Description */}
-          <div className="space-y-3">
+          <div className="space-y-3 lg:space-y-2">
             <h3 className="font-semibold text-primary flex items-center gap-2">
               <FileText className="w-5 h-5" />
               What do they need?
@@ -1095,23 +1103,89 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             />
           </div>
 
-          {!isEditMode&&<p className="text-sm text-secondary">For remaining project work, use the <a href="/?tab=punchlist" target="_blank" rel="noopener noreferrer" className="text-info underline">Project Punchlist</a>.</p>}
+          {requestType === 'service' && formData.service_approval_required && <div className="space-y-2 border-t border-subtle pt-3">
+            <label className="block text-sm text-primary">Service rates and terms<textarea required maxLength={20000} rows={2} value={formData.service_terms} onChange={e=>setFormData(prev=>({...prev,service_terms:e.target.value}))} placeholder="Labor rate, trip charge, minimum charge, and applicable service terms" className="block w-full mt-1 rounded-lg border border-subtle bg-canvas p-3" /></label>
+            <p className="text-xs text-muted">Included in the customer email. No payment is collected now.</p>
+          </div>}
+          <details className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">+ Details · notes, photos</summary><div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-2">Additional Notes</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any additional context for the service team..."
+                rows={3}
+                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Photo Upload (both modes, max 3) */}
+          <div className="space-y-3 lg:space-y-2 border-t border-subtle pt-4">
+            <h3 className="font-semibold text-primary flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Photos (Optional, up to {MAX_PHOTOS})
+            </h3>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoSelect}
+              disabled={photos.length >= MAX_PHOTOS}
+              className="hidden"
+            />
+            {photoPreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                {photoPreviews.map((preview, i) => (
+                  <div key={i} className="relative group">
+                    <img src={preview} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover rounded-lg border border-strong" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-primary rounded-full p-1 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {photos.length < MAX_PHOTOS && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <Paperclip className="w-5 h-5" />
+                {photos.length === 0 ? 'Attach Photos' : `Add More (${photos.length}/${MAX_PHOTOS})`}
+              </button>
+            )}
+            {photos.length >= MAX_PHOTOS && (
+              <p className="text-xs text-muted text-center">Maximum {MAX_PHOTOS} photos reached.</p>
+            )}
+          </div>
+
+</details>
+          </div>
+          <div className="min-w-0 space-y-2.5 lg:space-y-2 lg:border-l lg:border-subtle lg:pl-6">
+            <h3 className="font-semibold text-primary">Request Details</h3>
           <div className="grid grid-cols-3 gap-2">
             <select aria-label="Request type" value={requestType} disabled className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="service">Service</option>{isEditMode&&<option value="project">Project</option>}</select>
             <select aria-label="Priority" value={formData.priority} onChange={e => setFormData(prev => ({...prev, priority: e.target.value as 'normal' | 'urgent'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="normal">Normal</option><option value="urgent">Urgent</option></select>
             <select aria-label="Billing type" value={formData.billable_type} onChange={e => setFormData(prev => ({...prev, billable_type: e.target.value as 'billable' | 'warranty'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="billable">Billable</option><option value="warranty">Warranty</option></select>
           </div>
-          {formData.billable_type === 'warranty' && <div className="space-y-2">
-            <label className="block text-sm text-secondary">Warranty for</label>
-            <select value={formData.warranty_type} onChange={e => setFormData(prev => ({...prev, warranty_type: e.target.value, warranty_reference: ''}))} className="w-full min-h-11 bg-surface border border-strong rounded-lg text-base text-primary"><option value="project">Project</option><option value="previous_service">Previous Service</option><option value="equipment">Equipment</option><option value="other">Other</option></select>
+          {formData.billable_type === 'warranty' && <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm text-secondary col-span-2" htmlFor="request-warranty-type">Warranty for</label>
+            <select id="request-warranty-type" value={formData.warranty_type} onChange={e => setFormData(prev => ({...prev, warranty_type: e.target.value, warranty_reference: ''}))} className="min-w-0 w-full min-h-11 bg-surface border border-strong rounded-lg text-base text-primary px-2"><option value="project">Project</option><option value="previous_service">Previous Service</option><option value="equipment">Equipment</option><option value="other">Other</option></select>
             <datalist id="service-request-warranty-references">{warrantyReferences.map(value => <option key={value} value={value} />)}</datalist>
-            <input list="service-request-warranty-references" aria-label="Warranty reference" placeholder="Project / work order / equipment reference" value={formData.warranty_reference} onChange={e => setFormData(prev => ({...prev, warranty_reference: e.target.value}))} className="w-full p-3 bg-surface border border-strong rounded-lg text-base text-primary" />
-            <textarea aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="w-full p-3 bg-surface border border-strong rounded-lg text-base text-primary" />
+            <input list="service-request-warranty-references" aria-label="Warranty reference" placeholder="Reference" value={formData.warranty_reference} onChange={e => setFormData(prev => ({...prev, warranty_reference: e.target.value}))} className="min-w-0 w-full px-2 py-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+            <textarea rows={2} aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="col-span-2 w-full p-2 bg-surface border border-strong rounded-lg text-base text-primary" />
           </div>}
 <div className="space-y-2">
           {/* Billable By (Service mode only) */}
           {requestType === 'service' && (
-            <div className="space-y-3 border-t border-subtle pt-4">
+            <div className="space-y-1">
               <label htmlFor="request-billable-by" className="block text-sm font-medium text-secondary">Billable By</label>
               <select
                 id="request-billable-by"
@@ -1141,7 +1215,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
 </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-2 min-w-0">
             <label className="block min-w-0 space-y-1">
               <span className="text-sm font-medium text-secondary">Customer Contact</span>
               <select aria-label="Customer contact responsibility" value={formData.customer_contact_instruction} onChange={e => setFormData(prev => ({ ...prev, customer_contact_instruction: e.target.value }))} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
@@ -1191,70 +1265,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               </label>
             </div>}
           </div>
-          <details className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">+ Details · notes, photos</summary><div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">Additional Notes</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Any additional context for the service team..."
-                rows={3}
-                className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
-              />
-            </div>
           </div>
-
-          {/* Photo Upload (both modes, max 3) */}
-          <div className="space-y-3 border-t border-subtle pt-4">
-            <h3 className="font-semibold text-primary flex items-center gap-2">
-              <Camera className="w-5 h-5" />
-              Photos (Optional, up to {MAX_PHOTOS})
-            </h3>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoSelect}
-              disabled={photos.length >= MAX_PHOTOS}
-              className="hidden"
-            />
-            {photoPreviews.length > 0 && (
-              <div className="grid grid-cols-3 gap-3">
-                {photoPreviews.map((preview, i) => (
-                  <div key={i} className="relative group">
-                    <img src={preview} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover rounded-lg border border-strong" />
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(i)}
-                      className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-primary rounded-full p-1 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {photos.length < MAX_PHOTOS && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 border border-dashed border-strong rounded-lg text-muted hover:border-blue-500 hover:text-blue-400 transition-colors flex items-center justify-center gap-2"
-              >
-                <Paperclip className="w-5 h-5" />
-                {photos.length === 0 ? 'Attach Photos' : `Add More (${photos.length}/${MAX_PHOTOS})`}
-              </button>
-            )}
-            {photos.length >= MAX_PHOTOS && (
-              <p className="text-xs text-muted text-center">Maximum {MAX_PHOTOS} photos reached.</p>
-            )}
-          </div>
-
-</details>
-          {requestType === 'service' && formData.service_approval_required && <div className="space-y-2 border-t border-subtle pt-3">
-            <label className="block text-sm text-primary">Service rates and terms<textarea required maxLength={20000} rows={3} value={formData.service_terms} onChange={e=>setFormData(prev=>({...prev,service_terms:e.target.value}))} placeholder="Labor rate, trip charge, minimum charge, and applicable service terms" className="block w-full mt-1 rounded-lg border border-subtle bg-canvas p-3" /></label>
-            <p className="text-xs text-muted">Included in the customer email. No payment is collected now.</p>
-          </div>}
         </div>
           {/* Action Buttons */}
           <div className="shrink-0 flex flex-col gap-2 sm:flex-row sm:items-center bg-canvas border-t border-subtle px-3 py-2 sm:px-4">
@@ -1262,7 +1273,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               <input type="checkbox" checked={formData.service_approval_required} disabled={!!editingRequest?.service_approval_required} onChange={e=>setFormData(prev=>({...prev,service_approval_required:e.target.checked}))} className="shrink-0" />
               Require customer approval &amp; payment method before scheduling
             </label>}
-            <div className="flex gap-2 sm:w-72 sm:shrink-0">
+            <div className="flex gap-2 sm:w-72 lg:w-96 sm:shrink-0">
             <button
               type="button"
               onClick={onClose}

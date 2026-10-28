@@ -19,24 +19,52 @@ const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsW
 await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><div id="root"></div><script src="app.js"></script>');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));browser=await (process.env.BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.BROWSER_ENGINE==='webkit'?{}:{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})});
 const context=await browser.newContext();openPage=async viewport=>{const page=await context.newPage();await page.setViewportSize(viewport);return page;};
-// The compact default desktop request should not require scrolling; expanded flows may scroll.
-{
- const desktop=await openPage({width:1440,height:1000});
+// Desktop uses two columns so a complete request fits at ordinary laptop heights.
+for(const theme of ['dark','light']) for(const viewport of [{width:1024,height:768},{width:1366,height:768},{width:1440,height:900},{width:1920,height:1080}]) {
+ const desktop=await openPage(viewport);
  await desktop.goto(`http://127.0.0.1:${server.address().port}`);
  await desktop.getByPlaceholder('Search name, company, phone, or email...').waitFor();
- const initial=await desktop.locator('.service-request-compact').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
- assert.ok(initial.scroll<=initial.client+2,`Default desktop Service Request must fit without scrolling: ${JSON.stringify(initial)}`);
- const dialog=await desktop.getByRole('dialog').boundingBox();
- assert.ok(dialog.y>=0&&dialog.y+dialog.height<=1001,'Desktop modal stays within viewport');
+ await desktop.evaluate(t=>document.documentElement.dataset.theme=t,theme);
+ const fits=async scenario=>{
+  const metrics=await desktop.locator('.service-request-compact').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
+  assert.ok(metrics.scroll<=metrics.client+2,`${theme} ${viewport.width}x${viewport.height} ${scenario} must fit without scrolling: ${JSON.stringify(metrics)}`);
+  const dialog=await desktop.getByRole('dialog').boundingBox();
+  assert.ok(dialog.y>=-1&&dialog.y+dialog.height<=viewport.height+1,'Desktop modal stays within viewport');
+  assert.equal(await desktop.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  const submit=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
+  assert.ok(submit.y>=0&&submit.y+submit.height<=viewport.height+1,'Submit stays visible');
+ };
+ await fits('initial form');
  const approval=desktop.getByRole('checkbox',{name:'Require customer approval & payment method before scheduling'});
  assert.equal(await approval.isChecked(),false);
  assert.equal(await desktop.getByLabel('Service rates and terms',{exact:true}).count(),0);
- const option=await approval.boundingBox();const submit=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
- assert.ok(Math.abs(option.y-submit.y)<45,'Infrequent approval option stays beside the submit actions');
- await approval.check();await desktop.getByLabel('Service rates and terms',{exact:true}).waitFor();await approval.uncheck();
+ await desktop.getByPlaceholder('Search name, company, phone, or email...').fill('John');
+ await desktop.getByRole('button').filter({hasText:'John Smith'}).click();
+ await desktop.getByPlaceholder('What needs to be done? *').fill('Replace the failed network switch and restore Wi-Fi');
+ await desktop.getByRole('radio',{name:'Specific date',exact:true}).check();
+ await desktop.getByLabel('Earliest date',{exact:true}).fill('2026-10-28');
+ await desktop.getByLabel('Need by',{exact:true}).fill('2026-10-30');
+ await fits('selected customer with date preferences');
+ const customer=await desktop.getByRole('heading',{name:'Customer',exact:true}).boundingBox();
+ const request=await desktop.getByRole('heading',{name:'Request Details',exact:true}).boundingBox();
+ assert.ok(Math.abs(customer.y-request.y)<2&&request.x>customer.x,'Customer and request details share a desktop row');
+ await approval.check();await fits('approval terms');await approval.uncheck();
+ await desktop.getByRole('button',{name:'Change',exact:true}).click();
  await desktop.getByRole('button',{name:'New Customer',exact:true}).click();
- const action=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
- assert.ok(action.y>=0&&action.y+action.height<=1001,'Submit stays visible with expanded customer fields');
+ await desktop.getByPlaceholder('Customer Name *').fill('New Customer');
+ await desktop.getByPlaceholder('Phone',{exact:true}).fill('5559876543');
+ await fits('new customer with date preferences');
+ await desktop.getByLabel('Billing type').selectOption('warranty');
+ await desktop.getByLabel('Warranty reference',{exact:true}).fill('WO-101');
+ await desktop.getByLabel('Warranty reason',{exact:true}).fill('Return visit');
+ await fits('new customer with warranty and date preferences');
+ if(viewport.height>=900){
+  await desktop.locator('summary').filter({hasText:'Location'}).click();
+  await desktop.getByPlaceholder('Street Address (optional)').fill('123 Main Street');
+  await fits('expanded location and warranty');
+  if(process.env.INTAKE_DESKTOP_SCREENSHOT&&theme==='dark'&&viewport.width===1440)await desktop.screenshot({path:process.env.INTAKE_DESKTOP_SCREENSHOT});
+ }
+ console.log(`${theme} ${viewport.width}x${viewport.height}: desktop request fits without body scrolling`);
  await desktop.close();
 }
 for(const width of [320,375,390,430,768,1024,1280]){
