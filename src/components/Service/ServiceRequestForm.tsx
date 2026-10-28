@@ -742,7 +742,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         if (onSuccess) onSuccess();
         onClose();
         if (serviceRequest?.id) {
-          window.location.hash = `#dispatch`;
+          window.location.hash = '#feed';
         }
       }, 900);
     } catch (error: any) {
@@ -1084,6 +1084,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               />
             </div>
             </div>}
+            {specificDate && <p className="sm:col-span-2 text-xs text-muted">Requested dates are not guaranteed. Scheduling will confirm availability.</p>}
           </div>
 
 </details>
@@ -1109,11 +1110,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           </div>}
           <details className="border-t border-subtle pt-3"><summary className="min-h-11 cursor-pointer text-primary">+ Details · notes, photos</summary><div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-secondary mb-2">Additional Notes</label>
+              <label className="block text-sm font-medium text-secondary mb-2">Message to Scheduling (Internal Only)</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Any additional context for the service team..."
+                placeholder="Example: Customer is out of town until next Friday. Call to schedule after they return."
                 rows={3}
                 className="w-full px-3 py-2.5 bg-surface border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-primary placeholder-gray-500 resize-none"
               />
@@ -1226,14 +1227,16 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </label>
             <label className="block min-w-0 space-y-1">
               <span className="text-sm font-medium text-secondary">Preferred Technician</span>
-              <select aria-label="Preferred technician" value={formData.requested_tech_ids.length > 1 ? 'existing' : formData.requested_tech_ids[0] || ''} onChange={e => {
-                if (e.target.value !== 'existing') setFormData(prev => ({ ...prev, requested_tech_ids: e.target.value ? [e.target.value] : [] }));
-              }} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
-                <option value="">No preference</option>
-                {formData.requested_tech_ids.length > 1 && <option value="existing">Keep existing preferences</option>}
-                {formData.requested_tech_ids.length === 1 && !technicians.some(tech => tech.id === formData.requested_tech_ids[0]) && <option value={formData.requested_tech_ids[0]}>Existing preference</option>}
-                {technicians.map(tech => <option key={tech.id} value={tech.id}>{tech.full_name}</option>)}
-              </select>
+              <div className="rounded-lg border border-strong bg-surface p-2 max-h-28 overflow-y-auto" aria-label="Preferred technicians">
+                <label className="flex items-center gap-2 text-sm text-primary min-h-8">
+                  <input type="checkbox" checked={formData.requested_tech_ids.length === 0} onChange={() => setFormData(prev => ({ ...prev, requested_tech_ids: [] }))} />
+                  Any available
+                </label>
+                {technicians.map(tech => <label key={tech.id} className="flex items-center gap-2 text-sm text-primary min-h-8">
+                  <input type="checkbox" checked={formData.requested_tech_ids.includes(tech.id)} onChange={e => setFormData(prev => ({ ...prev, requested_tech_ids: e.target.checked ? [...prev.requested_tech_ids, tech.id] : prev.requested_tech_ids.filter(id => id !== tech.id) }))} />
+                  {tech.full_name}
+                </label>)}
+              </div>
             </label>
             <fieldset className="min-w-0">
               <legend className="text-sm font-medium text-secondary mb-1">Scheduling</legend>
@@ -1257,11 +1260,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             {specificDate && <div className="grid grid-cols-2 gap-3 sm:col-span-2 min-w-0">
               <label className="block min-w-0 space-y-1">
                 <span className="text-sm font-medium text-secondary">Earliest date</span>
-                <input type="date" aria-label="Earliest date" value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+                <input type="date" aria-label="Earliest date" min={new Date().toISOString().slice(0, 10)} value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
               </label>
               <label className="block min-w-0 space-y-1">
                 <span className="text-sm font-medium text-secondary">Need by</span>
-                <input type="date" aria-label="Need by" value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+                <input type="date" aria-label="Need by" min={new Date().toISOString().slice(0, 10)} value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
               </label>
             </div>}
           </div>
