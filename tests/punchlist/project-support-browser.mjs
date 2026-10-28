@@ -31,8 +31,8 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.getByRole('textbox',{name:'What needs attention?'}).fill('Master bedroom speaker needs adjusting');
   await page.getByRole('button',{name:'Add Item',exact:true}).click();await page.getByRole('status').filter({hasText:'Item added'}).waitFor();
-  await page.getByRole('checkbox',{name:'Request visit for Master bedroom speaker needs adjusting',exact:true}).check();
-  await page.getByRole('button',{name:'Request visit (1)',exact:true}).click();await page.getByRole('status').filter({hasText:'Visit requested'}).waitFor();
+  await page.getByRole('checkbox',{name:'Select Master bedroom speaker needs adjusting for service',exact:true}).check();
+  await page.getByRole('button',{name:'Request Service (1)',exact:true}).click();await page.getByRole('status').filter({hasText:'Service requested'}).waitFor();
   assert.equal((await page.evaluate(()=>window.calls)).filter(call=>call[0]==='request_project_punchlist_visit').length,1);
   await page.screenshot({path:'/tmp/project-punchlist-'+width+'.png',fullPage:true});
   await page.getByRole('button',{name:'Service Requests',exact:true}).click();

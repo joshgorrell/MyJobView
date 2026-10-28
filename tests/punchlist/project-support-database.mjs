@@ -171,4 +171,57 @@ await as(91,31);await db.query(`SELECT set_test_tune_submission_updates('${id(31
 console.log('PASS: ordinary project visits retain their own origin and mixed scope cannot be mislabeled.');
 console.log('PASS: 3-of-5 atomic handoff, immutable audit, request-history exclusion, retry mismatch, mixed-project and module/org/portal guards.');
 
+
+/* Earlier expiration assertions intentionally move project 50 outside its service window.
+   Restore an active window for the separate draft-edit regression scenario. */
+await owner(`UPDATE projects SET substantial_completion_date=CURRENT_DATE-2 WHERE id='${id(50)}'`);
+
+/* Exercise the Test & Tune migrations against an isolated Postgres-compatible fixture,
+   rather than only checking SQL source text. The production schema has updated_at already. */
+await owner('ALTER TABLE public.project_tasks ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now()');
+for (const name of [
+  '20261026183000_test_tune_project_task_handoff.sql',
+  '20261026190000_test_tune_feed_workspace_fields.sql',
+  '20261026193000_customer_punchlist_draft_edit.sql',
+  '20261026200000_customer_punchlist_draft_removal.sql',
+  '20261026201000_customer_support_hide_removed_drafts.sql',
+  '20261026202000_punchlist_request_exclude_removed_drafts.sql',
+  '20261026203000_customer_drafts_staff_feed.sql',
+  '20261026204000_customer_punchlist_draft_photos.sql',
+]) await db.exec(await readFile('supabase/migrations/' + name, 'utf8'));
+await as(90,30);
+await db.query(`SELECT submit_project_punchlist_item('${id(50)}','Original customer draft','${id(320)}')`);
+await db.query(`SELECT update_customer_punchlist_draft('${id(50)}','${id(320)}','Edited customer draft')`);
+let newState=await support();
+assert.equal(newState.projects.find(p=>p.id===id(50)).tasks.find(t=>t.id===id(320)).description,'Edited customer draft');
+await owner(`INSERT INTO storage.objects(bucket_id,name) VALUES('portal-support','${id(1)}/${id(30)}/draft-batch/0.jpg')`);
+await as(90,30);
+await db.query(`SELECT add_customer_punchlist_draft_photos('${id(50)}','${id(320)}',ARRAY['${id(1)}/${id(30)}/draft-batch/0.jpg'])`);
+await reject(`SELECT add_customer_punchlist_draft_photos('${id(52)}','${id(320)}',ARRAY['${id(1)}/${id(30)}/draft-batch/0.jpg'])`,/Not authorized/);
+await as(10);
+let feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
+let fedTask=feed.flatMap(p=>p.tasks).find(t=>t.id===id(320));
+assert.equal(fedTask.customer_description,'Edited customer draft','Staff sees customer edits before service request');
+assert.equal(fedTask.photos.length,1,'Staff sees draft photo attachments');
+await as(90,30);
+await db.query(`SELECT request_project_punchlist_visit('${id(50)}',ARRAY['${id(320)}'::uuid],'${id(321)}')`);
+await reject(`SELECT update_customer_punchlist_draft('${id(50)}','${id(320)}','Too late')`,/no longer editable/);
+await reject(`SELECT add_customer_punchlist_draft_photos('${id(50)}','${id(320)}',ARRAY['${id(1)}/${id(30)}/draft-batch/0.jpg'])`,/no longer editable/);
+await db.query(`SELECT submit_project_punchlist_item('${id(50)}','Draft to remove','${id(322)}')`);
+await db.query(`SELECT remove_customer_punchlist_draft('${id(50)}','${id(322)}')`);
+assert.equal((await support()).projects.find(p=>p.id===id(50)).tasks.some(t=>t.id===id(322)),false,'Removed draft hidden from portal');
+await reject(`SELECT request_project_punchlist_visit('${id(50)}',ARRAY['${id(322)}'::uuid],'${id(323)}')`,/Invalid item selection/);
+await as(10);
+feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
+assert.equal(feed.flatMap(p=>p.tasks).some(t=>t.id===id(322)),false,'Removed draft hidden from staff feed');
+// Verify the workspace status follows completed linked work orders, but not mixed completion.
+await owner(`INSERT INTO work_orders(id,organization_id,project_id,status) VALUES ('${id(330)}','${id(1)}','${id(50)}','completed'),('${id(331)}','${id(1)}','${id(50)}','pending')`);
+await owner(`INSERT INTO work_order_tasks(work_order_id,organization_id,project_task_id,title,status) VALUES ('${id(330)}','${id(1)}','${id(320)}','First visit','completed'),('${id(331)}','${id(1)}','${id(320)}','Second visit','pending')`);
+feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
+assert.notEqual(feed.flatMap(p=>p.tasks).find(t=>t.id===id(320)).service_status,'completed','Incomplete linked work order prevents completion');
+await owner(`UPDATE work_orders SET status='completed' WHERE id='${id(331)}'`);
+feed=(await db.query('SELECT get_test_tune_workspace() AS data')).rows[0].data;
+assert.equal(feed.flatMap(p=>p.tasks).find(t=>t.id===id(320)).service_status,'completed','All linked work orders completed');
+console.log('PASS: eight Test & Tune migrations executed in isolated fixture; edits, photos, visibility, removal, and submitted-item guards.');
+
 await db.close();

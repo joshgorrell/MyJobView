@@ -98,6 +98,8 @@ export function PortalPunchlist({
   const [address, setAddress] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const [message, setMessage] = useState("");
   const generation = useRef(0);
   const writing = useRef(false);
@@ -220,7 +222,7 @@ export function PortalPunchlist({
       submission.current = crypto.randomUUID();
       setMessage(
         view === "projects"
-          ? "Item added. Select items and request a visit when ready."
+          ? "Item added. Select items and request service when ready."
           : "Service request submitted. Our team will contact you to arrange service.",
       );
       await load();
@@ -233,6 +235,61 @@ export function PortalPunchlist({
       writing.current = false;
       setBusy(false);
     }
+  }
+  async function saveDraftEdit() {
+    if (!editingId || !editingText.trim() || writing.current || preview) return;
+    writing.current = true; setBusy(true); setError("");
+    try {
+      const { error: failure } = await supabase.rpc("update_customer_punchlist_draft", {
+        p_project_id: projectId, p_task_id: editingId, p_description: editingText.trim(),
+      });
+      if (failure) throw failure;
+      setEditingId(null); setEditingText(""); setMessage("Punchlist item updated.");
+      await load();
+    } catch (failure) { setError((failure as Error).message || "Unable to update item."); }
+    finally { writing.current = false; setBusy(false); }
+  }
+  async function addDraftPhotos(itemId: string, newFiles: File[]) {
+    if (!data || !contactId || !newFiles.length || busy || writing.current || preview) return;
+    const project = data.projects.find(p => p.id === projectId);
+    const item = project?.tasks.find(t => t.id === itemId);
+    if (!item || (item.photos?.length || 0) + newFiles.length > 10 ||
+        newFiles.some(file => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024)) {
+      setError('Use up to 10 total JPG, PNG or WebP photos, each under 10 MB.');
+      return;
+    }
+    writing.current = true; setBusy(true); setError('');
+    try {
+      const batch = crypto.randomUUID();
+      const paths: string[] = [];
+      for (let index = 0; index < newFiles.length; index++) {
+        const file = newFiles[index];
+        const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+        const path = `${data.organization_id}/${contactId}/${batch}/${index}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from('portal-support').upload(path, file, { upsert: false });
+        if (uploadError) throw uploadError;
+        paths.push(path);
+      }
+      const { error: failure } = await supabase.rpc('add_customer_punchlist_draft_photos', {
+        p_project_id: projectId, p_task_id: itemId, p_photos: paths,
+      });
+      if (failure) throw failure;
+      setMessage('Photos added to your punchlist item.');
+      await load();
+    } catch (failure) { setError((failure as Error).message || 'Unable to add photos.'); }
+    finally { writing.current = false; setBusy(false); }
+  }
+  async function removeDraftItem(itemId: string) {
+    if (writing.current || preview || !(await requestConfirmation("Remove this unsubmitted punchlist item?"))) return;
+    writing.current = true; setBusy(true); setError("");
+    try {
+      const { error: failure } = await supabase.rpc("remove_customer_punchlist_draft", { p_project_id: projectId, p_task_id: itemId });
+      if (failure) throw failure;
+      setSelected(current => current.filter(id => id !== itemId));
+      if (editingId === itemId) setEditingId(null);
+      setMessage("Punchlist item removed."); await load();
+    } catch (failure) { setError((failure as Error).message || "Unable to remove item."); }
+    finally { writing.current = false; setBusy(false); }
   }
   async function requestVisit() {
     if (writing.current || !selected.length || preview) return;
@@ -252,7 +309,7 @@ export function PortalPunchlist({
       if (failure) throw failure;
       setSelected([]);
       visitSubmission.current = crypto.randomUUID();
-      setMessage("Visit requested. Our team will arrange scheduling.");
+      setMessage("Service requested. Our team will arrange scheduling.");
       await load();
     } catch (failure) {
       setError(
@@ -283,7 +340,7 @@ export function PortalPunchlist({
       <div>
         <h1 className="text-xl font-bold">Punchlist & Service Requests</h1>
         <p className="text-sm text-gray-600">
-          Project adjustments and ongoing VIP support.
+          Project punchlist and ongoing VIP support.
         </p>
       </div>
       {preview && (
@@ -317,7 +374,7 @@ export function PortalPunchlist({
         </button>
       </div>
       {data?.submission_updates_enabled !== undefined && <label className="flex min-h-11 items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={data.submission_updates_enabled} disabled={preview || busy} onChange={e => void updateSubmissionPreference(e.target.checked)} />Show Test &amp; Tune submission updates in my portal</label>}
-      {!!data?.submission_updates?.length && <details className="rounded-xl border p-3"><summary>Service request updates ({data.submission_updates.length})</summary><ul className="space-y-2 pt-2">{data.submission_updates.map(update => <li key={update.request_id} className="text-sm">Your service request for {update.item_count} adjustment{update.item_count === 1 ? '' : 's'} was submitted on {new Date(update.submitted_at).toLocaleDateString()}. Our team will arrange scheduling.</li>)}</ul></details>}
+      {!!data?.submission_updates?.length && <details className="rounded-xl border p-3"><summary>Service request updates ({data.submission_updates.length})</summary><ul className="space-y-2 pt-2">{data.submission_updates.map(update => <li key={update.request_id} className="text-sm">Your service request for {update.item_count} punchlist item{update.item_count === 1 ? '' : 's'} was submitted on {new Date(update.submitted_at).toLocaleDateString()}. Our team will arrange scheduling.</li>)}</ul></details>}
       {loading && <p>Loading your items…</p>}
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 text-red-700 p-3">
@@ -400,7 +457,7 @@ export function PortalPunchlist({
                           <input
                             type="checkbox"
                             disabled={busy}
-                            aria-label={`Request visit for ${item.description}`}
+                            aria-label={`Select ${item.description} for service`}
                             checked={selected.includes(item.id)}
                             onChange={(e) => {
                               setSelected((current) =>
@@ -426,6 +483,24 @@ export function PortalPunchlist({
                         ? "Added by you"
                         : "Shared by our team"}
                     </p>
+                    {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && (
+                      editingId === item.id ? <div className="space-y-2">
+                        <textarea aria-label="Edit punchlist description" value={editingText} onChange={e => setEditingText(e.target.value)} maxLength={10000} className="w-full min-h-24 rounded-lg border p-2" />
+                        <div className="flex gap-2"><button type="button" disabled={busy || !editingText.trim()} onClick={() => void saveDraftEdit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white">Save</button><button type="button" disabled={busy} onClick={() => setEditingId(null)} className="min-h-11 px-3">Cancel</button></div>
+                      </div> : <button type="button" disabled={busy} onClick={() => { setEditingId(item.id); setEditingText(item.description); }} className="min-h-11 text-sm text-blue-700 underline">Edit item</button>
+                    )}
+                    {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && <button type="button" disabled={busy} onClick={() => void removeDraftItem(item.id)} className="min-h-11 text-sm text-red-700 underline">Remove item</button>}
+                    {item.source === "customer" && item.status === "open" && !item.requested && project.can_submit && !preview && (
+                      <label className="block text-sm text-blue-700">
+                        Add photos (up to 10 total)
+                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy || (item.photos?.length || 0) >= 10}
+                          className="mt-1 block w-full text-sm" onChange={event => {
+                            const chosen = Array.from(event.currentTarget.files || []);
+                            event.currentTarget.value = '';
+                            void addDraftPhotos(item.id, chosen);
+                          }} />
+                      </label>
+                    )}
                     <SupportPhotos paths={item.photos} />
                     {item.legacy_photos
                       ?.filter((url) => /^https:\/\//i.test(url))
@@ -457,7 +532,7 @@ export function PortalPunchlist({
                   onClick={() => void requestVisit()}
                   className="min-h-11 rounded-xl bg-blue-600 text-white px-4 disabled:opacity-50"
                 >
-                  Request visit ({selected.length})
+                  Request Service ({selected.length})
                 </button>
               )}
             </>

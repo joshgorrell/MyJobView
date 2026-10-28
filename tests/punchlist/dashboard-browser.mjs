@@ -13,13 +13,13 @@ const projects=JSON.parse(localStorage.getItem('test-projects')||JSON.stringify(
 export const useAuth=()=>({profile:{id:'admin'}});
 export const useDepartments=()=>({hasModuleAccess:()=>true});
 export const markPunchlistSeen=()=>{};
-export const PunchlistInviteManager=()=>null;
+export const PunchlistInviteManager=()=>null;\nexport const SupportPhotos=()=>null;
 export const supabase={rpc:async(name,args)=>{if(name==='get_test_tune_workspace')return {data:JSON.parse(JSON.stringify(projects)),error:null};window.calls.push([name,args]);if(name==='request_project_punchlist_visit'){for(const p of projects)for(const t of p.tasks)if(args.p_task_ids.includes(t.id))t.request_id='req1';localStorage.setItem('test-projects',JSON.stringify(projects));return {data:'req1',error:null};}return {data:null,error:null};},channel:()=>({on(){return this;},subscribe(){return this;}}),removeChannel(){}};`;
 const source=`import React from 'react';import{createRoot}from'react-dom/client';import{PunchlistAdminDashboard}from'./src/components/Production/PunchlistAdminDashboard';createRoot(document.getElementById('root')).render(<main className="p-2"><PunchlistAdminDashboard/></main>);`;
 let browser;
 const server=createServer(async(req,res)=>{const name=req.url.includes('app.js')?'app.js':req.url.includes('style.css')?'style.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,name)));});
 try{
-await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/lib\/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|Shared\/Toast$|usePunchlistUnseenCount$|ProjectPunchlistWorkspace$|PunchlistInviteManager$|PunchlistTaskDetailModal$|ContactQuickViewModal$|CreateWorkOrderModal$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
+await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/lib\/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|Shared\/Toast$|usePunchlistUnseenCount$|ProjectPunchlistWorkspace$|PunchlistInviteManager$|Shared\/SupportPhotos$|PunchlistTaskDetailModal$|ContactQuickViewModal$|CreateWorkOrderModal$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
 const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
 await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><div id="root"></div><script src="app.js"></script>');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
@@ -27,8 +27,28 @@ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors
 for(const width of [375,390,1280]){
  await page.setViewportSize({width,height:800});await page.goto('http://127.0.0.1:'+server.address().port);await page.evaluate(()=>localStorage.clear());await page.reload();
  await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).waitFor();
+ await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('c1');
+ assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('6')),true);
+ await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('p1');
+ assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('5')),true);
+ await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('customer');
+ assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a'}).count(),0);
+ await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('all');
+ await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('all');
+ await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('all');
+ await page.getByRole('button',{name:/Not submitted/}).click();
+ assert.equal(await page.getByRole('button',{name:/Not submitted/}).getAttribute('aria-pressed'),'true');
+ await page.getByRole('button',{name:/All items/}).click();
+
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.equal(await page.getByRole('checkbox',{name:'Select Expired adjustment',exact:true}).isDisabled(),true);
+ await page.getByRole('button',{name:'Preview Adjustment a'}).click();
+ const preview=page.getByRole('dialog',{name:'Punchlist preview: a'});
+ await preview.waitFor();
+ const bounds=await preview.boundingBox();
+ assert.ok(bounds && bounds.x>=0 && bounds.x+bounds.width<=width+1,'Preview fits viewport even inside horizontally scrolling table');
+ await page.getByRole('button',{name:'Close punchlist preview'}).click();
+
  for(const id of ['a','b','c'])await page.getByRole('checkbox',{name:'Select Adjustment '+id,exact:true}).check();
  assert.equal(await page.getByRole('checkbox',{name:'Select Other project',exact:true}).isDisabled(),true);
  await page.getByRole('button',{name:'Request service',exact:true}).click();await page.getByRole('status').filter({hasText:'ready for scheduling'}).waitFor();
@@ -36,9 +56,9 @@ for(const width of [375,390,1280]){
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).count(),1);
  const calls=await page.evaluate(()=>window.calls);assert.deepEqual(calls.find(c=>c[0]==='request_project_punchlist_visit')[1].p_task_ids,['a','b','c']);
  await page.reload();assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).count(),0);await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).waitFor();
- await page.getByRole('checkbox',{name:'Show history',exact:true}).check();assert.equal(await page.getByRole('link',{name:'View request →'}).count(),3);
+ await page.getByRole('combobox',{name:'Filter punchlist status'}).selectOption('requested');assert.equal(await page.getByRole('link',{name:'View request →'}).count(),3);
  await page.goto('http://127.0.0.1:'+server.address().port+'/?projectId=missing&contactId=c1');await page.getByRole('alert').filter({hasText:'unavailable or you no longer have access'}).waitFor();
- await page.goBack();await page.getByRole('checkbox',{name:'Show history'}).waitFor();
+ await page.goBack();await page.getByRole('button',{name:'Preview Adjustment d'}).waitFor();
 }
 assert.deepEqual(errors,[]);
 console.log('PASS: phone/desktop layout, exact grouped handoff, expired/project guards, persisted reload, history, missing context and browser back.');
