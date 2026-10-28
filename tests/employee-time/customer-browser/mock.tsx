@@ -3,6 +3,7 @@ const state: any = ((window as any).__timeTest = {
   writes: [],
   calls: [],
   session: null,
+  timerFailures: 0,
 });
 const customer = "randy",
   other = "empty";
@@ -106,6 +107,11 @@ export const supabase = {
         get(_, key) {
           if (key === "then")
             return (resolve: any) => {
+              if (table === "customer_time_sessions" && state.timerFailures > 0) {
+                state.timerFailures--;
+                resolve({ data: null, error: { message: "Temporary timer read failure" } });
+                return;
+              }
               if (payload) {
                 state.writes.push({ table, payload });
                 resolve({ data: null, error: null });

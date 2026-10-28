@@ -135,10 +135,17 @@ try {
       .getByRole("button", { name: "Start Timer", exact: true })
       .click();
     await page.getByRole("button", { name: "Record more time" }).waitFor();
+    await page.evaluate(() => { window.__timeTest.timerFailures = 1; window.dispatchEvent(new Event("customer-time-changed")); });
+    await page.getByRole("alert").filter({ hasText: "Unable to load your customer timer" }).waitFor();
+    await page.getByRole("button", { name: "Retry customer timer" }).click();
+    await page.getByRole("alert").waitFor({ state: "detached" });
     await page.getByRole("button", { name: "Stop & Submit Time" }).click();
     await page.waitForFunction(() =>
       window.__timeTest.calls.some((c) => c.name === "stop_customer_job_time"),
     );
+    await page.evaluate(() => { window.__timeTest.timerFailures = 1; window.dispatchEvent(new Event("customer-time-changed")); });
+    await page.getByRole("button", { name: "Retry customer timer" }).click();
+    await page.getByRole("button", { name: "Retry customer timer" }).waitFor({ state: "detached" });
     assert.ok(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
