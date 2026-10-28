@@ -734,6 +734,9 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         throw new Error(`Failed to create work order request: ${requestError.message}`);
       }
 
+      // The request is committed. Never allow a retry to insert a duplicate if
+      // optional follow-up work (approval email or photo upload) fails.
+      submissionSucceededRef.current = true;
       if (formData.service_approval_required) await deliverApproval(serviceRequest.id);
 
       // Upload photos if any
@@ -742,11 +745,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         try {
           const photoPaths = await uploadPhotos(serviceRequest.id);
           if (photoPaths.length > 0) {
-            await supabase
+            const { error: attachmentError } = await supabase
               .from('service_requests')
               .update({ attachments: photoPaths })
               .eq('id', serviceRequest.id);
+            if (attachmentError) throw attachmentError;
           }
+        } catch (photoError) {
+          console.error('Service request saved, but photo upload failed:', photoError);
+          notify('Service request saved, but photos could not be attached. You can add them later.', { theme: 'blue', tone: 'warning' });
         } finally {
           setUploadingPhotos(false);
         }
