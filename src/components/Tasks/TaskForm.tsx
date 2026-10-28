@@ -11,6 +11,7 @@ import { offlineSupabaseInsert, offlineSupabaseUpdate } from '../../lib/offlineS
 import { generateUniqueUsername } from '../../lib/username';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import ConfirmModal from '../ui/ConfirmModal';
+import { AssignmentSearchSelect } from './AssignmentSearchSelect';
 
 interface AIPrefill {
   contactId?: string;
@@ -63,7 +64,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [showDraftModal, setShowDraftModal] = useState(false);
 
   const autoSaveKey = task ? `task_edit_${task.id}` : supportMode ? 'task_new_support' : 'task_new';
-  const { restoreSavedData, clearSavedData } = useAutoSave({
+  const { restoreSavedData, clearSavedData, saveNow } = useAutoSave({
     key: autoSaveKey,
     data: formData,
     enabled: !task
@@ -383,8 +384,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   }
 
   function handleClose() {
-    if (!task && !false) {
-      const hasData = formData.title || formData.description;
+    if (!task) {
+      const title = supportMode ? formData.title.replace(/^Support:\s*/i, '') : formData.title;
+      const hasData = title.trim() || formData.description.trim() ||
+        formData.assigned_to || formData.assigned_department_id ||
+        formData.due_date || formData.reminder_date || formData.project_id ||
+        formData.work_order_id || formData.proposal_id ||
+        formData.contact_id !== (contactId || '') ||
+        formData.priority !== 'medium' || formData.status !== 'pending';
       if (hasData) {
         setShowDraftModal(true);
         return;
@@ -394,6 +401,12 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   }
 
   const otherUsers = users.filter(u => u.id !== profile?.id);
+  const assignmentOptions = [
+    { id: '', label: 'Anyone — open to the team', group: 'Team' },
+    ...departments.map(department => ({ id: `dept:${department.id}`, label: department.display_name, group: 'Department' })),
+    ...(profile ? [{ id: profile.id, label: `Me (${profile.full_name})`, group: 'Person' }] : []),
+    ...otherUsers.map(user => ({ id: user.id, label: user.full_name, group: 'Person' })),
+  ];
 
   return (
     <>
@@ -440,37 +453,17 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 <Users className="w-4 h-4 text-muted" />
                 Assign To
               </label>
-              <select
+              <AssignmentSearchSelect
+                options={assignmentOptions}
                 value={formData.assigned_department_id ? `dept:${formData.assigned_department_id}` : formData.assigned_to}
-                onChange={(e) => {
-                  const value = e.target.value;
+                onChange={value => {
                   if (value.startsWith('dept:')) {
                     setFormData({ ...formData, assigned_to: '', assigned_department_id: value.slice(5) });
                   } else {
                     setFormData({ ...formData, assigned_to: value, assigned_department_id: '' });
                   }
                 }}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              >
-                <option value="">Anyone — open to the team</option>
-                <optgroup label="Departments">
-                  {departments.map((department) => (
-                    <option key={department.id} value={`dept:${department.id}`}>
-                      {department.display_name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="People">
-                  {profile && (
-                    <option value={profile.id}>Me ({profile.full_name})</option>
-                  )}
-                  {otherUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+              />
               <p className="text-xs text-muted mt-1">
                 Anyone is the default. Department tasks notify that department; the first person to complete one earns the points.
               </p>
@@ -704,7 +697,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
           <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-subtle/60 flex-shrink-0">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-3 border border-subtle text-secondary rounded-xl hover:bg-surface transition-colors font-medium text-sm"
             >
               Cancel
@@ -722,13 +715,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
     <ConfirmModal
       isOpen={showDraftModal}
+      zIndex={70}
       title="Discard Draft?"
-      message="Keep draft? Your progress will be saved and you can restore it when you return."
+      message="Discard this draft, or keep it to finish when you return?"
       variant="danger"
       confirmLabel="Discard"
       cancelLabel="Keep Draft"
       onConfirm={() => { clearSavedData(); setShowDraftModal(false); onClose(); }}
-      onCancel={() => { setShowDraftModal(false); onClose(); }}
+      onCancel={() => { saveNow(); setShowDraftModal(false); onClose(); }}
     />
     </>
   );

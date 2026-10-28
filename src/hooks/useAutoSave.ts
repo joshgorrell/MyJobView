@@ -63,6 +63,7 @@ export function useAutoSave<T>({ key, data, enabled = true, delay = 1000 }: UseA
 
   // Function to clear saved data
   const clearSavedData = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     try {
       localStorage.removeItem(storageKey);
     } catch (error) {
@@ -70,8 +71,20 @@ export function useAutoSave<T>({ key, data, enabled = true, delay = 1000 }: UseA
     }
   };
 
+  // Flush before closing so the latest keystrokes survive the debounce cleanup.
+  const saveNow = () => {
+    if (!enabled) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ data, timestamp: Date.now() }));
+    } catch (error) {
+      console.error('Error auto-saving form data:', error);
+    }
+  };
+
   return {
     restoreSavedData,
-    clearSavedData
+    clearSavedData,
+    saveNow
   };
 }
