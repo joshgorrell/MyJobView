@@ -1079,14 +1079,6 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           </div>
 
 </details>
-          {requestType === 'service' && <section className="space-y-3 rounded-lg border border-subtle px-2 py-0">
-            <label className="flex min-h-11 sm:min-h-0 items-center gap-3 text-xs text-primary"><input type="checkbox" checked={formData.service_approval_required} disabled={!!editingRequest?.service_approval_required} onChange={e=>setFormData(prev=>({...prev,service_approval_required:e.target.checked}))} />Require customer approval &amp; payment method before scheduling</label>
-            {formData.service_approval_required && <>
-              <p className="text-xs text-secondary">The customer receives an email to accept the service rates and securely provide payment information. Nothing is charged now. A Service Manager or Admin can override this requirement in the service queue.</p>
-              <label className="block text-sm text-primary">Service rates and terms<textarea required maxLength={20000} rows={5} value={formData.service_terms} onChange={e=>setFormData(prev=>({...prev,service_terms:e.target.value}))} placeholder="Labor rate, trip charge, minimum charge, and applicable service terms" className="block w-full mt-1 rounded-lg border border-subtle bg-canvas p-3" /></label>
-              <p className="text-xs text-secondary">The rates and terms above will appear in the customer email and review page.</p>
-            </>}
-          </section>}
           {/* Job Description */}
           <div className="space-y-3">
             <h3 className="font-semibold text-primary flex items-center gap-2">
@@ -1259,9 +1251,18 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           </div>
 
 </details>
+          {requestType === 'service' && formData.service_approval_required && <div className="space-y-2 border-t border-subtle pt-3">
+            <label className="block text-sm text-primary">Service rates and terms<textarea required maxLength={20000} rows={3} value={formData.service_terms} onChange={e=>setFormData(prev=>({...prev,service_terms:e.target.value}))} placeholder="Labor rate, trip charge, minimum charge, and applicable service terms" className="block w-full mt-1 rounded-lg border border-subtle bg-canvas p-3" /></label>
+            <p className="text-xs text-muted">Included in the customer email. No payment is collected now.</p>
+          </div>}
         </div>
           {/* Action Buttons */}
-          <div className="shrink-0 flex gap-2 bg-canvas border-t border-subtle px-3 py-2 sm:px-4">
+          <div className="shrink-0 flex flex-col gap-2 sm:flex-row sm:items-center bg-canvas border-t border-subtle px-3 py-2 sm:px-4">
+            {requestType === 'service' && <label className="flex min-h-8 items-center gap-2 text-xs text-muted sm:flex-1 cursor-pointer">
+              <input type="checkbox" checked={formData.service_approval_required} disabled={!!editingRequest?.service_approval_required} onChange={e=>setFormData(prev=>({...prev,service_approval_required:e.target.checked}))} className="shrink-0" />
+              Require customer approval &amp; payment method before scheduling
+            </label>}
+            <div className="flex gap-2 sm:w-72 sm:shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -1289,6 +1290,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 'Send to Service'
               )}
             </button>
+            </div>
           </div>
         </form>
     </QuickActionModal>

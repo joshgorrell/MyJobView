@@ -28,6 +28,12 @@ const context=await browser.newContext();openPage=async viewport=>{const page=aw
  assert.ok(initial.scroll<=initial.client+2,`Default desktop Service Request must fit without scrolling: ${JSON.stringify(initial)}`);
  const dialog=await desktop.getByRole('dialog').boundingBox();
  assert.ok(dialog.y>=0&&dialog.y+dialog.height<=1001,'Desktop modal stays within viewport');
+ const approval=desktop.getByRole('checkbox',{name:'Require customer approval & payment method before scheduling'});
+ assert.equal(await approval.isChecked(),false);
+ assert.equal(await desktop.getByLabel('Service rates and terms',{exact:true}).count(),0);
+ const option=await approval.boundingBox();const submit=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
+ assert.ok(Math.abs(option.y-submit.y)<45,'Infrequent approval option stays beside the submit actions');
+ await approval.check();await desktop.getByLabel('Service rates and terms',{exact:true}).waitFor();await approval.uncheck();
  await desktop.getByRole('button',{name:'New Customer',exact:true}).click();
  const action=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
  assert.ok(action.y>=0&&action.y+action.height<=1001,'Submit stays visible with expanded customer fields');
