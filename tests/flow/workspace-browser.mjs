@@ -136,7 +136,7 @@ try {
     });
     await dialog.waitFor();
     assert.equal(
-      await dialog.getByRole("button", { name: /Internal chat/ }).count(),
+      await dialog.getByRole("button", { name: /Message Teammates/ }).count(),
       1,
     );
     await dialog.evaluate(async el => { await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished)); });
@@ -155,7 +155,7 @@ try {
       true,
     );
     await plus.click();
-    await page.getByRole("button", { name: /Log interaction Calls/ }).click();
+    await page.getByRole("button", { name: /Activity Calls/ }).click();
     await page
       .getByRole("textbox", { name: "Find a customer, project, or work order" })
       .fill("Test");
