@@ -768,7 +768,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       scrollBody={false}
       wide
       showSuccess={showSuccess}
-      successMessage="Work Order Request Created!"
+      successMessage="Service request created successfully."
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
         <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-3 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-3 lg:items-start">
