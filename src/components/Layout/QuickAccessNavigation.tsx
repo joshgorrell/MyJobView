@@ -2,12 +2,14 @@ import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { ActivityBadge } from './ActivityBadge';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu, Star } from 'lucide-react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useTaskCount } from '../../hooks/useTaskCount';
 import { useFishbowlCount } from '../../hooks/useFishbowlCount';
 import { useActivityCounts } from '../../hooks/useActivityCounts';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadCoworkerThreads } from '../Flow/coworkerConversations';
 
 interface QuickAccessNavigationProps {
   activeModule: string;
@@ -19,6 +21,22 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
   const taskCount = useTaskCount();
   const fishbowlCount = useFishbowlCount();
   const { counts: activityCounts } = useActivityCounts();
+  const { profile } = useAuth();
+  const [unreadTeamMessages, setUnreadTeamMessages] = useState(0);
+  useEffect(() => {
+    if (!profile?.id || !profile.organization_id || !hasModuleAccess('feed')) { setUnreadTeamMessages(0); return; }
+    let cancelled = false;
+    const refreshMessages = async () => {
+      try {
+        const threads = await loadCoworkerThreads(profile.organization_id, profile.id, {});
+        if (!cancelled) setUnreadTeamMessages(threads.reduce((total, thread) => total + thread.unread_count, 0));
+      } catch (error) { console.error('Unable to load unread team messages', error); if (!cancelled) setUnreadTeamMessages(0); }
+    };
+    void refreshMessages();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshMessages(); }, 30000);
+    window.addEventListener('flow-views-changed', refreshMessages);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('flow-views-changed', refreshMessages); };
+  }, [profile?.id, profile?.organization_id, hasModuleAccess]);
   const navigationRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
