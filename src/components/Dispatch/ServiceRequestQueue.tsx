@@ -5,6 +5,7 @@ import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { CreateWorkOrderModal } from '../Production/CreateWorkOrderModal';
 import type { ServiceRequestContext } from '../Production/CreateWorkOrderModal';
 import { WorkOrderSchedulePicker } from '../Production/WorkOrderSchedulePicker';
@@ -113,6 +114,16 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [expandedRequest, setExpandedRequest] = useState<string | null>(requestId || null);
+  const reviewRequest = (id: string) => {
+    if (profile?.id && profile.organization_id) {
+      void markActivitySeen(profile.id, profile.organization_id, 'service_request', id).catch(console.error);
+    }
+  };
+  const toggleReviewedRequest = (id: string) => {
+    const next = expandedRequest === id ? null : id;
+    setExpandedRequest(next);
+    if (next) reviewRequest(id);
+  };
   const [activeTab, setActiveTab] = useState<'queue' | 'needs_info'>('queue');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterSourceType, setFilterSourceType] = useState<string>('all');
@@ -608,7 +619,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                   )}
                   <div
                     className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
+                    onClick={() => toggleReviewedRequest(request.id)}
                   >
                     {/* Top row: customer name + timestamp + desktop Convert button */}
                     <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1">
@@ -699,7 +710,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                         </button>
                       )}
                       <button aria-label={expandedRequest === request.id ? 'Collapse request' : 'Expand request'}
-                        onClick={e => {e.stopPropagation();setExpandedRequest(expandedRequest === request.id ? null : request.id);}}
+                        onClick={e => {e.stopPropagation();toggleReviewedRequest(request.id);}}
                         className="shrink-0 min-h-11 px-2 text-muted hover:text-primary">
                         {expandedRequest === request.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
