@@ -1245,7 +1245,7 @@ function AppContent() {
             onSuccess={() => {
               setShowServiceRequestForm(false);
               setAiServiceRequestPrefill(null);
-              setActiveTab('dispatch_dashboard');
+              setActiveTab('feed');
             }}
             aiPrefill={aiServiceRequestPrefill}
           />
