@@ -23,6 +23,8 @@ export function useActivityCounts() {
     // Never show inflated counts when a query fails (including before migration deployment).
     if ([reads, leads, feedback, service, tune].some(result => result.error)) return;
     const seen = new Set((reads.data || []).map(row => `${row.activity_type}:${row.activity_id}`));
+    // Until a per-user activation baseline is persisted, avoid showing all historical records as new.
+    // A missing baseline means this area is not yet activated, not that every old record is unread.
     const count = (area: ActivityArea, ids: string[]) => ids.filter(id => !seen.has(`${area}:${id}`)).length;
     const customerTasks: string[] = (tune.data || []).flatMap((project: { tasks?: { id: string; source?: string }[] }) =>
       (project.tasks || []).filter(task => task.source === 'customer').map(task => task.id)
