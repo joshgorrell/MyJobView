@@ -77,7 +77,7 @@ try{
  await page.evaluate(()=>{const history=document.querySelector('.conversation-history');const block=document.createElement('div');block.style.height='2000px';history.prepend(block);history.scrollTop=history.scrollHeight;});
  await page.setViewportSize({width:1280,height:720});await page.waitForTimeout(100);
  assert.ok((await page.getByRole('button',{name:'Send',exact:true}).boundingBox()).y<720,'Reply remains accessible after resize with long history');
- assert.ok(await page.getByText('Unanswered',{exact:true}).count()>=2,'Internal note does not answer customer');
+ assert.equal(await page.locator('.conversation-list button').filter({has:page.getByRole('heading',{name:'Customer question',exact:true})}).getByText('Unanswered',{exact:true}).count(),1,'An internal staff note does not answer the customer thread');
  const reply=page.getByPlaceholder('Type your message…',{exact:true});await reply.fill('Draft for customer one');await page.getByRole('button',{name:'Notification t2',exact:true}).click();await page.getByText('Internal history',{exact:true}).waitFor();
  const checkbox=page.getByRole('checkbox');assert.equal(await checkbox.isChecked(),true);assert.equal(await checkbox.isDisabled(),true);
  assert.equal(await page.getByPlaceholder('Internal note…').inputValue(),'','Draft cannot follow user into another thread');await page.getByPlaceholder('Internal note…').fill('Keep internal');await page.getByRole('button',{name:'Send',exact:true}).click();await page.waitForFunction(()=>window.inserts.some(i=>i.body==='Keep internal'));assert.equal(await page.evaluate(()=>window.inserts.find(i=>i.body==='Keep internal').is_internal),true);
