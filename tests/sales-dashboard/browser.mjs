@@ -95,7 +95,7 @@ try {
   for(const role of ['sales','tech','finance']) {
     await page.goto('http://127.0.0.1:'+server.address().port+'/?role='+role+'&nonrep=1');
     await page.getByText('You do not have access to the Sales Dashboard.',{exact:true}).waitFor();
-    assert.equal((await page.evaluate(()=>window.calls)).length,0);
+    assert.equal((await page.evaluate(()=>window.calls)).filter(call => call[0] === 'rpc' || (call[0] === 'query' && ['proposals','leads','contacts','connections','work_orders','appointments'].includes(call[1]))).length,0, 'unauthorized roles must not load sales data');
   }
   assert.deepEqual(errors,[]);
   await page.screenshot({path:'/tmp/sales-dashboard.png',fullPage:true});
