@@ -24,7 +24,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
   const { profile } = useAuth();
   const [unreadTeamMessages, setUnreadTeamMessages] = useState(0);
   useEffect(() => {
-    if (!profile?.id || !profile.organization_id || !hasModuleAccess('feed')) { setUnreadTeamMessages(0); return; }
+    if (!profile?.id || !profile.organization_id || !hasModuleAccess('messages')) { setUnreadTeamMessages(0); return; }
     let cancelled = false;
     const refreshMessages = async () => {
       try {
