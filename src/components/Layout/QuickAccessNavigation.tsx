@@ -10,6 +10,7 @@ import { useFishbowlCount } from '../../hooks/useFishbowlCount';
 import { useActivityCounts } from '../../hooks/useActivityCounts';
 import { useAuth } from '../../contexts/AuthContext';
 import { loadCoworkerThreads } from '../Flow/coworkerConversations';
+import { supabase } from '../../lib/supabase';
 
 interface QuickAccessNavigationProps {
   activeModule: string;
@@ -23,14 +24,28 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
   const { counts: activityCounts } = useActivityCounts();
   const { profile } = useAuth();
   const [unreadTeamMessages, setUnreadTeamMessages] = useState(0);
+  const [unreadCustomerMessages, setUnreadCustomerMessages] = useState(0);
   useEffect(() => {
-    if (!profile?.id || !profile.organization_id || !hasModuleAccess('messages')) { setUnreadTeamMessages(0); return; }
+    if (!profile?.id || !profile.organization_id || !hasModuleAccess('messages')) { setUnreadTeamMessages(0); setUnreadCustomerMessages(0); return; }
     let cancelled = false;
     const refreshMessages = async () => {
       try {
         const threads = await loadCoworkerThreads(profile.organization_id, profile.id, {});
         if (!cancelled) setUnreadTeamMessages(threads.reduce((total, thread) => total + thread.unread_count, 0));
-      } catch (error) { console.error('Unable to load unread team messages', error); if (!cancelled) setUnreadTeamMessages(0); }
+        // Customer threads already enforce their visibility through RLS.
+        const { data: customerThreads, error: threadError } = await supabase.from('message_threads')
+          .select('id').eq('organization_id', profile.organization_id);
+        if (threadError) throw threadError;
+        const ids = (customerThreads || []).map(thread => thread.id);
+        let unread = 0;
+        for (let offset = 0; offset < ids.length; offset += 100) {
+          const { count, error } = await supabase.from('messages').select('id', { count: 'exact', head: true })
+            .in('thread_id', ids.slice(offset, offset + 100)).eq('author_type', 'customer').eq('is_internal', false).eq('is_read', false);
+          if (error) throw error;
+          unread += count || 0;
+        }
+        if (!cancelled) setUnreadCustomerMessages(unread);
+      } catch (error) { console.error('Unable to load unread team messages', error); if (!cancelled) { setUnreadTeamMessages(0); setUnreadCustomerMessages(0); } }
     };
     void refreshMessages();
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshMessages(); }, 30000);
