@@ -51,7 +51,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {!request.work_order && <p>Not yet scheduled</p>}
     <div className="sm:col-span-2 flex flex-wrap gap-2 py-1">
       {(['Edit', 'Assign', 'Schedule', 'Close'] as const).map(action => (
-        <a key={action} className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`/service-requests?serviceRequestId=${encodeURIComponent(request.id)}`} aria-label={`${action} service request`}>{action} ↗</a>
+        <a key={action} className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=service_requests&serviceRequestId=${encodeURIComponent(request.id)}`} aria-label={`${action} service request`}>{action} ↗</a>
       ))}
       {request.work_order && <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=work_orders&workOrderId=${encodeURIComponent(request.work_order.id)}`}>Open work order ↗</a>}
     </div>
