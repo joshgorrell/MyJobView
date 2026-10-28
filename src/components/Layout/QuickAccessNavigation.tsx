@@ -66,7 +66,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
             module.module_key === 'pipeline_board' ? activityCounts.pipeline_lead + (hasModuleAccess('fishbowl') ? fishbowlCount : 0) :
             module.module_key === 'fishbowl' ? fishbowlCount :
             module.module_key === 'test_tune' ? activityCounts.test_tune :
-            module.module_key === 'feedback' ? activityCounts.feedback :
+            (module.module_key === 'reviews' || module.module_key === 'feedback') ? activityCounts.feedback :
             (module.module_key === 'service_requests' || module.module_key === 'sales_service_requests') ? activityCounts.service_request :
             0;
           const showBadge = badgeCount > 0;
