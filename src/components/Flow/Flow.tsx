@@ -80,7 +80,16 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(true);
-  const [createdRequestId] = useState(() => !scoped ? window.sessionStorage.getItem('mjv-new-service-request') : null);
+  const [createdRequestId, setCreatedRequestId] = useState<string | null>(() => !scoped ? window.sessionStorage.getItem('mjv-new-service-request') : null);
+  useEffect(() => {
+    if (scoped) return;
+    const handleCreated = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      if (id) setCreatedRequestId(id);
+    };
+    window.addEventListener('mjv-service-request-created', handleCreated);
+    return () => window.removeEventListener('mjv-service-request-created', handleCreated);
+  }, [scoped]);
   const [mentionsOnly, setMentionsOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -120,6 +129,10 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   useEffect(() => {
     if (!createdRequestId) return;
     window.sessionStorage.removeItem('mjv-new-service-request');
+    setView('all');
+    setNewOnly(true);
+    setSearch('');
+    setDebouncedSearch('');
     void flow.refresh();
   }, [createdRequestId]);
   const scopeModule = workOrderId ? 'work_orders' : projectId ? 'projects' : contactId ? 'contacts' : null;
