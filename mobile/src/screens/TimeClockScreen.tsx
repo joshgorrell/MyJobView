@@ -317,8 +317,68 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   async function handleClockOut() {
     if (!todayEntry || !profile) return;
+    const network = await NetInfo.fetch();
+    const offline = network.isConnected === false || network.isInternetReachable === false;
+    if (offline) {
+      // Preserve the punch without pretending we can verify live job/break state.
+      // The offline record remains pending until the server reconciles it.
+      try {
+        const cached = await offlineStorage.getLocalClockShift(profile.id, todayEntry.id);
+        const policy = await offlineStorage.getEmployeeClockPolicy(profile.id);
+        if (!cached || cached.clock_out || cached.sync_state === 'conflict' ||
+            cached.clock_in !== todayEntry.clock_in ||
+            !policy?.dailyClock || Date.now() - Date.parse(policy.fetchedAt) > 24 * 3600000) {
+          throw new Error('Connect to verify your current shift and payroll settings.');
+        }
+        if (activeBreak) throw new Error('End your active break before clocking out.');
+        if (Date.now() - Date.parse(cached.clock_in) > 24 * 3600000) {
+          throw new Error('An older shift requires manager review.');
+        }
+        // Offline activity and break state cannot be verified against the server.
+        // Do not silently mark this as a confirmed payroll clock-out.
+        Alert.alert('Offline clock-out', 'Your clock-out will be saved on this device and must synchronize before payroll is finalized. Confirm that all job timers and breaks are stopped.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Save offline punch', onPress: () => { void (async () => {
+            try {
+              const punchedAt = new Date().toISOString();
+              await offlineStorage.recordOfflineClockTransition({
+                id: cached.id, technician_id: profile.id, entry_date: cached.entry_date,
+                clock_in: cached.clock_in, clock_out: punchedAt, status: 'clocked_out',
+                office_id: cached.office_id, notes: null,
+              });
+              try {
+                const location = await locationTrackingService.captureHighAccuracyLocation().catch(() => null);
+                await offlineStorage.saveClockGps(`${cached.id}:clock_out`, cached.id, profile.id, {
+                  clock_out_gps_attempted_at: punchedAt,
+                  clock_out_gps_capture_method: location ? ((location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy') : 'failed',
+                  clock_out_latitude: location?.coords.latitude ?? null,
+                  clock_out_longitude: location?.coords.longitude ?? null,
+                  clock_out_gps_accuracy: location?.coords.accuracy ?? null,
+                  clock_out_gps_captured_at: location ? new Date(location.timestamp).toISOString() : null,
+                  clock_out_gps_duration_ms: location ? (location.coords as any).duration_ms || 0 : Date.now() - Date.parse(punchedAt),
+                });
+              } catch (gpsError) {
+                console.error('Offline clock-out saved; GPS evidence could not be queued:', gpsError);
+                Alert.alert('GPS evidence warning', 'Your punch was saved, but GPS evidence could not be queued. Notify your supervisor.');
+              }
+              setTodayEntry({ ...todayEntry, clock_out: punchedAt, status: 'clocked_out' });
+              setClockStateUnverified(true);
+              await loadPendingSync();
+              try { await locationTrackingService.stopTracking(); }
+              catch (trackingError) { console.error('Unable to stop tracking after offline clock-out:', trackingError); }
+              Alert.alert('Offline punch saved', 'Your clock-out is stored locally and awaiting synchronization.');
+            } catch (error: any) {
+              Alert.alert('Unable to save offline punch', error.message || 'Clock-out could not be stored.');
+            }
+          })(); } },
+        ]);
+      } catch (error: any) {
+        Alert.alert('Offline clock-out unavailable', error.message);
+      }
+      return;
+    }
     if (clockStateUnverified) {
-      Alert.alert('Connection required', 'Your shift status is not verified. Offline clock-out is not yet enabled.');
+      Alert.alert('Clock status unverified', 'Reconnect and verify your shift before clocking out.');
       return;
     }
     try { await assertNoInternalTimer(profile); }
@@ -506,7 +566,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
       {clockStateUnverified && (
         <View style={styles.syncBanner}>
-          <Text style={styles.syncText}>Clock status unverified. Reconnect before recording a punch.</Text>
+          <Text style={styles.syncText}>Clock status unverified. Offline clock-out may be saved locally; synchronization is required for payroll.</Text>
         </View>
       )}
 
@@ -559,7 +619,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               <TouchableOpacity
                 style={[styles.clockOutButton, !!activeBreak && styles.disabledButton]}
                 onPress={handleClockOut}
-                disabled={!!activeBreak || clockStateUnverified}
+                disabled={!!activeBreak}
                 activeOpacity={0.8}
               >
                 <Text style={styles.clockOutButtonText}>Clock Out</Text>
