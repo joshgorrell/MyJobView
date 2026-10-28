@@ -517,6 +517,34 @@ class OfflineStorage {
 
     for (const event of events) {
       try {
+        // A locally recorded clock-out is evidence, not authorization to
+        // finalize payroll. Recheck overlapping activity and open breaks
+        // against the server before applying it.
+        if (event.status === 'clocked_out' && event.clock_out) {
+          const { data: openBreaks, error: breakError } = await supabase
+            .from('daily_clock_breaks')
+            .select('id')
+            .eq('daily_clock_entry_id', event.id)
+            .is('break_end', null)
+            .limit(1);
+          if (breakError) throw breakError;
+          const { data: openActivities, error: activityError } = await supabase
+            .from('time_entries')
+            .select('id')
+            .eq('technician_id', event.technician_id)
+            .is('clock_out', null)
+            .in('status', ['draft', 'submitted'])
+            .limit(1);
+          if (activityError) throw activityError;
+          if (openBreaks?.length || openActivities?.length) {
+            await this.db.runAsync(
+              "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+              [event.id, event.technician_id]
+            );
+            console.warn(`Offline clock-out ${event.id} requires review: server has an active break or activity timer`);
+            continue;
+          }
+        }
         // Never replay an offline clock event over an already-recorded shift.
         // Conflicting records require explicit reconciliation, not an overwrite.
         const { data: existing, error: lookupError } = await supabase
