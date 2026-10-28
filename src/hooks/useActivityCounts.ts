@@ -45,7 +45,8 @@ export function useActivityCounts() {
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 30000);
     const onFocus = () => void refresh();
     window.addEventListener('focus', onFocus);
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); void supabase.removeChannel(channel); };
+    window.addEventListener('activity:seen', onFocus);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); window.removeEventListener('activity:seen', onFocus); void supabase.removeChannel(channel); };
   }, [refresh, profile?.id]);
 
   return { counts, refresh };
