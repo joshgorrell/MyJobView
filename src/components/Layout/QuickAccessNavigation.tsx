@@ -1,6 +1,7 @@
 import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
+import { ActivityBadge } from './ActivityBadge';
 import { useEffect, useRef } from 'react';
 import { Menu, Star } from 'lucide-react';
 import { useDepartments } from '../../contexts/DepartmentContext';
@@ -84,11 +85,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
               <div className="flex items-center gap-2">
                 {module.module_key === 'feed' ? <FlowWaveIcon className="w-4 h-4 text-lg" /> : renderIcon(module.icon, "w-4 h-4")}
                 <span className="text-xs sm:text-sm font-semibold">{module.display_name}</span>
-                {showBadge && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg">
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                )}
+                {showBadge && <ActivityBadge count={badgeCount} className="absolute -top-1 -right-1 pointer-events-none" />}
               </div>
             </button>
           );
