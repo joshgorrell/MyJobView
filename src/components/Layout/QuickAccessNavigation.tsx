@@ -7,6 +7,7 @@ import { Menu, Star } from 'lucide-react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useTaskCount } from '../../hooks/useTaskCount';
 import { useFishbowlCount } from '../../hooks/useFishbowlCount';
+import { useActivityCounts } from '../../hooks/useActivityCounts';
 
 interface QuickAccessNavigationProps {
   activeModule: string;
@@ -17,6 +18,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
   const { starredModules, loading, hasModuleAccess } = useDepartments();
   const taskCount = useTaskCount();
   const fishbowlCount = useFishbowlCount();
+  const { counts: activityCounts } = useActivityCounts();
   const navigationRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -61,7 +63,11 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
 
           const badgeCount =
             (module.module_key === 'tasks' || (module.module_key === 'feed' && hasModuleAccess('tasks'))) ? taskCount :
-            (module.module_key === 'fishbowl' || (module.module_key === 'pipeline_board' && hasModuleAccess('fishbowl'))) ? fishbowlCount :
+            module.module_key === 'pipeline_board' ? activityCounts.pipeline_lead + (hasModuleAccess('fishbowl') ? fishbowlCount : 0) :
+            module.module_key === 'fishbowl' ? fishbowlCount :
+            module.module_key === 'test_tune' ? activityCounts.test_tune :
+            module.module_key === 'feedback' ? activityCounts.feedback :
+            (module.module_key === 'service_requests' || module.module_key === 'sales_service_requests') ? activityCounts.service_request :
             0;
           const showBadge = badgeCount > 0;
 
