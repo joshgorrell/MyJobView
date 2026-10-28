@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import { Trash2, FileText, Download, ExternalLink, Paperclip } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { markActivitySeen } from "../../hooks/useActivityCounts";
 import { responseReasons, lostReviewAction } from "./lostReview";
 import { printLostReview } from "./printLostReview";
 import { ReviewStatsRow, ReviewFilterBar, type StatItem, type FilterOption } from "./ReviewStats";
@@ -585,7 +586,10 @@ export default function LostOpportunityReviews(
                   disabled={busy}
                   onClick={() => {
                     setExpandedReview(v.request_id);
-                    if (v.response) void markViewed(v);
+                    if (v.response) {
+                      void markViewed(v);
+                      if (profile?.id && org) void markActivitySeen(profile.id, org, "feedback", v.request_id).catch(console.error);
+                    }
                   }}
                   className="w-full min-h-[108px] rounded-xl border border-gray-700 bg-gray-900 p-4 text-left transition hover:border-gray-600 hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60"
                 >
