@@ -273,3 +273,19 @@
 
 .conversation-start { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; max-width:680px; margin-inline:auto; width:100%; overflow:hidden; }
 .flow-messaging .flow-content > .flow-message-filters { padding-bottom:6px; }
+
+/* Keep the inbox above workspace footers, with room for touch controls. */
+.workspace-shell:has(main > .flow-messaging) > footer { display:none; }
+.flow-messaging > .flow > .flow-heading,
+.flow-messaging > .flow > .flow-toolbar { flex-shrink:0; }
+.flow-messaging .flow-message-filters { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+.flow-messaging .flow-message-filters button { min-height:44px; padding:6px; }
+.flow-messaging .flow-customer-inbox,
+.customer-conversations--fit,
+.customer-conversations--fit .conversation-workspace { overflow:hidden; }
+.team-message-form > :first-child { overscroll-behavior:contain; }
+.team-message-send { padding-bottom:max(12px,env(safe-area-inset-bottom)); }
+@media(min-width:701px) {
+  .flow-messaging .flow-message-filters { display:flex; }
+  .flow-messaging .flow-message-filters button { padding-inline:16px; }
+}
