@@ -4,8 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { SupportPhotos } from '../Shared/SupportPhotos';
 
-type Adjustment = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null; source?: string; created_at?: string; updated_at?: string; service_status?: string | null; photos?: string[] };
-type Project = { id: string; contact_id: string; name: string; number: string | null; customer: string; can_submit: boolean; end_date: string; tasks: Adjustment[] };
+type PunchlistTask = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null; source?: string; created_at?: string; updated_at?: string; service_status?: string | null; photos?: string[] };
+type Project = { id: string; contact_id: string; name: string; number: string | null; customer: string; can_submit: boolean; end_date: string; tasks: PunchlistTask[] };
 export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: { canViewServiceRequests?: boolean }) {
   const { profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -23,7 +23,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const openAdjustment = (id: string) => {
+  const openPunchlistTask = (id: string) => {
     setPreview(null);
     setDetailId(id);
     if (profile?.id && profile.organization_id) {
@@ -147,13 +147,13 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         return <article key={t.id} className="min-w-0 rounded-lg border border-subtle bg-surface p-3">
           <div className="flex items-start gap-3">
             {!requested && t.status === 'open' && <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}
-            <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { openAdjustment(t.id); }} aria-label={`Open task ${description}`}>
+            <button type="button" className="min-w-0 flex-1 text-left" onClick={() => { openPunchlistTask(t.id); }} aria-label={`Open task ${description}`}>
               <span className="block break-words font-medium text-primary">{description}</span>
               <span className="mt-1 block break-words text-xs text-muted">{p.customer} · {p.name}</span>
               <span className="mt-2 block text-xs text-secondary">{status} · {t.visibility === 'internal' ? 'Private' : 'Public'} · {t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'}</span>
               <span className="mt-1 block text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : '—'}</span>
             </button>
-            <button type="button" className="min-h-11 shrink-0 rounded-lg px-2 text-info" aria-label={`Open task ${description}`} onClick={() => openAdjustment(t.id)}>›</button>
+            <button type="button" className="min-h-11 shrink-0 rounded-lg px-2 text-info" aria-label={`Open task ${description}`} onClick={() => openPunchlistTask(t.id)}>›</button>
           </div>
         </article>;
       })}
@@ -176,7 +176,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
                     onMouseEnter={event => showPreview(t.id, event.currentTarget)}
                     onMouseLeave={closePreviewSoon}
                     onFocus={event => showPreview(t.id, event.currentTarget)}
-                    onClick={() => { openAdjustment(t.id); }}
+                    onClick={() => { openPunchlistTask(t.id); }}
                     className="w-full break-words text-left text-primary hover:underline focus:underline">{description}</button>
                 </div>
               </td>
