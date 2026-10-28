@@ -51,6 +51,7 @@ export function CustomerSatisfactionDashboard() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [clearingId, setClearingId] = useState<string | null>(null);
   const [showCleared, setShowCleared] = useState(false);
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
   const acknowledgeFeedback = (id: string) => {
     if (profile?.id && profile.organization_id) {
       void markActivitySeen(profile.id, profile.organization_id, 'feedback', id).catch(console.error);
@@ -285,7 +286,7 @@ export function CustomerSatisfactionDashboard() {
                         <Clock className="w-3 h-3" />
                         {r.responded_at ? new Date(r.responded_at).toLocaleDateString() : new Date(r.sent_at).toLocaleDateString()}
                       </span>
-                      <button type="button" onClick={() => acknowledgeFeedback(r.id)} title="Acknowledge this feedback notification" className="min-h-11 px-2.5 py-2 rounded-lg text-xs border border-gray-600 text-gray-300 hover:text-white">Mark viewed</button>
+                      <button type="button" aria-expanded={expandedFeedbackId === r.id} onClick={() => { setExpandedFeedbackId(current => current === r.id ? null : r.id); if (expandedFeedbackId !== r.id) acknowledgeFeedback(r.id); }} className="min-h-11 px-2.5 py-2 rounded-lg text-xs border border-gray-600 text-gray-300 hover:text-white">{expandedFeedbackId === r.id ? 'Close details' : 'View details'}</button>
                       {isAdmin && (
                         <button
                           onClick={() => clearFollowUp(r.id)}
