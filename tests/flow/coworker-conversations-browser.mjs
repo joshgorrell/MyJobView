@@ -22,19 +22,20 @@ const rows={
  contacts:[{id:'c1',full_name:'Test Customer',contact_name:'Test Customer',organization_id:'org'}], work_orders:[],
  messages:[{id:'m1',thread_id:'t1',body:'Adjust the TV',author_type:'customer',author_name:'Test Customer',is_read:false,is_internal:false,created_at:'2026-10-10T09:00:00Z'}]
 };
+if(location.search.includes('longDirectory')) rows.profiles.push(...Array.from({length:80},(_,i)=>({id:'staff-'+i,full_name:'Staff '+i,is_active:true,organization_id:'org'})));
 if(location.search.includes('emptyInbox')) {rows.message_threads=[];rows.discussion_posts=[];}
 export const supabase={from(table){let filters=[],orders=[],start=0,end=Infinity,single=false,mutation,count=false;const q={
 returns(){return q},select(columns,options){count=!!options?.count;return q},eq(k,v){filters.push(r=>r[k]===v);window.queries.push({table,k,v});return q},is(k,v){filters.push(r=>(r[k]??null)===v);return q},in(k,v){filters.push(r=>v.includes(r[k]));return q},order(k,options={}){orders.push([k,options.ascending!==false]);return q},range(a,b){start=a;end=b+1;return q},limit(n){end=n;return q},maybeSingle(){single=true;return q},single(){single=true;return q},insert(value){mutation=['insert',value];return q},update(value){mutation=['update',value];return q},upsert(value){mutation=['upsert',value];return q},then(a,b){if(location.search.includes('failedInbox')&&table==='message_threads')return Promise.resolve({data:null,error:{message:'Fixture inbox failure'}}).then(a,b);let data=(rows[table]||[]).filter(r=>filters.every(f=>f(r)));if(mutation?.[0]==='insert'){const value=mutation[1];let row={id:'new-'+window.inserts.length,created_at:new Date().toISOString(),...value};if(table==='discussion_posts'){const parent=rows.discussion_posts.find(p=>p.id===row.parent_id);row={...row,...(parent?{audience_type:parent.audience_type,audience_user_ids:parent.audience_user_ids,is_private:parent.is_private}:{}),profiles:{full_name:'Josh'}};rows.flow_events.push({id:rows.flow_events.length+1,source_id:row.id,source_table:'discussion_posts',organization_id:'org'});}window.inserts.push({table,...row});(rows[table]||=[]).push(row);data=[row];}else if(mutation?.[0]==='upsert'){for(const row of mutation[1]){window.views.push(row);if(!rows.flow_event_views.some(v=>v.event_id===row.event_id&&v.user_id===row.user_id))rows.flow_event_views.push(row);}data=mutation[1];}else if(mutation?.[0]==='update')data.forEach(r=>Object.assign(r,mutation[1]));data=[...data].sort((a,b)=>{for(const[k,asc]of orders){const n=String(a[k]).localeCompare(String(b[k]))*(asc?1:-1);if(n)return n;}return 0;}).slice(start,end);return Promise.resolve({data:single?data[0]||null:data,error:null,count:count?data.length:null}).then(value=>location.search.includes('slowInbox')?new Promise(resolve=>setTimeout(()=>resolve(value),350)):value).then(a,b)} };return q},channel(){const c={on(){return c},subscribe(){return c}};return c},removeChannel(){}};
 export function useFlow(){return{events:[],loading:false,error:'',markViewed:async()=>{},refresh:async()=>{}}}
 `;
-const source=`import React from 'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<main className="p-3"><Flow projectId={location.search.includes('scoped')?'p1':undefined}/></main>);`;
+const source=`import React from 'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<div className="workspace-shell"><header style={{height:72,flexShrink:0}}>Workspace navigation</header><main className="p-3"><Flow projectId={location.search.includes('scoped')?'p1':undefined}/></main><footer style={{padding:48}}>Sign Out</footer><footer>Powered by MyJobView</footer></div>);`;
 const server=createServer(async(req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(dir,file)));});
 let browser;
 try {
  await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(dir,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|lib\/flow\/useFlow$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js',resolveDir:process.cwd()}));}}]});
  const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));
  await writeFile(join(dir,'style.css'),Buffer.concat([await readFile('dist/assets/'+css),await readFile(join(dir,'app.css'))]));
- await writeFile(join(dir,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="style.css"></head><body><div id="root"></div><script src="app.js"></script></body></html>');
+ await writeFile(join(dir,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="style.css"><style>body{margin:0}.workspace-shell{display:flex;flex-direction:column;min-height:100dvh}.workspace-shell>main{flex:1;min-height:0;overflow:auto}</style></head><body><div id="root"></div><script src="app.js"></script></body></html>');
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
  const page=await browser.newPage();page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(e.message));const url='http://127.0.0.1:'+server.address().port;
@@ -91,7 +92,7 @@ try {
   await page.setViewportSize({width,height:400});
   await page.waitForTimeout(150);
   const send=await page.getByTitle('Send message').boundingBox();
-  assert.ok(send.y>=0 && send.y+send.height<=400,'Composer stays within reduced viewport at '+width);
+  assert.ok(send.y>=0 && send.y+send.height<=400,'Composer stays within reduced viewport at '+width+' '+JSON.stringify(send));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight+1),false,'No outer vertical scrolling');
   await page.screenshot({path:'/tmp/mjv-composer-viewport-'+width+'.png'});
  }
@@ -117,6 +118,30 @@ try {
   await page.getByRole('button',{name:'Clear search',exact:true}).click();
   await page.getByRole('heading',{name:'Julie',exact:true}).first().waitFor();
   await page.screenshot({path:'/tmp/mjv-empty-inbox-fixed-'+width+'.png'});
+ }
+ // The real workspace chrome and long directories must not clip the first-message form.
+ for (const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[1280,680]]) {
+  await page.setViewportSize({width,height});await page.goto(url+'?emptyInbox&longDirectory');await messages();
+  await page.getByRole('button',{name:'Julie',exact:true}).waitFor();
+  const send=page.getByRole('button',{name:'Send',exact:true});
+  const bounds=await send.boundingBox();
+  assert.ok(bounds.y>=0 && bounds.y+bounds.height<=height,JSON.stringify({width,height,bounds}));
+  assert.equal(await page.locator('.workspace-shell > footer').first().isVisible(),false);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  assert.equal(await page.locator('main').evaluate(el=>el.scrollHeight>el.clientHeight+1),false);
+  const scrollers=await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(node=>/auto|scroll/.test(getComputedStyle(node).overflowY)&&node.scrollHeight>node.clientHeight+1).length);
+  assert.equal(scrollers,1,'Only the compose body scrolls with a long directory');
+  await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Staff 79');
+  await page.getByRole('button',{name:'Staff 79',exact:true}).click();
+  assert.equal(await page.getByRole('searchbox',{name:'Search people',exact:true}).count(),0);
+  await page.getByRole('textbox',{name:'Message',exact:true}).fill('Draft preserved while adding recipients');
+  await page.getByRole('button',{name:'Add people',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Julie');
+  await page.getByRole('button',{name:'Julie',exact:true}).click();
+  assert.equal(await page.getByRole('textbox',{name:'Message',exact:true}).inputValue(),'Draft preserved while adding recipients');
+  await page.screenshot({path:'/tmp/mjv-messages-responsive-'+width+'.png'});
+  await send.click();await page.getByText('Draft preserved while adding recipients',{exact:true}).last().waitFor();
+  assert.deepEqual(await page.evaluate(()=>window.inserts[0].audience_user_ids),['staff-79','julie']);
  }
  await page.goto(url+'?slowInbox');await messages();
  await page.getByText('Loading messages...',{exact:true}).waitFor();
