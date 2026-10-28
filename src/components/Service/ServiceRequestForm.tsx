@@ -1207,12 +1207,12 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             <select aria-label="Priority" value={formData.priority} onChange={e => setFormData(prev => ({...prev, priority: e.target.value as 'normal' | 'urgent'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="normal">Normal</option><option value="urgent">Urgent</option></select>
             <select aria-label="Billing type" value={formData.billable_type} onChange={e => setFormData(prev => ({...prev, billable_type: e.target.value as 'billable' | 'warranty'}))} className="min-w-0 min-h-11 rounded-lg bg-surface border border-strong text-base text-primary px-2"><option value="billable">Billable</option><option value="warranty">Warranty</option></select>
           </div>
-          {formData.billable_type === 'warranty' && <div className="grid grid-cols-2 gap-2">
-            <label className="block text-sm text-secondary col-span-2" htmlFor="request-warranty-type">Warranty for</label>
+          {formData.billable_type === 'warranty' && <div className="grid grid-cols-2 gap-1.5">
+            <label className="sr-only" htmlFor="request-warranty-type">Warranty for</label>
             <select id="request-warranty-type" value={formData.warranty_type} onChange={e => setFormData(prev => ({...prev, warranty_type: e.target.value, warranty_reference: ''}))} className="min-w-0 w-full min-h-11 bg-surface border border-strong rounded-lg text-base text-primary px-2"><option value="project">Project</option><option value="previous_service">Previous Service</option><option value="equipment">Equipment</option><option value="other">Other</option></select>
             <datalist id="service-request-warranty-references">{warrantyReferences.map(value => <option key={value} value={value} />)}</datalist>
             <input list="service-request-warranty-references" aria-label="Warranty reference" placeholder="Reference" value={formData.warranty_reference} onChange={e => setFormData(prev => ({...prev, warranty_reference: e.target.value}))} className="min-w-0 w-full px-2 py-2 bg-surface border border-strong rounded-lg text-base text-primary" />
-            <textarea rows={2} aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="col-span-2 w-full p-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+            <textarea rows={1} aria-label="Warranty reason" placeholder="Why is this warranty?" value={formData.warranty_notes} onChange={e => setFormData(prev => ({...prev, warranty_notes: e.target.value}))} className="col-span-2 w-full p-2 bg-surface border border-strong rounded-lg text-base text-primary" />
           </div>}
 <div className="space-y-2">
           {/* Billable By (Service mode only) */}
@@ -1247,7 +1247,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           )}
 
 </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-2 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-1 min-w-0">
             <label className="block min-w-0 space-y-1">
               <span className="text-sm font-medium text-secondary">Customer Contact</span>
               <select aria-label="Customer contact responsibility" value={formData.customer_contact_instruction} onChange={e => setFormData(prev => ({ ...prev, customer_contact_instruction: e.target.value }))} className="w-full min-w-0 h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary">
@@ -1258,14 +1258,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </label>
             <div className="min-w-0 space-y-1">
               <label htmlFor="service-tech-search" className="block text-sm font-medium text-secondary">Preferred technicians (optional)</label>
-              <input id="service-tech-search" type="search" value={technicianSearch} onChange={e => setTechnicianSearch(e.target.value)} placeholder="Search technicians" className="w-full h-10 px-3 bg-surface border border-strong rounded-lg text-base text-primary" />
+              <input id="service-tech-search" type="search" value={technicianSearch} onChange={e => setTechnicianSearch(e.target.value)} placeholder="Search technicians" className="w-full h-9 px-3 bg-surface border border-strong rounded-lg text-base text-primary" />
               <div className="flex flex-wrap gap-1">
                 {formData.requested_tech_ids.map(id => {
                   const tech = technicians.find(t => t.id === id);
                   return <button key={id} type="button" title="Remove preferred technician" onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: prev.requested_tech_ids.filter(value => value !== id) }))} className="rounded-full bg-blue-500/10 px-2 py-1 text-xs text-primary">{tech?.full_name || 'Technician'} ×</button>;
                 })}
               </div>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Preferred technician choices">
+              <div className="flex flex-wrap gap-2 lg:gap-1" role="group" aria-label="Preferred technician choices">
                 <button type="button" aria-pressed={formData.requested_tech_ids.length === 0} onClick={() => setFormData(prev => ({ ...prev, requested_tech_ids: [] }))} className="rounded-md border border-strong px-2 py-1 text-sm">Any available</button>
                 {technicianSearch.trim() && technicians.filter(tech => tech.full_name.toLowerCase().includes(technicianSearch.trim().toLowerCase()) && !formData.requested_tech_ids.includes(tech.id)).slice(0, 6).map(tech => <button key={tech.id} type="button" onClick={() => { setFormData(prev => ({ ...prev, requested_tech_ids: [...prev.requested_tech_ids, tech.id] })); setTechnicianSearch(''); }} className="rounded-md border border-strong px-2 py-1 text-sm">{tech.full_name} +</button>)}
               </div>
