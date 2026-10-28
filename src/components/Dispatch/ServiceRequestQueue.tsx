@@ -218,7 +218,21 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
 
       if (error) throw error;
       setRequests(data || []);
-      if (requestId && data?.length) setExpandedRequest(requestId);
+      if (requestId && data?.length) {
+        setExpandedRequest(requestId);
+        const action = new URLSearchParams(window.location.search).get('serviceRequestAction');
+        const target = (data as ServiceRequest[]).find(item => item.id === requestId);
+        if (target && !['cancelled', 'closed'].includes(target.status)) {
+          if (action === 'edit') setResubmitTarget(target);
+          if ((action === 'assign' || action === 'schedule') && !serviceApprovalPending(target)) setConvertingTo(target.id);
+          if (action === 'close') setConfirmCancelId(target.id);
+        }
+        if (action) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('serviceRequestAction');
+          window.history.replaceState(window.history.state, '', url.toString());
+        }
+      }
     } catch (error) {
       console.error('Error loading service requests:', error);
       setLoadError('Unable to load the service request. Please try again.');
