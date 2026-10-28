@@ -294,3 +294,7 @@
   .flow-messaging:has(.conversation-workspace--selected) .flow-heading { display:none; }
   .flow-messaging .conversation-start > .shrink-0 { display:none; }
 }
+@container(max-width:340px) {
+  .flow .flow-heading-actions .flow-new-message { width:44px; padding:0; flex-shrink:0; }
+  .flow .flow-new-message > span { display:none; }
+}

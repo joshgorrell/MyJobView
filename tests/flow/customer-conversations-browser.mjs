@@ -41,7 +41,7 @@ try{
   const headerBounds=await page.locator('.flow').boundingBox();
   for(const button of await page.locator('.flow-heading-actions button').all()) {
    const rect=await button.boundingBox();
-   assert.ok(rect.x>=headerBounds.x&&rect.x+rect.width<=headerBounds.x+headerBounds.width,'Header actions fully visible at '+width);
+   assert.ok(rect.x>=headerBounds.x&&rect.x+rect.width<=headerBounds.x+headerBounds.width,'Header actions fully visible at '+width+': '+JSON.stringify({rect,headerBounds}));
   }
   await newMessage.click();
   const dialog=page.getByRole('dialog',{name:'New message',exact:true});
