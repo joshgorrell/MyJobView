@@ -111,6 +111,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [searching, setSearching] = useState(false);
   const [technicians, setTechnicians] = useState<{id: string; full_name: string}[]>([]);
   const [technicianSearch, setTechnicianSearch] = useState('');
+  const localToday = new Date();
+  const todayDate = `${localToday.getFullYear()}-${String(localToday.getMonth() + 1).padStart(2, '0')}-${String(localToday.getDate()).padStart(2, '0')}`;
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const [warrantyReferences, setWarrantyReferences] = useState<string[]>([]);
   const projectLoadVersion = useRef(0);
@@ -1270,13 +1272,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             {specificDate && <div className="grid grid-cols-2 gap-3 sm:col-span-2 min-w-0">
               <label className="block min-w-0 space-y-1">
                 <span className="text-sm font-medium text-secondary">Earliest date</span>
-                <input type="date" aria-label="Earliest date" min={new Date().toISOString().slice(0, 10)} value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+                <input type="date" aria-label="Earliest date" min={todayDate} value={formData.earliest_date} onChange={e => setFormData(prev => ({ ...prev, earliest_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
               </label>
               <label className="block min-w-0 space-y-1">
                 <span className="text-sm font-medium text-secondary">Need by</span>
-                <input type="date" aria-label="Need by" min={new Date().toISOString().slice(0, 10)} value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
+                <input type="date" aria-label="Need by" min={formData.earliest_date && formData.earliest_date > todayDate ? formData.earliest_date : todayDate} value={formData.requested_date} onChange={e => setFormData(prev => ({ ...prev, requested_date: e.target.value }))} className="block w-full min-w-0 max-w-full h-11 px-2 bg-surface border border-strong rounded-lg text-base text-primary" />
               </label>
             </div>}
+            {specificDate && <p className="sm:col-span-2 text-xs text-muted">Requested dates are not guaranteed. Our scheduling team will confirm availability before scheduling the work order.</p>}
           </div>
           </div>
         </div>
