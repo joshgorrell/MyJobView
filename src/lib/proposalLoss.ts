@@ -34,6 +34,7 @@ export const CUSTOMER_REASON_MAP: Record<string, string> = {
 };
 export type FeedbackSource =
   | "customer"
+  | "customer_portal"
   | "phone"
   | "email"
   | "in_person"
@@ -42,6 +43,7 @@ export type FeedbackSource =
   | "unknown";
 export const SOURCE_LABELS: Record<FeedbackSource, string> = {
   customer: "Customer online",
+  customer_portal: "Customer portal",
   phone: "Customer by phone",
   email: "Customer by email",
   in_person: "Customer in person",
@@ -116,7 +118,7 @@ export interface ReviewResponse {
   recorded_by: string | null;
 }
 export const isConfirmed = (source: FeedbackSource) =>
-  ["customer", "phone", "email", "in_person"].includes(source);
+  ["customer", "customer_portal", "phone", "email", "in_person"].includes(source);
 export const needsLossFeedback = (e: LossEvidence) =>
   !isConfirmed(e.source) ||
   !e.reasons.some((r) => !["unknown", "no_response"].includes(r));

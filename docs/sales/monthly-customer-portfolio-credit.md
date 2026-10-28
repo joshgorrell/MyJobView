@@ -1,58 +1,40 @@
-# Monthly Sales Performance and Competition — implementation contract
+# Monthly sales performance and competition
 
-## Scope
-This is a performance-credit metric, **not** a commission calculation. Never derive commission from this metric.
+Performance credit is separate from funds-received commission, payments and customer account credits. This change never moves money, transfers a deposit, issues a refund or changes commission entries.
 
-## Attribution and transaction ledger
-- Booked project/commercial sales orders count at the booked date, credited to the sales rep on the order.
-- Service, time-and-materials, and retail invoices count at the finalized/posted invoice date, credited to the sales rep **who owns the customer**, even when dispatch or another employee created the invoice.
-- Capture the credited rep and source customer on a durable immutable credit ledger at the qualifying event; later customer reassignment must not rewrite prior leaderboard results.
-- Do not include draft, cancelled, voided or reversed transactions. Credit notes, refunds, cancellations and changes must produce traceable negative adjustments according to effective posting date; never silently erase prior credit.
-- Sales tax is not revenue. Use net-of-tax amounts; establish consistent treatment of discounts, credits and freight before deployment.
-- Do not count an invoice arising from an already-credited sales order again. Distinguish project-progress/final invoices from **incremental** service/retail invoices, including invoices with mixed lines.
-- An unassigned customer's invoice is company/unassigned credit, not arbitrarily attributed to the creator.
-- Preserve transaction-level provenance: source type/id, customer id, credited rep id, effective date, net amount, adjustment relationship, organization id, attribution reason. Enforce uniqueness/idempotency on source credit events.
-- Migration/backfill must explicitly reconcile existing booked orders and invoices without duplicating historical totals.
+## Posting and attribution
 
-## Time periods
-- On opening the dashboard, a sales rep sees **This Month**, current local calendar month, by default.
-- Other periods: This Quarter, This Year, Year over Year (same elapsed dates in prior year). Historical own data remains accessible.
-- Monthly leaderboard resets at month boundary; do not delete history.
-- Monthly leaderboard sums booked sales orders plus separately qualified service and retail invoice credits, including negative adjustments. Show one combined monthly total; own breakdown may show source categories.
+- New committed project orders qualify at booking, including approved proposals awaiting a deposit or PO. Planning orders qualify when their proposal is subsequently approved.
+- Orders use the customer's owning salesperson at first posting. This resolves the older document's conflicting order-rep/customer-owner descriptions in favor of the customer portfolio rule used by this feature.
+- Contract totals are tax-inclusive. Posting removes the approved proposal's tax and the signed tax on approved billable change orders. Discounts and freight remain part of the before-tax sale.
+- Standalone service/T&M/retail invoices qualify when finalized, at their actual posting time. The customer owner receives credit, never the dispatcher or invoice creator.
+- Explicit sales-order/proposal/deposit/progress/final links and projects belonging to an order exclude duplicate project invoice credit. Mixed or unclassified sources need explicit source linkage before they qualify; labels are not used to guess missing project revenue.
+- New security agreements and subscriptions snapshot their customer's sales owner when created. Existing agreements without a reviewed origin remain unassigned. The subscription schema's actual `created_by` field is not mistaken for `created_by_user_id`, and creators are not treated as originators.
+- Recurring credit is earned only as billed. Linked subscription amounts allocate the actual before-tax invoice total with largest-remainder cent allocation. Late links, sequential transactions, changed allocations, voids and retries reconcile the whole invoice without duplicating credit.
+- The initial source/customer/rep attribution is immutable. Changing a customer's assigned rep never rewrites prior sales. A posted source cannot be moved to another customer or organization.
+- Price changes, approved change orders, cancellation, deletion and reinstatement append linked compensating entries. Repeating the same source state creates no event. Changes post in the adjustment month; the original dated entry remains intact.
+- Standalone credit-note/refund documents are not invented as a second sale. Any future credit-memo/refund source needs a verified original-sale relationship before a new posting hook is added.
 
-## Access control
-- Sales reps may see their own detailed history and transaction drilldowns.
-- All sales reps may see **only the current month's** ranking and aggregate credited dollar total for other reps; no historical period parameter, source breakdown, customer data, order/invoice ids, or drilldowns for other reps.
-- Authorized managers/admins may access company totals, individual history and details.
-- Implement separate restricted RPC for current-month leaderboard with server-side auth, org scoping and no arbitrary date argument. Do not use existing goal-attainment RPC as a backdoor to historical sales or quota figures.
-- Never fetch other reps' transaction rows client-side and hide them in UI. Enforce permissions on the server and through RLS.
-- Changing UI dates must not alter the current-month competition scope.
+## Privacy and reporting
 
-## Required validation
-1. $800 dispatch-created T&M invoice for customer owned by rep A adds $800 to A, not dispatcher.
-2. $20,000 booked sales order with $20,000 final invoice contributes $20,000 total, not $40,000.
-3. Retail invoice owned by rep B credits B; unassigned customer credits neither rep.
-4. Customer reassigned A to B after posting does not rewrite A's credited history.
-5. Cancellation/refund produces auditable reversal; duplicate webhook/import is idempotent.
-6. Rep A cannot request rep B's historical numbers or source rows by changing network parameters.
-7. Manager sees full authorized history; reps see only current-month shared leaderboard.
-8. Month transition resets current leaderboard without deleting prior results.
-9. Sales performance totals remain separate from funds-received commission.
-10. This Month/Quarter/Year/YoY totals use the same credit ledger and reconciled boundaries.
+- `get_current_month_sales_competition()` accepts no historical date or target rep. It returns only active same-organization rep names, ranks, current-month amounts and a current-user flag. There are no other-rep customer/source IDs or historical totals in that payload.
+- `get_sales_performance` checks the current user's active profile, sales designation or management role, central Sales Dashboard permission and target organization. Reps can request only their own detailed history. Authorized admins/managers/sales managers may request an individual or company view, including unassigned credit.
+- Month/quarter/year/YoY boundaries use the organization's timezone; comparisons use the same elapsed prior period. The competition stays on the current month when a user changes the performance period.
+- Detail records are paginated in the same server response as their full-period total and count. Underlying orders open directly; invoices open read-only. The existing dashboard tabs, quota goals, historical sales imports, company summaries and commissions remain available.
+- Invalid/denied responses show a retryable error; they do not become zero standings.
 
-## Existing code audit findings (2026-10-21)
-- `get_sales_goal_leaderboard` currently ranks annual quota attainment and is not the monthly revenue competition.
-- `get_sales_team_dashboard` aggregates sales-order-based individual quota periods; it does not implement combined customer-owned service/retail credits.
-- `useSalesDashboard` mixes quota-period RPC metrics with current-month activity counts. Period selection requires a backend reporting contract, not only a frontend selector.
+## Coverage and deployment
 
-## Merge dependency
-PR #255 and PR #256 are separate UI changes. This ledger/permission work must be implemented, tested and reconciled with both before the combined monthly competition is called complete.
+The seven earlier unmerged draft migrations were consolidated into the CLI-created `reliable_monthly_sales_credit` migration. Their versions were checked against the live migration history before consolidation; they were not applied there. The new migration has not been applied to production by this repair.
 
-## Admin void after deposit — approved business rule (2026-10-25)
-- Company policy: no cash refunds. If a customer cancels after a deposit, only an authorized admin may void the original Sales Order and retain the funds as **unapplied customer credit**; ordinary users cannot cancel the funded order.
-- Voiding the Sales Order posts a **full negative sales-performance reversal** against the original credited salesperson, in the void month. Preserve original sale and reversal as immutable, linked events; never silently delete history.
-- Unapplied customer credit, retained deposit, or movement of funds into customer credit **never creates sales-performance credit**. No partial Sales Order cancellation.
-- New qualifying service/retail invoices or approved Sales Orders earn fresh sales-performance credit according to their own attribution and posting rules, even when settled using existing customer credit. Do not double-count project invoices.
-- Applying existing customer credit is **not new cash received** and must not itself trigger another funds-received commission. Any prior commission paid on the original deposit must be handled explicitly under the separate commission policy; never infer commission from sales-performance reversals.
-- Require reason, authorization, accounting linkage, customer-credit balance reconciliation, idempotent void handling, and audit trail. Do not implement an automatic cash refund.
-- Before implementation verify existing Sales Order void statuses, deposit/payment allocation and customer-credit accounting schema. Never equate marking an order void with successfully transferring the deposit to customer credit.
+Posting is prospective. Migration records existing order/invoice IDs in a private legacy set, so later edits cannot silently credit historical transactions using today's owner. It records coverage start time, which is displayed beside the new metric. Historical sales remain in existing reports. No historical backfill runs, and no historic contract origin is inferred. Any reviewed backfill/origin mapping needs its own audited migration and reconciliation approval.
+
+Apply main's prerequisite schema first, particularly the work-order invoice linkage and existing permission helpers. Install the migration as one transaction. Before activation, review source classification and the read-only reconciliation queries below. Keep the older imported-sales reporting available during rollout.
+
+The admin-only funded-order void-and-unapplied-credit accounting workflow is separate: a performance reversal merely reflects an actual cancelled/voided sale. It is not evidence that a deposit was transferred, a customer-credit balance reconciled, or commission reversed. This PR grants no new ability to void orders or edit financial sources.
+
+## Validation
+
+`tests/sales-credit/database.mjs` executes the real new SQL plus main's actual change-order total trigger in isolated PostgreSQL/PGlite. It covers net-of-tax amounts, delayed approvals, customer-owner snapshots, order/invoice edits and cancellation/reinstatement, project deduplication, recurring allocation/rounding and late links, security origin, legacy exclusion, immutable events, role/module/tenant boundaries and Chicago/DST dates.
+
+`response.mjs` rejects malformed RPC payloads. `browser.mjs` runs real components at 320/390/768/1440px and verifies totals-to-records, pagination, read-only invoices, competition isolation, rep changes, errors/retries and complete tenant-scoped payment/credit history beyond API row limits. The dedicated monthly-credit workflow runs SQL, response, dashboard regressions, typecheck, build and browser checks.

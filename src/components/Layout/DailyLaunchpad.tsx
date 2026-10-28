@@ -1,3 +1,4 @@
+import { CustomerTimeTimer } from '../Technician/CustomerTimeTimer';
 import { MyJobTimeView } from '../Technician/MyJobTimeView';
 import { createPortal } from 'react-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -61,12 +62,14 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
     { key: 'team', label: 'Team', icon: Users }, { key: 'time', label: 'History', icon: History },
     { key: 'calendar', label: 'Calendar', icon: Briefcase },
   ] as const;
-  return <QuickActionModal title="Time Clock" subtitle="Your day, your jobs, your time off" icon={<Timer className="h-5 w-5" />} accentColor="from-cyan-700 to-blue-800" onClose={onClose}>
-    <div className="p-3 sm:p-5 space-y-4">
-      <nav aria-label="Time Clock views" className="grid grid-cols-5 gap-1 rounded-xl bg-elevated p-1">
+  return <QuickActionModal stableHeight scrollBody={false} title="Time Clock" subtitle="Your day, your jobs, your time off" icon={<Timer className="h-5 w-5" />} accentColor="from-cyan-700 to-blue-800" onClose={onClose}>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 p-3 sm:p-5">
+      <nav aria-label="Time Clock views" className="grid shrink-0 grid-cols-5 gap-1 rounded-xl bg-elevated p-1">
         {tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`min-h-14 min-w-0 rounded-lg flex flex-col items-center justify-center gap-1 text-[11px] sm:text-sm transition-colors ${tab === key ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:bg-surface'}`}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]" key={tab}>
       {tab === 'work' && <>
+        <CustomerTimeTimer onChanged={load} />
         {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.clockAccess === 'mobile' ? <MobileClockRedirect /> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <div className="rounded-2xl border border-subtle bg-elevated p-4"><p className="font-semibold">Ready for your next job?</p><p className="text-sm text-secondary mt-1">Your configuration does not require a daily clock. Record job time below.</p></div>}
         <div className="flex items-center justify-between"><div><h3 className="font-semibold text-primary">Today’s Jobs</h3><p className="text-xs text-secondary">{day}</p></div><button onClick={load} disabled={loading} aria-label="Refresh today’s work" className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-elevated"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
         {error && <p role="alert" className="text-red-600">{error}</p>}
@@ -78,7 +81,7 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
           <WorkOrderTimeControl workOrderId={job.id} assignedTo={profile?.id || null} onChanged={load} />
         </section>)}
         <div className="grid sm:grid-cols-2 gap-2 border-t border-subtle pt-4">
-          {policy.ready && <button onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-3 py-3 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Manual Job Time</button>}
+          {policy.ready && <button onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-3 py-3 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Job Time</button>}
           {settings && (settings.shop_time_request_enabled || settings.training_time_request_enabled) && <button onClick={() => setRequest('internal')} className="min-h-11 rounded-xl border border-subtle px-3 py-3 text-sm">Request Shop / Training Time</button>}
         </div>
       </>}
@@ -86,6 +89,7 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
       {tab === 'team' && <TeamTimeOffPanel />}
       {tab === 'time' && <div className="space-y-5"><MyTimeView />{policy.basis === 'daily_clock' && <section><h3 className="font-semibold mb-3">Job Time & Requests</h3><MyJobTimeView /></section>}</div>}
       {tab === 'calendar' && <Suspense fallback={<p>Loading daily calendar…</p>}><Calendar personalOnly onWorkOrderSelect={openWorkOrder} /></Suspense>}
+      </div>
     </div>
     {request === 'manual' && createPortal(<ManualJobTimeRequestModal onClose={() => setRequest(null)} onSubmitted={load} />, document.body)}
     {request === 'internal' && settings && createPortal(<RequestInternalTimeModal companySettings={settings} onClose={() => setRequest(null)} onSubmitted={load} />, document.body)}

@@ -1,4 +1,3 @@
-import { tokenFor } from "../send-review-followup-job/lostFeedback.ts";
 import { deleteProposalSubmission, deleteProposalEmail } from './deleteProposalSubmission.ts';
 import { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } from "./proposalFollowUp.ts";
 import { sendTrackedProposalCheck } from "./proposalCheckDelivery.ts";
@@ -55,6 +54,24 @@ const hash = async (v: string) =>
       await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)),
     ),
   ).map((n) => n.toString(16).padStart(2, "0")).join("");
+async function tokenFor(id: string, secret: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return [
+    ...new Uint8Array(
+      await crypto.subtle.sign(
+        "HMAC",
+        key,
+        new TextEncoder().encode("lost-feedback-reminder:" + id),
+      ),
+    ),
+  ].map((n) => n.toString(16).padStart(2, "0")).join("");
+}
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -383,7 +400,14 @@ Deno.serve(async (req) => {
       const isAdmin = ["admin", "owner", "super_admin"].includes(profile.role);
       if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
       if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
-      if (b.variant === "owner" && user.email?.toLowerCase() !== "josh@electroniclife.com") return json({ error: "Only Josh Gorrell can send the owner version." }, 403);
+
+      // The owner variant represents Josh personally and cannot be sent under
+      // his identity by other administrators or staff with review permissions.
+      if (b.variant === "owner" &&
+          (!isAdmin || user.email?.trim().toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the owner may send the owner follow-up." }, 403);
+      }
+
       const mode = b.recipient_mode || (b.proposal_id ? "proposal" : b.contact_id ? "customer" : "manual");
       if (!["proposal", "customer", "manual"].includes(mode)) return json({ error: "Choose a recipient." }, 400);
       let proposal: any = null;
@@ -413,7 +437,9 @@ Deno.serve(async (req) => {
         .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
       if (!rep) return json({ error: "Could not find the salesperson for this proposal. They may have been removed." }, 400);
       const owner = b.variant === "owner";
-      if (owner && organization.subdomain !== "elife") return json({ error: "Owner follow-up is currently configured for Electronic Life only." }, 400);
+      if (owner && (organization.subdomain !== "elife" || user.email?.toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the authorized owner can send from the owner identity." }, 403);
+      }
       const sender = { owner, name: owner ? "Josh Gorrell" : [rep.first_name, rep.last_name].filter(Boolean).join(" "),
         email: owner ? "josh@electroniclife.com" : rep.email,
         photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };
@@ -485,7 +511,7 @@ Deno.serve(async (req) => {
       }
       const senderVariant = b.sender_variant || "sales";
       if (!["sales", "owner"].includes(senderVariant)) return json({ error: "Choose a sender." }, 400);
-      if (senderVariant === "owner" && organization.subdomain !== "elife") return json({ error: "Owner template is configured for Electronic Life only." }, 400);
+
       let senderName = "";
       let senderEmail = "";
       if (senderVariant === "owner") {
@@ -547,6 +573,7 @@ Deno.serve(async (req) => {
           title: b.title.trim(),
           open_token: openToken,
           auto_followup_enabled: true,
+          sender_variant: senderVariant,
         }),
       );
       const token = crypto.randomUUID() + crypto.randomUUID();

@@ -52,7 +52,7 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); emails.push(JSON.parse(options.body)); return new Response('{}', { status: sendFail?502:200 }); };
 globalThis.__lostDeps = { tokenFor, sendSystemEmail:init=>fetch('https://api.resend.com/emails',init), validateAssessment, createClient: () => client, bidEmailBatches, bidFileFormat, bidFileHelp, validBidFile, wrapInEmailLayout: html => html };
 const source = (await readFile(new URL('../../supabase/functions/lost-opportunity-review/index.ts', import.meta.url), 'utf8')).replace(/^import[^;]+;\n/gm, '');
-await moduleFrom(`const {tokenFor,sendSystemEmail,validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
+await moduleFrom(`const {sendSystemEmail,validateAssessment,createClient,bidEmailBatches,bidFileFormat,bidFileHelp,validBidFile,wrapInEmailLayout}=globalThis.__lostDeps;
 const Deno={env:{get:key=>key==='RESEND_API_KEY'?'test-key':key==='SUPABASE_SERVICE_ROLE_KEY'?'test-secret':''},serve:handler=>{globalThis.__lostHandler=handler;}};
 ${source}`);
 async function call(body) { const r = await globalThis.__lostHandler(new Request('https://test.example', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, body: await r.json() }; }
@@ -146,13 +146,20 @@ assert.equal((await saveAssessment({ ...values, findings: 'Updated' },assessment
 assert.equal(assessment.findings,'Updated');
 console.log('Admin assessment permission, tenant, validation, save and conflict checks passed.');
 
-reset();
+reset();role='sales';
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Customer confirmed by phone',recoverable:'no'})).status,200);
 assert.equal(stored.source,'phone');assert.equal(stored.recorded_by,'employee-1');
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'email',reasons:['price'],message:'Overwrite',recoverable:'no'})).status,409);
 reset();permitted=false;
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403);
 permitted=true;
+reset();sendPermitted=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403,'Staff need send permission as well as submission access');
+sendPermitted=true;moduleAccess=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Private',recoverable:'no'})).status,403,'Module access is required');
+moduleAccess=true;role='admin';permitted=false;sendPermitted=false;
+assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'phone',reasons:['price'],message:'Admin feedback',recoverable:'no'})).status,200,'Admins retain feedback access without individual staff flags');
+role='sales';permitted=sendPermitted=true;
 console.log('Manual feedback authorization, audit source and original-answer preservation passed.');
 reset();
 assert.equal((await call({action:'record_feedback',request_id:'request-1',source:'in_person',reasons:['price'],message:'Restaurant conversation',recoverable:'maybe',recovery_message:'Revisit budget'})).status,200);

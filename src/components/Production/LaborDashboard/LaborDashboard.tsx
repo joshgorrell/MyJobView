@@ -46,7 +46,7 @@ function lastDay(zone = "America/Chicago") {
   while ([0, 6].includes(d.getUTCDay())) d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
 }
-export default function LaborDashboard() {
+export default function LaborDashboard({ controlsOnly = false }: { controlsOnly?: boolean } = {}) {
   const { profile } = useAuth();
   const [mode, setMode] = useState("day"),
     [anchor, setAnchor] = useState(() => lastDay()),
@@ -251,6 +251,96 @@ export default function LaborDashboard() {
         Labor reporting requires organization administrator access.
       </p>
     );
+  const controls = (
+    <div className="bg-surface border border-subtle rounded-xl p-4 space-y-4">
+      <h2 className="font-semibold text-primary">Import controls</h2>
+      <p className="text-sm text-secondary">
+        Turning off a source stops new imports into MJV and keeps its
+        history. Set a cutover date when native MJV records should take
+        over. The existing Electronic Life dashboard continues
+        independently.
+      </p>
+      {bundle?.sources.map((s) => (
+        <div
+          key={s.source}
+          className="flex flex-wrap gap-4 items-center border-t border-subtle pt-3"
+        >
+          <strong className="text-primary w-36">
+            {s.source === "ipoint" ? "iPoint" : "QuickBooks Time"}
+          </strong>
+          <label className="text-sm text-primary">
+            <input
+              type="checkbox"
+              checked={s.enabled}
+              disabled={saving === s.source}
+              onChange={(e) =>
+                void updateSource(s, { enabled: e.target.checked })
+              }
+            />{" "}
+            Import enabled
+          </label>
+          <label className="text-sm text-secondary">
+            MJV begins{" "}
+            <input
+              aria-label={s.source + " native cutover date"}
+              type="date"
+              className="bg-surface text-primary border border-subtle rounded p-2"
+              value={s.native_from ?? ""}
+              disabled={saving === s.source}
+              onChange={(e) =>
+                void updateSource(s, {
+                  native_from: e.target.value || null,
+                })
+              }
+            />
+          </label>
+          <span className="text-xs text-secondary">
+            Last successful sync:{" "}
+            {s.last_success_at
+              ? new Date(s.last_success_at).toLocaleString()
+              : "Not synced"}
+            {s.last_error && " · " + s.last_error}
+          </span>
+        </div>
+      ))}
+      <div className="border-t border-subtle pt-3">
+        <label
+          className="block text-sm text-primary"
+          htmlFor="labor-holidays"
+        >
+          Company holidays (YYYY-MM-DD, one per line)
+        </label>
+        <textarea
+          id="labor-holidays"
+          className="bg-surface text-primary border border-subtle rounded p-2 my-2 w-full max-w-sm"
+          rows={3}
+          value={holidayDraft}
+          onChange={(e) => setHolidayDraft(e.target.value)}
+        />
+        <button
+          className="block text-blue-600 underline text-sm"
+          disabled={saving === "calendar"}
+          onClick={() => void updateHolidays()}
+        >
+          Save holidays
+        </button>
+        <p className="text-xs text-secondary mt-2">
+          {bundle?.holidays.length
+            ? "Configured holidays reduce assumed salaried work hours."
+            : "No company holidays configured yet."}{" "}
+          Recorded leave is handled separately.
+        </p>
+      </div>
+    </div>
+  );
+  if (controlsOnly) return <section className="space-y-4">
+    <h2 className="text-xl font-semibold text-primary">Historical imports & availability calendar</h2>
+    <p className="text-sm text-secondary">Manage the sources and calendar behind historical reporting.</p>
+    {loading && <p role="status" className="text-sm text-secondary">Loading import settings…</p>}
+    {error && <p role="alert">{error}</p>}
+    <button className="text-blue-600 underline min-h-11" disabled={loading} onClick={() => void load()}>Refresh settings</button>
+    {controls}
+  </section>;
   return (
     <section className="space-y-6 p-4 sm:p-6">
       <header className="flex flex-wrap justify-between items-start gap-4">
@@ -354,88 +444,7 @@ export default function LaborDashboard() {
           {bundle && " Showing the last successful report."}
         </div>
       )}
-      {settings && (
-        <div className="bg-surface border border-subtle rounded-xl p-4 space-y-4">
-          <h2 className="font-semibold text-primary">Import controls</h2>
-          <p className="text-sm text-secondary">
-            Turning off a source stops new imports into MJV and keeps its
-            history. Set a cutover date when native MJV records should take
-            over. The existing Electronic Life dashboard continues
-            independently.
-          </p>
-          {bundle?.sources.map((s) => (
-            <div
-              key={s.source}
-              className="flex flex-wrap gap-4 items-center border-t border-subtle pt-3"
-            >
-              <strong className="text-primary w-36">
-                {s.source === "ipoint" ? "iPoint" : "QuickBooks Time"}
-              </strong>
-              <label className="text-sm text-primary">
-                <input
-                  type="checkbox"
-                  checked={s.enabled}
-                  disabled={saving === s.source}
-                  onChange={(e) =>
-                    void updateSource(s, { enabled: e.target.checked })
-                  }
-                />{" "}
-                Import enabled
-              </label>
-              <label className="text-sm text-secondary">
-                MJV begins{" "}
-                <input
-                  aria-label={s.source + " native cutover date"}
-                  type="date"
-                  className="bg-surface text-primary border border-subtle rounded p-2"
-                  value={s.native_from ?? ""}
-                  disabled={saving === s.source}
-                  onChange={(e) =>
-                    void updateSource(s, {
-                      native_from: e.target.value || null,
-                    })
-                  }
-                />
-              </label>
-              <span className="text-xs text-secondary">
-                Last successful sync:{" "}
-                {s.last_success_at
-                  ? new Date(s.last_success_at).toLocaleString()
-                  : "Not synced"}
-                {s.last_error && " · " + s.last_error}
-              </span>
-            </div>
-          ))}
-          <div className="border-t border-subtle pt-3">
-            <label
-              className="block text-sm text-primary"
-              htmlFor="labor-holidays"
-            >
-              Company holidays (YYYY-MM-DD, one per line)
-            </label>
-            <textarea
-              id="labor-holidays"
-              className="bg-surface text-primary border border-subtle rounded p-2 my-2 w-full max-w-sm"
-              rows={3}
-              value={holidayDraft}
-              onChange={(e) => setHolidayDraft(e.target.value)}
-            />
-            <button
-              className="block text-blue-600 underline text-sm"
-              disabled={saving === "calendar"}
-              onClick={() => void updateHolidays()}
-            >
-              Save holidays
-            </button>
-            <p className="text-xs text-secondary mt-2">
-              {bundle?.holidays.length
-                ? "Configured holidays reduce assumed salaried work hours."
-                : "No company holidays configured yet."}{" "}
-              Recorded leave is handled separately.
-            </p>
-          </div>
-        </div>
-      )}
+      {settings && controls}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           ["Job hours", totalJob],

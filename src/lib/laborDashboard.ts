@@ -1,9 +1,9 @@
 export type LaborSource = {
   source: "ipoint" | "quickbooks_time";
-  enabled: boolean;
+  enabled?: boolean;
   native_from: string | null;
-  last_success_at: string | null;
-  last_error: string | null;
+  last_success_at?: string | null;
+  last_error?: string | null;
 };
 export type LaborBundle = {
   timezone: string;
@@ -32,7 +32,7 @@ export type LaborBundle = {
   project_snapshot: LaborBundle["snapshots"][number] | null;
   latest_job_day: string | null;
   latest_payroll_day: string | null;
-  native_jobs: { profile_id: string; day: string; hours: number }[];
+  native_jobs: { profile_id: string; day: string; hours: number; shop_hours?: number; training_hours?: number; review_flags?: string[] }[];
   native_payroll: {
     profile_id: string;
     day: string;
@@ -62,6 +62,7 @@ export type LaborDay = {
   matchedJob: number;
   matchedPayroll: number;
   matched: boolean;
+  clockDataComplete?: boolean;
 };
 const week = [
   "sunday",
@@ -101,6 +102,7 @@ export function laborHistory(
   start: string,
   end: string,
   asOf: string,
+  actualPayroll = false,
 ): LaborDay[] {
   if (
     !validLaborDay(start) ||
@@ -109,9 +111,14 @@ export function laborHistory(
     Date.parse(end) - Date.parse(start) > 1830 * 86400000
   )
     return [];
-  const mapping = (source: string) =>
-    b.mappings.find((m) => m.profile_id === id && m.source === source)
-      ?.external_employee_id;
+  // Index once per technician/report instead of scanning snapshots for every day.
+  // Reverse copies retain the original first-match behavior for duplicate keys.
+  const personMappings = new Map(b.mappings.filter(m => m.profile_id === id)
+    .reverse().map(m => [m.source, m.external_employee_id]));
+  const mapping = (source: string) => personMappings.get(source);
+  const snapshots = new Map([...b.snapshots].reverse().map(s => [s.kind + ':' + s.day, s]));
+  const jobs = new Map(b.native_jobs.filter(j => j.profile_id === id).reverse().map(j => [j.day, j]));
+  const clocks = new Map(b.native_payroll.filter(p => p.profile_id === id).reverse().map(p => [p.day, p]));
   const native = (source: string, day: string) => {
     const cutoff = b.sources.find((s) => s.source === source)?.native_from;
     return !!cutoff && day >= cutoff;
@@ -138,14 +145,12 @@ export function laborHistory(
     const jobNative = native("ipoint", day),
       payNative = native("quickbooks_time", day);
     const j = jobNative
-      ? b.native_jobs.find((j) => j.profile_id === id && j.day === day)
-      : b.snapshots
-          .find((s) => s.kind === "technician" && s.day === day)
+      ? jobs.get(day)
+      : snapshots.get("technician:" + day)
           ?.payload.records.find((r) => r.technician === mapping("ipoint"));
     const p = payNative
-      ? b.native_payroll.find((p) => p.profile_id === id && p.day === day)
-      : b.snapshots
-          .find((s) => s.kind === "payroll" && s.day === day)
+      ? clocks.get(day)
+      : snapshots.get("payroll:" + day)
           ?.payload.records.find(
             (r) => String(r.user_id) === mapping("quickbooks_time"),
           );
@@ -154,7 +159,7 @@ export function laborHistory(
       unknown = p ? n(payNative ? 0 : p.unknown_hours) : null;
     flags.push(...(j?.review_flags ?? []), ...(p?.flags ?? []));
     if (p?.needs_review) flags.push("Open or unreviewed payroll clock entry");
-    const assumed = cfg?.compensation_type === "salary";
+    const assumed = !actualPayroll && cfg?.compensation_type === "salary";
     const workdays = cfg?.work_days?.length
       ? cfg.work_days
       : ["monday", "tuesday", "wednesday", "thursday", "friday"];
@@ -174,7 +179,7 @@ export function laborHistory(
       : p
         ? n(payNative ? p.hours : p.worked_hours)
         : null;
-    if (!cfg)
+    if (!actualPayroll && !cfg)
       flags.push("Employee payroll configuration missing for this date");
     if (job === null && ((payroll ?? 0) > 0 || (!p && workday)))
       flags.push("Job report or entry missing");
@@ -188,7 +193,7 @@ export function laborHistory(
     if (!assumed && workday && payroll === 0 && leave === 0)
       flags.push("No payroll or leave record; review attendance");
     const sourceClean =
-      !!cfg &&
+      (actualPayroll || !!cfg) &&
       !!p &&
       job !== null &&
       job >= 0 &&
@@ -226,6 +231,7 @@ export function laborHistory(
           : "QuickBooks Time",
       flags: [...new Set(flags)],
       matched,
+      clockDataComplete: sourceClean,
       matchedJob: matched ? job! : 0,
       matchedPayroll: matched ? payroll! : 0,
       efficiency: matched && payroll! > 0 ? (job! / payroll!) * 100 : null,

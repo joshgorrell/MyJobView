@@ -16,6 +16,8 @@ interface ContactLogModalProps {
 export function ContactLogModal({ workOrderId, serviceRequestId, customerName, onClose, onSaved }: ContactLogModalProps) {
   const { profile } = useAuth();
   const [notes, setNotes] = useState('');
+  const [method, setMethod] = useState('phone');
+  const [outcome, setOutcome] = useState('no_answer');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,12 +75,12 @@ export function ContactLogModal({ workOrderId, serviceRequestId, customerName, o
           service_request_id: serviceRequestId ?? null,
           logged_by: profile.id,
           logged_by_name: profile.full_name || profile.username || 'Unknown',
-          notes: notes.trim(),
+          notes: `[${({ phone: 'Phone', text: 'Text', email: 'Email', in_person: 'In person', other: 'Other' } as Record<string, string>)[method]} · ${({ no_answer: 'No answer', voicemail: 'Left voicemail', message_sent: 'Message sent', spoke: 'Spoke with customer', awaiting_callback: 'Awaiting callback', other: 'Other' } as Record<string, string>)[outcome]}] ${notes.trim()}`,
         });
 
       if (insertError) throw insertError;
 
-      if (workOrderId && !serviceRequestId) {
+      if (outcome === 'spoke' && workOrderId && !serviceRequestId) {
         await supabase
           .from('work_orders')
           .update({
@@ -89,7 +91,7 @@ export function ContactLogModal({ workOrderId, serviceRequestId, customerName, o
           .is('customer_contact_confirmed_at', null);
       }
 
-      if (serviceRequestId) {
+      if (outcome === 'spoke' && serviceRequestId) {
         await supabase
           .from('service_requests')
           .update({
@@ -133,6 +135,18 @@ export function ContactLogModal({ workOrderId, serviceRequestId, customerName, o
         </div>
 
         <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-medium text-gray-700">Method
+              <select aria-label="Contact method" value={method} onChange={e => setMethod(e.target.value)} className="mt-1.5 w-full border border-gray-200 rounded-lg p-2 text-sm">
+                <option value="phone">Phone</option><option value="text">Text</option><option value="email">Email</option><option value="in_person">In person</option><option value="other">Other</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-gray-700">Outcome
+              <select aria-label="Contact outcome" value={outcome} onChange={e => setOutcome(e.target.value)} className="mt-1.5 w-full border border-gray-200 rounded-lg p-2 text-sm">
+                <option value="no_answer">No answer</option><option value="voicemail">Left voicemail</option><option value="message_sent">Message sent</option><option value="spoke">Spoke with customer</option><option value="awaiting_callback">Awaiting callback</option><option value="other">Other</option>
+              </select>
+            </label>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-gray-400" />

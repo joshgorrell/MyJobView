@@ -10,11 +10,13 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabase';
 import { Colors } from '../theme/colors';
-import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
+import { Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,9 +26,32 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
+
+  async function handleResetPassword() {
+    const address = email.trim().toLowerCase();
+    if (!address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      Alert.alert('Email required', 'Enter your account email above to reset your password.');
+      return;
+    }
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: 'https://elife.myjobview.com/',
+      });
+      if (error) throw error;
+      Alert.alert('Check your email', 'If an account exists for that address, you will receive password reset instructions.');
+    } catch (error) {
+      Alert.alert('Reset unavailable', 'We could not request a password reset. Please try again later.');
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function handleLogin() {
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       Alert.alert('Missing Information', 'Please enter your email and password');
       return;
     }
@@ -48,7 +73,7 @@ export default function LoginScreen() {
   const features = [
     { title: 'High-Precision GPS', subtitle: '3-10 meter accuracy' },
     { title: 'Offline Support', subtitle: 'Works without connection' },
-    { title: 'Biometric Security', subtitle: 'Face ID & fingerprint' },
+    { title: 'Secure Access', subtitle: 'Your company account' },
   ];
 
   return (
@@ -65,7 +90,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Logo size={88} variant="light" />
             <Text style={styles.title}>MyJobView</Text>
-            <Text style={styles.subtitle}>Mobile Time Clock</Text>
+            <Text style={styles.subtitle}>Your workday. Connected.</Text>
           </View>
 
           {/* Login Form */}
@@ -84,29 +109,41 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 keyboardType="email-address"
                 editable={!loading}
+                textContentType="username"
+                autoComplete="email"
               />
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordRow}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.passwordInput]}
                 placeholder="Enter your password"
                 placeholderTextColor={Colors.gray[400]}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
+                textContentType="password"
+                autoComplete="password"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
                 onSubmitEditing={handleLogin}
               />
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword(value => !value)} style={styles.passwordToggle}>
+                <Text style={styles.passwordToggleText}>{showPassword ? '◉' : '◎'}</Text>
+              </TouchableOpacity>
+              </View>
             </View>
+            <TouchableOpacity onPress={handleResetPassword} disabled={resetting || loading} accessibilityRole="button" style={styles.resetLink}>
+              <Text style={styles.resetText}>{resetting ? 'Sending reset link…' : 'Forgot password?'}</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              style={[styles.loginButton, !canSubmit && styles.loginButtonDisabled]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={!canSubmit}
               activeOpacity={0.85}
             >
               {loading ? (
@@ -114,6 +151,10 @@ export default function LoginScreen() {
               ) : (
                 <Text style={styles.loginButtonText}>Sign In</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://elife.myjobview.com/')}>
+              <Text style={styles.resetText}>Open MyJobView on the web</Text>
             </TouchableOpacity>
 
             {/* Features */}
@@ -168,6 +209,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.gray[900],
   },
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordInput: { flex: 1, paddingRight: 48 },
+  passwordToggle: { position: 'absolute', right: 8, padding: 12 },
+  passwordToggleText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
+  signupLink: { alignSelf: 'center', paddingVertical: 14 },
+  resetLink: { alignSelf: 'flex-end', paddingVertical: 8 },
+  resetText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
   loginButton: {
     backgroundColor: Colors.primary[600],
     borderRadius: Radius.md,

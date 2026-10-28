@@ -1,9 +1,0 @@
--- Safety hold: deliberately do not install a Sales Order void trigger yet.
--- Audit found that customer_account_credits can be inserted by any org member
--- and does not prove a deposit payment was transferred or reconciled.
--- Existing Sales Order status constraint and posting flows also require
--- reconciliation before introducing 'voided' as a new status.
--- The prior draft trigger is withdrawn from this PR to avoid a false
--- accounting safeguard. Implement a single atomic, admin-authorized
--- void-and-credit transaction with verified payment allocations, a unique
--- origin link, balanced accounting, and end-to-end tests before deployment.

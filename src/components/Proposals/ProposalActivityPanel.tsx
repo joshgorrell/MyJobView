@@ -31,7 +31,17 @@ interface Stats {
   lastActivity: string | null;
 }
 
+const DECISION_STEP_LABELS: Record<string, string> = {
+  decline_started: 'Customer started to decline',
+  decline_to_changes: 'Customer switched to requesting changes',
+  decline_to_approval: 'Customer switched to approval',
+  decline_acknowledged: 'Customer acknowledged Our Promise and continued',
+  decline_cancelled: 'Customer cancelled declining',
+  change_request_submitted: 'Customer submitted a change request',
+};
+
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  decision_step: { label: 'Decision', icon: <Activity className="w-3.5 h-3.5" />, color: 'text-indigo-600 bg-indigo-50' },
   viewed:     { label: 'Viewed', icon: <Eye className="w-3.5 h-3.5" />, color: 'text-blue-600 bg-blue-50' },
   downloaded: { label: 'Downloaded', icon: <Download className="w-3.5 h-3.5" />, color: 'text-teal-600 bg-teal-50' },
   accepted:   { label: 'Approved', icon: <CheckCircle className="w-3.5 h-3.5" />, color: 'text-green-600 bg-green-50' },
@@ -173,7 +183,7 @@ export function ProposalActivityPanel({ proposalId, compact = false }: ProposalA
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex flex-wrap items-center gap-1">
-          {['all', 'viewed', 'downloaded', 'accepted', 'declined'].map(f => (
+          {['all', 'viewed', 'downloaded', 'accepted', 'declined', 'decision_step'].map(f => (
             <button key={f} onClick={() => setTypeFilter(f)} className={`px-2.5 py-1 text-xs rounded-lg capitalize transition-colors ${typeFilter === f ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {f === 'all' ? 'All' : TYPE_CONFIG[f]?.label ?? f}
             </button>
@@ -200,6 +210,7 @@ export function ProposalActivityPanel({ proposalId, compact = false }: ProposalA
               <div key={row.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex-shrink-0 mt-0.5"><ActivityBadge type={row.activity_type} /></div>
                 <div className="flex-1 min-w-0">
+                  {row.activity_type === 'decision_step' && <p className="mb-1 text-sm font-medium text-gray-800">{DECISION_STEP_LABELS[String(meta.step)] || 'Customer decision interaction'}</p>}
                   <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
                     {row.portal_version_number != null && <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700">v{row.portal_version_number}</span>}
                     {row.viewer_user_id && <span className="font-medium text-blue-700">Verified customer</span>}

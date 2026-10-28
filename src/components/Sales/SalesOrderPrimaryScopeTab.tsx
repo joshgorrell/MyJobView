@@ -297,23 +297,23 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h3 className="text-sm font-medium text-gray-400">Primary Scope of Work</h3>
           <p className="text-xs text-gray-500 mt-0.5">The overall project scope description sent with proposals</p>
         </div>
         {!editing && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:flex-shrink-0">
             <button
               onClick={() => requestEdit('ai')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg text-sm font-medium transition-all shadow-sm"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-lg text-sm font-medium transition-all shadow-sm min-h-[40px] sm:min-h-0"
             >
               <Sparkles className="w-3.5 h-3.5" />
               AI Scope
             </button>
             <button
               onClick={() => requestEdit('manual')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 border border-blue-700/40 rounded-lg transition-colors"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 border border-blue-700/40 rounded-lg transition-colors min-h-[40px] sm:min-h-0"
             >
               <Edit2 className="w-3.5 h-3.5" />
               {hasExistingScope ? 'Edit' : 'Add Scope'}
@@ -331,7 +331,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
         </div>
       )}
 
-      <div className="bg-gray-800/60 border border-gray-700 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-subtle rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50">
           <div className="flex items-center gap-2">
             <AlignLeft className="w-4 h-4 text-blue-400" />
@@ -349,10 +349,10 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
               rows={12}
               className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             />
-            <div className="flex items-center gap-2 justify-end">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:justify-end">
               <button
                 onClick={() => { setDraft(null);setEditing(false); setScopeText(proposalSettings?.scope_of_work || ''); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200 rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm text-gray-400 hover:text-gray-200 rounded-lg hover:bg-gray-700 transition-colors min-h-[40px] sm:min-h-0"
               >
                 <X className="w-3.5 h-3.5" />
                 Cancel
@@ -360,7 +360,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
               <button
                 onClick={saveScope}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 min-h-[40px] sm:min-h-0"
               >
                 <Save className="w-3.5 h-3.5" />
                 {saving ? 'Saving...' : 'Save'}
@@ -381,7 +381,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
       {/* Override Confirmation Modal */}
       {showOverrideConfirm && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-red-700/60 rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="bg-surface border border-red-700/60 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-red-700/40">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-red-900/40 rounded-xl">
@@ -429,7 +429,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
               </div>
             </div>
 
-            <div className="p-5 border-t border-gray-700/50 flex items-center gap-3 justify-end">
+            <div className="p-5 border-t border-gray-700/50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 sm:justify-end">
               <button
                 onClick={cancelOverride}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 rounded-lg hover:bg-gray-800 transition-colors"
@@ -452,7 +452,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
       {/* AI Scope Generator Modal */}
       {showAIModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+          <div className="bg-surface border border-subtle rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-600/20 rounded-xl">
@@ -562,7 +562,7 @@ export function SalesOrderPrimaryScopeTab({ order }: SalesOrderPrimaryScopeTabPr
               )}
             </div>
 
-            <div className="p-5 border-t border-gray-700 flex items-center gap-3">
+            <div className="p-5 border-t border-subtle flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3">
               {aiGeneratedScope && (
                 <>
                   <button

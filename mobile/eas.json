@@ -1,31 +1,41 @@
 {
   "cli": {
-    "version": ">= 5.9.0"
+    "version": ">= 5.9.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "image": "latest",
+        "image": "macos-sequoia-15.5-xcode-16.4",
         "resourceClass": "m-medium"
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
-        "image": "latest",
+        "image": "macos-sequoia-15.5-xcode-16.4",
         "simulator": true
-      }
+      },
+      "environment": "preview"
     },
     "production": {
       "ios": {
         "image": "latest",
         "resourceClass": "m-medium"
-      }
+      },
+      "environment": "production",
+      "autoIncrement": true
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "josh@ksav.com",
+        "ascAppId": "6824633500",
+        "appleTeamId": "68B83HZF8U"
+      }
+    }
   }
 }

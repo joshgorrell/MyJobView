@@ -12,7 +12,7 @@ type Preview = { html: string; content: string; subject: string; recipient: stri
 
 export default function ProposalFollowUps() {
   const { profile, companySettings } = useAuth();
-  const isJosh = profile?.email?.trim().toLowerCase() === 'josh@electroniclife.com';
+  const canSendOwner = true;
   const [proposals, setProposals] = useState<{ id: string; title: string; proposal_number: string; contacts: { contact_name: string } | null }[]>([]);
   const [mode, setMode] = useState<'customer' | 'manual' | 'proposal'>('customer');
   const [contacts, setContacts] = useState<{ id: string; contact_name: string; email: string }[]>([]);
@@ -98,18 +98,18 @@ export default function ProposalFollowUps() {
   const livePreviewHtml = preview ? preview.html.replace(preview.content, editedContent) : '';
 
   return <section className="min-w-0 space-y-5"><div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-6">
-    <div className="flex items-start gap-3"><Mail className="mt-1 h-6 w-6 text-cyan-400" /><div><h2 className="text-xl font-bold text-white">Send a Proposal Check</h2><p className="mt-1 text-sm text-gray-400">Thank customers for the opportunity and ask what would help earn their business.</p></div></div>
+    <div className="flex items-start gap-3"><Mail className="mt-1 h-6 w-6 text-blue-400" /><div><h2 className="text-xl font-bold text-white">Send a Proposal Check</h2><p className="mt-1 text-sm text-gray-400">Thank customers for the opportunity and ask what would help earn their business.</p></div></div>
     <div className="grid gap-3 sm:grid-cols-2">
-      {(['sales', ...(isJosh ? ['owner'] : [])] as ('sales' | 'owner')[]).map(v => <button key={v} disabled={busy} onClick={() => { setVariant(v); reset(); }} className={`rounded-xl border p-4 text-left transition ${variant === v ? 'border-cyan-400 bg-cyan-950/40' : 'border-gray-600 hover:border-gray-400'}`} aria-pressed={variant === v}><div className="font-semibold text-white">{v === 'owner' ? 'Owner Proposal Check' : 'Proposal Check'}</div><p className="mt-1 text-sm text-gray-400">{v === 'owner' ? 'A personal note from Josh Gorrell. Replies go directly to Josh.' : "A warm check-in from you, or the linked proposal's salesperson. Replies go directly to the sender."}</p></button>)}
+      {(['sales', ...(canSendOwner ? ['owner'] : [])] as ('sales' | 'owner')[]).map(v => <button key={v} disabled={busy} onClick={() => { setVariant(v); reset(); }} className={`rounded-xl border p-4 text-left transition ${variant === v ? 'border-blue-500 bg-blue-950/40' : 'border-gray-600 hover:border-gray-400'}`} aria-pressed={variant === v}><div className="font-semibold text-white">{v === 'owner' ? 'Owner Proposal Check' : 'Proposal Check'}</div><p className="mt-1 text-sm text-gray-400">{v === 'owner' ? 'A personal note from the company owner. Replies go directly to the owner.' : "A warm check-in from you, or the linked proposal's salesperson. Replies go directly to the sender."}</p></button>)}
     </div>
-    <div className="flex flex-wrap gap-2" role="group" aria-label="Choose recipient method">{([['customer', 'Select Customer'], ['manual', 'Enter Name & Email'], ['proposal', 'Link a Proposal']] as const).map(([value, label]) => <button key={value} disabled={busy} aria-pressed={mode === value} onClick={() => { setMode(value); reset(); }} className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${mode === value ? 'border-cyan-400 bg-cyan-950/40 text-cyan-200' : 'border-gray-600 text-gray-300'}`}>{label}</button>)}</div>
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Choose recipient method">{([['customer', 'Select Customer'], ['manual', 'Enter Name & Email'], ['proposal', 'Link a Proposal']] as const).map(([value, label]) => <button key={value} disabled={busy} aria-pressed={mode === value} onClick={() => { setMode(value); reset(); }} className={`min-h-11 rounded-lg border px-3 py-2 text-sm ${mode === value ? 'border-blue-500 bg-blue-950/40 text-blue-200' : 'border-gray-600 text-gray-300'}`}>{label}</button>)}</div>
     {mode === 'customer' && <div className="space-y-3"><label className="block text-sm font-medium text-gray-300">Search customers<input disabled={busy} value={search} onChange={e => setSearch(e.target.value)} placeholder="Name or email" className="mt-2 block w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white" /></label><label className="block text-sm font-medium text-gray-300">Customer<select disabled={busy || loading} value={contact} onChange={e => { setContact(e.target.value); reset(); }} className="mt-2 block w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white"><option value="">{loading ? 'Loading customers…' : 'Choose a customer…'}</option>{contacts.filter(c => c.id === contact || `${c.contact_name} ${c.email}`.toLowerCase().includes(search.toLowerCase())).map(c => <option key={c.id} value={c.id} disabled={!c.email}>{c.contact_name} · {c.email || 'No email address'}</option>)}</select></label><p className="text-xs text-gray-400">No proposal link is required. The salesperson version comes from you.</p></div>}
     {mode === 'manual' && <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-300">Customer name<input disabled={busy} maxLength={200} value={name} onChange={e => { setName(e.target.value); reset(); }} autoComplete="name" className="mt-2 block w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white" /></label><label className="block text-sm font-medium text-gray-300">Email address<input type="email" disabled={busy} maxLength={254} value={email} onChange={e => { setEmail(e.target.value); reset(); }} autoComplete="email" className="mt-2 block w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white" /></label><p className="text-xs text-gray-400 sm:col-span-2">Send without creating a customer record or linking a proposal.</p></div>}
     {mode === 'proposal' && <label className="block text-sm font-medium text-gray-300">Open proposal<select disabled={busy || loading} value={proposal} onChange={e => { setProposal(e.target.value); reset(); }} className="mt-2 block w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-white"><option value="">{loading ? 'Loading proposals…' : 'Choose a sent proposal…'}</option>{proposals.map(p => <option key={p.id} value={p.id}>{p.contacts?.contact_name || 'Customer'} · {p.proposal_number} · {p.title}</option>)}</select></label>}
     {error && <p role="alert" className="rounded-lg bg-red-950/50 p-3 text-red-300">{error}</p>}
     {sent && <p role="status" className="flex items-center gap-2 rounded-lg bg-emerald-950/50 p-3 text-emerald-300"><CheckCircle className="h-5 w-5" />Proposal follow-up sent successfully.</p>}
     <div className="flex flex-wrap gap-3">
-      <button disabled={!canSubmit || busy || sent} onClick={() => void act(false)} className="flex min-h-11 items-center gap-2 rounded-lg border border-cyan-600 px-4 py-2 text-cyan-300 disabled:opacity-50"><Eye className="h-4 w-4" />{busy ? 'Preparing…' : 'Preview Email'}</button>
+      <button disabled={!canSubmit || busy || sent} onClick={() => void act(false)} className="flex min-h-11 items-center gap-2 rounded-lg border border-blue-600 px-4 py-2 text-blue-300 disabled:opacity-50"><Eye className="h-4 w-4" />{busy ? 'Preparing…' : 'Preview Email'}</button>
     </div>
     </div>
     <ProposalCheckHistory refreshKey={historyRefresh} />
@@ -136,7 +136,7 @@ export default function ProposalFollowUps() {
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2"><strong className="shrink-0 text-gray-300">Replies to:</strong><span className="truncate text-gray-400">{preview.reply_to}</span></div>
               <div className="flex flex-col gap-1 border-t border-gray-700 pt-2 sm:flex-row sm:items-start sm:gap-2">
                 <strong className="mt-2 shrink-0 text-gray-300">Subject:</strong>
-                <input value={editedSubject} onChange={e => setEditedSubject(e.target.value)} disabled={busy} maxLength={300} className="w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white focus:border-cyan-400 focus:outline-none" />
+                <input value={editedSubject} onChange={e => setEditedSubject(e.target.value)} disabled={busy} maxLength={300} className="w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-white focus:border-blue-500 focus:outline-none" />
               </div>
             </div>
 
@@ -150,7 +150,7 @@ export default function ProposalFollowUps() {
             {isEditing && (
               <div className="mt-3 space-y-2">
                 <label className="block text-sm font-medium text-gray-300">Email body (HTML)</label>
-                <textarea value={editedContent} onChange={e => setEditedContent(e.target.value)} disabled={busy} rows={12} className="block w-full resize-y rounded-lg border border-gray-600 bg-gray-900 p-3 font-mono text-xs text-white focus:border-cyan-400 focus:outline-none sm:text-sm" />
+                <textarea value={editedContent} onChange={e => setEditedContent(e.target.value)} disabled={busy} rows={12} className="block w-full resize-y rounded-lg border border-gray-600 bg-gray-900 p-3 font-mono text-xs text-white focus:border-blue-500 focus:outline-none sm:text-sm" />
                 <p className="text-xs text-gray-400">Edit the email body above. The preview below updates live. HTML formatting is supported.</p>
               </div>
             )}
@@ -158,7 +158,7 @@ export default function ProposalFollowUps() {
             {/* Live preview iframe */}
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-600">
               <div className="border-b border-gray-600 bg-gray-900 px-4 py-2 text-xs font-medium text-gray-400">Live Preview</div>
-              {responsePreview ? <div><button type="button" onClick={()=>setResponsePreview(null)} className="min-h-11 px-4 text-sm text-cyan-300">← Back to email preview</button><ProposalCheckResponse key={responsePreview} previewChoice={responsePreview} previewBrand={{company_name:companySettings?.company_name||'Our team',company_logo_url:companySettings?.company_logo_url||'',owner_name:preview.owner_name||(isJosh?'Josh Gorrell':null),owner_email:preview.owner_email||(isJosh?'josh@electroniclife.com':companySettings?.company_email||preview.reply_to)}}/></div> : <ProposalEmailPreview html={livePreviewHtml} onChoice={setResponsePreview}/>}
+              {responsePreview ? <div><button type="button" onClick={()=>setResponsePreview(null)} className="min-h-11 px-4 text-sm text-cyan-300">← Back to email preview</button><ProposalCheckResponse key={responsePreview} previewChoice={responsePreview} previewBrand={{company_name:companySettings?.company_name||'Our team',company_logo_url:companySettings?.company_logo_url||'',owner_name:preview.owner_name||null,owner_email:preview.owner_email||companySettings?.company_email||preview.reply_to}}/></div> : <ProposalEmailPreview html={livePreviewHtml} onChoice={setResponsePreview}/>}
               <p className="bg-gray-900 px-4 py-2 text-xs text-gray-400">Click a response button to preview the customer’s next steps. Preview clicks and messages are not recorded. Other email links stay inactive here.</p>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function ProposalFollowUps() {
             <p className="text-xs text-gray-400">{isDirty ? 'You have unsaved edits — your changes will be sent.' : 'No edits made — the original template will be sent.'}</p>
             <div className="flex gap-2">
               <button onClick={() => !busy && setPreview(null)} disabled={busy} className="flex min-h-11 items-center justify-center rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 transition hover:border-gray-400 disabled:opacity-50">Cancel</button>
-              <button onClick={() => void act(true)} disabled={busy} className="flex min-h-11 items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2 font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-50"><Send className="h-4 w-4" />{busy ? 'Sending…' : 'Send This Email'}</button>
+              <button onClick={() => void act(true)} disabled={busy} className="flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 font-semibold text-white transition hover:bg-blue-500 disabled:opacity-50"><Send className="h-4 w-4" />{busy ? 'Sending…' : 'Send This Email'}</button>
             </div>
           </div>
         </div>

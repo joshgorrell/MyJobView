@@ -7,10 +7,11 @@ import React, { useEffect, useState } from "react";
 import { Trash2, FileText, Download, ExternalLink, Paperclip } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import { markActivitySeen } from "../../hooks/useActivityCounts";
 import { responseReasons, lostReviewAction } from "./lostReview";
 import { printLostReview } from "./printLostReview";
 import { ReviewStatsRow, ReviewFilterBar, type StatItem, type FilterOption } from "./ReviewStats";
-import { Send, TrendingUp, RotateCcw, AlertCircle } from 'lucide-react';
+import { Send, TrendingUp, RotateCcw, AlertCircle, TrendingDown } from 'lucide-react';
 import { bidFileFormat } from "../../../supabase/functions/lost-opportunity-review/bidFileTypes";
 interface Contact {
   id: string;
@@ -47,23 +48,26 @@ interface Review {
   sent_at: string | null;
   sent_by_name: string | null;
   response_created_at: string | null;
+  sender_variant?: string;
   follow_up_sent_at?: string|null;
   manual_resend_history?: {sent_at:string;sent_by:string}[];
 }
 export default function LostOpportunityReviews(
-  { showCreate = false }: { showCreate?: boolean },
+  { showCreate = true }: { showCreate?: boolean },
 ) {
   const { profile, companySettings } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [expandedReview, setExpandedReview] = useState<string | null>(null);
   const [adminReview, setAdminReview] = useState<Review | null>(null);
   const [filter, setFilter] = useState("all");
+  const [historySearch, setHistorySearch] = useState("");
 
   const [search, setSearch] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposal, setProposal] = useState("");
+  const [recipientMode, setRecipientMode] = useState<"customer" | "proposal">("customer");
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
@@ -279,6 +283,7 @@ export default function LostOpportunityReviews(
   }
   async function send(e: React.FormEvent) {
     e.preventDefault();
+    if (!preview || busy) return;
     if (
       await action({
         action: "create",
@@ -310,7 +315,7 @@ export default function LostOpportunityReviews(
   const recoveryRate = respondedCount > 0 ? Math.round((recoveredCount / respondedCount) * 100) : 0;
 
   const lostStats: StatItem[] = [
-    { label: 'Requests Sent', value: totalSent, sublabel: `${pendingCount} awaiting response`, icon: Send, iconColor: 'text-violet-400' },
+    { label: 'Requests Sent', value: totalSent, sublabel: `${pendingCount} awaiting response`, icon: Send, iconColor: 'text-blue-400' },
     { label: 'Response Rate', value: `${responseRate}%`, sublabel: `${respondedCount} of ${totalSent} responded`, icon: TrendingUp, iconColor: 'text-blue-400' },
     { label: 'Recovery Rate', value: `${recoveryRate}%`, sublabel: `${recoveredCount} won back`, icon: RotateCcw, iconColor: 'text-green-400' },
     { label: 'Winnable', value: winnableCount, sublabel: 'recoverable opportunities', icon: AlertCircle, iconColor: 'text-amber-400' },
@@ -326,18 +331,23 @@ export default function LostOpportunityReviews(
     { value: 'bids', label: 'Bids', count: reviews.filter(v => !!v.response?.attachments.length).length },
   ];
 
+  const historySearchLower = historySearch.trim().toLowerCase();
   const visible = reviews.filter((v) =>
-    filter === "all" || v.request_id === expandedReview ||
+    (filter === "all" || v.request_id === expandedReview ||
     filter === "call_list" && needsPersonalFollowup(v) ||
     filter === "new" && !!v.responded_at && !v.reviewed_at ||
     filter === "awaiting" && !v.responded_at ||
     filter === "complete" && !!v.reviewed_at ||
     filter === "winnable" &&
       ["yes", "maybe"].includes(v.response?.recoverable || "") ||
-    filter === "bids" && !!v.response?.attachments.length
+    filter === "bids" && !!v.response?.attachments.length) &&
+    (!historySearchLower ||
+      (v.recipient || "").toLowerCase().includes(historySearchLower) ||
+      (v.opportunity_name || "").toLowerCase().includes(historySearchLower) ||
+      (v.title || "").toLowerCase().includes(historySearchLower))
   );
   const input =
-    "block w-full rounded-lg border border-gray-600 bg-gray-900 text-gray-100 p-3 mt-2";
+    "block w-full rounded-lg border border-gray-600 bg-gray-900 text-gray-100 px-3 py-2 mt-1";
   function formatDateTime(iso: string | null): string | null {
     if (!iso) return null;
     const d = new Date(iso);
@@ -353,7 +363,8 @@ export default function LostOpportunityReviews(
   function HistoryLine({ v }: { v: Review }) {
     const segments: string[] = [];
     if (v.sent_at) {
-      const sender = v.sent_by_name ? `Sent by ${v.sent_by_name}` : "Sent";
+      const variantLabel = v.sender_variant === "owner" ? " (Owner version)" : "";
+      const sender = v.sent_by_name ? `Sent by ${v.sent_by_name}${variantLabel}` : `Sent${variantLabel}`;
       segments.push(`${sender} \u00b7 ${formatDateTime(v.sent_at)}`);
     }
     if (v.delivery_status === "sent" && v.sent_at) {
@@ -381,20 +392,11 @@ export default function LostOpportunityReviews(
     );
   }
   return (
-    <section className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-      <div className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-white">
-            Lost Opportunities
-          </h2>
-          <p className="text-gray-400 text-sm mt-0.5">
-            Learn why we lost and earn another chance. Customer feedback is
-            visible only to users with submission viewing permission.
-          </p>
-        </div>
-        <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {canSend && <button type="button" onClick={() => setCreateOpen(value => !value)} aria-expanded={createOpen} className="min-h-11 rounded-lg bg-violet-700 px-4 py-2 font-semibold text-white hover:bg-violet-600">{createOpen ? "Hide Feedback Form" : "Send Feedback Form"}</button>}
-        </div>
+    <section className="min-w-0 space-y-3 [overflow-wrap:anywhere]">
+      <div className="flex items-center gap-2 px-1">
+        <TrendingDown className="h-5 w-5 shrink-0 text-blue-400" />
+        <h2 className="text-lg font-semibold text-white">Lost Opportunities</h2>
+        <span className="hidden text-sm text-gray-400 sm:inline">· Learn why we lost and earn another chance.</span>
       </div>
       {error && !expandedReview && (
         <p role="alert" className="p-3 rounded-lg bg-red-950 text-red-200">
@@ -406,13 +408,29 @@ export default function LostOpportunityReviews(
           {notice}
         </p>
       )}
+      {canSend && !createOpen && (
+        <button type="button" onClick={() => setCreateOpen(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-500">Show Feedback Form</button>
+      )}
       {canSend && createOpen && (
         <form
           onSubmit={send}
-          className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4"
+          className="bg-gray-800 border border-gray-700 rounded-xl p-3 sm:p-4 space-y-3"
         >
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setCreateOpen(false)} className="text-sm text-gray-400 hover:text-white">Hide form</button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <button key={variant} type="button" disabled={busy} onClick={() => { setSenderVariant(variant); setPreview(null); }} className={`cursor-pointer rounded-xl border px-3 py-2 text-left transition ${senderVariant === variant ? "border-blue-500 bg-blue-950/40" : "border-gray-600 hover:border-gray-400"}`} aria-pressed={senderVariant === variant}><div className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</div><p className="mt-0.5 text-xs text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from the company owner with their signature and reply-to address."}</p></button>)}</div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Choose recipient method">
+            {(["customer", "proposal"] as const).map(mode => (
+              <button key={mode} type="button" aria-pressed={recipientMode === mode}
+                onClick={() => setRecipientMode(mode)}
+                className={`min-h-10 rounded-lg border px-3 py-2 text-sm ${recipientMode === mode ? "border-blue-500 bg-blue-950/40 text-blue-200" : "border-gray-600 text-gray-300"}`}>
+                {mode === "customer" ? "Select Customer" : "Link a Proposal"}
+              </button>
+            ))}
+          </div>
           <label className="block text-gray-200">
-            Customer (required)<input
+            {recipientMode === "proposal" ? "Find proposal customer (required)" : "Select Customer (required)"}<input
               value={contact
                 ? contact.contact_name || contact.company_name
                 : search}
@@ -450,8 +468,8 @@ export default function LostOpportunityReviews(
                 "Add an email address to this customer before sending."}
             </p>
           )}
-          <label className="block text-gray-200">
-            Proposal (optional)<select
+          {(recipientMode === "proposal" || contact) && <label className="block text-gray-200">
+            {recipientMode === "proposal" ? "Link a Proposal" : "Proposal (optional)"}<select
               value={proposal}
               disabled={!contact}
               onChange={(e) => {
@@ -469,9 +487,8 @@ export default function LostOpportunityReviews(
                 </option>
               ))}
             </select>
-          </label>
+          </label>}
           {!proposal && <label className="block text-gray-200">Opportunity Name (required for manual entry)<input required maxLength={200} value={name} onChange={(e) => opportunity(e.target.value)} placeholder="e.g. Home Theater Installation" className={input} /></label>}
-          <fieldset className="space-y-2"><legend className="text-gray-200 font-medium">Send email from</legend><div className="grid gap-3 sm:grid-cols-2">{(["sales", "owner"] as const).map(variant => <label key={variant} className={`cursor-pointer rounded-xl border p-4 ${senderVariant === variant ? "border-cyan-400 bg-cyan-950/40" : "border-gray-600"}`}><input type="radio" name="lost-opportunity-sender" className="mr-2" checked={senderVariant === variant} onChange={() => { setSenderVariant(variant); setPreview(null); }} /><span className="font-semibold text-white">{variant === "sales" ? "Sales Rep" : "Owner"}</span><p className="mt-1 text-sm text-gray-400">{variant === "sales" ? "Personal message from the assigned salesperson (or you when no proposal is linked)." : "Personal message from Josh Gorrell with his signature and reply-to address."}</p></label>)}</div></fieldset>
           <label className="block text-gray-200">
             Review Title / Email Subject<input
               required
@@ -484,24 +501,16 @@ export default function LostOpportunityReviews(
               className={input}
             />
           </label>
-          <p className="text-sm text-gray-400">
-            Use Preview Email to see the personalized message before sending.
-          </p>
           <button
             type="button"
             disabled={busy || previewing || !canSend || !contact?.email ||
               !title.trim() || !name.trim()}
             onClick={previewEmail}
-            className="w-full sm:w-auto rounded-lg border border-cyan-600 px-5 py-3 text-cyan-200 disabled:opacity-50"
+            className="w-full sm:w-auto rounded-lg border border-blue-600 px-5 py-3 text-blue-300 disabled:opacity-50"
           >
             {previewing ? "Loading Preview…" : "Preview Email"}
           </button>
-          <button
-            disabled={busy || !canSend || !contact?.email || !title.trim()}
-            className="w-full sm:w-auto rounded-lg bg-cyan-700 px-5 py-3 text-white disabled:opacity-50"
-          >
-            {busy ? "Sending…" : "Send Lost Opportunity Review"}
-          </button>
+
         </form>
       )}
       <ReviewStatsRow stats={lostStats} />
@@ -541,15 +550,20 @@ export default function LostOpportunityReviews(
             <div className="min-h-0 flex-1 overflow-auto bg-white" role="region" aria-label="Full email preview" tabIndex={0}>
               <FullEmailPreview title="Lost Opportunity email preview" html={preview.html} />
             </div>
-            <p className="shrink-0 p-3 text-sm text-gray-400">
-              Scroll to see the entire email, including its buttons and footer. Preview only—no email has been sent.
-            </p>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-gray-700 p-3">
+              <p className="text-xs text-gray-400">Preview only — no email has been sent.</p>
+              <div className="flex gap-2">
+                <button type="button" disabled={busy} onClick={() => setPreview(null)} className="min-h-11 rounded-lg border border-gray-600 px-4 py-2 text-gray-200">Back to Form</button>
+                <button type="button" disabled={busy} onClick={() => void send({ preventDefault() {} } as React.FormEvent)} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy ? "Sending…" : "Send This Email"}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
       {adminReview && <AdminSalesReviewModal requestId={adminReview.request_id} customer={adminReview.recipient || "Customer"} onClose={() => setAdminReview(null)} />}
       <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-white">Send History & Responses</h2>
-          <ReviewFilterBar options={filterOptions} active={filter} onChange={setFilter} /></div>
+          <input value={historySearch} onChange={e=>setHistorySearch(e.target.value)} placeholder="Search history" className="min-h-11 w-full sm:w-56 rounded-lg border border-gray-600 bg-gray-900 p-3 text-white" /></div>
+      <ReviewFilterBar options={filterOptions} active={filter} onChange={setFilter} />
       {loading
         ? <p className="text-gray-400">Loading…</p>
         : visible.length === 0
@@ -572,9 +586,12 @@ export default function LostOpportunityReviews(
                   disabled={busy}
                   onClick={() => {
                     setExpandedReview(v.request_id);
-                    if (v.response) void markViewed(v);
+                    if (v.response) {
+                      void markViewed(v);
+                      if (profile?.id && org) void markActivitySeen(profile.id, org, "feedback", v.request_id).catch(console.error);
+                    }
                   }}
-                  className="w-full min-h-[108px] rounded-xl border border-gray-700 bg-gray-800 p-4 text-left transition hover:border-gray-600 hover:bg-gray-750 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-60"
+                  className="w-full min-h-[108px] rounded-xl border border-gray-700 bg-gray-900 p-4 text-left transition hover:border-gray-600 hover:bg-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60"
                 >
                   <div className="flex min-w-0 items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -582,22 +599,24 @@ export default function LostOpportunityReviews(
                       <p className="mt-0.5 truncate text-sm text-gray-400">{v.title || v.opportunity_name}</p>
                     </div>
                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                      status === "NEW!" ? "bg-cyan-700 text-white" :
+                      status === "NEW!" ? "bg-blue-600 text-white" :
                       status === "Delivery Failed" ? "bg-red-950 text-red-200" :
-                      "bg-gray-700 text-cyan-300"
+                      status === "Needs Follow-up" ? "bg-amber-950 text-amber-200" :
+                      "bg-gray-700 text-blue-300"
                     }`}>{status}</span>
                   </div>
                   <div className="mt-3 flex min-w-0 items-center gap-3 text-xs text-gray-400">
                     <span className="truncate">
                       {v.responded_at ? "Customer responded" : "Sent"}{activityAt ? ` · ${formatDateTime(activityAt)}` : ""}
                     </span>
+                    {v.sender_variant === "owner" && <span className="shrink-0 rounded-full bg-blue-950 px-2 py-0.5 text-blue-300">Owner</span>}
                     {canView && !!v.response?.attachments.length && (
                       <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-gray-300">
                         <Paperclip size={14} aria-hidden="true" />
                         {v.response.attachments.length}
                       </span>
                     )}
-                    <span className="shrink-0 text-cyan-300" aria-hidden="true">›</span>
+                    <span className="shrink-0 text-blue-300" aria-hidden="true">›</span>
                   </div>
                 </button>
               );
@@ -617,13 +636,14 @@ export default function LostOpportunityReviews(
             onClick={() => setExpandedReview(null)}
           >
             <div
-              className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-gray-700 bg-gray-800 p-5 sm:max-w-2xl sm:rounded-2xl"
+              className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-gray-700 bg-gray-800 p-5 sm:max-w-3xl sm:rounded-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4 border-b border-gray-700 pb-4">
                 <div className="min-w-0">
                   <h3 id={`lost-review-detail-${v.request_id}`} className="text-xl font-semibold text-white">{v.recipient || "Customer"}</h3>
                   <p className="mt-1 text-sm text-gray-400">{v.title || v.opportunity_name}</p>
+                  {v.sender_variant === "owner" && <span className="mt-1 inline-block rounded-full bg-blue-950 px-2 py-0.5 text-xs text-blue-300">Owner version</span>}
                 </div>
                 <button type="button" onClick={() => setExpandedReview(null)} className="min-h-11 shrink-0 px-2 text-sm text-gray-300">Close</button>
               </div>
@@ -633,8 +653,8 @@ export default function LostOpportunityReviews(
                 <HistoryLine v={v} />
                 {needsPersonalFollowup(v)&&<p className="rounded-lg border border-amber-700 bg-amber-900/20 p-3 text-sm text-amber-200">Needs Personal Follow-up — 30 days or more without customer feedback. No automatic email is sent at day 30.</p>}
                 {(v.manual_resend_history||[]).map((entry,i)=><p key={i} className="text-sm text-gray-400">Survey manually resent {formatDateTime(entry.sent_at)}</p>)}
-                {!v.responded_at&&canSend&&<button type="button" disabled={busy} className="min-h-11 rounded-lg bg-violet-700 px-4 text-white disabled:opacity-50" onClick={async()=>{
-                  const confirmed=await requestConfirmation(`Send the survey again to ${v.recipient||'this customer'}? This keeps the original request date and follow-up flag.`,{title:'Resend feedback survey?',confirmLabel:'Resend survey',theme:'violet'});
+                {!v.responded_at&&canSend&&<button type="button" disabled={busy} className="min-h-11 rounded-lg bg-blue-600 px-4 text-white disabled:opacity-50" onClick={async()=>{
+                  const confirmed=await requestConfirmation(`Send the survey again to ${v.recipient||'this customer'}? This keeps the original request date and follow-up flag.`,{title:'Resend feedback survey?',confirmLabel:'Resend survey',theme:'blue'});
                   if(!confirmed)return;
                   setBusy(true);setError('');
                   try{await lostReviewAction({action:'resend',request_id:v.request_id});setNotice('Survey resent. The request is still awaiting feedback.');await load();}
@@ -644,7 +664,7 @@ export default function LostOpportunityReviews(
 
                 {v.follow_up_sent_at&&<p className="text-sm text-gray-400">Final feedback reminder sent {formatDateTime(v.follow_up_sent_at)}</p>}
                 {!v.responded_at&&canView&&(canSend||['admin','owner','super_admin'].includes(profile?.role||''))&&<RecordLostFeedback requestId={v.request_id} onSaved={()=>void load()}/>}
-                {v.response?.source&&<p className="text-sm text-cyan-300">Feedback source: {v.response.source==='customer'?'Customer online':v.response.source==='in_person'?'Customer in person':`Customer by ${v.response.source}`}</p>}
+                {v.response?.source&&<p className="text-sm text-blue-300">Feedback source: {v.response.source==='customer'?'Customer online':v.response.source==='in_person'?'Customer in person':`Customer by ${v.response.source}`}</p>}
                 {v.responded_at && !v.response && (
                   <p className="text-sm text-gray-400">Private — viewing this response requires the View Lost Opportunity Submissions permission.</p>
                 )}
@@ -662,7 +682,7 @@ export default function LostOpportunityReviews(
                     )}
                     <div>
                       <h4 className="text-sm font-semibold text-gray-400">Is there still a chance to earn your business?</h4>
-                      <p className="mt-1 text-cyan-300">{({ yes: "Yes", maybe: "Maybe", no: "No" } as Record<string, string>)[v.response.recoverable] || v.response.recoverable}</p>
+                      <p className="mt-1 text-blue-300">{({ yes: "Yes", maybe: "Maybe", no: "No" } as Record<string, string>)[v.response.recoverable] || v.response.recoverable}</p>
                     </div>
                     {v.response.recovery_message && (
                       <div>
@@ -675,10 +695,10 @@ export default function LostOpportunityReviews(
                         <h4 className="text-sm font-semibold text-gray-400">Competing bid attachments ({v.response.attachments.length})</h4>
                         {v.response.attachments.map((a) => (
                           <div key={a.path} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-600 bg-gray-900/40 p-3">
-                            <FileText size={20} className="shrink-0 text-cyan-300" aria-hidden="true" />
+                            <FileText size={20} className="shrink-0 text-blue-300" aria-hidden="true" />
                             <span className="min-w-0 flex-1 break-words text-sm text-gray-200">{a.name}<span className="block text-xs text-gray-400">{bidFileFormat(a.name)?.label || "File attachment"}</span></span>
-                            <button type="button" disabled={busy} onClick={() => openAttachment(v, a, false)} className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300"><ExternalLink size={14} /> View</button>
-                            <button type="button" disabled={busy} onClick={() => openAttachment(v, a, true)} className="min-h-11 inline-flex items-center gap-1 text-sm text-cyan-300"><Download size={14} /> Download</button>
+                            <button type="button" disabled={busy} onClick={() => openAttachment(v, a, false)} className="min-h-11 inline-flex items-center gap-1 text-sm text-blue-300"><ExternalLink size={14} /> View</button>
+                            <button type="button" disabled={busy} onClick={() => openAttachment(v, a, true)} className="min-h-11 inline-flex items-center gap-1 text-sm text-blue-300"><Download size={14} /> Download</button>
                           </div>
                         ))}
                       </section>
@@ -689,13 +709,13 @@ export default function LostOpportunityReviews(
 
               <div className="flex flex-wrap items-center gap-3 border-t border-gray-700 pt-4">
                 {canView && profile?.role === "admin" && v.response && (
-                  <button type="button" disabled={busy} onClick={() => setAdminReview(v)} className="min-h-11 rounded-lg border border-cyan-700 px-3 text-sm text-cyan-300">Admin Review</button>
+                  <button type="button" disabled={busy} onClick={() => setAdminReview(v)} className="min-h-11 rounded-lg border border-blue-600 px-3 text-sm text-blue-300">Admin Review</button>
                 )}
                 {canView && v.response && (
                   <button type="button" onClick={() => {
                     try { printLostReview(v, companySettings?.company_name || "Customer Feedback"); void markViewed(v); }
                     catch (e) { setError(e instanceof Error ? e.message : "Unable to open printable review."); }
-                  }} className="min-h-11 rounded-lg border border-gray-600 px-3 text-sm text-cyan-300">Print / Save PDF</button>
+                  }} className="min-h-11 rounded-lg border border-gray-600 px-3 text-sm text-blue-300">Print / Save PDF</button>
                 )}
                 {canView && v.response && (
                   <label className="w-full text-sm text-gray-300 sm:ml-auto sm:w-auto">

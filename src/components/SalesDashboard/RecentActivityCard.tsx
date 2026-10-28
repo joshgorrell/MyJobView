@@ -1,4 +1,5 @@
 import { Activity, Phone, Plus, FileText, ChevronRight } from 'lucide-react';
+import type { SalesRecord } from '../../lib/salesDashboardRecords';
 import type { RecentActivityItem } from '../../lib/salesDashboardTypes';
 
 function formatRelativeTime(dateStr: string): string {
@@ -32,10 +33,11 @@ function getActivityColor(type: string): string {
 
 interface RecentActivityCardProps {
   activities: RecentActivityItem[];
+  onOpenRecord?: (record: SalesRecord) => void;
   onNavigateToActivity?: () => void;
 }
 
-export function RecentActivityCard({ activities, onNavigateToActivity }: RecentActivityCardProps) {
+export function RecentActivityCard({ activities, onNavigateToActivity, onOpenRecord }: RecentActivityCardProps) {
   if (activities.length === 0) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -69,7 +71,7 @@ export function RecentActivityCard({ activities, onNavigateToActivity }: RecentA
           const Icon = getActivityIcon(a.type);
           const colorCls = getActivityColor(a.type);
           return (
-            <div key={a.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+            <button type="button" onClick={() => a.recordId && a.recordKind && onOpenRecord?.({ id: a.recordId, kind: a.recordKind, title: a.title, customer: a.description, date: a.createdAt, status: '' })} key={a.id} className="w-full text-left flex items-start gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
               <div className={`inline-flex items-center justify-center w-8 h-8 rounded-lg ${colorCls} flex-shrink-0`}>
                 <Icon className="w-4 h-4" />
               </div>
@@ -80,7 +82,7 @@ export function RecentActivityCard({ activities, onNavigateToActivity }: RecentA
               <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
                 {formatRelativeTime(a.createdAt)}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>

@@ -108,14 +108,15 @@ class LocationTrackingService {
   }
 
   async stopTracking() {
-    // Disable new breadcrumb writes first, including callbacks from another JS runtime.
+    // Stop the OS task before clearing its persisted identity. If stopping fails,
+    // retain the session so callbacks remain attributable and a retry is possible.
     const session = await this.getTrackingSession();
+    const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
     await SecureStore.deleteItemAsync(TRACKING_SESSION_KEY);
     this.isTracking = false;
     this.currentClockEntryId = null;
     this.currentTechnicianId = null;
-    const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-    if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
     if (session) console.log('Workday GPS tracking stopped');
   }
 

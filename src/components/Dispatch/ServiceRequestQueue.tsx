@@ -1,3 +1,5 @@
+import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
+import { serviceApprovalPending, type ServiceApprovalFields } from '../../lib/serviceApproval';
 import { SupportRequestItems } from '../Shared/SupportRequestItems';
 import { SupportPhotos } from '../Shared/SupportPhotos';
 import { notify } from '../../lib/feedback';
@@ -5,6 +7,7 @@ import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { CreateWorkOrderModal } from '../Production/CreateWorkOrderModal';
 import type { ServiceRequestContext } from '../Production/CreateWorkOrderModal';
 import { WorkOrderSchedulePicker } from '../Production/WorkOrderSchedulePicker';
@@ -18,7 +21,6 @@ import {
   User,
   Phone,
   Mail,
-  FileText,
   CheckCircle,
   XCircle,
   ArrowRight,
@@ -29,7 +31,6 @@ import {
   DollarSign,
   Paperclip,
   UserPlus,
-  ListTodo,
   ClipboardList,
   MessageSquareWarning,
   RotateCcw,
@@ -40,11 +41,14 @@ import {
 } from 'lucide-react';
 import { ServiceRequestForm } from '../Service/ServiceRequestForm';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
+import { ContactLogModal } from '../Shared/ContactLogModal';
+import { ContactLogHistory } from '../Shared/ContactLogHistory';
 
-interface ServiceRequest {
+interface ServiceRequest extends ServiceApprovalFields {
   id: string;
   created_at: string;
   request_type: 'service' | 'project' | null;
+  is_test_and_tune?: boolean;
   project_id: string | null;
   projects?: { id: string; name: string; project_number: string } | null;
   customer_name: string;
@@ -104,13 +108,23 @@ interface Technician {
   role: string;
 }
 
-export function ServiceRequestQueue({ requestId }: { requestId?: string | null }) {
+export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { requestId?: string | null; canViewTestTune?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [expandedRequest, setExpandedRequest] = useState<string | null>(requestId || null);
+  const reviewRequest = (id: string) => {
+    if (profile?.id && profile.organization_id) {
+      void markActivitySeen(profile.id, profile.organization_id, 'service_request', id).catch(console.error);
+    }
+  };
+  const toggleReviewedRequest = (id: string) => {
+    const next = expandedRequest === id ? null : id;
+    setExpandedRequest(next);
+    if (next) reviewRequest(id);
+  };
   const [activeTab, setActiveTab] = useState<'queue' | 'needs_info'>('queue');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterSourceType, setFilterSourceType] = useState<string>('all');
@@ -122,7 +136,10 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
   const [selectedRequestIds, setSelectedRequestIds] = useState<Set<string>>(new Set());
   const [showCombineModal, setShowCombineModal] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
+  const [contactLogTarget, setContactLogTarget] = useState<ServiceRequest | null>(null);
+  const [contactLogRevision, setContactLogRevision] = useState(0);
 
   const isManager = profile?.role === 'admin' ||
     String(profile?.role) === 'service_manager' ||
@@ -158,6 +175,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
         .from('service_requests')
         .select(`
           *,
+          service_waived_by_profile:profiles!service_requests_service_waived_by_fkey (full_name),
           contacts (
             id,
             company_name,
@@ -201,7 +219,22 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
 
       if (error) throw error;
       setRequests(data || []);
-      if (requestId && data?.length) setExpandedRequest(requestId);
+      if (requestId && data?.length) {
+        setExpandedRequest(requestId);
+        const action = new URLSearchParams(window.location.search).get('serviceRequestAction');
+        const target = (data as ServiceRequest[]).find(item => item.id === requestId);
+        if (target && !['cancelled', 'closed'].includes(target.status)) {
+          if (action === 'edit') setResubmitTarget(target);
+          if ((action === 'assign' || action === 'schedule') && !serviceApprovalPending(target)) setConvertingTo(target.id);
+          if (action === 'cancel') setConfirmCancelId(target.id);
+          if (action === 'close') setConfirmCloseId(target.id);
+        }
+        if (action) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('serviceRequestAction');
+          window.history.replaceState(window.history.state, '', url.toString());
+        }
+      }
     } catch (error) {
       console.error('Error loading service requests:', error);
       setLoadError('Unable to load the service request. Please try again.');
@@ -305,8 +338,10 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
 
   function getStatusLabel(status: string) {
     switch (status) {
+      case 'pending_customer':
+        return 'Pending – Waiting on Customer';
       case 'open':
-        return 'Open';
+        return 'Ready to Schedule';
       case 'scheduled':
         return 'Scheduled';
       case 'in_progress':
@@ -322,42 +357,16 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
     }
   }
 
-  function getSourceTypeIcon(sourceType: string) {
-    switch (sourceType) {
-      case 'punchlist':
-        return <ListTodo className="w-4 h-4" />;
-      case 'staff_form':
-        return <ClipboardList className="w-4 h-4" />;
-      case 'customer_portal':
-        return <User className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  }
-
   function getSourceTypeLabel(sourceType: string) {
     switch (sourceType) {
       case 'punchlist':
-        return 'Punchlist';
+        return 'Project Punchlist';
       case 'staff_form':
         return 'Staff Form';
       case 'customer_portal':
         return 'Customer Portal';
       default:
         return 'Other';
-    }
-  }
-
-  function getSourceTypeColor(sourceType: string) {
-    switch (sourceType) {
-      case 'punchlist':
-        return 'text-teal-400 bg-teal-500/10 border-teal-500/20';
-      case 'staff_form':
-        return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      case 'customer_portal':
-        return 'text-green-400 bg-green-500/10 border-green-500/20';
-      default:
-        return 'text-muted bg-elevated border-strong';
     }
   }
 
@@ -368,7 +377,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
     : null;
 
   function canSelectRequest(request: ServiceRequest): boolean {
-    if (request.status !== 'open' || !request.contact_id) return false;
+    if (request.status !== 'open' || !request.contact_id || serviceApprovalPending(request)) return false;
     if (constraintContactId && request.contact_id !== constraintContactId) return false;
     const first = requests.find(item => selectedRequestIds.has(item.id));
     if (first && (request.project_id !== first.project_id || request.billable_type !== first.billable_type || [request.job_location_address,request.job_location_city,request.job_location_state,request.job_location_zip].map(value => (value || '').trim().toLowerCase()).join('|') !== [first.job_location_address,first.job_location_city,first.job_location_state,first.job_location_zip].map(value => (value || '').trim().toLowerCase()).join('|'))) return false;
@@ -600,8 +609,8 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                 </div>
               )}
 
-              <div className="p-3">
-                <div className="flex items-start gap-3">
+              <div className="px-3 py-2">
+                <div className="flex items-start gap-2">
                   {/* Multi-select checkbox — only shown on open status queue tab */}
                   {activeTab === 'queue' && (
                     <div className="flex-shrink-0 pt-1 w-5">
@@ -630,10 +639,10 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                   )}
                   <div
                     className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
+                    onClick={() => toggleReviewedRequest(request.id)}
                   >
                     {/* Top row: customer name + timestamp + desktop Convert button */}
-                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1.5">
+                    <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-1 sm:gap-2 mb-1">
                       {request.contact_id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
@@ -656,7 +665,9 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                         {/* Convert button — only on desktop (sm+), only when collapsed */}
                         {expandedRequest !== request.id && !['closed', 'cancelled'].includes(request.status) && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
+                            disabled={serviceApprovalPending(request)}
+                            title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
                             className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap"
                           >
                             <ArrowRight className="w-3 h-3" />
@@ -666,38 +677,29 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                       </div>
                     </div>
 
-                    {/* Badge row: priority + status + source — compact, limited to 3 */}
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityColor(request.priority)}`}>
-                        {getPriorityIcon(request.priority)}
-                        {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                    {/* Compact status strip: keep routine metadata in expanded details. */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1 text-xs">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${getStatusColor(request.status)}`}>
                         {request.status === 'needs_more_info' && <AlertTriangle className="w-3 h-3" />}
                         {getStatusLabel(request.status)}
                       </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        request.request_type === 'project'
-                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                          : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        {request.request_type === 'project' ? <Briefcase className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                        {request.request_type === 'project' ? 'Project' : 'Service'}
-                      </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getSourceTypeColor(request.source_type)}`}>
-                        {getSourceTypeIcon(request.source_type)}
-                        {getSourceTypeLabel(request.source_type)}
-                      </span>
-                      {request.customer_contact_confirmed_at && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                          <PhoneCall className="w-3 h-3" />
-                          Contacted
+                      {request.priority !== 'normal' && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border ${getPriorityColor(request.priority)}`}>
+                          {getPriorityIcon(request.priority)}
+                          {request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}
                         </span>
+                      )}
+                      <span className="text-muted">{request.request_type === 'project' ? 'Project' : 'Service'}</span>
+                      {request.is_test_and_tune && <span className="text-muted">· Test &amp; Tune</span>}
+                      {request.customer_contact_confirmed_at && <span className="text-emerald-400">· Contacted</span>}
+                      {expandedRequest === request.id && canViewTestTune && request.is_test_and_tune && request.project_id && <a onClick={e => e.stopPropagation()} href={`/test-and-tune?projectId=${encodeURIComponent(request.project_id)}&contactId=${encodeURIComponent(request.contact_id || '')}&serviceRequestId=${encodeURIComponent(request.id)}&history=1`} className="text-info hover:underline">View Test &amp; Tune →</a>}
+                      {expandedRequest === request.id && (
+                        <span className="text-muted">· {getSourceTypeLabel(request.source_type)}</span>
                       )}
                     </div>
 
                     {/* Description preview */}
-                    <div className="text-sm text-muted break-words line-clamp-2 mb-1.5">{request.job_description}</div>
+                    <div className={`text-sm text-primary break-words mb-1 ${expandedRequest === request.id ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>{request.job_description}</div>
 
                     {/* Meta row + mobile Convert button */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -722,7 +724,9 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                       {/* Convert button — only on mobile (hidden sm+), only when collapsed */}
                       {expandedRequest !== request.id && !['closed', 'cancelled'].includes(request.status) && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
+                          disabled={serviceApprovalPending(request)}
+                            title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
                           className="sm:hidden flex items-center gap-1 min-h-11 px-3 py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold whitespace-nowrap shrink-0"
                         >
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -730,18 +734,18 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                         </button>
                       )}
                       <button aria-label={expandedRequest === request.id ? 'Collapse request' : 'Expand request'}
-                        onClick={e => {e.stopPropagation();setExpandedRequest(expandedRequest === request.id ? null : request.id);}}
-                        className="shrink-0 min-h-11 px-2 text-muted hover:text-primary">
+                        onClick={e => {e.stopPropagation();toggleReviewedRequest(request.id);}}
+                        className="shrink-0 min-h-11 sm:min-h-7 px-2 text-muted hover:text-primary">
                         {expandedRequest === request.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     </div>
 
                     {/* Expanded Details */}
                     {expandedRequest === request.id && (
-                      <div className="mt-3 space-y-3 pt-3 border-t border-strong">
+                      <div onClick={e => e.stopPropagation()} className="mt-2 space-y-2 pt-2 border-t border-strong cursor-default">
                         <SupportPhotos requestId={request.id}/><SupportRequestItems requestId={request.id}/>
                         {/* Address */}
-                        <div className="flex items-start gap-2.5">
+                        {(request.job_location_address || request.job_location_city || request.job_location_state || request.job_location_zip) && <div className="flex items-start gap-2.5">
                           <MapPin className="w-4 h-4 text-muted mt-0.5 shrink-0" />
                           <div>
                             <div className="text-xs font-medium text-muted mb-0.5">Address</div>
@@ -756,47 +760,37 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                               )}
                             </div>
                           </div>
-                        </div>
+                        </div>}
 
-                        {/* Full description */}
-                        <div className="flex items-start gap-2.5">
-                          <FileText className="w-4 h-4 text-muted mt-0.5 shrink-0" />
-                          <div>
-                            <div className="text-xs font-medium text-muted mb-0.5">Full Description</div>
-                            <div className="text-sm text-primary whitespace-pre-wrap">{request.job_description}</div>
-                          </div>
-                        </div>
-
-                        <div className="text-sm text-secondary space-y-1">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary">
                           <p>{request.customer_contact_instruction === 'requester' ? 'Requester will coordinate with customer' : request.customer_contact_instruction === 'already_contacted' ? 'Customer already contacted / schedule as requested' : 'Dispatch should contact customer'}</p>
                           {request.earliest_date && <p>Do not schedule before: {request.earliest_date}</p>}
                           {request.warranty_type && <p>Warranty: {request.warranty_type} · {request.warranty_reference} · {request.warranty_notes}</p>}
-                          {request.estimated_duration && <p>Estimated duration: {request.estimated_duration}</p>}
                         </div>
                         {/* Contact details grid */}
                         {(request.customer_phone || request.customer_email || request.requested_date || request.attachments?.length > 0) && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                             {request.customer_phone && (
-                              <a href={`tel:${request.customer_phone}`} className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted hover:text-primary hover:bg-elevated transition-colors">
+                              <a href={`tel:${request.customer_phone}`} className="flex items-center gap-2 py-1 text-xs text-muted hover:text-primary hover:bg-elevated transition-colors">
                                 <Phone className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {request.customer_phone}
                               </a>
                             )}
                             {request.customer_email && (
-                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted hover:text-primary hover:bg-elevated transition-colors break-all">
+                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 py-1 text-xs text-muted hover:text-primary hover:bg-elevated transition-colors break-all">
                                 <Mail className="w-3.5 h-3.5 text-muted shrink-0" />
                                 <span className="truncate">{request.customer_email}</span>
                               </a>
                             )}
                             {request.requested_date && (
-                              <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
+                              <div className="flex items-center gap-2 py-1 text-xs text-muted">
                                 <Calendar className="w-3.5 h-3.5 text-muted shrink-0" />
                                 Need by: {request.requested_date.split('T')[0]}
                                 {request.requested_time && ` · ${request.requested_time}`}
                               </div>
                             )}
                             {request.attachments && request.attachments.length > 0 && (
-                              <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
+                              <div className="flex items-center gap-2 py-1 text-xs text-muted">
                                 <Paperclip className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {request.attachments.length} attachment{request.attachments.length !== 1 ? 's' : ''}
                               </div>
@@ -816,7 +810,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                         )}
 
                         {/* Contact record */}
-                        {request.contacts && (
+                        {request.contacts && (request.contacts.full_name !== request.customer_name || request.contacts.company_name) && (
                           <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg">
                             <User className="w-3.5 h-3.5 text-muted shrink-0" />
                             <div className="text-xs text-muted">
@@ -828,22 +822,20 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
 
                         {request.notes && (
                           <div className="p-3 bg-canvas rounded-lg border border-strong">
-                            <div className="text-xs font-medium text-muted mb-1">Notes</div>
+                            <div className="text-xs font-medium text-muted mb-1">Internal scheduling message (staff only)</div>
                             <div className="text-sm text-muted whitespace-pre-wrap">{request.notes}</div>
                           </div>
                         )}
 
                         {/* Customer contact status */}
-                        <div className={`flex items-start gap-2.5 p-3 rounded-lg border ${
+                        <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 py-1 text-xs ${
                           request.customer_contact_confirmed_at
-                            ? 'bg-emerald-500/10 border-emerald-500/20'
-                            : 'bg-canvas border-strong'
+                            ? 'text-emerald-400'
+                            : 'text-muted'
                         }`}>
                           <PhoneCall className={`w-4 h-4 mt-0.5 shrink-0 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-muted'}`} />
-                          <div>
-                            <div className={`text-xs font-medium mb-0.5 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-muted'}`}>
-                              Customer Contact
-                            </div>
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-medium">Customer contact:</span>
                             {request.customer_contact_confirmed_at ? (
                               <div className="text-xs text-emerald-300">
                                 Confirmed {new Date(request.customer_contact_confirmed_at).toLocaleString()}
@@ -855,13 +847,19 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                               <div className="text-xs text-muted">Not yet confirmed</div>
                             )}
                           </div>
+                          <button type="button" onClick={e => { e.stopPropagation(); setContactLogTarget(request); }} className="min-h-11 sm:min-h-8 rounded-lg bg-elevated px-3 py-1 text-xs font-medium text-primary sm:ml-auto">Log Contact / Note</button>
                         </div>
+                        <ContactLogHistory serviceRequestId={request.id} refreshKey={contactLogRevision} />
+
+                        <ServiceApprovalPanel request={request} onChanged={loadData} />
 
                         {/* Action buttons — full-width row at bottom of expanded section */}
                         {!['closed', 'cancelled'].includes(request.status) && <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
                           <button
-                            onClick={(e) => { e.stopPropagation(); setConvertingTo(request.id); }}
-                            className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
+                            disabled={serviceApprovalPending(request)}
+                            title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
+                            className="col-span-2 sm:col-span-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
                           >
                             <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                             Schedule Work Order
@@ -871,7 +869,7 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                             onClick={(e) => { e.stopPropagation(); handleToggleCustomerContact(request); }}
                             disabled={confirmingContact === request.id}
                             title={request.customer_contact_confirmed_at ? 'Click to undo' : 'Mark customer contacted'}
-                            className={`sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 ${
+                            className={`min-w-0 px-3 py-2.5 sm:py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                               request.customer_contact_confirmed_at
                                 ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30'
                                 : 'bg-elevated text-muted hover:bg-elevated'
@@ -884,14 +882,14 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
                           {isManager && request.status === 'open' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setKickbackTarget(request); }}
-                              className="sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-amber-600/20 text-amber-400 rounded-lg hover:bg-amber-600/30 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                              className="min-w-0 px-3 py-2.5 sm:py-2 bg-amber-600/20 text-amber-400 rounded-lg hover:bg-amber-600/30 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                             >
                               <MessageSquareWarning className="w-3.5 h-3.5 shrink-0" />
                               Need Info
                             </button>
                           )}
 
-                          {(request.status === 'open' || request.status === 'scheduled' || request.status === 'needs_more_info') && (
+                          {(request.status === 'open' || request.status === 'scheduled' || request.status === 'pending_customer' || request.status === 'needs_more_info') && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setConfirmCancelId(request.id); }}
                               className="px-3 py-2.5 sm:py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
@@ -1005,6 +1003,18 @@ export function ServiceRequestQueue({ requestId }: { requestId?: string | null }
         }}
         onCancel={() => setConfirmCancelId(null)}
       />
+      <ConfirmModal
+        isOpen={!!confirmCloseId}
+        title="Close Service Request"
+        message="Close this service request? This marks the request closed without cancelling it."
+        confirmLabel="Close Request"
+        onConfirm={() => {
+          if (confirmCloseId) void updateRequestStatus(confirmCloseId, 'closed');
+          setConfirmCloseId(null);
+        }}
+        onCancel={() => setConfirmCloseId(null)}
+      />
+      {contactLogTarget && <ContactLogModal serviceRequestId={contactLogTarget.id} customerName={contactLogTarget.customer_name} onClose={() => setContactLogTarget(null)} onSaved={() => { setContactLogRevision(n => n + 1); void loadData(); }} />}
       {quickViewContactId && (
         <ContactQuickViewModal
           contactId={quickViewContactId}

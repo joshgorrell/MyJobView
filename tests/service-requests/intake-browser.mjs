@@ -5,32 +5,68 @@ import {join} from 'node:path';
 import {createServer} from 'node:http';
 import {chromium,webkit} from 'playwright';
 import assert from 'node:assert/strict';
+const dateOffset = days => { const d = new Date(); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const earliestDate = dateOffset(2), requestedDate = dateOffset(4), invalidDate = dateOffset(1);
 const directory=await mkdtemp(join(tmpdir(),'service-intake-'));
 const fixture=`import React from 'react';window.calls=[];
 export const useAuth=()=>({profile:{id:'staff',role:'service_manager'}});
 export const AddressAutocomplete=({value,onChange,...props})=><input {...props} value={value} onChange={e=>onChange(e.target.value)}/>;
 export const supabase={from(table){let payload;const q={select:()=>q,in:()=>q,eq:()=>q,order:()=>q,limit:()=>q,or:query=>{window.calls.push(['search',query]);return q;},insert:value=>{payload=value;window.calls.push([table,value]);return q;},update:value=>{payload=value;window.calls.push([table,value]);return q;},single:async()=>({data:{id:'saved'},error:null}),then:resolve=>Promise.resolve({data:table==='contacts'?[{id:'c1',full_name:'John Smith',phone:'5551234567',street_address:'123 Main St',city:'Topeka'}]:table==='profiles'?[{id:'tech',full_name:'JP'}]:table==='projects'?[{id:'project',name:'Project',project_number:'101',job_site_address:{street:'Wrong project address'}}]:[],error:null}).then(result=>table==='projects'?new Promise(done=>setTimeout(()=>done(result),250)):result).then(resolve)};return q;}};`;
-const source=`import React from 'react';import{createRoot}from'react-dom/client';import{ServiceRequestForm}from'./src/components/Service/ServiceRequestForm';import{FeedbackHost}from'./src/components/Shared/FeedbackHost';createRoot(document.getElementById('root')).render(<><ServiceRequestForm onClose={()=>{}} editingRequest={location.search.includes('edit')?{id:'edit',contact_id:'c1',customer_name:'John Smith',job_description:'Existing request',requested_tech_ids:['tech','inactive'],earliest_date:'2026-10-08',requested_date:'2026-10-10',requested_time:'10:30'}:undefined} aiPrefill={location.search.includes('prefill')?{contactId:'c1',customerName:'John Smith',jobDescription:'AI service request',requestedDate:'2026-10-20'}:undefined}/><FeedbackHost/></>);`;
+const source=`import React from 'react';import{createRoot}from'react-dom/client';import{ServiceRequestForm}from'./src/components/Service/ServiceRequestForm';import{FeedbackHost}from'./src/components/Shared/FeedbackHost';createRoot(document.getElementById('root')).render(<><ServiceRequestForm onClose={()=>{}} editingRequest={location.search.includes('edit')?{id:'edit',contact_id:'c1',customer_name:'John Smith',job_description:'Existing request',requested_tech_ids:['tech','inactive'],earliest_date:'${earliestDate}',requested_date:'${requestedDate}',requested_time:'10:30'}:undefined} aiPrefill={location.search.includes('prefill')?{contactId:'c1',customerName:'John Smith',jobDescription:'AI service request',requestedDate:'${requestedDate}'}:undefined}/><FeedbackHost/></>);`;
 let browser;let openPage;
 const server=createServer(async(req,res)=>{const name=req.url.includes('app.js')?'app.js':req.url.includes('style.css')?'style.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,name)));});
 try{
-await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/lib\/supabase$|contexts\/AuthContext$|Shared\/AddressAutocomplete$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
+await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/\/supabase$|contexts\/AuthContext$|Shared\/AddressAutocomplete$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
 const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
 await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><div id="root"></div><script src="app.js"></script>');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));browser=await (process.env.BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.BROWSER_ENGINE==='webkit'?{}:{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})});
 const context=await browser.newContext();openPage=async viewport=>{const page=await context.newPage();await page.setViewportSize(viewport);return page;};
-// The compact default desktop request should not require scrolling; expanded flows may scroll.
-{
- const desktop=await openPage({width:1440,height:1000});
+// Desktop uses two columns so a complete request fits at ordinary laptop heights.
+for(const theme of ['dark','light']) for(const viewport of [{width:1024,height:768},{width:1366,height:768},{width:1440,height:900},{width:1920,height:1080}]) {
+ const desktop=await openPage(viewport);
  await desktop.goto(`http://127.0.0.1:${server.address().port}`);
  await desktop.getByPlaceholder('Search name, company, phone, or email...').waitFor();
- const initial=await desktop.locator('.service-request-compact').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
- assert.ok(initial.scroll<=initial.client+2,`Default desktop Service Request must fit without scrolling: ${JSON.stringify(initial)}`);
- const dialog=await desktop.getByRole('dialog').boundingBox();
- assert.ok(dialog.y>=0&&dialog.y+dialog.height<=1001,'Desktop modal stays within viewport');
+ await desktop.evaluate(t=>document.documentElement.dataset.theme=t,theme);
+ const fits=async scenario=>{
+  const metrics=await desktop.locator('.service-request-compact').evaluate(el=>({scroll:el.scrollHeight,client:el.clientHeight}));
+  assert.ok(metrics.scroll<=metrics.client+2,`${theme} ${viewport.width}x${viewport.height} ${scenario} must fit without scrolling: ${JSON.stringify(metrics)}`);
+  const dialog=await desktop.getByRole('dialog').boundingBox();
+  assert.ok(dialog.y>=-1&&dialog.y+dialog.height<=viewport.height+1,'Desktop modal stays within viewport');
+  assert.equal(await desktop.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  const submit=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
+  assert.ok(submit.y>=0&&submit.y+submit.height<=viewport.height+1,'Submit stays visible');
+ };
+ await fits('initial form');
+ const approval=desktop.getByRole('checkbox',{name:'Require customer approval & payment method before scheduling'});
+ assert.equal(await approval.isChecked(),false);
+ assert.equal(await desktop.getByLabel('Service rates and terms',{exact:true}).count(),0);
+ await desktop.getByPlaceholder('Search name, company, phone, or email...').fill('John');
+ await desktop.getByRole('button').filter({hasText:'John Smith'}).click();
+ await desktop.getByPlaceholder('What needs to be done? *').fill('Replace the failed network switch and restore Wi-Fi');
+ await desktop.getByRole('radio',{name:'Specific date',exact:true}).check();
+ await desktop.getByLabel('Earliest date',{exact:true}).fill(earliestDate);
+ await desktop.getByLabel('Need by',{exact:true}).fill(requestedDate);
+ await fits('selected customer with date preferences');
+ const customer=await desktop.getByRole('heading',{name:'Customer',exact:true}).boundingBox();
+ const request=await desktop.getByRole('heading',{name:'Request Details',exact:true}).boundingBox();
+ assert.ok(Math.abs(customer.y-request.y)<2&&request.x>customer.x,'Customer and request details share a desktop row');
+ await approval.check();await fits('approval terms');await approval.uncheck();
+ await desktop.getByRole('button',{name:'Change',exact:true}).click();
  await desktop.getByRole('button',{name:'New Customer',exact:true}).click();
- const action=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
- assert.ok(action.y>=0&&action.y+action.height<=1001,'Submit stays visible with expanded customer fields');
+ await desktop.getByPlaceholder('Customer Name *').fill('New Customer');
+ await desktop.getByPlaceholder('Phone',{exact:true}).fill('5559876543');
+ await fits('new customer with date preferences');
+ await desktop.getByLabel('Billing type').selectOption('warranty');
+ await desktop.getByLabel('Warranty reference',{exact:true}).fill('WO-101');
+ await desktop.getByLabel('Warranty reason',{exact:true}).fill('Return visit');
+ await fits('new customer with warranty and date preferences');
+ if(viewport.height>=900){
+  await desktop.locator('summary').filter({hasText:'Location'}).click();
+  await desktop.getByPlaceholder('Street Address (optional)').fill('123 Main Street');
+  await fits('expanded location and warranty');
+  if(process.env.INTAKE_DESKTOP_SCREENSHOT&&theme==='dark'&&viewport.width===1440)await desktop.screenshot({path:process.env.INTAKE_DESKTOP_SCREENSHOT});
+ }
+ console.log(`${theme} ${viewport.width}x${viewport.height}: desktop request fits without body scrolling`);
  await desktop.close();
 }
 for(const width of [320,375,390,430,768,1024,1280]){
@@ -38,8 +74,8 @@ for(const width of [320,375,390,430,768,1024,1280]){
  await page.getByPlaceholder('Search name, company, phone, or email...').waitFor();
  assert.equal(await page.locator('input[type=date]').count(),0,'ASAP hides dates');
  await page.getByRole('radio',{name:'Specific date',exact:true}).check();
- await page.getByLabel('Earliest date',{exact:true}).fill('2026-10-08');
- await page.getByLabel('Need by',{exact:true}).fill('2026-10-10');
+ await page.getByLabel('Earliest date',{exact:true}).fill(earliestDate);
+ await page.getByLabel('Need by',{exact:true}).fill(requestedDate);
  await page.getByRole('radio',{name:'ASAP',exact:true}).check();
  assert.equal(await page.locator('input[type=date]').count(),0);
  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c[0]==='search').length),0);
@@ -59,9 +95,9 @@ await page.getByPlaceholder('Customer Name *').fill('New Customer');await page.g
 await page.getByPlaceholder('What needs to be done? *').fill('New alarm request');
 await page.getByRole('radio',{name:'Specific date',exact:true}).check();
 await page.getByLabel('Customer contact responsibility').selectOption('requester');
-await page.getByLabel('Earliest date',{exact:true}).fill('2026-10-08');
-await page.locator('input[type=date]').nth(1).fill('2026-10-10');
-await page.getByLabel('Preferred technician',{exact:true}).selectOption('tech');
+await page.getByLabel('Earliest date',{exact:true}).fill(earliestDate);
+await page.locator('input[type=date]').nth(1).fill(requestedDate);
+await page.getByLabel('Preferred technicians (optional)').count(); await page.getByPlaceholder('Search technicians').fill('JP'); await page.getByRole('button',{name:'JP +'}).click();
 await page.getByLabel('Billing type').selectOption('warranty');
 await page.getByLabel('Warranty reference',{exact:true}).fill('Service 101');await page.getByLabel('Warranty reason',{exact:true}).fill('Return visit');
 await page.setViewportSize({width:390,height:450});
@@ -69,29 +105,30 @@ await page.waitForFunction(()=>{const button=[...document.querySelectorAll('butt
 const send=page.getByRole('button',{name:'Send to Service',exact:true});const box=await send.boundingBox();assert.ok(box.y+box.height<=450,'Submit stays visible with reduced keyboard viewport');
 assert.equal(await page.evaluate(()=>document.querySelector('[role=dialog]').scrollWidth>document.querySelector('[role=dialog]').clientWidth),false);
 const alerts=[];page.on('dialog',async dialog=>{alerts.push(dialog.message());await dialog.accept();});
-await page.locator('input[type=date]').nth(1).fill('2026-10-07');await send.click();await page.getByText('Earliest date must be on or before Need By.',{exact:true}).waitFor();assert.deepEqual(alerts,[],'Validation uses in-app feedback, not a browser alert');assert.equal(await page.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').length),0);
-await page.locator('input[type=date]').nth(1).fill('2026-10-10');await send.click();const calls=await page.evaluate(()=>window.calls);const request=calls.find(c=>c[0]==='service_requests')[1];
-assert.equal(calls.find(c=>c[0]==='contacts')[1].phone,'5559876543');assert.equal(request.job_location_address,'');assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.earliest_date,'2026-10-08');assert.equal(request.requested_date,'2026-10-10');assert.equal(request.warranty_reference,'Service 101');assert.deepEqual(request.requested_tech_ids,['tech']);assert.equal(request.billable_by,'dispatch');assert.deepEqual(errors,[]);await page.close();
+await page.getByLabel('Earliest date',{exact:true}).fill(requestedDate); await page.getByLabel('Need by',{exact:true}).fill(dateOffset(6)); await page.getByLabel('Earliest date',{exact:true}).fill(dateOffset(7)); assert.equal(await page.getByLabel('Need by',{exact:true}).evaluate(input => input.validity.rangeUnderflow),true,'Browser blocks Need by earlier than earliest date'); await send.click();assert.deepEqual(alerts,[],'Validation uses in-app feedback, not a browser alert');assert.equal(await page.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').length),0);
+await page.getByLabel('Earliest date',{exact:true}).fill(earliestDate); await page.locator('input[type=date]').nth(1).fill(requestedDate);await send.click();const calls=await page.evaluate(()=>window.calls);const request=calls.find(c=>c[0]==='service_requests')[1];
+assert.equal(calls.find(c=>c[0]==='contacts')[1].phone,'5559876543');assert.equal(request.job_location_address,'');assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.earliest_date,earliestDate);assert.equal(request.requested_date,requestedDate);assert.equal(request.warranty_reference,'Service 101');assert.deepEqual(request.requested_tech_ids,['tech']);assert.equal(request.billable_by,'dispatch');assert.deepEqual(errors,[]);await page.close();
 const edit=await openPage({width:390,height:844});await edit.goto(`http://127.0.0.1:${server.address().port}/?edit`);
 assert.equal(await edit.getByRole('radio',{name:'Specific date',exact:true}).isChecked(),true);
-assert.equal(await edit.getByLabel('Earliest date',{exact:true}).inputValue(),'2026-10-08');
-assert.equal(await edit.getByLabel('Preferred technician',{exact:true}).inputValue(),'existing');
+assert.equal(await edit.getByLabel('Earliest date',{exact:true}).inputValue(),earliestDate);
+assert.equal(await edit.getByRole('button',{name:'Any available'}).getAttribute('aria-pressed'),'false');
 await edit.getByRole('button',{name:'Resubmit for Review',exact:true}).click();
 await edit.waitForFunction(()=>window.calls.filter(c=>c[0]==='service_requests').length===1);
 assert.deepEqual(await edit.evaluate(()=>window.calls.find(c=>c[0]==='service_requests')[1].requested_tech_ids),['tech','inactive'],'Unchanged multi-tech preferences must survive resubmission');
-await edit.getByLabel('Preferred technician',{exact:true}).selectOption('tech');
-assert.equal(await edit.getByLabel('Preferred technician',{exact:true}).inputValue(),'tech');
-await edit.getByRole('radio',{name:'ASAP',exact:true}).check();
-assert.equal(await edit.locator('input[type=date]').count(),0);
-await edit.getByRole('button',{name:'Resubmit for Review',exact:true}).click();
-await edit.waitForFunction(()=>window.calls.filter(c=>c[0]==='service_requests').length===2);
-const edited=await edit.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').at(-1)[1]);
+await edit.close();
+const secondEdit=await openPage({width:390,height:844});await secondEdit.goto(`http://127.0.0.1:${server.address().port}/?edit`);
+await secondEdit.getByRole('button',{name:'Technician ×'}).last().click();
+await secondEdit.getByRole('radio',{name:'ASAP',exact:true}).check();
+assert.equal(await secondEdit.locator('input[type=date]').count(),0);
+await secondEdit.getByRole('button',{name:'Resubmit for Review',exact:true}).click();
+await secondEdit.waitForFunction(()=>window.calls.filter(c=>c[0]==='service_requests').length===1);
+const edited=await secondEdit.evaluate(()=>window.calls.filter(c=>c[0]==='service_requests').at(-1)[1]);
 assert.deepEqual(edited.requested_tech_ids,['tech']);
 assert.equal(edited.earliest_date,null);assert.equal(edited.requested_date,null);assert.equal(edited.requested_time,null,'ASAP must clear a previously saved time');
-await edit.close();
+await secondEdit.close();
 const prefill=await openPage({width:390,height:844});await prefill.goto(`http://127.0.0.1:${server.address().port}/?prefill`);
 assert.equal(await prefill.getByRole('radio',{name:'Specific date',exact:true}).isChecked(),true);
-assert.equal(await prefill.getByLabel('Need by',{exact:true}).inputValue(),'2026-10-20','AI date prefill must remain visible');
+assert.equal(await prefill.getByLabel('Need by',{exact:true}).inputValue(),requestedDate,'AI date prefill must remain visible');
 await prefill.close();
 console.log('320/375/390/430/768/1024/1280px intake, ASAP date reset, new customer, date preferences/warranty, and keyboard viewport submission passed.');
 }finally{await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}

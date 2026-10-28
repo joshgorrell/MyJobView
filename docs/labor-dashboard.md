@@ -1,8 +1,8 @@
 # External labor dashboard
 
-Imported technician performance lives in the existing **Tech Stats → Performance** tab. It is available to active organization administrators; other staff retain the existing native activity view without gaining imported-payroll access. Native clocks/travel and advisor tools remain under **Native MJV activity & travel** on the same Tech Stats page. Legacy `/labor-dashboard` links open that same Tech Stats entry; the duplicate Time & Payroll tab is removed. Project reporting lives separately in **Projects → Project Stats** within the existing Projects workspace.
+Tech Stats presents production, utilization, rankings and technician activity in one experience. Organization administrators can use verified historical imports; other permitted staff retain native MJV reporting under existing row permissions. Payroll review, source controls and payments are outside this page. Historical source switches, cutover dates and the availability calendar remain accessible to administrators in **Time & Payroll → Historical Imports**. Legacy `/labor-dashboard` links open Tech Stats. Project reporting remains in **Projects → Project Stats**.
 
-The performance view defaults to the previous weekday (Monday uses Friday). Its single reporting period controls ranking, drilldown, team utilization and monthly job-hour breakdown. It loads the existing verified MJV import feed on entry, on focus and on manual refresh; the existing 4 AM Central weekday automation remains the only scheduled importer. No additional automation or provider credential is introduced.
+Tech Stats defaults to the current completed week, or the previous week on Monday. One date range controls the overview, rankings and technician details. It loads on entry, focus and manual refresh, reusing a short-lived viewer-scoped cache. The existing 4 AM Central weekday importer remains unchanged; no additional automation or provider credential is introduced.
 
 ## Calculation and source rules
 
@@ -31,7 +31,7 @@ Checks: `npm run test:labor-dashboard`, `node tests/navigation/workspace-routes.
 
 The live payroll generator already uses profile IDs correctly. This change intentionally preserves that contract. The legacy Daily Clock CSV importer now uses `organization_id` and `primary_office_id`, and import profiles/history distinguish new daily-time and job-time files while retaining historical profiles as `legacy`.
 
-Company holidays must be explicitly configured in Data sources. Recurring delivery of fresh project reports must be verified independently; keep the actual report as-of date visible when a newer valid report has not arrived.
+Company holidays must be explicitly configured in Time & Payroll → Historical Imports. Recurring delivery of fresh project reports must be verified independently; keep the actual report as-of date visible when a newer valid report has not arrived.
 
 ## Project Stats presentation
 
@@ -52,3 +52,24 @@ The modal averages complete unflagged per-day first/last pairs from imported sou
 Additional checks: `node tests/labor-dashboard/timing.mjs`, `node tests/labor-dashboard/team-utilization.mjs`, and `node tests/labor-dashboard/tech-stats-entry.mjs`. No native clock, employee setting, source switch, existing import history, standalone dashboard or schedule is changed by this frontend integration.
 
 Tech Stats validation: the complete labor regression suite, navigation routes, workspace-consolidation test and production build pass. The workspace test checks the current Assignments tab label and retains both allowed/denied task permission assertions. Repository-wide typecheck reports existing errors outside the changed files; compare against the same base before attributing them to this integration. Live MJV was still serving the prior Projects bundle at verification, so frontend publication remains required for both views.
+
+## Production-focused Tech Stats (October 23)
+
+Tech Stats now presents one production/utilization experience. The overview shows recorded job hours, available work hours, weighted team utilization and a daily/monthly trend. Searchable technician rankings switch between job hours and utilization, preserve ties at displayed precision, leave unavailable values unranked and compare against the immediately preceding period of equal calendar length. Dates exclude today's incomplete activity. A technician opens into a full-width daily history with expandable MJV job entries and links to work orders, projects and customers. Historical imports supply daily totals only; native entries shown alongside historical totals are labeled context and never added twice. Print produces a Letter-sized ranking or technician daily report.
+
+The new `get_tech_production(date,date)` read-only RPC preserves the existing historical organization-admin gate and availability calculation inputs, while omitting project calculations, financial fields and import controls. Native completed, approved customer activity is included with project/work-order production. Staff use batched, paginated native reads under their existing RLS instead of the historical RPC. No permission grants on tables, employee settings, pay records, import data, source switches or scheduled syncs are changed. Payroll reviews, leave amounts, bonuses, travel payments and the payroll-oriented advisor are absent from this page. The legacy reporting implementation remains available for its administrator import controls in Time & Payroll → Historical Imports.
+
+Reports are cached in memory for 60 seconds with viewer/organization/role/date keys, bounded to six entries, and cleared at sign-out. Manual refresh bypasses the cache. Obsolete requests are aborted, response generations prevent stale replacement, and date/identity mismatches hide old data immediately. Daily histories are indexed during calculation and reused by summary, chart and ranking; technician job entries load only after selection. Native queries paginate rather than silently stopping at 1,000 rows.
+
+Rollout: apply `20261023114939_tech_production_report.sql` before publishing the frontend. The existing customer-first time migration `20261021174441_customer_first_job_time.sql` must also be installed for direct customer job links. Do not claim production publication based on build/test success. Validation includes production RPC authorization/isolation, weighted utilization and tie behavior, cache/pagination/error tests, and browser fixtures at 390px/1440px in light/dark themes. Fixture verification does not replace an authenticated production smoke test after deployment.
+
+
+## Actual clock breakdown
+
+Tech Stats uses actual payroll clock hours for both hourly and salaried technicians, excluding leave. Configured schedules are never substituted on this page; existing Time & Payroll/import-control schedule calculations are unchanged. Utilization remains weighted job hours divided by actual payroll clock hours on matched, unflagged dates.
+
+The team overview, technician detail, daily activity and Letter print report show payroll clock hours, job hours, shop time, training time and unaccounted time. Approved completed `shop_time` and `training` entries are separate from customer/project/work-order job hours and appear in the technician drilldown. A native payroll-only date has zero recorded job/category hours, rather than an invented missing import. Open, unapproved or invalid entries withhold comparison/reconciliation; rejected/cancelled records do not count.
+
+Unaccounted time is calculated per technician/date as payroll minus jobs, shop and training, with a separate excess warning when recorded categories exceed payroll. Excess dates cannot cancel gaps on other dates. Missing clock/category records remain unknown. Historical reports contain no shop/training breakdown; those dates show missing categories and no inferred unaccounted amount. Partial totals state the number of covered technician dates.
+
+Rollout: apply `20261023190001_tech_production_actual_clock_breakdown.sql` after the existing Tech Stats permission migration and before frontend publication. The migration was created with the CLI and ordered after its already-merged predecessor. It preserves the existing effective Tech Stats permission predicate, organization scope, empty search path and authenticated-only execution. No employee, clock, payroll-payment or source records are edited. Local SQL fixture tests verify category aggregation, leave exclusion, approval filtering and cross-organization authorization; model/browser tests verify salary actuals, unknowns, reconciliation, drilldowns, mobile themes and print. Production rollout and an authenticated smoke test are separate from PR validation.

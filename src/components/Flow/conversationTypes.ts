@@ -1,6 +1,8 @@
 export interface EnrichedThread {
   source?: 'coworker';
   discussion_type?: string;
+  root_ids?: string[];
+  recipient_key?: string;
   audience_label?: string;
   id: string;
   subject: string;

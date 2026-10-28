@@ -214,7 +214,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     end_time: '',
     target_completion_date: serviceRequest?.requested_date?.split('T')[0] || '',
     estimated_hours: '',
-    notes: serviceRequest?.notes || '',
+    // Scheduling messages belong in internal_notes, never general work-order notes.
+    notes: '',
     internal_notes: serviceRequest ? [serviceRequest.notes, serviceRequest.earliest_date && `Do not schedule before: ${serviceRequest.earliest_date}`, serviceRequest.requested_date && `Need by: ${serviceRequest.requested_date}`, `Customer contact: ${serviceRequest.customer_contact_instruction || 'dispatch'}`, serviceRequest.estimated_duration && `Estimated duration: ${serviceRequest.estimated_duration}`, serviceRequest.warranty_type && `Warranty: ${serviceRequest.warranty_type}; ${serviceRequest.warranty_reference || ''}; ${serviceRequest.warranty_notes || ''}`].filter(Boolean).join('\n') : '',
 
     // Appointment reminders

@@ -24,6 +24,7 @@ import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
 import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { SalesRecord } from './lib/salesDashboardRecords';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
 import { LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
@@ -117,6 +118,7 @@ const TimeClockHistory = lazy(() => import('./components/Dispatch/TimeClockHisto
 const ContractManagement = lazy(() => import('./components/Finance/ContractOnboarding'));
 const SecurityOnboarding = lazy(() => import('./components/Finance/SecurityOnboarding'));
 const FinanceDashboard = lazy(() => import('./components/Finance/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })));
+const ServiceApprovalPage = lazy(() => import('./components/Portal/ServiceApprovalPage'));
 const SecurityOnboardingPortal = lazy(() => import('./components/Portal/SecurityOnboardingPortal'));
 const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m => ({ default: m.PortalLogin })));
 const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
@@ -205,6 +207,17 @@ function AppContent() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('leadId'));
   const [openTaskId, setOpenTaskId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('taskId'));
   const [openFlowThreadId, setOpenFlowThreadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('threadId'));
+  const openSalesDashboardRecord = (record: SalesRecord) => {
+    if (record.kind === 'proposal') { setOpenProposalId(record.id); setActiveTab('proposals'); }
+    else if (record.kind === 'lead') { setSelectedLeadId(record.id); }
+    else if (record.kind === 'order') { setOpenSalesOrderId(record.id); setActiveTab('sales_orders'); }
+    else if (record.kind === 'contact') { const url = new URL(window.location.href); url.searchParams.set('contactId', record.id); window.history.replaceState({}, '', url); setActiveTab('contacts'); }
+  };
+  const navigateSalesDashboard = (tab: string, recordId?: string) => {
+    if (recordId && tab === 'work_orders') setSelectedWorkOrderId(recordId);
+    if (recordId && tab === 'pipeline_board') { setSelectedLeadId(recordId); return; }
+    setActiveTab(tab);
+  };
   const [openProposalId, setOpenProposalId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('proposalId'));
   const [aiProposalPrefill, setAiProposalPrefill] = useState<ProposalPrefill | null>(null);
   const [aiServiceRequestPrefill, setAiServiceRequestPrefill] = useState<ServiceRequestPrefill | null>(null);
@@ -481,6 +494,7 @@ function AppContent() {
     '/portal',
     '/portal/dashboard',
     '/portal/security',
+    '/portal/service-approval',
     '/portal/punchlist',
     '/portal/proposals',
     '/portal/vip-membership',
@@ -538,6 +552,10 @@ function AppContent() {
         <SecurityOnboardingPortal token={token || undefined} />
       </Suspense>
     );
+  }
+
+  if (currentPath === '/portal/service-approval') {
+    return <Suspense fallback={<LoadingFallback />}><ServiceApprovalPage /></Suspense>;
   }
 
   if (currentPath === '/portal/dashboard') {
@@ -1007,8 +1025,9 @@ function AppContent() {
                 setOpenProposalId(proposalId);
                 setActiveTab('proposals');
               }}
+              onOpenRecord={openSalesDashboardRecord}
               onRepContextChange={setSalesRepAIContext}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
+              onNavigateToTab={navigateSalesDashboard}
             />
           )}
           {activeTab === 'sales_orders' && checkModuleAccess('sales_orders') && (
@@ -1022,7 +1041,7 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
+          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onOpenRecord={openSalesDashboardRecord} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={navigateSalesDashboard} />}
           {['pipeline_board', 'prospects', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
             ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
             ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
@@ -1226,7 +1245,7 @@ function AppContent() {
             onSuccess={() => {
               setShowServiceRequestForm(false);
               setAiServiceRequestPrefill(null);
-              setActiveTab('dispatch_dashboard');
+              setActiveTab('feed');
             }}
             aiPrefill={aiServiceRequestPrefill}
           />

@@ -18,6 +18,10 @@ function harness(path, globals = {}, imports = {}) {
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText, {
     module, exports:module.exports, console, ...globals,
     require(name) {
+      if (name.endsWith('/ServiceApprovalPanel')) return {ServiceApprovalPanel:'ApprovalPanel'};
+      if (name.endsWith('/serviceApproval')) return {sendServiceApproval:async()=>{},serviceApprovalPending:r=>!!r.service_approval_required&&!r.service_waived_at&&(!r.service_accepted_at||!r.service_payment_method_id)};
+      if (name.endsWith('/ContactLogModal')) return {ContactLogModal:'ContactLogModal'};
+      if (name.endsWith('/ContactLogHistory')) return {ContactLogHistory:'ContactLogHistory'};
       if (name.endsWith('/SupportPhotos')) return {SupportPhotos:'SupportPhotos'};
       if (name.endsWith('/SupportRequestItems')) return {SupportRequestItems:'SupportRequestItems'};
       if (name.endsWith('.css')) return {};
@@ -26,6 +30,8 @@ function harness(path, globals = {}, imports = {}) {
         async requestConfirmation(message) { const decision = globals.confirm || globals.window?.confirm; if (!decision) throw Error('Confirmation fixture required: ' + message); return decision(message); },
         async requestText(message, initial) { const decision = globals.prompt || globals.window?.prompt; if (!decision) throw Error('Text-entry fixture required: ' + message); return decision(message, initial); },
       };
+      if (name.endsWith('/useActivityCounts')) return {markActivitySeen: async () => {}};
+      if (name.endsWith('/AuthContext')) return {useAuth: () => ({profile: {id:'test-user',organization_id:'test-org'}})};
       if (name === 'react') return react; if (name === 'react/jsx-runtime') return {jsx,jsxs:jsx,Fragment:'fragment'}; if (name === 'lucide-react') return new Proxy({}, {get:(_,key)=>key}); if (name in imports) return imports[name]; throw Error(name); },
   });
   return {render(props, exportName) { cursor=0; rendering=true; try { return module.exports[exportName](props); } finally {rendering=false;} }, effects};
@@ -35,14 +41,22 @@ function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); i
 
 const profile={id:'manager',role:'service_manager'};
 const requests=[{id:'one',customer_name:'Customer With A Very Long Name',contact_id:'c1',created_at:'2026-10-05',status:'open',job_description:'Pool sound needs attention',source_type:'punchlist',priority:'normal',billable_type:'warranty',created_by:'manager',profiles:{full_name:'Long Staff Name'},attachments:[],requested_tech_ids:[]},{id:'two',customer_name:'Other Customer',contact_id:'c2',created_at:'2026-10-05',status:'open',job_description:'Check audio',source_type:'staff_form',priority:'normal',billable_type:'billable',created_by:'manager',attachments:[],requested_tech_ids:[]}];
-const supabase={channel:()=>({on(){return this;},subscribe(){return{unsubscribe(){}};}}),from(table){const q={select:()=>q,eq:()=>q,not:()=>q,order:()=>q,then:resolve=>Promise.resolve({data:table==='service_requests'?requests:[],error:null}).then(resolve)};return q;}};
+let requestLoads=0;
+const supabase={channel:()=>({on(){return this;},subscribe(){return{unsubscribe(){}};}}),from(table){if(table==='service_requests')requestLoads++;const q={select:()=>q,eq:()=>q,not:()=>q,order:()=>q,then:resolve=>Promise.resolve({data:table==='service_requests'?requests:[],error:null}).then(resolve)};return q;}};
 const h=harness('src/components/Dispatch/ServiceRequestQueue.tsx',{alert:msg=>{throw Error(msg);}}, {
  '../../lib/dispatchNotifications':{notifyTechJobAssigned(){}},'../Production/WorkOrderSchedulePicker':{WorkOrderSchedulePicker:'Calendar'},'../Shared/QuickActionModal':{QuickActionModal:'Modal'},'../../lib/supabase':{supabase},'../../contexts/AuthContext':{useAuth:()=>({profile,loading:false})},'../Production/CreateWorkOrderModal':{CreateWorkOrderModal:'Scheduler'},'../ui/ConfirmModal':{default:'Confirm'},'../Service/ServiceRequestForm':{ServiceRequestForm:'RequestForm'},'../Shared/ContactQuickViewModal':{ContactQuickViewModal:'Contact'},
 });
 let tree=h.render({},'ServiceRequestQueue');for(const effect of h.effects.splice(0))effect();await new Promise(resolve=>setTimeout(resolve,0));const render=()=>{tree=h.render({},'ServiceRequestQueue');};render();
 const button=name=>nodes(tree).find(n=>n.type==='button'&&(n.props['aria-label']===name||text(n)===name));
 assert.equal(nodes(tree).filter(n=>n.props?.['data-testid']?.startsWith('service-request-')).length,2);
-button('Expand request').props.onClick({stopPropagation(){}});render();assert.ok(text(tree).includes('Full Description'));assert.ok(button('Collapse request'));assert.ok(button('Schedule Work Order'));
+button('Expand request').props.onClick({stopPropagation(){}});render();assert.ok(!text(tree).includes('Full Description'));assert.ok(button('Collapse request'));assert.ok(button('Schedule Work Order'));
+button('Log Contact / Note').props.onClick({stopPropagation(){}});render();
+const contactLog=nodes(tree).find(n=>n.type==='ContactLogModal');
+const priorLoads=requestLoads;
+contactLog.props.onSaved();await new Promise(resolve=>setTimeout(resolve,0));render();
+assert.equal(requestLoads,priorLoads+1,'Saving a contact log refreshes the queue');
+assert.equal(nodes(tree).find(n=>n.type==='ContactLogHistory').props.refreshKey,1,'Saving also refreshes the expanded contact history');
+contactLog.props.onClose();render();
 button('Schedule Work Order').props.onClick({stopPropagation(){}});render();let scheduler=nodes(tree).find(n=>n.type==='Scheduler');assert.equal(scheduler.props.serviceRequest.id,'one');assert.equal(scheduler.props.serviceRequest.contact_id,'c1');scheduler.props.onClose();render();
 button('Collapse request').props.onClick({stopPropagation(){}});render();
 const checkboxes=()=>nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox');checkboxes()[0].props.onChange({stopPropagation(){}});render();assert.equal(checkboxes().length,1,'Other customer must not be selectable for a combined work order');

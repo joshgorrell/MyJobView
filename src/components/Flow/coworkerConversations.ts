@@ -14,9 +14,12 @@ interface Post {
   audience_user_ids: string[];
   audience_department_id: string | null;
   is_private: boolean;
+  contact_id?: string | null;
+  project_id?: string | null;
+  work_order_id?: string | null;
   profiles: { full_name: string } | null;
 }
-const POST_COLUMNS = 'id,parent_id,content,post_type,user_id,created_at,audience_type,audience_user_ids,audience_department_id,is_private,profiles!discussion_posts_user_id_fkey(full_name)';
+const POST_COLUMNS = 'id,parent_id,content,post_type,user_id,created_at,audience_type,audience_user_ids,audience_department_id,is_private,contact_id,project_id,work_order_id,profiles!discussion_posts_user_id_fkey(full_name)';
 
 // Every query uses the signed-in client and existing audience RLS. Fetch in pages
 // and batches so a busy conversation or inbox does not silently lose older rows.
@@ -78,13 +81,15 @@ export async function loadCoworkerThreads(organizationId: string, userId: string
   const departmentNames = new Map(departments.map(d => [d.id, d.display_name]));
   const byRoot = new Map<string, Post[]>();
   replies.forEach(p => { const list = byRoot.get(p.parent_id!) || []; list.push(p); byRoot.set(p.parent_id!, list); });
-  return roots.map(root => {
+  const threads: EnrichedThread[] = roots.sort((a,b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)).map(root => {
     const history = [root, ...(byRoot.get(root.id) || [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
     const last = history[history.length - 1];
     const audience = root.audience_type || (root.is_private ? 'direct' : 'company');
     const recipients = [...new Set([root.user_id, ...(root.audience_user_ids || [])])].filter(id => id !== userId).map(id => names.get(id) || 'Teammate');
     return {
-      source: 'coworker', discussion_type: root.post_type, id: root.id, subject: root.content.split('\n')[0].slice(0, 80),
+      source: 'coworker', root_ids: [root.id],
+      recipient_key: root.post_type === 'general' && root.audience_type ? coworkerRecipientKey(audience, [root.user_id, ...(root.audience_user_ids || [])], root.audience_department_id, root) : undefined,
+      discussion_type: root.post_type, id: root.id, subject: root.content.split('\n')[0].slice(0, 80),
       audience_label: audience === 'direct' ? 'Direct' : audience === 'department' ? 'Department' : 'Company',
       related_context_name: audience === 'department' ? departmentNames.get(root.audience_department_id!) || 'Department' : audience === 'company' ? 'Everyone' : recipients.join(', ') || 'You',
       context_type: 'coworker', context_id: null, proposal_id: null, visibility: 'internal',
@@ -95,14 +100,39 @@ export async function loadCoworkerThreads(organizationId: string, userId: string
       last_rep_response_at: null, context_label: null, attachment_url: null, attachment_type: null,
     };
   });
+  // General chats share a recipient inbox; task/question discussions remain separate.
+  // Include record scope in the key so a job conversation never leaks into another job.
+  const grouped = new Map<string, EnrichedThread>();
+  for (const thread of threads) {
+    const key = thread.recipient_key || thread.id;
+    const previous = grouped.get(key);
+    if (!previous) {
+      if (thread.recipient_key) thread.subject = thread.related_context_name || 'Conversation';
+      grouped.set(key, thread);
+    } else {
+      const latest = thread.last_message_at > previous.last_message_at ? thread : previous;
+      grouped.set(key, { ...latest, id: previous.id, subject: previous.subject,
+        root_ids: [...previous.root_ids!, ...thread.root_ids!],
+        message_count: previous.message_count + thread.message_count,
+        unread_count: previous.unread_count + thread.unread_count });
+    }
+  }
+  return [...grouped.values()];
 }
 
-export async function loadCoworkerMessages(organizationId: string, userId: string, rootId: string): Promise<Message[]> {
-  const { data: root, error } = await supabase.from('discussion_posts').select(POST_COLUMNS).eq('organization_id', organizationId).eq('id', rootId).is('parent_id', null).maybeSingle();
-  if (error) throw error;
-  if (!root) throw new Error('This conversation is unavailable or you do not have access.');
-  const replies = await pages<Post>(() => supabase.from('discussion_posts').select(POST_COLUMNS).eq('organization_id', organizationId).eq('parent_id', rootId).order('created_at').order('id'));
-  const history = [root as unknown as Post, ...replies].sort((a, b) => a.created_at.localeCompare(b.created_at));
+export function coworkerRecipientKey(audience: string, participants: string[], departmentId: string | null, scope: { contact_id?: string | null; project_id?: string | null; work_order_id?: string | null }) {
+  return JSON.stringify([audience, audience === 'direct' ? [...new Set(participants)].sort() : [], audience === 'department' ? departmentId : null,
+    scope.contact_id || null, scope.project_id || null, scope.work_order_id || null]);
+}
+
+export async function loadCoworkerMessages(organizationId: string, userId: string, rootId: string, rootIds = [rootId]): Promise<Message[]> {
+  const ids = [...new Set([rootId, ...rootIds])];
+  const roots = await batches<Post>(ids, batch => supabase.from('discussion_posts').select(POST_COLUMNS)
+    .eq('organization_id', organizationId).in('id', batch).is('parent_id', null).order('id'));
+  if (roots.length !== ids.length) throw new Error('This conversation is unavailable or you do not have access.');
+  const replies = await batches<Post>(ids, batch => supabase.from('discussion_posts').select(POST_COLUMNS)
+    .eq('organization_id', organizationId).in('parent_id', batch).order('created_at').order('id'));
+  const history = [...roots, ...replies].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   const unread = await unreadState(organizationId, userId, history.map(p => p.id));
   return history.map(p => ({ id: p.id, thread_id: rootId, author_id: p.user_id, author_name: p.profiles?.full_name || 'Teammate', author_type: 'staff', body: p.content,
     is_read: !unread.has(p.id), is_internal: true, created_at: p.created_at, context_room_id: null, context_line_item_id: null, context_label: null, attachment_url: null, attachment_type: null }));

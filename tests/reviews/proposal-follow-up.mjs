@@ -45,7 +45,7 @@ assert.equal(emails.length,0,'Preview must never send');
 role='employee'; authenticatedEmail='other@example.com'; assert.equal((await call()).status,403);
 assert.equal((await call({variant:'sales'})).body.reply_to,'aaron@example.com');
 permission=false; assert.equal((await call({variant:'sales'})).status,403);
-role='admin'; assert.equal((await call()).status,403, 'Other admins cannot send Josh’s owner email'); authenticatedEmail='josh@electroniclife.com'; tenant='other'; assert.equal((await call()).status,400);
+role='admin'; assert.equal((await call()).status,403, 'Other admins cannot send Josh’s owner email'); authenticatedEmail='josh@electroniclife.com'; tenant='other'; assert.equal((await call()).status,403, 'Owner identity is restricted to Electronic Life');
 tenant='elife'; status='approved'; assert.equal((await call()).status,400);
 status='sent'; sentAt=null; assert.equal((await call()).status,400);
 sentAt='2026-10-01'; moduleAccess=false; assert.equal((await call()).status,403);
@@ -83,3 +83,44 @@ for (const variant of ['sales', 'owner']) {
 const savedName = proposalFollowUpContent(settings, { contact_name: 'Volland Foundation', first_name: 'Volland' }, { name: 'Josh', email: 'sender@example.com', owner: true });
 assert.ok(savedName.includes('Hi Volland Foundation,'), 'Saved complete name takes priority over first name');
 console.log('Full business and personal recipient names preserved in both preview and send variants.');
+
+// The response-page preview receives owner branding from its server preview payload.
+// CompanySettings intentionally has no owner_name/owner_email columns.
+{
+ const vm = await import('node:vm');
+ const compiled = ts.transpileModule(await readFile('src/components/Reviews/ProposalFollowUps.tsx','utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ const allNodes = tree => Array.isArray(tree) ? tree.flatMap(allNodes) : tree && typeof tree === 'object' ? [tree,...allNodes(tree.props?.children)] : [];
+ const nodeText = tree => Array.isArray(tree) ? tree.map(nodeText).join('') : tree && typeof tree === 'object' ? nodeText(tree.props?.children) : tree == null ? '' : String(tree);
+ for (const scenario of [
+   {owner_name:'Company Owner',owner_email:'owner@example.com',company_email:'office@example.com',expectedName:'Company Owner',expectedEmail:'owner@example.com'},
+   {company_email:'office@example.com',expectedName:null,expectedEmail:'office@example.com'},
+   {company_email:null,expectedName:null,expectedEmail:'sender@example.com'},
+ ]) {
+   let cursor=0; const states=[]; const module={exports:{}};
+   const react={useState(initial){const index=cursor++;if(!(index in states))states[index]=initial;return[states[index],value=>states[index]=typeof value==='function'?value(states[index]):value];},useEffect(){}};
+   const jsx=(type,props)=>({type,props});
+   vm.runInNewContext(compiled,{module,exports:module.exports,crypto:globalThis.crypto,require(name){
+     if(name==='react')return react;
+     if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
+     if(name==='lucide-react')return new Proxy({},{get:(_,key)=>key});
+     if(name.endsWith('/AuthContext'))return{useAuth:()=>({profile:{id:'rep',organization_id:'org'},companySettings:{company_name:'Example Company',company_logo_url:null,company_email:scenario.company_email}})};
+     if(name.endsWith('/supabase'))return{supabase:{}};
+     if(name==='./lostReview')return{lostReviewAction:async body=>{assert.equal(body.action,'proposal_preview','The test must never send mail');return{html:'<p>Preview</p>',content:'Preview',subject:'Example',recipient:'customer@example.com',sender:'Rep',reply_to:'sender@example.com',owner_name:scenario.owner_name,owner_email:scenario.owner_email};}};
+     if(name==='./ProposalEmailPreview')return{default:'EmailPreview'};
+     if(name==='./ProposalCheckResponse')return{default:'ResponsePreview'};
+     if(name==='./ProposalCheckHistory')return{default:'History'};
+     throw Error(name);
+   }});
+   const render=()=>{cursor=0;return module.exports.default();};let tree=render();
+   const button=label=>allNodes(tree).find(node=>node.type==='button'&&nodeText(node)===label);
+   button('Enter Name & Email').props.onClick();tree=render();
+   allNodes(tree).find(node=>node.type==='input'&&node.props.autoComplete==='name').props.onChange({target:{value:'Customer'}});
+   allNodes(tree).find(node=>node.type==='input'&&node.props.type==='email').props.onChange({target:{value:'customer@example.com'}});tree=render();
+   button('Preview Email').props.onClick();for(let i=0;i<10;i++)await Promise.resolve();tree=render();
+   allNodes(tree).find(node=>node.type==='EmailPreview').props.onChoice('declined');tree=render();
+   const response=allNodes(tree).find(node=>node.type==='ResponsePreview');
+   assert.equal(response.props.previewBrand.owner_name,scenario.expectedName);
+   assert.equal(response.props.previewBrand.owner_email,scenario.expectedEmail);
+ }
+ console.log('Proposal response preview: server owner branding, company email fallback and sender fallback passed without sending mail.');
+}

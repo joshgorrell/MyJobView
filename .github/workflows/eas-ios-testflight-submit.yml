@@ -1,0 +1,62 @@
+name: Submit MJV iOS to TestFlight (EAS)
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Full EAS build ID for the already-succeeded iOS build 1.0.0 (6)'
+        required: true
+        type: string
+      confirm_submit:
+        description: 'I confirm this build should be submitted to Apple TestFlight'
+        required: true
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: mjv-ios-testflight-submit
+  cancel-in-progress: false
+jobs:
+  submit-ios:
+    if: ${{ inputs.confirm_submit }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Expo token exists
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::Missing EXPO_TOKEN secret"; exit 1; }
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest
+      - name: Verify Expo authentication
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas whoami
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+      - name: Validate submitted build ID format
+        env:
+          BUILD_ID: ${{ inputs.build_id }}
+        run: |
+          if ! [[ "$BUILD_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::Enter the full EAS build UUID."
+            exit 1
+          fi
+          echo "Submitting existing EAS build ID: $BUILD_ID"
+      - name: Submit existing build to App Store Connect / TestFlight
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ inputs.build_id }}
+        run: eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --no-wait

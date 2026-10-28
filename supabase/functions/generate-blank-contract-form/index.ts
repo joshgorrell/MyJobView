@@ -49,12 +49,23 @@ Deno.serve(async (req: Request) => {
     }
 
     let contract: any;
+    let requestedContactId: string | null = null;
     if (!contractId) {
       if (req.method !== 'POST') return new Response(JSON.stringify({error:'Choose a template and services'}), {status:400,headers:{...corsHeaders,'Content-Type':'application/json'}});
       const payload = await req.json();
+      requestedContactId = typeof payload.contact_id === 'string' ? payload.contact_id : null;
       const {data,error} = await supabaseClient.rpc('staff_security_onboarding', {p_action:'print_form',p_id:null,p_payload:payload});
       if (error) return new Response(JSON.stringify({error:error.message}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
       contract = data;
+      if (requestedContactId) {
+        const { data: profile, error: profileError } = await supabaseClient.from('profiles').select('organization_id').eq('id', user.id).single();
+        if (profileError || !profile?.organization_id) throw new Error('Organization access required');
+        const { data: contact, error: contactError } = await supabaseClient.from('contacts')
+          .select('id,full_name,email,phone,street_address,city,state,zip_code,organization_id')
+          .eq('id', requestedContactId).eq('organization_id', profile.organization_id).single();
+        if (contactError || !contact) return new Response(JSON.stringify({error:'Customer not found or not accessible'}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
+        contract = { ...contract, contact, personalInfo: { ...contract.personalInfo, full_name: contact.full_name, email: contact.email, phone: contact.phone }, propertyInfo: { ...contract.propertyInfo, address_line1: contact.street_address, city: contact.city, state: contact.state, zip_code: contact.zip_code } };
+      }
     } else {
       const {data:review,error} = await supabaseClient.rpc('staff_security_onboarding', {p_action:'get',p_id:contractId});
       if (error) return new Response(JSON.stringify({error:'Security onboarding permission required'}), {status:403,headers:{...corsHeaders,'Content-Type':'application/json'}});
@@ -100,15 +111,21 @@ Deno.serve(async (req: Request) => {
     }
     .page {
       background: white;
-      max-width: 8.5in;
+      width: 8.5in;
+      min-height: 11in;
       margin: 0 auto 20px;
-      padding: 0.75in;
+      padding: 0.5in;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
   }
   @media print {
     body { background: white; }
     .page {
+      width: 7.5in;
+      max-width: 7.5in;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
       page-break-after: always;
     }
     .page:last-child {
@@ -128,6 +145,7 @@ Deno.serve(async (req: Request) => {
 
   .page {
     position: relative;
+    overflow-wrap: anywhere;
   }
 
   .print-btn {
@@ -354,11 +372,11 @@ ${branding.css}
       <div class="field-label">Account Type (Check One)</div>
       <div class="account-type-row">
         <div class="checkbox-field">
-          <span class="checkbox"></span>
+          <span class="checkbox">${contract.account_type === 'residential' ? '&#10003;' : ''}</span>
           <span>Residential</span>
         </div>
         <div class="checkbox-field">
-          <span class="checkbox"></span>
+          <span class="checkbox">${contract.account_type === 'commercial' ? '&#10003;' : ''}</span>
           <span>Commercial</span>
         </div>
       </div>
@@ -369,20 +387,20 @@ ${branding.css}
     <div class="section-header">Property Address (Where System is Installed)</div>
     <div class="field-group">
       <div class="field-label">Street Address</div>
-      <div class="field-input"></div>
+      <div class="field-value">${escapeHtml(contract.propertyInfo?.address_line1 || contract.contact?.street_address || '')}</div>
     </div>
     <div class="grid-thirds">
       <div class="field-group">
         <div class="field-label">City</div>
-        <div class="field-input"></div>
+        <div class="field-value">${escapeHtml(contract.propertyInfo?.city || contract.contact?.city || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">State</div>
-        <div class="field-input"></div>
+        <div class="field-value">${escapeHtml(contract.propertyInfo?.state || contract.contact?.state || '')}</div>
       </div>
       <div class="field-group">
         <div class="field-label">ZIP Code</div>
-        <div class="field-input"></div>
+        <div class="field-value">${escapeHtml(contract.propertyInfo?.zip_code || contract.contact?.zip_code || '')}</div>
       </div>
     </div>
   </div>

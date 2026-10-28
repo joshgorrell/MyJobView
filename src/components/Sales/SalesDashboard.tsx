@@ -206,11 +206,14 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   const isAdmin = profile?.role && ['admin', 'manager', 'sales_manager'].includes(profile.role);
 
   // For single-rep view: the rep whose data the dashboard shows
-  const viewingRepId = selectedRepIds.length === 1 ? selectedRepIds[0] : null;
+  const viewingRepId = isAdmin
+    ? (selectedRepIds.length === 1 ? selectedRepIds[0] : null)
+    : (profile?.id || null);
 
   // Fetch Average Sale and Profit Margin KPIs
   useEffect(() => {
     async function loadKpis() {
+      if (!profile?.id) return;
       setSalesKpisLoading(true);
       try {
         const scope: KpiScope = viewingRepId
@@ -225,7 +228,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
       }
     }
     loadKpis();
-  }, [viewingRepId, dateRange]);
+  }, [profile?.id, viewingRepId, dateRange]);
   const isComparingMultiple = selectedRepIds.length >= 2;
 
   useEffect(() => {
@@ -491,8 +494,7 @@ export function SalesDashboard({ onProposalClick, onRepContextChange }: SalesDas
   async function handleDateRangeChange(newRange: string) {
     setDateRange(newRange);
     // Note: We no longer save the date range preference - always defaults to 'this_month'
-    // Reload data with new range
-    loadDashboardData();
+    // The date-range effect loads the new range once.
   }
 
   async function loadDashboardData() {

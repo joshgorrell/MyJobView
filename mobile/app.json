@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MyJobView",
-    "slug": "field-ops-mobile",
+    "slug": "myjobview",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2563eb"
+      "backgroundColor": "#000209"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.myjobview.app",
-      "buildNumber": "1",
+      "buildNumber": "5",
       "infoPlist": {
         "NSLocationAlwaysAndWhenInUseUsageDescription": "MyJobView needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
         "NSLocationWhenInUseUsageDescription": "MyJobView needs your location while you're working to track your position and calculate travel time.",
@@ -80,7 +80,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "field-ops-mobile"
+        "projectId": "7d9e3303-8b1d-416e-9ace-fd3b15d9340f"
       }
     }
   }

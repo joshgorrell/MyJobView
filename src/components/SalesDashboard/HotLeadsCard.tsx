@@ -8,6 +8,7 @@ function formatCurrency(value: number): string {
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
+  urgent: 'bg-red-50 text-red-700 border-red-200',
   critical: 'bg-red-50 text-red-700 border-red-200',
   high: 'bg-orange-50 text-orange-700 border-orange-200',
   medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -17,9 +18,10 @@ const PRIORITY_COLORS: Record<string, string> = {
 interface HotLeadsCardProps {
   leads: HotLead[];
   onNavigateToPipeline?: () => void;
+  onLeadClick?: (id: string) => void;
 }
 
-export function HotLeadsCard({ leads, onNavigateToPipeline }: HotLeadsCardProps) {
+export function HotLeadsCard({ leads, onNavigateToPipeline, onLeadClick }: HotLeadsCardProps) {
   if (leads.length === 0) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -52,7 +54,7 @@ export function HotLeadsCard({ leads, onNavigateToPipeline }: HotLeadsCardProps)
         {leads.map((lead) => {
           const priorityCls = PRIORITY_COLORS[lead.priority] || PRIORITY_COLORS.low;
           return (
-            <div key={lead.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+            <button type="button" onClick={() => onLeadClick?.(lead.id)} key={lead.id} className="w-full text-left flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${priorityCls}`}>
                 {lead.priority}
               </span>
@@ -65,7 +67,7 @@ export function HotLeadsCard({ leads, onNavigateToPipeline }: HotLeadsCardProps)
               <span className="text-sm font-semibold text-gray-700 tabular-nums">
                 {formatCurrency(lead.estimatedValue)}
               </span>
-            </div>
+            </button>
           );
         })}
       </div>

@@ -10,6 +10,7 @@ interface ConfirmModalProps {
   cancelLabel?: string;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
+  zIndex?: number;
 }
 
 export default function ConfirmModal({
@@ -21,6 +22,7 @@ export default function ConfirmModal({
   cancelLabel = 'Cancel',
   onConfirm,
   onCancel,
+  zIndex = 50,
 }: ConfirmModalProps) {
   const titleId = useId();
   const messageId = useId();
@@ -92,6 +94,7 @@ export default function ConfirmModal({
       `}</style>
       <div
         className="confirm-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+        style={{ zIndex }}
         onClick={(e) => { if (e.target === e.currentTarget && !pending) onCancel(); }}
       >
         <div ref={panel} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={messageId} aria-busy={pending}

@@ -414,7 +414,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     <div className="space-y-4 pb-20">
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Package className="w-4 h-4 text-blue-400" />
             <span className="text-xs text-gray-400">Line Items</span>
@@ -422,7 +422,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           <div className="text-lg font-bold text-white">{displayItems.length}</div>
           <div className="text-[10px] text-gray-600 mt-0.5">{summarize ? 'summarized' : 'total items'}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Hash className="w-4 h-4 text-teal-400" />
             <span className="text-xs text-gray-400">Quantity</span>
@@ -430,7 +430,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           <div className="text-lg font-bold text-white">{fmt(totalQty)}</div>
           <div className="text-[10px] text-gray-600 mt-0.5">units total</div>
         </div>
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-amber-400" />
             <span className="text-xs text-gray-400">Labor Hours</span>
@@ -438,7 +438,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           <div className="text-lg font-bold text-white">{fmt(totalLaborHours)}</div>
           <div className="text-[10px] text-gray-600 mt-0.5">${fmt(totalLaborTotal)} labor</div>
         </div>
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Tag className="w-4 h-4 text-green-400" />
             <span className="text-xs text-gray-400">Line Total</span>

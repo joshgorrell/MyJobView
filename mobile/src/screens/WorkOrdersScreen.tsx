@@ -40,6 +40,7 @@ export default function WorkOrdersScreen({ navigation }: any) {
   const loadWorkOrders = useCallback(async () => {
     if (!profile) return;
     try {
+      await offlineStorage.initialize();
       if (isConnected) {
         const { data, error } = await supabase
           .from('work_orders')
@@ -57,6 +58,13 @@ export default function WorkOrdersScreen({ navigation }: any) {
       }
     } catch (error) {
       console.error('Error loading work orders:', error);
+      try {
+        await offlineStorage.initialize();
+        const cached = await offlineStorage.getCachedWorkOrders(profile.id);
+        setWorkOrders(cached);
+      } catch (cacheError) {
+        console.error('Error loading cached work orders:', cacheError);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
