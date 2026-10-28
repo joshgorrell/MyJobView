@@ -22,7 +22,7 @@ export function useActivityCounts() {
       supabase.rpc('get_test_tune_workspace'),
     ]);
     // Never show inflated counts when a query fails (including before migration deployment).
-    if ([reads, leads, feedback, service, tune].some(result => result.error)) return;
+    if ([reads, baselines, leads, feedback, service, tune].some(result => result.error)) return;
     const seen = new Set((reads.data || []).map(row => `${row.activity_type}:${row.activity_id}`));
     const baseline = new Map((baselines.data || []).map(row => [row.activity_type, row.started_at]));
     const areas: ActivityArea[] = ['pipeline_lead', 'test_tune', 'feedback', 'service_request'];
@@ -32,7 +32,8 @@ export function useActivityCounts() {
         missing.map(activity_type => ({ user_id: profile.id, organization_id: org, activity_type })),
         { onConflict: 'user_id,activity_type', ignoreDuplicates: true },
       );
-      if (!error) void refresh();
+      if (error) console.error('Activity baseline initialization failed:', error);
+      // A subsequent refresh reads the stored baseline; never count older items on first visit.
       return;
     }
     const isNew = (area: ActivityArea, timestamp: string | null | undefined) =>
