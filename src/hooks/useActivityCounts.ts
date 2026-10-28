@@ -13,27 +13,40 @@ export function useActivityCounts() {
   const refresh = useCallback(async () => {
     if (!profile?.id || !profile.organization_id) return;
     const org = profile.organization_id;
-    const [reads, leads, feedback, service, tune] = await Promise.all([
+    const [reads, baselines, leads, feedback, service, tune] = await Promise.all([
       supabase.from('activity_notification_reads').select('activity_type,activity_id').eq('user_id', profile.id),
-      supabase.from('leads').select('id,is_fishbowl').eq('organization_id', org).eq('assigned_to', profile.id),
-      supabase.from('customer_satisfaction').select('id').eq('organization_id', org).not('responded_at', 'is', null),
-      supabase.from('service_requests').select('id').eq('organization_id', org),
+      supabase.from('activity_notification_baselines').select('activity_type,started_at').eq('user_id', profile.id),
+      supabase.from('leads').select('id,is_fishbowl,created_at').eq('organization_id', org).eq('assigned_to', profile.id),
+      supabase.from('customer_satisfaction').select('id,responded_at').eq('organization_id', org).not('responded_at', 'is', null),
+      supabase.from('service_requests').select('id,created_at').eq('organization_id', org),
       supabase.rpc('get_test_tune_workspace'),
     ]);
     // Never show inflated counts when a query fails (including before migration deployment).
     if ([reads, leads, feedback, service, tune].some(result => result.error)) return;
     const seen = new Set((reads.data || []).map(row => `${row.activity_type}:${row.activity_id}`));
-    // Until a per-user activation baseline is persisted, avoid showing all historical records as new.
-    // A missing baseline means this area is not yet activated, not that every old record is unread.
-    const count = (area: ActivityArea, ids: string[]) => ids.filter(id => !seen.has(`${area}:${id}`)).length;
-    const customerTasks: string[] = (tune.data || []).flatMap((project: { tasks?: { id: string; source?: string }[] }) =>
-      (project.tasks || []).filter(task => task.source === 'customer').map(task => task.id)
+    const baseline = new Map((baselines.data || []).map(row => [row.activity_type, row.started_at]));
+    const areas: ActivityArea[] = ['pipeline_lead', 'test_tune', 'feedback', 'service_request'];
+    const missing = areas.filter(area => !baseline.has(area));
+    if (missing.length) {
+      const { error } = await supabase.from('activity_notification_baselines').upsert(
+        missing.map(activity_type => ({ user_id: profile.id, organization_id: org, activity_type })),
+        { onConflict: 'user_id,activity_type', ignoreDuplicates: true },
+      );
+      if (!error) void refresh();
+      return;
+    }
+    const isNew = (area: ActivityArea, timestamp: string | null | undefined) =>
+      Boolean(timestamp && Date.parse(timestamp) > Date.parse(baseline.get(area) || ''));
+    const count = (area: ActivityArea, ids: string[]) =>
+      ids.filter(id => !seen.has(`${area}:${id}`)).length;
+    const customerTasks: string[] = (tune.data || []).flatMap((project: { tasks?: { id: string; source?: string; created_at?: string }[] }) =>
+      (project.tasks || []).filter(task => task.source === 'customer' && isNew('test_tune', task.created_at)).map(task => task.id)
     );
     setCounts({
-      pipeline_lead: count('pipeline_lead', (leads.data || []).filter(row => !row.is_fishbowl).map(row => row.id)),
+      pipeline_lead: count('pipeline_lead', (leads.data || []).filter(row => !row.is_fishbowl && isNew('pipeline_lead', row.created_at)).map(row => row.id)),
       test_tune: count('test_tune', customerTasks),
-      feedback: count('feedback', (feedback.data || []).map(row => row.id)),
-      service_request: count('service_request', (service.data || []).map(row => row.id)),
+      feedback: count('feedback', (feedback.data || []).filter(row => isNew('feedback', row.responded_at)).map(row => row.id)),
+      service_request: count('service_request', (service.data || []).filter(row => isNew('service_request', row.created_at)).map(row => row.id)),
     });
   }, [profile?.id, profile?.organization_id]);
 
