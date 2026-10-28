@@ -306,6 +306,8 @@ export function CustomerSatisfactionDashboard() {
                       )}
                     </div>
                   </div>
+                  {expandedFeedbackId === r.id && (
+                    <div className="mt-2 rounded-lg border border-gray-700 p-3">
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     {r.sales_rep_name && <span>Sales: <span className="text-gray-300">{r.sales_rep_name}</span></span>}
                     {r.lead_tech_name && <span>Tech: <span className="text-gray-300">{r.lead_tech_name}</span></span>}
@@ -324,6 +326,8 @@ export function CustomerSatisfactionDashboard() {
                     <p className="mt-2 text-sm text-gray-400 bg-gray-900 rounded-lg px-3 py-2 italic">
                       "{r.comment}"
                     </p>
+                  )}
+                    </div>
                   )}
                 </div>
               );
