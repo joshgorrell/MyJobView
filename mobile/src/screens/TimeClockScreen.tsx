@@ -79,7 +79,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     try {
       const context = await getEmployeeTimeContext(profile.id);
       setTimeContext(context);
-      setClockStateUnverified(false);
+      // A successful policy lookup does not verify the shift or break state.
       if (!context.dailyClock) return;
       const { data, error } = await supabase
         .from('daily_clock_entries')
@@ -126,7 +126,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         });
       }
       setTodayEntry(data);
-      if (data) await loadBreaks(data.id);
+      if (data) {
+        await loadBreaks(data.id);
+        setClockStateUnverified(false);
+      }
       else {
         const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
         const local = unresolved ?? await offlineStorage.getLocalActiveClockShift(profile.id);
@@ -138,6 +141,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         }
         setBreaks([]);
         setActiveBreak(null);
+        if (!local) setClockStateUnverified(false);
       }
     } catch (error) {
       setClockStateUnverified(true);
@@ -187,6 +191,8 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       setActiveBreak(data?.find(b => !b.break_end) || null);
     } catch (error) {
       console.error('Error loading breaks; retaining last verified state:', error);
+      // Break verification is required before permitting an online clock-out.
+      throw error;
     }
   }
 
