@@ -97,6 +97,7 @@ const MAX_PHOTOS = 3;
 export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, editingRequest, aiPrefill }: ServiceRequestFormProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -579,6 +580,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   }
 
   async function submitForm() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
 
     try {
@@ -750,6 +753,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       const errorMessage = error?.message || 'Unknown error occurred';
       notify(`Failed to submit work order request: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }
