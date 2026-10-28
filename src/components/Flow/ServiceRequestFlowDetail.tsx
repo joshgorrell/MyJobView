@@ -31,8 +31,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {!request.work_order && <p>Not yet scheduled</p>}
     {(request.earliest_date || request.requested_date) && <p><strong>Requested dates:</strong> {[request.earliest_date, request.requested_date].filter(Boolean).join(" – ")} (not guaranteed)</p>}
     {request.requested_tech_ids?.length ? <p><strong>Preferred technicians:</strong> {request.requested_tech_ids.length} requested</p> : null}
-    {request.notes && <p className="sm:col-span-2 rounded-md bg-surface p-2"><strong>Internal scheduling message:</strong> {request.notes}</p>}
     <p className="sm:col-span-2"><strong>Contact history</strong></p>
-    {activities.length ? <div className="sm:col-span-2 space-y-1 max-h-24 overflow-y-auto">{activities.map(activity => <p key={activity.id}><small>{new Date(activity.created_at).toLocaleString()} · {activity.logged_by_name}</small> — {activity.notes}</p>)}</div> : <p>No contact notes recorded yet.</p>}
+    {activities.length ? <div className="sm:col-span-2 space-y-1 ">{activities.map(activity => <p key={activity.id}><small>{new Date(activity.created_at).toLocaleString()} · {activity.logged_by_name}</small> — {activity.notes}</p>)}</div> : <p>No contact notes recorded yet.</p>}
   </div>;
 }
