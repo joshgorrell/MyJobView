@@ -737,7 +737,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       // The request is committed. Never allow a retry to insert a duplicate if
       // optional follow-up work (approval email or photo upload) fails.
       submissionSucceededRef.current = true;
-      if (formData.service_approval_required) await deliverApproval(serviceRequest.id);
+      if (formData.service_approval_required) {
+        try {
+          await deliverApproval(serviceRequest.id);
+        } catch (approvalError) {
+          console.error('Service request saved, but approval delivery failed:', approvalError);
+          notify('Service request saved, but the approval could not be delivered. Please retry approval from the request.', { theme: 'blue', tone: 'warning' });
+        }
+      }
 
       // Upload photos if any
       if (photos.length > 0 && serviceRequest?.id) {
