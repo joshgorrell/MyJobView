@@ -44,7 +44,9 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {request.work_order && <p><strong>Work order:</strong> <a href={`?tab=work_orders&workOrderId=${request.work_order.id}`}>#{request.work_order.work_order_number}</a> · {request.work_order.status}{scheduled && <> · {request.work_order.scheduled_date} </>}</p>}
     {!request.work_order && <p>Not yet scheduled</p>}
     <div className="sm:col-span-2 flex flex-wrap gap-2 py-1">
-      <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`/service-requests?serviceRequestId=${encodeURIComponent(request.id)}`}>Open request to edit, assign, schedule or close ↗</a>
+      {(['Edit', 'Assign', 'Schedule', 'Close'] as const).map(action => (
+        <a key={action} className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`/service-requests?serviceRequestId=${encodeURIComponent(request.id)}`} aria-label={`${action} service request`}>{action} ↗</a>
+      ))}
       {request.work_order && <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=work_orders&workOrderId=${encodeURIComponent(request.work_order.id)}`}>Open work order ↗</a>}
     </div>
     {(request.earliest_date || request.requested_date) && <p><strong>Requested dates:</strong> {[request.earliest_date, request.requested_date].filter(Boolean).join(" – ")} (not guaranteed)</p>}
