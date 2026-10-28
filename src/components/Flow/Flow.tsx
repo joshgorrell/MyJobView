@@ -117,7 +117,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     };
   }, [scope, target, focusUpdateId, debouncedSearch, newOnly, mentionsOnly, todayOnly, category, kind, office, actor, location, from, to]);
   const flow = useFlow(filters);
-  useEffect(() => { if (createdRequestId) { void flow.refresh(); window.sessionStorage.removeItem('mjv-new-service-request'); } }, [createdRequestId]);
+  useEffect(() => {
+    if (!createdRequestId) return;
+    window.sessionStorage.removeItem('mjv-new-service-request');
+    void flow.refresh();
+  }, [createdRequestId]);
   const scopeModule = workOrderId ? 'work_orders' : projectId ? 'projects' : contactId ? 'contacts' : null;
   const canPost = scopeModule ? hasModuleAccess(scopeModule) : ['contacts', 'projects', 'work_orders'].some(hasModuleAccess);
   useEffect(() => {
