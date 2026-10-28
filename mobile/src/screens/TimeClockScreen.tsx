@@ -153,8 +153,8 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       try {
         const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
         const local = unresolved ?? await offlineStorage.getLocalActiveClockShift(profile.id);
-        setBreaks([]);
-        setActiveBreak(null);
+        // Connectivity failure cannot prove an existing break ended.
+        // Retain the last verified break state until the server responds.
         if (local) {
           setTodayEntry({
             id: local.id, entry_date: local.entry_date, clock_in: local.clock_in,
@@ -186,7 +186,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       setBreaks(data || []);
       setActiveBreak(data?.find(b => !b.break_end) || null);
     } catch (error) {
-      console.error('Error loading breaks:', error);
+      console.error('Error loading breaks; retaining last verified state:', error);
     }
   }
 
