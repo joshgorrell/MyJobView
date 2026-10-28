@@ -234,6 +234,28 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           status: 'clocked_in' as const, office_id: profile.primary_office_id,
         };
         await offlineStorage.recordOfflineClockTransition(shift);
+        // An offline payroll punch must retain GPS evidence on-device. The
+        // GPS queue is linked to the shift and waits for its clock sync.
+        const gpsAttemptedAt = now.toISOString();
+        try {
+          const location = await locationTrackingService.captureHighAccuracyLocation().catch(() => null);
+          await offlineStorage.saveClockGps(
+            `${shift.id}:clock_in`, shift.id, profile.id,
+            {
+              clock_in_gps_attempted_at: gpsAttemptedAt,
+              clock_in_gps_capture_method: location ? ((location.coords as any).method === 'cached' ? 'cached' : 'high_accuracy') : 'failed',
+              clock_in_latitude: location?.coords.latitude ?? null,
+              clock_in_longitude: location?.coords.longitude ?? null,
+              clock_in_gps_accuracy: location?.coords.accuracy ?? null,
+              clock_in_gps_captured_at: location ? new Date(location.timestamp).toISOString() : null,
+              clock_in_gps_duration_ms: location ? (location.coords as any).duration_ms || 0 : Date.now() - Date.parse(gpsAttemptedAt),
+            },
+          );
+        } catch (gpsError) {
+          // Never roll back a valid payroll punch because GPS storage failed.
+          console.error('Offline clock-in saved; GPS evidence could not be queued:', gpsError);
+          Alert.alert('GPS evidence warning', 'Your clock-in is saved, but GPS evidence could not be queued. Notify your supervisor.');
+        }
         setTodayEntry({ ...shift, clock_out: null, total_hours: 0, break_minutes: 0, notes: null });
         setClockStateUnverified(true); // Block unsupported offline break/out until independently verified.
         await loadPendingSync();
