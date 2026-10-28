@@ -9,6 +9,7 @@ const directory = await mkdtemp(join(tmpdir(), 'sales-dashboard-'));
 const fixture = `
 window.calls=[];window.failSales=false;
 export const useDepartments=()=>({starredModules:Array.from({length:8},(_,i)=>({id:String(i),module_key:'favorite_'+i,display_name:'Favorite '+i,icon:'Star'})),loading:false,hasModuleAccess:()=>true});
+export const useActivityCounts=()=>({counts:{pipeline_lead:0,test_tune:0,feedback:0,service_request:0}});
 export const useTaskCount=()=>0;export const useFishbowlCount=()=>0;
 const now=new Date(),day=now.toISOString().slice(0,10),start=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1)).toISOString();
 const proposals=[{id:'stale-old',created_by:'rep1',proposal_number:'P-OLD',title:'Old proposal',status:'expired',created_at:'2025-01-01',valid_until:'2025-02-01',total:1200,contact:{full_name:'Old Customer'}},{id:'won',created_by:'rep1',proposal_number:'P-WON',status:'approved',created_at:start,approved_at:day,total:4500,contact:{full_name:'Won Customer'}},{id:'lost',created_by:'rep1',proposal_number:'P-LOST',status:'declined',created_at:start,declined_at:day,total:800,contact:{full_name:'Lost Customer'}},{id:'other',created_by:'rep2',proposal_number:'P-OTHER',status:'expired',created_at:'2025-01-01',valid_until:'2025-02-01',total:100,contact:{full_name:'Second Rep Customer'}}].map(p=>({...p,organization_id:'org'}));
@@ -20,7 +21,7 @@ const source = `import React from 'react';import{createRoot}from'react-dom/clien
 let browser;
 const server = createServer(async(req,res)=>{const name=req.url.includes('app.js')?'app.js':req.url.includes('style.css')?'style.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,name)));});
 try {
-  await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/^\.\/supabase$|lib\/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useTaskCount$|hooks\/useFishbowlCount$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
+  await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/^\.\/supabase$|lib\/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useTaskCount$|hooks\/useActivityCounts$|hooks\/useFishbowlCount$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
   const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
   await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><body style="background:#111827"><div id="root"></div><script src="app.js"></script></body>');
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
