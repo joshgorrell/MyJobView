@@ -388,9 +388,11 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     if (!todayEntry || !profile) return;
     try {
       await assertNoInternalTimer(profile);
+      // Fix the punch time before GPS acquisition; location lookup may take seconds.
+      const breakStartedAt = new Date().toISOString();
       const gps = await breakGpsEvidence('start');
       const { error } = await supabase.from('daily_clock_breaks').insert({
-        id: Crypto.randomUUID(), daily_clock_entry_id: todayEntry.id, break_start: new Date().toISOString(), break_type: breakType, ...gps,
+        id: Crypto.randomUUID(), daily_clock_entry_id: todayEntry.id, break_start: breakStartedAt, break_type: breakType, ...gps,
       });
       if (error) throw error;
       await loadBreaks(todayEntry.id);
@@ -403,8 +405,9 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   async function handleEndBreak() {
     if (!activeBreak || !todayEntry) return;
     try {
+      const breakEndedAt = new Date().toISOString();
       const gps = await breakGpsEvidence('end');
-      const { error } = await supabase.from('daily_clock_breaks').update({ break_end: new Date().toISOString(), ...gps }).eq('id', activeBreak.id);
+      const { error } = await supabase.from('daily_clock_breaks').update({ break_end: breakEndedAt, ...gps }).eq('id', activeBreak.id);
       if (error) throw error;
       await loadBreaks(todayEntry.id);
     } catch (error) {
