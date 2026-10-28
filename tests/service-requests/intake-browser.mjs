@@ -14,7 +14,7 @@ const source=`import React from 'react';import{createRoot}from'react-dom/client'
 let browser;let openPage;
 const server=createServer(async(req,res)=>{const name=req.url.includes('app.js')?'app.js':req.url.includes('style.css')?'style.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(directory,name)));});
 try{
-await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/lib\/supabase$|contexts\/AuthContext$|Shared\/AddressAutocomplete$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
+await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/\/supabase$|contexts\/AuthContext$|Shared\/AddressAutocomplete$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'tsx',resolveDir:process.cwd()}));}}]});
 const css=(await readdir('dist/assets')).find(p=>p.startsWith('index-')&&p.endsWith('.css'));await writeFile(join(directory,'style.css'),await readFile('dist/assets/'+css));
 await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><div id="root"></div><script src="app.js"></script>');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));browser=await (process.env.BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.BROWSER_ENGINE==='webkit'?{}:{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})});
@@ -28,6 +28,12 @@ const context=await browser.newContext();openPage=async viewport=>{const page=aw
  assert.ok(initial.scroll<=initial.client+2,`Default desktop Service Request must fit without scrolling: ${JSON.stringify(initial)}`);
  const dialog=await desktop.getByRole('dialog').boundingBox();
  assert.ok(dialog.y>=0&&dialog.y+dialog.height<=1001,'Desktop modal stays within viewport');
+ const approval=desktop.getByRole('checkbox',{name:'Require customer approval & payment method before scheduling'});
+ assert.equal(await approval.isChecked(),false);
+ assert.equal(await desktop.getByLabel('Service rates and terms',{exact:true}).count(),0);
+ const option=await approval.boundingBox();const submit=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
+ assert.ok(Math.abs(option.y-submit.y)<45,'Infrequent approval option stays beside the submit actions');
+ await approval.check();await desktop.getByLabel('Service rates and terms',{exact:true}).waitFor();await approval.uncheck();
  await desktop.getByRole('button',{name:'New Customer',exact:true}).click();
  const action=await desktop.getByRole('button',{name:'Send to Service',exact:true}).boundingBox();
  assert.ok(action.y>=0&&action.y+action.height<=1001,'Submit stays visible with expanded customer fields');

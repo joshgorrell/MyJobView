@@ -293,3 +293,10 @@ verify_jwt = true
 # Public opaque-token endpoint validates the share link and returns limited proposal data.
 [functions.view-shared-proposal]
 verify_jwt = false
+
+
+[functions.service-approval-payment-methods]
+verify_jwt = false
+
+[functions.send-service-approval]
+verify_jwt = false

@@ -1,3 +1,4 @@
+import { sendServiceApproval } from '../../lib/serviceApproval';
 import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -25,6 +26,8 @@ import {
 
 interface EditingRequest {
   id: string;
+  service_approval_required?: boolean;
+  service_terms?: string;
   contact_id: string | null;
   customer_location_id?: string | null;
   customer_name: string;
@@ -138,6 +141,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   const [formData, setFormData] = useState({
+    service_approval_required: editingRequest?.service_approval_required || false,
+    service_terms: editingRequest?.service_terms || '',
     contact_id: editingRequest?.contact_id || prefilledContactId || null,
     customer_location_id: editingRequest?.customer_location_id || null as string | null,
     customer_name: editingRequest?.customer_name || '',
@@ -550,6 +555,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       return;
     }
 
+    if (formData.service_approval_required && (!formData.customer_email.trim() || !formData.service_terms.trim())) {
+      notify('Customer email and service rates/terms are required.', { theme: 'blue', tone: 'warning' });
+      return;
+    }
+
     // Check if the user added info that was missing from the contact record
     if (!isEditMode && formData.contact_id && originalContact) {
       const updates = getContactUpdates();
@@ -561,6 +571,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }
 
     await submitForm();
+  }
+
+  async function deliverApproval(id: string) {
+    try { await sendServiceApproval(id); }
+    catch (error) { notify(`Request saved and held for customer action. Email needs attention: ${(error as Error).message}. Send it again from the service queue.`, {theme:'blue',tone:'warning'}); }
   }
 
   async function submitForm() {
@@ -587,6 +602,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         const { error } = await supabase
           .from('service_requests')
           .update({
+            service_approval_required: formData.service_approval_required,
+            service_terms: formData.service_terms,
             customer_location_id: formData.customer_location_id,
             customer_name: formData.customer_name,
             customer_phone: formData.customer_phone || null,
@@ -620,6 +637,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
 
         if (error) throw error;
 
+        if (formData.service_approval_required) await deliverApproval(editingRequest.id);
         if (onSuccess) onSuccess();
         onClose();
         return;
@@ -659,6 +677,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       const { data: serviceRequest, error: requestError } = await supabase
         .from('service_requests')
         .insert({
+          service_approval_required: formData.service_approval_required,
+          service_terms: formData.service_terms,
           created_by: profile.id,
           contact_id: finalContactId || null,
           customer_location_id: formData.customer_location_id,
@@ -698,6 +718,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         console.error('Error creating work order request:', requestError);
         throw new Error(`Failed to create work order request: ${requestError.message}`);
       }
+
+      if (formData.service_approval_required) await deliverApproval(serviceRequest.id);
 
       // Upload photos if any
       if (photos.length > 0 && serviceRequest?.id) {
@@ -1229,9 +1251,18 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           </div>
 
 </details>
+          {requestType === 'service' && formData.service_approval_required && <div className="space-y-2 border-t border-subtle pt-3">
+            <label className="block text-sm text-primary">Service rates and terms<textarea required maxLength={20000} rows={3} value={formData.service_terms} onChange={e=>setFormData(prev=>({...prev,service_terms:e.target.value}))} placeholder="Labor rate, trip charge, minimum charge, and applicable service terms" className="block w-full mt-1 rounded-lg border border-subtle bg-canvas p-3" /></label>
+            <p className="text-xs text-muted">Included in the customer email. No payment is collected now.</p>
+          </div>}
         </div>
           {/* Action Buttons */}
-          <div className="shrink-0 flex gap-2 bg-canvas border-t border-subtle px-3 py-2 sm:px-4">
+          <div className="shrink-0 flex flex-col gap-2 sm:flex-row sm:items-center bg-canvas border-t border-subtle px-3 py-2 sm:px-4">
+            {requestType === 'service' && <label className="flex min-h-8 items-center gap-2 text-xs text-muted sm:flex-1 cursor-pointer">
+              <input type="checkbox" checked={formData.service_approval_required} disabled={!!editingRequest?.service_approval_required} onChange={e=>setFormData(prev=>({...prev,service_approval_required:e.target.checked}))} className="shrink-0" />
+              Require customer approval &amp; payment method before scheduling
+            </label>}
+            <div className="flex gap-2 sm:w-72 sm:shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -1259,6 +1290,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 'Send to Service'
               )}
             </button>
+            </div>
           </div>
         </form>
     </QuickActionModal>
