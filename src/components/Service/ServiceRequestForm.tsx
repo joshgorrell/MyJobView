@@ -1109,7 +1109,6 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               />
             </div>
             </div>}
-            {specificDate && <p className="sm:col-span-2 text-xs text-muted">Requested dates are not guaranteed. Scheduling will confirm availability.</p>}
           </div>
 
 </details>
