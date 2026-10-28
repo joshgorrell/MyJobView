@@ -30,6 +30,8 @@ function harness(path, globals = {}, imports = {}) {
         async requestConfirmation(message) { const decision = globals.confirm || globals.window?.confirm; if (!decision) throw Error('Confirmation fixture required: ' + message); return decision(message); },
         async requestText(message, initial) { const decision = globals.prompt || globals.window?.prompt; if (!decision) throw Error('Text-entry fixture required: ' + message); return decision(message, initial); },
       };
+      if (name.endsWith('/useActivityCounts')) return {markActivitySeen: async () => {}};
+      if (name.endsWith('/AuthContext')) return {useAuth: () => ({profile: {id:'test-user',organization_id:'test-org'}})};
       if (name === 'react') return react; if (name === 'react/jsx-runtime') return {jsx,jsxs:jsx,Fragment:'fragment'}; if (name === 'lucide-react') return new Proxy({}, {get:(_,key)=>key}); if (name in imports) return imports[name]; throw Error(name); },
   });
   return {render(props, exportName) { cursor=0; rendering=true; try { return module.exports[exportName](props); } finally {rendering=false;} }, effects};

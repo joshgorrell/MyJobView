@@ -2,6 +2,7 @@ import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { ContactDetail } from '../Contacts/ContactDetail';
 import { ContactForm } from '../Contacts/ContactForm';
 import { LeadDetail } from '../Leads/LeadDetail';
@@ -39,6 +40,12 @@ export function PipelineBoard() {
   });
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  const openLead = (id: string) => {
+    setSelectedLead(id);
+    if (profile?.id && profile.organization_id) {
+      void markActivitySeen(profile.id, profile.organization_id, 'pipeline_lead', id).catch(console.error);
+    }
+  };
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showConnectionForm, setShowConnectionForm] = useState(false);
@@ -941,7 +948,7 @@ export function PipelineBoard() {
                     return (
                       <div
                         key={item.id}
-                        onClick={() => setSelectedLead(item.id)}
+                        onClick={() => openLead(item.id)}
                         className={`bg-white rounded-lg border-2 p-3 hover:shadow-md active:shadow-lg transition-all cursor-pointer touch-manipulation ${
                           isAssignedToMe
                             ? 'border-blue-500 bg-blue-50/30'
