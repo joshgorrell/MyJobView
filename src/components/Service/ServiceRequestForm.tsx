@@ -741,6 +741,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       }
 
       setShowSuccess(true);
+      submittingRef.current = true;
       setTimeout(() => {
         if (serviceRequest?.id) {
           window.sessionStorage.setItem('mjv-new-service-request', serviceRequest.id);
@@ -753,7 +754,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       const errorMessage = error?.message || 'Unknown error occurred';
       notify(`Failed to submit work order request: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
-      submittingRef.current = false;
+      if (!showSuccess && !window.sessionStorage.getItem('mjv-new-service-request')) submittingRef.current = false;
       setLoading(false);
     }
   }
