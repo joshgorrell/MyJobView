@@ -21,7 +21,6 @@ import {
   User,
   Phone,
   Mail,
-  FileText,
   CheckCircle,
   XCircle,
   ArrowRight,
@@ -684,7 +683,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                     </div>
 
                     {/* Description preview */}
-                    <div className="text-sm text-muted break-words line-clamp-1 mb-1">{request.job_description}</div>
+                    <div className={`text-sm text-primary break-words mb-1 ${expandedRequest === request.id ? 'whitespace-pre-wrap' : 'line-clamp-1'}`}>{request.job_description}</div>
 
                     {/* Meta row + mobile Convert button */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -720,17 +719,17 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                       )}
                       <button aria-label={expandedRequest === request.id ? 'Collapse request' : 'Expand request'}
                         onClick={e => {e.stopPropagation();toggleReviewedRequest(request.id);}}
-                        className="shrink-0 min-h-11 px-2 text-muted hover:text-primary">
+                        className="shrink-0 min-h-11 sm:min-h-7 px-2 text-muted hover:text-primary">
                         {expandedRequest === request.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     </div>
 
                     {/* Expanded Details */}
                     {expandedRequest === request.id && (
-                      <div className="mt-3 space-y-3 pt-3 border-t border-strong">
+                      <div onClick={e => e.stopPropagation()} className="mt-2 space-y-2 pt-2 border-t border-strong cursor-default">
                         <SupportPhotos requestId={request.id}/><SupportRequestItems requestId={request.id}/>
                         {/* Address */}
-                        <div className="flex items-start gap-2.5">
+                        {(request.job_location_address || request.job_location_city || request.job_location_state || request.job_location_zip) && <div className="flex items-start gap-2.5">
                           <MapPin className="w-4 h-4 text-muted mt-0.5 shrink-0" />
                           <div>
                             <div className="text-xs font-medium text-muted mb-0.5">Address</div>
@@ -745,47 +744,37 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                               )}
                             </div>
                           </div>
-                        </div>
+                        </div>}
 
-                        {/* Full description */}
-                        <div className="flex items-start gap-2.5">
-                          <FileText className="w-4 h-4 text-muted mt-0.5 shrink-0" />
-                          <div>
-                            <div className="text-xs font-medium text-muted mb-0.5">Full Description</div>
-                            <div className="text-sm text-primary whitespace-pre-wrap">{request.job_description}</div>
-                          </div>
-                        </div>
-
-                        <div className="text-sm text-secondary space-y-1">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary">
                           <p>{request.customer_contact_instruction === 'requester' ? 'Requester will coordinate with customer' : request.customer_contact_instruction === 'already_contacted' ? 'Customer already contacted / schedule as requested' : 'Dispatch should contact customer'}</p>
                           {request.earliest_date && <p>Do not schedule before: {request.earliest_date}</p>}
                           {request.warranty_type && <p>Warranty: {request.warranty_type} · {request.warranty_reference} · {request.warranty_notes}</p>}
-                          {request.estimated_duration && <p>Estimated duration: {request.estimated_duration}</p>}
                         </div>
                         {/* Contact details grid */}
                         {(request.customer_phone || request.customer_email || request.requested_date || request.attachments?.length > 0) && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                             {request.customer_phone && (
-                              <a href={`tel:${request.customer_phone}`} className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted hover:text-primary hover:bg-elevated transition-colors">
+                              <a href={`tel:${request.customer_phone}`} className="flex items-center gap-2 py-1 text-xs text-muted hover:text-primary hover:bg-elevated transition-colors">
                                 <Phone className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {request.customer_phone}
                               </a>
                             )}
                             {request.customer_email && (
-                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted hover:text-primary hover:bg-elevated transition-colors break-all">
+                              <a href={`mailto:${request.customer_email}`} className="flex min-w-0 items-center gap-2 py-1 text-xs text-muted hover:text-primary hover:bg-elevated transition-colors break-all">
                                 <Mail className="w-3.5 h-3.5 text-muted shrink-0" />
                                 <span className="truncate">{request.customer_email}</span>
                               </a>
                             )}
                             {request.requested_date && (
-                              <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
+                              <div className="flex items-center gap-2 py-1 text-xs text-muted">
                                 <Calendar className="w-3.5 h-3.5 text-muted shrink-0" />
                                 Need by: {request.requested_date.split('T')[0]}
                                 {request.requested_time && ` · ${request.requested_time}`}
                               </div>
                             )}
                             {request.attachments && request.attachments.length > 0 && (
-                              <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg text-xs text-muted">
+                              <div className="flex items-center gap-2 py-1 text-xs text-muted">
                                 <Paperclip className="w-3.5 h-3.5 text-muted shrink-0" />
                                 {request.attachments.length} attachment{request.attachments.length !== 1 ? 's' : ''}
                               </div>
@@ -805,7 +794,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                         )}
 
                         {/* Contact record */}
-                        {request.contacts && (
+                        {request.contacts && (request.contacts.full_name !== request.customer_name || request.contacts.company_name) && (
                           <div className="flex items-center gap-2 px-3 py-2 bg-canvas rounded-lg">
                             <User className="w-3.5 h-3.5 text-muted shrink-0" />
                             <div className="text-xs text-muted">
@@ -823,16 +812,14 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                         )}
 
                         {/* Customer contact status */}
-                        <div className={`flex items-start gap-2.5 p-3 rounded-lg border ${
+                        <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 py-1 text-xs ${
                           request.customer_contact_confirmed_at
-                            ? 'bg-emerald-500/10 border-emerald-500/20'
-                            : 'bg-canvas border-strong'
+                            ? 'text-emerald-400'
+                            : 'text-muted'
                         }`}>
                           <PhoneCall className={`w-4 h-4 mt-0.5 shrink-0 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-muted'}`} />
-                          <div>
-                            <div className={`text-xs font-medium mb-0.5 ${request.customer_contact_confirmed_at ? 'text-emerald-400' : 'text-muted'}`}>
-                              Customer Contact
-                            </div>
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="font-medium">Customer contact:</span>
                             {request.customer_contact_confirmed_at ? (
                               <div className="text-xs text-emerald-300">
                                 Confirmed {new Date(request.customer_contact_confirmed_at).toLocaleString()}
@@ -844,9 +831,8 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                               <div className="text-xs text-muted">Not yet confirmed</div>
                             )}
                           </div>
+                          <button type="button" onClick={e => { e.stopPropagation(); setContactLogTarget(request); }} className="min-h-11 sm:min-h-8 rounded-lg bg-elevated px-3 py-1 text-xs font-medium text-primary sm:ml-auto">Log Contact / Note</button>
                         </div>
-
-                        <div className="flex justify-end"><button type="button" onClick={e => { e.stopPropagation(); setContactLogTarget(request); }} className="rounded-lg bg-elevated px-3 py-2 text-xs font-medium text-primary">Log Contact / Note</button></div>
                         <ContactLogHistory serviceRequestId={request.id} refreshKey={contactLogRevision} />
 
                         <ServiceApprovalPanel request={request} onChanged={loadData} />
@@ -857,7 +843,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                             disabled={serviceApprovalPending(request)}
                             title={serviceApprovalPending(request) ? 'Waiting for customer requirements or manager override' : undefined}
                             onClick={(e) => { e.stopPropagation(); if (!serviceApprovalPending(request)) setConvertingTo(request.id); }}
-                            className="col-span-2 sm:col-span-1 sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
+                            className="col-span-2 sm:col-span-1 min-w-0 px-3 py-2.5 sm:py-2 bg-orange-600 text-primary rounded-lg hover:bg-orange-700 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5"
                           >
                             <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                             Schedule Work Order
@@ -867,7 +853,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                             onClick={(e) => { e.stopPropagation(); handleToggleCustomerContact(request); }}
                             disabled={confirmingContact === request.id}
                             title={request.customer_contact_confirmed_at ? 'Click to undo' : 'Mark customer contacted'}
-                            className={`sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 ${
+                            className={`min-w-0 px-3 py-2.5 sm:py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                               request.customer_contact_confirmed_at
                                 ? 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30'
                                 : 'bg-elevated text-muted hover:bg-elevated'
@@ -880,7 +866,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                           {isManager && request.status === 'open' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setKickbackTarget(request); }}
-                              className="sm:flex-1 min-w-0 px-3 py-2.5 sm:py-2 bg-amber-600/20 text-amber-400 rounded-lg hover:bg-amber-600/30 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                              className="min-w-0 px-3 py-2.5 sm:py-2 bg-amber-600/20 text-amber-400 rounded-lg hover:bg-amber-600/30 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                             >
                               <MessageSquareWarning className="w-3.5 h-3.5 shrink-0" />
                               Need Info
