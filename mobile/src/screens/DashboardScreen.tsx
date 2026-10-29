@@ -33,6 +33,8 @@ export default function DashboardScreen({ navigation }: any) {
   const [hoursToday, setHoursToday] = useState<string>('0.00');
   const [jobsToday, setJobsToday] = useState<number>(0);
   const [isClockedIn, setIsClockedIn] = useState(false);
+  const [usesDailyClock, setUsesDailyClock] = useState<boolean | null>(null);
+  const [jobTimerActive, setJobTimerActive] = useState(false);
   const [clockInTime, setClockInTime] = useState<string | null>(null);
   const [recentDays, setRecentDays] = useState<RecentDay[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -48,33 +50,60 @@ export default function DashboardScreen({ navigation }: any) {
     try {
       const context = await getEmployeeTimeContext(profile.id);
       const today = workDate(new Date(), context.timezone);
+      setUsesDailyClock(context.dailyClock);
 
-      const { data: todayEntry } = await supabase
-        .from('daily_clock_entries')
-        .select('id, clock_in, clock_out, total_hours, status, entry_date')
-        .eq('technician_id', profile.id)
-        .is('clock_out', null)
-        .order('clock_in', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (todayEntry) {
-        setIsClockedIn(true);
-        setClockInTime(todayEntry.clock_in);
-        const elapsedMs = Date.now() - new Date(todayEntry.clock_in).getTime();
-        const elapsedHours = elapsedMs / (1000 * 60 * 60);
-        setHoursToday(elapsedHours.toFixed(2));
-      } else {
-        setIsClockedIn(false);
-        setClockInTime(null);
-        const { data: completedToday } = await supabase
+      if (context.dailyClock) {
+        setJobTimerActive(false);
+        const { data: todayEntry, error: openError } = await supabase
           .from('daily_clock_entries')
-          .select('total_hours')
+          .select('id, clock_in, clock_out, total_hours, status, entry_date')
+          .eq('technician_id', profile.id)
+          .is('clock_out', null)
+          .order('clock_in', { ascending: false })
+          .limit(1).maybeSingle();
+        if (openError) throw openError;
+        if (todayEntry) {
+          setIsClockedIn(true);
+          setClockInTime(todayEntry.clock_in);
+          const elapsedMs = Date.now() - new Date(todayEntry.clock_in).getTime();
+          setHoursToday((elapsedMs / 3600000).toFixed(2));
+        } else {
+          setIsClockedIn(false);
+          setClockInTime(null);
+          const { data: completedToday, error: completedError } = await supabase
+            .from('daily_clock_entries')
+            .select('total_hours')
+            .eq('technician_id', profile.id)
+            .eq('entry_date', today)
+            .not('clock_out', 'is', null);
+          if (completedError) throw completedError;
+          setHoursToday((completedToday || []).reduce((sum, entry) => sum + Number(entry.total_hours || 0), 0).toFixed(2));
+        }
+      } else {
+        // Job Time employees never use Daily Clock. Show their job activity,
+        // not a false "Not Clocked In" payroll warning.
+        const { data: activeJob, error: activeError } = await supabase
+          .from('time_entries')
+          .select('clock_in')
+          .eq('technician_id', profile.id)
+          .is('clock_out', null)
+          .in('status', ['draft', 'submitted'])
+          .order('clock_in', { ascending: false }).limit(1).maybeSingle();
+        if (activeError) throw activeError;
+        setJobTimerActive(!!activeJob);
+        setIsClockedIn(false);
+        setClockInTime(activeJob?.clock_in || null);
+        const { data: todayActivities, error: hoursError } = await supabase
+          .from('time_entries')
+          .select('clock_in, clock_out, total_hours')
           .eq('technician_id', profile.id)
           .eq('entry_date', today)
-          .not('clock_out', 'is', null)
-          .maybeSingle();
-        setHoursToday(completedToday ? completedToday.total_hours.toFixed(2) : '0.00');
+          .in('status', ['draft', 'submitted', 'approved']);
+        if (hoursError) throw hoursError;
+        const hours = (todayActivities || []).reduce((sum, entry) => sum +
+          (entry.clock_out ? Number(entry.total_hours || 0) :
+            Math.max(0, (Date.now() - Date.parse(entry.clock_in)) / 3600000)), 0);
+        setHoursToday(hours.toFixed(2));
       }
 
       const { count } = await supabase
@@ -85,13 +114,18 @@ export default function DashboardScreen({ navigation }: any) {
         .not('work_order_id', 'is', null);
       setJobsToday(count || 0);
 
-      const { data: recent } = await supabase
-        .from('daily_clock_entries')
-        .select('entry_date, clock_in, clock_out, total_hours, status')
-        .eq('technician_id', profile.id)
-        .order('clock_in', { ascending: false })
-        .limit(5);
-      setRecentDays(recent || []);
+      if (context.dailyClock) {
+        const { data: recent, error: recentError } = await supabase
+          .from('daily_clock_entries')
+          .select('entry_date, clock_in, clock_out, total_hours, status')
+          .eq('technician_id', profile.id)
+          .order('clock_in', { ascending: false })
+          .limit(5);
+        if (recentError) throw recentError;
+        setRecentDays(recent || []);
+      } else {
+        setRecentDays([]);
+      }
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -171,14 +205,14 @@ export default function DashboardScreen({ navigation }: any) {
         onPress={() => navigation.navigate('TimeClock')}
       >
         <View style={styles.heroLeft}>
-          <Text style={styles.heroLabel}>{isClockedIn ? 'CURRENT SHIFT' : 'CLOCK STATUS'}</Text>
-          <Text style={styles.heroValue}>{isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
-          {isClockedIn && clockInTime && (
+          <Text style={styles.heroLabel}>{usesDailyClock === false ? 'JOB TIME STATUS' : isClockedIn ? 'CURRENT SHIFT' : 'CLOCK STATUS'}</Text>
+          <Text style={styles.heroValue}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No Active Job Timer') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
+          {(isClockedIn || jobTimerActive) && clockInTime && (
             <Text style={styles.heroSubtext}>Started at {formatTime(clockInTime)}</Text>
           )}
         </View>
-        <View style={[styles.heroButton, { backgroundColor: isClockedIn ? Colors.green[500] : Colors.primary[600] }]}>
-          <Text style={styles.heroButtonText}>{isClockedIn ? 'VIEW' : 'START'}</Text>
+        <View style={[styles.heroButton, { backgroundColor: (isClockedIn || jobTimerActive) ? Colors.green[500] : Colors.primary[600] }]}>
+          <Text style={styles.heroButtonText}>{usesDailyClock === false ? 'MY TIME' : isClockedIn ? 'VIEW' : 'START'}</Text>
         </View>
       </TouchableOpacity>
 
@@ -187,7 +221,7 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{loadingStats ? '--' : hoursToday}</Text>
           <Text style={styles.statUnit}>hrs</Text>
-          <Text style={styles.statLabel}>Today</Text>
+          <Text style={styles.statLabel}>{usesDailyClock === false ? 'Recorded Today' : 'Today'}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{loadingStats ? '--' : String(jobsToday)}</Text>
