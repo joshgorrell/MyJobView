@@ -8,6 +8,7 @@ import type { DashboardTab } from '../../lib/salesDashboardTypes';
 import { AnnualGoalHero } from './AnnualGoalHero';
 import { SalesKpiGrid } from './SalesKpiGrid';
 import { SalesTrendChart } from './SalesTrendChart';
+import { MonthlySalesCompetition } from './MonthlySalesCompetition';
 import { SalesGoalLeaderboard } from './SalesGoalLeaderboard';
 import { SalesAttentionList } from './SalesAttentionList';
 import { ManagerRepSelector } from './ManagerRepSelector';
@@ -294,6 +295,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          <MonthlySalesCompetition key={`${profile?.organization_id}:${effectiveRepId || "all"}`} repId={effectiveRepId} onOrderClick={id => onOpenRecord?.({ id, kind: 'order', title: 'Sales order', customer: '', status: '', date: '' })} />
           {!allSales && <AnnualGoalHero data={data} teamRank={data.teamRank ?? null} />}
           <SalesKpiGrid data={data} onSelect={selectList} />
           {data.periodStats && <PeriodStatsRow stats={data.periodStats} onSelect={selectList} />}

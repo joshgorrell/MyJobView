@@ -21,6 +21,7 @@ import ConnectionForm from '../Connections/ConnectionForm';
 import { PortalPreviewModal } from '../Shared/PortalPreviewModal';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
 import { CompetitorSelector } from './CompetitorSelector';
+import {ContactPaymentsCredits} from './ContactPaymentsCredits';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Connection {
@@ -122,7 +123,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [portalAccessEnabled, setPortalAccessEnabled] = useState((contact as any).portal_access_enabled || false);
   const [punchlistExpirationEmailsEnabled, setPunchlistExpirationEmailsEnabled] = useState((contact as any).punchlist_expiration_emails_enabled !== false);
   const [savingPunchlistExpirationEmails, setSavingPunchlistExpirationEmails] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow' | 'payments_credits'>('overview');
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
@@ -1278,6 +1279,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                 Overview
               </div>
             </button>
+            <button onClick={() => setActiveTab('payments_credits')} className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'payments_credits' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}><span className="flex items-center gap-2"><DollarSign className="w-4 h-4" />Payments &amp; Credits</span></button>
             <button
               onClick={() => setActiveTab('history')}
               className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation whitespace-nowrap ${
@@ -1336,7 +1338,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         </div>
 
         <div className="p-4 sm:p-6">
-          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'overview' ? (
+          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'payments_credits' ? (<ContactPaymentsCredits contactId={contact.id} />) : activeTab === 'overview' ? (
             <div className="space-y-4">
               {/* Quick Actions */}
               <div className="pb-3 border-b border-gray-200">
@@ -2435,8 +2437,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
             )}
           </div>
 
-          {/* Account Credits */}
-          <ContactAccountCredits contactId={contact.id} />
+
 
           {/* Mentions & Hashtags */}
           <div className="border-t border-gray-200 pt-6">
@@ -3341,155 +3342,6 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
         onCancel={() => setConfirmModal(null)}
       />
-    </div>
-  );
-}
-
-interface AccountCredit {
-  id: string;
-  amount: number;
-  amount_applied: number;
-  amount_remaining: number;
-  status: string;
-  notes: string | null;
-  created_at: string;
-  sales_order_id: string | null;
-  source_invoice_id: string | null;
-  sales_order?: { order_number: string } | null;
-  source_invoice?: { invoice_number: string } | null;
-}
-
-function ContactAccountCredits({ contactId }: { contactId: string }) {
-  const [credits, setCredits] = useState<AccountCredit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const { data } = await supabase
-          .from('customer_account_credits')
-          .select(`
-            id, amount, amount_applied, amount_remaining, status, notes, created_at,
-            sales_order_id, source_invoice_id,
-            sales_order:sales_orders(order_number),
-            source_invoice:invoices(invoice_number)
-          `)
-          .eq('contact_id', contactId)
-          .order('created_at', { ascending: false }).overrideTypes<AccountCredit[], { merge: false }>();
-        setCredits((data as AccountCredit[]) || []);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [contactId]);
-
-  if (loading) return null;
-
-  const openCredits = credits.filter(c => c.status === 'open');
-  const otherCredits = credits.filter(c => c.status !== 'open');
-  const totalAvailable = openCredits.reduce((s, c) => s + (c.amount_remaining || 0), 0);
-
-  if (credits.length === 0) return null;
-
-  function fmt(n: number) {
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  const displayedOther = showAll ? otherCredits : [];
-
-  return (
-    <div className="border-t border-gray-200 pt-6">
-      <h3 className="text-xs sm:text-sm font-medium text-gray-700 uppercase tracking-wide pb-2 border-b border-gray-200 mb-3 flex items-center gap-2">
-        <DollarSign className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-green-600" />
-        Account Credits
-        {totalAvailable > 0 && (
-          <span className="ml-auto text-sm font-semibold text-green-700 normal-case tracking-normal">
-            ${fmt(totalAvailable)} available
-          </span>
-        )}
-      </h3>
-
-      {openCredits.length === 0 && (
-        <p className="text-sm text-gray-500">No open credits on account.</p>
-      )}
-
-      <div className="space-y-2">
-        {openCredits.map(credit => (
-          <div key={credit.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-green-800">
-                    ${fmt(credit.amount_remaining)} remaining
-                  </span>
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 font-medium">
-                    Open
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  Issued {new Date(credit.created_at).toLocaleDateString()}
-                  {credit.amount_applied > 0 && (
-                    <> · ${fmt(credit.amount_applied)} of ${fmt(credit.amount)} applied</>
-                  )}
-                </div>
-                {credit.source_invoice && (
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    From Invoice #{credit.source_invoice.invoice_number}
-                    {credit.sales_order && (
-                      <> · SO #{credit.sales_order.order_number}</>
-                    )}
-                  </div>
-                )}
-                {credit.notes && (
-                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">{credit.notes}</p>
-                )}
-              </div>
-              <div className="shrink-0 text-right">
-                <div className="text-base font-bold text-green-700">${fmt(credit.amount)}</div>
-                <div className="text-xs text-gray-400">original</div>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {otherCredits.length > 0 && (
-          <button
-            onClick={() => setShowAll(v => !v)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-1"
-          >
-            {showAll ? 'Hide' : `Show ${otherCredits.length} applied/voided credit${otherCredits.length > 1 ? 's' : ''}`}
-          </button>
-        )}
-
-        {displayedOther.map(credit => (
-          <div key={credit.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 opacity-70">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-700">${fmt(credit.amount)}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                    credit.status === 'fully_applied'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                      : 'bg-gray-200 text-gray-500 border border-gray-300'
-                  }`}>
-                    {credit.status === 'fully_applied' ? 'Applied' : 'Voided'}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {new Date(credit.created_at).toLocaleDateString()}
-                  {credit.source_invoice && (
-                    <> · Invoice #{credit.source_invoice.invoice_number}</>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

@@ -26,7 +26,7 @@ try {
   await writeFile(join(directory,'index.html'),'<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"><body style="background:#111827"><div id="root"></div><script src="app.js"></script></body>');
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
-  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({timezoneId:'UTC'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:1000});await page.goto('http://127.0.0.1:'+server.address().port);
     await page.getByRole('heading',{name:'My Results & Activity'}).waitFor();
