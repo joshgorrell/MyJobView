@@ -594,6 +594,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           </TouchableOpacity>
         </View>
         <InternalTimeCard key={profile?.id} />
+        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('TimeHistory')} style={styles.historyLink}>
+          <Text style={styles.historyLinkText}>View My Time History</Text>
+          <View style={styles.chevronRight} />
+        </TouchableOpacity>
       </ScreenContainer>
     );
   }
