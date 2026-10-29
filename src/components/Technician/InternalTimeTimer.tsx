@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -94,7 +95,7 @@ export function InternalTimeTimer({ onChanged }: { onChanged?: () => void }) {
   }
   async function stop() {
     if (!runningSession || !active || busy || !verified || !navigator.onLine) return;
-    if (!window.confirm(`Verify clock-out: Stop ${runningSession.session_type === 'shop_time' ? 'Shop Time' : 'Training'} and submit the recorded time for manager review?`)) return;
+    if (!await requestConfirmation(`Verify clock-out: Stop ${runningSession.session_type === 'shop_time' ? 'Shop Time' : 'Training'} and submit the recorded time for manager review?`, { theme: 'blue', title: 'Verify Clock-Out', confirmLabel: 'Stop Time' })) return;
     setBusy(true);
     try {
       const { error } = await supabase.rpc('stop_internal_time', {
