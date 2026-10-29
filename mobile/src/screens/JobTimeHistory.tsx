@@ -11,7 +11,7 @@ import { ScreenContainer } from '../components/ScreenContainer';
 type Activity = {
   id: string; clock_in: string; clock_out: string | null; total_hours: number | null;
   entry_type: string | null; work_order_id: string | null; internal_session_id: string | null;
-  status: string; notes: string | null;
+  status: string; notes: string | null; session_type?: 'shop_time' | 'training' | null;
 };
 const duration = (entry: Activity, now: number) =>
   Math.max(0, (Date.parse(entry.clock_out || new Date(now).toISOString()) - Date.parse(entry.clock_in)) / 3600000);
@@ -31,7 +31,16 @@ export function JobTimeHistory() {
         .select('id,clock_in,clock_out,total_hours,entry_type,work_order_id,internal_session_id,status,notes')
         .eq('technician_id', profile.id).order('clock_in', { ascending: false }).limit(50);
       if (queryError) throw queryError;
-      setEntries(data || []);
+      const activityRows: Activity[] = data || [];
+      const sessionIds = Array.from(new Set(activityRows.map(row => row.internal_session_id).filter((id): id is string => !!id)));
+      if (sessionIds.length) {
+        const { data: sessions, error: sessionsError } = await supabase.from('internal_time_sessions')
+          .select('id,session_type').in('id', sessionIds).eq('assigned_to', profile.id);
+        if (sessionsError) throw sessionsError;
+        const types = new Map((sessions || []).map(session => [session.id, session.session_type]));
+        activityRows.forEach(row => { if (row.internal_session_id) row.session_type = types.get(row.internal_session_id) || null; });
+      }
+      setEntries(activityRows);
       setError('');
     } catch (e: any) {
       setError(e?.message || 'Unable to load job time history.');
@@ -60,7 +69,7 @@ export function JobTimeHistory() {
       <Text style={styles.heading}>RECENT JOB, SHOP & TRAINING TIME</Text>
       {entries.length === 0 && !error && <EmptyState title="No Activity Yet" message="Your recorded Job Time, Shop Time, and Training will appear here." />}
       {entries.map(entry => {
-        const type = entry.internal_session_id ? (entry.entry_type === 'training' ? 'Training' : 'Shop / Training') : entry.work_order_id ? 'Work Order' : 'Customer / Job Activity';
+        const type = entry.internal_session_id ? (entry.session_type === 'training' ? 'Training' : entry.session_type === 'shop_time' ? 'Shop Time' : 'Internal Time') : entry.work_order_id ? 'Work Order' : entry.entry_type === 'project' ? 'Project Time' : 'Customer / Job Activity';
         const hours = entry.clock_out ? Number(entry.total_hours ?? duration(entry, now)) : duration(entry, now);
         return <View key={entry.id} style={styles.row}>
           <View style={styles.top}><Text style={styles.label}>{type}</Text><Badge label={entry.clock_out ? entry.status || 'Submitted' : 'Active'} variant={entry.clock_out ? 'gray' : 'green'} /></View>
