@@ -98,6 +98,8 @@ export const offlineSupabaseUpdate = async (
   return { error: null };
 };
 export const supabase = {
+  channel() { return { on() { return this; }, subscribe() { return this; }, unsubscribe() {} }; },
+  removeChannel: async () => {},
   from(table: string) {
     let filters: any[] = [],
       single = false,
