@@ -73,3 +73,7 @@ console.log('Service scheduling message is isolated from customer and technician
 const approvalEmailSource=fs.readFileSync('supabase/functions/send-service-approval/index.ts','utf8');
 assert.doesNotMatch(approvalEmailSource,/attempt\.notes|serviceRequest\.notes|request\.notes/,'Customer approval email must never interpolate scheduling notes');
 assert.match(approvalEmailSource,/attempt\.description/,'Customer approval email uses approved service description');
+
+assert.match(approvalEmailSource,/wrapInEmailLayout\(/,'Approval email must use the shared branded layout');
+assert.match(approvalEmailSource,/reply_to:settings\.reply_to_email \|\| settings\.company_email \|\| settings\.from_email/,'Approval email must route customer replies to configured inbox');
+assert.match(approvalEmailSource,/company_logo_url/,'Approval email must use configured company logo');
