@@ -21,7 +21,7 @@ export function BusinessCardIdentity({ fullName, title, email, phone, linkedinUr
   linkedinUrl?: string | null; photoUrl?: string | null; company?: CardBranding | null; bannerUrl?: string | null; onEditPhoto?: () => void; onEditBanner?: () => void;
 }) {
   const electronicLife = company?.company_name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'electronic life';
-  const banner = bannerUrl || company?.business_card_banner_url ?? (electronicLife ? '/images/electronic-life-card-banner.webp' : null);
+  const banner = bannerUrl || (company?.business_card_banner_url ?? (electronicLife ? '/images/electronic-life-card-banner.webp' : null));
   const logo = company?.company_logo_url || (electronicLife ? '/el_logo_color_(2).png' : null);
   const names = fullName.trim().split(/\s+/);
   const actions = [
