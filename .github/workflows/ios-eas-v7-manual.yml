@@ -28,13 +28,14 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       CI: '1'
     steps:
+      # Checkout must precede any run step using working-directory: mobile.
+      - uses: actions/checkout@v4
       - name: Check Expo credentials
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
             echo "::error::Set EXPO_TOKEN as an ios-production environment secret before running this workflow."
             exit 1
           fi
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
