@@ -82,7 +82,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={[Colors.primary[600], Colors.primary[700], Colors.primary[900]]}
+        colors={['#000000', '#171717', '#000000']}
         style={styles.gradient}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -91,6 +91,7 @@ export default function LoginScreen() {
             <Logo size={88} variant="light" />
             <Text style={styles.title}>MyJobView</Text>
             <Text style={styles.subtitle}>Your workday. Connected.</Text>
+            <View style={styles.brandAccent} />
           </View>
 
           {/* Login Form */}
@@ -153,7 +154,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://elife.myjobview.com/')}>
+            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://myjobview.com/')}>
               <Text style={styles.resetText}>Open MyJobView on the web</Text>
             </TouchableOpacity>
 
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
   resetLink: { alignSelf: 'flex-end', paddingVertical: 8 },
   resetText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
   loginButton: {
-    backgroundColor: Colors.primary[600],
+    backgroundColor: '#1d4ed8',
     borderRadius: Radius.md,
     paddingVertical: Spacing.lg + 4,
     alignItems: 'center',
@@ -252,6 +253,7 @@ const styles = StyleSheet.create({
   },
   featureTitle: { fontSize: 14, fontWeight: '600', color: Colors.gray[800] },
   featureSubtitle: { fontSize: 12, color: Colors.gray[400], marginTop: 1 },
+  brandAccent: { width: 64, height: 3, backgroundColor: '#b91c1c', marginTop: 8 },
   footer: { alignItems: 'center', marginBottom: 20 },
   footerText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '500', letterSpacing: 1 },
 });
