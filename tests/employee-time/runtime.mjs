@@ -191,9 +191,9 @@ assert.ok(liveModal.includes('activeJobStarted') && liveModal.includes('Job Time
 assert.ok(liveModal.includes("setInterval(() => setNow(Date.now()), 1000)"),
   'Active job elapsed time must update each second');
 assert.ok(internalTimer.includes("start_internal_time") && internalTimer.includes("stop_internal_time") &&
-  internalTimer.includes("Start Shop Time") && internalTimer.includes("Start Training"),
+  internalTimer.includes("Start {session.session_type === 'shop_time' ? 'Shop Time' : 'Training'}"),
   'Job Time employees must be able to start and stop internal time without Daily Clock');
-assert.ok(internalTimer.includes('window.confirm') && customerTimer.includes('window.confirm'),
+assert.ok(internalTimer.includes('requestConfirmation') && customerTimer.includes('requestConfirmation'),
   'Internal and customer timer stop actions must request explicit confirmation');
 assert.ok(verifiedStop.includes('verifiedClockOut') && verifiedStop.includes('Verify & Clock Out'),
   'Daily and job clock-out dialogs must require explicit verification');
