@@ -19,6 +19,8 @@ Deno.serve(async (req:Request)=>{
   if(settingsError || !settings?.from_email) throw new Error('Configure the company email sender before sending this request.');
   const base=org?.subdomain ? `https://${org.subdomain}.myjobview.com` : new URL(settings.portal_url || 'https://myjobview.com').origin;
   const url=`${base}/portal/service-approval?request=${encodeURIComponent(requestId)}&token=${encodeURIComponent(attempt.token)}`;
+  // Only the staff_service_approval description and terms are approved for customer delivery.
+  // service_requests.notes is a staff-only scheduling message and must never be fetched or interpolated here.
   const company=settings.company_name || 'Your service provider';
   const text=`Hello ${attempt.customer_name},\n\nPlease review your service request, accept our rates and terms, and securely provide a payment method before we schedule your appointment.\n\n${attempt.description}\n\nService rates and terms:\n${attempt.terms}\n\nNo payment is collected now. Completing these steps allows us to schedule your service appointment. An appointment time has not yet been reserved.\n\nReview and complete your request:\n${url}\n\nThis link expires in 14 days. If you have questions, contact ${company}.`;
   // Recheck immediately before delivery: waived/cancelled/revised requests must not be sent.
