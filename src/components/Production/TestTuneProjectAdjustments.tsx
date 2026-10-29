@@ -139,7 +139,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </header>
         <div className="grid min-w-0 grid-cols-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
           <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-secondary">Status
-            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All statuses</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
+            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All items ({summaryCounts.all})</option><option value="unsubmitted">Not submitted ({summaryCounts.unsubmitted})</option><option value="requested">Service requested ({summaryCounts.requested})</option><option value="completed">Completed ({summaryCounts.completed})</option></select>
           </label>
           <select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
       <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
@@ -154,7 +154,6 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </footer>
       </section>
     </div>}
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Punchlist summary filters">{([{ key: 'all', label: 'All items' }, { key: 'unsubmitted', label: 'Not submitted' }, { key: 'requested', label: 'Service requested' }, { key: 'completed', label: 'Completed' }] as const).map(item => <button key={item.key} type="button" aria-pressed={statusFilter === item.key} onClick={() => setStatusFilter(item.key)} className={`min-h-14 min-w-0 rounded-xl border px-3 py-2 text-left text-sm ${statusFilter === item.key ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary'}`}><strong>{summaryCounts[item.key]}</strong> {item.label}</button>)}</div>
     {loading && <p role="status">Loading punchlist…</p>}
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
     {notice && <p role="status" className="break-words text-sm text-secondary">{notice}</p>}
