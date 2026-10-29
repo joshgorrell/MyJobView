@@ -139,7 +139,7 @@ try {
     await page.getByRole("alert").filter({ hasText: "Unable to load your customer timer" }).waitFor();
     await page.getByRole("button", { name: "Retry customer timer" }).click();
     await page.getByRole("alert").waitFor({ state: "detached" });
-    await page.getByRole("button", { name: "Stop & Submit Time" }).click();
+    await page.getByRole("button", { name: "Stop & Verify Time" }).click();
     await page.waitForFunction(() =>
       window.__timeTest.calls.some((c) => c.name === "stop_customer_job_time"),
     );
