@@ -62,8 +62,8 @@ console.log('Fast intake submits without mandatory address and preserves schedul
 
 // Regression: the scheduling-only message must never enter customer OR technician work-order notes.
 const combinedQueueSource=fs.readFileSync('src/components/Dispatch/ServiceRequestQueue.tsx','utf8');
-assert.doesNotMatch(combinedQueueSource,/p_internal_notes:\\s*serviceRequests\\.map\\(sr\\s*=>\\s*\\[sr\\.notes/,'Combined scheduling must not copy request messages into work-order notes');
-assert.doesNotMatch(fs.readFileSync('src/components/Production/CreateWorkOrderModal.tsx','utf8'),/internal_notes:\\s*serviceRequest\\s*\\?\\s*\\[serviceRequest\\.notes/,'Individual scheduling must not copy request messages into work-order notes');
+assert.doesNotMatch(combinedQueueSource,/p_internal_notes:\s*serviceRequests\.map\(sr\s*=>\s*\[sr\.notes/,'Combined scheduling must not copy request messages into work-order notes');
+assert.doesNotMatch(fs.readFileSync('src/components/Production/CreateWorkOrderModal.tsx','utf8'),/internal_notes:\s*serviceRequest\s*\?\s*\[serviceRequest\.notes/,'Individual scheduling must not copy request messages into work-order notes');
 // Regression: internal scheduling notes must not prefill customer-visible work-order descriptions.
 const workOrderSource=fs.readFileSync('src/components/Production/CreateWorkOrderModal.tsx','utf8');
 assert.match(workOrderSource,/notes:\s*'',\s*internal_notes:\s*serviceRequest\s*\?/,'Work-order conversion must initialize customer notes empty and retain separate internal metadata');
