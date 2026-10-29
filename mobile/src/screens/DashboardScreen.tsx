@@ -221,7 +221,7 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{loadingStats ? '--' : hoursToday}</Text>
           <Text style={styles.statUnit}>hrs</Text>
-          <Text style={styles.statLabel}>{usesDailyClock === false ? 'Recorded Today' : 'Today'}</Text>
+          <Text style={styles.statLabel}>{usesDailyClock === false ? 'Recorded Today' : isClockedIn ? 'Elapsed Today' : 'Today'}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{loadingStats ? '--' : String(jobsToday)}</Text>
