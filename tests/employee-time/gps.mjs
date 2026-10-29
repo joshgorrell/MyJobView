@@ -127,3 +127,10 @@ assert.ok(nativeDashboardUi.includes("setUsesDailyClock(context.dailyClock)") &&
 assert.ok(nativeDashboardUi.includes("setRecentDays([])"),
   'Job Time employees must not be shown irrelevant Daily Clock recent shifts');
 console.log('Native Time Clock audit: completed shift, pending payroll hours, offline copy and Job Time dashboard.');
+
+assert.ok(!nativeDashboardUi.includes('onPress={signOut}') &&
+  nativeDashboardUi.includes("navigation.navigate('Settings')"),
+  'Dashboard sign-out must go through Settings workday safety verification');
+assert.ok(nativeClockUi.includes("PENDING SYNC / REVIEW") &&
+  nativeClockUi.includes("disabled={clockStateUnverified}"),
+  'Unverified shifts must be visually distinct and unverified starts disabled');
