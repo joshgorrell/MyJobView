@@ -688,9 +688,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               {!!activeActivity && <View style={{ backgroundColor: Colors.amber[50], borderRadius: Radius.md, padding: Spacing.lg, marginBottom: Spacing.md }}>
                 <Text style={{ color: Colors.amber[700], fontWeight: '700' }}>ACTIVE {activeActivity.internal_session_id ? 'SHOP / TRAINING' : 'JOB'} TIME</Text>
                 <Text style={{ color: Colors.gray[800], marginTop: Spacing.xs }}>Running {Math.max(0, Math.floor((currentTime.getTime() - new Date(activeActivity.clock_in).getTime()) / 60000))} minutes. Stop this timer before ending your workday.</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} accessibilityRole="button" style={[styles.primaryButton, { marginTop: Spacing.md }]}>
-                  <Text style={styles.primaryButtonText}>Open Time Controls</Text>
-                </TouchableOpacity>
+                {!activeActivity.internal_session_id && <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} accessibilityRole="button" style={[styles.primaryButton, { marginTop: Spacing.md }]}>
+                  <Text style={styles.primaryButtonText}>Open Job Time Controls</Text>
+                </TouchableOpacity>}
+                {!!activeActivity.internal_session_id && <Text style={{ color: Colors.gray[700], marginTop: Spacing.sm }}>Use the Shop Time &amp; Training controls below to stop this timer.</Text>}
               </View>}
               <TouchableOpacity
                 style={[styles.clockOutButton, !!activeBreak && styles.disabledButton]}
