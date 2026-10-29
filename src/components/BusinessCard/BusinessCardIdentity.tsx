@@ -1,4 +1,4 @@
-import { ChevronRight, Globe, Linkedin, Mail, Phone, User } from 'lucide-react';
+import { ChevronRight, Globe, Linkedin, Mail, Phone, User, Pencil } from 'lucide-react';
 
 export interface CardBranding {
   company_name: string;
@@ -16,12 +16,12 @@ function cardWebsiteUrl(value: string): string | undefined {
   } catch { return undefined; }
 }
 
-export function BusinessCardIdentity({ fullName, title, email, phone, linkedinUrl, photoUrl, company }: {
+export function BusinessCardIdentity({ fullName, title, email, phone, linkedinUrl, photoUrl, company, bannerUrl, onEditPhoto, onEditBanner }: {
   fullName: string; title: string; email: string; phone: string;
-  linkedinUrl?: string | null; photoUrl?: string | null; company?: CardBranding | null;
+  linkedinUrl?: string | null; photoUrl?: string | null; company?: CardBranding | null; bannerUrl?: string | null; onEditPhoto?: () => void; onEditBanner?: () => void;
 }) {
   const electronicLife = company?.company_name?.trim().replace(/\s+/g, ' ').toLowerCase() === 'electronic life';
-  const banner = company?.business_card_banner_url ?? (electronicLife ? '/images/electronic-life-card-banner.webp' : null);
+  const banner = bannerUrl || company?.business_card_banner_url ?? (electronicLife ? '/images/electronic-life-card-banner.webp' : null);
   const logo = company?.company_logo_url || (electronicLife ? '/el_logo_color_(2).png' : null);
   const names = fullName.trim().split(/\s+/);
   const actions = [
@@ -39,8 +39,10 @@ export function BusinessCardIdentity({ fullName, title, email, phone, linkedinUr
     <div className="relative h-32 sm:h-44 bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600">
       {banner && <img src={banner} alt="" className="h-full w-full object-cover object-center" />}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0c1325]/60 to-transparent" />
+      {onEditBanner && <button type="button" aria-label="Change background photo" title="Change background photo" onClick={onEditBanner} className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-950/85 text-white shadow-lg hover:bg-cyan-600 focus-visible:ring-2 focus-visible:ring-white"><Pencil size={17} /></button>}
       <div className="absolute -bottom-10 sm:-bottom-12 left-6 sm:left-8 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 p-[3px] shadow-[0_8px_30px_rgba(75,80,255,0.4)]">
         {photoUrl ? <img src={photoUrl} alt={fullName} className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-[#0c1325] object-cover" /> : <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-[#0c1325] bg-slate-800 flex items-center justify-center"><User className="h-12 w-12 text-cyan-300" /></div>}
+        {onEditPhoto && <button type="button" aria-label="Change profile photo" title="Change profile photo" onClick={onEditPhoto} className="absolute -bottom-1 -right-1 z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-950 bg-cyan-600 text-white shadow-lg hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-white"><Pencil size={16} /></button>}
       </div>
     </div>
     <div className="px-6 sm:px-8 pt-14 sm:pt-16 pb-6">
