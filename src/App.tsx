@@ -233,7 +233,7 @@ function AppContent() {
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<string>(() => {
-    return pageFromLocation(window.location, localStorage.getItem('activeTab') || 'feed');
+    return pageFromLocation(window.location, 'feed');
   });
   const setActiveTab = React.useCallback((tab: string) => {
     const page = resolveLegacyPage(tab);
@@ -362,7 +362,6 @@ function AppContent() {
       const hasAccess = checkModuleAccessRef.current(currentTab);
       if (!hasAccess) {
         setActiveTab('feed');
-        localStorage.setItem('activeTab', 'feed');
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -411,7 +410,6 @@ function AppContent() {
     if (!profile || isPortalUser || isPasswordRecovery || loading) return;
     if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) return;
     if (currentPath !== '/' && !workspacePage(currentPath)) return;
-    localStorage.setItem('activeTab', activeTab);
     const urlParams = new URLSearchParams(window.location.search);
     urlParams.delete('tab');
 
