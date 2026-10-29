@@ -435,7 +435,6 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
                   </div>
                   <button
                     onClick={handleClockOut}
-                    disabled={!!activeActivity}
                     disabled
                     className="w-full bg-gray-200 text-gray-400 cursor-not-allowed rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2"
                     title="End break first"
