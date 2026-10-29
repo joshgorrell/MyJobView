@@ -14,7 +14,7 @@ function harness(path,imports={},globals={}) {
   };
   const jsx=(type,props)=>({type,props});const module={exports:{}};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText.replaceAll('import.meta.env','__testEnv'),{
-    __testEnv:{},console,module,exports:module.exports,Date,URLSearchParams,...globals,
+    __testEnv:{},console,module,exports:module.exports,Date,URLSearchParams,setInterval:()=>1,clearInterval:()=>{},...globals,
     require(name){if(name==='react-dom')return {createPortal:x=>x};if(name==='../../lib/feedback')return {notify(value){globals.alert?.(value);},requestConfirmation:async()=>true,requestText:async()=>null};if(name==='react')return {...React,default:React};if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};if(name==='lucide-react')return new Proxy({},{get:(_,key)=>key});if(name in imports)return imports[name];throw Error(name);},
   });
   return {exports:module.exports,render(name,props={}){cursor=0;return module.exports[name](props);},effects};
