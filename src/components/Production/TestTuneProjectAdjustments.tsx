@@ -182,7 +182,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </article>;
       })}
     </div>
-    <div className="hidden max-w-full overflow-x-auto rounded-xl border border-subtle bg-surface md:block">
+    {rows.length > 0 && <div className="hidden max-w-full overflow-x-auto rounded-xl border border-subtle bg-surface md:block">
       <table className="w-full min-w-[680px] text-left text-sm">
         <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th></tr></thead>
         <tbody className="divide-y divide-subtle">
