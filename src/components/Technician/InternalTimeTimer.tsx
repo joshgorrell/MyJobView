@@ -79,7 +79,7 @@ export function InternalTimeTimer({ onChanged }: { onChanged?: () => void }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'internal_time_sessions', filter: 'assigned_to=eq.' + profile.id }, focus).subscribe();
     return () => { clearInterval(tick); clearInterval(poll); window.removeEventListener('focus', focus); void supabase.removeChannel(channel); };
   }, [load, profile?.id]);
-  async function start(type: Session['session_type'], sessionId = crypto.randomUUID()) {
+  async function start(type: Session['session_type'], sessionId: string) {
     if (!profile || busy || !verified || active || !navigator.onLine) return;
     setBusy(true);
     try {
@@ -119,10 +119,7 @@ export function InternalTimeTimer({ onChanged }: { onChanged?: () => void }) {
       <p className="text-sm text-green-900">{runningSession.title} · {duration(active.clock_in, now)} elapsed</p>
       <button type="button" disabled={busy || !verified || !navigator.onLine} onClick={() => void stop()} className="min-h-12 w-full rounded-xl bg-red-600 text-white font-semibold disabled:opacity-50">Stop &amp; Verify Time</button>
     </div> : active ? <p className="text-sm text-amber-700">Another job or activity is running. Stop it before starting Shop Time or Training.</p> : null}
-    {!active && <div className="grid grid-cols-2 gap-2">
-      <button type="button" disabled={!canStart} onClick={() => void start('shop_time')} className="min-h-12 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50">Start Shop Time</button>
-      <button type="button" disabled={!canStart} onClick={() => void start('training')} className="min-h-12 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-50">Start Training</button>
-    </div>}
+    {!active && approved.length === 0 && <p className="text-sm text-secondary">No approved Shop Time or Training sessions are ready to start. Request a session below for manager approval.</p>}
     {!active && approved.length > 0 && <div className="space-y-2">
       <p className="text-sm font-semibold">Approved sessions</p>
       {approved.map(session => <button key={session.id} type="button" disabled={!canStart}
