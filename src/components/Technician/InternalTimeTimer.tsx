@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import { requestConfirmation } from '../../lib/feedback';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -33,7 +34,7 @@ async function evidence(stopping: boolean) {
 }
 
 /** Shared Time Clock controls for employees with or without a Daily Clock. */
-export function InternalTimeTimer({ onChanged }: { onChanged?: () => void }) {
+export function InternalTimeTimer({ onChanged, compact = false }: { onChanged?: () => void; compact?: boolean }) {
   const { profile } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [active, setActive] = useState<Activity | null>(null);
@@ -110,17 +111,17 @@ export function InternalTimeTimer({ onChanged }: { onChanged?: () => void }) {
   if (!profile?.organization_id) return null;
   const canStart = verified && !active && !busy && navigator.onLine;
   const approved = sessions.filter(s => !!s.approved_by && !!s.approved_at && s.status === 'scheduled');
-  return <section className="rounded-xl border border-subtle bg-elevated p-3 space-y-3" aria-label="Shop Time and Training">
+  return <section className={`rounded-xl border border-subtle bg-elevated p-3 ${compact ? 'space-y-2' : 'space-y-3'}`} aria-label="Shop Time and Training">
     <div className="flex items-center justify-between gap-2">
       <h3 className="font-semibold text-primary">Shop Time &amp; Training</h3>
-      <button type="button" onClick={() => void load()} disabled={busy} className="min-h-11 px-3 rounded-lg border border-subtle text-sm">Refresh</button>
+      <button type="button" onClick={() => void load()} disabled={busy} aria-label="Refresh Shop Time and Training" className={`min-h-11 shrink-0 rounded-lg text-sm ${compact ? 'w-11 flex items-center justify-center hover:bg-surface' : 'px-3 border border-subtle'}`}>{compact ? <RefreshCw className="h-4 w-4" /> : 'Refresh'}</button>
     </div>
     {runningSession && active ? <div className="rounded-xl border border-green-300 bg-green-50 p-3 space-y-2">
       <p className="font-semibold text-green-900">{runningSession.session_type === 'shop_time' ? 'Shop Time' : 'Training'} · Running</p>
       <p className="text-sm text-green-900">{runningSession.title} · {duration(active.clock_in, now)} elapsed</p>
       <button type="button" disabled={busy || !verified || !navigator.onLine} onClick={() => void stop()} className="min-h-12 w-full rounded-xl bg-red-600 text-white font-semibold disabled:opacity-50">Stop &amp; Verify Time</button>
     </div> : active ? <p className="text-sm text-amber-700">Another job or activity is running. Stop it before starting Shop Time or Training.</p> : null}
-    {!active && approved.length === 0 && <p className="text-sm text-secondary">No approved Shop Time or Training sessions are ready to start. Request a session below for manager approval.</p>}
+    {!compact && !active && approved.length === 0 && <p className="text-sm text-secondary">No approved Shop Time or Training sessions are ready to start. Request a session below for manager approval.</p>}
     {!active && approved.length > 0 && <div className="space-y-2">
       <p className="text-sm font-semibold">Approved sessions</p>
       {approved.map(session => <button key={session.id} type="button" disabled={!canStart}
@@ -131,6 +132,9 @@ export function InternalTimeTimer({ onChanged }: { onChanged?: () => void }) {
     </div>}
     {!navigator.onLine && <p className="text-sm text-amber-700">Reconnect to start or stop internal time.</p>}
     {!!error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    <p className="text-xs text-secondary">Shop and Training time is separate from customer jobs and is submitted for manager review. Daily Clock employees remain on their workday clock.</p>
+    {compact ? <details className="text-xs text-secondary">
+      <summary className="cursor-pointer">{!active && approved.length === 0 ? 'No approved sessions · Details' : 'How Shop & Training time works'}</summary>
+      <p className="pt-1">Request Shop or Training time below for manager approval. Shop and Training time is separate from customer jobs and is submitted for manager review. Daily Clock employees remain on their workday clock.</p>
+    </details> : <p className="text-xs text-secondary">Shop and Training time is separate from customer jobs and is submitted for manager review. Daily Clock employees remain on their workday clock.</p>}
   </section>;
 }

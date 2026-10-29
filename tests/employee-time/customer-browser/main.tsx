@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "../../../src/index.css";
 import { ManualJobTimeRequestModal } from "../../../src/components/Technician/ManualJobTimeRequestModal";
 import { CustomerTimeTimer } from "../../../src/components/Technician/CustomerTimeTimer";
+import { FeedbackHost } from "../../../src/components/Shared/FeedbackHost";
 function App() {
   const [open, setOpen] = useState(true);
   return open ? (
@@ -17,4 +18,4 @@ function App() {
     </>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(<><App /><FeedbackHost /></>);

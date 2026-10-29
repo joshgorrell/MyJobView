@@ -1,10 +1,11 @@
+import { QuickActionModal } from '../Shared/QuickActionModal';
 import { notify } from '../../lib/feedback';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  X, Wrench, BookOpen, Clock, CheckCircle, AlertCircle, Send
+  Wrench, BookOpen, Clock, CheckCircle, AlertCircle, Send
 } from 'lucide-react';
 
 interface CompanySettings {
@@ -36,6 +37,8 @@ export function RequestInternalTimeModal({
 }: RequestInternalTimeModalProps) {
   const { profile } = useAuth();
   const [step, setStep] = useState<Step>('type');
+  const stepRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { stepRef.current?.focus({ preventScroll: true }); }, [step]);
   const [sessionType, setSessionType] = useState<'shop_time' | 'training' | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [reason, setReason] = useState('');
@@ -103,31 +106,17 @@ export function RequestInternalTimeModal({
   const headerGradient = sessionType === 'training' ? accentTraining : accentShop;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-        {/* Header */}
-        <div className={`bg-gradient-to-r ${headerGradient} text-white p-5 rounded-t-xl flex items-center justify-between`}>
-          <div className="flex items-center gap-3">
-            {sessionType === 'training'
-              ? <BookOpen className="w-5 h-5" />
-              : <Wrench className="w-5 h-5" />
-            }
-            <div>
-              <h2 className="text-lg font-bold">Request Time</h2>
-              <p className="text-white/80 text-xs">
-                {step === 'success' ? 'Request submitted' : 'Shop time or training request'}
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-white/80 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <QuickActionModal
+      title="Request Shop / Training Time"
+      subtitle={step === 'success' ? 'Request submitted' : 'Choose Shop Time or Training, then add the details'}
+      icon={sessionType === 'training' ? <BookOpen className="w-5 h-5" /> : <Wrench className="w-5 h-5" />}
+      accentColor={headerGradient}
+      onClose={onClose}
+    >
         {/* Step: Type Selection */}
         {step === 'type' && (
-          <div className="p-5 space-y-4">
-            <p className="text-sm text-gray-600">
+          <div ref={stepRef} tabIndex={-1} className="p-5 space-y-4 outline-none">
+            <p className="text-sm text-secondary">
               What type of time are you requesting?
             </p>
 
@@ -138,8 +127,8 @@ export function RequestInternalTimeModal({
                   onClick={() => setSessionType('shop_time')}
                   className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 transition-all text-left ${
                     sessionType === 'shop_time'
-                      ? 'border-amber-500 bg-amber-50'
-                      : 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/40'
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-subtle hover:border-amber-300 hover:bg-amber-500/10'
                   }`}
                 >
                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
@@ -148,8 +137,8 @@ export function RequestInternalTimeModal({
                     <Wrench className="w-5 h-5 text-amber-700" />
                   </div>
                   <div>
-                    <div className="font-semibold text-gray-900">Shop Time</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="font-semibold text-primary">Shop Time</div>
+                    <div className="text-xs text-secondary mt-0.5">
                       Cleaning, organizing, bench work, shop chores
                     </div>
                   </div>
@@ -165,8 +154,8 @@ export function RequestInternalTimeModal({
                   onClick={() => setSessionType('training')}
                   className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 transition-all text-left ${
                     sessionType === 'training'
-                      ? 'border-teal-600 bg-teal-50'
-                      : 'border-gray-200 hover:border-teal-400 hover:bg-teal-50/40'
+                      ? 'border-teal-600 bg-teal-500/10'
+                      : 'border-subtle hover:border-teal-400 hover:bg-teal-500/10'
                   }`}
                 >
                   <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
@@ -175,8 +164,8 @@ export function RequestInternalTimeModal({
                     <BookOpen className="w-5 h-5 text-teal-700" />
                   </div>
                   <div>
-                    <div className="font-semibold text-gray-900">Training</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="font-semibold text-primary">Training</div>
+                    <div className="text-xs text-secondary mt-0.5">
                       Instruction, certifications, product knowledge
                     </div>
                   </div>
@@ -190,15 +179,15 @@ export function RequestInternalTimeModal({
             {(
               <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-700">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                A manager will need to approve this request before it counts toward your pay.
+                A manager must approve this request before you can start the session.
               </div>
             )}
 
-            <div className="flex gap-3 pt-2 border-t border-gray-200">
+            <div className="flex gap-3 pt-2 border-t border-subtle">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-subtle rounded-lg text-sm text-secondary hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
@@ -216,9 +205,9 @@ export function RequestInternalTimeModal({
 
         {/* Step: Details */}
         {step === 'details' && (
-          <div className="p-5 space-y-4">
+          <div ref={stepRef} tabIndex={-1} className="p-5 space-y-4 outline-none">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-secondary mb-2">
                 <Clock className="w-4 h-4 inline mr-1" />
                 How much time?
               </label>
@@ -231,7 +220,7 @@ export function RequestInternalTimeModal({
                     className={`py-2 rounded-lg text-sm font-medium border transition-all ${
                       selectedDuration === opt.value
                         ? 'border-blue-500 bg-blue-50 text-blue-800'
-                        : 'border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50/40'
+                        : 'border-subtle text-secondary hover:border-blue-300 hover:bg-blue-50/40'
                     }`}
                   >
                     {opt.label}
@@ -241,7 +230,7 @@ export function RequestInternalTimeModal({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
                 Reason <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -253,12 +242,12 @@ export function RequestInternalTimeModal({
                     ? 'What will you be doing? (e.g. cleaning the van, organizing parts room)'
                     : 'What are you training on? (e.g. reviewing new product install guide)'
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full bg-surface text-primary px-3 py-2 border border-subtle rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="block text-sm font-semibold text-secondary mb-1.5">
                 Additional Notes
                 <span className="text-gray-400 font-normal ml-1">(optional)</span>
               </label>
@@ -267,15 +256,15 @@ export function RequestInternalTimeModal({
                 onChange={e => setNotes(e.target.value)}
                 rows={2}
                 placeholder="Anything else your manager should know?"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full bg-surface text-primary px-3 py-2 border border-subtle rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
             </div>
 
-            <div className="flex gap-3 pt-2 border-t border-gray-200">
+            <div className="flex gap-3 pt-2 border-t border-subtle">
               <button
                 type="button"
                 onClick={() => setStep('type')}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border border-subtle rounded-lg text-sm text-secondary hover:bg-gray-50 transition-colors"
               >
                 Back
               </button>
@@ -298,7 +287,7 @@ export function RequestInternalTimeModal({
 
         {/* Step: Success */}
         {step === 'success' && (
-          <div className="p-8 text-center space-y-4">
+          <div ref={stepRef} tabIndex={-1} className="p-8 text-center space-y-4 outline-none">
             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
               sessionType === 'training' ? 'bg-teal-100' : 'bg-amber-100'
             }`}>
@@ -307,10 +296,10 @@ export function RequestInternalTimeModal({
               }`} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className="text-lg font-bold text-primary">
                 {requiresApproval ? 'Request Submitted!' : 'Session Started!'}
               </h3>
-              <p className="text-sm text-gray-500 mt-1.5">
+              <p className="text-sm text-secondary mt-1.5">
                 {requiresApproval
                   ? 'Your request has been sent to your manager for approval. You\'ll see it in your Assigned Sessions once approved.'
                   : 'Your session has been created and submitted for payroll. Great work!'
@@ -336,7 +325,6 @@ export function RequestInternalTimeModal({
             </button>
           </div>
         )}
-      </div>
-    </div>
+    </QuickActionModal>
   );
 }
