@@ -15,6 +15,10 @@ interface PointsConfig {
   lead_claimed_points: number;
   lead_converted_points: number;
   manual_entry_points_loss: number;
+  attendance_early_points: number;
+  attendance_on_time_points: number;
+  attendance_late_points: number;
+  attendance_very_late_points: number;
 }
 
 interface Reward {
@@ -67,9 +71,14 @@ export function PointsAndRewards() {
     lead_claimed_points: 15,
     lead_converted_points: 50,
     manual_entry_points_loss: 10,
+    attendance_early_points: 10,
+    attendance_on_time_points: 5,
+    attendance_late_points: -5,
+    attendance_very_late_points: -10,
   });
 
   const [photoUploadPoints, setPhotoUploadPoints] = useState(1);
+  const [forgotClockOutPenalty, setForgotClockOutPenalty] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -88,7 +97,7 @@ export function PointsAndRewards() {
             rewards_catalog(name)
           `)
           .order('created_at', { ascending: false }),
-        supabase.from('company_settings').select('id, photo_upload_points').eq('organization_id', profile?.organization_id).maybeSingle(),
+        supabase.from('company_settings').select('id, photo_upload_points, forgot_clock_out_penalty_points').eq('organization_id', profile?.organization_id).maybeSingle(),
       ]);
 
       for (const result of [configResult, rewardsResult, redemptionsResult, companySettings]) {
@@ -105,11 +114,19 @@ export function PointsAndRewards() {
           lead_claimed_points: configResult.data.lead_claimed_points ?? 15,
           lead_converted_points: configResult.data.lead_converted_points ?? 50,
           manual_entry_points_loss: configResult.data.manual_entry_points_loss ?? 10,
+          attendance_early_points: configResult.data.attendance_early_points ?? 10,
+          attendance_on_time_points: configResult.data.attendance_on_time_points ?? 5,
+          attendance_late_points: configResult.data.attendance_late_points ?? -5,
+          attendance_very_late_points: configResult.data.attendance_very_late_points ?? -10,
         });
       }
 
       if (companySettings.data?.photo_upload_points !== undefined) {
         setPhotoUploadPoints(companySettings.data.photo_upload_points);
+      }
+
+      if (companySettings.data?.forgot_clock_out_penalty_points != null) {
+        setForgotClockOutPenalty(companySettings.data.forgot_clock_out_penalty_points);
       }
 
       setRewards(rewardsResult.data || []);
@@ -148,7 +165,7 @@ export function PointsAndRewards() {
       if (settings?.id) {
         const { error } = await supabase
           .from('company_settings')
-          .update({ photo_upload_points: photoUploadPoints })
+          .update({ photo_upload_points: photoUploadPoints, forgot_clock_out_penalty_points: forgotClockOutPenalty })
           .eq('id', settings.id);
         if (error) throw error;
       }
@@ -435,6 +452,42 @@ export function PointsAndRewards() {
                     className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Points awarded when answering a question</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Attendance & Punctuality</h3>
+              <p className="text-sm text-gray-400 mb-4">Configure daily arrival rewards and deductions. Positive values award points; negative values deduct points.</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                {([
+                  ['attendance_early_points', '15+ Minutes Early', 'Default: +10'],
+                  ['attendance_on_time_points', 'Early / On Time', 'Default: +5'],
+                  ['attendance_late_points', 'Up to 15 Minutes Late', 'Default: -5'],
+                  ['attendance_very_late_points', 'More Than 15 Minutes Late', 'Default: -10'],
+                ] as const).map(([key, label, description]) => (
+                  <div key={key}>
+                    <label htmlFor={key} className="block text-sm font-medium text-gray-300 mb-2">{label}</label>
+                    <input id={key} type="number" step="1" value={pointsForm[key]}
+                      onChange={e => setPointsForm(previous => ({ ...previous, [key]: Number.parseInt(e.target.value, 10) || 0 }))}
+                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500" />
+                    <p className="text-xs text-gray-500 mt-1">{description}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="forgot-clock-out-penalty" className="block text-sm font-medium text-gray-300 mb-2">Forgotten Clock-Out Penalty</label>
+                  <input
+                    id="forgot-clock-out-penalty"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={forgotClockOutPenalty}
+                    onChange={e => setForgotClockOutPenalty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="w-full px-4 py-2 bg-gray-900 border border-red-700 text-white rounded-lg focus:ring-2 focus:ring-red-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Points deducted when an employee forgets to clock out. Uses the existing company setting.</p>
                 </div>
               </div>
             </div>
