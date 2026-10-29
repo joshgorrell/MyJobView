@@ -16,6 +16,7 @@ import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Card, EmptyState, Badge } from '../components/UI';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
+import { JobTimeHistory } from './JobTimeHistory';
 
 interface ClockEntry {
   id: string;
@@ -42,6 +43,7 @@ interface BreakEntry {
 }
 
 export default function TimeHistoryScreen() {
+  const [usesDailyClock, setUsesDailyClock] = useState<boolean | null>(null);
   const { profile } = useAuth();
   const { isConnected } = useOffline();
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,8 @@ export default function TimeHistoryScreen() {
     try {
       const context = await getEmployeeTimeContext(profile.id);
       setTimezone(context.timezone);
+      setUsesDailyClock(context.dailyClock);
+      if (!context.dailyClock) { setLoading(false); setRefreshing(false); return; }
 
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -120,6 +124,8 @@ export default function TimeHistoryScreen() {
     const mins = minutes % 60;
     return `${hrs}h ${mins}m`;
   }
+
+  if (usesDailyClock === false) return <JobTimeHistory />;
 
   if (loading) {
     return (
