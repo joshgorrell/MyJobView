@@ -57,3 +57,54 @@ assert.match(sharedClockOutSource, /saveClockEventGps\(entryId,\s*type === 'dail
 assert.ok(workOrderClockSource.indexOf("supabase.rpc('start_work_order_time'") < workOrderClockSource.indexOf("saveClockEventGps(data, 'time_entries'"), 'Server must establish job time before GPS evidence attaches');
 assert.ok(sharedClockOutSource.indexOf('await offlineSupabaseUpdate(') < sharedClockOutSource.indexOf('void saveClockEventGps(entryId'), 'Clock-out must persist punch before GPS evidence');
 console.log('Customer Job Clock in/out paths are wired to GPS capture and durable evidence without blocking payroll punches.');
+
+
+const punchAt = '2026-10-29T12:00:00.000Z';
+let overlapRows = {daily_clock_breaks: [], time_entries: []};
+let overlapError = false;
+const overlapSupabase = {
+  from(table) {
+    const filters = [];
+    const query = new Proxy({}, {get(_, method) {
+      if (method === 'then') return resolve => {
+        if (overlapError) { resolve({data:null,error:{message:'Unable to verify activity'}}); return; }
+        const data = overlapRows[table].filter(row => filters.every(([op, field, value]) => {
+          if (op === 'eq') return row[field] === value;
+          if (op === 'lt') return Date.parse(row[field]) < Date.parse(value);
+          if (op === 'in') return value.includes(row[field]);
+          if (op === 'or') {
+            const [nullClause, gtClause] = field.split(',');
+            const nullField = nullClause.split('.')[0], gtField = gtClause.split('.')[0];
+            const threshold = gtClause.slice(gtField.length + 4);
+            return row[nullField] == null || Date.parse(row[gtField]) > Date.parse(threshold);
+          }
+          return true;
+        }));
+        resolve({data:data.slice(0,1),error:null});
+      };
+      return (...args) => { if (['eq','lt','in','or'].includes(method)) filters.push([method,...args]); return query; };
+    }});
+    return query;
+  },
+};
+const {hasOverlappingActivityAtClockOut} = load('mobile/src/services/OfflineStorage.ts',{
+  'expo-sqlite':{}, '@react-native-community/netinfo':{},
+  './supabase':{supabase:overlapSupabase},
+});
+const overlaps = () => hasOverlappingActivityAtClockOut('tech','shift',punchAt);
+overlapRows.daily_clock_breaks=[{id:'break',daily_clock_entry_id:'shift',break_start:'2026-10-29T11:30:00Z',break_end:'2026-10-29T12:30:00Z'}];
+assert.equal(await overlaps(),true,'Break ending after offline punch still conflicts at punch time');
+overlapRows.daily_clock_breaks=[{id:'break',daily_clock_entry_id:'shift',break_start:'2026-10-29T12:30:00Z',break_end:null}];
+assert.equal(await overlaps(),false,'Break starting after punch must not create a false conflict');
+overlapRows.daily_clock_breaks=[];
+overlapRows.time_entries=[{id:'job',technician_id:'tech',clock_in:'2026-10-29T11:00:00Z',clock_out:null,status:'draft'}];
+assert.equal(await overlaps(),true,'Open job timer spanning punch conflicts');
+overlapRows.time_entries=[{id:'job',technician_id:'tech',clock_in:'2026-10-29T11:00:00Z',clock_out:'2026-10-29T12:20:00Z',status:'approved'}];
+assert.equal(await overlaps(),true,'Approved job time ending after punch still conflicts');
+overlapRows.time_entries=[{id:'job',technician_id:'tech',clock_in:'2026-10-29T12:20:00Z',clock_out:null,status:'draft'}];
+assert.equal(await overlaps(),false,'Job time started after punch does not conflict');
+overlapRows.time_entries=[{id:'job',technician_id:'tech',clock_in:'2026-10-29T11:00:00Z',clock_out:null,status:'rejected'}];
+assert.equal(await overlaps(),false,'Rejected activity is not payable');
+overlapError=true;
+await assert.rejects(overlaps(),/Unable to verify activity/,'Failed server verification must not approve a punch');
+console.log('Offline Daily Clock-Out checks historical job/break overlap at the punch timestamp and fails closed.');
