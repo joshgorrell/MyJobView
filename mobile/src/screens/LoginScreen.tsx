@@ -39,7 +39,7 @@ export default function LoginScreen() {
     setResetting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(address, {
-        redirectTo: 'https://myjobview.com/',
+        redirectTo: 'https://elife.myjobview.com/',
       });
       if (error) throw error;
       Alert.alert('Check your email', 'If an account exists for that address, you will receive password reset instructions.');
