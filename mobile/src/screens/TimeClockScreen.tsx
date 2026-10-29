@@ -686,7 +686,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               <View style={styles.completedCheckInner} />
             </View>
             <Text style={styles.completedTitle}>Clocked Out</Text>
-            <Text style={styles.completedHours}>Total Hours: {todayEntry.total_hours.toFixed(2)}</Text>
+            <Text style={styles.completedHours}>{clockStateUnverified ? 'Hours pending synchronization or review' : `Total Hours: ${todayEntry.total_hours.toFixed(2)}`}</Text>
             <Text style={styles.completedTime}>
               {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               {' - '}
