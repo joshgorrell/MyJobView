@@ -36,12 +36,12 @@ export default function ServiceApprovalPage() {
   {!approval ? <p>{error ? 'Contact your service provider for help with this request.' : 'Loading service request…'}</p> : <>
    <p className="text-gray-700">Hello {approval.customer_name}. Review your service request and rates below.</p>
    <p className="whitespace-pre-wrap text-gray-700">{approval.description}</p>
-   <section className="border rounded-lg p-4"><h2 className="font-semibold text-gray-900">Service rates and terms</h2><p className="whitespace-pre-wrap text-gray-700 mt-2">{approval.terms}</p></section>
+   <details className="border rounded-lg p-4"><summary className="font-semibold text-gray-900 cursor-pointer">View Service Terms &amp; Conditions</summary><p className="whitespace-pre-wrap text-gray-700 mt-3">{approval.terms}</p></details>
    <p className="bg-blue-50 text-blue-900 rounded-lg p-4">No payment is collected now. Completing these steps allows us to schedule your service appointment. An appointment time has not yet been reserved.</p>
    {approval.waived ? <p role="status" className="text-green-800">Your service provider has waived these requirements. No further action is needed.</p> : approval.closed ? <p role="status">This request no longer needs customer action. Contact your provider about your appointment.</p> : <>
     {approval.accepted_at ? <p className="text-green-800">Rates and terms accepted by {approval.accepted_by}.</p> : <div className="space-y-3">
      <label className="block text-gray-800">Your name<input maxLength={200} value={name} onChange={e=>setName(e.target.value)} className="block border rounded-lg p-3 w-full mt-1" /></label>
-     <label className="flex gap-2 text-gray-800"><input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)} />I agree to the service rates and terms shown above.</label>
+     <label className="flex gap-2 text-gray-800"><input type="checkbox" checked={agreed} onChange={e=>setAgreed(e.target.checked)} />I have read and agree to the Service Terms &amp; Conditions.</label>
      <button disabled={busy || !agreed || !name.trim()} onClick={()=>void accept()} className="bg-blue-900 text-white px-4 py-3 rounded-lg disabled:opacity-50">Accept Rates &amp; Terms</button>
     </div>}
     {approval.ready ? <p role="status" className="rounded-lg bg-green-50 p-4 text-green-800">Your request is ready to schedule. Our service team will coordinate your appointment.</p> : <fieldset disabled={busy} className="space-y-3 disabled:opacity-60"><h2 className="font-semibold text-gray-900">Payment method for your service visit</h2>
