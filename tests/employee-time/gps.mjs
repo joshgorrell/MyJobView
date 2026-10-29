@@ -108,3 +108,7 @@ assert.equal(await overlaps(),false,'Rejected activity is not payable');
 overlapError=true;
 await assert.rejects(overlaps(),/Unable to verify activity/,'Failed server verification must not approve a punch');
 console.log('Offline Daily Clock-Out checks historical job/break overlap at the punch timestamp and fails closed.');
+
+const nativeOfflineSource=fs.readFileSync('mobile/src/services/OfflineStorage.ts','utf8');
+assert.equal((nativeOfflineSource.match(/await hasOverlappingActivityAtClockOut\(event\.technician_id, event\.id, event\.clock_out\)/g)||[]).length,2,
+  'Both existing-shift closure and offline-created-shift insertion must check historical activity overlap');
