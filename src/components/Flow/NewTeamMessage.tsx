@@ -53,7 +53,8 @@ export function NewTeamMessage({ inline = false, scope, threads, canTeam, canCus
     void load();
     return () => { cancelled = true; };
   }, [canTeam, profile?.id, profile?.organization_id]);
-  const choices = (kind === 'department' ? departments : people).filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  const query = search.trim().replace(/^@+/, '').toLowerCase();
+  const choices = query ? (kind === 'department' ? departments : people).filter(p => p.name.toLowerCase().includes(query)).slice(0, 8) : [];
   async function send(event: FormEvent) {
     event.preventDefault();
     if (busy.current || !profile?.organization_id || !canTeam || !body.trim() || (kind !== 'company' && !selected.length)) return;
@@ -97,9 +98,9 @@ export function NewTeamMessage({ inline = false, scope, threads, canTeam, canCus
           </div>
           {pickingRecipients && <>
             <label className="sr-only" htmlFor="team-recipient-search">{kind === 'direct' ? 'Search people' : 'Search departments'}</label>
-            <input id="team-recipient-search" autoFocus={!inline} type="search" value={search} disabled={sending} onChange={e => setSearch(e.target.value)} placeholder={kind === 'direct' ? 'Search people by name…' : 'Search departments…'} className="w-full rounded-lg border border-subtle bg-canvas p-2 text-base" />
+            <input id="team-recipient-search" autoFocus={!inline} type="search" value={search} disabled={sending} onChange={e => setSearch(e.target.value)} placeholder={kind === 'direct' ? 'Search people or type @name…' : 'Search departments or type @name…'} className="w-full rounded-lg border border-subtle bg-canvas p-2 text-base" />
             <div className="team-message-recipients min-h-11 flex-1 overflow-y-auto rounded-lg border border-subtle" aria-label="Recipient results">
-              {loading ? <p className="p-3 text-sm">Loading recipients…</p> : choices.length ? choices.map(p => <button type="button" key={p.id} disabled={sending} aria-pressed={selected.some(r => r.id === p.id)} onClick={() => { setSelected(kind === 'department' ? [p] : selected.some(r => r.id === p.id) ? selected.filter(r => r.id !== p.id) : [...selected, p]); setSearch(''); setPickingRecipients(false); }} className={`block w-full min-h-11 px-3 py-2 text-left text-sm ${selected.some(r => r.id === p.id) ? 'bg-blue-100 text-blue-800' : 'hover:bg-elevated'}`}>{p.name}</button>) : <p className="p-3 text-sm text-secondary">No matching recipients.</p>}
+              {!query ? <p className="p-3 text-sm text-secondary">{kind === 'direct' ? 'Type a name or @ to find a teammate.' : 'Type a department name or @ to find one. Everyone currently in it will receive the message.'}</p> : loading ? <p className="p-3 text-sm">Loading recipients…</p> : choices.length ? choices.map(p => <button type="button" key={p.id} disabled={sending} aria-pressed={selected.some(r => r.id === p.id)} onClick={() => { setSelected(kind === 'department' ? [p] : selected.some(r => r.id === p.id) ? selected.filter(r => r.id !== p.id) : [...selected, p]); setSearch(''); setPickingRecipients(false); }} className={`block w-full min-h-11 px-3 py-2 text-left text-sm ${selected.some(r => r.id === p.id) ? 'bg-blue-100 text-blue-800' : 'hover:bg-elevated'}`}>{p.name}</button>) : <p className="p-3 text-sm text-secondary">No matching recipients.</p>}
             </div>
           </>}
         </>}

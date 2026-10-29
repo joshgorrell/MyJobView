@@ -82,6 +82,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   }
   const [breaks, setBreaks] = useState<Break[]>([]);
   const [activeBreak, setActiveBreak] = useState<Break | null>(null);
+  const [activeActivity, setActiveActivity] = useState<{ id: string; clock_in: string; work_order_id: string | null; internal_session_id: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [pendingSync, setPendingSync] = useState(0);
@@ -90,8 +91,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   useEffect(() => {
     loadTodaysClock();
     loadPendingSync();
+    void loadActiveActivity();
+    const activityTimer = setInterval(() => { void loadActiveActivity(); }, 15000);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    return () => { clearInterval(timer); clearInterval(activityTimer); };
   }, [profile?.id]);
 
   useEffect(() => {
@@ -102,6 +105,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       .subscribe();
     return () => { subscription.unsubscribe(); };
   }, [todayEntry?.id]);
+
+  async function loadActiveActivity() {
+    if (!profile) return;
+    const { data, error } = await supabase.from('time_entries')
+      .select('id,clock_in,work_order_id,internal_session_id')
+      .eq('technician_id', profile.id).is('clock_out', null)
+      .in('status', ['draft', 'submitted']).order('clock_in', { ascending: false }).limit(1);
+    if (!error) setActiveActivity(data?.[0] || null);
+  }
 
   async function loadTodaysClock() {
     if (!profile) return;
@@ -427,6 +439,11 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     try { await assertNoInternalTimer(profile); }
     catch (error: any) { Alert.alert('Unable to clock out', error.message); return; }
     if (activeBreak) { Alert.alert('Active Break', 'Please end your break before clocking out'); return; }
+    await loadActiveActivity();
+    const { data: openActivities, error: activityError } = await supabase.from('time_entries').select('id,work_order_id,internal_session_id')
+      .eq('technician_id', profile.id).is('clock_out', null).in('status', ['draft', 'submitted']).limit(1);
+    if (activityError) { Alert.alert('Unable to verify job time', 'Reconnect and try again before clocking out.'); return; }
+    if (openActivities?.length) { Alert.alert('Active time must be stopped', 'Stop your running Job Time, Shop Time or Training before clocking out for the day.', [{ text: 'OK' }, { text: 'Open Work Orders', onPress: () => navigation.navigate('WorkOrders') }]); return; }
     if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) {
       Alert.alert('Unfinished shift', 'Ask your manager to correct this older shift before recording another day.');
       return;
@@ -668,10 +685,17 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
                 </TouchableOpacity>
               )}
 
+              {!!activeActivity && <View style={{ backgroundColor: Colors.amber[50], borderRadius: Radius.md, padding: Spacing.lg, marginBottom: Spacing.md }}>
+                <Text style={{ color: Colors.amber[700], fontWeight: '700' }}>ACTIVE {activeActivity.internal_session_id ? 'SHOP / TRAINING' : 'JOB'} TIME</Text>
+                <Text style={{ color: Colors.gray[800], marginTop: Spacing.xs }}>Running {Math.max(0, Math.floor((currentTime.getTime() - new Date(activeActivity.clock_in).getTime()) / 60000))} minutes. Stop this timer before ending your workday.</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} accessibilityRole="button" style={[styles.primaryButton, { marginTop: Spacing.md }]}>
+                  <Text style={styles.primaryButtonText}>Open Time Controls</Text>
+                </TouchableOpacity>
+              </View>}
               <TouchableOpacity
                 style={[styles.clockOutButton, !!activeBreak && styles.disabledButton]}
                 onPress={handleClockOut}
-                disabled={!!activeBreak}
+                disabled={!!activeBreak || !!activeActivity}
                 activeOpacity={0.8}
               >
                 <Text style={styles.clockOutButtonText}>Clock Out</Text>
