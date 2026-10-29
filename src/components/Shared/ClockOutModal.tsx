@@ -25,6 +25,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
   const completion = useCompletion(onSuccess);
   useEffect(() => { const previous = document.activeElement as HTMLElement | null; dialogRef.current?.focus(); return () => { previous?.focus(); }; }, []);
   const [notes, setNotes] = useState('');
+  const [verifiedClockOut, setVerifiedClockOut] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -85,6 +86,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
 
   async function handleClockOut() {
     if (uploading || completion.completed) return;
+    if (!verifiedClockOut) { setError('Confirm that you want to stop this timer before clocking out.'); return; }
     // Enforce minimum 20 characters for job clock out
     if (type === 'job' && noteChars < 20) {
       setError('Job notes must be at least 20 characters. Please describe what work was completed.');
@@ -506,6 +508,11 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
             </div>
           )}
 
+          <label className="flex items-start gap-3 rounded-xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 cursor-pointer">
+            <input type="checkbox" className="mt-1 h-5 w-5" checked={verifiedClockOut} onChange={e => setVerifiedClockOut(e.target.checked)} />
+            <span><strong>Verify clock-out</strong><br />I confirm I am stopping {type === 'daily' ? 'my Daily Clock for the day' : 'this Job Time timer'} now. {type === 'daily' ? 'All job and internal timers and breaks must already be stopped.' : 'My recorded time and notes will be submitted for review.'}</span>
+          </label>
+
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
@@ -517,10 +524,10 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowC
             </button>
             <button
               onClick={handleClockOut}
-              disabled={uploading || (type === 'job' && !notesValid)}
+              disabled={uploading || !verifiedClockOut || (type === 'job' && !notesValid)}
               className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              {uploading ? 'Clocking Out...' : 'Clock Out'}
+              {uploading ? 'Clocking Out...' : 'Verify & Clock Out'}
             </button>
           </div>
           {type === 'job' && !notesValid && (
