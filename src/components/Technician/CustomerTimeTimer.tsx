@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -72,7 +73,7 @@ export function CustomerTimeTimer({ onChanged }: { onChanged?: () => void }) {
   }, [profile?.id]);
   async function stop() {
     if (!session || busy) return;
-    if (!window.confirm('Verify clock-out: Stop this customer timer and submit the recorded time for manager review?')) return;
+    if (!await requestConfirmation('Verify clock-out: Stop this customer timer and submit the recorded time for manager review?', { theme: 'blue', title: 'Verify Clock-Out', confirmLabel: 'Stop Time' })) return;
     if (!navigator.onLine) {
       setError(
         "Reconnect to stop this timer. Its start time is saved and it continues running.",
