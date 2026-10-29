@@ -1,0 +1,57 @@
+name: iOS EAS TestFlight build (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit_to_testflight:
+        description: 'Submit completed production build to App Store Connect (internal testing only)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-eas-production
+  cancel-in-progress: false
+
+jobs:
+  ios-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ios-production
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      CI: '1'
+    steps:
+      - name: Check Expo credentials
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Set EXPO_TOKEN as an ios-production environment secret before running this workflow."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate mobile TypeScript
+        run: npx tsc --noEmit
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+      - name: Verify Expo account and project
+        run: |
+          eas whoami
+          node -e "const a=require('./app.json').expo; if(a.ios.bundleIdentifier!=='com.myjobview.app'||a.extra?.eas?.projectId!=='7d9e3303-8b1d-416e-9ace-fd3b15d9340f') process.exit(1)"
+      - name: Build iOS production artifact
+        run: eas build --platform ios --profile production --non-interactive --wait
+      - name: Submit latest build to App Store Connect
+        if: ${{ inputs.submit_to_testflight }}
+        run: eas submit --platform ios --profile production --latest --non-interactive
