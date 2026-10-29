@@ -30,18 +30,18 @@ for(const width of [375,390,1280]){
  await page.getByRole('button',{name:'Filter Test and Tune tasks'}).click();
  await page.getByRole('dialog',{name:'Test and Tune filters'}).waitFor();
  await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('c1');
- assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('6')),true);
+ assert.equal(await page.getByRole('combobox',{name:'Filter punchlist status'}).locator('option[value="all"]').textContent().then(t=>t.includes('6')),true);
  await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('p1');
- assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('5')),true);
+ assert.equal(await page.getByRole('combobox',{name:'Filter punchlist status'}).locator('option[value="all"]').textContent().then(t=>t.includes('5')),true);
  await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('customer');
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a'}).count(),0);
  await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('all');
  await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('all');
  await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('all');
+ await page.getByRole('combobox',{name:'Filter punchlist status'}).selectOption('unsubmitted');
+ assert.equal(await page.getByRole('combobox',{name:'Filter punchlist status'}).inputValue(),'unsubmitted');
+ await page.getByRole('combobox',{name:'Filter punchlist status'}).selectOption('all');
  await page.getByRole('button',{name:'Close filters'}).click();
- await page.getByRole('button',{name:/Not submitted/}).click();
- assert.equal(await page.getByRole('button',{name:/Not submitted/}).getAttribute('aria-pressed'),'true');
- await page.getByRole('button',{name:/All items/}).click();
 
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.equal(await page.getByRole('checkbox',{name:'Select Expired adjustment',exact:true}).isDisabled(),true);
@@ -59,6 +59,7 @@ for(const width of [375,390,1280]){
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).count(),1);
  const calls=await page.evaluate(()=>window.calls);assert.deepEqual(calls.find(c=>c[0]==='request_project_punchlist_visit')[1].p_task_ids,['a','b','c']);
  await page.reload();assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).count(),0);await page.getByRole('checkbox',{name:'Select Adjustment d',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Filter Test and Tune tasks'}).click();
  await page.getByRole('combobox',{name:'Filter punchlist status'}).selectOption('requested');assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a'}).count(),0);
  await page.goto('http://127.0.0.1:'+server.address().port+'/?projectId=missing&contactId=c1');await page.getByRole('alert').filter({hasText:'unavailable or you no longer have access'}).waitFor();
  await page.goBack();await page.getByRole('button',{name: width < 768 ? 'Open task Adjustment d' : 'Preview Adjustment d'}).first().waitFor();
