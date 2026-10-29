@@ -1,4 +1,5 @@
 import { CustomerTimeTimer } from '../Technician/CustomerTimeTimer';
+import { InternalTimeTimer } from '../Technician/InternalTimeTimer';
 import { MyJobTimeView } from '../Technician/MyJobTimeView';
 import { createPortal } from 'react-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -24,6 +25,8 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
   const [tab, setTab] = useState<'work' | 'calendar' | 'time' | 'pto' | 'team'>('work');
   const [jobs, setJobs] = useState<any[]>([]);
   const [activeJob, setActiveJob] = useState<{ id: string; title: string } | null>(null);
+  const [activeJobStarted, setActiveJobStarted] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
   const [day, setDay] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,22 +42,30 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
           .eq('organization_id', profile.organization_id).eq('assigned_to', profile.id).eq('scheduled_date', today)
           .not('status', 'in', '(cancelled,archived,split)').order('scheduled_start_time', { nullsFirst: false }),
         supabase.from('company_settings').select('id,shop_time_request_enabled,training_time_request_enabled,time_request_requires_approval').eq('organization_id', profile.organization_id).maybeSingle(),
-        supabase.from('time_entries').select('work_order_id,work_order:work_orders(title)').eq('technician_id', profile.id).is('clock_out', null).in('status', ['draft', 'submitted']).limit(1).maybeSingle(),
+        supabase.from('time_entries').select('work_order_id,clock_in,work_order:work_orders(title)').eq('technician_id', profile.id).is('clock_out', null).in('status', ['draft', 'submitted']).limit(1).maybeSingle(),
       ]);
       if (orders.error) throw orders.error;
       if (active.error) throw active.error;
       setJobs(orders.data || []); setDay(today);
       const current = active.data as any;
       setActiveJob(current?.work_order_id ? { id: current.work_order_id, title: current.work_order?.title || 'Active job' } : null);
+      setActiveJobStarted(current?.work_order_id ? current.clock_in : null);
       if (!config.error) setSettings(config.data);
     } catch (error: any) { setError(error.message || 'Unable to load your daily work.'); }
     finally { setLoading(false); }
   }
   useEffect(() => {
+    const ticker = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(ticker);
+  }, []);
+  useEffect(() => {
     void load();
     if (!profile) return;
     const channel = supabase.channel('time-hub-jobs').on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries', filter: `technician_id=eq.${profile.id}` }, load).subscribe();
-    return () => { void channel.unsubscribe(); };
+    const poll = setInterval(() => { if (navigator.onLine) void load(); }, 15000);
+    const focus = () => { void load(); };
+    window.addEventListener('focus', focus);
+    return () => { clearInterval(poll); window.removeEventListener('focus', focus); void channel.unsubscribe(); };
   }, [profile?.id]);
   function openWorkOrder(id: string) { if (onNavigate) { onNavigate('work_orders', { workOrderId: id }); onClose(); } }
   const tabs = [
@@ -69,17 +80,23 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
       </nav>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]" key={tab}>
       {tab === 'work' && <>
+        {activeJob && activeJobStarted && <section role="status" aria-label="Running Job Time" className="rounded-xl border-2 border-green-400 bg-green-50 p-3 space-y-2">
+          <p className="font-semibold text-green-900">Job Time running · {activeJob.title}</p>
+          <p className="text-sm text-green-900">{Math.max(0, Math.floor((now - Date.parse(activeJobStarted)) / 3600000))}h {Math.max(0, Math.floor((now - Date.parse(activeJobStarted)) / 60000)) % 60}m elapsed</p>
+          <WorkOrderTimeControl workOrderId={activeJob.id} assignedTo={profile?.id || null} onChanged={load} />
+        </section>}
         <CustomerTimeTimer onChanged={load} />
         {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.clockAccess === 'mobile' ? <MobileClockRedirect /> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <div className="rounded-2xl border border-subtle bg-elevated p-4"><p className="font-semibold">Ready for your next job?</p><p className="text-sm text-secondary mt-1">Your configuration does not require a daily clock. Record job time below.</p></div>}
         <div className="flex items-center justify-between"><div><h3 className="font-semibold text-primary">Today’s Jobs</h3><p className="text-xs text-secondary">{day}</p></div><button onClick={load} disabled={loading} aria-label="Refresh today’s work" className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-elevated"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
         {error && <p role="alert" className="text-red-600">{error}</p>}
-        {activeJob && !jobs.some(j => j.id === activeJob.id) && <section className="rounded-xl border border-blue-300 p-3 space-y-2"><h4 className="font-semibold">{activeJob.title}</h4><WorkOrderTimeControl workOrderId={activeJob.id} assignedTo={profile?.id || null} onChanged={load} /></section>}
+        {activeJob && !activeJobStarted && !jobs.some(j => j.id === activeJob.id) && <section className="rounded-xl border border-blue-300 p-3 space-y-2"><h4 className="font-semibold">{activeJob.title}</h4><WorkOrderTimeControl workOrderId={activeJob.id} assignedTo={profile?.id || null} onChanged={load} /></section>}
         {!loading && !error && !jobs.length && <p className="rounded-xl border border-dashed border-subtle p-4 text-sm text-secondary">No jobs scheduled today. You can still record project time below.</p>}
         {jobs.map(job => <section key={job.id} className="rounded-xl border border-subtle p-3 space-y-3 bg-surface">
           <button onClick={() => openWorkOrder(job.id)} className="flex gap-3 items-center justify-between text-left w-full min-h-11"><div className="min-w-0"><p className="font-semibold text-sm break-words">{job.work_order_number} · {job.title}</p><p className="text-xs text-secondary">{job.contact?.full_name || job.project?.contact?.full_name || job.project?.name || ''}</p></div><ArrowUpRight className="h-4 w-4 shrink-0 text-secondary" /></button>
           <p className="text-xs text-secondary">{job.scheduled_start_time?.slice(0, 5) || 'Time not set'}{job.scheduled_end_time ? `–${job.scheduled_end_time.slice(0, 5)}` : ''}</p>
-          <WorkOrderTimeControl workOrderId={job.id} assignedTo={profile?.id || null} onChanged={load} />
+          {activeJob?.id !== job.id && <WorkOrderTimeControl workOrderId={job.id} assignedTo={profile?.id || null} onChanged={load} />}
         </section>)}
+        <InternalTimeTimer onChanged={load} />
         <div className="grid sm:grid-cols-2 gap-2 border-t border-subtle pt-4">
           {policy.ready && <button onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-3 py-3 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Job Time</button>}
           {settings && (settings.shop_time_request_enabled || settings.training_time_request_enabled) && <button onClick={() => setRequest('internal')} className="min-h-11 rounded-xl border border-subtle px-3 py-3 text-sm">Request Shop / Training Time</button>}
