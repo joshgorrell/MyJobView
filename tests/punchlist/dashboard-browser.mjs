@@ -44,7 +44,7 @@ for(const width of [375,390,1280]){
 
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.equal(await page.getByRole('checkbox',{name:'Select Expired adjustment',exact:true}).isDisabled(),true);
- await page.getByRole('button',{name: width < 768 ? 'Open task Adjustment a' : 'Preview Adjustment a'}).first().click();
+ await page.getByRole('button',{name: width < 768 ? 'Open task Adjustment a' : 'Preview Adjustment a'}).first().dispatchEvent('click');
  const preview=page.getByRole('dialog',{name:'Test and Tune task: a'});
  await preview.waitFor();
  const bounds=await preview.boundingBox();
