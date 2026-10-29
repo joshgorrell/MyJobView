@@ -14,7 +14,7 @@ import { useLocation } from '../contexts/LocationContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Logo } from '../components/Logo';
-import { ScreenContainer, SafeHeader } from '../components/ScreenContainer';
+import { ScreenContainer } from '../components/ScreenContainer';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
@@ -170,7 +170,7 @@ export default function DashboardScreen({ navigation }: any) {
   return (
     <ScreenContainer scroll>
       {/* Status Bar */}
-      <SafeHeader style={styles.statusBar}>
+      <View style={styles.statusBar}>
         <View style={styles.statusItem}>
           <View style={[styles.statusDot, isConnected ? styles.online : styles.offline]} />
           <Text style={styles.statusText}>{isConnected ? 'Online' : 'Offline'}</Text>
@@ -186,7 +186,7 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.statusText}>GPS Active</Text>
           </View>
         )}
-      </SafeHeader>
+      </View>
 
       {/* Header with Logo */}
       <View style={styles.header}>
@@ -206,7 +206,7 @@ export default function DashboardScreen({ navigation }: any) {
       >
         <View style={styles.heroLeft}>
           <Text style={styles.heroLabel}>{usesDailyClock === false ? 'JOB TIME STATUS' : isClockedIn ? 'CURRENT SHIFT' : 'CLOCK STATUS'}</Text>
-          <Text style={styles.heroValue}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No Active Job Timer') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
+          <Text style={styles.heroValue}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No active job') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
           {(isClockedIn || jobTimerActive) && clockInTime && (
             <Text style={styles.heroSubtext}>Started at {formatTime(clockInTime)}</Text>
           )}
@@ -340,7 +340,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: Colors.white,
-    padding: Spacing.md,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
   },
@@ -354,20 +355,23 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.xxl,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
-    gap: Spacing.lg,
+    gap: 12,
   },
   headerText: { flex: 1 },
   greeting: { ...Typography.body, color: Colors.gray[500], marginBottom: 2 },
   name: { ...Typography.heading, marginBottom: 2 },
   role: { ...Typography.caption, color: Colors.primary[600], fontWeight: '600', textTransform: 'capitalize' as const, letterSpacing: 0 },
   heroCard: {
-    margin: Spacing.lg,
-    borderRadius: Radius.xl,
-    padding: Spacing.xxl,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 12,
+    borderRadius: Radius.lg,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -376,24 +380,24 @@ const styles = StyleSheet.create({
   },
   heroLeft: { flex: 1 },
   heroLabel: { ...Typography.label, marginBottom: Spacing.sm, color: Colors.gray[400] },
-  heroValue: { fontSize: 32, fontWeight: '700', color: Colors.gray[900], marginBottom: Spacing.xs },
+  heroValue: { fontSize: 23, fontWeight: '700', color: Colors.gray[900], marginBottom: Spacing.xs },
   heroSubtext: { ...Typography.body, color: Colors.gray[500] },
   heroButton: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md + 2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: Radius.md,
   },
   heroButtonText: { color: Colors.white, fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
-  statsContainer: { flexDirection: 'row', paddingHorizontal: Spacing.lg, gap: Spacing.lg, marginBottom: Spacing.lg },
+  statsContainer: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 16 },
   statCard: {
     flex: 1,
     backgroundColor: Colors.white,
     borderRadius: Radius.lg,
-    padding: Spacing.xl,
+    padding: 14,
     alignItems: 'center',
     ...Shadows.small,
   },
-  statValue: { fontSize: 28, fontWeight: '700', color: Colors.gray[900] },
+  statValue: { fontSize: 24, fontWeight: '700', color: Colors.gray[900] },
   statUnit: { ...Typography.caption, color: Colors.gray[400], marginTop: 2 },
   statLabel: { ...Typography.caption, color: Colors.gray[500], marginTop: Spacing.sm, fontWeight: '600' },
   recentSection: { marginBottom: Spacing.xxl },
@@ -422,15 +426,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+    marginHorizontal: 16,
+    marginBottom: 8,
     borderRadius: Radius.md,
-    padding: Spacing.lg,
+    padding: 12,
     ...Shadows.small,
   },
   menuIconContainer: {
-    width: 44,
-    height: 44,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
