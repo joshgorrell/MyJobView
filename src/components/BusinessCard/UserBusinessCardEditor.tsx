@@ -17,6 +17,8 @@ export function UserBusinessCardEditor() {
   const [company, setCompany] = useState<CardBranding | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [subdomain, setSubdomain] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
@@ -146,6 +148,7 @@ export function UserBusinessCardEditor() {
       if (error) throw error;
 
       setCard(data);
+      setBannerUrl((data as (BusinessCard & { banner_url?: string | null }) | null)?.banner_url || null);
       resetDraft(data);
     } catch (error) {
       console.error('Error loading card:', error);
@@ -196,6 +199,28 @@ export function UserBusinessCardEditor() {
         fileInputRef.current.value = '';
       }
     }
+  }
+
+  async function uploadBanner(event: React.ChangeEvent<HTMLInputElement>) {
+    const image = event.target.files?.[0];
+    event.target.value = '';
+    if (!image || !user) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type) || image.size === 0 || image.size > 5 * 1024 * 1024) {
+      notify('Choose a JPG, PNG or WebP image up to 5 MB', { theme: 'blue', tone: 'warning' }); return;
+    }
+    setUploading(true);
+    try {
+      const extension = image.type === 'image/jpeg' ? 'jpg' : image.type === 'image/png' ? 'png' : 'webp';
+      const path = `${user.id}/banner-${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await supabase.storage.from('business-card-photos').upload(path, image);
+      if (uploadError) throw uploadError;
+      const url = supabase.storage.from('business-card-photos').getPublicUrl(path).data.publicUrl;
+      const { error: saveError } = await supabase.from('business_cards').update({ banner_url: url }).eq('user_id', user.id);
+      if (saveError) throw saveError;
+      setBannerUrl(url);
+      notify('Background updated', { theme: 'blue', tone: 'success' });
+    } catch (error) { console.error('Failed to update card background', error); notify('Could not save background', { theme: 'blue', tone: 'error' }); }
+    finally { setUploading(false); }
   }
 
   function removePhoto() {
@@ -264,6 +289,12 @@ export function UserBusinessCardEditor() {
     }
   }
 
+  async function quickPhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    await handlePhotoUpload(event);
+    // Use the existing editor to review and save the selected photo.
+    setEditing(true);
+  }
+
   if (loading) {
     return <div className="text-center py-8 text-muted">Loading your business card...</div>;
   }
@@ -273,10 +304,11 @@ export function UserBusinessCardEditor() {
       {brandingError && <div role="alert" className="rounded-lg border border-subtle bg-surface p-3 text-sm text-primary">
         {brandingError} <button type="button" onClick={() => setBrandingAttempt(value => value + 1)} className="ml-2 font-medium text-brand underline">Retry</button>
       </div>}
+      <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Choose background photo" onChange={uploadBanner} />
       {!editing ? (
         <section className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm" aria-label="Your business card">
           <div data-theme-fixed className="bg-gradient-to-br from-[#111c30] via-[#111729] to-[#090f1d]">
-            <BusinessCardIdentity fullName={fullName || profile?.full_name || 'Your business card'} title={title} email={email} phone={phone} linkedinUrl={linkedinUrl} photoUrl={photoUrl} company={company} />
+            <BusinessCardIdentity fullName={fullName || profile?.full_name || 'Your business card'} title={title} email={email} phone={phone} linkedinUrl={linkedinUrl} photoUrl={photoUrl} company={company} bannerUrl={bannerUrl} onEditPhoto={() => { startEditing(); setTimeout(() => fileInputRef.current?.click(), 0); }} onEditBanner={() => bannerInputRef.current?.click()} />
             <BusinessCardFooter company={company} />
           </div>
           <div className="px-5 pb-6 sm:px-8 sm:pb-8">
