@@ -46,3 +46,14 @@ const nativeGps=load('mobile/src/services/ClockEventGps.ts',{
 for (const out of [false,true]) { await nativeGps.saveNativeClockGps('entry','tech',out,Promise.resolve(position),new Date().toISOString());const prefix=out?'clock_out':'clock_in';assert.equal(nativeWrites.at(-1)[`${prefix}_latitude`],0);assert.ok(nativeRemoved.includes(`entry:${prefix}`)); }
 nativeSession='other';const before=nativeWrites.length;await nativeGps.saveNativeClockGps('entry','tech',true,Promise.resolve(null),new Date().toISOString());assert.equal(nativeWrites.length,before,'Native GPS cannot sync through a different user account');assert.equal(nativeSaved.at(-1)[3].clock_out_gps_capture_method,'failed');
 console.log('Native punch GPS persists before network delivery, handles zero coordinates and records failure without crossing accounts.');
+
+
+const workOrderClockSource=fs.readFileSync('src/components/Production/WorkOrderTimeControl.tsx','utf8');
+const sharedClockOutSource=fs.readFileSync('src/components/Shared/ClockOutModal.tsx','utf8');
+assert.match(workOrderClockSource, /captureLocationForClockEvent\(\)/, 'Job clock-in must attempt GPS at the punch');
+assert.match(workOrderClockSource, /saveClockEventGps\(data,\s*'time_entries',\s*false,\s*capture\)/, 'Job clock-in must persist GPS evidence');
+assert.match(sharedClockOutSource, /captureLocationForClockEvent\(true\)/, 'Clock-out must attempt GPS at the punch');
+assert.match(sharedClockOutSource, /saveClockEventGps\(entryId,\s*type === 'daily' \? 'daily_clock_entries' : 'time_entries',\s*true,\s*capture\)/, 'Job clock-out must persist GPS evidence');
+assert.ok(workOrderClockSource.indexOf("supabase.rpc('start_work_order_time'") < workOrderClockSource.indexOf("saveClockEventGps(data, 'time_entries'"), 'Server must establish job time before GPS evidence attaches');
+assert.ok(sharedClockOutSource.indexOf('await offlineSupabaseUpdate(') < sharedClockOutSource.indexOf('void saveClockEventGps(entryId'), 'Clock-out must persist punch before GPS evidence');
+console.log('Customer Job Clock in/out paths are wired to GPS capture and durable evidence without blocking payroll punches.');
