@@ -140,7 +140,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {(taskId || requestId) && !loading && !error && !visible.some(p => p.tasks.length) && <p role="alert">This punchlist item or request is unavailable in the selected project.</p>}
     {lastRequestId && canViewServiceRequests && <a href={`/service-requests?serviceRequestId=${encodeURIComponent(lastRequestId)}`} className="inline-flex min-h-11 items-center text-sm text-info">View service request →</a>}
     {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected · {selectedProject?.customer}</span><button disabled={busy || !selectedProject?.can_submit} onClick={() => void submit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Request service'}</button><button disabled={busy} onClick={() => setSelected([])} className="min-h-11 px-3 text-info">Clear selection</button></div>}
-    {!loading && !error && !visible.length && <p className="text-sm text-muted">No matching Test &amp; Tune projects.</p>}
+    {!loading && !error && !visible.length && <div className="rounded-xl border border-subtle bg-surface px-5 py-10 text-center"><h2 className="text-base font-semibold text-primary">No matching Test &amp; Tune projects</h2><p className="mt-2 text-sm text-secondary">Try adjusting your filters, or add an adjustment to an eligible project.</p></div>}
     <div className="space-y-2 md:hidden" aria-label="Mobile Test and Tune tasks">
       {rows.map(({ p, t }) => {
         const description = t.customer_description || t.title;
@@ -189,7 +189,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
           })}
         </tbody>
       </table>
-    </div>
+    </div>}
     {detailId && (() => {
       const match = projects.flatMap(p => p.tasks.map(t => ({ p, t }))).find(({ t }) => t.id === detailId);
       if (!match) return null;
