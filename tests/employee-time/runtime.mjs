@@ -33,6 +33,7 @@ const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
   '../Technician/ManualJobTimeRequestModal':{ManualJobTimeRequestModal:'ManualJobTimeRequestModal'},
   '../Technician/RequestInternalTimeModal':{RequestInternalTimeModal:'RequestInternalTimeModal'},
   '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},'../Technician/CustomerTimeTimer':{CustomerTimeTimer:'CustomerTimeTimer'},
+  '../Technician/InternalTimeTimer':{InternalTimeTimer:'InternalTimeTimer'},
   '../Technician/MyTimeView':{MyTimeView:'MyTimeView'},
   '../Dispatch/MyTimeOff':{MyTimeOff:'MyTimeOff'},'../Shared/TeamTimeOffPanel':{TeamTimeOffPanel:'TeamTimeOffPanel'},
   '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},'./MobileClockRedirect':{MobileClockRedirect:'MobileClockRedirect'},
