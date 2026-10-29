@@ -588,7 +588,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       <LinearGradient colors={gradientColors} style={styles.clockCard}>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>
-            {isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
+            {clockStateUnverified ? 'PENDING SYNC / REVIEW' : isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
           </Text>
         </View>
 
@@ -601,7 +601,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified && !!todayEntry} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.clockButton, clockStateUnverified && styles.disabledButton]} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
             <Text style={styles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
