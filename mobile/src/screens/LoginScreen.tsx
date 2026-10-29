@@ -71,7 +71,7 @@ export default function LoginScreen() {
   }
 
   const features = [
-    { title: 'High-Precision GPS', subtitle: '3-10 meter accuracy' },
+    { title: 'GPS Workday Tracking', subtitle: 'Accuracy varies by device and conditions' },
     { title: 'Offline Support', subtitle: 'Works without connection' },
     { title: 'Secure Access', subtitle: 'Your company account' },
   ];
