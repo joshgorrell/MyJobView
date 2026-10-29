@@ -67,7 +67,7 @@ const overlapSupabase = {
     const filters = [];
     const query = new Proxy({}, {get(_, method) {
       if (method === 'then') return resolve => {
-        if (overlapError) { resolve({data:null,error:{message:'Unable to verify activity'}}); return; }
+        if (overlapError) { resolve({data:null,error:new Error('Unable to verify activity')}); return; }
         const data = overlapRows[table].filter(row => filters.every(([op, field, value]) => {
           if (op === 'eq') return row[field] === value;
           if (op === 'lt') return Date.parse(row[field]) < Date.parse(value);
