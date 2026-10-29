@@ -12,7 +12,7 @@
 .flow-subtitle,.flow-footnote{font-size:12px;color:var(--flow-secondary)}
 .flow button:where(:not(.flow-customer-inbox *)).flow-primary{background:#2563eb;color:#fff;border:1px solid #2563eb;white-space:nowrap}
 .flow button:where(:not(.flow-customer-inbox *)).flow-primary:hover{background:#1d4ed8}
-.flow-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:0 18px 12px}
+.flow-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:0 18px 12px;min-height:56px}
 .flow-segment{display:flex;padding:3px;border:1px solid var(--flow-line);border-radius:8px;background:var(--flow-muted);white-space:nowrap}
 .flow-segment button[aria-pressed=true],.flow button:where(:not(.flow-customer-inbox *)).flow-selected{background:var(--flow-new);color:var(--flow-accent);box-shadow:0 0 0 1px var(--flow-line);font-weight:600}
 .flow-search{display:flex;align-items:center;flex:1;min-width:220px;gap:8px;border:1px solid var(--flow-line);border-radius:7px;padding:0 9px;color:var(--flow-secondary)}
