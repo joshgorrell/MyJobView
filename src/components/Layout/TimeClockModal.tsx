@@ -1,4 +1,5 @@
 import { AttendanceBadge, useAttendanceResults } from '../Shared/AttendanceBadge';
+import { DailyClockFlash, type DailyClockFlashState } from '../Shared/DailyClockFlash';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { useState, useEffect, useRef } from 'react';
@@ -56,7 +57,22 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
   const actionLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
+  const [clockFlash, setClockFlash] = useState<DailyClockFlashState | null>(null);
+  const expireClockFlash = useRef((id: string) => setClockFlash(current => current?.id === id ? null : current)).current;
   const attendance = useAttendanceResults(todayEntry ? [todayEntry.id] : []);
+  // Attendance awards can land after the punch is saved. Reuse the existing
+  // realtime attendance subscription and update only the matching visible flash.
+  useEffect(() => {
+    if (!clockFlash || clockFlash.action !== 'in' || clockFlash.pending) return;
+    const result = attendance[clockFlash.id];
+    if (!result) return;
+    setClockFlash(current =>
+      current?.id === clockFlash.id && current.attendance?.points_awarded !== result.points_awarded
+        ? { ...current, attendance: result }
+        : current
+    );
+  }, [attendance, clockFlash?.id, clockFlash?.action, clockFlash?.pending]);
+
   const [activeBreak, setActiveBreak] = useState<ActiveBreak | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [activeActivity, setActiveActivity] = useState<{id:string;clock_in:string;work_order_id:string|null;internal_session_id:string|null}|null>(null);
@@ -225,8 +241,19 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
       void saveClockEventGps(entryId, 'daily_clock_entries', false, capture).catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
-      toast.success('You’re clocked in. Have a great day!');
-      if (!navigator.onLine) toast.info('Clock-in saved locally and will sync when you\'re back online.', 'You are offline');
+      const pending = !navigator.onLine;
+      setClockFlash({ id: entryId, action: 'in', pending });
+      if (!pending) {
+        // The attendance snapshot is written asynchronously; never guess the award.
+        void supabase.from('clock_in_rewards_log')
+          .select('daily_clock_entry_id,event_type,points_awarded,minutes_delta,scheduled_time,actual_time')
+          .eq('daily_clock_entry_id', entryId)
+          .in('event_type', ['early', 'on_time', 'late', 'very_late'])
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) setClockFlash(current => current?.id === entryId ? { ...current, attendance: data } : current);
+          });
+      }
       return entryId;
     } catch (error: any) {
       console.error('Error clocking in:', error);
@@ -283,8 +310,10 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
   }
 
   async function handleClockOutSuccess() {
+    const entryId = todayEntry?.id;
     await loadTodaysClock();
     setShowClockOutModal(false);
+    if (entryId) setClockFlash({ id: `${entryId}:out`, action: 'out', pending: !navigator.onLine });
   }
 
   async function handleStartBreak(breakType: 'lunch' | 'personal' | 'other') {
@@ -369,6 +398,7 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
           </div>
 
           {todayEntry && <AttendanceBadge result={attendance[todayEntry.id]} />}
+          {isClockedIn && activeActivity && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">An activity is still running. Stop your {activeActivity.internal_session_id ? 'Shop Time or Training' : 'Job Time'} entry above before clocking out of Daily Clock.</p>}
           {isClockedIn && (
             <div className="mt-3 flex items-center gap-3">
               <div className="bg-white/20 rounded-lg px-3 py-1.5 text-white text-sm font-medium">
@@ -394,8 +424,6 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
               <p className="text-sm text-orange-800">Offline — actions will sync when you reconnect.</p>
             </div>
           )}
-
-          {isClockedIn && activeActivity && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">An activity is still running. Stop your {activeActivity.internal_session_id ? 'Shop Time or Training' : 'Job Time'} entry above before clocking out of Daily Clock.</p>}
 
           {/* NOT CLOCKED IN */}
           {!todayEntry && (
@@ -621,6 +649,7 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
         </div>
       </div>
 
+      <DailyClockFlash value={clockFlash} onExpire={expireClockFlash} />
       {showClockOutModal && todayEntry && profile && (
         <ClockOutModal
           onClose={() => setShowClockOutModal(false)}
