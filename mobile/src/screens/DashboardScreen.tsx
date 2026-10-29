@@ -27,7 +27,7 @@ interface RecentDay {
 }
 
 export default function DashboardScreen({ navigation }: any) {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   const { isConnected, pendingSync } = useOffline();
   const { isTracking } = useLocation();
   const [hoursToday, setHoursToday] = useState<string>('0.00');
@@ -278,8 +278,8 @@ export default function DashboardScreen({ navigation }: any) {
       </View>
 
       {/* Sign Out */}
-      <TouchableOpacity style={styles.signOutButton} onPress={signOut} activeOpacity={0.7}>
-        <Text style={styles.signOutText}>Sign Out</Text>
+      <TouchableOpacity style={styles.signOutButton} onPress={() => navigation.navigate('Settings')} activeOpacity={0.7}>
+        <Text style={styles.signOutText}>Account & Sign Out</Text>
       </TouchableOpacity>
 
       <View style={styles.footer}>
