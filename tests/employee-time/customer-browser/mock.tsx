@@ -80,6 +80,7 @@ export const formatDateInTimezone = () => "2026-01-01";
 export const createTimestampInTimezone = (day: string, time: string) =>
   `${day}T${time}:00.000Z`;
 export const notify = () => {};
+export const requestConfirmation = async () => true;
 export const gpsTrackingService = {
   captureLocationForClockEvent: async () => ({
     latitude: 0,
