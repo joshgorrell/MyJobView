@@ -84,7 +84,7 @@ export function NewTeamMessage({ inline = false, scope, threads, canTeam, canCus
     } else { busy.current = false; setSending(false); }
   }
   const form = <form onSubmit={send} className="team-message-form flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden text-primary">
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="team-message-body min-h-0 flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Message recipients">
           {canTeam && (['direct', 'department', 'company'] as const).map(value => <button key={value} type="button" aria-pressed={kind === value} disabled={sending} onClick={() => { setKind(value); setSelected([]); setSearch(''); setPickingRecipients(true); }} className={`min-h-11 rounded-lg px-3 text-sm ${kind === value ? 'bg-blue-600 text-white' : 'bg-elevated text-primary'}`}>{value === 'direct' ? 'People' : value === 'department' ? 'Departments' : 'Everyone'}</button>)}
           {canCustomer && <button type="button" disabled={sending} onClick={onCustomer} className="min-h-11 rounded-lg bg-elevated px-3 text-sm">Customer</button>}
@@ -98,13 +98,13 @@ export function NewTeamMessage({ inline = false, scope, threads, canTeam, canCus
           {pickingRecipients && <>
             <label className="sr-only" htmlFor="team-recipient-search">{kind === 'direct' ? 'Search people' : 'Search departments'}</label>
             <input id="team-recipient-search" autoFocus={!inline} type="search" value={search} disabled={sending} onChange={e => setSearch(e.target.value)} placeholder={kind === 'direct' ? 'Search people by name…' : 'Search departments…'} className="w-full rounded-lg border border-subtle bg-canvas p-2 text-base" />
-            <div className="rounded-lg border border-subtle" aria-label="Recipient results">
+            <div className="team-message-recipients min-h-11 flex-1 overflow-y-auto rounded-lg border border-subtle" aria-label="Recipient results">
               {loading ? <p className="p-3 text-sm">Loading recipients…</p> : choices.length ? choices.map(p => <button type="button" key={p.id} disabled={sending} aria-pressed={selected.some(r => r.id === p.id)} onClick={() => { setSelected(kind === 'department' ? [p] : selected.some(r => r.id === p.id) ? selected.filter(r => r.id !== p.id) : [...selected, p]); setSearch(''); setPickingRecipients(false); }} className={`block w-full min-h-11 px-3 py-2 text-left text-sm ${selected.some(r => r.id === p.id) ? 'bg-blue-100 text-blue-800' : 'hover:bg-elevated'}`}>{p.name}</button>) : <p className="p-3 text-sm text-secondary">No matching recipients.</p>}
             </div>
           </>}
         </>}
         {canTeam && kind === 'company' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">This message will be visible to everyone in the company with Flow access.</p>}
-        {canTeam && (kind === 'company' || (selected.length > 0 && !pickingRecipients)) && <label className="block text-sm font-medium">Message<textarea value={body} disabled={sending} onChange={e => setBody(e.target.value)} rows={3} placeholder="Type your message…" className="mt-2 block w-full resize-none rounded-lg border border-subtle bg-canvas p-3 text-base" /></label>}
+        {canTeam && (kind === 'company' || (selected.length > 0 && !pickingRecipients)) && <label className="team-message-editor flex min-h-32 flex-1 flex-col text-sm font-medium">Message<textarea value={body} disabled={sending} onChange={e => setBody(e.target.value)} rows={3} placeholder="Type your message…" className="mt-2 block min-h-24 w-full flex-1 resize-none rounded-lg border border-subtle bg-canvas p-3 text-base" /></label>}
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       </div>
       {canTeam && <div className="team-message-send shrink-0 border-t border-subtle p-3 flex items-center justify-between gap-3"><span className="text-sm text-secondary">{kind !== 'company' && !selected.length ? 'Choose a recipient to continue' : kind === 'company' ? 'Company message' : `${selected.length} recipient${selected.length === 1 ? '' : 's'}`}</span><button type="submit" disabled={pickingRecipients && kind !== 'company' || sending || loading || !body.trim() || (kind !== 'company' && !selected.length)} className="flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-white disabled:opacity-50"><Send size={18} />{sending ? 'Sending…' : 'Send'}</button></div>}

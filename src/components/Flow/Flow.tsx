@@ -210,6 +210,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     <div className="flow-toolbar">
       <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => changeView(item.id)}>{item.label}</button>)}</div>
       <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => changeView(e.target.value as FlowView)}>{views.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+      {view === 'messages' && <div className="flow-message-filters" role="group" aria-label="Message filters">{MESSAGE_FILTERS.map(item => <button key={item.id} aria-pressed={messageFilter === item.id} className={messageFilter === item.id ? 'flow-selected' : ''} onClick={() => { setMessageFilter(item.id); setThreadId(null); }}>{item.label}</button>)}</div>}
       {view !== 'tasks' && view !== 'messages' && <>
       <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
@@ -223,7 +224,6 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
 
     <div className="flow-content">
     {view === 'tasks' && hasModuleAccess('tasks') && tasksContent}
-    {view === 'messages' && <div className="flow-message-filters" role="group" aria-label="Message filters">{MESSAGE_FILTERS.map(item => <button key={item.id} aria-pressed={messageFilter === item.id} className={messageFilter === item.id ? 'flow-selected' : ''} onClick={() => { setMessageFilter(item.id); setThreadId(null); }}>{item.label}</button>)}</div>}
     {view !== 'tasks' && view !== 'messages' && showFilters && <div className="flow-filters" id={filtersId}>
       <label>Content type<select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">All content types</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       <div className="flow-filter-quick-controls">

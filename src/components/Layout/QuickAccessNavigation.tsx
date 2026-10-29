@@ -79,11 +79,11 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
 
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <div className="hidden lg:flex flex-shrink-0 items-center gap-1 text-brand">
+      <div className="hidden xl:flex flex-shrink-0 items-center gap-1 text-brand">
         <Star className="w-4 h-4 fill-current" />
         <span className="text-xs font-semibold uppercase tracking-wider hidden lg:inline">Favorites</span>
       </div>
-      <div className="h-5 w-px bg-subtle hidden lg:block"></div>
+      <div className="h-5 w-px bg-subtle hidden xl:block"></div>
 
       {loading ? (
         <div className="text-gray-500 text-xs italic">Loading...</div>
@@ -121,7 +121,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
                   onModuleChange(module.module_key);
                 }
               }}
-              className={`px-2 sm:px-3 py-1.5 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
+              className={`min-h-11 px-2 sm:px-3 py-1.5 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
               title={`${module.display_name} (${module.description || 'Quick access'})`}
             >
               <div className="flex items-center gap-2">

@@ -28,7 +28,7 @@ export const supabase={from(table){let filters=[],orders=[],start=0,end=Infinity
 returns(){return q},select(columns,options){count=!!options?.count;return q},eq(k,v){filters.push(r=>r[k]===v);window.queries.push({table,k,v});return q},is(k,v){filters.push(r=>(r[k]??null)===v);return q},in(k,v){filters.push(r=>v.includes(r[k]));return q},order(k,options={}){orders.push([k,options.ascending!==false]);return q},range(a,b){start=a;end=b+1;return q},limit(n){end=n;return q},maybeSingle(){single=true;return q},single(){single=true;return q},insert(value){mutation=['insert',value];return q},update(value){mutation=['update',value];return q},upsert(value){mutation=['upsert',value];return q},then(a,b){if(location.search.includes('failedInbox')&&table==='message_threads')return Promise.resolve({data:null,error:{message:'Fixture inbox failure'}}).then(a,b);let data=(rows[table]||[]).filter(r=>filters.every(f=>f(r)));if(mutation?.[0]==='insert'){const value=mutation[1];let row={id:'new-'+window.inserts.length,created_at:new Date().toISOString(),...value};if(table==='discussion_posts'){const parent=rows.discussion_posts.find(p=>p.id===row.parent_id);row={...row,...(parent?{audience_type:parent.audience_type,audience_user_ids:parent.audience_user_ids,is_private:parent.is_private}:{}),profiles:{full_name:'Josh'}};rows.flow_events.push({id:rows.flow_events.length+1,source_id:row.id,source_table:'discussion_posts',organization_id:'org'});}window.inserts.push({table,...row});(rows[table]||=[]).push(row);data=[row];}else if(mutation?.[0]==='upsert'){for(const row of mutation[1]){window.views.push(row);if(!rows.flow_event_views.some(v=>v.event_id===row.event_id&&v.user_id===row.user_id))rows.flow_event_views.push(row);}data=mutation[1];}else if(mutation?.[0]==='update')data.forEach(r=>Object.assign(r,mutation[1]));data=[...data].sort((a,b)=>{for(const[k,asc]of orders){const n=String(a[k]).localeCompare(String(b[k]))*(asc?1:-1);if(n)return n;}return 0;}).slice(start,end);return Promise.resolve({data:single?data[0]||null:data,error:null,count:count?data.length:null}).then(value=>location.search.includes('slowInbox')?new Promise(resolve=>setTimeout(()=>resolve(value),350)):value).then(a,b)} };return q},channel(){const c={on(){return c},subscribe(){return c}};return c},removeChannel(){}};
 export function useFlow(){return{events:[],loading:false,error:'',markViewed:async()=>{},refresh:async()=>{}}}
 `;
-const source=`import React from 'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<div className="workspace-shell"><header style={{height:72,flexShrink:0}}>Workspace navigation</header><main className="p-3"><Flow projectId={location.search.includes('scoped')?'p1':undefined}/></main><footer style={{padding:48}}>Sign Out</footer><footer>Powered by MyJobView</footer></div>);`;
+const source=`import React from 'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<div className="theme-workspace workspace-shell"><header style={{height:112,flexShrink:0}}>Workspace navigation</header><main className="p-3"><Flow dark projectId={location.search.includes('scoped')?'p1':undefined}/></main><footer style={{padding:48}}>Sign Out</footer><footer>Powered by MyJobView</footer></div>);`;
 const server=createServer(async(req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(dir,file)));});
 let browser;
 try {
@@ -95,7 +95,10 @@ try {
   assert.ok(send.y>=0 && send.y+send.height<=400,'Composer stays within reduced viewport at '+width+' '+JSON.stringify(send));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight+1),false,'No outer vertical scrolling');
   await page.screenshot({path:'/tmp/mjv-composer-viewport-'+width+'.png'});
+  await page.getByRole('button',{name:'Back to conversations',exact:true}).click();
+  assert.equal(await filters().isVisible(),true,'Message navigation returns after leaving the focused conversation');
  }
+ await page.setViewportSize({width:1280,height:800});
  await page.goto(url);await messages();await filters().getByRole('button',{name:'Coworkers',exact:true}).click();await page.getByRole('heading',{name:'Department update',exact:true}).first().click();await page.getByTitle('Open discussion actions').waitFor();assert.equal(await page.getByTitle('Open discussion actions').getAttribute('href'),'?tab=feed&postId=r3','Task/question actions remain accessible');
  await page.goto(url+'?noCustomer');await messages();await page.getByRole('heading',{name:'Jesse',exact:true}).first().waitFor();assert.equal(await page.evaluate(()=>window.queries.some(q=>q.table==='message_threads')),false,'No customer reads without permission');
  await page.goto(url+'?noCoworker');await messages();await page.getByRole('heading',{name:'Customer question',exact:true}).first().waitFor();assert.equal(await page.evaluate(()=>window.queries.some(q=>q.table==='discussion_posts')),false,'No coworker reads without permission');
@@ -119,10 +122,28 @@ try {
   await page.getByRole('heading',{name:'Julie',exact:true}).first().waitFor();
   await page.screenshot({path:'/tmp/mjv-empty-inbox-fixed-'+width+'.png'});
  }
- // The real workspace chrome and long directories must not clip the first-message form.
- for (const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[1280,680]]) {
+ // Empty inbox recipients must follow the selected audience filter.
+ await page.goto(url+'?emptyInbox');await messages();
+ await filters().getByRole('button',{name:'Customer',exact:true}).click();
+ await page.getByText('Start a customer conversation.',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'People',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'Departments',exact:true}).count(),0);
+ await page.locator('.conversation-start').getByRole('button',{name:'Customer',exact:true}).click();
+ await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');
+ await filters().getByRole('button',{name:'Coworkers',exact:true}).click();
+ await page.getByRole('button',{name:'People',exact:true}).waitFor();
+ assert.equal(await page.locator('.conversation-start').getByRole('button',{name:'Customer',exact:true}).count(),0);
+ // Representative header/bookmark space and long directories must not clip the first-message form.
+ for (const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[820,1180],[1024,650],[1194,744],[1280,680]]) {
   await page.setViewportSize({width,height});await page.goto(url+'?emptyInbox&longDirectory');await messages();
   await page.getByRole('button',{name:'Julie',exact:true}).waitFor();
+  if(width>=1024){
+   const tabs=await page.locator('.flow-view-tabs').boundingBox();
+   const audience=await filters().boundingBox();
+   assert.ok(Math.abs(tabs.y+tabs.height/2-audience.y-audience.height/2)<2,'Tablet tabs and audience filters share one row');
+   const composer=await page.locator('.conversation-start').boundingBox();
+   assert.ok(composer.width>=width*.7,'Tablet composer uses the available width');
+  }
   const send=page.getByRole('button',{name:'Send',exact:true});
   const bounds=await send.boundingBox();
   assert.ok(bounds.y>=0 && bounds.y+bounds.height<=height,JSON.stringify({width,height,bounds}));
@@ -130,7 +151,7 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.equal(await page.locator('main').evaluate(el=>el.scrollHeight>el.clientHeight+1),false);
   const scrollers=await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(node=>/auto|scroll/.test(getComputedStyle(node).overflowY)&&node.scrollHeight>node.clientHeight+1).length);
-  assert.equal(scrollers,1,'Only the compose body scrolls with a long directory');
+  assert.equal(scrollers,1,JSON.stringify({width,height,areas:await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(n=>/auto|scroll/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight+1).map(n=>({cls:n.className,client:n.clientHeight,scroll:n.scrollHeight})))}));
   await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Staff 79');
   await page.getByRole('button',{name:'Staff 79',exact:true}).click();
   assert.equal(await page.getByRole('searchbox',{name:'Search people',exact:true}).count(),0);
