@@ -60,8 +60,20 @@ await nodes(tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
 const request=calls.find(c=>c[0]==='service_requests')[1];assert.equal(request.notes,'INTERNAL ONLY: do not share with customer','Internal scheduling message is persisted on service request only');assert.equal(request.earliest_date,localDate(earliest));assert.equal(request.requested_date,localDate(needByDate));assert.equal(request.customer_contact_instruction,'requester');assert.equal(request.warranty_reference,'Project 101');assert.equal(request.warranty_notes,'Return visit');assert.equal(request.job_location_address,'');assert.equal(request.billable_by,'assigned_sales_rep');assert.equal(request.priority,'urgent');
 console.log('Fast intake submits without mandatory address and preserves scheduling/warranty context.');
 
+// Regression: the scheduling-only message must never enter customer OR technician work-order notes.
+const combinedQueueSource=fs.readFileSync('src/components/Dispatch/ServiceRequestQueue.tsx','utf8');
+assert.doesNotMatch(combinedQueueSource,/p_internal_notes:\s*serviceRequests\.map\(sr\s*=>\s*\[sr\.notes/,'Combined scheduling must not copy request messages into work-order notes');
+assert.doesNotMatch(fs.readFileSync('src/components/Production/CreateWorkOrderModal.tsx','utf8'),/internal_notes:\s*serviceRequest\s*\?\s*\[serviceRequest\.notes/,'Individual scheduling must not copy request messages into work-order notes');
 // Regression: internal scheduling notes must not prefill customer-visible work-order descriptions.
 const workOrderSource=fs.readFileSync('src/components/Production/CreateWorkOrderModal.tsx','utf8');
-assert.match(workOrderSource,/notes:\s*'',\s*internal_notes:\s*serviceRequest\s*\?/,'Work-order conversion must keep scheduling notes exclusively internal');
+assert.match(workOrderSource,/notes:\s*'',\s*internal_notes:\s*serviceRequest\s*\?/,'Work-order conversion must initialize customer notes empty and retain separate internal metadata');
 assert.doesNotMatch(workOrderSource,/notes:\s*serviceRequest\?\.notes/,'Scheduling notes must never populate customer-visible work-order notes');
-console.log('Service scheduling message is isolated from customer-visible work-order description.');
+console.log('Service scheduling message is isolated from customer and technician work-order notes.');
+
+const approvalEmailSource=fs.readFileSync('supabase/functions/send-service-approval/index.ts','utf8');
+assert.doesNotMatch(approvalEmailSource,/attempt\.notes|serviceRequest\.notes|request\.notes/,'Customer approval email must never interpolate scheduling notes');
+assert.match(approvalEmailSource,/attempt\.description/,'Customer approval email uses approved service description');
+
+assert.match(approvalEmailSource,/wrapInEmailLayout\(/,'Approval email must use the shared branded layout');
+assert.match(approvalEmailSource,/reply_to:settings\.reply_to_email \|\| settings\.company_email \|\| settings\.from_email/,'Approval email must route customer replies to configured inbox');
+assert.match(approvalEmailSource,/company_logo_url/,'Approval email must use configured company logo');

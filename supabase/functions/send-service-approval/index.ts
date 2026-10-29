@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { corsHeaders, getSupabaseAdmin } from '../_shared/qbo-client.ts';
 import { sendSystemEmail } from '../_shared/system-email.ts';
+import { wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 Deno.serve(async (req:Request)=>{
  if(req.method==='OPTIONS') return new Response(null,{headers:corsHeaders});
@@ -14,21 +15,24 @@ Deno.serve(async (req:Request)=>{
   if(error || !attempt) return respond({error:error?.message || 'Staff access required'},403);
   if(attempt.sent_at) return respond({success:true});
   const admin=getSupabaseAdmin();
-  const {data:settings,error:settingsError}=await admin.from('company_settings').select('company_name,from_name,from_email,company_email,portal_url').eq('organization_id',attempt.organization_id).maybeSingle();
+  const {data:settings,error:settingsError}=await admin.from('company_settings').select('company_name,from_name,from_email,company_email,portal_url,company_logo_url,reply_to_email').eq('organization_id',attempt.organization_id).maybeSingle();
+  const {data:offices}=await admin.from('company_offices').select('office_name,phone').eq('organization_id',attempt.organization_id).order('display_order');
   const {data:org}=await admin.from('organizations').select('subdomain').eq('id',attempt.organization_id).maybeSingle();
   if(settingsError || !settings?.from_email) throw new Error('Configure the company email sender before sending this request.');
   const base=org?.subdomain ? `https://${org.subdomain}.myjobview.com` : new URL(settings.portal_url || 'https://myjobview.com').origin;
   const url=`${base}/portal/service-approval?request=${encodeURIComponent(requestId)}&token=${encodeURIComponent(attempt.token)}`;
+  // Only the staff_service_approval description and terms are approved for customer delivery.
+  // service_requests.notes is a staff-only scheduling message and must never be fetched or interpolated here.
   const company=settings.company_name || 'Your service provider';
-  const text=`Hello ${attempt.customer_name},\n\nPlease review your service request, accept our rates and terms, and securely provide a payment method before we schedule your appointment.\n\n${attempt.description}\n\nService rates and terms:\n${attempt.terms}\n\nNo payment is collected now. Completing these steps allows us to schedule your service appointment. An appointment time has not yet been reserved.\n\nReview and complete your request:\n${url}\n\nThis link expires in 14 days. If you have questions, contact ${company}.`;
+  const text=`Hello ${attempt.customer_name},\n\nPlease review your service request, accept the service terms, and securely provide a payment method before we schedule your appointment.\n\n${attempt.description}\n\nNo payment is collected now. Completing these steps allows us to schedule your service appointment. An appointment time has not yet been reserved.\n\nReview and complete your request:\n${url}\n\nThis link expires in 14 days. If you have questions, contact ${company}.`;
   // Recheck immediately before delivery: waived/cancelled/revised requests must not be sent.
   const check=await caller.rpc('staff_service_approval',{p_action:'prepare',p_id:requestId,p_delivery_id:deliveryId});
   if(check.error) return respond({error:check.error.message},409);
   const response=await sendSystemEmail({headers:{'Idempotency-Key':`service-approval-${deliveryId}`},body:JSON.stringify({
    from:`${String(settings.from_name || company).replace(/[<>\r\n]/g,'')} <${settings.from_email}>`,
-   to:[attempt.recipient],reply_to:settings.company_email || settings.from_email,
+   to:[attempt.recipient],reply_to:settings.reply_to_email || settings.company_email || settings.from_email,
    subject:`${company}: Complete your service request`,text,
-   html:`<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto"><h2>Prepare your service appointment</h2><p>Hello ${escape(attempt.customer_name)},</p><p>Please accept our service rates and terms and securely provide a payment method so we can schedule your service visit.</p><p style="white-space:pre-wrap">${escape(attempt.description)}</p><h3>Service rates and terms</h3><p style="white-space:pre-wrap">${escape(attempt.terms)}</p><p><strong>No payment is collected now.</strong> Completing these steps allows us to schedule your service appointment. An appointment time has not yet been reserved.</p><p><a href="${escape(url)}">Review &amp; Complete Service Request</a></p><p>This link expires in 14 days. Questions? Contact ${escape(company)}.</p></div>`,
+   html:wrapInEmailLayout(`<h2>Prepare your service appointment</h2><p>Hello ${escape(attempt.customer_name)},</p><p>Please review your service request, accept the service terms, and securely provide a payment method so we can schedule your service visit.</p><p style="white-space:pre-wrap">${escape(attempt.description)}</p><p>View the Service Terms &amp; Conditions on the approval page before accepting.</p><p><strong>No payment is collected now.</strong> Completing these steps allows us to schedule your service appointment. An appointment time has not yet been reserved.</p><p style="text-align:center;margin:28px 0;"><a href="${escape(url)}" style="display:inline-block;background:#0e7490;color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;font-weight:700;">Review &amp; Approve Service</a></p><p>This link expires in 14 days. Questions? Contact ${escape(company)}.</p>`,company,settings.company_email || settings.from_email,'#0e7490',settings.company_logo_url || '',(offices || []).filter(o=>o.phone).map(o=>({office_name:o.office_name,phone:o.phone}))),
   })});
   if(!response.ok) throw new Error('Email delivery failed. The request is saved and remains waiting on the customer. Retry from the service queue.');
   const result=await response.json();

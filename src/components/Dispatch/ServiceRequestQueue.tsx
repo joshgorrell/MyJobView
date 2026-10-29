@@ -1168,7 +1168,7 @@ function CombineWorkOrderModal({ serviceRequests, techs, onClose, onSuccess }: C
     try {
       const { data, error } = await supabase.rpc('create_combined_work_orders', { p_request_id: key.current, p_service_request_ids: serviceRequests.map(sr => sr.id), p_tech_ids: selectedTechs,
         p_date: schedule.date, p_start: schedule.start, p_end: schedule.end, p_estimated_hours: Number(hours), p_description: description.trim(),
-        p_internal_notes: serviceRequests.map(sr => [sr.notes, sr.earliest_date && `Do not schedule before: ${sr.earliest_date}`, sr.warranty_type && `Warranty: ${sr.warranty_type}; ${sr.warranty_reference || ''}; ${sr.warranty_notes || ''}`].filter(Boolean).join('\n')).join('\n\n') });
+        p_internal_notes: serviceRequests.map(sr => [sr.earliest_date && `Do not schedule before: ${sr.earliest_date}`, sr.warranty_type && `Warranty: ${sr.warranty_type}; ${sr.warranty_reference || ''}; ${sr.warranty_notes || ''}`].filter(Boolean).join('\n')).join('\n\n') });
       if (error) throw error;
       for (const [index, technicianId] of [...selectedTechs].sort().entries()) {
         await notifyTechJobAssigned(technicianId, { work_order_number: data?.[index]?.work_order_number || '', title: description.trim(), customer_name: serviceRequests[0].customer_name, scheduled_date: schedule.date, address: serviceRequests[0].job_location_address });

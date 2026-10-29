@@ -18,7 +18,7 @@ try {
   await page.getByRole('heading',{name:'Prepare your service appointment'}).waitFor();
   await page.getByText('Bank ending 1234').click();await page.waitForFunction(()=>window.calls.some(c=>c[0]==='service-approval-payment-methods'&&c[1].action==='verify'));
   assert.equal(await page.getByText('Your request is ready to schedule.',{exact:false}).count(),0);
-  await page.getByLabel('Your name',{exact:true}).fill('Jane Customer');await page.getByLabel('I agree to the service rates and terms shown above.').check();await page.getByRole('button',{name:'Accept Rates & Terms'}).click();
+  await page.getByLabel('Your name',{exact:true}).fill('Jane Customer');await page.getByLabel('I have read and agree to the Service Terms & Conditions.').check();await page.getByRole('button',{name:'Accept Rates & Terms'}).click();
   await page.getByText('Your request is ready to schedule.',{exact:false}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);await page.close();
  }
