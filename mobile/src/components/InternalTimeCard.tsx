@@ -140,7 +140,7 @@ export function InternalTimeCard() {
   return (
     <Card style={styles.card}>
       <Text style={styles.heading}>Shop Time & Training</Text>
-      <Text style={styles.body}>Track internal work separately from customer jobs. Your daily clock keeps running. Completed time is submitted for review.</Text>
+      <Text style={styles.body}>Track Shop Time and Training separately from customer jobs. Daily Clock employees stay on their workday clock; Job Time employees do not need a Daily Clock. Completed time is submitted for review.</Text>
       {!isConnected && <Text style={styles.warning}>Reconnect to start or stop internal time.</Text>}
       {loading && <ActivityIndicator color={Colors.primary[600]} />}
       {!!error && <Text accessibilityRole="alert" style={styles.warning}>{error}</Text>}
