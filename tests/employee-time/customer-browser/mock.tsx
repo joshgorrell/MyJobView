@@ -96,7 +96,10 @@ export const offlineSupabaseUpdate = async (
   state.writes.push({ table, values, id });
   return { error: null };
 };
+const channel = { on() { return channel; }, subscribe() { return channel; } };
 export const supabase = {
+  channel: () => channel,
+  removeChannel: async () => 'ok',
   from(table: string) {
     let filters: any[] = [],
       single = false,

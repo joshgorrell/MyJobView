@@ -15,7 +15,6 @@ export default defineConfig({
             "/contexts/AuthContext",
             "/hooks/useEmployeeTimePolicy",
             "/lib/timezoneUtils",
-            "/lib/feedback",
             "/lib/gpsTracking",
             "/lib/offlineSupport",
               "/lib/offlineStorage",
