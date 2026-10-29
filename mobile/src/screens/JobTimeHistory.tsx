@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -22,7 +22,6 @@ export function JobTimeHistory() {
   const { isConnected } = useOffline();
   const [entries, setEntries] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
   const load = useCallback(async () => {
@@ -36,7 +35,7 @@ export function JobTimeHistory() {
       setError('');
     } catch (e: any) {
       setError(e?.message || 'Unable to load job time history.');
-    } finally { setLoading(false); setRefreshing(false); }
+    } finally { setLoading(false); }
   }, [profile?.id]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -57,7 +56,7 @@ export function JobTimeHistory() {
       <Text style={styles.muted}>Recorded activity time · subject to manager approval</Text>
     </Card>
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-    <ScrollView nestedScrollEnabled refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}>
+    <TouchableOpacity accessibilityRole="button" onPress={() => { void load(); }} style={styles.refresh}><Text style={styles.refreshText}>Refresh history</Text></TouchableOpacity>
       <Text style={styles.heading}>RECENT JOB, SHOP & TRAINING TIME</Text>
       {entries.length === 0 && !error && <EmptyState title="No Activity Yet" message="Your recorded Job Time, Shop Time, and Training will appear here." />}
       {entries.map(entry => {
@@ -70,7 +69,7 @@ export function JobTimeHistory() {
           {!!entry.notes && <Text style={styles.notes}>{entry.notes}</Text>}
         </View>;
       })}
-    </ScrollView>
+
   </ScreenContainer>;
 }
 const styles = StyleSheet.create({
@@ -85,4 +84,6 @@ const styles = StyleSheet.create({
   hours: { color: Colors.gray[800], fontSize: 18, fontWeight: '700', marginTop: Spacing.sm },
   notes: { color: Colors.gray[600], marginTop: Spacing.sm },
   error: { color: Colors.red[600], marginBottom: Spacing.md },
+  refresh: { alignSelf: 'flex-end', marginBottom: Spacing.md, padding: Spacing.sm },
+  refreshText: { color: Colors.primary[600], fontWeight: '700' },
 });
