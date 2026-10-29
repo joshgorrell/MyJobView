@@ -288,7 +288,7 @@ export function ManualJobTimeRequestModal({
       showSuccess={completion.completed}
       successMessage="Time submitted for review!"
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-4 p-4 sm:p-5">
         <CustomerTimeTimer onChanged={onSubmitted} />
         {error && (
           <p role="alert" className="text-sm text-red-600">
@@ -382,7 +382,7 @@ export function ManualJobTimeRequestModal({
                       aria-pressed={project === p.id}
                       onClick={() => {
                         setProject(p.id);
-                        setTarget(null);
+                        choose({ kind: "project", id: p.id, label: `Project · ${p.name}` });
                       }}
                       className="block w-full rounded-lg border border-subtle p-3 text-left aria-pressed:border-blue-500 aria-pressed:bg-blue-500/10"
                     >

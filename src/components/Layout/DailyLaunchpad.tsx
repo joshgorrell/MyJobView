@@ -32,9 +32,10 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
   const [error, setError] = useState('');
   const [request, setRequest] = useState<'manual' | 'internal' | null>(null);
   const [settings, setSettings] = useState<any>(null);
-  async function load() {
+  async function load(showLoading = false) {
     if (!profile) return;
-    setLoading(true); setError('');
+    if (showLoading) setLoading(true);
+    setError('');
     try {
       const today = formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone());
       const [orders, config, active] = await Promise.all([
@@ -59,9 +60,10 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
     return () => clearInterval(ticker);
   }, []);
   useEffect(() => {
-    void load();
+    void load(true);
     if (!profile) return;
-    const channel = supabase.channel('time-hub-jobs').on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries', filter: `technician_id=eq.${profile.id}` }, load).subscribe();
+    const refresh = () => { void load(); };
+    const channel = supabase.channel('time-hub-jobs').on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries', filter: `technician_id=eq.${profile.id}` }, refresh).subscribe();
     const poll = setInterval(() => { if (navigator.onLine) void load(); }, 15000);
     const focus = () => { void load(); };
     window.addEventListener('focus', focus);
@@ -73,12 +75,15 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
     { key: 'team', label: 'Team', icon: Users }, { key: 'time', label: 'History', icon: History },
     { key: 'calendar', label: 'Calendar', icon: Briefcase },
   ] as const;
+  // Show one dialog at a time so request forms cannot sit behind the hub.
+  if (request === 'manual') return createPortal(<ManualJobTimeRequestModal onClose={() => setRequest(null)} onSubmitted={() => void load()} />, document.body);
+  if (request === 'internal' && settings) return createPortal(<RequestInternalTimeModal companySettings={settings} onClose={() => setRequest(null)} onSubmitted={() => void load()} />, document.body);
   return <QuickActionModal stableHeight scrollBody={false} title="Time Clock" subtitle="Your day, your jobs, your time off" icon={<Timer className="h-5 w-5" />} accentColor="from-cyan-700 to-blue-800" onClose={onClose}>
-    <div className="flex min-h-0 flex-1 flex-col gap-4 p-3 sm:p-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
       <nav aria-label="Time Clock views" className="grid shrink-0 grid-cols-5 gap-1 rounded-xl bg-elevated p-1">
         {tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`min-h-14 min-w-0 rounded-lg flex flex-col items-center justify-center gap-1 text-[11px] sm:text-sm transition-colors ${tab === key ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:bg-surface'}`}><Icon className="h-4 w-4" />{label}</button>)}
       </nav>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]" key={tab}>
+      <div className="min-h-0 flex-1 space-y-2 sm:space-y-3 overflow-y-auto overscroll-contain" aria-label={tab === 'work' ? 'Today’s time overview' : undefined} key={tab}>
       {tab === 'work' && <>
         {activeJob && activeJobStarted && <section role="status" aria-label="Running Job Time" className="rounded-xl border-2 border-green-400 bg-green-50 p-3 space-y-2">
           <p className="font-semibold text-green-900">Job Time running · {activeJob.title}</p>
@@ -86,30 +91,29 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
           <WorkOrderTimeControl workOrderId={activeJob.id} assignedTo={profile?.id || null} onChanged={load} />
         </section>}
         <CustomerTimeTimer onChanged={load} />
-        {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.clockAccess === 'mobile' ? <MobileClockRedirect /> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <div className="rounded-2xl border border-subtle bg-elevated p-4"><p className="font-semibold">Ready for your next job?</p><p className="text-sm text-secondary mt-1">Your configuration does not require a daily clock. Record job time below.</p></div>}
-        <div className="flex items-center justify-between"><div><h3 className="font-semibold text-primary">Today’s Jobs</h3><p className="text-xs text-secondary">{day}</p></div><button onClick={load} disabled={loading} aria-label="Refresh today’s work" className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-elevated"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
+        {policy.loading ? <p role="status">Loading your clock configuration…</p> : !policy.ready ? <p role="alert">Your time configuration could not be loaded. Reopen Time Clock to retry.</p> : policy.clockAccess === 'mobile' ? <MobileClockRedirect /> : policy.dailyClock ? <TimeClockModal embedded isOpen onClose={onClose} /> : <p className="rounded-xl border border-subtle bg-elevated px-3 py-2 text-sm text-secondary">No daily clock required. Record job time below.</p>}
+        <section aria-label="Today’s Jobs" className="space-y-2"><div className="flex items-center justify-between"><div className="flex flex-wrap items-baseline gap-x-2"><h3 className="font-semibold text-primary">Today’s Jobs</h3><p className="text-xs text-secondary">{day}</p></div><button type="button" onClick={() => void load(true)} disabled={loading} aria-label="Refresh today’s work" className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-elevated"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button></div>
         {error && <p role="alert" className="text-red-600">{error}</p>}
         {activeJob && !activeJobStarted && !jobs.some(j => j.id === activeJob.id) && <section className="rounded-xl border border-blue-300 p-3 space-y-2"><h4 className="font-semibold">{activeJob.title}</h4><WorkOrderTimeControl workOrderId={activeJob.id} assignedTo={profile?.id || null} onChanged={load} /></section>}
-        {!loading && !error && !jobs.length && <p className="rounded-xl border border-dashed border-subtle p-4 text-sm text-secondary">No jobs scheduled today. You can still record project time below.</p>}
+        {!loading && !error && !jobs.length && <p className="rounded-xl border border-dashed border-subtle px-3 py-2 text-sm text-secondary">No jobs scheduled today.</p>}
         {jobs.map(job => <section key={job.id} className="rounded-xl border border-subtle p-3 space-y-3 bg-surface">
           <button onClick={() => openWorkOrder(job.id)} className="flex gap-3 items-center justify-between text-left w-full min-h-11"><div className="min-w-0"><p className="font-semibold text-sm break-words">{job.work_order_number} · {job.title}</p><p className="text-xs text-secondary">{job.contact?.full_name || job.project?.contact?.full_name || job.project?.name || ''}</p></div><ArrowUpRight className="h-4 w-4 shrink-0 text-secondary" /></button>
           <p className="text-xs text-secondary">{job.scheduled_start_time?.slice(0, 5) || 'Time not set'}{job.scheduled_end_time ? `–${job.scheduled_end_time.slice(0, 5)}` : ''}</p>
           {activeJob?.id !== job.id && <WorkOrderTimeControl workOrderId={job.id} assignedTo={profile?.id || null} onChanged={load} />}
         </section>)}
-        <InternalTimeTimer onChanged={load} />
-        <div className="grid sm:grid-cols-2 gap-2 border-t border-subtle pt-4">
-          {policy.ready && <button onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-3 py-3 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Job Time</button>}
-          {settings && (settings.shop_time_request_enabled || settings.training_time_request_enabled) && <button onClick={() => setRequest('internal')} className="min-h-11 rounded-xl border border-subtle px-3 py-3 text-sm">Request Shop / Training Time</button>}
-        </div>
+        </section>
+        <InternalTimeTimer compact onChanged={load} />
       </>}
       {tab === 'pto' && <MyTimeOff compact />}
       {tab === 'team' && <TeamTimeOffPanel />}
       {tab === 'time' && <div className="space-y-5"><MyTimeView />{policy.basis === 'daily_clock' && <section><h3 className="font-semibold mb-3">Job Time & Requests</h3><MyJobTimeView /></section>}</div>}
       {tab === 'calendar' && <Suspense fallback={<p>Loading daily calendar…</p>}><Calendar personalOnly onWorkOrderSelect={openWorkOrder} /></Suspense>}
       </div>
+      {tab === 'work' && <div aria-label="Time Clock actions" className="grid grid-cols-2 shrink-0 gap-2 border-t border-subtle pt-3">
+          {policy.ready && <button type="button" onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-2 py-2 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Job Time</button>}
+          {settings && (settings.shop_time_request_enabled || settings.training_time_request_enabled) && <button type="button" onClick={() => setRequest('internal')} className="min-h-11 rounded-xl border border-subtle px-2 py-2 text-sm">Request Shop / Training Time</button>}
+      </div>}
     </div>
-    {request === 'manual' && createPortal(<ManualJobTimeRequestModal onClose={() => setRequest(null)} onSubmitted={load} />, document.body)}
-    {request === 'internal' && settings && createPortal(<RequestInternalTimeModal companySettings={settings} onClose={() => setRequest(null)} onSubmitted={load} />, document.body)}
   </QuickActionModal>;
 }
 export function DailyLaunchpadButton({ onOpen }: { onOpen: () => void }) {
