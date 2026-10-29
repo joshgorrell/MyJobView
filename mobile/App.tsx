@@ -26,7 +26,7 @@ function AppNavigation() {
       <StatusBar style="auto" />
       <Stack.Navigator>
         {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
           <Stack.Screen name="TimeClock" component={TimeClockScreen} />
           <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} />
           <Stack.Screen name="WorkOrderDetail" component={WorkOrderDetailScreen} />
