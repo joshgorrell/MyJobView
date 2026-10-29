@@ -289,12 +289,6 @@ export function UserBusinessCardEditor() {
     }
   }
 
-  async function quickPhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    await handlePhotoUpload(event);
-    // Use the existing editor to review and save the selected photo.
-    setEditing(true);
-  }
-
   if (loading) {
     return <div className="text-center py-8 text-muted">Loading your business card...</div>;
   }
