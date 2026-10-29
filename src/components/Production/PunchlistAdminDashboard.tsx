@@ -15,9 +15,9 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
 
   useEffect(() => { if (profile?.id) void markPunchlistSeen(profile.id); }, [profile?.id]);
 
-  const tabs: Array<{ id: WorkspaceView; label: string; description: string; icon: typeof ClipboardList }> = [
-    { id: 'feed', label: 'Tasks & Adjustments', description: 'Review and coordinate 90-day requests', icon: ClipboardList },
-    { id: 'access', label: 'Customers & Access', description: 'Manage invitations and customer access', icon: Users },
+  const tabs: Array<{ id: WorkspaceView; label: string; icon: typeof ClipboardList }> = [
+    { id: 'feed', label: 'Tasks & Adjustments', icon: ClipboardList },
+    { id: 'access', label: 'Customers & Access', icon: Users },
   ];
 
   return (
@@ -40,24 +40,14 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
         )}
       </header>
 
-      <nav aria-label="Test and Tune views" className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
-        {tabs.map(({ id, label, description, icon: Icon }) => {
+      <nav aria-label="Test and Tune views" className="flex min-w-0 flex-wrap gap-1 border-b border-subtle">
+        {tabs.map(({ id, label, icon: Icon }) => {
           const active = view === id;
           return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setView(id)}
+            <button key={id} type="button" onClick={() => setView(id)}
               aria-current={active ? 'page' : undefined}
-              className={`flex min-h-16 min-w-0 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${active ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle bg-surface text-secondary hover:bg-surface-hover'}`}
-            >
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-blue-500/15 text-blue-600' : 'bg-surface text-secondary'}`}>
-                <Icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">{label}</span>
-                <span className="mt-0.5 block text-xs opacity-80">{description}</span>
-              </span>
+              className={`inline-flex min-h-11 items-center gap-2 border-b-2 px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${active ? 'border-blue-500 text-primary' : 'border-transparent text-secondary hover:text-primary'}`}>
+              <Icon className="h-4 w-4" aria-hidden="true" />{label}
             </button>
           );
         })}
