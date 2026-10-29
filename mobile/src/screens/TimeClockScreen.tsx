@@ -125,23 +125,37 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           office_id: data.office_id, notes: data.notes, sync_state: 'synced',
         });
       }
-      setTodayEntry(data);
       if (data) {
+        setTodayEntry(data);
         await loadBreaks(data.id);
         setClockStateUnverified(false);
-      }
-      else {
+      } else {
         const unresolved = await offlineStorage.getUnresolvedClockShift(profile.id);
         const local = unresolved ?? await offlineStorage.getLocalActiveClockShift(profile.id);
         if (local) {
+          // Never hide a pending local punch behind a server's completed shift.
           setClockStateUnverified(true);
           setTodayEntry({ id: local.id, entry_date: local.entry_date,
             clock_in: local.clock_in, clock_out: local.clock_out, total_hours: 0,
             break_minutes: 0, status: local.status, notes: local.notes });
+          setBreaks([]);
+          setActiveBreak(null);
+        } else {
+          // Show the actual completed workday after clock-out instead of
+          // immediately reverting to a misleading "READY TO CLOCK IN" card.
+          const today = workDate(new Date(), context.timezone);
+          const { data: completed, error: completedError } = await supabase
+            .from('daily_clock_entries').select('*')
+            .eq('technician_id', profile.id).eq('entry_date', today)
+            .not('clock_out', 'is', null)
+            .order('clock_out', { ascending: false }).limit(1).maybeSingle();
+          if (completedError) throw completedError;
+          setTodayEntry(completed || null);
+          setClockStateUnverified(false);
+          setBreaks([]);
+          setActiveBreak(null);
+          if (completed) await loadBreaks(completed.id);
         }
-        setBreaks([]);
-        setActiveBreak(null);
-        if (!local) setClockStateUnverified(false);
       }
     } catch (error) {
       setClockStateUnverified(true);
@@ -259,7 +273,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         setTodayEntry({ ...shift, clock_out: null, total_hours: 0, break_minutes: 0, notes: null });
         setClockStateUnverified(true); // Block unsupported offline break/out until independently verified.
         await loadPendingSync();
-        Alert.alert('Offline clock-in saved', 'Your start time is saved on this device and will synchronize when connected. Offline clock-out and breaks are not yet available.');
+        Alert.alert('Offline clock-in saved', 'Your start time is saved on this device. Offline clock-out can be saved locally for synchronization; starting or ending breaks still requires a connection.');
       } catch (error: any) {
         Alert.alert('Unable to clock in offline', error.message || 'Local punch could not be saved.');
       }
@@ -574,7 +588,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       <LinearGradient colors={gradientColors} style={styles.clockCard}>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>
-            {isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
+            {clockStateUnverified ? 'PENDING SYNC / REVIEW' : isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
           </Text>
         </View>
 
@@ -587,7 +601,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified && !!todayEntry} activeOpacity={0.85}>
+          <TouchableOpacity style={[styles.clockButton, clockStateUnverified && styles.disabledButton]} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
             <Text style={styles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
@@ -634,7 +648,11 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               <View style={styles.completedCheckInner} />
             </View>
             <Text style={styles.completedTitle}>Clocked Out</Text>
-            <Text style={styles.completedHours}>Total Hours: {todayEntry.total_hours.toFixed(2)}</Text>
+            {clockStateUnverified ? (
+              <Text style={styles.completedHours}>Hours pending synchronization or review</Text>
+            ) : (
+              <Text style={styles.completedHours}>Total Hours: {Number(todayEntry.total_hours || 0).toFixed(2)}</Text>
+            )}
             <Text style={styles.completedTime}>
               {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               {' - '}
