@@ -443,7 +443,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     const { data: openActivities, error: activityError } = await supabase.from('time_entries').select('id,work_order_id,internal_session_id')
       .eq('technician_id', profile.id).is('clock_out', null).in('status', ['draft', 'submitted']).limit(1);
     if (activityError) { Alert.alert('Unable to verify job time', 'Reconnect and try again before clocking out.'); return; }
-    if (openActivities?.length) { Alert.alert('Active time must be stopped', 'Stop your running Job Time, Shop Time or Training before clocking out for the day.', [{ text: 'OK' }, { text: 'Open Work Orders', onPress: () => navigation.navigate('WorkOrders') }]); return; }
+    if (openActivities?.length) {
+      const internal = !!openActivities[0].internal_session_id;
+      Alert.alert('Active time must be stopped', internal
+        ? 'Stop Shop Time or Training using the controls below before clocking out for the day.'
+        : 'Stop your running Job Time before clocking out for the day.', internal
+        ? [{ text: 'OK' }]
+        : [{ text: 'Cancel', style: 'cancel' }, { text: 'Open Work Orders', onPress: () => navigation.navigate('WorkOrders') }]);
+      return;
+    }
     if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) {
       Alert.alert('Unfinished shift', 'Ask your manager to correct this older shift before recording another day.');
       return;
