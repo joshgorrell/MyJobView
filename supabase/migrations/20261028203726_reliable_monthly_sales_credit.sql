@@ -105,7 +105,7 @@ BEGIN
    SELECT coalesce(jsonb_agg(jsonb_build_object('key','subscription:'||i.id||':'||subscription_id,'rep',originating_sales_rep_id,'amount',(base+CASE WHEN n<=remaining THEN 1 ELSE 0 END)/100,'reason',CASE WHEN sales_origin_snapshotted_at IS NULL THEN 'subscription_origin_unverified' ELSE 'subscription_origin_snapshot' END)),'[]') INTO allocation FROM ranked;
   END IF;
   eligible:=false;
- ELSIF nullif(j->>'work_order_billing_request_id','') IS NOT NULL OR EXISTS(SELECT 1 FROM public.work_order_invoice_links l WHERE l.invoice_id=i.id AND l.organization_id=i.organization_id) THEN kind:='service_invoice';
+ ELSIF nullif(j->>'work_order_billing_request_id','') IS NOT NULL OR EXISTS(SELECT 1 FROM public.invoice_line_item_sources l JOIN public.invoice_line_items li ON li.id=l.invoice_line_item_id AND li.organization_id=l.organization_id WHERE li.invoice_id=i.id AND l.organization_id=i.organization_id AND l.source_type='work_order') THEN kind:='service_invoice';
  ELSIF lower(coalesce(i.invoice_type,'')) NOT IN ('retail','service','time_and_materials') AND lower(coalesce(i.source_type,'')) NOT IN ('retail','service','time_and_materials') THEN eligible:=false;END IF;
  IF eligible THEN allocation:=jsonb_build_array(jsonb_build_object('key','invoice:'||i.id,'rep',rep,'amount',v_net,'reason',reason));END IF;
  FOR s IN SELECT * FROM sales_credit_private.streams st WHERE st.organization_id=i.organization_id AND st.source_id=i.id AND st.source_type<>'sales_order' LOOP
@@ -151,7 +151,7 @@ CREATE CONSTRAINT TRIGGER sales_credit_proposal AFTER INSERT OR UPDATE OR DELETE
 CREATE CONSTRAINT TRIGGER sales_credit_change_order AFTER INSERT OR UPDATE OR DELETE ON public.change_orders DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION sales_credit_private.source_changed();
 CREATE CONSTRAINT TRIGGER sales_credit_invoice AFTER INSERT OR UPDATE OR DELETE ON public.invoices DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION sales_credit_private.source_changed();
 CREATE CONSTRAINT TRIGGER sales_credit_recurring_link AFTER INSERT OR UPDATE OR DELETE ON public.recurring_invoices DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION sales_credit_private.source_changed();
-CREATE CONSTRAINT TRIGGER sales_credit_work_order_link AFTER INSERT OR UPDATE OR DELETE ON public.work_order_invoice_links DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION sales_credit_private.source_changed();
+CREATE CONSTRAINT TRIGGER sales_credit_work_order_link AFTER INSERT OR UPDATE OR DELETE ON public.invoice_line_item_sources DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION sales_credit_private.source_changed();
 
 CREATE FUNCTION sales_credit_private.require_reader(p_target uuid,p_company boolean DEFAULT false)RETURNS uuid LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
 DECLARE a public.profiles%ROWTYPE;manager boolean;
