@@ -112,3 +112,18 @@ console.log('Offline Daily Clock-Out checks historical job/break overlap at the 
 const nativeOfflineSource=fs.readFileSync('mobile/src/services/OfflineStorage.ts','utf8');
 assert.equal((nativeOfflineSource.match(/await hasOverlappingActivityAtClockOut\(event\.technician_id, event\.id, event\.clock_out\)/g)||[]).length,2,
   'Both existing-shift closure and offline-created-shift insertion must check historical activity overlap');
+
+const nativeClockUi = fs.readFileSync('mobile/src/screens/TimeClockScreen.tsx', 'utf8');
+const nativeDashboardUi = fs.readFileSync('mobile/src/screens/DashboardScreen.tsx', 'utf8');
+assert.ok(nativeClockUi.includes(".eq('entry_date', today)") && nativeClockUi.includes(".not('clock_out', 'is', null)"),
+  'Completed shifts must remain visible on the native Time Clock after a successful clock-out');
+assert.ok(nativeClockUi.includes('Hours pending synchronization or review'),
+  'An unverified offline clock-out must never display fabricated 0.00 payroll hours');
+assert.ok(!nativeClockUi.includes('Offline clock-out and breaks are not yet available.'),
+  'Offline clock-in instructions must reflect supported offline clock-out');
+assert.ok(nativeDashboardUi.includes("setUsesDailyClock(context.dailyClock)") &&
+  nativeDashboardUi.includes('No Active Job Timer'),
+  'Job Time employees must not be shown a false Daily Clock status');
+assert.ok(nativeDashboardUi.includes("setRecentDays([])"),
+  'Job Time employees must not be shown irrelevant Daily Clock recent shifts');
+console.log('Native Time Clock audit: completed shift, pending payroll hours, offline copy and Job Time dashboard.');
