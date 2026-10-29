@@ -25,7 +25,7 @@ Baseline: Prior approved requirements plus current native and web implementation
 | P2 | Sync Now in Settings displays "All offline data has been synced!" without independently checking remaining pending/conflict counts. | mobile/src/screens/SettingsScreen.tsx | Open |
 | P2 | GPS/clock UI uses a large clock, gradient status card and banners; no verified screenshots across iPhone sizes, dynamic text, VoiceOver, dark mode, or low connectivity. | mobile/src/screens/TimeClockScreen.tsx; mobile/src/theme | Device UX acceptance required |
 | P2 | Offline clock transitions require cached policy less than 24 hours old; this policy age is an implementation restriction, not confirmed as an approved product requirement. | mobile/src/screens/TimeClockScreen.tsx; mobile/src/services/OfflineStorage.ts | Product decision required |
-| P2 | Native Shop Time/Training card says "Your daily clock keeps running" even for Job Time employees who never use Daily Clock. | mobile/src/components/InternalTimeCard.tsx | Open copy issue |
+| P2 | Native Shop Time/Training card says "Your daily clock keeps running" even for Job Time employees who never use Daily Clock. | mobile/src/components/InternalTimeCard.tsx | Copy corrected in PR #352 |
 | P2 | GPS, travel bonus approval, office radius and route comparison need end-to-end product validation; presence of location tracking is not proof of complete payroll travel-bonus workflow. | mobile/src/services/LocationTrackingService.ts; web time tracking modules | Device/business acceptance required |
 
 ## Positive confirmations
