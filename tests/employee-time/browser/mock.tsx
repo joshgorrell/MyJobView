@@ -8,7 +8,7 @@ export const formatTimeInTimezone=()=> '8:00 AM';
 export const useToast=()=>({success(){},error(){},warning(){},info(){}});
 export const gpsTrackingService={getPermissionState:async()=> 'prompt'};
 const channel={on(){return channel;},subscribe(){return channel;},unsubscribe(){}};
-export const supabase={channel:()=>channel,from(table:string){const q:any=new Proxy({}, {get(_,key){if(key==='then')return(resolve:any)=>resolve({error:null,data:table==='work_orders'?[{id:'wo',work_order_number:'WO-100',title:'Install Speakers',status:'assigned',scheduled_start_time:'08:00',project:{name:'Home'}}]:table==='time_entries'?null:table==='daily_clock_entries'||table==='daily_clock_breaks'?[]:{}});return()=>q;}});return q;}};
+export const supabase={channel:()=>channel,removeChannel:async()=> 'ok',from(table:string){const q:any=new Proxy({}, {get(_,key){if(key==='then')return(resolve:any)=>resolve({error:null,data:table==='work_orders'?[{id:'wo',work_order_number:'WO-100',title:'Install Speakers',status:'assigned',scheduled_start_time:'08:00',project:{name:'Home'}}]:['time_entries','daily_clock_entries','daily_clock_breaks','internal_time_sessions'].includes(table)?[]:{}});return()=>q;}});return q;}};
 export const ManualJobTimeRequestModal=()=> <div>Manual request</div>;
 export const RequestInternalTimeModal=()=> <div>Internal request</div>;
 export const MyTimeView=()=> <div>{location.search.includes('salary')?'Recorded Job Time':'Approved Job Time'}</div>;

@@ -14,7 +14,7 @@ function harness(path,imports={},globals={}) {
   };
   const jsx=(type,props)=>({type,props});const module={exports:{}};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText.replaceAll('import.meta.env','__testEnv'),{
-    __testEnv:{},console,module,exports:module.exports,Date,URLSearchParams,...globals,
+    __testEnv:{},console,module,exports:module.exports,Date,URLSearchParams,setInterval:()=>1,clearInterval:()=>{},...globals,
     require(name){if(name==='react-dom')return {createPortal:x=>x};if(name==='../../lib/feedback')return {notify(value){globals.alert?.(value);},requestConfirmation:async()=>true,requestText:async()=>null};if(name==='react')return {...React,default:React};if(name==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:'Fragment'};if(name==='lucide-react')return new Proxy({},{get:(_,key)=>key});if(name in imports)return imports[name];throw Error(name);},
   });
   return {exports:module.exports,render(name,props={}){cursor=0;return module.exports[name](props);},effects};
@@ -33,6 +33,7 @@ const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
   '../Technician/ManualJobTimeRequestModal':{ManualJobTimeRequestModal:'ManualJobTimeRequestModal'},
   '../Technician/RequestInternalTimeModal':{RequestInternalTimeModal:'RequestInternalTimeModal'},
   '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},'../Technician/CustomerTimeTimer':{CustomerTimeTimer:'CustomerTimeTimer'},
+  '../Technician/InternalTimeTimer':{InternalTimeTimer:'InternalTimeTimer'},
   '../Technician/MyTimeView':{MyTimeView:'MyTimeView'},
   '../Dispatch/MyTimeOff':{MyTimeOff:'MyTimeOff'},'../Shared/TeamTimeOffPanel':{TeamTimeOffPanel:'TeamTimeOffPanel'},
   '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},'./MobileClockRedirect':{MobileClockRedirect:'MobileClockRedirect'},
@@ -180,3 +181,20 @@ tree=completion.render('JobCompletionWizard',completionProps);
 const completeButton=nodes(tree).find(n=>n.type==='button'&&text(n).trim()==='Complete Job');assert.ok(completeButton);
 await completeButton.props.onClick();assert.equal(completionWrites.length,0);assert.ok(completionAlerts.some(a=>a.includes('Stop Job Time')));
 console.log('Canonical completion rejects running time before any completion writes and shows the recovery instruction.');
+
+const liveModal = fs.readFileSync('src/components/Layout/DailyLaunchpad.tsx', 'utf8');
+const internalTimer = fs.readFileSync('src/components/Technician/InternalTimeTimer.tsx', 'utf8');
+const customerTimer = fs.readFileSync('src/components/Technician/CustomerTimeTimer.tsx', 'utf8');
+const verifiedStop = fs.readFileSync('src/components/Shared/ClockOutModal.tsx', 'utf8');
+assert.ok(liveModal.includes('activeJobStarted') && liveModal.includes('Job Time running') &&
+  liveModal.includes('InternalTimeTimer'), 'Time Clock must show running job and internal controls');
+assert.ok(liveModal.includes("setInterval(() => setNow(Date.now()), 1000)"),
+  'Active job elapsed time must update each second');
+assert.ok(internalTimer.includes("start_internal_time") && internalTimer.includes("stop_internal_time") &&
+  internalTimer.includes("Start {session.session_type === 'shop_time' ? 'Shop Time' : 'Training'}"),
+  'Job Time employees must be able to start and stop internal time without Daily Clock');
+assert.ok(internalTimer.includes('requestConfirmation') && customerTimer.includes('requestConfirmation'),
+  'Internal and customer timer stop actions must request explicit confirmation');
+assert.ok(verifiedStop.includes('verifiedClockOut') && verifiedStop.includes('Verify & Clock Out'),
+  'Daily and job clock-out dialogs must require explicit verification');
+console.log('Time Clock live status, Shop/Training access and clock-out verification regression checks passed.');

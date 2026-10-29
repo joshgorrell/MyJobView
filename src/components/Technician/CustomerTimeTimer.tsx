@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
@@ -59,14 +60,20 @@ export function CustomerTimeTimer({ onChanged }: { onChanged?: () => void }) {
     };
     window.addEventListener("customer-time-changed", refresh);
     window.addEventListener("focus", refresh);
+    const poll = setInterval(() => { if (navigator.onLine) void load(); }, 15000);
+    const channel = profile ? supabase.channel('time-modal-customer-' + profile.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_time_sessions', filter: 'technician_id=eq.' + profile.id }, refresh).subscribe() : null;
     return () => {
       clearInterval(tick);
+      clearInterval(poll);
+      if (channel) void supabase.removeChannel(channel);
       window.removeEventListener("customer-time-changed", refresh);
       window.removeEventListener("focus", refresh);
     };
   }, [profile?.id]);
   async function stop() {
     if (!session || busy) return;
+    if (!await requestConfirmation('Verify clock-out: Stop this customer timer and submit the recorded time for manager review?', { theme: 'blue', title: 'Verify Clock-Out', confirmLabel: 'Stop Time' })) return;
     if (!navigator.onLine) {
       setError(
         "Reconnect to stop this timer. Its start time is saved and it continues running.",
@@ -121,7 +128,7 @@ export function CustomerTimeTimer({ onChanged }: { onChanged?: () => void }) {
             onClick={stop}
             className="min-h-11 rounded-lg bg-red-600 px-4 py-2 text-white disabled:opacity-50"
           >
-            {busy ? "Stopping…" : "Stop & Submit Time"}
+            {busy ? "Stopping…" : "Stop & Verify Time"}
           </button>
           <p className="text-xs text-secondary">
             Stopped time goes to the existing manager review queue. Pay follows

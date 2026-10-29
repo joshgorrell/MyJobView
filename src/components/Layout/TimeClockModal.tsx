@@ -59,6 +59,7 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
   const attendance = useAttendanceResults(todayEntry ? [todayEntry.id] : []);
   const [activeBreak, setActiveBreak] = useState<ActiveBreak | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
+  const [activeActivity, setActiveActivity] = useState<{id:string;clock_in:string;work_order_id:string|null;internal_session_id:string|null}|null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [, setLocationPermission] = useState<'granted' | 'denied' | 'prompt' | 'unknown'>('unknown');
   const [checkingPermission, setCheckingPermission] = useState(true);
@@ -126,6 +127,9 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
       const ownEntries = (entries || []).filter((e: any) => e.technician_id === profile.id && (!e.clock_out || e.entry_date === today));
       const entryData = ownEntries.find(e => !e.clock_out) || ownEntries[0] || null;
       setTodayEntry(entryData);
+      const { data: activities, error: activityError } = await supabase.from('time_entries').select('id,clock_in,work_order_id,internal_session_id').eq('technician_id',profile.id).is('clock_out',null).in('status',['draft','submitted']).limit(1);
+      if (activityError) throw activityError;
+      setActiveActivity(activities?.[0] || null);
 
       if (entryData) {
         const { data: breaks } = await offlineSupabaseQuery<ActiveBreak>(
@@ -274,6 +278,7 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
     if (!todayEntry || !profile) return;
     if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) { toast.warning('An unfinished older shift needs manager correction before you clock out.'); return; }
     if (activeBreak) { toast.warning('Please end your break before clocking out'); return; }
+    if (activeActivity) { toast.warning('Stop your open Job Time, Shop Time, or Training entry before clocking out for the day.'); return; }
     setShowClockOutModal(true);
   }
 
@@ -389,6 +394,8 @@ export function TimeClockModal({ isOpen, onClose, embedded = false }: TimeClockM
               <p className="text-sm text-orange-800">Offline — actions will sync when you reconnect.</p>
             </div>
           )}
+
+          {isClockedIn && activeActivity && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">An activity is still running. Stop your {activeActivity.internal_session_id ? 'Shop Time or Training' : 'Job Time'} entry above before clocking out of Daily Clock.</p>}
 
           {/* NOT CLOCKED IN */}
           {!todayEntry && (
