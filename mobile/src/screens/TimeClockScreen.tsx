@@ -15,6 +15,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  AccessibilityInfo,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -51,6 +52,34 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   const [timeContext, setTimeContext] = useState<{ timezone: string; basis: string; dailyClock: boolean } | null>(null);
   const { currentLocation, isTracking } = useLocation();
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
+  const [clockFlash, setClockFlash] = useState<{ id: string; action: 'in' | 'out'; pending: boolean; points?: number } | null>(null);
+  useEffect(() => {
+    if (!clockFlash) return;
+    const timer = setTimeout(() => setClockFlash(current => current?.id === clockFlash.id ? null : current), 2800);
+    return () => clearTimeout(timer);
+  }, [clockFlash?.id]);
+  function showClockFlash(id: string, action: 'in' | 'out', pending = false) {
+    setClockFlash({ id, action, pending });
+    AccessibilityInfo.announceForAccessibility(pending ? 'Clock saved, pending sync' : action === 'in' ? "You're in" : "You're off");
+    if (action !== 'in' || pending) return;
+    // The server trigger can commit the attendance snapshot after the punch.
+    // Check briefly while the confirmation is visible; never estimate points.
+    void (async () => {
+      for (const delay of [0, 450, 650, 700]) {
+        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+        const { data, error } = await supabase.from('clock_in_rewards_log')
+          .select('points_awarded')
+          .eq('daily_clock_entry_id', id)
+          .in('event_type', ['early', 'on_time', 'late', 'very_late'])
+          .maybeSingle();
+        if (error) return;
+        if (data) {
+          setClockFlash(current => current?.id === id ? { ...current, points: data.points_awarded } : current);
+          return;
+        }
+      }
+    })();
+  }
   const [breaks, setBreaks] = useState<Break[]>([]);
   const [activeBreak, setActiveBreak] = useState<Break | null>(null);
   const [loading, setLoading] = useState(true);
@@ -273,7 +302,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         setTodayEntry({ ...shift, clock_out: null, total_hours: 0, break_minutes: 0, notes: null });
         setClockStateUnverified(true); // Block unsupported offline break/out until independently verified.
         await loadPendingSync();
-        Alert.alert('Offline clock-in saved', 'Your start time is saved on this device. Offline clock-out can be saved locally for synchronization; starting or ending breaks still requires a connection.');
+        showClockFlash(shift.id, 'in', true);
       } catch (error: any) {
         Alert.alert('Unable to clock in offline', error.message || 'Local punch could not be saved.');
       }
@@ -322,7 +351,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         return;
       }
       await loadTodaysClock();
-      Alert.alert('Success', 'Clocked in successfully!');
+      showClockFlash(entryId, 'in');
     } catch (error: any) {
       console.error('Error clocking in:', error);
       Alert.alert('Error', error.message || 'Failed to clock in');
@@ -380,7 +409,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               await loadPendingSync();
               try { await locationTrackingService.stopTracking(); }
               catch (trackingError) { console.error('Unable to stop tracking after offline clock-out:', trackingError); }
-              Alert.alert('Offline punch saved', 'Your clock-out is stored locally and awaiting synchronization.');
+              showClockFlash(`${cached.id}:out`, 'out', true);
             } catch (error: any) {
               Alert.alert('Unable to save offline punch', error.message || 'Clock-out could not be stored.');
             }
@@ -437,7 +466,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           return;
         }
         await loadTodaysClock();
-        Alert.alert('Success', 'Clocked out successfully!');
+        showClockFlash(`${todayEntry.id}:out`, 'out');
       } catch (error: any) {
         console.error('Error clocking out:', error);
         Alert.alert('Error', error.message || 'Failed to clock out');
@@ -554,6 +583,15 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   return (
     <ScreenContainer scroll>
+      {clockFlash && (
+        <View accessible accessibilityRole="alert" style={styles.clockFlash}>
+          <Text style={styles.clockFlashTitle}>{clockFlash.pending ? 'CLOCK SAVED' : clockFlash.action === 'in' ? "YOU'RE IN!" : "YOU'RE OFF!"}</Text>
+          <Text style={styles.clockFlashText}>{clockFlash.pending ? 'Pending sync — points will be confirmed later.' : clockFlash.action === 'in' ? 'Have a great day!' : 'Enjoy the rest of your day!'}</Text>
+          {clockFlash.action === 'in' && !clockFlash.pending && clockFlash.points !== undefined && (
+            <Text style={styles.clockFlashPoints}>{clockFlash.points > 0 ? '+' : ''}{clockFlash.points} points {clockFlash.points < 0 ? 'deducted' : 'earned'}</Text>
+          )}
+        </View>
+      )}
       {/* GPS Status Banner */}
       <View style={[styles.statusBanner, isTracking ? styles.trackingActive : styles.trackingInactive]}>
         <View style={styles.bannerContent}>
@@ -588,7 +626,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       <LinearGradient colors={gradientColors} style={styles.clockCard}>
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>
-            {clockStateUnverified ? 'PENDING SYNC / REVIEW' : isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
+            {isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
           </Text>
         </View>
 
@@ -601,7 +639,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={[styles.clockButton, clockStateUnverified && styles.disabledButton]} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified && !!todayEntry} activeOpacity={0.85}>
             <Text style={styles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
@@ -648,11 +686,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               <View style={styles.completedCheckInner} />
             </View>
             <Text style={styles.completedTitle}>Clocked Out</Text>
-            {clockStateUnverified ? (
-              <Text style={styles.completedHours}>Hours pending synchronization or review</Text>
-            ) : (
-              <Text style={styles.completedHours}>Total Hours: {Number(todayEntry.total_hours || 0).toFixed(2)}</Text>
-            )}
+            <Text style={styles.completedHours}>Total Hours: {todayEntry.total_hours.toFixed(2)}</Text>
             <Text style={styles.completedTime}>
               {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               {' - '}
@@ -702,6 +736,10 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
+  clockFlash: { marginHorizontal: Spacing.lg, marginTop: Spacing.md, padding: Spacing.lg, backgroundColor: '#0c2849', borderRadius: Radius.xxl, alignItems: 'center' },
+  clockFlashTitle: { color: Colors.white, fontSize: 22, fontWeight: '800', letterSpacing: 1 },
+  clockFlashText: { color: '#d7e9ff', marginTop: 4, fontSize: 14 },
+  clockFlashPoints: { color: '#ffe08a', marginTop: 8, fontSize: 16, fontWeight: '700' },
   container: { flex: 1, backgroundColor: Colors.gray[100] },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[100] },
   statusBanner: { padding: Spacing.md + 2, alignItems: 'center' },
