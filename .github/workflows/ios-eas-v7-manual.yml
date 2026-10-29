@@ -38,7 +38,7 @@ jobs:
           fi
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - name: Install dependencies
@@ -53,20 +53,8 @@ jobs:
           node -e "const a=require('./app.json').expo; if(a.ios.bundleIdentifier!=='com.myjobview.app'||a.extra?.eas?.projectId!=='7d9e3303-8b1d-416e-9ace-fd3b15d9340f') process.exit(1)"
       - name: Verify production Supabase endpoint before building
         run: |
-          # EAS env:exec resolves variables from the same production environment
-          # selected by the EAS production build profile. Never print keys.
-          eas env:exec --environment production -- node -e '
-            const url = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
-            const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
-            let parsed;
-            try { parsed = new URL(url); } catch { throw Error("EAS production Supabase URL is missing or invalid"); }
-            if (parsed.origin !== "https://bqtsuzvuvqvgidipbsis.supabase.co" ||
-                parsed.pathname !== "/" || parsed.search || parsed.hash) {
-              throw Error("EAS production Supabase URL does not match the MJV project root");
-            }
-            if (!key.trim()) throw Error("EAS production Supabase public key is missing");
-            console.log("EAS production Supabase project URL and public key presence verified");
-          '
+          # env:exec takes ENVIRONMENT and BASH_COMMAND as positional arguments.
+          eas env:exec production 'node scripts/check-eas-production-env.cjs' --non-interactive
       - name: Build iOS production artifact
         run: eas build --platform ios --profile production --non-interactive --wait
       - name: Submit latest build to App Store Connect
