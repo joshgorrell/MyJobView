@@ -180,3 +180,20 @@ tree=completion.render('JobCompletionWizard',completionProps);
 const completeButton=nodes(tree).find(n=>n.type==='button'&&text(n).trim()==='Complete Job');assert.ok(completeButton);
 await completeButton.props.onClick();assert.equal(completionWrites.length,0);assert.ok(completionAlerts.some(a=>a.includes('Stop Job Time')));
 console.log('Canonical completion rejects running time before any completion writes and shows the recovery instruction.');
+
+const liveModal = fs.readFileSync('src/components/Layout/DailyLaunchpad.tsx', 'utf8');
+const internalTimer = fs.readFileSync('src/components/Technician/InternalTimeTimer.tsx', 'utf8');
+const customerTimer = fs.readFileSync('src/components/Technician/CustomerTimeTimer.tsx', 'utf8');
+const verifiedStop = fs.readFileSync('src/components/Shared/ClockOutModal.tsx', 'utf8');
+assert.ok(liveModal.includes('activeJobStarted') && liveModal.includes('Job Time running') &&
+  liveModal.includes('InternalTimeTimer'), 'Time Clock must show running job and internal controls');
+assert.ok(liveModal.includes("setInterval(() => setNow(Date.now()), 1000)"),
+  'Active job elapsed time must update each second');
+assert.ok(internalTimer.includes("start_internal_time") && internalTimer.includes("stop_internal_time") &&
+  internalTimer.includes("Start Shop Time") && internalTimer.includes("Start Training"),
+  'Job Time employees must be able to start and stop internal time without Daily Clock');
+assert.ok(internalTimer.includes('window.confirm') && customerTimer.includes('window.confirm'),
+  'Internal and customer timer stop actions must request explicit confirmation');
+assert.ok(verifiedStop.includes('verifiedClockOut') && verifiedStop.includes('Verify & Clock Out'),
+  'Daily and job clock-out dialogs must require explicit verification');
+console.log('Time Clock live status, Shop/Training access and clock-out verification regression checks passed.');
