@@ -27,6 +27,8 @@ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors
 for(const width of [375,390,1280]){
  await page.setViewportSize({width,height:800});await page.goto('http://127.0.0.1:'+server.address().port);await page.evaluate(()=>localStorage.clear());await page.reload();
  await page.getByRole('checkbox',{name:'Select Adjustment a',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Advanced filters'}).click();
+ assert.equal(await page.getByRole('button',{name:'Hide advanced filters'}).getAttribute('aria-expanded'),'true');
  await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('c1');
  assert.equal(await page.getByRole('button',{name:/All items/}).textContent().then(t=>t.includes('6')),true);
  await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('p1');
