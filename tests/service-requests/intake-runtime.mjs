@@ -69,3 +69,7 @@ const workOrderSource=fs.readFileSync('src/components/Production/CreateWorkOrder
 assert.match(workOrderSource,/notes:\s*'',\s*internal_notes:\s*serviceRequest\s*\?/,'Work-order conversion must initialize customer notes empty and retain separate internal metadata');
 assert.doesNotMatch(workOrderSource,/notes:\s*serviceRequest\?\.notes/,'Scheduling notes must never populate customer-visible work-order notes');
 console.log('Service scheduling message is isolated from customer and technician work-order notes.');
+
+const approvalEmailSource=fs.readFileSync('supabase/functions/send-service-approval/index.ts','utf8');
+assert.doesNotMatch(approvalEmailSource,/attempt\.notes|serviceRequest\.notes|request\.notes/,'Customer approval email must never interpolate scheduling notes');
+assert.match(approvalEmailSource,/attempt\.description/,'Customer approval email uses approved service description');
