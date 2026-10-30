@@ -256,7 +256,7 @@ export function MyCardView() {
   if (!card && !isEditing) {
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
-        <div className="relative rounded-2xl border border-purple-500/30 p-4 sm:p-8 bg-gray-900 bg-cover bg-center" style={{ backgroundImage: ((card as BusinessCard & { banner_url?: string | null }).banner_url || companySettings?.business_card_banner_url) ? `linear-gradient(rgba(8,12,25,.78), rgba(8,12,25,.92)), url("${(card as BusinessCard & { banner_url?: string | null }).banner_url || companySettings?.business_card_banner_url}")` : undefined }}>
+        <div className="bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-purple-500/30 p-8">
           <CreditCard className="w-16 h-16 text-gray-500 mx-auto mb-4" />
           <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">No Business Card Yet</h2>
           <p className="text-gray-400 mb-6">Create your digital business card to share with customers</p>
