@@ -898,7 +898,6 @@ function AppContent() {
             <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
           </div>
         )}
-        {directoryEnabled && !isStandalone && <div className="px-4 pt-2"><button type="button" onClick={() => setActiveTab('company_directory')} className="rounded-lg border border-subtle px-3 py-2 text-sm text-secondary hover:text-primary">Company Directory</button></div>}
         <main
           className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
@@ -1109,7 +1108,7 @@ function AppContent() {
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
               <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
-                <UserPreferences />
+                <UserPreferences directoryEnabled={directoryEnabled} onOpenDirectory={() => setActiveTab('company_directory')} />
               </div>
             </div>
           )}
