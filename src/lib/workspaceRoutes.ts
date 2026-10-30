@@ -7,6 +7,7 @@ const pages = [
   "calendar",
   "change_orders",
   "commission_management",
+  "company_directory",
   "commissions",
   "contact_import",
   "contacts",
