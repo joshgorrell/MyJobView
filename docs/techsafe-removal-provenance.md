@@ -1,3 +1,5 @@
+> Superseded activation guidance: the workflow-isolation migration detaches legacy receipt hooks and managed invalidation triggers. Keep the managed engine unused and do not register live COs. See [background sync plan](techsafe-background-sync.md). The historical tests below validate the earlier migration alone, not current export readiness.
+
 # Applied change-order removal evidence
 
 This source-data prerequisite separates equipment scope from portal presentation. It does not enable equipment export, live synchronization or checkout. It is a membership-evidence layer, not a complete committed sales-order revision implementation.

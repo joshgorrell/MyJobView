@@ -1,3 +1,5 @@
+> Superseded activation guidance: the workflow-isolation migration detaches legacy receipt hooks and managed invalidation triggers. Keep the managed engine unused and do not register live COs. See [background sync plan](techsafe-background-sync.md). The historical tests below validate the earlier migration alone, not current export readiness.
+
 # Opt-in change-order application engine
 
 This builds on the applied-removal provenance migration in main. It adds an internal engine and private application receipts. It does not redirect any existing approval screen, public applier or portal endpoint, create registrations, export equipment, or enable synchronization. Existing orders continue using their current flow.
