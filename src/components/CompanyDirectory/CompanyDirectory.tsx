@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, Mail, Phone, LayoutGrid, List, UserRound } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-type Colleague = { user_id:string; full_name:string; title:string; email:string; phone:string; photo_url:string|null; slug:string|null; office_name:string|null };
+type Colleague = { user_id:string; full_name:string; title:string; email:string; phone:string; photo_url:string|null; slug:string|null; office_name:string|null; banner_url:string|null };
 export function CompanyDirectory() {
   const [people,setPeople]=useState<Colleague[]>([]);
   const [loading,setLoading]=useState(true);
@@ -28,8 +28,8 @@ export function CompanyDirectory() {
       <div className="flex rounded-xl border dark:border-slate-700"><button aria-label="Card view" aria-pressed={mode==='cards'} onClick={()=>setMode('cards')} className="p-3 aria-pressed:bg-cyan-100 dark:aria-pressed:bg-slate-700"><LayoutGrid size={18}/></button><button aria-label="List view" aria-pressed={mode==='list'} onClick={()=>setMode('list')} className="p-3 aria-pressed:bg-cyan-100 dark:aria-pressed:bg-slate-700"><List size={18}/></button></div>
     </div>
     {loading?<p>Loading directory…</p>:error?<p role="alert">{error}</p>:filtered.length===0?<p className="rounded-xl border p-8 text-center dark:border-slate-700">No coworkers found. The directory may be disabled or no employees match your filters.</p>:
-    <div className={mode==='cards'?'grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5' :'space-y-2'}>{filtered.map(p=><article key={p.user_id} className="flex min-w-0 items-center gap-2 rounded-xl border bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      {p.photo_url?<img src={p.photo_url} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover"/>:<div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"><UserRound/></div>}
+    <div className={mode==='cards'?'grid gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5' :'space-y-2'}>{filtered.map(p=><article key={p.user_id} className="relative flex min-w-0 items-center gap-2 overflow-hidden rounded-xl border bg-white p-2 pt-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      {p.banner_url && <div className="absolute inset-x-0 top-0 h-2.5 bg-cover bg-center" style={{backgroundImage:`url("${p.banner_url}")`}} aria-hidden="true" />}\n      {p.photo_url?<img src={p.photo_url} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover"/>:<div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"><UserRound/></div>}
       <div className="min-w-0 flex-1"><h2 className="truncate font-semibold">{p.full_name}</h2>{p.title&&<p className="truncate text-sm text-slate-500 dark:text-slate-400">{p.title}</p>}{p.office_name&&<p className="text-xs text-slate-500">{p.office_name}</p>}
         <div className="mt-1 flex flex-wrap gap-2 text-xs">{p.email&&<a className="inline-flex items-center gap-1 text-cyan-700 dark:text-cyan-300" href={`mailto:${p.email}`}><Mail size={15}/> Email</a>}{p.phone&&<a className="inline-flex items-center gap-1 text-cyan-700 dark:text-cyan-300" href={`tel:${p.phone}`}><Phone size={15}/> Call</a>}{p.slug&&<a className="text-cyan-700 underline dark:text-cyan-300" href={`/card/${encodeURIComponent(p.slug)}`}>Business card</a>}</div>
       </div></article>)}</div>}
