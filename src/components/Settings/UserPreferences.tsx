@@ -10,7 +10,7 @@ import { RewardsDashboard } from '../Rewards/RewardsDashboard';
 import ConfirmModal from '../ui/ConfirmModal';
 import { ThemeSelector } from './ThemeSelector';
 
-export function UserPreferences() {
+export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: { directoryEnabled?: boolean; onOpenDirectory?: () => void } = {}) {
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards'>(() => {
     const target = sessionStorage.getItem('mjv-preferences-tab');
@@ -343,7 +343,7 @@ export function UserPreferences() {
     <div className="space-y-6">
       <ThemeSelector />
       <div className="border-b border-subtle">
-        <nav className="grid grid-cols-3 sm:flex gap-1 sm:gap-4 overflow-x-auto" aria-label="Preferences sections">
+        <nav className="flex flex-wrap gap-1 sm:gap-4" aria-label="Preferences sections">
           <button
             onClick={() => setActiveTab('notifications')}
             className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
@@ -386,6 +386,7 @@ export function UserPreferences() {
         </nav>
       </div>
 
+      {directoryEnabled && onOpenDirectory && <button type="button" onClick={onOpenDirectory} className="mb-4 rounded-lg border border-subtle bg-elevated px-4 py-2 text-sm font-medium text-primary hover:bg-surface">View Company Directory →</button>}
       {activeTab === 'business-card' && (
         <UserBusinessCardEditor />
       )}
