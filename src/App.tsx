@@ -50,6 +50,7 @@ const MasterFeed = lazy(() => import('./components/Feed/MasterFeed').then(m => (
 const QuickFlowUpdateModal = lazy(() => import('./components/Flow/QuickFlowUpdateModal').then(m => ({ default: m.QuickFlowUpdateModal })));
 const FishbowlView = lazy(() => import('./components/Fishbowl/FishbowlView').then(m => ({ default: m.FishbowlView })));
 const BusinessCardPage = lazy(() => import('./components/BusinessCard/BusinessCardPage').then(m => ({ default: m.BusinessCardPage })));
+const CompanyDirectory = lazy(() => import('./components/CompanyDirectory/CompanyDirectory').then(m => ({ default: m.CompanyDirectory })));
 const MyCardView = lazy(() => import('./components/BusinessCard/MyCardView').then(m => ({ default: m.MyCardView })));
 const Settings = lazy(() => import('./components/Admin/Settings').then(m => ({ default: m.Settings })));
 const PointsAndRewards = lazy(() => import('./components/Admin/PointsAndRewards').then(m => ({ default: m.PointsAndRewards })));
@@ -189,6 +190,8 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, signOut } = useAuth();
   const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const [directoryEnabled, setDirectoryEnabled] = useState(false);
+  useEffect(() => { if (!profile?.id) return; let active=true; const refresh=()=>{void supabase.rpc('company_directory_enabled').then(({data,error})=>{if(active)setDirectoryEnabled(!error && Boolean(data));});};refresh();window.addEventListener('company-directory-changed',refresh);return()=>{active=false;window.removeEventListener('company-directory-changed',refresh)};},[profile?.id]);
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -357,7 +360,7 @@ function AppContent() {
 
       if ((currentTab === 'settings' || currentTab.startsWith('settings_')) && profile.role === 'admin') return;
       if (currentTab === 'daily_sales_report_import' && profile.role === 'admin') return;
-      if (currentTab === 'preferences') return;
+      if (currentTab === 'preferences' || currentTab === 'company_directory') return;
 
       const hasAccess = checkModuleAccessRef.current(currentTab);
       if (!hasAccess) {
@@ -895,6 +898,7 @@ function AppContent() {
             <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
           </div>
         )}
+        {directoryEnabled && !isStandalone && <div className="px-4 pt-2"><button type="button" onClick={() => setActiveTab('company_directory')} className="rounded-lg border border-subtle px-3 py-2 text-sm text-secondary hover:text-primary">Company Directory</button></div>}
         <main
           className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
@@ -1094,6 +1098,7 @@ function AppContent() {
 
           {activeTab === 'portal_punchlist' && checkModuleAccess('punchlist') && <PortalPunchlist key={activeTab} />}
 
+          {activeTab === 'company_directory' && directoryEnabled && <CompanyDirectory key={activeTab} />}
           {activeTab === 'mycard' && <MyCardView key={activeTab} />}
           {activeTab === 'help' && <HowItWorks key={activeTab} />}
           {activeTab === 'improvements' && <ImprovementsView key={activeTab} />}
