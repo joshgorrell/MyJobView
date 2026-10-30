@@ -37,3 +37,11 @@ begin
 end $$;
 revoke all on function public.set_company_directory_enabled(boolean) from public,anon;
 grant execute on function public.set_company_directory_enabled(boolean) to authenticated;
+
+create or replace function public.company_directory_enabled()
+returns boolean language sql stable security definer set search_path=public as $$
+ select exists(select 1 from public.profiles p join public.company_directory_settings s
+ on s.organization_id=p.organization_id where p.id=auth.uid() and p.is_active and s.enabled);
+$$;
+revoke all on function public.company_directory_enabled() from public,anon;
+grant execute on function public.company_directory_enabled() to authenticated;
