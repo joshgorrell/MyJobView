@@ -1,0 +1,7 @@
+-- READ ONLY: schema/security metadata only; no application, vault or cron rows.
+SELECT jsonb_build_object(
+ 'schemas',(SELECT jsonb_agg(jsonb_build_object('name',nspname,'owner',pg_get_userbyid(nspowner),'acl',nspacl) ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','private','flow_private','pto_private','sales_credit_private','time_private','work_order_private','jobs')),
+ 'extensions',(SELECT jsonb_agg(jsonb_build_object('name',e.extname,'version',e.extversion,'schema',n.nspname) ORDER BY e.extname) FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace),
+ 'unsupported',(SELECT jsonb_build_object('foreignTables',(SELECT count(*) FROM pg_foreign_table),'subscriptions',(SELECT count(*) FROM pg_subscription),'userEventTriggers',(SELECT count(*) FROM pg_event_trigger e JOIN pg_proc p ON p.oid=e.evtfoid JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','private','flow_private','pto_private','sales_credit_private','time_private','work_order_private','jobs')))),
+ 'defaultPrivileges',(SELECT jsonb_agg(jsonb_build_object('role',pg_get_userbyid(d.defaclrole),'schema',n.nspname,'objectType',d.defaclobjtype,'acl',d.defaclacl) ORDER BY n.nspname,d.defaclrole,d.defaclobjtype) FROM pg_default_acl d LEFT JOIN pg_namespace n ON n.oid=d.defaclnamespace WHERE n.nspname IN ('public','private','flow_private','pto_private','sales_credit_private','time_private','work_order_private','jobs','storage','auth') OR d.defaclnamespace=0)
+) AS metadata;
