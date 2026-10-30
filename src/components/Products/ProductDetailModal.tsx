@@ -7,6 +7,7 @@ import { ProductUsageHistory } from './ProductUsageHistory';
 import { useAuth } from '../../contexts/AuthContext';
 import { type ProductDetailPanelData } from './ProductDetailPanel';
 import ProductStatusNotice from './ProductStatusNotice';
+import ProductTechsafeExclusion from './ProductTechsafeExclusion';
 import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 
 interface ProductDetailModalProps {
@@ -309,7 +310,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
               )}
             </>
           ) : activeTab === 'details' ? (
-            <div className="grid md:grid-cols-2 gap-4">{[['Sales description',catalogNotes.sales],['Purchase description',catalogNotes.purchase],['Specifications',catalogNotes.specifications]].map(([label,value]) => <section key={label} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3><p className="text-sm whitespace-pre-wrap break-words">{value || 'Not provided.'}</p></section>)}</div>
+            <div className="grid md:grid-cols-2 gap-4"><ProductTechsafeExclusion key={productId} productId={productId} canEdit={canEdit} />{[['Sales description',catalogNotes.sales],['Purchase description',catalogNotes.purchase],['Specifications',catalogNotes.specifications]].map(([label,value]) => <section key={label} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3><p className="text-sm whitespace-pre-wrap break-words">{value || 'Not provided.'}</p></section>)}</div>
           ) : activeTab === 'instructions' ? (
             <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p><p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p></section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
           ) : activeTab === 'accessories' ? (
