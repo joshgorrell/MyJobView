@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/*techsafe*'
+      - 'scripts/techsafe/observer-preflight.sql'
+      - 'scripts/techsafe/observer-plan.sql'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source.yml'
       - 'src/components/Products/ProductTechsafeExclusion.tsx'
@@ -30,5 +32,6 @@ jobs:
       - run: node tests/techsafe/application-observations.mjs
       - run: node tests/techsafe/observation-assessment.mjs
       - run: node tests/techsafe/application-observer-hook.mjs
+      - run: node tests/techsafe/observer-preflight.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
