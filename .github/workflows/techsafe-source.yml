@@ -29,5 +29,6 @@ jobs:
       - run: node tests/techsafe/source-evidence-regressions.mjs
       - run: node tests/techsafe/application-observations.mjs
       - run: node tests/techsafe/observation-assessment.mjs
+      - run: node tests/techsafe/application-observer-hook.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
