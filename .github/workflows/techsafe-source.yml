@@ -7,6 +7,7 @@ on:
       - 'scripts/techsafe/observer-plan.sql'
       - 'scripts/techsafe/replay-preflight.sql'
       - 'scripts/techsafe/catalog-capture*'
+      - 'scripts/techsafe/restore-table-layer.mjs'
       - 'supabase/migrations/20251104191142_create_customer_pipeline.sql'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source.yml'
@@ -38,5 +39,6 @@ jobs:
       - run: node tests/techsafe/observer-preflight.mjs
       - run: node tests/techsafe/migration-replay-preflight.mjs
       - run: node tests/techsafe/catalog-capture.mjs
+      - run: node tests/techsafe/restore-table-layer.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
