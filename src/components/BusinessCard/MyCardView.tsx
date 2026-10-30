@@ -9,7 +9,7 @@ import ConfirmModal from '../ui/ConfirmModal';
 export function MyCardView() {
   const { user, profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [companySettings, setCompanySettings] = useState<Pick<CompanySettings, 'company_name' | 'company_logo_url' | 'website'> | null>(null);
+  const [companySettings, setCompanySettings] = useState<Pick<CompanySettings, 'company_name' | 'company_logo_url' | 'website' | 'business_card_banner_url'> | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,7 +68,7 @@ export function MyCardView() {
   async function loadCompanyInfo() {
     try {
       const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('company_name, company_logo_url, website').eq('organization_id', profile?.organization_id).maybeSingle(),
+        supabase.from('company_settings').select('company_name, company_logo_url, website, business_card_banner_url').eq('organization_id', profile?.organization_id).maybeSingle(),
         supabase.from('company_offices').select('*').order('display_order', { ascending: true })
       ]);
 

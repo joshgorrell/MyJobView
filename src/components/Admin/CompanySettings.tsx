@@ -8,6 +8,7 @@ import { TIMEZONE_OPTIONS, clearTimezoneCache } from '../../lib/timezoneUtils';
 import { validateSubdomain } from '../../lib/subdomainConfig';
 import ConfirmModal from '../ui/ConfirmModal';
 import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCardIdentity';
+import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
 export function CompanySettings() {
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
@@ -772,6 +773,7 @@ export function CompanySettings() {
         <p className="text-gray-300">Manage company information displayed on business cards</p>
       </div>
 
+      <CompanyDirectorySetting />
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <Building2 className="w-5 h-5" />
