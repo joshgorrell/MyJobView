@@ -1,0 +1,65 @@
+{
+  "capturedOn": "2026-10-30",
+  "sourceProject": "bqtsuzvuvqvgidipbsis",
+  "format": "mjv-catalog-capture-v2",
+  "catalogStamp": "6bb93a7a911cf3ad9b4a1eb888ba62970974ed61726135d5461ead6ffe5a3ecd",
+  "counts": {
+    "relations": 409,
+    "routines": 799,
+    "types": 1,
+    "managedAdjuncts": 35
+  },
+  "objectCount": 1244,
+  "definitionFingerprintsVerified": true,
+  "catalogPagesComplete": true,
+  "nativePgDump": false,
+  "restoreApproved": false,
+  "quoteReady": false,
+  "contentSetHash": "cb3ffe01e34c1f1d6a1f06f9d3c3ad45125d76d6e112a9f30b8ea48a7372c204",
+  "relationKinds": {
+    "r": 386,
+    "S": 4,
+    "v": 16,
+    "c": 3
+  },
+  "schemaCount": 8,
+  "extensionCount": 9,
+  "extensionOwnedRelations": [
+    {
+      "identity": "public.http_header",
+      "extension": "http"
+    },
+    {
+      "identity": "public.http_request",
+      "extension": "http"
+    },
+    {
+      "identity": "public.http_response",
+      "extension": "http"
+    }
+  ],
+  "outboundReviewCandidates": [
+    "private.invoke_security_billing_worker()",
+    "public.complete_employee_welcome_onboarding(p_avatar_url text, p_preferences jsonb, p_skip boolean)",
+    "public.notify_customer_question()",
+    "public.send_mileage_reminder_emails()",
+    "public.send_mileage_reminders()",
+    "public.submit_customer_proposal_decision(p_proposal_id uuid, p_expected_version integer, p_request_id uuid, p_action text, p_details jsonb)"
+  ],
+  "unsupportedFlags": {
+    "foreignTables": 0,
+    "subscriptions": 0,
+    "userEventTriggers": 0,
+    "operators": 0,
+    "aggregates": 0,
+    "collations": 0
+  },
+  "excludedData": [
+    "application rows",
+    "auth user/session rows",
+    "storage objects and bucket rows",
+    "vault secret rows",
+    "cron schedules",
+    "migration-history rows"
+  ]
+}
