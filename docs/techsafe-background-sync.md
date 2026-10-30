@@ -1,3 +1,5 @@
+> Follow-up to the source-evidence audit: the [opt-in application observer](techsafe-opt-in-application-observer.md) documents a narrow backend instrumentation change with a separate default-off control. Its isolated observation blocks supersede the blanket no-instrumentation direction below only for application-success evidence. No approval rerouting, error-propagating legacy receipts, remote calls or synchronization are enabled. Full-schema/performance validation remains required before deployment.
+
 # Workflow preservation review and background sync plan
 
 ## Decision
