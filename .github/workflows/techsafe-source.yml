@@ -1,0 +1,23 @@
+name: Techsafe source safeguards
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*techsafe*'
+      - 'tests/techsafe/**'
+      - '.github/workflows/techsafe-source.yml'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: read
+jobs:
+  classification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node tests/techsafe/product-classification.mjs
