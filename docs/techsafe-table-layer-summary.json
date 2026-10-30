@@ -1,0 +1,30 @@
+{
+  "privateRehearsal": true,
+  "serverVersion": "17.5",
+  "tables": 386,
+  "sequences": 4,
+  "enums": 1,
+  "columns": 5777,
+  "generated": 25,
+  "identities": 1,
+  "statements": 779,
+  "deferred": 8278,
+  "deferredKinds": {
+    "default": 2534,
+    "constraints": 2225,
+    "indexes": 1893,
+    "policies": 1235,
+    "triggers": 375,
+    "view": 16
+  },
+  "fullBaseline": false,
+  "runtimeTestsAllowed": false,
+  "capturedOn": "2026-10-30",
+  "engine": "PGlite 0.3.14",
+  "sourcePostgresVersion": "17.6",
+  "nativeSupabaseRestore": false,
+  "productionWrites": false,
+  "sourceDataCopied": false,
+  "restoreApproved": false,
+  "quoteReady": false
+}
