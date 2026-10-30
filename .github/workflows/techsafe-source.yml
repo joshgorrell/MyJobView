@@ -5,12 +5,14 @@ on:
       - 'supabase/migrations/*techsafe*'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source.yml'
+      - 'src/components/Products/ProductTechsafeExclusion.tsx'
+      - 'src/components/Products/ProductDetailModal.tsx'
       - 'package.json'
       - 'package-lock.json'
 permissions:
   contents: read
 jobs:
-  classification:
+  exclusions:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -20,4 +22,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: node tests/techsafe/product-classification.mjs
+      - run: node tests/techsafe/product-exclusions.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/techsafe/product-exclusions-browser.mjs
