@@ -26,5 +26,6 @@ jobs:
       - run: node tests/techsafe/removal-provenance.mjs
       - run: node tests/techsafe/retry-safe-application.mjs
       - run: node tests/techsafe/workflow-isolation.mjs
+      - run: node tests/techsafe/source-evidence-regressions.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
