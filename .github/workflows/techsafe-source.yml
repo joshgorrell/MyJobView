@@ -23,5 +23,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node tests/techsafe/product-exclusions.mjs
+      - run: node tests/techsafe/removal-provenance.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
