@@ -9,6 +9,7 @@ on:
       - 'scripts/techsafe/catalog-capture*'
       - 'scripts/techsafe/restore-table-layer.mjs'
       - 'scripts/techsafe/restore-definition-layer.mjs'
+      - 'scripts/techsafe/restore-constraint-layer.mjs'
       - 'supabase/migrations/20251104191142_create_customer_pipeline.sql'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source.yml'
@@ -42,5 +43,6 @@ jobs:
       - run: node tests/techsafe/catalog-capture.mjs
       - run: node tests/techsafe/restore-table-layer.mjs
       - run: node tests/techsafe/restore-definition-layer.mjs
+      - run: node tests/techsafe/restore-constraint-layer.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
