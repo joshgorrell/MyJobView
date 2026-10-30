@@ -1,5 +1,7 @@
 # Live source compatibility preflight
 
+> Follow-up: the isolated branch replay attempt failed on the first recorded legacy migration before Techsafe code ran. See [isolated replay blocker](techsafe-isolated-replay-blocker.md). The structural pass below remains a limited compatibility result, not full-schema validation.
+
 ## October 30 read-only result
 
 MyJobView #387 was verified merged. The connected source database was inspected using catalog SELECTs and a planner-only EXPLAIN; no source rows, schema, controls or migration history were changed. PostgreSQL reported version 17.6.
