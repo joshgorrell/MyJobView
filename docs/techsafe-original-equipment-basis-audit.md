@@ -35,7 +35,7 @@ The candidate includes an equipment-row digest using the existing private equipm
 
 ## Remaining work
 
-An approved-row candidate is not yet a complete determination of initial sold membership or final net equipment prices. It does not infer membership from hidden state, fill missing historical fields or promote raw unit prices to resolved selling prices. `originalScopeVerified`, `scopeVerified`, `snapshotReady` and `quoteReady` remain false.
+An approved-row candidate is not yet a complete determination of initial sold membership or verified product unit selling prices. It does not infer membership from hidden state, fill missing historical fields or promote raw unit prices to resolved selling prices. `originalScopeVerified`, `scopeVerified`, `snapshotReady` and `quoteReady` remain false.
 
 `assessApprovedRowsConnection` now compares a supplied basis with the first observed application/current rows, including the direct path for no-change orders; see `techsafe-approved-rows-connection.md`. This remains a row comparison, with all original scope and quote flags false. An audited initial membership policy, complete history, current eligibility and resolved selling prices still need to be combined. Manual approvals need a separately reviewed evidence strategy that preserves their existing workflow. Native authorization/provenance, concurrency, performance, checkout freshness and activation gates remain open. No live transport or dealer-facing history is introduced.
 
@@ -44,3 +44,6 @@ An approved-row candidate is not yet a complete determination of initial sold me
 `node tests/techsafe/private-order-source.mjs --equipment-evidence --equipment-pairs --portal-basis` runs existing reader/observation safeguards and the new portal candidate tests. Cases cover no-receipt/manual headers, original values after current edits, unassigned rows, privacy projection, timezone stability, approval/version/approver/order/customer mismatches, existing-order/reapproval evidence, foreign/malformed/duplicate items, ambiguous approvals, byte/count limits, unhealthy connections, denied API roles and read-only behavior.
 
 The optional privately captured schema run adds the capture directory as the first argument. It compiles the new reader against reconstructed source tables, checks unavailable/no-connection results and confirms no connection was seeded. It does not execute the outbound portal approval function or certify real Auth/native approval behavior. Raw captures and runtime receipt dumps are not committed. Existing effect, continuity and application-evidence tests are also run.
+
+Product-price policy: use the stored product unit selling price. Project discounts and miscellaneous percentages are ignored and do not block price verification; see `techsafe-unit-selling-price-audit.md`.
+
