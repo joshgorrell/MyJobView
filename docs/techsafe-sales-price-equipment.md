@@ -78,15 +78,19 @@ verified membership, multiple source identities, tenant binding, unresolved part
 blocking, quantity/overflow rejection and the output field allowlist.
 
 An optional absolute local path to Techsafe's contract module checks the real
-receiver contract without duplicating it in MJV. That check passed against Techsafe
-commit `001413f6833420cca69d55129f25254e6264428c`, including eight synthetic complete
-revisions with current quantity/sales-price changes, final removals, miscellaneous
-exclusion and empty-draft suppression. The synthetic envelope's complete flag is
-test data, not certification of a real source snapshot. CI runs the standalone
-MJV suite without another repository or credentials.
+receiver contract without duplicating it in MJV. The earlier pre-release v1 check
+passed at Techsafe commit `001413f6833420cca69d55129f25254e6264428c`.
+The current synthetic envelopes require the named v2 contract in
+[Techsafe PR #23](https://github.com/joshgorrell/Techsafe/pull/23), verified at
+`6c0aafe44f8eebfcf90fcd575a2cee7260ec763b`. Eight revisions cover current
+quantity/sales-price changes, final removals, miscellaneous exclusion and empty
+draft suppression. Complete-envelope flags are synthetic test data, not source
+certification. CI runs the standalone MJV suite without another repository or
+credentials.
 
 Dealer linking, server-loaded settings, the consistent verified source reader,
-customer-name transport, revision/checkpoint storage, delivery/reconciliation and
+verified customer context, revision/checkpoint storage, delivery/reconciliation and
 checkout freshness remain separate implementation work. This helper is not yet
 called by either website. No source cost correction, database migration, production
 query, integration activation, automatic draft or coverage change is included.
+
