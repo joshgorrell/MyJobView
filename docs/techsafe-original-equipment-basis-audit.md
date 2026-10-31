@@ -37,7 +37,7 @@ The candidate includes an equipment-row digest using the existing private equipm
 
 An approved-row candidate is not yet a complete determination of initial sold membership or final net equipment prices. It does not infer membership from hidden state, fill missing historical fields or promote raw unit prices to resolved selling prices. `originalScopeVerified`, `scopeVerified`, `snapshotReady` and `quoteReady` remain false.
 
-The next verifier must compare a validated original basis with the first observed application/current rows, apply an audited initial membership policy, and combine the complete observed history with current eligibility and resolved selling prices. Orders with no changes also need this original-basis path; an empty change history alone is not proof. Manual approvals need a separately reviewed evidence strategy that preserves their existing workflow. Native authorization/provenance, concurrency, performance, checkout freshness and activation gates remain open. No live transport or dealer-facing history is introduced.
+`assessApprovedRowsConnection` now compares a supplied basis with the first observed application/current rows, including the direct path for no-change orders; see `techsafe-approved-rows-connection.md`. This remains a row comparison, with all original scope and quote flags false. An audited initial membership policy, complete history, current eligibility and resolved selling prices still need to be combined. Manual approvals need a separately reviewed evidence strategy that preserves their existing workflow. Native authorization/provenance, concurrency, performance, checkout freshness and activation gates remain open. No live transport or dealer-facing history is introduced.
 
 ## Validation
 
