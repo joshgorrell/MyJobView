@@ -6,6 +6,7 @@ on:
       - 'supabase/functions/_shared/techsafe-sales-equipment.mjs'
       - 'supabase/functions/_shared/techsafe-order-content.mjs'
       - 'supabase/functions/_shared/techsafe-application-evidence.mjs'
+      - 'supabase/functions/_shared/techsafe-equipment-effects.mjs'
       - 'scripts/techsafe/observer-preflight.sql'
       - 'scripts/techsafe/observer-plan.sql'
       - 'scripts/techsafe/replay-preflight.sql'
@@ -62,6 +63,8 @@ jobs:
       - run: node tests/techsafe/order-content.mjs
       - run: node tests/techsafe/private-order-source.mjs --equipment-evidence
       - run: node tests/techsafe/application-evidence.mjs
+      - run: node tests/techsafe/equipment-effects.mjs
+      - run: node tests/techsafe/equipment-effects-source.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
 
