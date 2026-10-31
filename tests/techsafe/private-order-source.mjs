@@ -71,7 +71,7 @@ for(const value of [-1,'9007199254740992'])await assert.rejects(db.query('UPDATE
 for(const role of ['anon','authenticated','service_role']){await db.exec('BEGIN; SET LOCAL ROLE '+role);await assert.rejects(read(),e=>e.code==='42501');await db.exec('ROLLBACK');}
 const attr=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_order_source(uuid,uuid)'::regprocedure")).rows[0];assert.equal(attr.prosecdef,false);assert.equal(attr.provolatile,'s');assert.deepEqual(attr.proconfig,['search_path=""']);
 assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN ('sales_orders'::regclass,'proposals'::regclass,'change_orders'::regclass,'proposal_line_items'::regclass)")).rows[0].n,0);
-if(process.argv.includes('--equipment-evidence')){
+if(process.argv.includes('--equipment-evidence')||process.argv.includes('--equipment-pairs')){
  const update='supabase/migrations/20261031152939_techsafe_equipment_application_evidence.sql';
  await db.exec('ALTER TABLE change_order_line_items ADD COLUMN sort_order integer;ALTER TABLE change_order_line_items ADD COLUMN created_at timestamptz DEFAULT now();');
  const beginDefinition=(await db.query("SELECT pg_get_functiondef('techsafe_source.try_begin_application_observation(uuid)'::regprocedure) AS definition")).rows[0].definition;
@@ -110,6 +110,10 @@ if(process.argv.includes('--equipment-evidence')){
  assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='techsafe_source' AND p.proname IN ('equipment_evidence_content','read_order_equipment_source','try_begin_application_observation','try_finish_application_observation') AND p.prosecdef")).rows[0].n,0);
  console.log('Equipment evidence v2 passed: no legacy backfill, per-change receipts and ordered scope hashes, cost/retail independence, edit and missing-application detection, later draft compatibility, same-transaction completion and API-role denial. Scope and quote certification remain false.');
 }
+if(process.argv.includes('--equipment-pairs')){
+ const {testEquipmentSnapshotPairs}=await import('./equipment-snapshot-pairs.mjs');
+ await testEquipmentSnapshotPairs({db,id,org,other,actor,outsider,order,proposal,connection,product,line,co});
+}
 if(process.argv[2]&&!process.argv[2].startsWith('--')){
  const fixture=await capturedSourceDb(process.argv[2]);try{
   for(const file of ['20261030162612_techsafe_product_exclusions.sql','20261030182910_techsafe_private_application_observations.sql','20261031150238_techsafe_private_order_read_model.sql'])await fixture.db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
@@ -120,3 +124,4 @@ if(process.argv[2]&&!process.argv[2].startsWith('--')){
 }
 console.log('Private order read passed: scoped named/priced facts, opt-outs/evidence, stable selective fingerprint, no private/cost/retail leakage or reads with unavailable connections/cross-tenant data, no source writes, API-role denial, bounded rows/bytes and no invented scope/price/quote verification.');
 }finally{await db.close();}
+

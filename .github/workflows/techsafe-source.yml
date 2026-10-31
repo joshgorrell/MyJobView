@@ -62,12 +62,13 @@ jobs:
       - run: node tests/techsafe/privilege-trigger-layer.mjs
       - run: node tests/techsafe/sales-equipment.mjs
       - run: node tests/techsafe/order-content.mjs
-      - run: node tests/techsafe/private-order-source.mjs --equipment-evidence
+      - run: node tests/techsafe/private-order-source.mjs --equipment-evidence --equipment-pairs
       - run: node tests/techsafe/application-evidence.mjs
       - run: node tests/techsafe/equipment-effects.mjs
       - run: node tests/techsafe/equipment-effects-source.mjs
       - run: node tests/techsafe/equipment-continuity.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
+
 
 

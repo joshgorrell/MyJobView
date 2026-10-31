@@ -2,7 +2,7 @@
 
 Techsafe receives one current equipment list for each MJV sales order. It does not receive change-order records, separate change-order quotes, application receipts or this diagnostic history. MJV change inputs are checked internally so the eventual list represents the actual approved sales scope, including applied additions and removals at selling prices.
 
-`assessEquipmentContinuity` is an inactive pure diagnostic that combines the existing current-application assessment and per-application equipment effect checker. It requires a trusted current private read and SQL-validated before/after pairs. Pair capture/reading is proposed separately in PR #400; this module can be reviewed and tested independently and installs no caller. Tests use synthetic bound fixtures, not a claim that production evidence exists.
+`assessEquipmentContinuity` is an inactive pure diagnostic that combines the existing current-application assessment and per-application equipment effect checker. It requires a trusted current private read and SQL-validated before/after pairs. Merged PR #400 supplies the private pair capture/reader; this module installs no caller. Continuity tests use synthetic bound fixtures, not a claim that production evidence exists.
 
 ## Checks
 
@@ -28,4 +28,4 @@ No database migration, source workflow, UI, external contract, network transport
 
 Run `node tests/techsafe/equipment-continuity.mjs`. It covers eight approved changes (quantity, selling price, addition, removal, labor and modifiers), unordered reads, numeric formatting, cost independence, unapplied drafts, gaps with/without inconsistent claimed hashes, final-row drift, overlapping ranges, old retries, approval reversals, legacy/incomplete/missing/foreign evidence, tenant/proposal/transaction/input mismatches, processing bounds and ordinals above JavaScript's safe integer limit. All quote/scope flags remain false.
 
-The existing `equipment-effects.mjs`, ten local `equipment-effects-source.mjs` source scenarios and `application-evidence.mjs` suites are also run. These verify shared-helper compatibility. No new production or native Supabase behavior is certified by this change.
+The existing `equipment-effects.mjs`, ten local `equipment-effects-source.mjs` source scenarios and `application-evidence.mjs` suites are also run. The combined `private-order-source.mjs --equipment-evidence --equipment-pairs` tests from #400 verify that stored facts and the pair reader still work with the extracted shared comparator. No new production or native Supabase behavior is certified by this change.
