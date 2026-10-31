@@ -7,6 +7,8 @@ import {captureKinds,captureQuery} from '../../scripts/techsafe/catalog-capture.
 import {compileTableLayer} from '../../scripts/techsafe/restore-table-layer.mjs';
 import {compileDefinitionLayer,rehearseDefinitionLayer} from '../../scripts/techsafe/restore-definition-layer.mjs';
 import {compileConstraintLayer,rehearseConstraintLayer} from '../../scripts/techsafe/restore-constraint-layer.mjs';
+import {compileLocalAuthInterface} from '../../scripts/techsafe/local-auth-interface.mjs';
+import {compileAccessLayer,rehearseAccessLayer} from '../../scripts/techsafe/restore-access-layer.mjs';
 async function capture(db){
  const pages=[];for(const kind of captureKinds)for(let offset=0;;offset+=25){
   const rows=(await db.query(captureQuery(kind,offset,25))).rows;if(!rows.length)break;pages.push({kind,offset,rows});
@@ -68,12 +70,54 @@ if(process.argv[2]){
  const directory=process.argv[2],captured=captureKinds.flatMap(kind=>JSON.parse(fs.readFileSync(path.join(directory,kind+'.json'),'utf8')).pages);
  const metadata=JSON.parse(fs.readFileSync(path.join(directory,'extra-metadata.json'),'utf8'));
  const db=new PGlite();try{
+  let localAuthInterface=false;
+  if(process.argv[3]==='--local-auth-interface'){
+   const record=JSON.parse(fs.readFileSync('tests/techsafe/fixtures/auth-interface-catalog.json','utf8'));
+   const auth=compileLocalAuthInterface(record);
+   await db.exec('BEGIN;');for(const sql of auth.statements)await db.exec(sql);await db.exec('COMMIT;');localAuthInterface=true;
+  }else if(process.argv[3])throw new Error('Unsupported rehearsal option');
   const prerequisite=await prepare(db,captured,metadata),actual=await rehearseConstraintLayer(db,compileConstraintLayer(captured));
-  const mismatches=verify(await capture(db),captured,actual);
+  let access=null;
+  if(process.argv[4]==='--access-layer')access=await rehearseAccessLayer(db,compileAccessLayer(captured));
+  else if(process.argv[4])throw new Error('Unsupported access rehearsal option');
+  const restored=await capture(db),mismatches=verify(restored,captured,actual);
+  const byKey=new Map(restored.flatMap(p=>p.rows.map(r=>[p.kind+':'+r.identity,JSON.parse(r.payload_text)])));
+  const original=new Map(captured.flatMap(p=>p.rows.map(r=>[p.kind+':'+r.identity,JSON.parse(r.payload_text)])));
+  let prerequisiteDefinitionsCompared=0;
+  for(const item of prerequisite.applied){
+   if(item.stage==='schemas')continue;
+   if(item.stage==='routines')assert.equal(byKey.get('routines:'+item.identity).definition,original.get('routines:'+item.identity).definition,item.identity);
+   else assert.equal(byKey.get('relations:'+item.identity).columns.find(c=>c.name===item.column).default,
+    original.get('relations:'+item.identity).columns.find(c=>c.name===item.column).default,item.identity+'.'+item.column);
+   prerequisiteDefinitionsCompared++;
+  }
   const appliedCounts={};for(const item of actual.applied)appliedCounts[item.stage]=(appliedCounts[item.stage]??0)+1;
-  console.log(JSON.stringify({engine:'PGlite 0.3.14',serverVersion:(await db.query('SHOW server_version')).rows[0].server_version,
+  const prerequisiteAppliedCounts={};for(const item of prerequisite.applied)prerequisiteAppliedCounts[item.stage]=(prerequisiteAppliedCounts[item.stage]??0)+1;
+  let accessSummary=null;
+  if(access){
+   const accessMismatches=[],accessCounts={};
+   for(const item of access.applied){
+    accessCounts[item.stage]=(accessCounts[item.stage]??0)+1;
+    const target=byKey.get('relations:'+item.identity),expected=original.get('relations:'+item.identity);
+    let actualFields,expectedFields;
+    if(item.stage==='views'){
+     const columns=o=>o.columns.map(c=>({name:c.name,type:c.type,collation:c.collation}));
+     actualFields={view:target.view,options:target.options,columns:columns(target)};
+     expectedFields={view:expected.view,options:expected.options,columns:columns(expected)};
+    }else if(item.stage==='rls'){
+     actualFields={rls:target.rls,forceRls:target.forceRls};expectedFields={rls:expected.rls,forceRls:expected.forceRls};
+    }else{
+     const policy=o=>{const p=o.policies.find(p=>p.name===item.name);return {...p,roles:[...p.roles].sort()};};
+     actualFields=policy(target);expectedFields=policy(expected);
+    }
+    const differingFields=Object.keys(expectedFields).filter(k=>JSON.stringify(actualFields[k])!==JSON.stringify(expectedFields[k]));
+    if(differingFields.length)accessMismatches.push({stage:item.stage,identity:item.identity,...(item.name?{name:item.name}:{}),differingFields});
+   }
+   accessSummary={appliedCounts:accessCounts,failures:access.failures,definitionMismatches:accessMismatches,nativePermissionsVerified:false};
+  }
+  console.log(JSON.stringify({engine:'PGlite 0.3.14',localAuthInterface,nativeAuthService:false,serverVersion:(await db.query('SHOW server_version')).rows[0].server_version,
    appliedCounts,definitionsCompared:actual.applied.length,exactDefinitionsMatched:actual.applied.length-mismatches.length,definitionMismatches:mismatches,reusedIndexes:actual.applied.filter(x=>x.reused).length,
-   failures:actual.failures,deferred:actual.deferred,prerequisiteFailures:prerequisite.failures,
+   failures:actual.failures,deferred:actual.deferred,prerequisiteAppliedCounts,prerequisiteDefinitionsCompared,prerequisiteFailures:prerequisite.failures,access:accessSummary,
    fullBaseline:false,runtimeTestsAllowed:false,restoreApproved:false,quoteReady:false,productionWrites:false}));
  }finally{await db.close();}
 }
