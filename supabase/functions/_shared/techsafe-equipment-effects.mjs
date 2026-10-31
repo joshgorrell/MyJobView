@@ -15,6 +15,26 @@ function time(v){
  const [whole,fraction='']=v.split('.');return BigInt(whole)*1000000n+BigInt(fraction.padEnd(6,'0'));
 }
 const compare=(a,b)=>a<b?-1:a>b?1:0;
+function equipmentRows(source,b){
+ if(!Array.isArray(source)||source.length>10000||!object(b)||!id(b.organizationId)||!id(b.proposalId))throw Error('invalid_effect_rows');
+ const map=new Map();
+ for(const row of source){
+  const l=row?.line;
+  if(!object(l)||!id(l.id)||map.has(l.id))throw Error('invalid_effect_line_identity');
+  if(l.organization_id!==b.organizationId||l.proposal_id!==b.proposalId)throw Error('effect_line_binding_mismatch');
+  if(l.product_id!==null&&!id(l.product_id)||!classes.includes(l.item_type)||!text(l.description)
+   ||typeof l.is_customer_supplied!=='boolean'||typeof l.is_hidden!=='boolean')throw Error('invalid_effect_line');
+  // Explicit equipment projection. Catalog, cost, retail and labor prices absent.
+  map.set(l.id,{id:l.id,product:l.product_id,type:l.item_type,description:l.description,
+   supplied:l.is_customer_supplied,hidden:l.is_hidden,quantity:count(l.quantity),price:salesPriceToCents(row.unitSalePrice)});
+ }return map;
+}
+// Reuse the same validated projection when comparing consecutive observations.
+// Row order, numeric formatting and unrelated cost/catalog fields are ignored.
+export function equipmentRowsEqual(left,right,binding){
+ const a=equipmentRows(left,binding),b=equipmentRows(right,binding);
+ return a.size===b.size&&[...a].every(([identity,row])=>JSON.stringify(row)===JSON.stringify(b.get(identity)));
+}
 export function assessEquipmentEffects(input){
  const result={equipmentEffectsMatch:false,issues:[],addedLineBindings:[],removedLineIds:[],scopeVerified:false,snapshotReady:false,quoteReady:false};
  const issue=(code,actionId)=>{result.issues.push(actionId?{code,actionId}:{code});};
@@ -26,20 +46,7 @@ export function assessEquipmentEffects(input){
    ||co.organization_id!==b.organizationId||co.sales_order_id!==b.orderId||co.proposal_id!==b.proposalId)stop('effect_binding_mismatch');
   if(co.status!=='approved')stop('application_not_approved');
   for(const key of ['beforeLines','afterLines','changeLines'])if(!Array.isArray(input[key])||input[key].length>10000)stop('invalid_effect_rows');
-  function rows(source){
-   const map=new Map();
-   for(const row of source){
-    const l=row?.line;
-    if(!object(l)||!id(l.id)||map.has(l.id))stop('invalid_effect_line_identity');
-    if(l.organization_id!==b.organizationId||l.proposal_id!==b.proposalId)stop('effect_line_binding_mismatch');
-    if(l.product_id!==null&&!id(l.product_id)||!classes.includes(l.item_type)||!text(l.description)
-     ||typeof l.is_customer_supplied!=='boolean'||typeof l.is_hidden!=='boolean')stop('invalid_effect_line');
-    // Explicit equipment projection. Catalog, cost, retail and labor prices absent.
-    map.set(l.id,{id:l.id,product:l.product_id,type:l.item_type,description:l.description,
-     supplied:l.is_customer_supplied,hidden:l.is_hidden,quantity:count(l.quantity),price:salesPriceToCents(row.unitSalePrice)});
-   }return map;
-  }
-  const expected=rows(input.beforeLines),after=rows(input.afterLines),beforeIds=new Set(expected.keys());
+  const expected=equipmentRows(input.beforeLines,b),after=equipmentRows(input.afterLines,b),beforeIds=new Set(expected.keys());
   const semantic=row=>JSON.stringify([row.product,row.description,row.quantity,row.price]);
   const semanticCounts=new Map(),newRows=new Map();
   const track=(row,delta)=>{const key=semantic(row);semanticCounts.set(key,(semanticCounts.get(key)??0)+delta);};
@@ -92,3 +99,4 @@ export function assessEquipmentEffects(input){
  }catch(error){issue(error.message||'invalid_effect_input');}
  return result;
 }
+
