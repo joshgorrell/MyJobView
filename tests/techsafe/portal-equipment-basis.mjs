@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {assessApprovedRowsConnection} from '../../supabase/functions/_shared/techsafe-approved-rows-connection.mjs';
 const migration='supabase/migrations/20261031193323_techsafe_portal_approval_equipment_basis.sql';
 export async function testPortalEquipmentBasis(f){
  const {db,id,org,other,actor,outsider,order,proposal,connection,line}=f,request=id(70),customer=id(7),stamp='2026-10-31T12:00:00Z';
@@ -28,6 +29,16 @@ export async function testPortalEquipmentBasis(f){
  const original=await read();assert.ok(original);assert.equal(original.sourceKind,'customer_portal_approval');assert.equal(original.lines.length,2);
  assert.equal(original.lines.find(x=>x.line.id===line).line.quantity,'2.00');assert.equal(original.lines.find(x=>x.line.id===line).unitSalePrice,'800.00');
  assert.equal(original.originalScopeVerified,false);assert.equal(original.scopeVerified,false);assert.equal(original.snapshotReady,false);assert.equal(original.quoteReady,false);
+ // Read both private inputs in one statement snapshot for the direct path.
+ await db.exec('BEGIN;DELETE FROM techsafe_source.application_observations;DELETE FROM change_order_line_items;DELETE FROM change_orders;');
+ await db.query('UPDATE proposal_line_items SET quantity=2 WHERE id=$1',[line]);
+ const connected=async()=>{
+  const {model,basis}=(await db.query('SELECT techsafe_source.read_order_equipment_source($1,$2) AS model,techsafe_source.read_portal_approval_equipment_basis($1,$2) AS basis',[connection,order])).rows[0];
+  return assessApprovedRowsConnection({currentModel:model,basis,pairs:[]},{connectionId:connection,organizationId:org,orderId:order,proposalId:proposal});
+ };
+ const direct=await connected();assert.equal(direct.approvedRowsConnected,true,JSON.stringify(direct));assert.equal(direct.connectionMode,'direct');assert.equal(direct.scopeVerified,false);assert.equal(direct.quoteReady,false);
+ await db.query('UPDATE proposal_line_items SET quantity=3 WHERE id=$1',[line]);assert.equal((await connected()).approvedRowsConnected,false);
+ await db.exec('ROLLBACK');
  assert.equal(JSON.stringify(original).includes('PRIVATE_'),false);
  for(const key of ['cost','retail_price','email','phone','private_notes','settings','display','rooms','viewer_id'])assert.equal(JSON.stringify(original).includes('"'+key+'"'),false);
  // Unassigned-room items are present; subsequent source edits cannot rewrite an approval record.
