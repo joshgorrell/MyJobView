@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {resolveStandaloneSellingPrice as resolve} from '../../supabase/functions/_shared/techsafe-unit-selling-price.mjs';
+import {prepareTechsafeDraftCandidate} from '../../supabase/functions/_shared/techsafe-draft-candidate.mjs';
 const binding={connectionId:'connection',organizationId:'org',orderId:'order',proposalId:'proposal'};
 const fixture=()=>({context:{version:1,binding:{...binding}},row:{line:{id:'line',organization_id:'org',proposal_id:'proposal',quantity:'2.00'},
  unitSalePrice:'800.00',salePriceFacts:{parentItemId:null,displayMode:'itemized',hasChildren:false}}});
@@ -50,6 +51,20 @@ export async function testUnitSellingPriceSource(f){
  const a=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_order_selling_price_facts(uuid,uuid)'::regprocedure")).rows[0];
  assert.equal(a.prosecdef,false);assert.equal(a.provolatile,'s');assert.deepEqual(a.proconfig,['search_path=""']);
  assert.equal(model.quoteReady,false);
+ // Compose actual local SQL readers with a synthetic visible original approval.
+ // All fixture changes are rolled back; no production database is contacted.
+ await db.exec('BEGIN;DELETE FROM techsafe_source.application_observations;DELETE FROM change_order_line_items;DELETE FROM change_orders;UPDATE proposal_line_items SET is_hidden=false;');
+ await db.query('UPDATE proposal_line_items SET quantity=2 WHERE id=$1',[line]);
+ await db.exec("UPDATE private.proposal_customer_decisions SET evidence=jsonb_set(evidence,'{items}',(SELECT jsonb_agg(jsonb_set(item,'{is_hidden}','false'::jsonb) ORDER BY item->>'id') FROM jsonb_array_elements(evidence->'items') item))");
+ const candidate=async()=>{
+  const v=(await db.query('SELECT techsafe_source.read_order_selling_price_facts($1,$2) AS model,techsafe_source.read_portal_approval_equipment_basis($1,$2) AS basis',[connection,order])).rows[0];
+  return prepareTechsafeDraftCandidate({currentModel:v.model,basis:v.basis,pairs:[]},b);
+ };
+ const prepared=await candidate();assert.equal(prepared.valid,true,JSON.stringify(prepared));assert.equal(prepared.content.lines.length,1);assert.equal(prepared.content.lines[0].quantity,2);assert.equal(prepared.content.lines[0].unitEquipmentValueCents,80000);
+ assert.ok(prepared.excluded.some(x=>x.reason==='miscellaneous'));assert.equal(prepared.quoteReady,false);
+ await db.exec('UPDATE proposals SET discount_percent=50;UPDATE proposal_settings SET misc_parts_percent=35');assert.deepEqual((await candidate()).content,prepared.content);
+ await db.query('UPDATE proposal_line_items SET unit_price=900 WHERE id=$1',[line]);assert.equal((await candidate()).valid,false,'An unobserved price edit cannot bypass approval evidence');
+ await db.exec('ROLLBACK');
  console.log('Private unit price facts passed: ready-order bindings, product selling-price sensitivity, project-discount/misc/billing and cost independence, parent/child guards and denied API roles.');
 }
 

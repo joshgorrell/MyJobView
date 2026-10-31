@@ -7,6 +7,7 @@ on:
       - 'supabase/functions/_shared/techsafe-order-content.mjs'
       - 'supabase/functions/_shared/techsafe-draft-eligibility.mjs'
       - 'supabase/functions/_shared/techsafe-unit-selling-price.mjs'
+      - 'supabase/functions/_shared/techsafe-draft-candidate.mjs'
       - 'supabase/functions/_shared/techsafe-application-evidence.mjs'
       - 'supabase/functions/_shared/techsafe-equipment-effects.mjs'
       - 'supabase/functions/_shared/techsafe-equipment-continuity.mjs'
@@ -67,6 +68,7 @@ jobs:
       - run: node tests/techsafe/order-content.mjs
       - run: node tests/techsafe/private-order-source.mjs --equipment-evidence --equipment-pairs --portal-basis --draft-eligibility --unit-selling-prices
       - run: node tests/techsafe/unit-selling-price.mjs
+      - run: node tests/techsafe/draft-candidate.mjs
       - run: node tests/techsafe/draft-eligibility.mjs
       - run: node tests/techsafe/application-evidence.mjs
       - run: node tests/techsafe/equipment-effects.mjs
