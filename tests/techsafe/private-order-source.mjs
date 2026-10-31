@@ -71,7 +71,7 @@ for(const value of [-1,'9007199254740992'])await assert.rejects(db.query('UPDATE
 for(const role of ['anon','authenticated','service_role']){await db.exec('BEGIN; SET LOCAL ROLE '+role);await assert.rejects(read(),e=>e.code==='42501');await db.exec('ROLLBACK');}
 const attr=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_order_source(uuid,uuid)'::regprocedure")).rows[0];assert.equal(attr.prosecdef,false);assert.equal(attr.provolatile,'s');assert.deepEqual(attr.proconfig,['search_path=""']);
 assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN ('sales_orders'::regclass,'proposals'::regclass,'change_orders'::regclass,'proposal_line_items'::regclass)")).rows[0].n,0);
-if(process.argv.includes('--equipment-evidence')||process.argv.includes('--equipment-pairs')){
+if(process.argv.includes('--equipment-evidence')||process.argv.includes('--equipment-pairs')||process.argv.includes('--portal-basis')){
  const update='supabase/migrations/20261031152939_techsafe_equipment_application_evidence.sql';
  await db.exec('ALTER TABLE change_order_line_items ADD COLUMN sort_order integer;ALTER TABLE change_order_line_items ADD COLUMN created_at timestamptz DEFAULT now();');
  const beginDefinition=(await db.query("SELECT pg_get_functiondef('techsafe_source.try_begin_application_observation(uuid)'::regprocedure) AS definition")).rows[0].definition;
@@ -114,9 +114,17 @@ if(process.argv.includes('--equipment-pairs')){
  const {testEquipmentSnapshotPairs}=await import('./equipment-snapshot-pairs.mjs');
  await testEquipmentSnapshotPairs({db,id,org,other,actor,outsider,order,proposal,connection,product,line,co});
 }
+if(process.argv.includes('--portal-basis')){
+ const {testPortalEquipmentBasis}=await import('./portal-equipment-basis.mjs');
+ await testPortalEquipmentBasis({db,id,org,other,actor,outsider,order,proposal,connection,line});
+}
 if(process.argv[2]&&!process.argv[2].startsWith('--')){
  const fixture=await capturedSourceDb(process.argv[2]);try{
   for(const file of ['20261030162612_techsafe_product_exclusions.sql','20261030182910_techsafe_private_application_observations.sql','20261031150238_techsafe_private_order_read_model.sql'])await fixture.db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
+  if(process.argv.includes('--portal-basis')){
+   for(const file of ['20261031152939_techsafe_equipment_application_evidence.sql','20261031193323_techsafe_portal_approval_equipment_basis.sql'])await fixture.db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
+   assert.equal((await fixture.db.query('SELECT techsafe_source.read_portal_approval_equipment_basis($1,$2) AS basis',[connection,order])).rows[0].basis,null);
+  }
   assert.equal((await fixture.db.query('SELECT techsafe_source.read_order_source($1,$2) AS model',[connection,order])).rows[0].model,null);
   assert.equal((await fixture.db.query('SELECT count(*)::int AS n FROM techsafe_source.integration_connections')).rows[0].n,0);
   console.log('Private reader compiled against the reconstructed captured schema; missing connections/orders remain unavailable and no connection was seeded. This is not a native Supabase test.');
@@ -124,4 +132,5 @@ if(process.argv[2]&&!process.argv[2].startsWith('--')){
 }
 console.log('Private order read passed: scoped named/priced facts, opt-outs/evidence, stable selective fingerprint, no private/cost/retail leakage or reads with unavailable connections/cross-tenant data, no source writes, API-role denial, bounded rows/bytes and no invented scope/price/quote verification.');
 }finally{await db.close();}
+
 
