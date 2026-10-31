@@ -14,6 +14,9 @@ on:
       - 'scripts/techsafe/capture-auth-interface.sql'
       - 'scripts/techsafe/constraint-boolean-audit.sql'
       - 'scripts/techsafe/restore-access-layer.mjs'
+      - 'scripts/techsafe/restore-privilege-layer.mjs'
+      - 'scripts/techsafe/restore-trigger-layer.mjs'
+      - 'scripts/techsafe/cost-guard-preflight.sql'
       - 'supabase/migrations/20251104191142_create_customer_pipeline.sql'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source.yml'
@@ -51,5 +54,6 @@ jobs:
       - run: node tests/techsafe/local-auth-interface.mjs
       - run: node tests/techsafe/constraint-boolean-audit.mjs
       - run: node tests/techsafe/restore-access-layer.mjs
+      - run: node tests/techsafe/privilege-trigger-layer.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs

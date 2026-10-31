@@ -1,0 +1,458 @@
+{
+  "capturedOn": "2026-10-30",
+  "engine": "PGlite 0.3.14",
+  "serverVersion": "17.5",
+  "sourceMetadataVersion": "17.6",
+  "outcomesMatch": true,
+  "enabledSourceTriggers": 374,
+  "privilegeComparison": {
+    "objectsCompared": 1208,
+    "columnsCompared": 6222,
+    "mismatches": [],
+    "grantorsVerified": false,
+    "defaultPrivilegesVerified": false
+  },
+  "triggerComparison": {
+    "compared": 374,
+    "mismatches": []
+  },
+  "restoreFailures": {
+    "definitions": [],
+    "constraints": [],
+    "access": [],
+    "privileges": [
+      {
+        "identity": "private.invoke_security_billing_worker()",
+        "kind": "FUNCTION",
+        "sqlState": "42883"
+      },
+      {
+        "identity": "public.complete_employee_welcome_onboarding(p_avatar_url text, p_preferences jsonb, p_skip boolean)",
+        "kind": "FUNCTION",
+        "sqlState": "42883"
+      },
+      {
+        "identity": "public.notify_customer_question()",
+        "kind": "FUNCTION",
+        "sqlState": "42883"
+      },
+      {
+        "identity": "public.send_mileage_reminder_emails()",
+        "kind": "FUNCTION",
+        "sqlState": "42883"
+      },
+      {
+        "identity": "public.send_mileage_reminders()",
+        "kind": "FUNCTION",
+        "sqlState": "42883"
+      },
+      {
+        "identity": "public.submit_customer_proposal_decision(p_proposal_id uuid, p_expected_version integer, p_request_id uuid, p_action text, p_details jsonb)",
+        "kind": "FUNCTION",
+        "sqlState": "42883"
+      }
+    ],
+    "triggers": [
+      {
+        "identity": "public.messages",
+        "name": "on_customer_question_insert",
+        "sqlState": "42883"
+      }
+    ]
+  },
+  "observations": {
+    "total": 9,
+    "completed": 8
+  },
+  "incompleteAssessments": [
+    {
+      "state": "incomplete_observation",
+      "quoteReady": false
+    }
+  ],
+  "cases": [
+    {
+      "action": "modify_quantity",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "500.00",
+          "line_total": "1000.00",
+          "labor_total": "200.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1000.00",
+        "labor_total": "200.00",
+        "subtotal": "1200.00",
+        "tax_amount": "0.00",
+        "total": "1200.00",
+        "deposit_amount_due": "600.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "modify_price",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "600.00",
+          "line_total": "1200.00",
+          "labor_total": "200.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1200.00",
+        "labor_total": "200.00",
+        "subtotal": "1400.00",
+        "tax_amount": "0.00",
+        "total": "1400.00",
+        "deposit_amount_due": "700.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "modify_labor",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "600.00",
+          "line_total": "1200.00",
+          "labor_total": "500.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1200.00",
+        "labor_total": "500.00",
+        "subtotal": "1700.00",
+        "tax_amount": "0.00",
+        "total": "1700.00",
+        "deposit_amount_due": "850.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "remove",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "600.00",
+          "line_total": "1200.00",
+          "labor_total": "500.00",
+          "is_hidden": true
+        }
+      ],
+      "finance": {
+        "parts_total": "1200.00",
+        "labor_total": "500.00",
+        "subtotal": "1700.00",
+        "tax_amount": "0.00",
+        "total": "1700.00",
+        "deposit_amount_due": "850.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "add",
+      "error": {
+        "sqlState": "23514"
+      },
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "600.00",
+          "line_total": "1200.00",
+          "labor_total": "500.00",
+          "is_hidden": true
+        }
+      ],
+      "finance": {
+        "parts_total": "1200.00",
+        "labor_total": "500.00",
+        "subtotal": "1700.00",
+        "tax_amount": "0.00",
+        "total": "1700.00",
+        "deposit_amount_due": "850.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "modify_quantity",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "3.00",
+          "unit_price": "600.00",
+          "line_total": "1800.00",
+          "labor_total": "750.00",
+          "is_hidden": true
+        }
+      ],
+      "finance": {
+        "parts_total": "1800.00",
+        "labor_total": "750.00",
+        "subtotal": "2550.00",
+        "tax_amount": "0.00",
+        "total": "2550.00",
+        "deposit_amount_due": "1275.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "modify_price",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "3.00",
+          "unit_price": "650.00",
+          "line_total": "1950.00",
+          "labor_total": "750.00",
+          "is_hidden": true
+        }
+      ],
+      "finance": {
+        "parts_total": "1950.00",
+        "labor_total": "750.00",
+        "subtotal": "2700.00",
+        "tax_amount": "0.00",
+        "total": "2700.00",
+        "deposit_amount_due": "1350.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "modify_modifiers",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "3.00",
+          "unit_price": "650.00",
+          "line_total": "1950.00",
+          "labor_total": "750.00",
+          "is_hidden": true
+        }
+      ],
+      "finance": {
+        "parts_total": "1950.00",
+        "labor_total": "750.00",
+        "subtotal": "2700.00",
+        "tax_amount": "0.00",
+        "total": "2700.00",
+        "deposit_amount_due": "1350.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "retry_old_quantity_change",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "650.00",
+          "line_total": "1300.00",
+          "labor_total": "500.00",
+          "is_hidden": true
+        }
+      ],
+      "finance": {
+        "parts_total": "1300.00",
+        "labor_total": "500.00",
+        "subtotal": "1800.00",
+        "tax_amount": "0.00",
+        "total": "1800.00",
+        "deposit_amount_due": "900.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "reject_removal",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "650.00",
+          "line_total": "1300.00",
+          "labor_total": "500.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1300.00",
+        "labor_total": "500.00",
+        "subtotal": "1800.00",
+        "tax_amount": "0.00",
+        "total": "1800.00",
+        "deposit_amount_due": "900.00"
+      },
+      "header": {
+        "status": "rejected",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "finish_observer_outage",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "650.00",
+          "line_total": "1300.00",
+          "labor_total": "500.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1300.00",
+        "labor_total": "500.00",
+        "subtotal": "1800.00",
+        "tax_amount": "0.00",
+        "total": "1800.00",
+        "deposit_amount_due": "900.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "begin_observer_outage",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "600.00",
+          "line_total": "1200.00",
+          "labor_total": "500.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1200.00",
+        "labor_total": "500.00",
+        "subtotal": "1700.00",
+        "tax_amount": "0.00",
+        "total": "1700.00",
+        "deposit_amount_due": "850.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    },
+    {
+      "action": "missing_observer_control",
+      "error": null,
+      "scope": [
+        {
+          "description": "Existing equipment",
+          "quantity": "2.00",
+          "unit_price": "600.00",
+          "line_total": "1200.00",
+          "labor_total": "500.00",
+          "is_hidden": false
+        }
+      ],
+      "finance": {
+        "parts_total": "1200.00",
+        "labor_total": "500.00",
+        "subtotal": "1700.00",
+        "tax_amount": "0.00",
+        "total": "1700.00",
+        "deposit_amount_due": "850.00"
+      },
+      "header": {
+        "status": "approved",
+        "is_active": false
+      },
+      "contract": {
+        "contract_total": "500.00"
+      }
+    }
+  ],
+  "nativeSupabase": false,
+  "fullWorkflowCertified": false,
+  "quoteReady": false,
+  "productionWrites": false
+}
