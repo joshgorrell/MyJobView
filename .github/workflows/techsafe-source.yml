@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/*techsafe*'
+      - 'supabase/functions/_shared/techsafe-sales-equipment.mjs'
       - 'scripts/techsafe/observer-preflight.sql'
       - 'scripts/techsafe/observer-plan.sql'
       - 'scripts/techsafe/replay-preflight.sql'
@@ -55,5 +56,6 @@ jobs:
       - run: node tests/techsafe/constraint-boolean-audit.mjs
       - run: node tests/techsafe/restore-access-layer.mjs
       - run: node tests/techsafe/privilege-trigger-layer.mjs
+      - run: node tests/techsafe/sales-equipment.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
