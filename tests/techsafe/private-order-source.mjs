@@ -71,7 +71,7 @@ for(const value of [-1,'9007199254740992'])await assert.rejects(db.query('UPDATE
 for(const role of ['anon','authenticated','service_role']){await db.exec('BEGIN; SET LOCAL ROLE '+role);await assert.rejects(read(),e=>e.code==='42501');await db.exec('ROLLBACK');}
 const attr=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_order_source(uuid,uuid)'::regprocedure")).rows[0];assert.equal(attr.prosecdef,false);assert.equal(attr.provolatile,'s');assert.deepEqual(attr.proconfig,['search_path=""']);
 assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN ('sales_orders'::regclass,'proposals'::regclass,'change_orders'::regclass,'proposal_line_items'::regclass)")).rows[0].n,0);
-if(process.argv.includes('--equipment-evidence')||process.argv.includes('--equipment-pairs')||process.argv.includes('--portal-basis')||process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')){
+if(process.argv.includes('--equipment-evidence')||process.argv.includes('--equipment-pairs')||process.argv.includes('--portal-basis')||process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
  const update='supabase/migrations/20261031152939_techsafe_equipment_application_evidence.sql';
  await db.exec('ALTER TABLE change_order_line_items ADD COLUMN sort_order integer;ALTER TABLE change_order_line_items ADD COLUMN created_at timestamptz DEFAULT now();');
  const beginDefinition=(await db.query("SELECT pg_get_functiondef('techsafe_source.try_begin_application_observation(uuid)'::regprocedure) AS definition")).rows[0].definition;
@@ -110,37 +110,46 @@ if(process.argv.includes('--equipment-evidence')||process.argv.includes('--equip
  assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='techsafe_source' AND p.proname IN ('equipment_evidence_content','read_order_equipment_source','try_begin_application_observation','try_finish_application_observation') AND p.prosecdef")).rows[0].n,0);
  console.log('Equipment evidence v2 passed: no legacy backfill, per-change receipts and ordered scope hashes, cost/retail independence, edit and missing-application detection, later draft compatibility, same-transaction completion and API-role denial. Scope and quote certification remain false.');
 }
-if(process.argv.includes('--equipment-pairs')){
+if(process.argv.includes('--equipment-pairs')||process.argv.includes('--candidate-inputs')){
  const {testEquipmentSnapshotPairs}=await import('./equipment-snapshot-pairs.mjs');
  await testEquipmentSnapshotPairs({db,id,org,other,actor,outsider,order,proposal,connection,product,line,co});
 }
-if(process.argv.includes('--portal-basis')){
+if(process.argv.includes('--portal-basis')||process.argv.includes('--candidate-inputs')){
  const {testPortalEquipmentBasis}=await import('./portal-equipment-basis.mjs');
  await testPortalEquipmentBasis({db,id,org,other,actor,outsider,order,proposal,connection,line});
 }
-if(process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')){
+if(process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
  const {testDraftEligibilitySource}=await import('./draft-eligibility.mjs');
  await testDraftEligibilitySource({db,id,org,other,actor,outsider,order,proposal,connection});
 }
-if(process.argv.includes('--unit-selling-prices')){
+if(process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
  const {testUnitSellingPriceSource}=await import('./unit-selling-price.mjs');
  await testUnitSellingPriceSource({db,id,org,actor,order,proposal,connection,line});
+}
+if(process.argv.includes('--candidate-inputs')){
+ const {testCandidateInputs}=await import('./candidate-inputs.mjs');
+ await testCandidateInputs({db,id,org,other,actor,outsider,order,proposal,connection,line,product});
 }
 if(process.argv[2]&&!process.argv[2].startsWith('--')){
  const fixture=await capturedSourceDb(process.argv[2]);try{
   for(const file of ['20261030162612_techsafe_product_exclusions.sql','20261030182910_techsafe_private_application_observations.sql','20261031150238_techsafe_private_order_read_model.sql'])await fixture.db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
-  if(process.argv.includes('--portal-basis')||process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices'))await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031152939_techsafe_equipment_application_evidence.sql','utf8'));
-  if(process.argv.includes('--portal-basis')){
+  if(process.argv.includes('--portal-basis')||process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs'))await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031152939_techsafe_equipment_application_evidence.sql','utf8'));
+  if(process.argv.includes('--candidate-inputs'))await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031170609_techsafe_private_equipment_snapshot_pairs.sql','utf8'));
+  if(process.argv.includes('--portal-basis')||process.argv.includes('--candidate-inputs')){
    await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031193323_techsafe_portal_approval_equipment_basis.sql','utf8'));
    assert.equal((await fixture.db.query('SELECT techsafe_source.read_portal_approval_equipment_basis($1,$2) AS basis',[connection,order])).rows[0].basis,null);
   }
-  if(process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')){
+  if(process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
    await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031202439_techsafe_substantial_completion_draft_gate.sql','utf8'));
    assert.equal((await fixture.db.query('SELECT techsafe_source.read_order_draft_candidate($1,$2) AS model',[connection,order])).rows[0].model,null);
   }
-  if(process.argv.includes('--unit-selling-prices')){
+  if(process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
    await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031203649_techsafe_standalone_selling_price_facts.sql','utf8'));
    assert.equal((await fixture.db.query('SELECT techsafe_source.read_order_selling_price_facts($1,$2) AS model',[connection,order])).rows[0].model,null);
+  }
+  if(process.argv.includes('--candidate-inputs')){
+   await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031213103_techsafe_bounded_candidate_input_bundle.sql','utf8'));
+   assert.equal((await fixture.db.query('SELECT techsafe_source.read_draft_candidate_inputs($1,$2) AS bundle',[connection,order])).rows[0].bundle,null);
   }
   assert.equal((await fixture.db.query('SELECT techsafe_source.read_order_source($1,$2) AS model',[connection,order])).rows[0].model,null);
   assert.equal((await fixture.db.query('SELECT count(*)::int AS n FROM techsafe_source.integration_connections')).rows[0].n,0);
