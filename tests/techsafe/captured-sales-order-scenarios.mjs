@@ -34,6 +34,7 @@ async function run(observed){
  for(const t of fixture.triggerPlan.triggers)if(fixture.reports.triggers.installed.some(x=>x.identity===t.identity&&x.name===t.name))await db.exec(t.enableSql);
  if(observed){
   for(const migration of migrations)await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
+  if(process.argv.includes('--equipment-evidence'))for(const migration of ['20261031150238_techsafe_private_order_read_model.sql','20261031152939_techsafe_equipment_application_evidence.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
   await db.query("INSERT INTO techsafe_source.integration_connections(organization_id,connection_id,enabled,status,last_verified_at) VALUES($1,$2,true,'active',now())",[org,id(50)]);
   await db.query('INSERT INTO techsafe_source.application_observer_controls(organization_id,enabled) VALUES($1,true)',[org]);
  }
@@ -58,8 +59,9 @@ async function run(observed){
  await execute('missing_observer_control',7);
  const observations=observed?(await db.query('SELECT count(*)::int AS total,count(completed_at)::int AS completed FROM techsafe_source.application_observations')).rows[0]:null;
  const incompleteAssessments=observed?(await db.query('SELECT techsafe_source.assess_application_observation(change_order_id,id) AS assessment FROM techsafe_source.application_observations WHERE completed_at IS NULL')).rows.map(x=>x.assessment):[];
+ const equipmentReceipts=observed&&process.argv.includes('--equipment-evidence')?(await db.query('SELECT count(equipment_input_hash)::int AS inputs,count(equipment_after_scope_hash)::int AS scopes,count(equipment_started_order)::int AS starts,count(equipment_completed_order)::int AS completions FROM techsafe_source.application_observations')).rows[0]:null;
  if(observed)assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.managed_change_orders')).rows[0].n,0);
- return {restoreFailures,privilegeComparison:fixture.reports.privileges.comparison,triggerComparison:fixture.reports.triggers.comparison,outcomes,observations,incompleteAssessments,enabledSourceTriggers:fixture.reports.triggers.installed.length};
+ return {restoreFailures,privilegeComparison:fixture.reports.privileges.comparison,triggerComparison:fixture.reports.triggers.comparison,outcomes,observations,incompleteAssessments,equipmentReceipts,enabledSourceTriggers:fixture.reports.triggers.installed.length};
  }finally{await db.close();}
 }
 const baseline=await run(false),observed=await run(true);
@@ -67,6 +69,7 @@ assert.deepEqual(observed.outcomes,baseline.outcomes,'Observer must preserve sou
 assert.deepEqual(baseline.outcomes.map(x=>x.error?.sqlState??null),[null,null,null,null,'23514',null,null,null,null,null,null,null,null]);
 assert.deepEqual(observed.observations,{total:9,completed:8});
 assert.equal(observed.incompleteAssessments.length,1);assert.equal(observed.incompleteAssessments[0].state,'incomplete_observation');assert.equal(observed.incompleteAssessments[0].quoteReady,false);
+if(process.argv.includes('--equipment-evidence'))assert.deepEqual(observed.equipmentReceipts,{inputs:9,scopes:8,starts:9,completions:8});
 for(const run of [baseline,observed]){
  assert.deepEqual(run.privilegeComparison.mismatches,[]);assert.deepEqual(run.triggerComparison.mismatches,[]);
  for(const kind of ['definitions','constraints','access'])assert.deepEqual(run.restoreFailures[kind],[]);
