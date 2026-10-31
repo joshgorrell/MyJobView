@@ -1,0 +1,354 @@
+{
+  "engine": "PGlite 0.3.14",
+  "serverVersion": "17.5",
+  "appliedCounts": {
+    "keys": 531,
+    "checks": 525,
+    "foreignKeys": 1122,
+    "indexes": 1893
+  },
+  "definitionsCompared": 4071,
+  "exactDefinitionsMatched": 4070,
+  "definitionMismatches": [
+    {
+      "stage": "checks",
+      "identity": "public.proposal_loss_feedback",
+      "name": "proposal_loss_feedback_reasons_check",
+      "differingFields": [
+        "definition"
+      ]
+    }
+  ],
+  "reusedIndexes": 531,
+  "failures": [
+    {
+      "stage": "foreignKeys",
+      "identity": "public.bug_reports",
+      "name": "bug_reports_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.competitors",
+      "name": "competitors_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.contacts",
+      "name": "contacts_portal_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.contracts",
+      "name": "contracts_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.daily_clock_entries",
+      "name": "daily_clock_entries_auto_clock_out_approved_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.department_user_overrides",
+      "name": "department_user_overrides_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.discount_codes",
+      "name": "discount_codes_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.intake_notification_preferences",
+      "name": "intake_notification_preferences_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.issue_reports",
+      "name": "issue_reports_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.platform_pricing",
+      "name": "platform_pricing_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.platform_pricing_history",
+      "name": "platform_pricing_history_changed_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.points_configuration",
+      "name": "points_configuration_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.points_transactions",
+      "name": "points_transactions_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.priority_levels",
+      "name": "priority_levels_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.products",
+      "name": "products_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.products",
+      "name": "products_updated_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.profiles",
+      "name": "profiles_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposal_activity_views",
+      "name": "proposal_activity_views_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposal_area_templates",
+      "name": "proposal_area_templates_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposal_portal_versions",
+      "name": "proposal_portal_versions_submitted_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposal_recordings",
+      "name": "proposal_recordings_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposal_report_templates",
+      "name": "proposal_report_templates_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposal_share_links",
+      "name": "proposal_share_links_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposals",
+      "name": "proposals_approved_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposals",
+      "name": "proposals_declined_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposals",
+      "name": "proposals_last_emailed_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.proposals",
+      "name": "proposals_locked_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.prospect_competitor_relationships",
+      "name": "prospect_competitor_relationships_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.push_tokens",
+      "name": "push_tokens_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.reward_redemptions",
+      "name": "reward_redemptions_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.rewards_catalog",
+      "name": "rewards_catalog_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.security_contract_approvals",
+      "name": "security_contract_approvals_requested_by_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.security_contract_approvals",
+      "name": "security_contract_approvals_reviewed_by_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.security_contracts",
+      "name": "security_contracts_approved_by_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.security_contracts",
+      "name": "security_contracts_created_by_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.tax_exemption_certificates",
+      "name": "tax_exemption_certificates_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.tax_exemption_certificates",
+      "name": "tax_exemption_certificates_verified_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.tax_jurisdictions",
+      "name": "tax_jurisdictions_company_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.user_permission_overrides",
+      "name": "user_permission_overrides_created_by_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.user_permission_overrides",
+      "name": "user_permission_overrides_user_id_fkey",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "foreignKeys",
+      "identity": "public.user_starred_modules",
+      "name": "user_starred_modules_user_id_fkey",
+      "sqlState": "3F000"
+    }
+  ],
+  "deferred": [
+    {
+      "stage": "constraints",
+      "identity": "public.change_orders",
+      "name": "sales_credit_change_order",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.invoice_line_item_sources",
+      "name": "sales_credit_work_order_link",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.invoices",
+      "name": "sales_credit_invoice",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.proposals",
+      "name": "sales_credit_proposal",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.recurring_invoices",
+      "name": "sales_credit_recurring_link",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.sales_orders",
+      "name": "sales_credit_order",
+      "reason": "constraint-trigger-review"
+    }
+  ],
+  "prerequisiteFailures": [
+    {
+      "stage": "routines",
+      "identity": "public.flow_can_view_thread(p_thread uuid, p_user uuid)",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.get_sales_performance(p_period text, p_rep_id uuid, p_offset integer, p_limit integer)",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.daily_recap_todos",
+      "column": "user_id",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.flow_event_views",
+      "column": "user_id",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.flow_updates",
+      "column": "author_id",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.proposal_loss_feedback",
+      "column": "recorded_by",
+      "sqlState": "3F000"
+    }
+  ],
+  "fullBaseline": false,
+  "runtimeTestsAllowed": false,
+  "restoreApproved": false,
+  "quoteReady": false,
+  "productionWrites": false,
+  "capturedOn": "2026-10-30",
+  "sourcePostgresVersion": "17.6",
+  "nativeSupabaseRestore": false,
+  "sourceDataCopied": false
+}

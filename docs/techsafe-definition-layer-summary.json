@@ -1,0 +1,87 @@
+{
+  "engine": "PGlite 0.3.14",
+  "serverVersion": "17.5",
+  "appliedCounts": {
+    "schemas": 6,
+    "routines": 791,
+    "defaults": 2530
+  },
+  "definitionsCompared": 3321,
+  "failures": [
+    {
+      "stage": "routines",
+      "identity": "public.flow_can_view_thread(p_thread uuid, p_user uuid)",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.get_sales_performance(p_period text, p_rep_id uuid, p_offset integer, p_limit integer)",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.daily_recap_todos",
+      "column": "user_id",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.flow_event_views",
+      "column": "user_id",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.flow_updates",
+      "column": "author_id",
+      "sqlState": "3F000"
+    },
+    {
+      "stage": "defaults",
+      "identity": "public.proposal_loss_feedback",
+      "column": "recorded_by",
+      "sqlState": "3F000"
+    }
+  ],
+  "deferred": [
+    {
+      "stage": "routines",
+      "identity": "private.invoke_security_billing_worker()",
+      "reason": "outbound-review"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.complete_employee_welcome_onboarding(p_avatar_url text, p_preferences jsonb, p_skip boolean)",
+      "reason": "outbound-review"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.notify_customer_question()",
+      "reason": "outbound-review"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.send_mileage_reminder_emails()",
+      "reason": "outbound-review"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.send_mileage_reminders()",
+      "reason": "outbound-review"
+    },
+    {
+      "stage": "routines",
+      "identity": "public.submit_customer_proposal_decision(p_proposal_id uuid, p_expected_version integer, p_request_id uuid, p_action text, p_details jsonb)",
+      "reason": "outbound-review"
+    }
+  ],
+  "fullBaseline": false,
+  "runtimeTestsAllowed": false,
+  "restoreApproved": false,
+  "quoteReady": false,
+  "productionWrites": false,
+  "capturedOn": "2026-10-30",
+  "sourcePostgresVersion": "17.6",
+  "nativeSupabaseRestore": false,
+  "sourceDataCopied": false
+}
