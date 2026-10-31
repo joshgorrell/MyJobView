@@ -67,5 +67,13 @@ assert.equal((await db.query('SELECT is_hidden FROM proposal_line_items WHERE id
 assert.equal((await db.query('SELECT techsafe_source.order_line_membership($1,$2) AS state',[order,target])).rows[0].state,'unverified');
 // No registration, receipt or source change is introduced by the observer tests.
 for(const table of ['managed_change_orders','change_applications','applied_removals'])assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.'+table)).rows[0].n,0);
-console.log('Source evidence regressions passed: approved-before-application, identical-add ambiguity, old retry overwriting newer quantity, conflicting restoration, and no managed registrations or receipts. These reproduce existing behavior; they do not certify export readiness.');
+// Current full-schema replay additionally found the legacy ADD path omits cost.
+// Match the source column defaults/guard without changing any applier statement.
+await db.exec('ALTER TABLE proposal_line_items ADD COLUMN cost numeric NOT NULL DEFAULT 0;ALTER TABLE proposal_line_items ADD COLUMN is_customer_supplied boolean DEFAULT false;UPDATE proposal_line_items SET cost=100;ALTER TABLE proposal_line_items ADD CONSTRAINT proposal_line_items_cost_positive CHECK(cost>=0 AND (is_customer_supplied=true OR cost>0));');
+await db.query("INSERT INTO change_orders(id,sales_order_id,organization_id,status) VALUES($1,$2,$3,'approved')",[id(205),order,org]);await add(205,1206);
+const countBeforeFailedAdd=await equipmentCount();
+await assert.rejects(db.query('SELECT public.apply_change_order($1)',[id(205)]),e=>e.code==='23514'&&e.constraint==='proposal_line_items_cost_positive');
+assert.equal(await equipmentCount(),countBeforeFailedAdd);
+assert.deepEqual((await db.query('SELECT status,is_active FROM change_orders WHERE id=$1',[id(205)])).rows[0],{status:'approved',is_active:true});
+console.log('Source evidence regressions passed: approved-before-application, identical-add ambiguity, old retry overwriting newer quantity, conflicting restoration, cost-guard ADD rollback with approved header retained, and no managed registrations or receipts. These reproduce existing behavior; they do not certify export readiness.');
 }finally{await db.close();}
