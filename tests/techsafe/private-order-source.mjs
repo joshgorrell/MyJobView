@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 import {prepareOrderContent} from '../../supabase/functions/_shared/techsafe-order-content.mjs';
 import {capturedSourceDb} from './fixtures/captured-source-db.mjs';
+import {assessApplicationEvidence} from '../../supabase/functions/_shared/techsafe-application-evidence.mjs';
 const migration='supabase/migrations/20261031150238_techsafe_private_order_read_model.sql';
 const id=n=>'40000000-0000-0000-0000-'+String(n).padStart(12,'0');
 const org=id(1),other=id(2),actor=id(3),outsider=id(4),order=id(5),proposal=id(6),customer=id(7),connection=id(8),product=id(9),line=id(10),co=id(11);
@@ -70,7 +71,46 @@ for(const value of [-1,'9007199254740992'])await assert.rejects(db.query('UPDATE
 for(const role of ['anon','authenticated','service_role']){await db.exec('BEGIN; SET LOCAL ROLE '+role);await assert.rejects(read(),e=>e.code==='42501');await db.exec('ROLLBACK');}
 const attr=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_order_source(uuid,uuid)'::regprocedure")).rows[0];assert.equal(attr.prosecdef,false);assert.equal(attr.provolatile,'s');assert.deepEqual(attr.proconfig,['search_path=""']);
 assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN ('sales_orders'::regclass,'proposals'::regclass,'change_orders'::regclass,'proposal_line_items'::regclass)")).rows[0].n,0);
-if(process.argv[2]){
+if(process.argv.includes('--equipment-evidence')){
+ const update='supabase/migrations/20261031152939_techsafe_equipment_application_evidence.sql';
+ await db.exec('ALTER TABLE change_order_line_items ADD COLUMN sort_order integer;ALTER TABLE change_order_line_items ADD COLUMN created_at timestamptz DEFAULT now();');
+ const beginDefinition=(await db.query("SELECT pg_get_functiondef('techsafe_source.try_begin_application_observation(uuid)'::regprocedure) AS definition")).rows[0].definition;
+ await db.exec('BEGIN');await db.exec(beginDefinition.replace('RETURN identity;','RETURN NULL;'));
+ await assert.rejects(db.exec(fs.readFileSync(update,'utf8')),/Review changed observation helper/);await db.exec('ROLLBACK');
+ assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_attribute WHERE attrelid='techsafe_source.application_observations'::regclass AND attname='equipment_input_hash' AND NOT attisdropped")).rows[0].n,0);
+ await db.exec(fs.readFileSync(update,'utf8'));
+ const binding={connectionId:connection,organizationId:org,orderId:order,proposalId:proposal};
+ const equipment=async()=>(await db.query('SELECT techsafe_source.read_order_equipment_source($1,$2) AS model',[connection,order])).rows[0].model;
+ const assess=async()=>assessApplicationEvidence(await equipment(),binding);
+ assert.equal((await assess()).applicationEvidenceCurrent,false,'Legacy completed rows must not be backfilled into v2 proof');
+ assert.equal((await db.query('SELECT equipment_input_hash FROM techsafe_source.application_observations')).rows[0].equipment_input_hash,null);
+ await db.query("UPDATE change_order_line_items SET action_type='modify_quantity',proposal_line_item_id=$1,new_quantity=3 WHERE change_order_id=$2",[line,co]);
+ await db.query("SELECT set_config('test.actor',$1,false)",[actor]);
+ await db.exec('BEGIN');const observation=(await db.query('SELECT techsafe_source.try_begin_application_observation($1) AS id',[co])).rows[0].id;assert.ok(observation);
+ await db.query('UPDATE proposal_line_items SET quantity=3 WHERE id=$1',[line]);
+ assert.equal((await db.query('SELECT techsafe_source.try_finish_application_observation($1,$2) AS id',[co,observation])).rows[0].id,observation);await db.exec('COMMIT');
+ assert.equal((await assess()).applicationEvidenceCurrent,true);assert.equal((await assess()).quoteReady,false);assert.equal((await assess()).scopeVerified,false);
+ const good=await equipment();
+ await db.exec("SET TIME ZONE 'America/Chicago'");assert.deepEqual((await equipment()).equipmentEvidence,good.equipmentEvidence);await db.exec("SET TIME ZONE 'UTC'");
+ await db.query('UPDATE products SET cost=4321,retail_price=123 WHERE id=$1',[product]);await db.query('UPDATE proposal_line_items SET cost=888 WHERE id=$1',[line]);
+ assert.deepEqual((await equipment()).equipmentEvidence,good.equipmentEvidence);assert.equal((await assess()).applicationEvidenceCurrent,true);
+ for(const sql of ['UPDATE proposal_line_items SET unit_price=825 WHERE id=$1','UPDATE change_order_line_items SET new_quantity=4 WHERE change_order_id=$1']){
+  await db.exec('BEGIN');await db.query(sql,[sql.includes('proposal_line_items')?line:co]);assert.equal((await assess()).applicationEvidenceCurrent,false);await db.exec('ROLLBACK');
+ }
+ await db.exec('BEGIN');await db.query('UPDATE change_order_line_items SET sort_order=100 WHERE change_order_id=$1',[co]);assert.equal((await assess()).applicationEvidenceCurrent,false);await db.exec('ROLLBACK');
+ await db.query("INSERT INTO change_orders(id,organization_id,sales_order_id,proposal_id,status) VALUES($1,$2,$3,$4,'draft')",[id(50),org,order,proposal]);
+ assert.equal((await assess()).applicationEvidenceCurrent,true,'Later drafts must not erase valid per-change equipment evidence');
+ await db.query("UPDATE change_orders SET status='approved' WHERE id=$1",[id(50)]);assert.equal((await assess()).applicationEvidenceCurrent,false);
+ await db.exec('BEGIN');const second=(await db.query('SELECT techsafe_source.try_begin_application_observation($1) AS id',[id(50)])).rows[0].id;assert.ok(second);
+ assert.equal((await db.query('SELECT techsafe_source.try_finish_application_observation($1,$2) AS id',[id(50),second])).rows[0].id,second);await db.exec('COMMIT');
+ assert.equal((await assess()).applicationEvidenceCurrent,true);
+ await db.exec('BEGIN');const late=(await db.query('SELECT techsafe_source.try_begin_application_observation($1) AS id',[co])).rows[0].id;await db.exec('COMMIT');
+ assert.equal((await db.query('SELECT techsafe_source.try_finish_application_observation($1,$2) AS id',[co,late])).rows[0].id,null);assert.equal((await assess()).applicationEvidenceCurrent,false,'A cross-transaction finish must leave incomplete evidence');
+ for(const role of ['anon','authenticated','service_role']){await db.exec('BEGIN; SET LOCAL ROLE '+role);await assert.rejects(equipment(),e=>e.code==='42501');await db.exec('ROLLBACK');}
+ assert.equal((await db.query("SELECT count(*)::int AS n FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='techsafe_source' AND p.proname IN ('equipment_evidence_content','read_order_equipment_source','try_begin_application_observation','try_finish_application_observation') AND p.prosecdef")).rows[0].n,0);
+ console.log('Equipment evidence v2 passed: no legacy backfill, per-change receipts and ordered scope hashes, cost/retail independence, edit and missing-application detection, later draft compatibility, same-transaction completion and API-role denial. Scope and quote certification remain false.');
+}
+if(process.argv[2]&&!process.argv[2].startsWith('--')){
  const fixture=await capturedSourceDb(process.argv[2]);try{
   for(const file of ['20261030162612_techsafe_product_exclusions.sql','20261030182910_techsafe_private_application_observations.sql','20261031150238_techsafe_private_order_read_model.sql'])await fixture.db.exec(fs.readFileSync('supabase/migrations/'+file,'utf8'));
   assert.equal((await fixture.db.query('SELECT techsafe_source.read_order_source($1,$2) AS model',[connection,order])).rows[0].model,null);
