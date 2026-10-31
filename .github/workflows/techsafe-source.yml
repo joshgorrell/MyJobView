@@ -66,7 +66,7 @@ jobs:
       - run: node tests/techsafe/privilege-trigger-layer.mjs
       - run: node tests/techsafe/sales-equipment.mjs
       - run: node tests/techsafe/order-content.mjs
-      - run: node tests/techsafe/private-order-source.mjs --equipment-evidence --equipment-pairs --portal-basis --draft-eligibility --unit-selling-prices
+      - run: node tests/techsafe/private-order-source.mjs --equipment-evidence --equipment-pairs --portal-basis --draft-eligibility --unit-selling-prices --candidate-inputs
       - run: node tests/techsafe/unit-selling-price.mjs
       - run: node tests/techsafe/draft-candidate.mjs
       - run: node tests/techsafe/draft-eligibility.mjs
