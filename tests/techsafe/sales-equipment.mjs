@@ -59,7 +59,7 @@ assert.deepEqual(Object.keys(output.equipment[0]).sort(),['sourceLineId','produc
 // Optional local cross-repository check against the actual Techsafe contract.
 if(process.argv[2]){
  const {selectEquipment,validateSnapshot,decideImport}=await import(pathToFileURL(process.argv[2]).href);
- const snapshot={schemaVersion:1,environment:'sandbox',connectionId:'connection-1',sourceInstanceId:'mjv',organizationId:'org-1',orderId:'order-1',eventId:'event-1',generation:1,revision:1,complete:true,scopeState:'committed',orderStatus:'open',currency:'USD',minimumUnitValueCents:50000,customerRef:'customer-1',siteRef:'site-1',lines:output.equipment};
+ const snapshot={schemaVersion:2,environment:'sandbox',connectionId:'connection-1',sourceInstanceId:'mjv',organizationId:'org-1',orderId:'order-1',eventId:'event-1',generation:1,revision:1,complete:true,scopeState:'committed',orderStatus:'open',currency:'USD',minimumUnitValueCents:50000,customerRef:'customer-1',customerName:'Synthetic Customer',siteRef:'site-1',lines:output.equipment};
  validateSnapshot(snapshot);assert.deepEqual(selectEquipment(snapshot).equipment,output.equipment);
  const binding={connectionId:'connection-1',sourceInstanceId:'mjv',organizationId:'org-1',environment:'sandbox',generation:1,dealerId:'dealer-1',status:'active',reconciliationRequired:false};
  let current=null,lastEquipment=[];
@@ -80,3 +80,4 @@ if(process.argv[2]){
  console.log('Actual Techsafe receiver contract accepted the prepared sales-price-only lines. The test envelope is synthetic; no real source snapshot was certified.');
 }
 console.log('Sales equipment checks passed: sold-price-only values, cost/list-price independence, exact cents, inclusive per-unit minimum, existing material/labor classes, miscellaneous/opt-out/removal/supplied exclusions, distinct identities, tenant binding and blocked partial/unresolved candidates. No source read/write, transport or quote authorization exists.');
+
