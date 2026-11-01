@@ -6,7 +6,7 @@ For example, equipment sold at $800 remains $800 of unit equipment value when th
 
 ## Private source projection
 
-`read_order_selling_price_facts(connection, order)` uses the substantial-completion candidate reader, retaining its tenant, actor, connection-health, project and size gates. It adds only the line's parent, display and child-presence facts for the standalone-price check, plus a bound private price context. It does not query project adjustment fields for pricing.
+`read_order_selling_price_facts(connection, order)` uses the supported-sales-order candidate reader, retaining its tenant, actor, connection-health and size gates. Completion/project milestones no longer control draft visibility; see [draft timing policy](techsafe-precompletion-drafts.md). It adds only the line's parent, display and child-presence facts for the standalone-price check, plus a bound private price context. It does not query project adjustment fields for pricing.
 
 The candidate removes aggregate `pricingFacts` and projects change headers to identity/status fields needed for internal scope verification. Discounts, percentage values and billing flags are omitted from this price candidate. Those fields remain unchanged in MJV. Lower-level private evidence tools remain internal; no change-order history or pricing diagnostics are transported to Techsafe.
 
@@ -31,4 +31,5 @@ The private reader retains unresolved source-row flags; the helper does not muta
 The optional captured-schema run compiles the reader against reconstructed MJV source tables without seeding a connection. Existing completed-order preparation against current Techsafe v2 accepts eligible content and preserves active coverage; approved-row connection/history tests pass too. These are local tests, not native concurrency or production-history certification.
 
 Techsafe will receive one final eligible equipment list. Live synchronization remains disabled until the remaining membership, source/provenance and checkout freshness gates are completed.
+
 

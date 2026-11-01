@@ -46,7 +46,7 @@ export async function testUnitSellingPriceSource(f){
  await db.exec('BEGIN');await db.query('UPDATE proposal_line_items SET unit_price=900 WHERE id=$1',[line]);assert.equal((await price()).unitEquipmentValueCents,90000);await db.exec('ROLLBACK');
  await db.exec('BEGIN');await db.query("UPDATE proposal_line_items SET display_mode='bundle' WHERE id=$1",[line]);assert.equal((await price()).salesPriceResolved,false);await db.exec('ROLLBACK');
  await db.exec('BEGIN');await db.query('UPDATE proposal_line_items SET parent_item_id=$1 WHERE id<>$1',[line]);assert.equal((await price()).salesPriceResolved,false);await db.exec('ROLLBACK');
- await db.exec('BEGIN');await db.exec("UPDATE sales_orders SET status='active';UPDATE projects SET substantial_completion_date=NULL");assert.equal(await read(),null);await db.exec('ROLLBACK');
+ await db.exec('BEGIN');await db.exec("UPDATE sales_orders SET status='active';UPDATE projects SET substantial_completion_date=NULL");assert.ok(await read(),'Work need not be complete for draft price facts');await db.exec('ROLLBACK');
  for(const role of ['anon','authenticated','service_role']){await db.exec('BEGIN;SET LOCAL ROLE '+role);await assert.rejects(read(),e=>e.code==='42501');await db.exec('ROLLBACK');}
  const a=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_order_selling_price_facts(uuid,uuid)'::regprocedure")).rows[0];
  assert.equal(a.prosecdef,false);assert.equal(a.provolatile,'s');assert.deepEqual(a.proconfig,['search_path=""']);
@@ -67,4 +67,5 @@ export async function testUnitSellingPriceSource(f){
  await db.exec('ROLLBACK');
  console.log('Private unit price facts passed: ready-order bindings, product selling-price sensitivity, project-discount/misc/billing and cost independence, parent/child guards and denied API roles.');
 }
+
 

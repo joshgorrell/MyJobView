@@ -38,7 +38,7 @@ async function run(observed){
   for(const migration of migrations)await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
   if(equipmentEvidence)for(const migration of ['20261031150238_techsafe_private_order_read_model.sql','20261031152939_techsafe_equipment_application_evidence.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8'));
   if(pairs)await db.exec(fs.readFileSync('supabase/migrations/20261031170609_techsafe_private_equipment_snapshot_pairs.sql','utf8'));
-  if(candidateInputs)for(const migration of ['20261031193323_techsafe_portal_approval_equipment_basis.sql','20261031202439_techsafe_substantial_completion_draft_gate.sql','20261031203649_techsafe_standalone_selling_price_facts.sql','20261031213103_techsafe_bounded_candidate_input_bundle.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8')); 
+  if(candidateInputs)for(const migration of ['20261031193323_techsafe_portal_approval_equipment_basis.sql','20261031202439_techsafe_substantial_completion_draft_gate.sql','20261031203649_techsafe_standalone_selling_price_facts.sql','20261031213103_techsafe_bounded_candidate_input_bundle.sql','20261101135453_techsafe_precompletion_sales_order_drafts.sql'])await db.exec(fs.readFileSync('supabase/migrations/'+migration,'utf8')); 
   await db.query("INSERT INTO techsafe_source.integration_connections(organization_id,connection_id,enabled,status,last_verified_at) VALUES($1,$2,true,'active',now())",[org,id(50)]);
   await db.query('INSERT INTO techsafe_source.application_observer_controls(organization_id,enabled) VALUES($1,true)',[org]);
  }
@@ -95,5 +95,6 @@ for(const run of [baseline,observed]){
  assert.equal(run.enabledSourceTriggers,374);
 }
 console.log(JSON.stringify({baseline,observed,outcomesMatch:true,nativeSupabase:false,fullWorkflowCertified:false,quoteReady:false,productionWrites:false}));
+
 
 

@@ -20,14 +20,14 @@ for(const full_name of [null,undefined,'','  ','x'.repeat(257),'Name\nCompany'])
 const unicode=input();unicode.customer.full_name=' 李明 & O’Connor ';assert.equal(prepareOrderContent(unicode).content.customerName,' 李明 & O’Connor ');
 for(const status of ['pending_deposit','pending_po','planning','active','complete','closed']){
  const source=input();source.order.status=status;const r=prepareOrderContent(source);
- if(['complete','closed'].includes(status))assert.equal(r.content.orderStatus,'completed');else{assert.equal(r.content,null);assert.equal(r.draftEligible,false);}
+ assert.equal(r.draftEligible,true);assert.equal(r.content.orderStatus,['complete','closed'].includes(status)?'completed':'open');
 }
 const substantiallyComplete=input();substantiallyComplete.order.status='active';substantiallyComplete.order.project_id='project-1';
 substantiallyComplete.completion.project={id:'project-1',organization_id:'org-1',sales_order_id:'order-1',substantial_completion_date:'2026-10-31'};
 assert.equal(prepareOrderContent(substantiallyComplete).content.orderStatus,'open');
-substantiallyComplete.completion.project.substantial_completion_date='2026-11-01';assert.equal(prepareOrderContent(substantiallyComplete).content,null);
-const early=input();early.order.status='planning';Object.defineProperty(early,'lines',{get(){throw Error('Must not inspect early equipment');}});assert.equal(prepareOrderContent(early).content,null);
-const noEvidence=input();delete noEvidence.completion;assert.equal(prepareOrderContent(noEvidence).content,null);
+substantiallyComplete.completion.project.substantial_completion_date='2026-11-01';assert.equal(prepareOrderContent(substantiallyComplete).content.orderStatus,'open');
+const early=input();early.order.status='planning';Object.defineProperty(early,'completion',{get(){throw Error('Must not inspect completion');}});assert.equal(prepareOrderContent(early).content.orderStatus,'open');
+const noEvidence=input();delete noEvidence.completion;assert.equal(prepareOrderContent(noEvidence).valid,true);
 const unknown=input();unknown.order.status='unknown';assert.throws(()=>prepareOrderContent(unknown),/unresolved_order_status/);
 const site=input();site.site={id:'site-1',order_id:'order-1',organization_id:'org-1'};assert.equal(prepareOrderContent(site).content.siteRef,'site-1');site.site.order_id='other';assert.throws(()=>prepareOrderContent(site),/site_binding_mismatch/);
 const unresolved=input();unresolved.lines[0].salesPriceResolved=false;assert.equal(prepareOrderContent(unresolved).content,null);
@@ -45,4 +45,5 @@ if(process.argv[2]){
  console.log('Actual Techsafe v2 preparation accepted named source content, fingerprinted name changes and preserved active coverage. The complete envelope is synthetic test data only.');
 }
 console.log('Order-content checks passed: MJV display name, stable customer/order/site bindings, status mapping, detached sales-price lines, blocked unresolved context and no source/snapshot/quote authorization.');
+
 

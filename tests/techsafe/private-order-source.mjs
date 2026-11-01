@@ -141,6 +141,7 @@ if(process.argv[2]&&!process.argv[2].startsWith('--')){
   }
   if(process.argv.includes('--draft-eligibility')||process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
    await fixture.db.exec(fs.readFileSync('supabase/migrations/20261031202439_techsafe_substantial_completion_draft_gate.sql','utf8'));
+   await fixture.db.exec(fs.readFileSync('supabase/migrations/20261101135453_techsafe_precompletion_sales_order_drafts.sql','utf8'));
    assert.equal((await fixture.db.query('SELECT techsafe_source.read_order_draft_candidate($1,$2) AS model',[connection,order])).rows[0].model,null);
   }
   if(process.argv.includes('--unit-selling-prices')||process.argv.includes('--candidate-inputs')){
@@ -158,6 +159,7 @@ if(process.argv[2]&&!process.argv[2].startsWith('--')){
 }
 console.log('Private order read passed: scoped named/priced facts, opt-outs/evidence, stable selective fingerprint, no private/cost/retail leakage or reads with unavailable connections/cross-tenant data, no source writes, API-role denial, bounded rows/bytes and no invented scope/price/quote verification.');
 }finally{await db.close();}
+
 
 
 
