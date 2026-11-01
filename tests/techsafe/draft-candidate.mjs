@@ -38,7 +38,11 @@ originalHidden.currentModel.lines[0].exclusion={product_id:'TV',organization_id:
 const supplied=fixture(true);supplied.basis.lines[0].line.is_customer_supplied=true;supplied.currentModel.lines[0].line.is_customer_supplied=true;
 supplied.basis.approvedRowsHash=supplied.currentModel.equipmentEvidence.scopeHash=digest(supplied.basis.lines);assert.equal(pass(supplied).content.lines.length,1);
 const noBasis=fixture();noBasis.basis=null;block(noBasis,'original_approval_basis_unavailable');
-const early=fixture();early.currentModel.order.status='active';Object.defineProperty(early,'pairs',{get(){throw Error('Early history must not be read');}});block(early,'substantial_completion_required');
+for(const status of ['pending_deposit','pending_po','planning','active']){const early=fixture();early.currentModel.order.status=status;Object.defineProperty(early.currentModel,'completion',{get(){throw Error('Completion must not be read');}});const result=pass(early);assert.equal(result.content.orderStatus,'open');assert.deepEqual(result.content.lines,r.content.lines);}
+const unknown=fixture();unknown.currentModel.order.status='unknown';Object.defineProperty(unknown,'pairs',{get(){throw Error('Unsupported order history must not be read');}});block(unknown,'draft_order_unverified');
+const earlyUnapproved=fixture();earlyUnapproved.currentModel.order.status='active';earlyUnapproved.basis=null;block(earlyUnapproved,'original_approval_basis_unavailable');
+const pending=fixture(true);pending.currentModel.order.status='planning';const change={id:'pending-co',organization_id:'org',sales_order_id:'order',proposal_id:'proposal',status:'pending_approval'};pending.currentModel.changeOrders=[change];pending.currentModel.equipmentEvidence.inputs=[{changeOrderId:change.id,inputHash:'a'.repeat(64)}];assert.deepEqual(pass(pending).content.lines,pass(fixture(true)).content.lines,'Pending changes cannot add equipment to the approved list');
+pending.currentModel.changeOrders[0].status='approved';block(pending,'approved_application_missing');
 const drift=fixture();drift.currentModel.lines[0].line.quantity='100.00';block(drift,'approved_application_history_not_connected');
 const unknownPrice=fixture();delete unknownPrice.currentModel.lines[0].salePriceFacts;block(unknownPrice,'sales_price_unresolved');
 const percentages=fixture();for(const key of ['pricingFacts','discount_percent','misc_parts_percent'])Object.defineProperty(percentages.currentModel,key,{get(){throw Error('Aggregate pricing must not be read');}});pass(percentages);
@@ -47,10 +51,12 @@ assert.equal(prepare(null,binding).valid,false);
 if(process.argv[2]){
  const {prepareImport}=await import(pathToFileURL(process.argv[2]).href);
  const receiverBinding={...binding,sourceInstanceId:'mjv',environment:'sandbox',generation:1,dealerId:'dealer',status:'active',reconciliationRequired:false};
- const envelope={...r.content,connectionId:binding.connectionId,sourceInstanceId:'mjv',environment:'sandbox',generation:1,eventId:'event-1',revision:1,complete:true,scopeState:'committed'};
- const accepted=await prepareImport(envelope,receiverBinding,null);assert.equal(accepted.decision.action,'replace_draft');assert.equal(accepted.snapshot.lines.length,2);assert.equal(accepted.snapshot.customerName,'Example Customer');
+ const early=fixture();early.currentModel.order.status='active';const open=pass(early).content;
+ const envelope={...open,connectionId:binding.connectionId,sourceInstanceId:'mjv',environment:'sandbox',generation:1,eventId:'event-1',revision:1,complete:true,scopeState:'committed'};
+ const accepted=await prepareImport(envelope,receiverBinding,null);assert.equal(accepted.decision.action,'replace_draft');assert.equal(accepted.snapshot.orderStatus,'open');assert.equal(accepted.snapshot.lines.length,2);assert.equal(accepted.snapshot.customerName,'Example Customer');
  const active={connectionId:binding.connectionId,dealerId:'dealer',orderId:'order',revision:1,contentHash:accepted.contentHash,lifecycle:'active'};
  assert.equal((await prepareImport({...envelope,revision:2},receiverBinding,active)).decision.action,'preserve_coverage_snapshot');
  console.log('Composed candidate accepted by actual Techsafe v2 preparation as one equipment list; active coverage remains preserved. Authorized envelope fields are synthetic test data only.');
 }
-console.log('Draft candidate passed: one final equipment list from original approval plus eight applied changes, proven removals/additions, stored unit prices, readiness/minimum/opt-out/misc rules, no financial/cost reads and no partial or empty quote candidates.');
+console.log('Draft candidate passed: one final equipment list from original approval plus eight applied changes, proven removals/additions, stored unit prices, precompletion/minimum/opt-out/misc rules, no financial/cost reads and no partial or empty quote candidates.');
+

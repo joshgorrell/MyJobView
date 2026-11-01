@@ -36,8 +36,10 @@ export async function testCandidateInputs(f){
  assert.equal(await read(id(999)),null);assert.equal(await read(connection,id(999)),null);
  await db.query("SELECT set_config('test.actor',$1,false)",[outsider]);assert.equal(await read(),null);await db.query("SELECT set_config('test.actor',$1,false)",[actor]);
  for(const role of ['anon','authenticated','service_role']){await db.exec('SAVEPOINT role_test;SET LOCAL ROLE '+role);await assert.rejects(read(),e=>e.code==='42501');await db.exec('ROLLBACK TO SAVEPOINT role_test');}
- // Verify early readiness rejects before approval lookup.
- await db.exec('SAVEPOINT early');await db.exec("UPDATE sales_orders SET status='active';UPDATE projects SET substantial_completion_date=NULL;CREATE OR REPLACE FUNCTION techsafe_source.read_portal_approval_equipment_basis(p_connection uuid,p_order uuid) RETURNS jsonb LANGUAGE plpgsql STABLE SET search_path='' AS $$BEGIN RAISE EXCEPTION 'Approval lookup must not run';END$$;");assert.equal(await read(),null);await db.exec('ROLLBACK TO SAVEPOINT early');
+ // Supported early orders assemble the same approved applied equipment.
+ for(const status of ['pending_deposit','pending_po','planning','active']){await db.exec('SAVEPOINT precompletion');await db.query('UPDATE sales_orders SET status=$1',[status]);await db.exec('UPDATE projects SET substantial_completion_date=CURRENT_DATE+100');const early=await read();assert.ok(early);const candidate=prepareTechsafeDraftCandidate(early,b);assert.equal(candidate.valid,true,JSON.stringify(candidate));assert.equal(candidate.content.orderStatus,'open');assert.deepEqual(candidate.content.lines,prepared.content.lines);await db.exec('ROLLBACK TO SAVEPOINT precompletion');}
+ // Unsupported order states still reject before approval lookup.
+ await db.exec('SAVEPOINT early');await db.exec("UPDATE sales_orders SET status='unknown';UPDATE projects SET substantial_completion_date=NULL;CREATE OR REPLACE FUNCTION techsafe_source.read_portal_approval_equipment_basis(p_connection uuid,p_order uuid) RETURNS jsonb LANGUAGE plpgsql STABLE SET search_path='' AS $$BEGIN RAISE EXCEPTION 'Approval lookup must not run';END$$;");assert.equal(await read(),null);await db.exec('ROLLBACK TO SAVEPOINT early');
  // Oversized history must be rejected from counters before any fact rehash.
  await db.exec('SAVEPOINT budget');await db.query("INSERT INTO proposal_line_items(organization_id,proposal_id,product_id,item_type,quantity,unit_price,is_customer_supplied,description,is_hidden) SELECT $1,$2,$3,'material',1,800,false,repeat('X',12000),false FROM generate_series(1,20)",[org,proposal,product]);
  const large=await begin();assert.ok(large);assert.equal(await finish(large),large);
@@ -48,5 +50,6 @@ export async function testCandidateInputs(f){
  const attrs=(await db.query("SELECT prosecdef,provolatile,proconfig FROM pg_proc WHERE oid='techsafe_source.read_draft_candidate_inputs(uuid,uuid)'::regprocedure")).rows[0];assert.equal(attrs.prosecdef,false);assert.equal(attrs.provolatile,'s');assert.deepEqual(attrs.proconfig,['search_path=""']);
  const before=JSON.stringify((await db.query('SELECT to_jsonb(so) AS row FROM sales_orders so')).rows);await read();assert.equal(JSON.stringify((await db.query('SELECT to_jsonb(so) AS row FROM sales_orders so')).rows),before);
  await db.exec('ROLLBACK');
- console.log('Candidate input bundle passed: bound ready-order original/current/pair reads in one statement, direct/applied preparation, byte metadata integrity/no backfill, parity with existing pair validation, missing/corrupt/oversized/early/health/tenant/API holds and no source writes.');
+ console.log('Candidate input bundle passed: bound ready-order original/current/pair reads in one statement, direct/applied preparation, byte metadata integrity/no backfill, parity with existing pair validation, missing/corrupt/oversized/unsupported/health/tenant/API holds and no source writes.');
 }
+

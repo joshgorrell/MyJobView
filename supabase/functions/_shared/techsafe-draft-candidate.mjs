@@ -13,7 +13,7 @@ export function prepareTechsafeDraftCandidate(input,binding){
   const model=input?.currentModel;
   const readiness=assessDraftEligibility(model);
   if(!readiness.eligible)stop(readiness.reason);
-  // Do not inspect an early order's approval or application history.
+  // Supported early orders still require full approval/application evidence.
   const basis=input.basis,pairs=input.pairs;
   const connection=assessApprovedRowsConnection({currentModel:model,basis,pairs},binding);
   if(!connection.approvedRowsConnected)stop(connection.issues[0]?.code??'approved_rows_not_connected');
@@ -40,7 +40,7 @@ export function prepareTechsafeDraftCandidate(input,binding){
     salesPriceResolved:price.salesPriceResolved,unitSalePrice:price.unitSalePrice};
   });
   const prepared=prepareOrderContent({organizationId:model.organizationId,currency:model.currency,order:model.order,customer:model.customer,
-   completion:model.completion,site:model.site,minimumUnitValueCents:model.minimumUnitValueCents,lines});
+   site:model.site,minimumUnitValueCents:model.minimumUnitValueCents,lines});
   result.excluded=prepared.excluded;result.issues=prepared.issues;
   if(!prepared.valid)return result;
   if(!prepared.content.lines.length){result.issues.push({code:'no_eligible_equipment'});return result;}
@@ -49,3 +49,4 @@ export function prepareTechsafeDraftCandidate(input,binding){
  // A prepared business candidate is still not an authorized source envelope.
  return result;
 }
+
