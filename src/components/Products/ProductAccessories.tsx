@@ -91,9 +91,18 @@ export default function ProductAccessories({ productId, readOnly = false, summar
           const change = (key: string, value: any) => setDrafts(current => ({ ...current, [row.id]: { ...draft, [key]: value } }));
           const preview = accessoryPricing({ ...row, ...draft, unit_price_override: draft.unit_price_override === '' ? null : draft.unit_price_override, labor_hours_override: draft.labor_hours_override === '' ? null : draft.labor_hours_override, labor_rate_override: draft.labor_rate_override === '' ? null : draft.labor_rate_override }, parentQuantity);
           return <article key={row.id} className="border rounded-lg p-3 space-y-2">
-            <div className="flex justify-between gap-2"><strong className="text-sm">{row.accessory.name || row.accessory.manufacturer_model_number}</strong><span className="text-sm font-semibold">{money(preview.total)}</span></div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <strong className="text-sm">{row.accessory.name || row.accessory.manufacturer_model_number}</strong>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${draft.is_default_selected ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>{draft.is_default_selected ? 'Default' : 'Optional'}</span>
+              </div>
+              <span className="text-sm font-semibold shrink-0">{money(preview.total)}</span>
+            </div>
             {canEdit ? <>
-              <label className="text-xs flex items-center gap-2"><input type="checkbox" checked={draft.is_default_selected} onChange={e => change('is_default_selected', e.target.checked)} />Selected by default</label>
+              <label className="text-xs flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <input type="checkbox" checked={!!draft.is_default_selected} onChange={e => change('is_default_selected', e.target.checked)} />
+                <span><strong>Include by default</strong><span className="block text-gray-500">Unchecked = optional; checked = preselected when this product is added.</span></span>
+              </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{[['quantity', 'Qty per item', 1], ['unit_price_override', 'Unit price', price.price], ['labor_hours_override', 'Labor hours / unit', price.hours], ['labor_rate_override', 'Labor rate / hour', price.rate]].map(([key, label, fallback]) => <label key={String(key)} className="text-xs">{label}<input type="number" aria-label={`${label} — ${row.accessory.name || row.accessory.manufacturer_model_number}`} min={key === 'quantity' ? 0.001 : 0} step="any" value={draft[String(key)]} placeholder={String(fallback)} onChange={e => change(String(key), e.target.value)} className="w-full border rounded p-2 text-sm mt-1" /></label>)}</div>
               <p className="text-xs text-gray-500">Blank price/labor fields use catalog defaults. Labor: {row.accessory.labor_phases?.name || 'No phase'} · {money(preview.labor)}. Set hours to 0 to remove labor from this accessory.</p>
               <div className="flex gap-3 text-sm"><button type="button" disabled={!drafts[row.id] || !!saving} onClick={() => save(row)} className="text-blue-700 disabled:text-gray-400">{saving === row.id ? 'Saving…' : 'Save accessory'}</button><button type="button" disabled={!!saving} onClick={() => change('labor_hours_override', 0)} className="text-gray-700">Remove labor</button><button type="button" disabled={!!saving} onClick={async () => { if ((await requestConfirmation('Remove this accessory link? The catalog product is preserved.', { theme: 'amber' }))) void mutate(row.id); }} className="text-red-700">Remove accessory</button></div>
