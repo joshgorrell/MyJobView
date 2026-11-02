@@ -44,13 +44,57 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
   type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders';
   const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders'];
+  const adminGroups = [
+    { id: 'company', label: 'Company & Branding', description: 'Identity, offices, portal' },
+    { id: 'people', label: 'People & Access', description: 'Team, roles, security' },
+    { id: 'sales', label: 'Sales & Finance', description: 'Proposals, tax, targets' },
+    { id: 'operations', label: 'Operations', description: 'Jobs, labor, time' },
+    { id: 'communications', label: 'Communications', description: 'Email, messages, feedback' },
+    { id: 'system', label: 'System & Tools', description: 'Integrations, catalogs' },
+  ] as const;
+  const adminItems: { id: SettingsTab; label: string; group: typeof adminGroups[number]['id']; visible?: boolean }[] = [
+    { id: 'company', label: 'Company Settings', group: 'company' },
+    { id: 'cards', label: 'Business Cards', group: 'company' },
+    { id: 'users', label: 'Users', group: 'people' },
+    { id: 'sessions', label: 'Sessions', group: 'people' },
+    { id: 'roles', label: 'Roles', group: 'people' },
+    { id: 'permissions', label: 'Permissions', group: 'people' },
+    { id: 'departments', label: 'Departments', group: 'people' },
+    { id: 'rewards', label: 'Points & Rewards', group: 'people' },
+    { id: 'kiosk', label: 'Kiosk', group: 'people', visible: isAdminOrManager },
+    { id: 'proposals', label: 'Proposal Templates', group: 'sales' },
+    { id: 'salestax', label: 'Sales Tax', group: 'sales' },
+    { id: 'salestargets', label: 'Sales Targets', group: 'sales' },
+    { id: 'contracts', label: 'Contracts', group: 'sales' },
+    { id: 'work_orders', label: 'Work Orders', group: 'operations', visible: profile?.role === 'admin' },
+    { id: 'labor', label: 'Labor Phases', group: 'operations' },
+    { id: 'timeclock', label: 'Time Clock', group: 'operations' },
+    { id: 'travel', label: 'Travel Bonus', group: 'operations' },
+    { id: 'priorities', label: 'Priorities', group: 'operations' },
+    { id: 'emails', label: 'Email Templates', group: 'communications' },
+    { id: 'messages', label: 'Company Messages', group: 'communications' },
+    { id: 'suggestions', label: 'Suggestions', group: 'communications' },
+    { id: 'integrations', label: 'Integrations', group: 'system' },
+    { id: 'products', label: 'Products', group: 'system', visible: jobModuleEnabled },
+    { id: 'catalog', label: 'Catalog', group: 'system' },
+    { id: 'classes', label: 'Classes', group: 'system' },
+    { id: 'contact_import', label: 'Contact Import', group: 'system', visible: profile?.role === 'admin' },
+    { id: 'orphaned', label: 'Orphaned Records', group: 'system' },
+  ];
   const getTabFromUrl = (): SettingsTab => {
     const tab = new URLSearchParams(window.location.search).get('settingsTab') as SettingsTab | null;
     return tab && validTabs.includes(tab) ? tab : ((initialTab as SettingsTab) || 'users');
   };
   const [activeTab, setActiveTabState] = useState<SettingsTab>(getTabFromUrl);
+  const groupForTab = (tab: SettingsTab) => adminItems.find(item => item.id === tab)?.group || 'people';
+  const [selectedGroup, setSelectedGroup] = useState<typeof adminGroups[number]['id']>(() => groupForTab(getTabFromUrl()));
+  const [settingsSearch, setSettingsSearch] = useState('');
+  const visibleSettings = adminItems.filter(item => item.visible !== false && (settingsSearch.trim()
+    ? `${item.label} ${adminGroups.find(group => group.id === item.group)?.label || ''}`.toLowerCase().includes(settingsSearch.trim().toLowerCase())
+    : item.group === selectedGroup));
   const setActiveTab = useCallback((tab: SettingsTab) => {
     setActiveTabState(tab);
+    setSelectedGroup(groupForTab(tab));
     const url = new URL(window.location.href);
     if (tab === 'users') url.searchParams.delete('settingsTab');
     else url.searchParams.set('settingsTab', tab);
@@ -58,7 +102,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   }, []);
 
   useEffect(() => {
-    const handlePopState = () => setActiveTabState(getTabFromUrl());
+    const handlePopState = () => { const tab = getTabFromUrl(); setActiveTabState(tab); setSelectedGroup(groupForTab(tab)); };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [initialTab]);
@@ -74,353 +118,34 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
       </div>
 
       <div className="bg-canvas rounded-lg shadow-sm border-2 border-subtle">
-        <div className="border-b border-subtle bg-canvas">
-          <nav className="flex gap-2 sm:gap-4 px-4 sm:px-6 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'users'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Users</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('sessions')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'sessions'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Sessions</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('roles')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'roles'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Roles</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('permissions')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'permissions'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Permissions</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('cards')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'cards'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Business Cards</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('company')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'company'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Company</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('departments')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'departments'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Departments</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('integrations')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'integrations'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Plug className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Integrations</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('salestax')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'salestax'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Sales Tax</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('salestargets')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'salestargets'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Sales Targets</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('suggestions')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'suggestions'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Suggestions</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('contracts')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'contracts'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Contracts</span>
-              </div>
-            </button>
-            {jobModuleEnabled && (
-              <button
-                onClick={() => setActiveTab('products')}
-                className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                  activeTab === 'products'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-secondary hover:text-primary'
-                }`}
-              >
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <Package className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span>Products</span>
-                </div>
+        <div className="border-b border-subtle bg-canvas p-3 sm:p-5 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <label className="block w-full sm:max-w-sm">
+              <span className="sr-only">Search admin settings</span>
+              <input type="search" value={settingsSearch} onChange={e => setSettingsSearch(e.target.value)}
+                placeholder="Search admin settings…" className="w-full rounded-lg border border-subtle bg-canvas px-3 py-2 text-primary" />
+            </label>
+            <span className="text-xs text-muted">Choose a category, then a setting</span>
+          </div>
+          <nav aria-label="Admin categories" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            {adminGroups.map(group => (
+              <button key={group.id} type="button" onClick={() => { setSelectedGroup(group.id); setSettingsSearch(''); }}
+                aria-pressed={selectedGroup === group.id}
+                className={`rounded-xl border px-3 py-3 text-left transition-colors ${selectedGroup === group.id ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary hover:bg-surface-secondary hover:text-primary'}`}>
+                <span className="block text-sm font-semibold">{group.label}</span>
+                <span className="mt-1 block text-xs opacity-75">{group.description}</span>
               </button>
-            )}
-            <button
-              onClick={() => setActiveTab('catalog')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'catalog'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Tags className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Catalog</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('rewards')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'rewards'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Award className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Points & Rewards</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('priorities')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'priorities'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Flag className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Priorities</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('emails')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'emails'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Email Templates</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('messages')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'messages'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Megaphone className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Company Messages</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('travel')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'travel'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Travel Bonus</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('timeclock')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'timeclock'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Time Clock</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('proposals')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'proposals'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Proposals</span>
-              </div>
-            </button>
-            {profile?.role === 'admin' && <button onClick={() => setActiveTab('work_orders')} className={`px-4 py-3 whitespace-nowrap text-sm ${activeTab === 'work_orders' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-secondary'}`}>Work Orders</button>}
-            <button
-              onClick={() => setActiveTab('labor')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'labor'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Labor Phases</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('classes')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'classes'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Tags className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Classes</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('orphaned')}
-              className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                activeTab === 'orphaned'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-secondary hover:text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Orphaned Records</span>
-              </div>
-            </button>
-            {isAdminOrManager && (
-              <button
-                onClick={() => setActiveTab('kiosk')}
-                className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                  activeTab === 'kiosk'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-secondary hover:text-primary'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Monitor className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span>Kiosk</span>
-                </div>
+            ))}
+          </nav>
+          <nav aria-label="Admin settings" className="flex flex-wrap gap-2">
+            {visibleSettings.map(item => (
+              <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
+                aria-current={activeTab === item.id ? 'page' : undefined}
+                className={`rounded-lg border px-3 py-2 text-sm transition-colors ${activeTab === item.id ? 'border-blue-500 bg-blue-500/10 font-semibold text-primary' : 'border-subtle text-secondary hover:text-primary'}`}>
+                {item.label}
               </button>
-            )}
-            {profile?.role === 'admin' && (
-              <button
-                onClick={() => setActiveTab('contact_import')}
-                className={`px-3 sm:px-4 py-3 sm:py-4 font-medium transition-all relative whitespace-nowrap text-sm sm:text-base ${
-                  activeTab === 'contact_import'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-secondary hover:text-primary'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span>Import Customers</span>
-                </div>
-              </button>
-            )}
+            ))}
+            {visibleSettings.length === 0 && <p className="py-2 text-sm text-muted">No settings match your search.</p>}
           </nav>
         </div>
 
