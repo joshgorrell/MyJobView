@@ -1253,7 +1253,7 @@ export function CompanySettings() {
 
         <button
           onClick={saveSettings}
-          disabled={saving}
+          disabled={saving || loading || !!settingsLoadError || !settings}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
         >
           <Save className="w-4 h-4" />
