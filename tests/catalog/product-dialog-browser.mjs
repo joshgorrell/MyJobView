@@ -30,7 +30,10 @@ for(const width of [320,390,768,1440]) {
  await productPage.goto('http://127.0.0.1:5173/tests/catalog/product-dialog.html?product');
  await productPage.getByRole('heading',{name:'QN85Q8F',exact:true}).waitFor();
  const description=productPage.getByText(productDescription,{exact:true});
- assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'3','Overview shows a concise preview');
+ assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Overview displays the full-width, unclamped description');
+ assert.ok((await description.innerText()).endsWith('DESCRIPTION END'),'Overview retains the entire description');
+ assert.ok(await productPage.getByRole('heading',{name:'Product information'}).isVisible(),'Product identity is displayed beside the photo');
+ assert.ok(await productPage.getByRole('heading',{name:'Pricing'}).isVisible(),'Pricing card is visible');
  await productPage.getByRole('button',{name:'Details',exact:true}).click();
  await productPage.getByRole('heading',{name:'Sales description',exact:true}).waitFor();
  assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Details exposes the full description');
