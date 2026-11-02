@@ -112,12 +112,7 @@ export function UserSessionsDashboard() {
     setSaving(true); setError('');
     try {
       const existing = nameMap.get(s.device_signature);
-      if (!existing) {
-        const { data, error: insertError } = await supabase.from('device_nicknames').insert({ device_signature: s.device_signature, nickname: name.trim(), organization_id: profile!.organization_id, user_id: s.user_id }).select('id, device_signature, nickname').single();
-        if (insertError) throw insertError;
-        if (!data) throw new Error('The device name was not saved.');
-        setNicknames(current => [...current, data]); setEditing(null); return;
-      }
+      if (!existing) throw new Error('Device record is not registered. Naming is unavailable for this device.');
       const { data, error: saveError } = await supabase.from('device_nicknames').update({ nickname: name.trim() }).eq('id', existing.id).eq('organization_id', profile!.organization_id).select('id, device_signature, nickname').single();
       if (saveError) throw saveError;
       if (!data) throw new Error('The device name was not saved.');
