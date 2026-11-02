@@ -43,8 +43,8 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   const { companySettings, profile } = useAuth();
   const jobModuleEnabled = companySettings?.job_module_enabled ?? false;
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders' | 'portal' | 'billing' | 'automation';
-  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders', 'portal', 'billing', 'automation'];
+  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders' | 'portal' | 'billing' | 'automation' | 'email_config';
+  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders', 'portal', 'billing', 'automation', 'email_config'];
   const adminGroups = [
     { id: 'company', label: 'Company & Branding', description: 'Identity, offices, portal' },
     { id: 'people', label: 'People & Access', description: 'Team, roles, security' },
@@ -76,6 +76,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'travel', label: 'Travel Bonus', group: 'operations' },
     { id: 'priorities', label: 'Priorities', group: 'operations' },
     { id: 'emails', label: 'Email Templates', group: 'communications' },
+    { id: 'email_config', label: 'Email Configuration', group: 'communications' },
     { id: 'messages', label: 'Company Messages', group: 'communications' },
     { id: 'suggestions', label: 'Suggestions', group: 'communications' },
     { id: 'integrations', label: 'Integrations', group: 'system' },
@@ -164,6 +165,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
             {activeTab === 'company' && <CompanySettings />}
             {activeTab === 'billing' && <CompanySettings section="billing" />}
             {activeTab === 'automation' && <CompanySettings section="automation" />}
+            {activeTab === 'email_config' && <CompanySettings section="email" />}
             {activeTab === 'portal' && <CustomerPortalSettings />}
             {activeTab === 'departments' && <DepartmentManager />}
             {activeTab === 'integrations' && <IntegrationsSettings />}
