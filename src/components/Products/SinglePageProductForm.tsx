@@ -60,7 +60,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>('overview');
   const selectEditorTab = (tab: typeof editorTab) => {
     setEditorTab(tab);
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   };
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
