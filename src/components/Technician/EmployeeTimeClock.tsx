@@ -5,6 +5,7 @@ import { Clock, Briefcase, History } from 'lucide-react';
 import { DailyClock } from './DailyClock';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { WorkOrderTimeControl } from '../Production/WorkOrderTimeControl';
+import { ProjectTimeClock } from './ProjectTimeClock';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 
 type TimeSection = 'daily' | 'job' | 'mine';
@@ -81,7 +82,8 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
       {current === 'job' && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Job Clock</h2>
-          <p className="text-sm text-gray-600">Job time is recorded against a project or service work order. It does not start or stop your daily payroll clock.</p>
+          <ProjectTimeClock onChanged={() => setHistoryRevision(value => value + 1)} />
+          <p className="text-sm text-gray-600">Clock directly into any open project, even without an assigned work order. Daily payroll time remains separate.</p>
           {jobsLoading && <p className="text-sm text-gray-500">Loading assigned work orders…</p>}
           {jobsError && <p role="alert" className="text-sm text-red-700">Unable to load assigned work orders.</p>}
           {!jobsLoading && !jobsError && (
