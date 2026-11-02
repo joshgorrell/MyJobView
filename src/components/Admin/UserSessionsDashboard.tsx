@@ -96,7 +96,7 @@ export function UserSessionsDashboard() {
     sessions.forEach(s => { const key = sessionDeviceKey(s); result.set(key, [...(result.get(key) || []), s]); });
     return [...result.entries()];
   }, [sessions]);
-  const historyRows = sessions.filter(s => Date.parse(s.last_activity) >= Date.now() - historyDays * 86400000 && matches(s));
+  const historyRows = sessions.filter(s => Date.parse(s.session_start) >= Date.now() - historyDays * 86400000 && matches(s));
   const online = sessions.filter(s => sessionStatus(s) === 'Online');
   const onlineUsers = new Set(online.map(s => s.user_id));
   const currentDevices = groups.filter(([, rows]) => rows[0].device_signature);
