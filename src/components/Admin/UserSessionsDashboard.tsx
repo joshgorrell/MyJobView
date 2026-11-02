@@ -6,6 +6,7 @@ import { sessionDeviceKey, sessionStatus } from '../../lib/sessionDevices';
 const AdvancedTools = lazy(() => import('./UserSessionsViewerEnhanced').then(m => ({ default: m.SessionAdvancedTools })));
 type Person = { id: string; full_name: string; email: string; role: string; is_active: boolean };
 type Session = { id: string; user_id: string; device_signature: string | null; device_type: string | null; browser_name: string | null; os_name: string | null; device_model: string | null; session_start: string; session_end: string | null; last_activity: string; is_active: boolean; city: string | null; region: string | null; ip_city: string | null; ip_region: string | null; ip_address: string | null; current_page: string | null };
+type PageVisit = { page_key: string; user_id: string; visited_at: string };
 type Nickname = { id: string; device_signature: string; nickname: string };
 type IPLabel = { ip_address: string; nickname: string; location_classification: 'office' | 'remote' | 'unknown' };
 const panel = 'rounded-xl border border-subtle bg-surface p-4';
@@ -25,6 +26,8 @@ export function UserSessionsDashboard() {
   const { profile } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [pageVisits, setPageVisits] = useState<PageVisit[]>([]);
+  const [pageDays, setPageDays] = useState(7);
   const [nicknames, setNicknames] = useState<Nickname[]>([]);
   const [ipLabels, setIpLabels] = useState<IPLabel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +103,8 @@ export function UserSessionsDashboard() {
   const online = sessions.filter(s => sessionStatus(s) === 'Online');
   const onlineUsers = new Set(online.map(s => s.user_id));
   const currentDevices = groups.filter(([, rows]) => rows[0].device_signature);
+  const pageCutoff = Date.now() - pageDays * 86400000;
+  const pageStats = useMemo(() => { const pages = new Map<string, { visits: number; users: Set<string> }>(); pageVisits.filter(v => Date.parse(v.visited_at) >= pageCutoff).forEach(v => { const item = pages.get(v.page_key) || { visits: 0, users: new Set<string>() }; item.visits++; item.users.add(v.user_id); pages.set(v.page_key, item); }); return [...pages.entries()].map(([page, stats]) => ({ page, visits: stats.visits, users: stats.users.size })).sort((a,b) => b.visits-a.visits); }, [pageVisits, pageCutoff]);
   const usageCutoff = Date.now() - usageDays * 86400000;
   const usagePeople = people.filter(p => p.is_active !== false).map(p => {
     const rows = sessions.filter(s => s.user_id === p.id && Date.parse(s.session_start) >= usageCutoff);
