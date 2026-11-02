@@ -1,6 +1,6 @@
 import { WorkOrderSettings } from './WorkOrderSettings';
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Settings as SettingsIcon, Users, Building2, CreditCard, Plug, Lightbulb, Package, Award, Flag, Mail, Shield, Lock, Receipt, Layers, FileText, Clock, Wrench, Tags, AlertCircle, Activity, Megaphone, MapPin, Target, Monitor, Upload } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const UserManagement = lazy(() => import('./UserManagement').then(m => ({ default: m.UserManagement })));
