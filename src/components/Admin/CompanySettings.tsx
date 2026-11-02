@@ -44,16 +44,6 @@ export function CompanySettings() {
   const [ccFeeLabel, setCcFeeLabel] = useState('Credit Card Convenience Fee');
   const [defaultInvoiceTermsAndConditions, setDefaultInvoiceTermsAndConditions] = useState('');
 
-  const [portalSecurityContractsEnabled, setPortalSecurityContractsEnabled] = useState(true);
-  const [portalProposalsEnabled, setPortalProposalsEnabled] = useState(true);
-  const [portalProjectsEnabled, setPortalProjectsEnabled] = useState(false);
-  const [portalAppointmentsEnabled, setPortalAppointmentsEnabled] = useState(false);
-  const [portalInvoicesEnabled, setPortalInvoicesEnabled] = useState(false);
-  const [portalMessagesEnabled, setPortalMessagesEnabled] = useState(false);
-  const [portalVipServicesEnabled, setPortalVipServicesEnabled] = useState(false);
-  const [portalTasksEnabled, setPortalTasksEnabled] = useState(true);
-  const [portalSalesOrdersEnabled, setPortalSalesOrdersEnabled] = useState(true);
-  const [enablePublicVipSignup, setEnablePublicVipSignup] = useState(false);
 
   // Project Task Auto-Completion Settings
   const [autoCompletionEnabled, setAutoCompletionEnabled] = useState(true);
