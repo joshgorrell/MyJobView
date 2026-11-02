@@ -236,6 +236,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
         onClose={() => setIsEditing(false)}
         onSave={() => {
           setIsEditing(false);
+          void loadProduct();
           onSaved?.();
         }}
       />
