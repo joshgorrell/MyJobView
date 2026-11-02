@@ -838,7 +838,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                 {/* Filter Panel Dropdown - shared for mobile and desktop */}
                 {showFilterPanel && (
-                  <div className="filter-panel absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-80 bg-surface border border-subtle rounded-lg shadow-xl z-50">
+                  <div className="filter-panel absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-80 max-h-[calc(100dvh-8rem)] flex flex-col bg-surface border border-subtle rounded-lg shadow-xl z-50">
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-subtle">
                       <h3 className="text-sm font-semibold text-primary">Filter Proposals</h3>
@@ -851,7 +851,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     </div>
 
                     {/* Filter Content */}
-                    <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    <div className="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
                       {/* Status Filter */}
                       <div>
                         <label className="block text-xs font-medium text-muted mb-2">Status</label>
@@ -1038,7 +1038,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
 
                 {/* Filter Panel Dropdown - shared */}
                 {showFilterPanel && (
-                  <div className="filter-panel absolute right-0 top-full mt-2 w-screen max-w-[320px] sm:w-80 bg-surface border border-subtle rounded-lg shadow-xl z-50">
+                  <div className="filter-panel absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-80 max-h-[calc(100dvh-8rem)] flex flex-col bg-surface border border-subtle rounded-lg shadow-xl z-50">
                     {/* Header */}
                     <div className="flex items-center justify-between p-4 border-b border-subtle">
                       <h3 className="text-sm font-semibold text-primary">Filter Proposals</h3>
@@ -1051,7 +1051,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
                     </div>
 
                     {/* Filter Content */}
-                    <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    <div className="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
                       {/* Status Filter */}
                       <div>
                         <label className="block text-xs font-medium text-muted mb-2">Status</label>
