@@ -728,7 +728,6 @@ export default function ProductsManagement() {
 
       {showForm && (
         <SinglePageProductForm
-          initialTab={initialProductEditTab}
           productId={editingProductId || undefined}
           duplicateFromId={duplicateProductId || undefined}
           readOnly={!canEdit}
