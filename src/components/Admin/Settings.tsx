@@ -1,8 +1,8 @@
-import { WorkOrderSettings } from './WorkOrderSettings';
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
+const WorkOrderSettings = lazy(() => import('./WorkOrderSettings').then(m => ({ default: m.WorkOrderSettings })));
 const UserManagement = lazy(() => import('./UserManagement').then(m => ({ default: m.UserManagement })));
 const UserSessionsViewerEnhanced = lazy(() => import('./UserSessionsViewerEnhanced').then(m => ({ default: m.UserSessionsViewerEnhanced })));
 const CustomerPortalSettings = lazy(() => import('./CustomerPortalSettings').then(m => ({ default: m.CustomerPortalSettings })));
