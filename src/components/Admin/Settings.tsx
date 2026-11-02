@@ -1,8 +1,8 @@
-import { WorkOrderSettings } from './WorkOrderSettings';
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
+const WorkOrderSettings = lazy(() => import('./WorkOrderSettings').then(m => ({ default: m.WorkOrderSettings })));
 const UserManagement = lazy(() => import('./UserManagement').then(m => ({ default: m.UserManagement })));
 const UserSessionsViewerEnhanced = lazy(() => import('./UserSessionsViewerEnhanced').then(m => ({ default: m.UserSessionsViewerEnhanced })));
 const CustomerPortalSettings = lazy(() => import('./CustomerPortalSettings').then(m => ({ default: m.CustomerPortalSettings })));
@@ -117,7 +117,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-primary mb-1 flex items-center gap-2">
           <SettingsIcon className="w-6 h-6" />
-          Settings
+          Dealer Admin
         </h2>
         <p className="text-muted">Manage users, business cards, and company information</p>
       </div>
