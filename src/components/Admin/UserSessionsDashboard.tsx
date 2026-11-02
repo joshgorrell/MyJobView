@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
-import { Monitor, Smartphone, Tablet, RefreshCw, Search, Settings, ChevronDown, ChevronRight, Pencil, Check, X } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, RefreshCw, Search, Settings, ChevronDown, ChevronRight, Pencil, Check, X, HelpCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { sessionDeviceKey, sessionStatus } from '../../lib/sessionDevices';
@@ -147,7 +147,7 @@ export function UserSessionsDashboard() {
     </div>;
   }
   return <div className="space-y-4 text-primary">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-semibold">User Activity</h2><p className="mt-1 text-sm text-muted">See who is online, review employee access, and explore recent usage.</p></div><button className={button} disabled={refreshing} onClick={() => void load()}><RefreshCw className={`mr-2 inline h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh</button></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-semibold">User Activity</h2><details className="relative inline-block"><summary className="cursor-pointer text-muted" aria-label="About User Activity"><HelpCircle className="inline h-4 w-4" /></summary><div className="absolute left-0 top-6 z-20 w-[min(85vw,340px)] rounded-lg border border-subtle bg-surface p-3 text-sm shadow-xl"><p className="font-semibold">About User Activity</p><p className="mt-2">Online means activity within six minutes; otherwise Offline. Browser presence is not proof of work time. Employee and device history reflects recorded sessions. Page Usage counts navigation events only after tracking is deployed; it does not record clicks or form contents. Data refreshes approximately once per minute while visible.</p></div></details><p className="mt-1 text-sm text-muted">See who is online, review employee access, and explore recent usage.</p></div><button className={button} disabled={refreshing} onClick={() => void load()}><RefreshCw className={`mr-2 inline h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Refresh</button></header>
     {error && <div role="alert" className="rounded-lg border border-danger p-3 text-sm text-danger">{error}</div>}
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{[['Online people', onlineUsers.size], ['Online browsers', new Set(online.map(sessionDeviceKey)).size], ['Browsers seen in 30 days', currentDevices.length]].map(([label, count]) => <div key={label} className={panel}><p className="text-xs text-muted">{label}</p><p className="mt-1 text-2xl font-semibold">{count}</p></div>)}</div>
     <div className={panel}>
