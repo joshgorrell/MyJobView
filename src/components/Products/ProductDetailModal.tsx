@@ -15,6 +15,7 @@ interface ProductDetailModalProps {
   productId: string;
   onClose: () => void;
   onSaved?: () => void;
+  onEdit?: () => void;
   onDuplicate?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
@@ -261,7 +262,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
             <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
               {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
-            {canEdit && onEdit && (
+            {canEdit && (
               <button type="button" onClick={() => setIsEditing(true)} aria-label="Edit product" title="Edit product"
                 className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit className="w-4 h-4" />
