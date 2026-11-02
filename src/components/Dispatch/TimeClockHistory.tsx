@@ -1129,7 +1129,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           }`}
         >
           <Clock className="w-4 h-4" />
-          Clock History
+          Daily Clock History
         </button>
         <button
           onClick={() => setActiveTab('job_time')}
@@ -1140,7 +1140,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           }`}
         >
           <LayoutList className="w-4 h-4" />
-          Job Time History
+          Job Clock History
         </button>
         <button
           onClick={() => setActiveTab('sessions')}
@@ -1151,14 +1151,14 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           }`}
         >
           <Wrench className="w-4 h-4" />
-          Shop &amp; Training
+          My Time
         </button>
       </div>
 
       {/* Job Time History Tab */}
       {activeTab === 'job_time' && <JobTimeHistory />}
 
-      {/* Internal Sessions Management Tab */}
+      {/* My Time: internal shop and training sessions; additional employee records will be consolidated here. */}
       {activeTab === 'sessions' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <InternalSessionsManagement />
