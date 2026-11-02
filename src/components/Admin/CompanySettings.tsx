@@ -10,7 +10,7 @@ import ConfirmModal from '../ui/ConfirmModal';
 import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCardIdentity';
 import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
-export function CompanySettings() {
+export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' }) {
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -737,12 +737,13 @@ export function CompanySettings() {
     />
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Company Settings</h2>
-        <p className="text-gray-300">Manage company information displayed on business cards</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">{section === 'billing' ? 'Billing & Payments' : section === 'automation' ? 'Operational Automation' : 'Company Settings'}</h2>
+        <p className="text-gray-300">{section === 'billing' ? 'Manage payment fees and recurring billing' : section === 'automation' ? 'Manage task, clock-out, and follow-up automation' : 'Manage company identity, branding, offices, and domain'}</p>
       </div>
 
       {settingsLoadError && <div role="alert" className="rounded-lg border border-red-500/40 bg-red-950/30 p-4 text-red-200"><p className="font-semibold">Company information could not be loaded. Saving is disabled to protect your existing settings.</p><p className="mt-1 text-sm break-words">{settingsLoadError}</p><button type="button" className="mt-3 rounded border border-red-400/50 px-3 py-1 text-sm" onClick={() => { setLoading(true); void loadSettings(); }}>Retry loading</button></div>}
-      <CompanyDirectorySetting />
+      {section === 'company' && <CompanyDirectorySetting />}
+      {section === 'company' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <Building2 className="w-5 h-5" />
@@ -1221,6 +1222,8 @@ export function CompanySettings() {
         </button>
       </div>
 
+      </>}
+      {section === 'billing' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <CreditCard className="w-5 h-5" />
@@ -1543,6 +1546,8 @@ export function CompanySettings() {
         </button>
       </div>
 
+      </>}
+      {section === 'automation' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">Operational Automation</h3>
         <p className="text-sm text-gray-600">Configure project task completion, clock-out, and customer follow-up rules.</p>
@@ -1790,6 +1795,8 @@ export function CompanySettings() {
         </button>
       </div>
 
+      </>}
+      {section === 'company' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
