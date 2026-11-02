@@ -2273,7 +2273,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         message="This item will show a placeholder in the catalog and documents. Add a photo now, or save without one if no useful photo exists."
         variant="warning" confirmLabel="Save without photo" cancelLabel="Add photo"
         onConfirm={() => { setShowMissingImagePrompt(false); void handleSave(); }}
-        onCancel={() => { setShowMissingImagePrompt(false); imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />
+        onCancel={() => { setShowMissingImagePrompt(false); selectEditorTab('overview'); setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }} />
     </div>
   );
 }
