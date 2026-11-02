@@ -2013,7 +2013,8 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
           ))}
         </div>
       </div>
-    </div>
+       </>}
+   </div>
     </>
   );
 }
