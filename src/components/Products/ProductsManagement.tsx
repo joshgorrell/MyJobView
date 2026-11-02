@@ -55,6 +55,7 @@ export default function ProductsManagement() {
   const [packagesKey, setPackagesKey] = useState(0);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
   const [returnToProductId, setReturnToProductId] = useState<string | null>(null);
+  const [initialProductEditTab, setInitialProductEditTab] = useState<'overview' | 'details' | 'instructions' | 'accessories'>('overview');
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [manufacturers, setManufacturers] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
@@ -728,6 +729,7 @@ export default function ProductsManagement() {
 
       {showForm && (
         <SinglePageProductForm
+          initialTab={initialProductEditTab}
           productId={editingProductId || undefined}
           duplicateFromId={duplicateProductId || undefined}
           readOnly={!canEdit}
@@ -843,7 +845,8 @@ export default function ProductsManagement() {
           productId={viewingProductId}
           onSaved={loadProducts}
           onClose={() => setViewingProductId(null)}
-          onEdit={() => {
+          onEdit={(tab) => {
+            setInitialProductEditTab(tab === 'history' ? 'overview' : tab);
             setEditingProductId(viewingProductId);
             setReturnToProductId(viewingProductId);
             setViewingProductId(null);
