@@ -1298,7 +1298,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           ))}
         </nav>
 
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-start">
+        <div ref={scrollContainerRef} role="tabpanel" aria-label={`${editorTab} product fields`} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-start content-start">
           {editorTab === 'overview' && (<React.Fragment>
           {/* AUTO-SAVE INFO */}
           {!readOnly && (
