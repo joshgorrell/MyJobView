@@ -59,7 +59,10 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Job Clock</h2>
           <p className="text-sm text-gray-600">Job time is recorded against a project or service work order. It does not start or stop your daily payroll clock.</p>
-          <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open Work Orders</button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => onNavigate('tech_center')} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open Technician Work Center</button>
+            <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">Browse Work Orders</button>
+          </div>
         </div>
       )}
       {current === 'mine' && (
