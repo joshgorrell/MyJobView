@@ -31,28 +31,29 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
   const [editError, setEditError] = useState('');
   const [draft, setDraft] = useState<ProductDetailPanelData | null>(null);
   const [draftNotes, setDraftNotes] = useState({ purchase: '', specifications: '', instructions: '' });
-  const startEditing = () => { setDraft(panelData); setDraftNotes({ purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
+  const startEditing = () => { if (!canEdit || !panelData) return; setDraft({ ...panelData }); setDraftNotes({ purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
   const cancelEditing = () => { setIsEditing(false); setDraft(null); setEditError(''); };
   const changeField = (key: 'modelNumber' | 'sku' | 'itemColor' | 'unitPrice' | 'cost' | 'quantity' | 'unit' | 'laborHours' | 'description', value: string) => {
     setDraft(prev => prev ? { ...prev, [key]: ['unitPrice','cost','quantity','laborHours'].includes(key) ? Number(value) : value } : prev);
   };
   const saveEdits = async () => {
-    if (!draft || savingEdits) return;
-    if (!draft.modelNumber?.trim() || !draft.sku?.trim() || draft.unitPrice < 0 || draft.cost < 0 || draft.quantity <= 0 || draft.laborHours < 0) {
+    if (!draft || savingEdits || !canEdit || !profile?.organization_id) return;
+    if (!draft.modelNumber?.trim() || !draft.sku?.trim() || !Number.isFinite(draft.unitPrice) || !Number.isFinite(draft.cost) || !Number.isFinite(draft.quantity) || !Number.isFinite(draft.laborHours) || draft.unitPrice < 0 || draft.cost < 0 || draft.quantity <= 0 || draft.laborHours < 0) {
       setEditError('Model, SKU, valid pricing, quantity and labor hours are required.');
       return;
     }
     setSavingEdits(true);
     setEditError('');
     try {
-      const { error } = await supabase.from('products').update({
+      const { data: updated, error } = await supabase.from('products').update({
         manufacturer_model_number: draft.modelNumber, sku: draft.sku, item_color: draft.itemColor,
         our_price: draft.unitPrice, cost: draft.cost, default_qty: draft.quantity,
         unit: draft.unit, default_labor_hours: draft.laborHours,
         sales_description: draft.description, purchase_description: draftNotes.purchase,
         specifications: draftNotes.specifications, default_install_task: draftNotes.instructions,
-      }).eq('id', productId).eq('organization_id', profile?.organization_id);
+      }).eq('id', productId).eq('organization_id', profile.organization_id).select('id').single();
       if (error) throw error;
+      if (!updated) throw new Error('Product update was not confirmed.');
       setIsEditing(false);
       setDraft(null);
       await loadProduct();
@@ -279,10 +280,10 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
           </div>
           <div className="contents">
             <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
-              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
+              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => { setEditError(''); setActiveTab(tab); }} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             {canEdit && (
-              <button type="button" onClick={startEditing} aria-label="Edit product" title="Edit product"
+              <button type="button" onClick={isEditing ? cancelEditing : startEditing} aria-label={isEditing ? 'Cancel editing' : 'Edit product'} title="Edit product"
                 className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit className="w-4 h-4" />
               </button>
