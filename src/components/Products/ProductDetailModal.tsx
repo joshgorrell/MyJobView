@@ -1,3 +1,4 @@
+import SinglePageProductForm from './SinglePageProductForm';
 import CatalogProductOverview from './CatalogProductOverview';
 import ProductAccessories from './ProductAccessories';
 import { useState, useEffect, useRef } from 'react';
@@ -13,19 +14,20 @@ import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 interface ProductDetailModalProps {
   productId: string;
   onClose: () => void;
-  onEdit?: () => void;
   onSaved?: () => void;
+  onEdit?: () => void;
   onDuplicate?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
 }
 
-export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: ProductDetailModalProps) {
+export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetailModalProps) {
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
   const [productStatus, setProductStatus] = useState<{is_active?: boolean; is_discontinued?: boolean}>({});
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'instructions' | 'accessories' | 'history'>('overview');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
   const [catalogNotes, setCatalogNotes] = useState<any>({});
@@ -227,6 +229,21 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
   if (!panelData) return null;
 
+  if (isEditing) {
+    return (
+      <SinglePageProductForm
+        productId={productId}
+        initialTab={activeTab === 'history' ? 'overview' : activeTab}
+        onClose={() => setIsEditing(false)}
+        onSave={() => {
+          setIsEditing(false);
+          void loadProduct();
+          onSaved?.();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
       <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-[calc(100dvh-2rem)] min-h-0">
@@ -245,6 +262,12 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
             <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
               {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
+            {canEdit && (
+              <button type="button" onClick={() => setIsEditing(true)} aria-label="Edit product" title="Edit product"
+                className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
             <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
             </button>
@@ -322,15 +345,6 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
         {/* Footer */}
         <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-          {canEdit && onEdit ? (
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              <Edit className="w-3.5 h-3.5" />
-              Edit Product
-            </button>
-          ) : <div />}
           <button
             onClick={onClose}
             className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
