@@ -1,4 +1,3 @@
-import SinglePageProductForm from './SinglePageProductForm';
 import CatalogProductOverview from './CatalogProductOverview';
 import ProductAccessories from './ProductAccessories';
 import { useState, useEffect, useRef } from 'react';
@@ -28,6 +27,38 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
   const [productStatus, setProductStatus] = useState<{is_active?: boolean; is_discontinued?: boolean}>({});
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [draft, setDraft] = useState<ProductDetailPanelData | null>(null);
+  const startEditing = () => { setDraft(panelData); setEditError(''); setIsEditing(true); };
+  const cancelEditing = () => { setIsEditing(false); setDraft(null); setEditError(''); };
+  const changeField = (key: 'modelNumber' | 'sku' | 'itemColor' | 'unitPrice' | 'cost' | 'quantity' | 'unit' | 'laborHours' | 'description', value: string) => {
+    setDraft(prev => prev ? { ...prev, [key]: ['unitPrice','cost','quantity','laborHours'].includes(key) ? Number(value) : value } : prev);
+  };
+  const saveEdits = async () => {
+    if (!draft || savingEdits) return;
+    if (!draft.modelNumber?.trim() || !draft.sku?.trim() || draft.unitPrice < 0 || draft.cost < 0 || draft.quantity <= 0 || draft.laborHours < 0) {
+      setEditError('Model, SKU, valid pricing, quantity and labor hours are required.');
+      return;
+    }
+    setSavingEdits(true);
+    setEditError('');
+    try {
+      const { error } = await supabase.from('products').update({
+        manufacturer_model_number: draft.modelNumber, sku: draft.sku, item_color: draft.itemColor,
+        our_price: draft.unitPrice, cost: draft.cost, default_qty: draft.quantity,
+        unit: draft.unit, default_labor_hours: draft.laborHours,
+        sales_description: draft.description,
+      }).eq('id', productId).eq('organization_id', profile?.organization_id);
+      if (error) throw error;
+      setIsEditing(false);
+      setDraft(null);
+      await loadProduct();
+      onSaved?.();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Could not save product.');
+    } finally { setSavingEdits(false); }
+  };
   const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'instructions' | 'accessories' | 'history'>('overview');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
   const [catalogNotes, setCatalogNotes] = useState<any>({});
@@ -229,20 +260,6 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
 
   if (!panelData) return null;
 
-  if (isEditing) {
-    return (
-      <SinglePageProductForm
-        productId={productId}
-        initialTab={activeTab === 'history' ? 'overview' : activeTab}
-        onClose={() => setIsEditing(false)}
-        onSave={() => {
-          setIsEditing(false);
-          void loadProduct();
-          onSaved?.();
-        }}
-      />
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
@@ -263,7 +280,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
               {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             {canEdit && (
-              <button type="button" onClick={() => setIsEditing(true)} aria-label="Edit product" title="Edit product"
+              <button type="button" onClick={startEditing} aria-label="Edit product" title="Edit product"
                 className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit className="w-4 h-4" />
               </button>
@@ -278,7 +295,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
         <div className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4 bg-gray-50/50">
           {activeTab === 'overview' ? (
             <>
-              <CatalogProductOverview data={panelData} />
+              <CatalogProductOverview data={isEditing && draft ? draft : panelData} editing={isEditing} onFieldChange={changeField} />
               <div className="mt-2"><ProductAccessories productId={productId} readOnly summaryOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} /></div>
               {photoOpen && canEdit && (
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3" onPaste={e => {
@@ -345,6 +362,9 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
 
         {/* Footer */}
         <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+          {editError && <p role="alert" className="text-xs text-red-600">{editError}</p>}
+          {isEditing && <button onClick={cancelEditing} className="px-4 py-2.5 rounded-lg border">Cancel</button>}
+          {isEditing && <button onClick={() => void saveEdits()} disabled={savingEdits} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">{savingEdits ? 'Saving...' : 'Save Product'}</button>}
           <button
             onClick={onClose}
             className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
