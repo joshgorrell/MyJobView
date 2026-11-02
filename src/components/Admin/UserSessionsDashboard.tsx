@@ -66,7 +66,12 @@ export function UserSessionsDashboard() {
       }
       setPeople(users.data || []); setNicknames(names.data || []); setIpLabels(locations.data || []); setSessions(rows);
       setUpdated(new Date().toISOString()); setError('');
-    } catch (e) { setError(`Could not load session data. ${e instanceof Error ? e.message : 'Please try refreshing.'}`); }
+     } catch (e) {
+      const failure = e && typeof e === 'object' ? e as { message?: string; code?: string; details?: string; hint?: string } : null;
+      const detail = [failure?.message, failure?.code && `Code: ${failure.code}`, failure?.details, failure?.hint].filter(Boolean).join(' — ');
+      console.error('User Sessions query failed:', e);
+      setError(`Could not load session data. ${detail || (e instanceof Error ? e.message : 'Please try refreshing.')}`);
+    }
     finally { busy.current = false; setRefreshing(false); setLoading(false); }
   }, [profile?.organization_id]);
   useEffect(() => { void load(); const timer = setInterval(() => void load(), 30000); return () => clearInterval(timer); }, [load]);
