@@ -65,7 +65,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
       {current === 'mine' && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
-          <p className="text-sm text-gray-600">Your recent daily and job time entries.</p>
+          <p className="text-sm text-gray-600">Your recent daily and job time entries. Time-off requests are available from Daily Clock when your payroll policy enables it.</p>
           {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
           {historyError && <p role="alert" className="text-sm text-red-700">Time history could not be loaded.</p>}
           {!historyLoading && !historyError && entries.length === 0 && <p className="text-sm text-gray-500">No recent time entries.</p>}
