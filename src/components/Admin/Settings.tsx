@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const UserManagement = lazy(() => import('./UserManagement').then(m => ({ default: m.UserManagement })));
 const UserSessionsViewerEnhanced = lazy(() => import('./UserSessionsViewerEnhanced').then(m => ({ default: m.UserSessionsViewerEnhanced })));
+const CustomerPortalSettings = lazy(() => import('./CustomerPortalSettings').then(m => ({ default: m.CustomerPortalSettings })));
 const CompanySettings = lazy(() => import('./CompanySettings').then(m => ({ default: m.CompanySettings })));
 const BusinessCardManager = lazy(() => import('../BusinessCard/BusinessCardManager').then(m => ({ default: m.BusinessCardManager })));
 const IntegrationsSettings = lazy(() => import('./IntegrationsSettings').then(m => ({ default: m.IntegrationsSettings })));
@@ -42,8 +43,8 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   const { companySettings, profile } = useAuth();
   const jobModuleEnabled = companySettings?.job_module_enabled ?? false;
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders';
-  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders'];
+  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders' | 'portal';
+  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders', 'portal'];
   const adminGroups = [
     { id: 'company', label: 'Company & Branding', description: 'Identity, offices, portal' },
     { id: 'people', label: 'People & Access', description: 'Team, roles, security' },
@@ -55,6 +56,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   const adminItems: { id: SettingsTab; label: string; group: typeof adminGroups[number]['id']; visible?: boolean }[] = [
     { id: 'company', label: 'Company Settings', group: 'company' },
     { id: 'cards', label: 'Business Cards', group: 'company' },
+    { id: 'portal', label: 'Customer Portal', group: 'company' },
     { id: 'users', label: 'Users', group: 'people' },
     { id: 'sessions', label: 'Sessions', group: 'people' },
     { id: 'roles', label: 'Roles', group: 'people' },
@@ -158,6 +160,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
             {activeTab === 'permissions' && <PermissionsManagement />}
             {activeTab === 'cards' && <BusinessCardManager />}
             {activeTab === 'company' && <CompanySettings />}
+            {activeTab === 'portal' && <CustomerPortalSettings />}
             {activeTab === 'departments' && <DepartmentManager />}
             {activeTab === 'integrations' && <IntegrationsSettings />}
             {activeTab === 'salestax' && <SalesTaxManagement />}
