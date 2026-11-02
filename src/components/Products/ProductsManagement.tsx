@@ -54,6 +54,7 @@ export default function ProductsManagement() {
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
   const [packagesKey, setPackagesKey] = useState(0);
   const [viewingProductId, setViewingProductId] = useState<string | null>(null);
+  const [returnToProductId, setReturnToProductId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [manufacturers, setManufacturers] = useState<any[]>([]);
   const [vendors, setVendors] = useState<any[]>([]);
@@ -287,6 +288,10 @@ export default function ProductsManagement() {
   }
 
   function handleCloseForm() {
+    if (returnToProductId) {
+      setViewingProductId(returnToProductId);
+      setReturnToProductId(null);
+    }
     setShowForm(false);
     setEditingProductId(null);
     setDuplicateProductId(null);
@@ -840,6 +845,7 @@ export default function ProductsManagement() {
           onClose={() => setViewingProductId(null)}
           onEdit={() => {
             setEditingProductId(viewingProductId);
+            setReturnToProductId(viewingProductId);
             setViewingProductId(null);
             setShowForm(true);
           }}
