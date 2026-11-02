@@ -117,7 +117,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-primary mb-1 flex items-center gap-2">
           <SettingsIcon className="w-6 h-6" />
-          Settings
+          Dealer Admin
         </h2>
         <p className="text-muted">Manage users, business cards, and company information</p>
       </div>
