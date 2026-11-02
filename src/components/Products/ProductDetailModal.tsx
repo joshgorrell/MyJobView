@@ -30,8 +30,8 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
   const [savingEdits, setSavingEdits] = useState(false);
   const [editError, setEditError] = useState('');
   const [draft, setDraft] = useState<ProductDetailPanelData | null>(null);
-  const [draftNotes, setDraftNotes] = useState({ sales: '', purchase: '', specifications: '', instructions: '' });
-  const startEditing = () => { setDraft(panelData); setDraftNotes({ sales: catalogNotes.sales || '', purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
+  const [draftNotes, setDraftNotes] = useState({ purchase: '', specifications: '', instructions: '' });
+  const startEditing = () => { setDraft(panelData); setDraftNotes({ purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
   const cancelEditing = () => { setIsEditing(false); setDraft(null); setEditError(''); };
   const changeField = (key: 'modelNumber' | 'sku' | 'itemColor' | 'unitPrice' | 'cost' | 'quantity' | 'unit' | 'laborHours' | 'description', value: string) => {
     setDraft(prev => prev ? { ...prev, [key]: ['unitPrice','cost','quantity','laborHours'].includes(key) ? Number(value) : value } : prev);
@@ -356,7 +356,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
           ) : activeTab === 'instructions' ? (
             <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p>{isEditing ? <textarea aria-label="Install Instructions" value={draftNotes.instructions} onChange={e => setDraftNotes(prev => ({...prev,instructions:e.target.value}))} rows={5} className="w-full rounded border border-gray-300 bg-white text-gray-900 p-2 text-sm" /> : <p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p>}</section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
           ) : activeTab === 'accessories' ? (
-            <ProductAccessories productId={productId} readOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} />
+            <ProductAccessories productId={productId} readOnly={!isEditing} parentQuantity={(isEditing && draft ? draft : panelData).quantity} baseMaterial={(isEditing && draft ? draft : panelData).unitPrice * (isEditing && draft ? draft : panelData).quantity} baseLabor={(isEditing && draft ? draft : panelData).laborHours * (isEditing && draft ? draft : panelData).laborRate * (isEditing && draft ? draft : panelData).quantity} />
           ) : (
             <ProductUsageHistory productId={productId} />
           )}
@@ -365,10 +365,9 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
         {/* Footer */}
         <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
           {editError && <p role="alert" className="text-xs text-red-600">{editError}</p>}
-          {isEditing && <button onClick={cancelEditing} className="px-4 py-2.5 rounded-lg border">Cancel</button>}
           {isEditing && <button onClick={() => void saveEdits()} disabled={savingEdits} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">{savingEdits ? 'Saving...' : 'Save Product'}</button>}
           <button
-            onClick={onClose}
+            onClick={isEditing ? cancelEditing : onClose}
             className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
             Close
