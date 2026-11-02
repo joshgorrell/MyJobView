@@ -1256,14 +1256,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     <div className="product-form-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div
         role="dialog" aria-modal="true" aria-labelledby="product-form-title"
-        className="bg-white text-gray-900 rounded-none sm:rounded-2xl shadow-2xl max-w-5xl w-full h-[100dvh] sm:h-auto sm:max-h-[92dvh] flex flex-col min-h-0 overflow-hidden"
+        className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl max-w-5xl w-full h-[100dvh] sm:h-[calc(100dvh-2rem)] flex flex-col min-h-0 overflow-hidden"
       >
         <div className="shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Package className="w-6 h-6 text-blue-600" />
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h2 id="product-form-title" className="text-lg sm:text-xl font-semibold text-gray-900">
-                {readOnly ? 'View Product' : productId ? 'Edit Product' : 'New Product'}
+                {readOnly ? 'Product Details' : productId ? 'Product Details · Editing' : 'New Product'}
               </h2>
               {hasSavedDraft && !readOnly && (
                 <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
@@ -1278,7 +1278,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </button>
         </div>
 
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 bg-gray-50 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-start">
           {/* AUTO-SAVE INFO */}
           {!readOnly && (
             <div className="lg:col-span-2 flex items-center gap-2 text-gray-500">
