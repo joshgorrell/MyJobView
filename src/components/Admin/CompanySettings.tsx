@@ -12,7 +12,7 @@ import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCard
 import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
 export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' | 'email' }) {
-  const { profile, companySettings: cachedCompanySettings } = useAuth();
+  const { profile } = useAuth();
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,12 +103,12 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
-        .eq('organization_id', profile?.organization_id || cachedCompanySettings?.organization_id || '00000000-0000-0000-0000-000000000000')
+        .eq('organization_id', profile?.organization_id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
       if (error) throw error;
 
-      const resolvedData = data || (cachedCompanySettings?.organization_id === profile?.organization_id ? cachedCompanySettings : null);
+      const resolvedData = data;
       if (!resolvedData) throw new Error(`Electronic Life company settings could not be loaded for your signed-in organization. Check that your user profile has the correct organization and that company_settings SELECT access is allowed.`);
       if (resolvedData) {
         const data = resolvedData;
