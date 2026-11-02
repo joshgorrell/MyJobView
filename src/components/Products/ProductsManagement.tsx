@@ -845,13 +845,6 @@ export default function ProductsManagement() {
           productId={viewingProductId}
           onSaved={loadProducts}
           onClose={() => setViewingProductId(null)}
-          onEdit={(tab) => {
-            setInitialProductEditTab(tab === 'history' ? 'overview' : tab);
-            setEditingProductId(viewingProductId);
-            setReturnToProductId(viewingProductId);
-            setViewingProductId(null);
-            setShowForm(true);
-          }}
         />
       )}
 
