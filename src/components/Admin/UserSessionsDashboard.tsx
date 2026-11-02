@@ -118,64 +118,6 @@ export function UserSessionsDashboard() {
     const classification = known?.location_classification === 'office' ? 'Office' : known?.location_classification === 'remote' ? 'Remote' : 'Unknown';
     return { name: known?.nickname || 'Unlabeled network', classification };
   }
-  function centralDate(value: string): string {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date(value));
-  }
-  function dailySessions(userId: string): [string, number, number][] {
-    const now = Date.now();
-    const cutoff = now - 7 * 86400000;
-    const intervals = sessions.filter(s => s.user_id === userId).map(s => ({
-      start: Math.max(cutoff, Date.parse(s.session_start)),
-      end: Math.min(now, Date.parse(s.session_end || s.last_activity)),
-    })).filter(x => Number.isFinite(x.start) && Number.isFinite(x.end) && x.end > x.start);
-    const boundaries = new Set<number>([cutoff, now]);
-    // Probe hourly to discover Chicago calendar transitions, including DST.
-    let previous = centralDate(new Date(cutoff).toISOString());
-    for (let t = cutoff + 3600000; t <= now + 3600000; t += 3600000) {
-      const probe = Math.min(t, now);
-      const day = centralDate(new Date(probe).toISOString());
-      if (day !== previous) {
-        let low = Math.max(cutoff, probe - 3600000), high = probe;
-        while (high - low > 1000) {
-          const mid = Math.floor((low + high) / 2);
-          if (centralDate(new Date(mid).toISOString()) === previous) low = mid;
-          else high = mid;
-        }
-        boundaries.add(high);
-      }
-      previous = day;
-    }
-    const points = [...boundaries].sort((a, b) => a - b);
-    const result: [string, number, number][] = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const dayStart = points[i], dayEnd = points[i + 1];
-      const day = centralDate(new Date(dayStart).toISOString());
-      const clipped = intervals.map(x => ({ start: Math.max(dayStart, x.start), end: Math.min(dayEnd, x.end) }))
-        .filter(x => x.end > x.start).sort((a, b) => a.start - b.start);
-      let covered = 0, lastEnd = dayStart;
-      for (const x of clipped) {
-        covered += Math.max(0, x.end - Math.max(x.start, lastEnd));
-        lastEnd = Math.max(lastEnd, x.end);
-      }
-      result.push([day, covered, clipped.length]);
-    }
-    return result.reverse();
-  }
-  function sessionCoverage(rows: Session[]): number {
-    const cutoff = Date.now() - 7 * 86400000;
-    const windows = rows.map(s => [Math.max(cutoff, Date.parse(s.session_start)), Math.min(Date.now(), Date.parse(s.session_end || s.last_activity))] as const)
-      .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
-      .sort((a, b) => a[0] - b[0]);
-    let total = 0;
-    let latestEnd = 0;
-    for (const [start, end] of windows) {
-      total += Math.max(0, end - Math.max(start, latestEnd));
-      latestEnd = Math.max(latestEnd, end);
-    }
-    return total;
-  }
   function SessionRow({ session: s }: { session: Session }) {
     return <div className="grid gap-2 border-t border-subtle py-3 sm:grid-cols-[1fr_auto]">
       <div className="min-w-0"><p className="text-sm font-medium break-words">{nickname(s) || deviceLabel(s)}</p><p className="text-xs text-muted">{new Date(s.session_start).toLocaleString()} · Last activity {ago(s.last_activity)}</p>
