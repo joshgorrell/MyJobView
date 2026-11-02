@@ -38,6 +38,12 @@ originalHidden.currentModel.lines[0].exclusion={product_id:'TV',organization_id:
 const supplied=fixture(true);supplied.basis.lines[0].line.is_customer_supplied=true;supplied.currentModel.lines[0].line.is_customer_supplied=true;
 supplied.basis.approvedRowsHash=supplied.currentModel.equipmentEvidence.scopeHash=digest(supplied.basis.lines);assert.equal(pass(supplied).content.lines.length,1);
 const noBasis=fixture();noBasis.basis=null;block(noBasis,'original_approval_basis_unavailable');
+
+// Fail-closed source-verification regressions: never promote incomplete evidence into a draft.
+const missingPair=fixture();missingPair.pairs.splice(3,1);block(missingPair,'approved_application_history_not_connected');
+const changedOriginal=fixture(true);changedOriginal.basis.lines[0].line.quantity='99.00';block(changedOriginal,'approved_rows_connection_unverified');
+const wrongCustomer=fixture(true);wrongCustomer.currentModel.customer.id='different-customer';block(wrongCustomer,'draft_order_unverified');
+
 for(const status of ['pending_deposit','pending_po','planning','active']){const early=fixture();early.currentModel.order.status=status;Object.defineProperty(early.currentModel,'completion',{get(){throw Error('Completion must not be read');}});const result=pass(early);assert.equal(result.content.orderStatus,'open');assert.deepEqual(result.content.lines,r.content.lines);}
 const unknown=fixture();unknown.currentModel.order.status='unknown';Object.defineProperty(unknown,'pairs',{get(){throw Error('Unsupported order history must not be read');}});block(unknown,'draft_order_unverified');
 const earlyUnapproved=fixture();earlyUnapproved.currentModel.order.status='active';earlyUnapproved.basis=null;block(earlyUnapproved,'original_approval_basis_unavailable');
