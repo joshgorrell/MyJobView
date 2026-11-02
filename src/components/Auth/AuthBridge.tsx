@@ -38,6 +38,11 @@ export function AuthBridge() {
           session.refresh_token,
           returnPath,
         );
+        // Hand off the session to the dealer site without leaving a second
+        // refresh loop running on the root site.
+        supabase.auth.stopAutoRefresh();
+        const projectRef = new URL(import.meta.env.VITE_SUPABASE_URL as string).hostname.split('.')[0];
+        window.localStorage.removeItem(`sb-${projectRef}-auth-token`);
         window.location.replace(callbackUrl);
       } catch (err) {
         console.error('Auth bridge error:', err);
