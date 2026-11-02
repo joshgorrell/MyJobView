@@ -14,6 +14,7 @@ export function CompanySettings() {
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingFooterLogo, setUploadingFooterLogo] = useState(false);
@@ -105,6 +106,7 @@ export function CompanySettings() {
   }, []);
 
   async function loadSettings() {
+    setSettingsLoadError(null);
     try {
       const { data, error } = await supabase
         .from('company_settings')
@@ -113,6 +115,7 @@ export function CompanySettings() {
 
       if (error) throw error;
 
+      if (!data) throw new Error('No company settings record is accessible for this account.');
       if (data) {
         setSettings(data);
         setCompanyName(data.company_name);
@@ -174,6 +177,7 @@ export function CompanySettings() {
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+      setSettingsLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -429,6 +433,10 @@ export function CompanySettings() {
   }
 
   async function saveSettings() {
+    if (settingsLoadError || !settings) {
+      notify('Company information did not load. Refresh or contact support before saving.', { theme: 'blue', tone: 'error' });
+      return;
+    }
     setSaving(true);
     try {
       if (settings) {
@@ -773,6 +781,7 @@ export function CompanySettings() {
         <p className="text-gray-300">Manage company information displayed on business cards</p>
       </div>
 
+      {settingsLoadError && <div role="alert" className="rounded-lg border border-red-500/40 bg-red-950/30 p-4 text-red-200"><p className="font-semibold">Company information could not be loaded. Saving is disabled to protect your existing settings.</p><p className="mt-1 text-sm break-words">{settingsLoadError}</p><button type="button" className="mt-3 rounded border border-red-400/50 px-3 py-1 text-sm" onClick={() => { setLoading(true); void loadSettings(); }}>Retry loading</button></div>}
       <CompanyDirectorySetting />
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1244,7 +1253,7 @@ export function CompanySettings() {
 
         <button
           onClick={saveSettings}
-          disabled={saving}
+          disabled={saving || loading || !!settingsLoadError || !settings}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
         >
           <Save className="w-4 h-4" />
