@@ -10,7 +10,7 @@ import ConfirmModal from '../ui/ConfirmModal';
 import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCardIdentity';
 import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
-export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' }) {
+export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' | 'email' }) {
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -419,7 +419,13 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
     }
     setSaving(true);
     try {
-      const updates = section === 'billing' ? {
+      const updates = section === 'email' ? {
+        from_email: fromEmail?.trim() || null,
+        from_name: fromName?.trim() || null,
+        reply_to_email: replyToEmail?.trim() || null,
+        welcome_support_email: welcomeSupportEmail?.trim() || null,
+        photographer_email: photographerEmail?.trim() || null,
+      } : section === 'billing' ? {
         cc_convenience_fee_enabled: ccFeeEnabled,
         cc_convenience_fee_type: ccFeeType,
         cc_convenience_fee_percentage: ccFeePercentage / 100,
@@ -456,11 +462,6 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
         website: website,
         portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
         company_logo_url: logoUrl || null,
-        from_email: fromEmail?.trim() || null,
-        from_name: fromName?.trim() || null,
-        reply_to_email: replyToEmail?.trim() || null,
-        welcome_support_email: welcomeSupportEmail?.trim() || null,
-        photographer_email: photographerEmail?.trim() || null,
       };
       const { error } = await supabase.from('company_settings')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -686,8 +687,8 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
     />
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">{section === 'billing' ? 'Billing & Payments' : section === 'automation' ? 'Operational Automation' : 'Company Settings'}</h2>
-        <p className="text-gray-300">{section === 'billing' ? 'Manage payment fees and recurring billing' : section === 'automation' ? 'Manage task, clock-out, and follow-up automation' : 'Manage company identity, branding, offices, and domain'}</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">{section === 'billing' ? 'Billing & Payments' : section === 'automation' ? 'Operational Automation' : section === 'email' ? 'Email Configuration' : 'Company Settings'}</h2>
+        <p className="text-gray-300">{section === 'billing' ? 'Manage payment fees and recurring billing' : section === 'automation' ? 'Manage task, clock-out, and follow-up automation' : section === 'email' ? 'Manage outbound email sender and reply addresses' : 'Manage company identity, branding, offices, and domain'}</p>
       </div>
 
       {settingsLoadError && <div role="alert" className="rounded-lg border border-red-500/40 bg-red-950/30 p-4 text-red-200"><p className="font-semibold">Company information could not be loaded. Saving is disabled to protect your existing settings.</p><p className="mt-1 text-sm break-words">{settingsLoadError}</p><button type="button" className="mt-3 rounded border border-red-400/50 px-3 py-1 text-sm" onClick={() => { setLoading(true); void loadSettings(); }}>Retry loading</button></div>}
@@ -948,100 +949,6 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
           </p>
         </div>
 
-        <div className="border-t border-gray-200 pt-4 space-y-4">
-          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Mail className="w-5 h-5" />
-            Email Settings (Resend)
-          </h4>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-900">
-              <strong>Important:</strong> The "From Email" must use a domain you've verified in Resend.
-              Don't forget to add your Resend API key to Supabase Edge Functions secrets.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              From Email Address *
-            </label>
-            <input
-              type="email"
-              value={fromEmail}
-              onChange={(e) => setFromEmail(e.target.value)}
-              placeholder="proposals@yourdomain.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Must be from a domain verified in Resend (e.g., proposals@yourdomain.com)
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              From Name
-            </label>
-            <input
-              type="text"
-              value={fromName}
-              onChange={(e) => setFromName(e.target.value)}
-              placeholder="Your Company Name"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              The display name shown in emails (e.g., "Acme Security")
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Reply-To Email
-            </label>
-            <input
-              type="email"
-              value={replyToEmail}
-              onChange={(e) => setReplyToEmail(e.target.value)}
-              placeholder="support@yourdomain.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Where customers should reply (optional, defaults to From Email)
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Welcome Email Support Address
-            </label>
-            <input
-              type="email"
-              value={welcomeSupportEmail}
-              onChange={(e) => setWelcomeSupportEmail(e.target.value)}
-              placeholder="admin@yourdomain.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Shown to employees in Welcome emails when they need help. If blank, MyJobView uses the company email, then Reply-To/From Email.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Photographer Email
-            </label>
-            <input
-              type="email"
-              value={photographerEmail}
-              onChange={(e) => setPhotographerEmail(e.target.value)}
-              placeholder="photographer@yourdomain.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Where paparazzi photo requests will be sent (optional)
-            </p>
-          </div>
-        </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Company Logo
@@ -1172,6 +1079,103 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
       </div>
 
       </>}
+      {section === 'email' && <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
+        <div className="border-t border-gray-200 pt-4 space-y-4">
+          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Email Settings (Resend)
+          </h4>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-900">
+              <strong>Important:</strong> The "From Email" must use a domain you've verified in Resend.
+              Don't forget to add your Resend API key to Supabase Edge Functions secrets.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              From Email Address *
+            </label>
+            <input
+              type="email"
+              value={fromEmail}
+              onChange={(e) => setFromEmail(e.target.value)}
+              placeholder="proposals@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Must be from a domain verified in Resend (e.g., proposals@yourdomain.com)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              From Name
+            </label>
+            <input
+              type="text"
+              value={fromName}
+              onChange={(e) => setFromName(e.target.value)}
+              placeholder="Your Company Name"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              The display name shown in emails (e.g., "Acme Security")
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reply-To Email
+            </label>
+            <input
+              type="email"
+              value={replyToEmail}
+              onChange={(e) => setReplyToEmail(e.target.value)}
+              placeholder="support@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Where customers should reply (optional, defaults to From Email)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Welcome Email Support Address
+            </label>
+            <input
+              type="email"
+              value={welcomeSupportEmail}
+              onChange={(e) => setWelcomeSupportEmail(e.target.value)}
+              placeholder="admin@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown to employees in Welcome emails when they need help. If blank, MyJobView uses the company email, then Reply-To/From Email.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Photographer Email
+            </label>
+            <input
+              type="email"
+              value={photographerEmail}
+              onChange={(e) => setPhotographerEmail(e.target.value)}
+              placeholder="photographer@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Where paparazzi photo requests will be sent (optional)
+            </p>
+          </div>
+        </div>
+
+        <button type="button" onClick={saveSettings} disabled={saving || loading || !!settingsLoadError || !settings} className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save Email Settings'}</button>
+      </div>}
       {section === 'billing' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
