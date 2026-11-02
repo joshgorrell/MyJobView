@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
 import { DailyClock } from './DailyClock';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
+import { WorkOrderTimeControl } from '../Production/WorkOrderTimeControl';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 
 type TimeSection = 'daily' | 'job' | 'mine';
@@ -15,6 +16,24 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
   const [section, setSection] = useState<TimeSection>('job');
   const [correctionEntry, setCorrectionEntry] = useState<PersonalEntry | null>(null);
   const [historyRevision, setHistoryRevision] = useState(0);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState('');
+  const [assignedJobs, setAssignedJobs] = useState<{ id: string; work_order_number: string; title: string; assigned_to: string | null }[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobsError, setJobsError] = useState(false);
+  useEffect(() => {
+    if (section !== 'job' || !profile?.id) return;
+    let cancelled = false;
+    setJobsLoading(true); setJobsError(false);
+    supabase.from('work_orders').select('id, work_order_number, title, assigned_to')
+      .eq('assigned_to', profile.id).order('created_at', { ascending: false }).limit(50)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setJobsError(true); return; }
+        setAssignedJobs(data ?? []);
+      }).catch(() => { if (!cancelled) setJobsError(true); })
+      .finally(() => { if (!cancelled) setJobsLoading(false); });
+    return () => { cancelled = true; };
+  }, [section, profile?.id]);
   const [entries, setEntries] = useState<PersonalEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState(false);
@@ -62,6 +81,23 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Job Clock</h2>
           <p className="text-sm text-gray-600">Job time is recorded against a project or service work order. It does not start or stop your daily payroll clock.</p>
+          {jobsLoading && <p className="text-sm text-gray-500">Loading assigned work orders…</p>}
+          {jobsError && <p role="alert" className="text-sm text-red-700">Unable to load assigned work orders.</p>}
+          {!jobsLoading && !jobsError && (
+            <label className="block text-sm font-medium text-gray-700">
+              Assigned work order
+              <select value={selectedWorkOrderId} onChange={e => setSelectedWorkOrderId(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+                <option value="">Select a work order</option>
+                {assignedJobs.map(job => <option key={job.id} value={job.id}>{job.work_order_number} — {job.title}</option>)}
+              </select>
+            </label>
+          )}
+          {selectedWorkOrderId && assignedJobs.some(job => job.id === selectedWorkOrderId) && (
+            <WorkOrderTimeControl workOrderId={selectedWorkOrderId}
+              assignedTo={assignedJobs.find(job => job.id === selectedWorkOrderId)?.assigned_to ?? null}
+              onChanged={() => setHistoryRevision(value => value + 1)} />
+          )}
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => onNavigate('tech_center')} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open Technician Work Center</button>
             <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">Browse Work Orders</button>
