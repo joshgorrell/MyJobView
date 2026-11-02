@@ -70,7 +70,15 @@ export function UserSessionsDashboard() {
         rows.push(...(result.data || []));
         if ((result.data?.length || 0) < 1000) break;
       }
+      const visits: PageVisit[] = [];
+      for (let offset = 0; offset < 10000; offset += 1000) {
+        const page = await supabase.from('user_page_visits').select('page_key, user_id, visited_at').eq('organization_id', org).gte('visited_at', cutoff).order('visited_at', { ascending: false }).range(offset, offset + 999);
+        if (page.error) { if (page.error.code !== '42P01' && page.error.code !== 'PGRST205') console.warn('Page usage unavailable:', page.error.message); break; }
+        visits.push(...(page.data || []));
+        if ((page.data?.length || 0) < 1000) break;
+      }
       if (!mounted.current) return;
+      setPageVisits(visits);
       setPeople(users.data || []); setNicknames(names.data || []); setIpLabels(locations.data || []); setSessions(rows);
       setUpdated(new Date().toISOString()); setError('');
     } catch (e) {
