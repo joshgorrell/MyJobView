@@ -72,6 +72,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       console.log('Users loaded:', data?.length || 0);
       setUsers(data || []);
+      setLoading(false);
       // Independent settings metadata must not serialize initial user rendering.
       const [statusResult, reviewResult, employeeResult] = await Promise.all([
         supabase.from('user_account_email_status').select('*'),
