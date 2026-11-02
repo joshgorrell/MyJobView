@@ -43,8 +43,9 @@ export function UserSessionsDashboard() {
   const [saving, setSaving] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const busy = useRef(false);
+  const mounted = useRef(true);
   const load = useCallback(async () => {
-    if (!profile?.organization_id || busy.current) return;
+    if (!profile?.organization_id || busy.current || document.visibilityState === 'hidden') return;
     busy.current = true; setRefreshing(true);
     try {
       const org = profile.organization_id;
@@ -58,18 +59,31 @@ export function UserSessionsDashboard() {
       if (locations.error) throw locations.error;
       const rows: Session[] = [];
       const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
-      for (let offset = 0; ; offset += 1000) {
+      for (let offset = 0; offset < 10000; offset += 1000) {
         const result = await supabase.from('user_sessions').select('*').eq('organization_id', org).gte('last_activity', cutoff).order('last_activity', { ascending: false }).order('id').range(offset, offset + 999);
         if (result.error) throw result.error;
         rows.push(...(result.data || []));
         if ((result.data?.length || 0) < 1000) break;
       }
+      if (!mounted.current) return;
       setPeople(users.data || []); setNicknames(names.data || []); setIpLabels(locations.data || []); setSessions(rows);
       setUpdated(new Date().toISOString()); setError('');
-    } catch (e) { setError(`Could not load session data. ${e instanceof Error ? e.message : 'Please try refreshing.'}`); }
+    } catch (e) {
+      console.error('User Sessions load failed', e);
+      const failure = e && typeof e === 'object' ? e as { message?: string; code?: string; details?: string; hint?: string } : null;
+      const detail = [failure?.message, failure?.code && `Code: ${failure.code}`, failure?.details, failure?.hint].filter(Boolean).join(' — ');
+      if (mounted.current) setError(`Could not load session data. ${detail || (e instanceof Error ? e.message : 'Please try refreshing.')}`);
+    }
     finally { busy.current = false; setRefreshing(false); setLoading(false); }
   }, [profile?.organization_id]);
-  useEffect(() => { void load(); const timer = setInterval(() => void load(), 30000); return () => clearInterval(timer); }, [load]);
+  useEffect(() => {
+    mounted.current = true;
+    void load();
+    const timer = setInterval(() => void load(), 60000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { mounted.current = false; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [load]);
   const personMap = useMemo(() => new Map(people.map(p => [p.id, p])), [people]);
   const nameMap = useMemo(() => new Map(nicknames.map(n => [n.device_signature, n])), [nicknames]);
   function nickname(s: Session) { const n = s.device_signature ? nameMap.get(s.device_signature)?.nickname : null; return n && n !== s.device_signature ? n : null; }
