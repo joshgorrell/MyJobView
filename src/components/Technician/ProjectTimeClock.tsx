@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
 type Project = { id: string; name: string; status: string };
-type ActiveEntry = { id: string; project_id: string | null; clock_in: string; notes: string | null };
+type ActiveEntry = { id: string; project_id: string | null; work_order_id: string | null; clock_in: string; notes: string | null };
 
 export function ProjectTimeClock({ onChanged }: { onChanged: () => void }) {
   const { profile } = useAuth();
@@ -22,7 +22,7 @@ export function ProjectTimeClock({ onChanged }: { onChanged: () => void }) {
     setLoading(true);
     const [projectsResult, activeResult] = await Promise.all([
       supabase.from('projects').select('id,name,status').not('status', 'in', '("completed","cancelled","archived")').order('name').limit(500),
-      supabase.from('time_entries').select('id,project_id,clock_in,notes').eq('technician_id', profile.id).is('clock_out', null).in('status', ['draft', 'submitted']).order('clock_in', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('time_entries').select('id,project_id,work_order_id,clock_in,notes').eq('technician_id', profile.id).is('clock_out', null).in('status', ['draft', 'submitted']).order('clock_in', { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (projectsResult.error || activeResult.error) setError(projectsResult.error?.message || activeResult.error?.message || 'Unable to load job time.');
     else {
@@ -54,7 +54,7 @@ export function ProjectTimeClock({ onChanged }: { onChanged: () => void }) {
   }
 
   async function stop() {
-    if (!active || busy) return;
+    if (!active || active.work_order_id || busy) return;
     setBusy(true); setError('');
     try {
       const endTime = new Date();
@@ -74,7 +74,7 @@ export function ProjectTimeClock({ onChanged }: { onChanged: () => void }) {
   return <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
     <h3 className="font-semibold text-gray-900">Project Time</h3>
     {loading && <p className="text-sm text-gray-500">Loading projects and active time…</p>}
-    {active ? <p className="text-sm font-medium text-green-700">Time running · {Math.floor(elapsed / 60)}h {elapsed % 60}m</p> : <>
+    {active ? <p className="text-sm font-medium text-green-700">Time running · {Math.floor(elapsed / 60)}h {elapsed % 60}m{active.work_order_id ? ' · Work order time must be stopped from its work order' : ''}</p> : <>
       <label className="block text-sm font-medium text-gray-700">Find an open project
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects" className="mt-1 w-full rounded-lg border border-gray-300 p-2" />
       </label>
@@ -87,7 +87,7 @@ export function ProjectTimeClock({ onChanged }: { onChanged: () => void }) {
       <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={active ? 'What did you work on?' : 'Optional notes'} rows={2} className="mt-1 w-full rounded-lg border border-gray-300 p-2" />
     </label>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-    {active ? <button type="button" disabled={busy || loading} onClick={stop} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Stop Time</button>
-      : <button type="button" disabled={busy || loading || !projectId} onClick={start} className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Start Time</button>}
+    {active && !active.work_order_id ? <button type="button" disabled={busy || loading} onClick={stop} className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Stop Time</button>
+      : !active ? <button type="button" disabled={busy || loading || !projectId} onClick={start} className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">Start Time</button> : null}
   </div>;
 }
