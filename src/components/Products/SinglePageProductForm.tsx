@@ -919,8 +919,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
+      // Fields are split across tabs: reveal the invalid section before
+      // attempting to focus or scroll to its first error.
+      const firstError = Object.keys(newErrors)[0];
+      const errorTab = firstError === 'cost' || firstError === 'price' ? 'pricing' : 'overview';
+      selectEditorTab(errorTab);
       setTimeout(() => {
-        const firstErrorEl = document.querySelector('[data-error-field]');
+        const firstErrorEl = scrollContainerRef.current?.querySelector('[data-error-field]');
         firstErrorEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 50);
       return false;
