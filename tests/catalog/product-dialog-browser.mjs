@@ -45,6 +45,7 @@ for(const width of [320,390,768,1440]) {
  await productPage.setViewportSize({width,height:844});
  await productPage.goto('http://127.0.0.1:5173/tests/catalog/product-dialog.html?add-product');
  await productPage.getByRole('heading',{name:'New Product',exact:true}).waitFor();
+ await productPage.getByRole('navigation',{name:'Product editor sections'}).getByRole('button',{name:'Details',exact:true}).click();
  const controls=productPage.locator('.product-form-controls input:not([type="hidden"]):not([type="file"]):not(:disabled), .product-form-controls select:not(:disabled), .product-form-controls textarea:not(:disabled)');
  assert.ok(await controls.count()>10);
  // Product forms follow the workspace palette; security agreement fields above stay white.
