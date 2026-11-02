@@ -164,7 +164,9 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
       }
     } catch (error) {
       console.error('Error loading settings:', error);
-      setSettingsLoadError(error instanceof Error ? error.message : String(error));
+      const details = error && typeof error === 'object' ? error as { message?: string; code?: string; details?: string; hint?: string } : null;
+      const diagnostic = [details?.message, details?.code && `Code: ${details.code}`, details?.details, details?.hint].filter(Boolean).join(' — ');
+      setSettingsLoadError(diagnostic || (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
