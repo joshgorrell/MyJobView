@@ -136,16 +136,6 @@ export function CompanySettings() {
         setCcFeeLabel(data.cc_convenience_fee_label || 'Credit Card Convenience Fee');
         setDefaultInvoiceTermsAndConditions(data.default_invoice_terms_and_conditions || '');
 
-        setPortalSecurityContractsEnabled(data.portal_security_contracts_enabled ?? true);
-        setPortalProposalsEnabled(data.portal_proposals_enabled ?? true);
-        setPortalProjectsEnabled(data.portal_projects_enabled ?? false);
-        setPortalAppointmentsEnabled(data.portal_appointments_enabled ?? false);
-        setPortalInvoicesEnabled(data.portal_invoices_enabled ?? false);
-        setPortalMessagesEnabled(data.portal_messages_enabled ?? false);
-        setPortalVipServicesEnabled(data.portal_vip_services_enabled ?? false);
-        setPortalTasksEnabled(data.portal_tasks_enabled ?? true);
-        setPortalSalesOrdersEnabled(data.portal_sales_orders_enabled ?? true);
-        setEnablePublicVipSignup(data.enable_public_vip_signup ?? false);
 
         // Auto-completion settings
         setAutoCompletionEnabled(data.auto_completion_enabled ?? true);
@@ -469,16 +459,6 @@ export function CompanySettings() {
             billing_change_effective_date: billingChangeEffective,
             default_auto_renew: defaultAutoRenew,
             grace_period_days: gracePeriodDays,
-            portal_security_contracts_enabled: portalSecurityContractsEnabled,
-            portal_proposals_enabled: portalProposalsEnabled,
-            portal_projects_enabled: portalProjectsEnabled,
-            portal_appointments_enabled: portalAppointmentsEnabled,
-            portal_invoices_enabled: portalInvoicesEnabled,
-            portal_messages_enabled: portalMessagesEnabled,
-            portal_vip_services_enabled: portalVipServicesEnabled,
-            portal_tasks_enabled: portalTasksEnabled,
-            portal_sales_orders_enabled: portalSalesOrdersEnabled,
-            enable_public_vip_signup: enablePublicVipSignup,
             auto_completion_enabled: autoCompletionEnabled,
             auto_completion_requires_approval: autoCompletionRequiresApproval,
             auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
@@ -526,16 +506,6 @@ export function CompanySettings() {
             billing_change_effective_date: billingChangeEffective,
             default_auto_renew: defaultAutoRenew,
             grace_period_days: gracePeriodDays,
-            portal_security_contracts_enabled: portalSecurityContractsEnabled,
-            portal_proposals_enabled: portalProposalsEnabled,
-            portal_projects_enabled: portalProjectsEnabled,
-            portal_appointments_enabled: portalAppointmentsEnabled,
-            portal_invoices_enabled: portalInvoicesEnabled,
-            portal_messages_enabled: portalMessagesEnabled,
-            portal_vip_services_enabled: portalVipServicesEnabled,
-            portal_tasks_enabled: portalTasksEnabled,
-            portal_sales_orders_enabled: portalSalesOrdersEnabled,
-            enable_public_vip_signup: enablePublicVipSignup,
             auto_completion_enabled: autoCompletionEnabled,
             auto_completion_requires_approval: autoCompletionRequiresApproval,
             auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
@@ -1584,169 +1554,8 @@ export function CompanySettings() {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Globe className="w-5 h-5" />
-          Customer Portal Visibility
-        </h3>
-        <p className="text-sm text-gray-600">
-          Control which sections are visible to customers in the portal. Use this to enable features as you're ready to launch them.
-        </p>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input type="checkbox" id="portal-security-contracts" checked={portalSecurityContractsEnabled}
-              onChange={e => setPortalSecurityContractsEnabled(e.target.checked)} className="w-5 h-5 text-blue-600 rounded" />
-            <div className="flex-1"><label htmlFor="portal-security-contracts" className="font-medium text-gray-900 cursor-pointer">Security Contracts</label>
-              <p className="text-sm text-gray-600">Show onboarding, signed agreements, monthly charges, balances, and months remaining when the security contracts module is enabled.</p></div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-proposals"
-              checked={portalProposalsEnabled}
-              onChange={(e) => setPortalProposalsEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-proposals" className="font-medium text-gray-900 cursor-pointer">
-                Proposals
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view and approve proposals</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-tasks"
-              checked={portalTasksEnabled}
-              onChange={(e) => setPortalTasksEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-tasks" className="font-medium text-gray-900 cursor-pointer">
-                Tasks
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to submit and track punchlist items</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-sales-orders"
-              checked={portalSalesOrdersEnabled}
-              onChange={(e) => setPortalSalesOrdersEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-sales-orders" className="font-medium text-gray-900 cursor-pointer">
-                Sales Orders
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view their approved sales orders</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-projects"
-              checked={portalProjectsEnabled}
-              onChange={(e) => setPortalProjectsEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-projects" className="font-medium text-gray-900 cursor-pointer">
-                Projects
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view active project details and status</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-appointments"
-              checked={portalAppointmentsEnabled}
-              onChange={(e) => setPortalAppointmentsEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-appointments" className="font-medium text-gray-900 cursor-pointer">
-                Appointments
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view and schedule appointments</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-invoices"
-              checked={portalInvoicesEnabled}
-              onChange={(e) => setPortalInvoicesEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-invoices" className="font-medium text-gray-900 cursor-pointer">
-                Invoices
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view and pay invoices</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-messages"
-              checked={portalMessagesEnabled}
-              onChange={(e) => setPortalMessagesEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-messages" className="font-medium text-gray-900 cursor-pointer">
-                Messages
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to send and receive messages</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-vip-services"
-              checked={portalVipServicesEnabled}
-              onChange={(e) => setPortalVipServicesEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-vip-services" className="font-medium text-gray-900 cursor-pointer">
-                VIP Services
-              </label>
-              <p className="text-sm text-gray-600">Allow VIP customers to view upcoming service appointments</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border-2 border-yellow-300">
-            <input
-              type="checkbox"
-              id="enable-public-vip-signup"
-              checked={enablePublicVipSignup}
-              onChange={(e) => setEnablePublicVipSignup(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="enable-public-vip-signup" className="font-medium text-gray-900 cursor-pointer">
-                Enable Public VIP Self-Signup
-              </label>
-              <p className="text-sm text-gray-600">
-                Allow anonymous customers to sign up for VIP memberships on their own.
-                When disabled, the public VIP page shows "Coming Soon" and customers can only join via punchlist invites or contact you directly.
-              </p>
-            </div>
-          </div>
-        </div>
-
+        <h3 className="text-lg font-semibold text-gray-900">Operational Automation</h3>
+        <p className="text-sm text-gray-600">Configure project task completion, clock-out, and customer follow-up rules.</p>
         {/* Project Task Auto-Completion Settings */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6">
           <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
@@ -1987,7 +1796,7 @@ export function CompanySettings() {
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
         >
           <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Portal Settings'}
+          {saving ? 'Saving...' : 'Save Automation Settings'}
         </button>
       </div>
 
