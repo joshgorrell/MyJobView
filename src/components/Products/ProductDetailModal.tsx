@@ -273,7 +273,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
       <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-[calc(100dvh-2rem)] min-h-0">
         {/* Header */}
-        <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
+        <div className="px-3 sm:px-6 pt-3 sm:pt-4 pb-2 sm:pb-3 border-b border-gray-200 grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2 shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-gray-900 break-words">{panelData.productName}</h2>
             <ProductStatusNotice product={productStatus} />
@@ -284,23 +284,23 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
             )}
           </div>
           <div className="contents">
-            <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
-              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => { setEditError(''); setActiveTab(tab); }} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
+            <div className="col-span-2 order-3 w-full min-w-0 sm:col-span-1 sm:w-auto sm:order-none flex gap-1 overflow-x-auto overscroll-x-contain bg-gray-100 p-1 rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => { setEditError(''); setActiveTab(tab); }} aria-pressed={activeTab === tab} className={`shrink-0 px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             {canEdit && (
               <button type="button" onClick={isEditing ? cancelEditing : startEditing} disabled={savingEdits} aria-label={isEditing ? 'Cancel editing' : 'Edit product'} title="Edit product"
-                className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                className="p-2 sm:p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit className="w-4 h-4" />
               </button>
             )}
-            <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <button onClick={onClose} aria-label="Close product details" className="p-2 sm:p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 bg-gray-50/50">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-4 bg-gray-50/50">
           {activeTab === 'overview' ? (
             <>
               <CatalogProductOverview data={isEditing && draft ? draft : panelData} editing={isEditing} onFieldChange={changeField} />
@@ -369,13 +369,13 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
         </div>
 
         {/* Footer */}
-        <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+        <div className="px-3 sm:px-6 py-2 sm:pt-3 sm:pb-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
           {editError && <p role="alert" className="text-xs text-red-600">{editError}</p>}
           {isEditing && <button onClick={() => void saveEdits()} disabled={savingEdits} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">{savingEdits ? 'Saving...' : 'Save Product'}</button>}
           <button
             onClick={isEditing ? cancelEditing : onClose}
             disabled={savingEdits}
-            className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
             {isEditing ? 'Cancel' : 'Close'}
           </button>
