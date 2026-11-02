@@ -32,7 +32,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
   const [draft, setDraft] = useState<ProductDetailPanelData | null>(null);
   const [draftNotes, setDraftNotes] = useState({ purchase: '', specifications: '', instructions: '' });
   const startEditing = () => { if (!canEdit || !panelData) return; setDraft({ ...panelData }); setDraftNotes({ purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
-  const cancelEditing = () => { setIsEditing(false); setDraft(null); setEditError(''); };
+  const cancelEditing = () => { if (savingEdits) return; setIsEditing(false); setDraft(null); setEditError(''); };
   const changeField = (key: 'modelNumber' | 'sku' | 'itemColor' | 'unitPrice' | 'cost' | 'quantity' | 'unit' | 'laborHours' | 'description', value: string) => {
     setDraft(prev => prev ? { ...prev, [key]: ['unitPrice','cost','quantity','laborHours'].includes(key) ? Number(value) : value } : prev);
   };
@@ -59,9 +59,9 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
       }).eq('id', productId).eq('organization_id', profile.organization_id).select('id').single();
       if (error) throw error;
       if (!updated) throw new Error('Product update was not confirmed.');
+      await loadProduct();
       setIsEditing(false);
       setDraft(null);
-      await loadProduct();
       onSaved?.();
     } catch (error) {
       setEditError(error instanceof Error ? error.message : 'Could not save product.');
@@ -288,7 +288,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
               {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => { setEditError(''); setActiveTab(tab); }} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             {canEdit && (
-              <button type="button" onClick={isEditing ? cancelEditing : startEditing} aria-label={isEditing ? 'Cancel editing' : 'Edit product'} title="Edit product"
+              <button type="button" onClick={isEditing ? cancelEditing : startEditing} disabled={savingEdits} aria-label={isEditing ? 'Cancel editing' : 'Edit product'} title="Edit product"
                 className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit className="w-4 h-4" />
               </button>
@@ -374,6 +374,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
           {isEditing && <button onClick={() => void saveEdits()} disabled={savingEdits} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">{savingEdits ? 'Saving...' : 'Save Product'}</button>}
           <button
             onClick={isEditing ? cancelEditing : onClose}
+            disabled={savingEdits}
             className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
             {isEditing ? 'Cancel' : 'Close'}
