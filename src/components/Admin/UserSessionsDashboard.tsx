@@ -103,7 +103,7 @@ export function UserSessionsDashboard() {
   const usageCutoff = Date.now() - usageDays * 86400000;
   const usagePeople = people.filter(p => p.is_active !== false).map(p => {
     const rows = sessions.filter(s => s.user_id === p.id && Date.parse(s.session_start) >= usageCutoff);
-    const days = new Set(rows.map(s => new Date(s.last_activity).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }))).size;
+    const days = new Set(rows.map(s => new Date(s.session_start).toLocaleDateString('en-CA'))).size;
     return { person: p, rows, days };
   }).sort((a, b) => usageSort === 'name' ? (a.person.full_name || a.person.email).localeCompare(b.person.full_name || b.person.email) : usageSort === 'least' ? a.rows.length - b.rows.length : b.rows.length - a.rows.length);
   const visiblePeople = people.filter(p => p.is_active !== false && (!onlineOnly || onlineUsers.has(p.id)) && ([p.full_name, p.email].join(' ').toLowerCase().includes(search.toLowerCase()) || sessions.some(s => s.user_id === p.id && matches(s))));
