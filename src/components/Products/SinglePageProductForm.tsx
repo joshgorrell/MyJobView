@@ -58,6 +58,10 @@ interface SuggestedPhoto { url: string; description: string }
 export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
   const { profile } = useAuth();
   const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>('overview');
+  const selectEditorTab = (tab: typeof editorTab) => {
+    setEditorTab(tab);
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  };
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1281,7 +1285,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
         <nav aria-label="Product editor sections" className="shrink-0 flex gap-1 overflow-x-auto border-b border-gray-200 bg-white px-4 sm:px-6 py-2">
           {(['overview', 'pricing', 'details', 'instructions', 'accessories'] as const).map(tab => (
-            <button key={tab} type="button" onClick={() => setEditorTab(tab)}
+            <button key={tab} type="button" onClick={() => selectEditorTab(tab)}
               aria-current={editorTab === tab ? 'page' : undefined}
               className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${editorTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
               {{ overview: 'Overview', pricing: 'Pricing & Labor', details: 'Details', instructions: 'Instructions & Resources', accessories: 'Accessories' }[tab]}
