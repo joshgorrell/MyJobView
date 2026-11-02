@@ -38,19 +38,24 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
   };
   const saveEdits = async () => {
     if (!draft || savingEdits || !canEdit || !profile?.organization_id) return;
-    if (!draft.modelNumber?.trim() || !draft.sku?.trim() || !Number.isFinite(draft.unitPrice) || !Number.isFinite(draft.cost) || !Number.isFinite(draft.quantity) || !Number.isFinite(draft.laborHours) || draft.unitPrice < 0 || draft.cost < 0 || draft.quantity <= 0 || draft.laborHours < 0) {
-      setEditError('Model, SKU, valid pricing, quantity and labor hours are required.');
+    if (!Number.isFinite(draft.unitPrice) || !Number.isFinite(draft.cost) || !Number.isFinite(draft.quantity) || !Number.isFinite(draft.laborHours) || draft.unitPrice < 0 || draft.cost < 0 || draft.quantity <= 0 || draft.laborHours < 0) {
+      setEditError('Enter valid pricing, a quantity greater than zero, and nonnegative labor hours.');
       return;
     }
     setSavingEdits(true);
     setEditError('');
     try {
       const { data: updated, error } = await supabase.from('products').update({
-        manufacturer_model_number: draft.modelNumber, sku: draft.sku, item_color: draft.itemColor,
-        our_price: draft.unitPrice, cost: draft.cost, default_qty: draft.quantity,
+        manufacturer_model_number: draft.modelNumber, name: draft.modelNumber || panelData?.productName,
+        sku: draft.sku, item_color: draft.itemColor,
+        our_price: draft.unitPrice, unit_price: draft.unitPrice, cost: draft.cost,
+        margin_percent: draft.unitPrice > 0 ? (draft.unitPrice - draft.cost) / draft.unitPrice * 100 : 0,
+        default_qty: draft.quantity,
         unit: draft.unit, default_labor_hours: draft.laborHours,
-        sales_description: draft.description, purchase_description: draftNotes.purchase,
-        specifications: draftNotes.specifications, default_install_task: draftNotes.instructions,
+        sales_description: draft.description || null, description: draft.description || null,
+        purchase_description: draftNotes.purchase || null,
+        specifications: draftNotes.specifications || null, default_install_task: draftNotes.instructions || null,
+        updated_at: new Date().toISOString(),
       }).eq('id', productId).eq('organization_id', profile.organization_id).select('id').single();
       if (error) throw error;
       if (!updated) throw new Error('Product update was not confirmed.');
