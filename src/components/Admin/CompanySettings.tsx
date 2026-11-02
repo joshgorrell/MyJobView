@@ -92,10 +92,12 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
   const cardBannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadSettings();
-    loadOffices();
-    loadOrganization();
-  }, []);
+    if (!profile?.organization_id) return;
+    setLoading(true);
+    void loadSettings();
+    void loadOffices();
+    void loadOrganization();
+  }, [profile?.organization_id]);
 
   async function loadSettings() {
     setSettingsLoadError(null);
