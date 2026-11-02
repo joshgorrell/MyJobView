@@ -46,6 +46,7 @@ interface ProductFormProps {
   productId?: string;
   duplicateFromId?: string;
   readOnly?: boolean;
+  initialTab?: 'overview' | 'pricing' | 'details' | 'instructions' | 'accessories';
   onClose: () => void;
   onSave: (productData?: any) => void;
   onDuplicate?: () => void;
@@ -55,9 +56,9 @@ interface ProductFormProps {
 
 interface SuggestedPhoto { url: string; description: string }
 
-export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
+export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, initialTab = 'overview', onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
   const { profile } = useAuth();
-  const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>('overview');
+  const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>(initialTab);
   const selectEditorTab = (tab: typeof editorTab) => {
     setEditorTab(tab);
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
