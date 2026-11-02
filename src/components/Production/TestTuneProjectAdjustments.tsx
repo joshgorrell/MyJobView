@@ -122,7 +122,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const rows = visible.flatMap(p => p.tasks.filter(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(t => ({ p, t }))).sort((a, b) => (Date.parse(b.t.updated_at || b.t.created_at || '') || 0) - (Date.parse(a.t.updated_at || a.t.created_at || '') || 0));
   const summary = scoped.flatMap(p => p.tasks).filter(t => (sourceFilter === 'all' || t.source === sourceFilter) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (!dateCutoff || (Date.parse(t.updated_at || t.created_at || '') || 0) >= dateCutoff) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && [search.toLowerCase()].every(q => !q || [t.title, t.customer_description, ...scoped.filter(p => p.tasks.some(item => item.id === t.id)).flatMap(p => [p.customer, p.name, p.number])].some(v => v?.toLowerCase().includes(q))));
   const summaryCounts = { all: summary.length, unsubmitted: summary.filter(t => !t.request_id && t.status === 'open').length, requested: summary.filter(t => Boolean(t.request_id)).length, completed: summary.filter(t => t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || ''))).length };
-  return <section className="min-w-0 space-y-3" aria-label="Test and Tune punchlist feed">
+  return <section className="min-w-0 space-y-2" aria-label="Test and Tune punchlist feed">
     <div data-testid="punchlist-toolbar" className="flex min-w-0 items-center gap-2">
       <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers, projects or tasks" className="min-h-11 min-w-0 flex-1 rounded-xl border border-subtle bg-surface px-3 text-primary" />
       <button type="button" aria-label="Filter Test and Tune tasks" aria-haspopup="dialog" aria-expanded={showAdvancedFilters} onClick={() => setShowAdvancedFilters(true)} className="relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-subtle bg-surface px-3 text-sm font-medium text-primary">
@@ -139,7 +139,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </header>
         <div className="grid min-w-0 grid-cols-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
           <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-secondary">Status
-            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All statuses</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
+            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All items</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
           </label>
           <select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
       <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
@@ -154,7 +154,10 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </footer>
       </section>
     </div>}
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Punchlist summary filters">{([{ key: 'all', label: 'All items' }, { key: 'unsubmitted', label: 'Not submitted' }, { key: 'requested', label: 'Service requested' }, { key: 'completed', label: 'Completed' }] as const).map(item => <button key={item.key} type="button" aria-pressed={statusFilter === item.key} onClick={() => setStatusFilter(item.key)} className={`min-h-14 min-w-0 rounded-xl border px-3 py-2 text-left text-sm ${statusFilter === item.key ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary'}`}><strong>{summaryCounts[item.key]}</strong> {item.label}</button>)}</div>
+    <div className="flex items-center justify-between gap-2 text-xs text-secondary" aria-live="polite">
+      <span>{rows.length} {rows.length === 1 ? 'item' : 'items'} shown</span>
+      <span>{summaryCounts[statusFilter as keyof typeof summaryCounts] ?? rows.length} in selected category</span>
+    </div>
     {loading && <p role="status">Loading punchlist…</p>}
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
     {notice && <p role="status" className="break-words text-sm text-secondary">{notice}</p>}
