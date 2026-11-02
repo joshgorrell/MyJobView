@@ -42,7 +42,7 @@ const noBasis=fixture();noBasis.basis=null;block(noBasis,'original_approval_basi
 // Fail-closed source-verification regressions: never promote incomplete evidence into a draft.
 const missingPair=fixture();missingPair.pairs.splice(3,1);block(missingPair,'approved_application_history_not_connected');
 const changedOriginal=fixture(true);changedOriginal.basis.lines[0].line.quantity='99.00';block(changedOriginal,'current_rows_differ_from_approval');
-const wrongCustomer=fixture(true);wrongCustomer.currentModel.customer.id='different-customer';block(wrongCustomer,'draft_order_unverified');
+const wrongCustomer=fixture(true);wrongCustomer.currentModel.customer.id='different-customer';block(wrongCustomer,'customer_binding_mismatch');
 
 for(const status of ['pending_deposit','pending_po','planning','active']){const early=fixture();early.currentModel.order.status=status;Object.defineProperty(early.currentModel,'completion',{get(){throw Error('Completion must not be read');}});const result=pass(early);assert.equal(result.content.orderStatus,'open');assert.deepEqual(result.content.lines,r.content.lines);}
 const unknown=fixture();unknown.currentModel.order.status='unknown';Object.defineProperty(unknown,'pairs',{get(){throw Error('Unsupported order history must not be read');}});block(unknown,'draft_order_unverified');
