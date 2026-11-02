@@ -300,7 +300,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4 bg-gray-50/50">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 bg-gray-50/50">
           {activeTab === 'overview' ? (
             <>
               <CatalogProductOverview data={isEditing && draft ? draft : panelData} editing={isEditing} onFieldChange={changeField} />
@@ -376,7 +376,7 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
             onClick={isEditing ? cancelEditing : onClose}
             className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
-            Close
+            {isEditing ? 'Cancel' : 'Close'}
           </button>
         </div>
       </div>
