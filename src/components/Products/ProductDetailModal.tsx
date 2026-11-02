@@ -13,7 +13,7 @@ import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 interface ProductDetailModalProps {
   productId: string;
   onClose: () => void;
-  onEdit?: () => void;
+  onEdit?: (tab: 'overview' | 'details' | 'instructions' | 'accessories' | 'history') => void;
   onSaved?: () => void;
   onDuplicate?: () => void;
   onArchive?: () => void;
@@ -246,7 +246,7 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
               {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
             {canEdit && onEdit && (
-              <button type="button" onClick={onEdit} aria-label="Edit product" title="Edit product"
+              <button type="button" onClick={() => onEdit(activeTab)} aria-label="Edit product" title="Edit product"
                 className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit className="w-4 h-4" />
               </button>
