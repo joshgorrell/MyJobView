@@ -30,6 +30,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
         if (cancelled) return;
         if (error) { setJobsError(true); return; }
         setAssignedJobs(data ?? []);
+        setSelectedWorkOrderId(current => current && (data ?? []).some(job => job.id === current) ? current : '');
       }).catch(() => { if (!cancelled) setJobsError(true); })
       .finally(() => { if (!cancelled) setJobsLoading(false); });
     return () => { cancelled = true; };
@@ -93,8 +94,9 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
               </select>
             </label>
           )}
+          {!jobsLoading && !jobsError && assignedJobs.length === 0 && <p className="text-sm text-gray-500">No work orders are currently assigned to you. Ask your project manager to assign one, or open the Technician Work Center.</p>}
           {selectedWorkOrderId && assignedJobs.some(job => job.id === selectedWorkOrderId) && (
-            <WorkOrderTimeControl workOrderId={selectedWorkOrderId}
+            <WorkOrderTimeControl key={selectedWorkOrderId} workOrderId={selectedWorkOrderId}
               assignedTo={assignedJobs.find(job => job.id === selectedWorkOrderId)?.assigned_to ?? null}
               onChanged={() => setHistoryRevision(value => value + 1)} />
           )}
