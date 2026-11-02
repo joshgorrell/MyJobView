@@ -26,6 +26,12 @@ export function AuthCallback() {
 
         if (sessionError) throw sessionError;
 
+        // A transferred login is a new interactive session on this origin.
+        // Initialize its idle clock before navigating into AuthProvider.
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Transferred session has no authenticated user');
+        localStorage.setItem(`mjv-last-interaction:${user.id}`, String(Date.now()));
+
         window.location.hash = '';
         const returnPath = getReturnPath();
         window.location.replace(returnPath);

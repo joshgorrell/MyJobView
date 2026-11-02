@@ -62,39 +62,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const recoveryLink = passwordRecoveryLink.active;
     if (recoveryLink) setIsPasswordRecovery(true);
 
-    // Wrap getSession in a timeout so a hanging session fetch doesn't
-    // leave the app on the loading screen indefinitely.
+    // The auth listener owns INITIAL_SESSION. Calling getSession() separately
+    // raced with it and could start duplicate profile/session initialization.
     const sessionTimeout = setTimeout(() => {
       console.error('Session initialization timed out after 15 seconds');
-      setUser(null);
-      setProfile(null);
-      setCompanySettings(null);
       setLoading(false);
       setLoadingProfile(false);
     }, 15000);
 
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        clearTimeout(sessionTimeout);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          if (recoveryLink) setLoading(false);
-          else loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch((error) => {
-        clearTimeout(sessionTimeout);
-        console.error('Session initialization error:', error);
-        setUser(null);
-        setProfile(null);
-        setCompanySettings(null);
-        setLoading(false);
-        setLoadingProfile(false);
-      });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') clearTimeout(sessionTimeout);
       if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordRecovery(true);
         setUser(session?.user ?? null);
@@ -143,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(sessionTimeout); subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
