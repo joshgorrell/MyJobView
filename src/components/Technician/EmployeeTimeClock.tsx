@@ -1,12 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
 import { DailyClock } from './DailyClock';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 
 type TimeSection = 'daily' | 'job' | 'mine';
+type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' };
 
 export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) => void }) {
   const policy = useEmployeeTimePolicy();
+  const { profile } = useAuth();
+  const [entries, setEntries] = useState<PersonalEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  useEffect(() => {
+    if (section !== 'mine' || !profile?.id) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError(false);
+    Promise.all([
+      supabase.from('daily_clock_entries').select('id, entry_date, clock_in, clock_out, total_hours').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
+      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
+    ]).then(([daily, job]) => {
+      if (cancelled) return;
+      if (daily.error || job.error) { setHistoryError(true); return; }
+      const combined: PersonalEntry[] = [
+        ...(daily.data ?? []).map(e => ({ ...e, kind: 'Daily' as const })),
+        ...(job.data ?? []).map(e => ({ ...e, kind: 'Job' as const })),
+      ];
+      setEntries(combined.sort((a, b) => b.clock_in.localeCompare(a.clock_in)).slice(0, 30));
+    }).catch(() => { if (!cancelled) setHistoryError(true); }).finally(() => { if (!cancelled) setHistoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [section, profile?.id]);
   const [section, setSection] = useState<TimeSection>('job');
   const sections: { id: TimeSection; label: string; icon: typeof Clock }[] = [
     ...(policy.dailyClock ? [{ id: 'daily' as const, label: 'Daily Clock', icon: Clock }] : []),
@@ -39,8 +65,17 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
       {current === 'mine' && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
-          <p className="text-sm text-gray-600">Review your recorded job time and available time-related actions in your assigned work orders.</p>
-          <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">View Work Orders</button>
+          <p className="text-sm text-gray-600">Your recent daily and job time entries.</p>
+          {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
+          {historyError && <p role="alert" className="text-sm text-red-700">Time history could not be loaded.</p>}
+          {!historyLoading && !historyError && entries.length === 0 && <p className="text-sm text-gray-500">No recent time entries.</p>}
+          {!historyLoading && !historyError && entries.map(entry => (
+            <div key={`${entry.kind}-${entry.id}`} className="flex items-center justify-between gap-3 border-t border-gray-100 py-3 text-sm">
+              <div><span className="font-medium text-gray-900">{entry.kind} time</span><div className="text-gray-500">{entry.entry_date}</div></div>
+              <span className="font-semibold tabular-nums text-gray-900">{entry.total_hours == null ? 'In progress' : `${Number(entry.total_hours).toFixed(2)} hrs`}</span>
+            </div>
+          ))}
+          <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">Open Work Orders</button>
         </div>
       )}
     </div>
