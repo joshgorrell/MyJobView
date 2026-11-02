@@ -57,6 +57,7 @@ interface SuggestedPhoto { url: string; description: string }
 
 export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
   const { profile } = useAuth();
+  const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>('overview');
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1278,7 +1279,18 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </button>
         </div>
 
+        <nav aria-label="Product editor sections" className="shrink-0 flex gap-1 overflow-x-auto border-b border-gray-200 bg-white px-4 sm:px-6 py-2">
+          {(['overview', 'pricing', 'details', 'instructions', 'accessories'] as const).map(tab => (
+            <button key={tab} type="button" onClick={() => setEditorTab(tab)}
+              aria-current={editorTab === tab ? 'page' : undefined}
+              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${editorTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {{ overview: 'Overview', pricing: 'Pricing & Labor', details: 'Details', instructions: 'Instructions & Resources', accessories: 'Accessories' }[tab]}
+            </button>
+          ))}
+        </nav>
+
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-start">
+          {editorTab === 'overview' && (<React.Fragment>
           {/* AUTO-SAVE INFO */}
           {!readOnly && (
             <div className="lg:col-span-2 flex items-center gap-2 text-gray-500">
@@ -1730,6 +1742,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
+          {editorTab === 'pricing' && (<React.Fragment>
+          </React.Fragment>)}
           {/* PRICING */}
           <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -2026,6 +2040,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
+          {editorTab === 'details' && (<React.Fragment>
+          </React.Fragment>)}
           {/* DESCRIPTIONS */}
           <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Descriptions & Instructions</h3>
@@ -2097,6 +2113,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             />
           </div>
 
+          {editorTab === 'instructions' && (<React.Fragment>
+          </React.Fragment>)}
           {/* RESOURCES */}
           <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -2187,11 +2205,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
           </div>
 
+          {editorTab === 'accessories' && (<React.Fragment>
+          </React.Fragment>)}
           {/* Accessories Section */}
           {productId && (
             <ProductAccessories productId={productId} readOnly={readOnly} parentQuantity={Number(formData.default_qty || 1)} baseMaterial={Number(formData.our_price || 0) * Number(formData.default_qty || 1)} baseLabor={Number(formData.default_labor_hours || 0) * Number(formData.default_qty || 1) * Number(laborPhases.find(phase => phase.id === formData.labor_phase_id)?.default_price || laborRate)} />
           )}
-          {!readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+          </React.Fragment>)}
+          {editorTab === 'details' && !readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">Product status</h3>
             <label className="flex items-start gap-3 text-sm text-gray-700">
               <input type="checkbox" aria-label="Discontinue item" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
