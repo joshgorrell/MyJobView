@@ -18,7 +18,8 @@ as $$
   join public.company_directory_settings s on s.organization_id=p.organization_id and s.enabled
   join public.profiles viewer on viewer.id=auth.uid() and viewer.is_active and viewer.organization_id=p.organization_id
   left join public.business_cards b on b.user_id=p.id and b.is_active
-  left join public.company_offices o on o.id=p.primary_office_id\n  left join public.company_settings cs on cs.organization_id=p.organization_id
+  left join public.company_offices o on o.id=p.primary_office_id
+  left join public.company_settings cs on cs.organization_id=p.organization_id
   where p.is_active
   order by p.full_name;
 $$;
