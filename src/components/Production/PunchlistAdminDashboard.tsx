@@ -21,12 +21,12 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   ];
 
   return (
-    <section className="min-w-0 w-full max-w-full space-y-5 pb-6">
-      <header className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="min-w-0 w-full max-w-full space-y-3 pb-4">
+      <header className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-secondary">Production · Customer Care</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-primary sm:text-3xl">Test &amp; Tune</h1>
-          <p className="mt-1 max-w-2xl text-sm text-secondary">
+          <h1 className="text-xl font-bold tracking-tight text-primary sm:text-2xl">Test &amp; Tune</h1>
+          <p className="max-w-2xl text-xs text-secondary">
             Track post-completion adjustments, coordinate follow-up work, and manage customer access.
           </p>
         </div>
