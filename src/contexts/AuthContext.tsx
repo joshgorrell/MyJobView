@@ -29,6 +29,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // A navigation reload should only be counted once, even if tracking restarts on tab focus.
 let reloadActivityHandled = false;
+// Prevent the idle watchdog from treating a successful interactive login as an old session.
+let interactiveSignInInProgress = false;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -251,7 +253,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    interactiveSignInInProgress = true;
+    let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'];
+    let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['error'];
+    try {
+      ({ data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password }));
+    } catch (signInError) {
+      interactiveSignInInProgress = false;
+      throw signInError;
+    }
+    if (error || !data?.user || !data.session) interactiveSignInInProgress = false;
 
     if (error) throw error;
 
@@ -269,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Explicit login begins a new idle window, even after an earlier expired session.
     localStorage.setItem(`mjv-last-interaction:${data.user.id}`, String(Date.now()));
+    interactiveSignInInProgress = false;
 
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect_to');
@@ -415,7 +427,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (event.isTrusted) recordIdleInteraction();
         };
         const previousActivity = readLastInteraction();
-        if (!previousActivity) localStorage.setItem(idleKey, String(Date.now()));
+        if (interactiveSignInInProgress || !previousActivity) {
+          localStorage.setItem(idleKey, String(Date.now()));
+        }
         // Navigation Timing identifies reloads but cannot distinguish a manual
         // browser refresh from an automatic one. Never revive an expired session.
         if (!reloadActivityHandled) {
