@@ -1,4 +1,5 @@
 import { notify } from './lib/feedback';
+import { recordPageVisit } from './lib/pageVisitTracking';
 import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
 import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
@@ -272,6 +273,17 @@ function AppContent() {
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [_currentHash, setCurrentHash] = useState(window.location.hash);
+
+  // Record a visit only when the logical workspace page changes, not on each render.
+  const lastTrackedPage = useRef('');
+  useEffect(() => {
+    if (!user?.id || !profile?.organization_id || isPortalUser || loading) return;
+    const path = window.location.pathname;
+    const page = path === '/' || workspacePage(path) ? 'workspace/' + activeTab : path;
+    if (lastTrackedPage.current === page) return;
+    lastTrackedPage.current = page;
+    void recordPageVisit(user.id, profile.organization_id, page);
+  }, [user?.id, profile?.organization_id, isPortalUser, loading, activeTab, currentPath]);
 
   const notificationCount = useNotificationCount();
 
