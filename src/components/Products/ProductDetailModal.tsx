@@ -14,14 +14,13 @@ import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 interface ProductDetailModalProps {
   productId: string;
   onClose: () => void;
-  onEdit?: (tab: 'overview' | 'details' | 'instructions' | 'accessories' | 'history') => void;
   onSaved?: () => void;
   onDuplicate?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
 }
 
-export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: ProductDetailModalProps) {
+export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetailModalProps) {
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
