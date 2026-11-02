@@ -414,115 +414,64 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
 
   async function saveSettings() {
     if (settingsLoadError || !settings) {
-      notify('Company information did not load. Refresh or contact support before saving.', { theme: 'blue', tone: 'error' });
+      notify('Company information did not load. Refresh before saving.', { theme: 'blue', tone: 'error' });
       return;
     }
     setSaving(true);
     try {
-      if (settings) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update({
-            company_name: companyName,
-            print_accent_color: printAccentColor,
-            website: website,
-            portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
-            company_logo_url: logoUrl || null,
-            from_email: fromEmail?.trim() || null,
-            from_name: fromName?.trim() || null,
-            reply_to_email: replyToEmail?.trim() || null,
-            welcome_support_email: welcomeSupportEmail?.trim() || null,
-            photographer_email: photographerEmail?.trim() || null,
-            cc_convenience_fee_enabled: ccFeeEnabled,
-            cc_convenience_fee_type: ccFeeType,
-            cc_convenience_fee_percentage: ccFeePercentage / 100,
-            cc_convenience_fee_flat_amount: ccFeeFlatAmount,
-            cc_convenience_fee_label: ccFeeLabel,
-            annual_billing_enabled: annualBillingEnabled,
-            default_billing_preference: defaultBillingPreference,
-            annual_discount_type: annualDiscountType,
-            annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
-            annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
-            customer_can_change_billing_preference: customerCanChangePref,
-            staff_can_override_billing_preference: staffCanOverridePref,
-            billing_proration_rule: billingProrationRule,
-            billing_change_effective_date: billingChangeEffective,
-            default_auto_renew: defaultAutoRenew,
-            grace_period_days: gracePeriodDays,
-            auto_completion_enabled: autoCompletionEnabled,
-            auto_completion_requires_approval: autoCompletionRequiresApproval,
-            auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
-            auto_clock_out_enabled: autoClockOutEnabled,
-            auto_clock_out_schedule_enabled: autoClockOutEnabled,
-            auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
-            auto_clock_out_time: autoClockOutTime + ':00',
-            forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
-            default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
-            auto_review_followup_enabled: autoReviewFollowupEnabled,
-            auto_review_followup_days: autoReviewFollowupDays,
-            lost_review_followup_enabled:lostFollowupEnabled,
-            lost_review_followup_days:lostFollowupDays,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', settings.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('company_settings')
-          .insert({
-            company_name: companyName,
-            print_accent_color: printAccentColor,
-            website: website,
-            portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
-            company_logo_url: logoUrl || null,
-            from_email: fromEmail?.trim() || null,
-            from_name: fromName?.trim() || null,
-            reply_to_email: replyToEmail?.trim() || null,
-            photographer_email: photographerEmail?.trim() || null,
-            cc_convenience_fee_enabled: ccFeeEnabled,
-            cc_convenience_fee_type: ccFeeType,
-            cc_convenience_fee_percentage: ccFeePercentage / 100,
-            cc_convenience_fee_flat_amount: ccFeeFlatAmount,
-            cc_convenience_fee_label: ccFeeLabel,
-            annual_billing_enabled: annualBillingEnabled,
-            default_billing_preference: defaultBillingPreference,
-            annual_discount_type: annualDiscountType,
-            annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
-            annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
-            customer_can_change_billing_preference: customerCanChangePref,
-            staff_can_override_billing_preference: staffCanOverridePref,
-            billing_proration_rule: billingProrationRule,
-            billing_change_effective_date: billingChangeEffective,
-            default_auto_renew: defaultAutoRenew,
-            grace_period_days: gracePeriodDays,
-            auto_completion_enabled: autoCompletionEnabled,
-            auto_completion_requires_approval: autoCompletionRequiresApproval,
-            auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
-            auto_clock_out_enabled: autoClockOutEnabled,
-            auto_clock_out_schedule_enabled: autoClockOutEnabled,
-            auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
-            auto_clock_out_time: autoClockOutTime + ':00',
-            forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
-            default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
-            auto_review_followup_enabled: autoReviewFollowupEnabled,
-            auto_review_followup_days: autoReviewFollowupDays,
-            lost_review_followup_enabled:lostFollowupEnabled,
-            lost_review_followup_days:lostFollowupDays,
-          });
-
-        if (error) throw error;
+      const updates = section === 'billing' ? {
+        cc_convenience_fee_enabled: ccFeeEnabled,
+        cc_convenience_fee_type: ccFeeType,
+        cc_convenience_fee_percentage: ccFeePercentage / 100,
+        cc_convenience_fee_flat_amount: ccFeeFlatAmount,
+        cc_convenience_fee_label: ccFeeLabel,
+        annual_billing_enabled: annualBillingEnabled,
+        default_billing_preference: defaultBillingPreference,
+        annual_discount_type: annualDiscountType,
+        annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
+        annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
+        customer_can_change_billing_preference: customerCanChangePref,
+        staff_can_override_billing_preference: staffCanOverridePref,
+        billing_proration_rule: billingProrationRule,
+        billing_change_effective_date: billingChangeEffective,
+        default_auto_renew: defaultAutoRenew,
+        grace_period_days: gracePeriodDays,
+        default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
+      } : section === 'automation' ? {
+        auto_completion_enabled: autoCompletionEnabled,
+        auto_completion_requires_approval: autoCompletionRequiresApproval,
+        auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
+        auto_clock_out_enabled: autoClockOutEnabled,
+        auto_clock_out_schedule_enabled: autoClockOutEnabled,
+        auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
+        auto_clock_out_time: autoClockOutTime + ':00',
+        forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
+        auto_review_followup_enabled: autoReviewFollowupEnabled,
+        auto_review_followup_days: autoReviewFollowupDays,
+        lost_review_followup_enabled:lostFollowupEnabled,
+        lost_review_followup_days:lostFollowupDays,
+      } : {
+        company_name: companyName,
+        print_accent_color: printAccentColor,
+        website: website,
+        portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
+        company_logo_url: logoUrl || null,
+        from_email: fromEmail?.trim() || null,
+        from_name: fromName?.trim() || null,
+        reply_to_email: replyToEmail?.trim() || null,
+        welcome_support_email: welcomeSupportEmail?.trim() || null,
+        photographer_email: photographerEmail?.trim() || null,
+      };
+      const { error } = await supabase.from('company_settings')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', settings.id);
+      if (error) throw error;
+      if (section === 'company') {
+        await saveTimezone();
+        clearTimezoneCache();
       }
-
-      window.location.reload();
-
-      // Save timezone to organizations table
-      await saveTimezone();
-
-      clearTimezoneCache();
-
-      notify('Company settings saved successfully', { theme: 'blue', tone: 'success' });
-      loadSettings();
+      notify('Settings saved successfully', { theme: 'blue', tone: 'success' });
+      await loadSettings();
     } catch (error) {
       console.error('Error saving settings:', error);
       notify('Failed to save settings', { theme: 'blue', tone: 'error' });
