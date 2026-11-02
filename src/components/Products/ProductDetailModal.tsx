@@ -30,7 +30,8 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
   const [savingEdits, setSavingEdits] = useState(false);
   const [editError, setEditError] = useState('');
   const [draft, setDraft] = useState<ProductDetailPanelData | null>(null);
-  const startEditing = () => { setDraft(panelData); setEditError(''); setIsEditing(true); };
+  const [draftNotes, setDraftNotes] = useState({ sales: '', purchase: '', specifications: '', instructions: '' });
+  const startEditing = () => { setDraft(panelData); setDraftNotes({ sales: catalogNotes.sales || '', purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
   const cancelEditing = () => { setIsEditing(false); setDraft(null); setEditError(''); };
   const changeField = (key: 'modelNumber' | 'sku' | 'itemColor' | 'unitPrice' | 'cost' | 'quantity' | 'unit' | 'laborHours' | 'description', value: string) => {
     setDraft(prev => prev ? { ...prev, [key]: ['unitPrice','cost','quantity','laborHours'].includes(key) ? Number(value) : value } : prev);
@@ -48,7 +49,8 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
         manufacturer_model_number: draft.modelNumber, sku: draft.sku, item_color: draft.itemColor,
         our_price: draft.unitPrice, cost: draft.cost, default_qty: draft.quantity,
         unit: draft.unit, default_labor_hours: draft.laborHours,
-        sales_description: draft.description,
+        sales_description: draft.description, purchase_description: draftNotes.purchase,
+        specifications: draftNotes.specifications, default_install_task: draftNotes.instructions,
       }).eq('id', productId).eq('organization_id', profile?.organization_id);
       if (error) throw error;
       setIsEditing(false);
@@ -350,9 +352,9 @@ export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetai
               )}
             </>
           ) : activeTab === 'details' ? (
-            <div className="grid md:grid-cols-2 gap-4"><ProductTechsafeExclusion key={productId} productId={productId} canEdit={canEdit} />{[['Sales description',catalogNotes.sales],['Purchase description',catalogNotes.purchase],['Specifications',catalogNotes.specifications]].map(([label,value]) => <section key={label} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3><p className="text-sm whitespace-pre-wrap break-words">{value || 'Not provided.'}</p></section>)}</div>
+            <div className="grid md:grid-cols-2 gap-4"><ProductTechsafeExclusion key={productId} productId={productId} canEdit={canEdit} />{([['Sales description','sales'],['Purchase description','purchase'],['Specifications','specifications']] as const).map(([label,key]) => <section key={key} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3>{isEditing ? <textarea aria-label={label} value={key === 'sales' ? draft?.description || '' : draftNotes[key]} onChange={e => { if (key === 'sales') changeField('description', e.target.value); else setDraftNotes(prev => ({...prev,[key]:e.target.value})); }} rows={5} className="w-full rounded border border-gray-300 bg-white text-gray-900 p-2 text-sm" /> : <p className="text-sm whitespace-pre-wrap break-words">{catalogNotes[key] || 'Not provided.'}</p>}</section>)}</div>
           ) : activeTab === 'instructions' ? (
-            <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p><p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p></section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
+            <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p>{isEditing ? <textarea aria-label="Install Instructions" value={draftNotes.instructions} onChange={e => setDraftNotes(prev => ({...prev,instructions:e.target.value}))} rows={5} className="w-full rounded border border-gray-300 bg-white text-gray-900 p-2 text-sm" /> : <p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p>}</section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
           ) : activeTab === 'accessories' ? (
             <ProductAccessories productId={productId} readOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} />
           ) : (
