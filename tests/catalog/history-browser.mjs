@@ -6,6 +6,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.CH
 try{for(const width of [390,1440]){
  const page=await browser.newPage({viewport:{width,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:5199/?mode=edit');
+ await page.getByRole('navigation',{name:'Product editor sections'}).getByRole('button',{name:'Details',exact:true}).click();
  await page.getByLabel('Discontinue item',{exact:true}).waitFor();
  assert.equal(await page.getByLabel('Discontinue item',{exact:true}).isChecked(),true);
  const status=page.getByRole('region',{name:'Product status'});
