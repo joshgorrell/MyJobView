@@ -245,6 +245,12 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
             <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
               {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
+            {canEdit && onEdit && (
+              <button type="button" onClick={onEdit} aria-label="Edit product" title="Edit product"
+                className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
             <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
             </button>
@@ -322,15 +328,6 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
         {/* Footer */}
         <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-          {canEdit && onEdit ? (
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              <Edit className="w-3.5 h-3.5" />
-              Edit Product
-            </button>
-          ) : <div />}
           <button
             onClick={onClose}
             className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
