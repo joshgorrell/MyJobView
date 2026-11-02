@@ -1742,8 +1742,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
-          {editorTab === 'pricing' && (<React.Fragment>
           </React.Fragment>)}
+          {editorTab === 'pricing' && (<React.Fragment>
           {/* PRICING */}
           <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -2040,8 +2040,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
-          {editorTab === 'details' && (<React.Fragment>
           </React.Fragment>)}
+          {editorTab === 'details' && (<React.Fragment>
           {/* DESCRIPTIONS */}
           <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Descriptions & Instructions</h3>
@@ -2113,8 +2113,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             />
           </div>
 
-          {editorTab === 'instructions' && (<React.Fragment>
           </React.Fragment>)}
+          {editorTab === 'instructions' && (<React.Fragment>
           {/* RESOURCES */}
           <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -2205,8 +2205,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
           </div>
 
-          {editorTab === 'accessories' && (<React.Fragment>
           </React.Fragment>)}
+          {editorTab === 'accessories' && (<React.Fragment>
           {/* Accessories Section */}
           {productId && (
             <ProductAccessories productId={productId} readOnly={readOnly} parentQuantity={Number(formData.default_qty || 1)} baseMaterial={Number(formData.our_price || 0) * Number(formData.default_qty || 1)} baseLabor={Number(formData.default_labor_hours || 0) * Number(formData.default_qty || 1) * Number(laborPhases.find(phase => phase.id === formData.labor_phase_id)?.default_price || laborRate)} />
