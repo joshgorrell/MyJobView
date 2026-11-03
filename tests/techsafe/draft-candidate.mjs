@@ -62,7 +62,7 @@ const bundle={bundleVersion:1,currentModel:bundleInput.currentModel,basis:bundle
 const composed=prepareTechsafeCandidateFromBundle(bundle,binding);
 assert.equal(composed.valid,true,JSON.stringify(composed));
 for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(composed[flag],false);
-const rejectBundle=b=>{const out=prepareTechsafeCandidateFromBundle(b,binding);
+const rejectBundle=(b,actor=binding)=>{const out=prepareTechsafeCandidateFromBundle(b,actor);
  assert.equal(out.valid,false,JSON.stringify(out));assert.equal(out.content,null);
  for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(out[flag],false);};
 rejectBundle(null);
@@ -75,6 +75,17 @@ rejectBundle({...bundle,quoteReady:true});
 rejectBundle({...bundle,eventId:'fabricated'});
 rejectBundle({...bundle,revision:1});
 rejectBundle({...bundle,basis:null});
+
+for(const key of ['connectionId','organizationId','orderId','proposalId']){
+ rejectBundle({...bundle,basis:{...bundle.basis,binding:{...bundle.basis.binding,[key]:'other'}}});
+ rejectBundle({...bundle}, {...binding,[key]:'other'});
+}
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,connectionId:'other'}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,organizationId:'other'}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,order:{...bundle.currentModel.order,id:'other'}}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,order:{...bundle.currentModel.order,proposal_id:'other'}}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,order:{...bundle.currentModel.order,organization_id:'other'}}});
+
 
 
 // Phase 2: malformed and partial source bundles must never authorize export.
