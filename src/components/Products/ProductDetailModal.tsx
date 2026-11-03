@@ -13,19 +13,60 @@ import { catalogTaxonomy } from './CatalogTaxonomyFilters';
 interface ProductDetailModalProps {
   productId: string;
   onClose: () => void;
-  onEdit?: () => void;
   onSaved?: () => void;
+  onEdit?: () => void;
   onDuplicate?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
 }
 
-export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: ProductDetailModalProps) {
+export function ProductDetailModal({ productId, onClose, onSaved }: ProductDetailModalProps) {
   const { profile } = useAuth();
   const canEdit = profile?.can_edit_products ?? false;
   const [panelData, setPanelData] = useState<ProductDetailPanelData | null>(null);
   const [productStatus, setProductStatus] = useState<{is_active?: boolean; is_discontinued?: boolean}>({});
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [draft, setDraft] = useState<ProductDetailPanelData | null>(null);
+  const [draftNotes, setDraftNotes] = useState({ purchase: '', specifications: '', instructions: '' });
+  const startEditing = () => { if (!canEdit || !panelData) return; setDraft({ ...panelData }); setDraftNotes({ purchase: catalogNotes.purchase || '', specifications: catalogNotes.specifications || '', instructions: catalogNotes.instructions || '' }); setEditError(''); setIsEditing(true); };
+  const cancelEditing = () => { if (savingEdits) return; setIsEditing(false); setDraft(null); setEditError(''); };
+  const changeField = (key: 'modelNumber' | 'sku' | 'itemColor' | 'unitPrice' | 'cost' | 'quantity' | 'unit' | 'laborHours' | 'description', value: string) => {
+    setDraft(prev => prev ? { ...prev, [key]: ['unitPrice','cost','quantity','laborHours'].includes(key) ? Number(value) : value } : prev);
+  };
+  const saveEdits = async () => {
+    if (!draft || savingEdits || !canEdit || !profile?.organization_id) return;
+    if (!Number.isFinite(draft.unitPrice) || !Number.isFinite(draft.cost) || !Number.isFinite(draft.quantity) || !Number.isFinite(draft.laborHours) || draft.unitPrice < 0 || draft.cost < 0 || draft.quantity <= 0 || draft.laborHours < 0) {
+      setEditError('Enter valid pricing, a quantity greater than zero, and nonnegative labor hours.');
+      return;
+    }
+    setSavingEdits(true);
+    setEditError('');
+    try {
+      const { data: updated, error } = await supabase.from('products').update({
+        manufacturer_model_number: draft.modelNumber, name: draft.modelNumber || panelData?.productName,
+        sku: draft.sku, item_color: draft.itemColor,
+        our_price: draft.unitPrice, unit_price: draft.unitPrice, cost: draft.cost,
+        margin_percent: draft.unitPrice > 0 ? (draft.unitPrice - draft.cost) / draft.unitPrice * 100 : 0,
+        default_qty: draft.quantity,
+        unit: draft.unit, default_labor_hours: draft.laborHours,
+        sales_description: draft.description || null, description: draft.description || null,
+        purchase_description: draftNotes.purchase || null,
+        specifications: draftNotes.specifications || null, default_install_task: draftNotes.instructions || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', productId).eq('organization_id', profile.organization_id).select('id').single();
+      if (error) throw error;
+      if (!updated) throw new Error('Product update was not confirmed.');
+      await loadProduct();
+      setIsEditing(false);
+      setDraft(null);
+      onSaved?.();
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Could not save product.');
+    } finally { setSavingEdits(false); }
+  };
   const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'instructions' | 'accessories' | 'history'>('overview');
   const [auditInfo, setAuditInfo] = useState<{ createdAt: string; createdBy: string; updatedAt: string; updatedBy: string } | null>(null);
   const [catalogNotes, setCatalogNotes] = useState<any>({});
@@ -227,11 +268,12 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
 
   if (!panelData) return null;
 
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-4">
       <div className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl w-full max-w-5xl flex flex-col h-[100dvh] sm:h-[calc(100dvh-2rem)] min-h-0">
         {/* Header */}
-        <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3 shrink-0">
+        <div className="px-3 sm:px-6 pt-3 sm:pt-4 pb-2 sm:pb-3 border-b border-gray-200 grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-2 shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-gray-900 break-words">{panelData.productName}</h2>
             <ProductStatusNotice product={productStatus} />
@@ -242,20 +284,26 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
             )}
           </div>
           <div className="contents">
-            <div className="order-3 w-full sm:w-auto sm:order-none flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl">
-              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} aria-pressed={activeTab === tab} className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
+            <div className="col-span-2 order-3 w-full min-w-0 sm:col-span-1 sm:w-auto sm:order-none flex gap-1 overflow-x-auto overscroll-x-contain bg-gray-100 p-1 rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {(['overview','details','instructions','accessories','history'] as const).map(tab => <button key={tab} type="button" onClick={() => { setEditError(''); setActiveTab(tab); }} aria-pressed={activeTab === tab} className={`shrink-0 px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{({ overview: 'Overview', details: 'Details', instructions: 'Instructions & Tasks', accessories: accessoryCount > 0 ? `Accessories (${accessoryCount})` : 'Accessories', history: 'History' })[tab]}</button>)}
             </div>
-            <button onClick={onClose} aria-label="Close product details" className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            {canEdit && (
+              <button type="button" onClick={isEditing ? cancelEditing : startEditing} disabled={savingEdits} aria-label={isEditing ? 'Cancel editing' : 'Edit product'} title="Edit product"
+                className="p-2 sm:p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={onClose} aria-label="Close product details" className="p-2 sm:p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-hidden p-3 sm:p-4 bg-gray-50/50">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-4 bg-gray-50/50">
           {activeTab === 'overview' ? (
             <>
-              <CatalogProductOverview data={panelData} />
+              <CatalogProductOverview data={isEditing && draft ? draft : panelData} editing={isEditing} onFieldChange={changeField} />
               <div className="mt-2"><ProductAccessories productId={productId} readOnly summaryOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} /></div>
               {photoOpen && canEdit && (
                 <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4 space-y-3" onPaste={e => {
@@ -310,32 +358,26 @@ export function ProductDetailModal({ productId, onClose, onEdit, onSaved }: Prod
               )}
             </>
           ) : activeTab === 'details' ? (
-            <div className="grid md:grid-cols-2 gap-4"><ProductTechsafeExclusion key={productId} productId={productId} canEdit={canEdit} />{[['Sales description',catalogNotes.sales],['Purchase description',catalogNotes.purchase],['Specifications',catalogNotes.specifications]].map(([label,value]) => <section key={label} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3><p className="text-sm whitespace-pre-wrap break-words">{value || 'Not provided.'}</p></section>)}</div>
+            <div className="grid md:grid-cols-2 gap-4"><ProductTechsafeExclusion key={productId} productId={productId} canEdit={canEdit} />{([['Sales description','sales'],['Purchase description','purchase'],['Specifications','specifications']] as const).map(([label,key]) => <section key={key} className="rounded-lg border bg-white p-4"><h3 className="text-sm font-semibold mb-2">{label}</h3>{isEditing ? <textarea aria-label={label} value={key === 'sales' ? draft?.description || '' : draftNotes[key]} onChange={e => { if (key === 'sales') changeField('description', e.target.value); else setDraftNotes(prev => ({...prev,[key]:e.target.value})); }} rows={5} className="w-full rounded border border-gray-300 bg-white text-gray-900 p-2 text-sm" /> : <p className="text-sm whitespace-pre-wrap break-words">{catalogNotes[key] || 'Not provided.'}</p>}</section>)}</div>
           ) : activeTab === 'instructions' ? (
-            <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p><p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p></section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
+            <div className="grid md:grid-cols-2 gap-4"><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Install Instructions</h3><p className="text-xs text-gray-500 mt-1">A general note for installing this product.</p>{isEditing ? <textarea aria-label="Install Instructions" value={draftNotes.instructions} onChange={e => setDraftNotes(prev => ({...prev,instructions:e.target.value}))} rows={5} className="w-full rounded border border-gray-300 bg-white text-gray-900 p-2 text-sm" /> : <p className="text-sm whitespace-pre-wrap mt-3">{catalogNotes.instructions || 'No install instructions.'}</p>}</section><section className="rounded-lg border bg-white p-4"><h3 className="font-semibold text-sm">Default Tasks</h3><p className="text-xs text-gray-500 mt-1">Individual work items created for this product on the project.</p>{defaultTasks.length ? defaultTasks.map(task => <div key={task.id} className="mt-3"><h4 className="text-sm font-medium">{task.title}</h4><p className="text-xs whitespace-pre-wrap">{task.description}</p></div>) : <p className="text-sm mt-3">No default tasks.</p>}</section></div>
           ) : activeTab === 'accessories' ? (
-            <ProductAccessories productId={productId} readOnly parentQuantity={panelData.quantity} baseMaterial={panelData.unitPrice * panelData.quantity} baseLabor={panelData.laborHours * panelData.laborRate * panelData.quantity} />
+            <ProductAccessories productId={productId} readOnly={!isEditing} parentQuantity={(isEditing && draft ? draft : panelData).quantity} baseMaterial={(isEditing && draft ? draft : panelData).unitPrice * (isEditing && draft ? draft : panelData).quantity} baseLabor={(isEditing && draft ? draft : panelData).laborHours * (isEditing && draft ? draft : panelData).laborRate * (isEditing && draft ? draft : panelData).quantity} />
           ) : (
             <ProductUsageHistory productId={productId} />
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-          {canEdit && onEdit ? (
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              <Edit className="w-3.5 h-3.5" />
-              Edit Product
-            </button>
-          ) : <div />}
+        <div className="px-3 sm:px-6 py-2 sm:pt-3 sm:pb-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+          {editError && <p role="alert" className="text-xs text-red-600">{editError}</p>}
+          {isEditing && <button onClick={() => void saveEdits()} disabled={savingEdits} className="px-4 py-2.5 rounded-lg bg-blue-600 text-white disabled:opacity-50">{savingEdits ? 'Saving...' : 'Save Product'}</button>}
           <button
-            onClick={onClose}
-            className="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+            onClick={isEditing ? cancelEditing : onClose}
+            disabled={savingEdits}
+            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
-            Close
+            {isEditing ? 'Cancel' : 'Close'}
           </button>
         </div>
       </div>

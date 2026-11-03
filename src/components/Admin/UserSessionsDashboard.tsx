@@ -8,7 +8,7 @@ type Person = { id: string; full_name: string; email: string; role: string; is_a
 type Session = { id: string; user_id: string; device_signature: string | null; device_type: string | null; browser_name: string | null; os_name: string | null; device_model: string | null; session_start: string; session_end: string | null; last_activity: string; is_active: boolean; city: string | null; region: string | null; ip_city: string | null; ip_region: string | null; ip_address: string | null; current_page: string | null };
 type PageVisit = { page_key: string; user_id: string; visited_at: string };
 type Nickname = { id: string; device_signature: string; nickname: string };
-type IPLabel = { ip_address: string; nickname: string; location_classification: 'office' | 'remote' | 'unknown' };
+type IPLabel = { ip_address: string; nickname: string; is_trusted: boolean | null };
 const panel = 'rounded-xl border border-subtle bg-surface p-4';
 const button = 'min-h-[44px] rounded-lg border border-subtle px-3 py-2 text-sm hover:bg-elevated disabled:opacity-50';
 function ago(value: string | null) {
@@ -57,7 +57,7 @@ export function UserSessionsDashboard() {
       const [users, names, locations] = await Promise.all([
         supabase.from('profiles').select('id, full_name, email, role, is_active').eq('organization_id', org).order('full_name'),
         supabase.from('device_nicknames').select('id, device_signature, nickname').eq('organization_id', org),
-        supabase.from('ip_nicknames').select('ip_address, nickname, location_classification').eq('organization_id', org),
+        supabase.from('ip_nicknames').select('ip_address, nickname, is_trusted').eq('organization_id', org),
       ]);
       if (users.error) throw users.error;
       if (names.error) throw names.error;
@@ -136,7 +136,7 @@ export function UserSessionsDashboard() {
   const ipMap = new Map(ipLabels.map(location => [location.ip_address, location]));
   function locationLabel(s: Session) {
     const known = s.ip_address ? ipMap.get(s.ip_address) : null;
-    const classification = known?.location_classification === 'office' ? 'Office' : known?.location_classification === 'remote' ? 'Remote' : 'Unknown';
+    const classification = known?.is_trusted ? 'Trusted' : 'Unknown';
     return { name: known?.nickname || 'Unlabeled network', classification };
   }
   function SessionRow({ session: s }: { session: Session }) {

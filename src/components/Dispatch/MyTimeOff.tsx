@@ -49,6 +49,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("12:00");
   const [reason, setReason] = useState("");
+  const [calledManagerAcknowledged, setCalledManagerAcknowledged] = useState(false);
   const [preview, setPreview] = useState<LeaveDay[]>([]);
   const [previewError, setPreviewError] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -192,7 +193,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       86400000 <
       28;
   async function submit() {
-    if (!policy || !preview.length || previewError) return;
+    if (!policy || !preview.length || previewError || (start === today && !calledManagerAcknowledged)) return;
     setBusy(true);
     setError("");
     const { error } = await supabase.rpc("submit_time_off", {
@@ -202,10 +203,13 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       p_type: type,
       p_start_time: type === "full_day" ? null : startTime,
       p_end_time: type === "full_day" ? null : endTime,
-      p_reason: reason || null,
+      p_reason: start === today
+        ? [reason.trim() || "Same-day call-in", `Manager phone call self-attested by employee ${user?.id ?? "unknown"} at ${new Date().toISOString()} (UTC).`].join("\n")
+        : reason || null,
     });
     if (error) setError(error.message);
     else {
+      setCalledManagerAcknowledged(false);
       setShowForm(false);
       setRefresh((v) => v + 1);
     }
@@ -494,10 +498,18 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                 onChange={(e) => setReason(e.target.value)}
               />
             </label>
+            {start === today && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2 text-amber-950">
+                <p className="font-semibold">You must personally call your manager</p>
+                <p className="text-sm">Submitting this request does not replace the required phone call. Paid time off requires eligible hours and manager approval.</p>
+                <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={calledManagerAcknowledged} onChange={e => setCalledManagerAcknowledged(e.target.checked)} />I confirm that I personally called my manager to report this absence.</label>
+              </div>
+            )}
             <button
               type="button"
               disabled={
                 busy ||
+                (start === today && !calledManagerAcknowledged) ||
                 previewLoading ||
                 !policy ||
                 !preview.length ||

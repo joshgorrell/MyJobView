@@ -134,7 +134,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
           </div>
           <nav aria-label="Admin categories" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
             {adminGroups.map(group => (
-              <button key={group.id} type="button" onClick={() => { setSelectedGroup(group.id); setSettingsSearch(''); }}
+              <button key={group.id} type="button" onClick={() => { setSettingsSearch(''); const firstPage = adminItems.find(item => item.group === group.id && item.visible !== false); if (firstPage) setActiveTab(firstPage.id); else setSelectedGroup(group.id); }}
                 aria-pressed={selectedGroup === group.id}
                 className={`rounded-xl border px-3 py-3 text-left transition-colors ${selectedGroup === group.id ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary hover:bg-surface-secondary hover:text-primary'}`}>
                 <span className="block text-sm font-semibold">{group.label}</span>
