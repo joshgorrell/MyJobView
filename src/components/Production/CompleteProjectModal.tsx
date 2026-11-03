@@ -112,8 +112,8 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
         }
       }
 
-      if (completionChoice === 'test_and_tune' && sendEmail) {
-        // Use the established customer-program grant before emailing a portal link.
+      if (completionChoice === 'test_and_tune') {
+        // Activate customer access regardless of whether an email is requested.
         // If access provisioning fails, do not send an unusable invitation.
         try {
           const { data: grantId, error: grantError } = await supabase.rpc('grant_customer_program', {
@@ -132,6 +132,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
             .single();
           if (grantLookupError || !grant) throw new Error('Customer access expiration could not be confirmed');
 
+          if (sendEmail) {
           const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
             body: {
               contact_email: emailAddress.trim(),
@@ -144,9 +145,10 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
           if (inviteError || inviteResult?.success !== true) {
             throw new Error(inviteResult?.error || inviteError?.message || 'Invitation delivery was not confirmed');
           }
+          }
         } catch (inviteError) {
-          console.error('Project completed; customer invitation requires attention:', inviteError);
-          toast.error('Project completed, but customer invitation needs attention. Review access and resend from Test & Tune.', 'Invitation not confirmed');
+          console.error('Project completed; Test & Tune access or invitation requires attention:', inviteError);
+          toast.error('Project completed, but Test & Tune access or invitation needs attention. Review customer access in Test & Tune.', 'Follow-up required');
         }
       }
       setDone(true);
