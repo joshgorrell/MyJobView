@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from './_shared/emailTemplates.ts';
@@ -188,7 +189,7 @@ Deno.serve(async (req: Request) => {
 
     // Send email via Resend
     if (RESEND_API_KEY) {
-      const res = await fetch("https://api.resend.com/emails", {
+      const res = await sendSystemEmail({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -211,8 +212,7 @@ Deno.serve(async (req: Request) => {
         console.error('Email sending failed:', errorData);
       }
     } else {
-      console.log(`[SIMULATED] Feedback email to ${workOrder.contact.email}:`, subject);
-      emailSent = true; // Simulate success in development
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
 
     // Update work order to mark feedback email as sent

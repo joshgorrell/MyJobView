@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CreditCard, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +10,7 @@ export function BusinessCardManager() {
   const [cards, setCards] = useState<BusinessCard[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState<BusinessCard | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
@@ -19,6 +21,7 @@ export function BusinessCardManager() {
   }, []);
 
   async function loadCards() {
+    setLoadError(null);
     try {
       const { data, error } = await supabase
         .from('business_cards')
@@ -29,6 +32,8 @@ export function BusinessCardManager() {
       setCards(data || []);
     } catch (error) {
       console.error('Error loading cards:', error);
+      const failure = error && typeof error === 'object' ? error as { message?: string; code?: string } : null;
+      setLoadError([failure?.message, failure?.code && `Code: ${failure.code}`].filter(Boolean).join(' — ') || 'Unable to retrieve business cards.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +65,7 @@ export function BusinessCardManager() {
       loadCards();
     } catch (error) {
       console.error('Error deleting card:', error);
-      alert('Failed to delete business card');
+      notify('Failed to delete business card', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -75,7 +80,7 @@ export function BusinessCardManager() {
       loadCards();
     } catch (error) {
       console.error('Error updating card:', error);
-      alert('Failed to update business card');
+      notify('Failed to update business card', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -108,7 +113,8 @@ export function BusinessCardManager() {
         </button>
       </div>
 
-      {cards.length === 0 ? (
+      {loadError && <div role="alert" className="rounded-lg border border-red-400 bg-red-950/40 p-4 text-red-200">Business cards could not be loaded: {loadError}</div>}
+      {!loadError && (cards.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
           <CreditCard className="w-12 h-12 mx-auto mb-3 text-gray-400" />
           <p className="text-gray-500">No business cards yet. Create your first one!</p>
@@ -183,7 +189,7 @@ export function BusinessCardManager() {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       <ConfirmModal
         isOpen={confirmModal !== null}

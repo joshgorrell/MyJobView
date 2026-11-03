@@ -2,8 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  Upload, FileText, AlertCircle, CheckCircle, X, Download,
-  ArrowRight, ArrowLeft, Shield, SkipForward, Trash2,
+  Upload, FileText, AlertCircle, CheckCircle, Download,
+  ArrowRight, ArrowLeft, Shield, Trash2,
   ChevronDown, ChevronUp, History, RotateCcw, Search,
   RefreshCw, Eye, DollarSign
 } from 'lucide-react';
@@ -19,6 +19,12 @@ import {
 type ImportStep = 'upload' | 'mapping' | 'validation' | 'importing' | 'complete';
 
 interface ContractColumnMap {
+  agreement_type?: ColumnMapping;
+  system_type?: ColumnMapping;
+  service_schedule?: ColumnMapping;
+  billing_frequency?: ColumnMapping;
+  warranty_start_date?: ColumnMapping;
+  warranty_end_date?: ColumnMapping;
   customer_email?: ColumnMapping;
   customer_name?: ColumnMapping;
   account_number?: ColumnMapping;
@@ -126,8 +132,8 @@ function detectContractColumnMapping(parsed: ParsedCSV): ContractColumnMap {
   for (const [field, keywords] of Object.entries(fieldKeywords) as [keyof Omit<ContractColumnMap, 'unmapped'>, string[]][]) {
     let bestMatch: { header: string; score: number; index: number } | null = null;
 
-    parsed.headers.forEach((header, index) => {
-      if (usedHeaders.has(header)) return;
+    for (const [index, header] of parsed.headers.entries()) {
+      if (usedHeaders.has(header)) continue;
       const headerLower = header.toLowerCase().replace(/[^a-z0-9]/g, '');
       let maxScore = 0;
       for (const kw of keywords) {
@@ -140,7 +146,7 @@ function detectContractColumnMapping(parsed: ParsedCSV): ContractColumnMap {
       if (maxScore > 0.6 && (!bestMatch || maxScore > bestMatch.score)) {
         bestMatch = { header, score: maxScore, index };
       }
-    });
+    }
 
     if (bestMatch) {
       usedHeaders.add(bestMatch.header);
@@ -647,7 +653,7 @@ export function SecurityContractCSVImport() {
           billing_day: billingDay,
           auto_invoice: autoInvoiceEnabled,
           auto_send: autoInvoiceEnabled,
-          office_id: profile.office_id || null,
+          office_id: profile.primary_office_id || profile.default_office_id || null,
           created_by: profile.id,
         };
         if (d.external_id) subData.billing_external_id = d.external_id;

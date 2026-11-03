@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -5,7 +6,7 @@ import { Task } from '../../lib/types';
 import { formatDistanceToNow } from '../../lib/utils';
 import { TaskForm } from './TaskForm';
 import { useAuth } from '../../contexts/AuthContext';
-import { offlineSupabaseUpdate, offlineSupabaseDelete, offlineSupabaseInsert } from '../../lib/offlineSupport';
+import { offlineSupabaseDelete } from '../../lib/offlineSupport';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface TaskListProps {
@@ -76,43 +77,14 @@ export function TaskList({ leadId }: TaskListProps) {
 
   async function toggleTaskStatus(task: Task) {
     try {
-      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-      const updateData: any = {
-        status: newStatus,
-        completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-      };
-
-      if (newStatus === 'completed' && !(task as any).assigned_to && !(task as any).claimed_by) {
-        updateData.claimed_by = profile?.id;
-      }
-
-      const result = await offlineSupabaseUpdate('tasks', updateData, task.id);
-
-      if (result.error) throw result.error;
-
-      if (newStatus === 'completed' && profile) {
-        await offlineSupabaseInsert('feed_events', {
-          event_type: 'task_completed',
-          task_id: task.id,
-          lead_id: leadId,
-          user_id: profile.id,
-          metadata: {
-            task_title: task.title,
-          },
-        });
-
-        const pointsToAward = (task as any).points || 10;
-        await supabase.rpc('award_points', {
-          p_user_id: profile.id,
-          p_points: pointsToAward,
-          p_reason: `Completed task: ${task.title}`
-        });
-      }
+      const rpc = task.status === 'completed' ? 'reopen_task_atomic' : 'complete_task_atomic';
+      const { error } = await supabase.rpc(rpc, { p_task_id: task.id });
+      if (error) throw error;
 
       loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task status');
+      notify('Failed to update task status', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -138,7 +110,7 @@ export function TaskList({ leadId }: TaskListProps) {
       loadTasks();
     } catch (error) {
       console.error('Error deleting task:', error);
-      alert('Failed to delete task');
+      notify('Failed to delete task', { theme: 'cyan', tone: 'error' });
     }
   }
 

@@ -1,3 +1,4 @@
+import { requestConfirmation } from '../../lib/feedback';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -107,7 +108,7 @@ export default function ProjectActivityLog({ projectId, projectName, canLog }: P
   }, [loadEntries]);
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this activity log entry?')) return;
+    if (!(await requestConfirmation('Delete this activity log entry?', { theme: 'blue' }))) return;
     setDeletingId(id);
     try {
       const { error } = await supabase.from('project_activity_logs').delete().eq('id', id);

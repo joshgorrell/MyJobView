@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+const src = fs.readFileSync('src/lib/smart-intake/intake-detail-model.ts','utf8');
+vm.runInNewContext(ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+const item = exports.summarizeIntakeDetail({id:'1',subject:null,raw_body:'  ',source_address:'x@example.com',status:'received',service_request_id:null});
+assert.equal(item.isBlank,true);
+assert.equal(item.hasServiceRequest,false);
+assert.equal(item.title,'(No subject)');
+console.log('Blank message detail passed');

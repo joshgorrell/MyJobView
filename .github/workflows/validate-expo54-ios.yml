@@ -1,0 +1,83 @@
+name: Validate Expo SDK 54 iOS native project
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/ios-expo54-upgrade-20261023
+      - fix/ios27-scene-lifecycle-20261026
+      - fix/ios27-expo-scene-bootstrap-build4
+    paths:
+      - mobile/ios/**
+      - mobile/package.json
+      - mobile/package-lock.json
+      - mobile/app.json
+      - mobile/eas.json
+      - .github/workflows/validate-expo54-ios.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-pods:
+    if: github.repository == 'joshgorrell/MyJobView'
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          pod --version
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify Expo package compatibility
+        run: CI=1 npx expo install --check
+      - name: Install CocoaPods for checked-in iOS project
+        run: |
+          cd ios
+          pod install --repo-update
+      - name: Compile iOS simulator without signing
+        run: |
+          xcodebuild -workspace ios/MyJobView.xcworkspace -scheme MyJobView -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > /tmp/myjobview-ios-build.log 2>&1 || { grep -n -E -C 5 '(^| )error:|fatal error:|file not found|no member named|use of undeclared identifier' /tmp/myjobview-ios-build.log | tail -n 160 || true; tail -n 35 /tmp/myjobview-ios-build.log; exit 1; }
+      - name: Build release simulator app with bundled JavaScript
+        run: |
+          xcodebuild -workspace ios/MyJobView.xcworkspace -scheme MyJobView -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/myjobview-derived CODE_SIGNING_ALLOWED=NO build > /tmp/myjobview-ios-release.log 2>&1 || { grep -n -E -C 5 '(^| )error:|fatal error:|file not found|no member named|use of undeclared identifier' /tmp/myjobview-ios-release.log | tail -n 160 || true; tail -n 40 /tmp/myjobview-ios-release.log; exit 1; }
+      - name: Boot simulator and smoke-test launch
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((d["udid"] for group in data["devices"].values() for d in group if d["state"]=="Shutdown" and "iPhone" in d["name"]), ""))')
+          test -n "$SIM_ID" || { echo "No available iPhone simulator"; exit 1; }
+          xcrun simctl boot "$SIM_ID"
+          xcrun simctl bootstatus "$SIM_ID" -b
+          APP=/tmp/myjobview-derived/Build/Products/Release-iphonesimulator/MyJobView.app
+          test -d "$APP"
+          xcrun simctl install "$SIM_ID" "$APP"
+          xcrun simctl launch --terminate-running-process "$SIM_ID" com.myjobview.app
+          sleep 15
+          xcrun simctl spawn "$SIM_ID" launchctl list > /tmp/myjobview-launchctl.txt
+          if ! grep -q 'com.myjobview.app' /tmp/myjobview-launchctl.txt; then
+            echo "App is no longer running after launch (possible startup crash)"
+            xcrun simctl spawn "$SIM_ID" log show --last 2m --style compact --predicate 'process == "MyJobView"' | tail -n 120 || true
+            exit 1
+          fi
+          echo "MyJobView remained registered after 15 seconds."
+      - name: Upload iOS build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo54-ios-build-diagnostics
+          path: |
+            /tmp/myjobview-ios-build.log
+            /tmp/myjobview-ios-release.log
+            /tmp/myjobview-launchctl.txt
+          if-no-files-found: ignore

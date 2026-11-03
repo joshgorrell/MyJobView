@@ -1,4 +1,6 @@
+import {customerSecurityInvoiceLines} from '../../supabase/functions/_shared/security-customer-invoice';
 export interface PrintableInvoice {
+  security_billing_cycle_id?: string | null;
   invoice_number: string;
   invoice_title?: string | null;
   invoice_date: string;
@@ -53,6 +55,7 @@ export function buildPortalInvoicePrintHTML(
   payments: PrintablePayment[],
   company: PrintableCompanyInfo,
 ): string {
+  lineItems = customerSecurityInvoiceLines(invoice, lineItems);
   const fmt = (n: number) =>
     (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

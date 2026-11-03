@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Award,
   TrendingUp,
-  TrendingDown,
   Clock,
   Target,
   Calendar,
@@ -16,10 +15,8 @@ import {
   FileText,
   Crown,
   ExternalLink,
-  Hourglass,
   ChevronRight,
   Layers,
-  Star,
   UserCheck,
   History
 } from 'lucide-react';
@@ -250,10 +247,10 @@ export function TestTuneProjectDetail({ projectId, onClose }: TestTuneProjectDet
   const totalPostCompletionHours = project.field_hours_used + project.pm_hours_used + project.non_performance_hours;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto z-50">
-      <div className="min-h-screen p-4">
-        <div className="max-w-7xl mx-auto my-8">
-          <div className="bg-white rounded-lg shadow-lg">
+    <div className="responsive-modal-overlay fixed inset-0 bg-black bg-opacity-50 overflow-y-auto z-50">
+      <div className="responsive-modal-layout min-h-screen p-4">
+        <div className="responsive-modal-layout max-w-7xl mx-auto my-8">
+          <div className="responsive-modal-panel max-w-7xl bg-white rounded-lg shadow-lg">
             {/* Header */}
             <div className="border-b border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">

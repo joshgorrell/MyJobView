@@ -1,3 +1,5 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
+import { wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -37,6 +39,7 @@ Deno.serve(async (req: Request) => {
       proposalId,
       toEmail,
       ccEmails,
+      bccEmails,
       subject: customSubject,
       message: customMessage,
       // Array of { filename, content } where content is base64-encoded HTML
@@ -45,6 +48,7 @@ Deno.serve(async (req: Request) => {
       sentAttachments = {} as Record<string, boolean>,
       // When true, skip sending the email notification (rep is with the customer)
       skipNotification = false,
+      previewOnly = false,
     } = body;
 
     if (!proposalId) {
@@ -77,7 +81,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings } = await supabaseClient
       .from('company_settings')
-      .select('company_name, company_email, company_phone, from_email, from_name, reply_to_email, portal_url')
+      .select('company_name, company_email, company_phone, company_logo_url, from_email, from_name, reply_to_email, portal_url')
       .maybeSingle();
 
     const { data: orgData } = await supabaseClient
@@ -87,8 +91,23 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     // Use override email if provided, otherwise fall back to contact email
-    const recipientEmail = toEmail || proposal.contacts?.email;
-    if (!recipientEmail && !skipNotification) {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizeRecipients = (value: unknown): string[] => {
+      if (Array.isArray(value)) return value.flatMap(normalizeRecipients);
+      if (typeof value !== 'string') return [];
+      return value.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    };
+    const recipientEmails = normalizeRecipients(toEmail || proposal.contacts?.email);
+    const ccRecipients = normalizeRecipients(ccEmails);
+    const bccRecipients = normalizeRecipients(bccEmails);
+    if ([...recipientEmails, ...ccRecipients, ...bccRecipients].some(email => !emailPattern.test(email)) ||
+        recipientEmails.length + ccRecipients.length + bccRecipients.length > 30) {
+      return new Response(JSON.stringify({ error: 'Invalid email recipient list' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!recipientEmails.length && !skipNotification) {
       return new Response(JSON.stringify({ error: 'Customer email not found' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -142,6 +161,28 @@ Deno.serve(async (req: Request) => {
       const placeholder = `{{${key}}}`;
       subject = subject.split(placeholder).join(value);
       emailBody = emailBody.split(placeholder).join(value);
+    }
+
+    // Escape employee-entered plain text before adding it to the branded HTML shell.
+    // The proposal action URL is generated server-side and is not editable by the sender.
+    const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const messageHtml = escapeHtml(emailBody).replace(/\r?\n/g, '<br>');
+    const safeProposalUrl = escapeHtml(proposalUrl);
+    const htmlBody = wrapInEmailLayout(
+      `<div style="white-space:normal">${messageHtml}</div>
+       <p style="text-align:center;margin:28px 0"><a href="${safeProposalUrl}" style="background:#0e7490;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:600;display:inline-block">View Proposal</a></p>`,
+      companyName,
+      settings?.company_email || settings?.from_email || '',
+      '#0e7490',
+      settings?.company_logo_url || ''
+    );
+
+    if (previewOnly) {
+      return new Response(JSON.stringify({ subject, html: htmlBody, text: `${emailBody}\n\nView proposal: ${proposalUrl}` }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const now = new Date();
@@ -215,15 +256,21 @@ Deno.serve(async (req: Request) => {
     // Build Resend payload
     const resendPayload: Record<string, unknown> = {
       from: fromField,
-      to: recipientEmail,
+      to: recipientEmails,
       reply_to: replyTo,
       subject,
-      text: emailBody,
+      text: `${emailBody}\n\nView proposal: ${proposalUrl}`,
+      html: htmlBody,
     };
 
     // Add CC recipients if provided
-    if (Array.isArray(ccEmails) && ccEmails.length > 0) {
-      resendPayload.cc = ccEmails;
+    if (ccRecipients.length > 0) {
+      resendPayload.cc = ccRecipients;
+    }
+
+    // Bcc recipients are passed privately to the mail provider, not included in visible headers.
+    if (bccRecipients.length > 0) {
+      resendPayload.bcc = bccRecipients;
     }
 
     // Add attachments if any (Resend accepts { filename, content } where content is base64)
@@ -234,7 +281,7 @@ Deno.serve(async (req: Request) => {
       }));
     }
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
+    const emailResponse = await sendSystemEmail({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,

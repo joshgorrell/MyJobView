@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, RotateCcw, Globe, Clock, User, DollarSign, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
 import { format } from 'date-fns';
@@ -78,11 +79,11 @@ export function PortalVersionHistoryModal({
           onRestored();
         }, 2500);
       } else {
-        alert(data?.error || 'Failed to restore version');
+        notify(data?.error || 'Failed to restore version', { theme: 'violet', tone: 'error' });
       }
     } catch (err: any) {
       console.error('Error restoring portal version:', err);
-      alert('Failed to restore version: ' + err.message);
+      notify('Failed to restore version: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setRestoring(null);
       setConfirmRestore(null);

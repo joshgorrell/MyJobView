@@ -1,0 +1,393 @@
+{
+  "capturedOn": "2026-10-30",
+  "serverVersion": "17.6",
+  "sourceIntegrationInstalled": false,
+  "inspectedColumnCounts": {
+    "profiles": 99,
+    "sales_orders": 35,
+    "proposals": 135,
+    "change_orders": 90,
+    "change_order_line_items": 36,
+    "proposal_line_items": 37
+  },
+  "requiredColumns": [
+    {
+      "type": "uuid",
+      "table": "change_order_line_items",
+      "column": "id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "change_order_line_items",
+      "column": "change_order_id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "change_order_line_items",
+      "column": "organization_id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "change_orders",
+      "column": "id",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "change_orders",
+      "column": "status",
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "change_orders",
+      "column": "updated_at",
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "change_orders",
+      "column": "sales_order_id",
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "change_orders",
+      "column": "organization_id",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "change_orders",
+      "column": "is_active",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "profiles",
+      "column": "id",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "profiles",
+      "column": "is_active",
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "profiles",
+      "column": "organization_id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "proposal_line_items",
+      "column": "id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "proposal_line_items",
+      "column": "proposal_id",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "proposal_line_items",
+      "column": "updated_at",
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "proposal_line_items",
+      "column": "organization_id",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "proposal_line_items",
+      "column": "task_completed",
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "proposal_line_items",
+      "column": "tasks_seeded_at",
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "proposals",
+      "column": "id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "proposals",
+      "column": "organization_id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "sales_orders",
+      "column": "id",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "sales_orders",
+      "column": "proposal_id",
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "sales_orders",
+      "column": "organization_id",
+      "nullable": false
+    }
+  ],
+  "parentIndexes": [
+    {
+      "table": "change_order_line_items",
+      "definition": "CREATE INDEX idx_co_line_items_change_order ON public.change_order_line_items USING btree (change_order_id)"
+    },
+    {
+      "table": "change_orders",
+      "definition": "CREATE INDEX idx_change_orders_sales_order ON public.change_orders USING btree (sales_order_id)"
+    },
+    {
+      "table": "proposal_line_items",
+      "definition": "CREATE INDEX idx_proposal_line_items_proposal_id ON public.proposal_line_items USING btree (proposal_id)"
+    }
+  ],
+  "triggerInventory": [
+    {
+      "table": "change_order_line_items",
+      "name": "zz_check_catalog_product_availability",
+      "enabled": "O",
+      "function": "check_catalog_product_availability"
+    },
+    {
+      "table": "change_orders",
+      "name": "capture_flow_event",
+      "enabled": "O",
+      "function": "capture_event"
+    },
+    {
+      "table": "change_orders",
+      "name": "recalculate_field_target_on_approval",
+      "enabled": "O",
+      "function": "recalculate_field_target_on_change_order_approval"
+    },
+    {
+      "table": "change_orders",
+      "name": "sales_credit_change_order",
+      "enabled": "O",
+      "function": "source_changed"
+    },
+    {
+      "table": "change_orders",
+      "name": "set_change_order_number",
+      "enabled": "O",
+      "function": "generate_co_number_per_so"
+    },
+    {
+      "table": "change_orders",
+      "name": "trg_auto_lock_change_order",
+      "enabled": "O",
+      "function": "auto_lock_change_order"
+    },
+    {
+      "table": "change_orders",
+      "name": "trg_recalc_contract_total_on_co_change",
+      "enabled": "O",
+      "function": "recalc_sales_order_contract_total"
+    },
+    {
+      "table": "change_orders",
+      "name": "trigger_guard_finalization_change_orders",
+      "enabled": "O",
+      "function": "guard_finalization_tax_check"
+    },
+    {
+      "table": "change_orders",
+      "name": "trigger_log_change_order_action",
+      "enabled": "O",
+      "function": "log_change_order_action"
+    },
+    {
+      "table": "change_orders",
+      "name": "trigger_tax_snapshot_co_approved",
+      "enabled": "O",
+      "function": "write_tax_snapshot_on_co_approved"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "proposal_line_items_touch_proposal",
+      "enabled": "O",
+      "function": "touch_proposal_on_line_item_change"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "recalculate_proposal_totals_trigger",
+      "enabled": "O",
+      "function": "trigger_recalculate_proposal_totals"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "seed_tasks_on_labor_update",
+      "enabled": "O",
+      "function": "seed_tasks_on_line_item_insert_trigger"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "trg_auto_compute_line_item_totals",
+      "enabled": "O",
+      "function": "auto_compute_line_item_totals"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "trg_seed_tasks_on_line_item_insert",
+      "enabled": "O",
+      "function": "seed_tasks_on_line_item_insert_trigger"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "trigger_calculate_labor_total",
+      "enabled": "O",
+      "function": "calculate_proposal_line_item_labor"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "trigger_update_proposal_items_hash",
+      "enabled": "O",
+      "function": "update_proposal_items_hash"
+    },
+    {
+      "table": "proposal_line_items",
+      "name": "zz_check_catalog_product_availability",
+      "enabled": "O",
+      "function": "check_catalog_product_availability"
+    },
+    {
+      "table": "sales_orders",
+      "name": "guard_customer_document_ownership",
+      "enabled": "O",
+      "function": "guard_customer_document_ownership"
+    },
+    {
+      "table": "sales_orders",
+      "name": "guard_proposal_template_assignment",
+      "enabled": "O",
+      "function": "guard_proposal_template_assignment"
+    },
+    {
+      "table": "sales_orders",
+      "name": "sales_credit_order",
+      "enabled": "O",
+      "function": "source_changed"
+    },
+    {
+      "table": "sales_orders",
+      "name": "sales_credit_order_identity",
+      "enabled": "O",
+      "function": "guard_source_identity"
+    },
+    {
+      "table": "sales_orders",
+      "name": "trg_set_sales_order_sales_rep_id",
+      "enabled": "O",
+      "function": "set_sales_order_sales_rep_id"
+    },
+    {
+      "table": "sales_orders",
+      "name": "trg_set_sales_order_user_names",
+      "enabled": "O",
+      "function": "set_sales_order_user_names"
+    },
+    {
+      "table": "sales_orders",
+      "name": "trg_set_so_original_contract_total",
+      "enabled": "O",
+      "function": "set_so_original_contract_total"
+    }
+  ],
+  "applier": {
+    "body": "\nDECLARE\nv_co          change_orders%ROWTYPE;\nv_item        change_order_line_items%ROWTYPE;\nv_proposal_id uuid;\nBEGIN\n-- Load the change order\nSELECT * INTO v_co\nFROM change_orders\nWHERE id = p_change_order_id;\n\nIF NOT FOUND THEN\nRAISE EXCEPTION 'Change order % not found', p_change_order_id;\nEND IF;\n\nIF v_co.status <> 'approved' THEN\nRAISE EXCEPTION 'Change order % must be in approved status to apply (current: %)',\np_change_order_id, v_co.status;\nEND IF;\n\n-- Resolve the parent proposal from the sales order\nSELECT proposal_id INTO v_proposal_id\nFROM sales_orders\nWHERE id = v_co.sales_order_id;\n\n-- Process each line item action\nFOR v_item IN\nSELECT *\nFROM change_order_line_items\nWHERE change_order_id = p_change_order_id\nORDER BY sort_order NULLS LAST, created_at\nLOOP\n\nIF v_item.action_type = 'remove' THEN\n-- Permanently hide the removed line item\nUPDATE proposal_line_items\nSET    is_hidden  = true,\nupdated_at = now()\nWHERE  id = v_item.proposal_line_item_id;\n\nELSIF v_item.action_type = 'add' THEN\n-- Insert a new line item on the proposal (skip if somehow already there)\nIF v_proposal_id IS NOT NULL AND NOT EXISTS (\nSELECT 1 FROM proposal_line_items\nWHERE proposal_id   = v_proposal_id\nAND product_id    IS NOT DISTINCT FROM v_item.product_id\nAND description   = COALESCE(v_item.product_description, v_item.product_name)\nAND unit_price    = v_item.new_unit_price\nAND quantity      = v_item.new_quantity\n) THEN\nINSERT INTO proposal_line_items (\nproposal_id,\nproduct_id,\ndescription,\nquantity,\nunit_price,\nline_total,\nis_taxable,\nitem_type,\nlabor_phase_id,\nsort_order,\norganization_id,\ncreated_at,\nupdated_at\n) VALUES (\nv_proposal_id,\nv_item.product_id,\nCOALESCE(v_item.product_description, v_item.product_name),\nv_item.new_quantity,\nv_item.new_unit_price,\nROUND(v_item.new_quantity * v_item.new_unit_price, 2),\nCOALESCE(v_item.is_taxable, true),\nv_item.item_type,\nv_item.labor_phase_id,\nv_item.sort_order,\nv_co.organization_id,\nnow(),\nnow()\n);\nEND IF;\n\nELSIF v_item.action_type IN ('modify_quantity', 'modify_price') THEN\nUPDATE proposal_line_items\nSET\nquantity   = CASE WHEN v_item.action_type = 'modify_quantity'\nTHEN v_item.new_quantity ELSE quantity END,\nunit_price = CASE WHEN v_item.action_type = 'modify_price'\nTHEN v_item.new_unit_price ELSE unit_price END,\nline_total = ROUND(\nCASE WHEN v_item.action_type = 'modify_quantity'\nTHEN v_item.new_quantity ELSE quantity END\n*\nCASE WHEN v_item.action_type = 'modify_price'\nTHEN v_item.new_unit_price ELSE unit_price END\n, 2),\nupdated_at = now()\nWHERE id = v_item.proposal_line_item_id;\n\nELSIF v_item.action_type = 'modify_labor' THEN\nUPDATE proposal_line_items\nSET\nlabor_hours = v_item.labor_hours,\nlabor_rate  = v_item.labor_rate,\nlabor_total = v_item.new_labor_total,\nupdated_at  = now()\nWHERE id = v_item.proposal_line_item_id;\n\n-- modify_modifiers: no per-line-item change needed\nEND IF;\n\nEND LOOP;\n\n-- Lock the CO: mark is_active = false so it becomes historical\nUPDATE change_orders\nSET    is_active  = false,\nupdated_at = now()\nWHERE  id = p_change_order_id;\n\n-- Recalculate proposal totals if helper function exists\nIF v_proposal_id IS NOT NULL THEN\nBEGIN\nPERFORM calculate_proposal_totals(v_proposal_id);\nEXCEPTION WHEN undefined_function THEN\nNULL;\nEND;\nEND IF;\n\nEND;\n",
+    "owner": "postgres",
+    "config": [
+      "search_path=public"
+    ],
+    "securityDefiner": true
+  },
+  "preflightResult": {
+    "quoteReady": false,
+    "functionOwner": "postgres",
+    "serverVersion": "17.6",
+    "deploymentApproved": false,
+    "observerCodePresent": false,
+    "missingParentIndexes": [],
+    "sourceSchemaInstalled": false,
+    "structuralChecksPassed": true,
+    "missingOrChangedColumns": [],
+    "applierAnonExecuteAllowed": false,
+    "loadAndConcurrencyValidated": false,
+    "fullSchemaScenariosValidated": false,
+    "observerControlTableInstalled": false,
+    "businessFunctionMatchesBaseline": true,
+    "functionImplementationRecognized": true,
+    "applierAuthenticatedExecuteAllowed": true
+  },
+  "planSummary": {
+    "rootType": "Result",
+    "estimatedCost": 21.48,
+    "scans": [
+      {
+        "relation": "change_orders",
+        "type": "Index Scan",
+        "index": "change_orders_pkey",
+        "estimatedRows": 1
+      },
+      {
+        "relation": "profiles",
+        "type": "Index Scan",
+        "index": "profiles_pkey",
+        "estimatedRows": 1
+      },
+      {
+        "relation": "sales_orders",
+        "type": "Seq Scan",
+        "estimatedRows": 1
+      },
+      {
+        "relation": "proposals",
+        "type": "Bitmap Heap Scan",
+        "estimatedRows": 1
+      },
+      {
+        "relation": "change_orders",
+        "type": "Seq Scan",
+        "estimatedRows": 4
+      },
+      {
+        "relation": "change_order_line_items",
+        "type": "Seq Scan",
+        "estimatedRows": 7
+      },
+      {
+        "relation": "change_orders",
+        "type": "Seq Scan",
+        "estimatedRows": 4
+      },
+      {
+        "relation": "proposal_line_items",
+        "type": "Seq Scan",
+        "estimatedRows": 51
+      }
+    ]
+  }
+}

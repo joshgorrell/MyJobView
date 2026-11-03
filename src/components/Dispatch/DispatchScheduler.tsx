@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { requestConfirmation } from '../../lib/feedback';
+import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
+import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
+import { dateKey } from '../../lib/workOrderScheduling';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  Calendar,
   Clock,
   User,
   MapPin,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Settings,
-  Printer,
   Download,
-  Filter,
   TrendingUp,
   AlertTriangle,
   Zap
@@ -74,7 +73,7 @@ export function DispatchScheduler() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [draggedWorkOrder, setDraggedWorkOrder] = useState<string | null>(null);
@@ -141,11 +140,11 @@ export function DispatchScheduler() {
           `)
           .gte('scheduled_date', dateRange.start)
           .lte('scheduled_date', dateRange.end)
-          .order('scheduled_start_time'),
+          .order('scheduled_start_time').overrideTypes<WorkOrder[], { merge: false }>(),
         supabase
           .from('profiles')
           .select('id, full_name, role, employment_type')
-          .in('role', ['tech', 'lead_tech'])
+          .eq('is_technician', true)
           .eq('is_active', true)
           .order('full_name')
       ]);
@@ -167,17 +166,17 @@ export function DispatchScheduler() {
       case 'day':
         break;
       case 'week':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         end = new Date(start);
         end.setDate(end.getDate() + 6);
         break;
       case 'work-week':
-        start.setDate(start.getDate() - start.getDay() + 1);
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         end = new Date(start);
         end.setDate(end.getDate() + 4);
         break;
       case 'multi-week':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         end = new Date(start);
         end.setDate(end.getDate() + 27);
         break;
@@ -186,7 +185,7 @@ export function DispatchScheduler() {
         end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
         break;
       case 'timeline':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         end = new Date(start);
         end.setDate(end.getDate() + 13);
         break;
@@ -196,8 +195,8 @@ export function DispatchScheduler() {
     }
 
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
+      start: dateKey(start),
+      end: dateKey(end)
     };
   }
 
@@ -207,7 +206,7 @@ export function DispatchScheduler() {
 
     technicians.forEach(tech => {
       days.forEach(day => {
-        const dayStr = day.toISOString().split('T')[0];
+        const dayStr = dateKey(day);
         const dayJobs = workOrders.filter(
           wo => wo.assigned_to === tech.id && wo.scheduled_date === dayStr
         );
@@ -244,19 +243,19 @@ export function DispatchScheduler() {
         numDays = 1;
         break;
       case 'week':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         numDays = 7;
         break;
       case 'work-week':
-        start.setDate(start.getDate() - start.getDay() + 1);
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         numDays = 5;
         break;
       case 'multi-week':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         numDays = 28;
         break;
       case 'timeline':
-        start.setDate(start.getDate() - start.getDay());
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
         numDays = 14;
         break;
       default:
@@ -307,9 +306,11 @@ export function DispatchScheduler() {
   async function handleDrop(technicianId: string, date: Date, startTime?: string) {
     if (!draggedWorkOrder) return;
 
+    if (!(await requestConfirmation('Confirm this schedule move?', { theme: 'blue' }))) return;
+
     try {
       const wo = workOrders.find(w => w.id === draggedWorkOrder);
-      const newDate = date.toISOString().split('T')[0];
+      const newDate = dateKey(date);
       const newStart = startTime || '08:00';
       const durationMin = resolveWorkOrderDurationMinutes(wo || { estimated_hours: 2 });
       const endMin = toMinutes(newStart) + durationMin;
@@ -324,7 +325,7 @@ export function DispatchScheduler() {
       );
 
       if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+        if (!(await requestConfirmation('Scheduling conflict detected. Proceed anyway?', { theme: 'blue' }))) {
           return;
         }
         await rescheduleWorkOrder(draggedWorkOrder, newDate, newStart, newEnd, technicianId || undefined, { force: true });
@@ -341,7 +342,7 @@ export function DispatchScheduler() {
   }
 
   function getWorkOrdersForTechAndDate(techId: string | null, date: Date) {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateKey(date);
     return workOrders.filter(
       wo => wo.assigned_to === techId && wo.scheduled_date === dateStr
     );
@@ -354,7 +355,7 @@ export function DispatchScheduler() {
   }
 
   function getCapacityForTechAndDate(techId: string, date: Date): TechCapacity | undefined {
-    const key = `${techId}-${date.toISOString().split('T')[0]}`;
+    const key = `${techId}-${dateKey(date)}`;
     return techCapacities.get(key);
   }
 
@@ -403,60 +404,22 @@ export function DispatchScheduler() {
     a.click();
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading dispatch schedule...</div>
-      </div>
-    );
-  }
 
   const days = getDaysInView();
   const unassignedJobs = workOrders.filter(wo => !wo.assigned_to);
 
   return (
-    <div className="space-y-4">
+    <CalendarWorkspace loading={loading} className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-xl sm:text-2xl font-bold text-white">Dispatch Scheduler</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('prev')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5 text-gray-700" />
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => navigate('next')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronRight className="w-5 h-5 text-gray-700" />
-            </button>
-          </div>
+          <CalendarNavigation date={dateKey(currentDate)} onDateChange={date => setCurrentDate(new Date(date + 'T12:00:00'))} onPrevious={() => navigate('prev')} onNext={() => navigate('next')} />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* View Mode Selector */}
-          <select
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value as ViewMode)}
-            className="px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="day">Day View</option>
-            <option value="week">Full Week (7 days)</option>
-            <option value="work-week">Work Week (Mon-Fri)</option>
-            <option value="multi-week">Multi-Week (4 weeks)</option>
-            <option value="month">Month View</option>
-            <option value="timeline">Timeline (2 weeks)</option>
-            <option value="list">List/Agenda View</option>
-          </select>
+          <CalendarViewSwitcher value={viewMode} onChange={setViewMode} options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'work-week', label: 'Work week' }, { value: 'multi-week', label: '4 weeks' }, { value: 'month', label: 'Month' }, { value: 'timeline', label: 'Timeline' }, { value: 'list', label: 'Agenda' }]} />
 
           <button
             onClick={exportToCSV}
@@ -568,7 +531,7 @@ export function DispatchScheduler() {
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <User className="w-5 h-5 text-blue-600" />
             </div>
@@ -579,7 +542,7 @@ export function DispatchScheduler() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
             </div>
@@ -590,7 +553,7 @@ export function DispatchScheduler() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <Zap className="w-5 h-5 text-green-600" />
             </div>
@@ -603,7 +566,7 @@ export function DispatchScheduler() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-orange-600" />
             </div>
@@ -738,7 +701,7 @@ export function DispatchScheduler() {
                                 <div className="flex items-center gap-1 text-gray-500 mt-1">
                                   <Clock className="w-3 h-3" />
                                   {wo.scheduled_start_time}
-                                  {wo.estimated_duration && ` (${wo.estimated_duration}m)`}
+                                  {` (${resolveWorkOrderDurationMinutes(wo)}m)`}
                                 </div>
                               )}
                               {wo.project?.contacts?.city && (
@@ -769,6 +732,6 @@ export function DispatchScheduler() {
           }}
         />
       )}
-    </div>
+    </CalendarWorkspace>
   );
 }

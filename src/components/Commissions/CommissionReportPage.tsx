@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar,
   ChevronDown,
@@ -65,14 +65,6 @@ interface Deduction {
   isNew?: boolean;
 }
 
-interface RateOverride {
-  commissionRecordId: string;
-  invoiceId: string;
-  employeeId: string;
-  roleType: string;
-  originalRate: number;
-  overriddenRate: number;
-}
 
 interface SummaryCards {
   totalGross: number;
@@ -481,7 +473,7 @@ export function CommissionReportPage() {
 
   // ── Rate override handlers ──
 
-  function startEditRate(commissionRecordId: string, invoiceId: string, employeeId: string, roleType: string, currentRate: number) {
+  function startEditRate(_commissionRecordId: string, invoiceId: string, employeeId: string, roleType: string, currentRate: number) {
     const key = `${invoiceId}__${employeeId}__${roleType}`;
     setEditingOverride(key);
     setOverrideDraft(String(currentRate));
@@ -489,7 +481,7 @@ export function CommissionReportPage() {
 
   async function saveRateOverride(line: ReportLine) {
     const key = `${line.invoiceId}__${line.employeeId}__${line.roleType}`;
-    const newRate = parseFloat(overrideDraft);
+    const newRate = parseFloat(String(overrideDraft));
     if (isNaN(newRate) || newRate < 0) {
       setEditingOverride(null);
       return;
@@ -553,7 +545,7 @@ export function CommissionReportPage() {
       ...prev,
       [employeeId]: (prev[employeeId] || []).map(d =>
         d.id === dedId
-          ? { ...d, [field]: field === 'amount' ? parseFloat(value) || 0 : value }
+          ? { ...d, [field]: field === 'amount' ? parseFloat(String(value)) || 0 : value }
           : d
       )
     }));
@@ -951,7 +943,7 @@ export function CommissionReportPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-700/30">
-                          {group.lines.map((line, idx) => {
+                          {group.lines.map((line, _idx) => {
                             const overrideKey = `${line.invoiceId}__${line.employeeId}__${line.roleType}`;
                             const isEditing = editingOverride === overrideKey;
                             const hasOverride = overrides[overrideKey] !== undefined && overrides[overrideKey] !== line.originalRate;
@@ -977,7 +969,7 @@ export function CommissionReportPage() {
                                   <span className="flex items-center gap-1">
                                     {fmtDate(line.paymentDate)}
                                     {line.paymentMethod === 'credit_card' && (
-                                      <CreditCard className="w-3 h-3 text-amber-400" title="Credit card payment" />
+                                      <CreditCard className="w-3 h-3 text-amber-400"><title>{"Credit card payment"}</title></CreditCard>
                                     )}
                                   </span>
                                 </td>

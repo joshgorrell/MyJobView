@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, CheckSquare, User, Calendar, AlertCircle, Tag, MessageSquare } from 'lucide-react';
@@ -21,10 +22,11 @@ interface Profile {
   id: string;
   full_name: string;
   role: string;
+  is_sales_rep?: boolean;
 }
 
 export function CreateTaskFromWorkOrderModal({
-  workOrderId,
+  workOrderId: _workOrderId,
   workOrderNumber,
   workOrderTitle,
   contactId,
@@ -91,7 +93,7 @@ export function CreateTaskFromWorkOrderModal({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, role')
+        .select('id, full_name, role, is_sales_rep')
         .eq('is_active', true)
         .order('full_name');
 
@@ -99,7 +101,7 @@ export function CreateTaskFromWorkOrderModal({
       setUsers(data || []);
 
       const salesUsers = (data || []).filter(u =>
-        ['sales', 'admin'].includes(u.role)
+        u.is_sales_rep === true
       );
       setSalesReps(salesUsers);
     } catch (error) {
@@ -151,7 +153,7 @@ export function CreateTaskFromWorkOrderModal({
     if (!profile) return;
 
     if (!formData.assigned_to) {
-      alert('Please assign this task to someone');
+      notify('Please assign this task to someone', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -199,10 +201,11 @@ export function CreateTaskFromWorkOrderModal({
 
       if (commentError) console.error('Error adding comment:', commentError);
 
+      notify('Task created!', { theme: 'blue', tone: 'success' });
       onSuccess(task.id);
     } catch (error: any) {
       console.error('Error creating task:', error);
-      alert(`Failed to create task: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to create task: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

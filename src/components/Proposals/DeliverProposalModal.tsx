@@ -1,5 +1,6 @@
+import { loadProposalDocument, downloadProposalDocument } from '../../lib/proposalDocument';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle, Check, CheckSquare, ChevronDown, ChevronUp, Download, Globe2, Loader2, Mail, Send, Square, X } from 'lucide-react';
+import { AlertCircle, Check, CheckSquare, ChevronDown, ChevronUp, Download, Eye, Globe2, Loader2, Mail, Send, Square, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { checkTaxFinalizationGuard } from '../../lib/taxCalculations';
@@ -17,6 +18,7 @@ interface ProposalInfo {
   is_portal_visible: boolean | null;
   sent_at: string | null;
   report_template_id: string | null;
+  include_promise_page?: boolean | null;
   portal_customer_message?: string | null;
   tax_calculation_status: string | null;
   contacts: { full_name: string | null; email: string | null } | null;
@@ -49,6 +51,9 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
   const { profile } = useAuth();
   const [proposal, setProposal] = useState<ProposalInfo | null>(null);
   const [companyName, setCompanyName] = useState('');
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; is_default: boolean; is_personal: boolean }>>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [previewing, setPreviewing] = useState(false);
   const [email, setEmail] = useState(false);
   const [portal, setPortal] = useState(false);
   const [pdf, setPdf] = useState(false);
@@ -60,6 +65,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
   const [subject, setSubject] = useState('');
   const [approvalWindowDays, setApprovalWindowDays] = useState(30);
   const [showEmailDetails, setShowEmailDetails] = useState(false);
+  const [includePromisePage, setIncludePromisePage] = useState(true);
   const [includeProposal, setIncludeProposal] = useState(true);
   const [includeTerms, setIncludeTerms] = useState(false);
   const [includePaymentSchedule, setIncludePaymentSchedule] = useState(false);
@@ -76,11 +82,13 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
     void (async () => {
       try {
         setLoading(true);
-        const [{ data: p, error: pError }, { data: settings }] = await Promise.all([
-          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
+        const [{ data: p, error: pError }, { data: settings }, { data: availableTemplates, error: templateError }] = await Promise.all([
+          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,include_promise_page,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
           supabase.from('company_settings').select('company_name').eq('organization_id', profile?.organization_id).maybeSingle(),
+          supabase.from('proposal_report_templates').select('id,name,is_default,is_personal').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
         ]);
         if (pError) throw pError;
+        if (templateError) throw templateError;
         if (!p || !alive) return;
         const info = p as unknown as ProposalInfo;
         const fullName = info.contacts?.full_name?.trim() || 'there';
@@ -88,6 +96,12 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         const defaultMessage = info.portal_customer_message?.trim() || `Hi ${firstName} — check out the proposal and let us know what you think!`;
         const co = settings?.company_name || 'Your Company';
         setProposal(info);
+        const available = availableTemplates || [];
+        setTemplates(available);
+        const saved = templateId || info.report_template_id;
+        const preferred = available.find(t => t.id === saved) || available.find(t => t.id === profile?.default_proposal_report_template_id) || available.find(t => t.is_default && !t.is_personal) || available[0];
+        setSelectedTemplateId(preferred?.id || '');
+        setIncludePromisePage(info.include_promise_page ?? true);
         setPortalMessage(defaultMessage);
         setEmailMessage(defaultMessage);
         setToEmail(info.contacts?.email || '');
@@ -101,7 +115,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
       }
     })();
     return () => { alive = false; };
-  }, [proposalId]);
+  }, [proposalId, profile?.id, profile?.organization_id, profile?.default_proposal_report_template_id, templateId]);
 
   useEffect(() => {
     if (!email || docs || docsLoading) return;
@@ -117,7 +131,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
 
   const anySelected = email || portal || pdf;
   const deliveryLabel = useMemo(() => {
-    const chosen = [portal && 'Portal', email && 'Email', pdf && 'PDF'].filter(Boolean);
+    const chosen = [portal && 'Portal', email && 'Email', pdf && 'Print / PDF'].filter(Boolean);
     return chosen.length ? `Deliver via ${chosen.join(' + ')}` : 'Choose Delivery Method';
   }, [portal, email, pdf]);
 
@@ -130,9 +144,8 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
     if (!proposal) return [] as Array<{ filename: string; content: string }>;
     const attachments: Array<{ filename: string; content: string }> = [];
     if (includeProposal) {
-      const { data, error: pdfError } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
-      if (pdfError) throw pdfError;
-      if (data?.base64) attachments.push({ filename: `Proposal-${proposal.proposal_number}.pdf`, content: data.base64 });
+      const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage, selectedTemplateId || null);
+      attachments.push({ filename: document.filename, content: document.content });
     }
     if (includeTerms && docs?.termsBase64) attachments.push({ filename: `Terms-Conditions-${proposal.proposal_number}.html`, content: docs.termsBase64 });
     if (includePaymentSchedule && docs?.paymentScheduleBase64) attachments.push({ filename: `Payment-Schedule-${proposal.proposal_number}.html`, content: docs.paymentScheduleBase64 });
@@ -149,21 +162,31 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
     return attachments;
   }
 
+  async function previewProposal() {
+    if (!proposal || previewing) return;
+    setPreviewing(true);
+    setError('');
+    // Open synchronously to avoid popup blockers after asynchronous generation.
+    const previewWindow = window.open('', '_blank');
+    if (!previewWindow) { setError('Allow popups to preview this proposal.'); setPreviewing(false); return; }
+    previewWindow.document.title = 'Preparing proposal preview';
+    previewWindow.document.body.textContent = 'Preparing your proposal preview…';
+    try {
+      const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage, selectedTemplateId || null);
+      const bytes = Uint8Array.from(atob(document.content), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: document.mimeType }));
+      previewWindow.location.replace(url);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e: unknown) {
+      previewWindow.close();
+      setError(e instanceof Error ? e.message : 'Unable to generate preview.');
+    } finally { setPreviewing(false); }
+  }
+
   async function downloadPdf() {
     if (!proposal) return;
-    const { data, error: pdfError } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
-    if (pdfError) throw pdfError;
-    if (!data?.base64) throw new Error('PDF generation did not return a file.');
-    const bytes = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Proposal-${proposal.proposal_number}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+    const document = await loadProposalDocument(proposalId, proposal.proposal_number, includePromisePage, selectedTemplateId || null);
+    downloadProposalDocument(document);
   }
 
   async function deliver() {
@@ -182,7 +205,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         const { error: portalError } = await supabase.from('proposals').update({
           status: 'sent', sent_at: now.toISOString(), expires_at: expiresAt.toISOString(), is_portal_visible: true,
           is_locked: true, locked_at: now.toISOString(), locked_by: profile?.id || null,
-          report_template_id: templateId || proposal.report_template_id, portal_customer_message: portalMessage.trim() || null,
+          report_template_id: selectedTemplateId || null, include_promise_page: includePromisePage, portal_customer_message: portalMessage.trim() || null,
         }).eq('id', proposalId);
         if (portalError) throw portalError;
         completed.push('Published to Customer Portal');
@@ -206,11 +229,12 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
         completed.push(`Emailed to ${toEmail.trim()}`);
       }
 
-      if (pdf) { await downloadPdf(); completed.push('PDF generated'); }
+      if (pdf) { await downloadPdf(); completed.push('Printable proposal downloaded'); }
 
       const lockUpdates: Record<string, unknown> = { is_locked: true, locked_at: now.toISOString(), locked_by: profile?.id || null };
       if (!proposal.sent_at && !portal) { lockUpdates.sent_at = now.toISOString(); lockUpdates.status = 'sent'; }
-      if (templateId) lockUpdates.report_template_id = templateId;
+      lockUpdates.report_template_id = selectedTemplateId || null;
+      lockUpdates.include_promise_page = includePromisePage;
       const { error: lockError } = await supabase.from('proposals').update(lockUpdates).eq('id', proposalId);
       if (lockError) throw lockError;
       setResult(completed);
@@ -234,10 +258,20 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
           {loading ? <div className="flex min-h-48 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-blue-400" /></div> : <div className="space-y-5">
             {error && <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300"><AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" /><span>{error}</span></div>}
 
+            <section className="rounded-xl border border-gray-700 p-3 sm:p-4">
+              <label htmlFor="delivery-template" className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-400">Proposal template</label>
+              <select id="delivery-template" value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" disabled={!templates.length}>
+                {!templates.length && <option value="">Standard layout</option>}
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (Company default)' : t.is_personal ? ' (Personal)' : ''}</option>)}
+              </select>
+              <label className="mt-3 flex items-center gap-2 text-sm text-gray-200"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} /> Include Our Promise page</label>
+              <button type="button" onClick={() => void previewProposal()} disabled={previewing} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-500/60 px-3 text-sm font-semibold text-blue-300 hover:bg-blue-500/10 disabled:opacity-50"><Eye className="h-4 w-4" />{previewing ? 'Generating preview…' : 'Preview customer proposal'}</button>
+              <p className="mt-2 text-xs text-gray-400">Preview uses the selected template and Promise-page setting. Review before sending or downloading.</p>
+            </section>
             <section><h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-400">Delivery Methods</h3><div className="grid gap-2 sm:grid-cols-3">
               <Choice checked={portal} onClick={() => setPortal(v => !v)} icon={<Globe2 className="h-5 w-5" />} title="Customer Portal" description={proposal?.is_portal_visible ? 'Currently live. Publish/refresh this version.' : 'Publish this proposal to the customer portal.'} />
               <Choice checked={email} onClick={() => setEmail(v => !v)} icon={<Mail className="h-5 w-5" />} title="Email Customer" description="Send a personalized email with the secure proposal link." />
-              <Choice checked={pdf} onClick={() => setPdf(v => !v)} icon={<Download className="h-5 w-5" />} title="Print / PDF" description="Generate a PDF that can be saved or printed." />
+              <Choice checked={pdf} onClick={() => setPdf(v => !v)} icon={<Download className="h-5 w-5" />} title="Print / PDF" description="Download a printable proposal to open, print, or save as PDF." />
             </div></section>
 
             {(portal || email) && <section className="rounded-xl border border-gray-700 bg-gray-900/40 p-3 sm:p-4">
@@ -249,10 +283,10 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
 
             {portal && <section className="rounded-xl border border-gray-700 p-3 sm:p-4"><label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-400">Approval Window</label><select value={approvalWindowDays} onChange={e => setApprovalWindowDays(Number(e.target.value))} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white sm:max-w-xs"><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={45}>45 days</option><option value={60}>60 days</option><option value={90}>90 days</option></select><p className="mt-2 text-xs text-gray-500">Publishing locks the proposal. To change it later, use Take Offline & Unlock.</p></section>}
 
-            {email && <section className="rounded-xl border border-gray-700 p-3 sm:p-4"><button type="button" onClick={() => setShowEmailDetails(v => !v)} className="flex min-h-10 w-full items-center justify-between text-left"><span><span className="block text-sm font-semibold text-white">Email details & attachments</span><span className="block text-xs text-gray-400">{toEmail || 'No recipient email'} · Proposal PDF {includeProposal ? 'attached' : 'not attached'}</span></span>{showEmailDetails ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}</button>{showEmailDetails && <div className="mt-4 space-y-3 border-t border-gray-700 pt-4">
+            {email && <section className="rounded-xl border border-gray-700 p-3 sm:p-4"><button type="button" onClick={() => setShowEmailDetails(v => !v)} className="flex min-h-10 w-full items-center justify-between text-left"><span><span className="block text-sm font-semibold text-white">Email details & attachments</span><span className="block text-xs text-gray-400">{toEmail || 'No recipient email'} · Proposal document {includeProposal ? 'attached' : 'not attached'}</span></span>{showEmailDetails ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}</button>{showEmailDetails && <div className="mt-4 space-y-3 border-t border-gray-700 pt-4">
               <div className="grid gap-3 sm:grid-cols-2"><div><label className="mb-1 block text-xs text-gray-400">To</label><input type="email" value={toEmail} onChange={e => setToEmail(e.target.value)} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" /></div><div><label className="mb-1 block text-xs text-gray-400">CC</label><input value={ccEmails} onChange={e => setCcEmails(e.target.value)} placeholder="Optional, comma separated" className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" /></div></div>
               <div><label className="mb-1 block text-xs text-gray-400">Subject</label><input value={subject} onChange={e => setSubject(e.target.value)} className="h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3 text-sm text-white" /></div>
-              <div><div className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-500">Attachments</div><div className="grid sm:grid-cols-2"><AttachmentChoice checked={includeProposal} label="Proposal PDF" onClick={() => setIncludeProposal(v => !v)} /><AttachmentChoice checked={includeTerms} disabled={docsLoading || !docs?.termsAvailable} label={docsLoading ? 'Terms & Conditions (checking…)' : 'Terms & Conditions'} onClick={() => setIncludeTerms(v => !v)} /><AttachmentChoice checked={includePaymentSchedule} disabled={docsLoading || !docs?.paymentScheduleAvailable} label={docsLoading ? 'Payment Schedule (checking…)' : 'Payment Schedule'} onClick={() => setIncludePaymentSchedule(v => !v)} /><AttachmentChoice checked={includeFinancing} disabled={docsLoading || !docs?.financingAvailable} label={docsLoading ? 'Financing Documents (checking…)' : 'Financing Documents'} onClick={() => setIncludeFinancing(v => !v)} /></div></div>
+              <div><div className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-500">Attachments</div><div className="grid sm:grid-cols-2"><AttachmentChoice checked={includeProposal} label="Printable proposal" onClick={() => setIncludeProposal(v => !v)} /><AttachmentChoice checked={includeTerms} disabled={docsLoading || !docs?.termsAvailable} label={docsLoading ? 'Terms & Conditions (checking…)' : 'Terms & Conditions'} onClick={() => setIncludeTerms(v => !v)} /><AttachmentChoice checked={includePaymentSchedule} disabled={docsLoading || !docs?.paymentScheduleAvailable} label={docsLoading ? 'Payment Schedule (checking…)' : 'Payment Schedule'} onClick={() => setIncludePaymentSchedule(v => !v)} /><AttachmentChoice checked={includeFinancing} disabled={docsLoading || !docs?.financingAvailable} label={docsLoading ? 'Financing Documents (checking…)' : 'Financing Documents'} onClick={() => setIncludeFinancing(v => !v)} /></div></div>
             </div>}</section>}
 
             <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-xs leading-relaxed text-blue-200"><strong>After delivery:</strong> MyJobView locks this proposal to prevent accidental edits. If it is live on the portal, unlocking it automatically takes it offline first. Discussion history stays with the proposal.</div>

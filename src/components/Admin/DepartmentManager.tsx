@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Layers, Plus, Edit2, Save, X, GripVertical, ChevronDown, ChevronRight, Eye, EyeOff, Package } from 'lucide-react';
+import { Plus, Edit2, Save, X, GripVertical, ChevronDown, ChevronRight, Eye, EyeOff, Package } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 
 const AVAILABLE_ICONS = [
@@ -204,7 +205,7 @@ export function DepartmentManager() {
       setIsCreating(false);
     } catch (error) {
       console.error('Error saving module:', error);
-      alert('Failed to save module');
+      notify('Failed to save module', { theme: 'blue', tone: 'error' });
     }
   };
 

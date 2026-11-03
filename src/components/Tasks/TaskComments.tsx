@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Edit2, Trash2, X } from 'lucide-react';
+import { MessageSquare, Send, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
@@ -151,7 +152,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
       loadComments();
     } catch (error: any) {
       console.error('Error posting comment:', error);
-      alert('Failed to post comment: ' + error.message);
+      notify('Failed to post comment: ' + error.message, { theme: 'cyan', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -174,7 +175,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
       loadComments();
     } catch (error: any) {
       console.error('Error updating comment:', error);
-      alert('Failed to update comment: ' + error.message);
+      notify('Failed to update comment: ' + error.message, { theme: 'cyan', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -351,7 +352,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
         message="Delete this comment? This cannot be undone."
         variant="danger"
         confirmLabel="Delete"
-        onConfirm={() => confirmDeleteId && handleDeleteComment(confirmDeleteId)}
+        onConfirm={async () => { if (confirmDeleteId) await handleDeleteComment(confirmDeleteId); }}
         onCancel={() => setConfirmDeleteId(null)}
       />
     </div>

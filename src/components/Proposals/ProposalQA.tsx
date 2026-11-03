@@ -1,6 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send, X, Loader, ImagePlus, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { resolveMessageAttachments } from '../../lib/messageAttachments';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Message {
@@ -100,7 +102,7 @@ export function ProposalQA({
   const [activeContextLineItemId, setActiveContextLineItemId] = useState<string | null>(contextLineItemId);
   const [activeContextLabel, setActiveContextLabel] = useState<string | null>(contextLabel);
   const [uploading, setUploading] = useState(false);
-  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: 'image' | 'link' } | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; preview?: string; type: 'image' | 'link' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,6 +151,13 @@ export function ProposalQA({
     try {
       if (autoThreadId) {
         setThreadId(autoThreadId);
+        return;
+      }
+
+      if (isPortal) {
+        const { data, error } = await supabase.rpc('ensure_customer_proposal_thread', { p_proposal_id: proposalId });
+        if (error || !data) throw error || new Error('Unable to route the proposal conversation');
+        setThreadId(data);
         return;
       }
 
@@ -213,7 +222,7 @@ export function ProposalQA({
       const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages(await resolveMessageAttachments(data || []));
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -226,6 +235,11 @@ export function ProposalQA({
     const unreadMessages = messages.filter(m => m.author_type !== authorType && !m.is_read);
 
     if (unreadMessages.length > 0) {
+      if (isPortal) {
+        await supabase.rpc('mark_customer_conversation_read', { p_thread: threadId });
+        onMessagesChanged?.();
+        return;
+      }
       await supabase
         .from('messages')
         .update({ is_read: true })
@@ -253,10 +267,11 @@ export function ProposalQA({
         .from('message-attachments')
         .getPublicUrl(path);
 
-      setPendingAttachment({ url: urlData.publicUrl, type: 'image' });
+      const [resolved] = await resolveMessageAttachments([{attachment_url: urlData.publicUrl, attachment_type: 'image'}]);
+      setPendingAttachment({ url: urlData.publicUrl, preview: resolved.attachment_url || undefined, type: 'image' });
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image. Please try again.');
+      notify('Failed to upload image. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setUploading(false);
     }
@@ -309,7 +324,7 @@ export function ProposalQA({
       onMessagesChanged?.();
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+      notify('Failed to send message. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSending(false);
     }
@@ -345,7 +360,7 @@ export function ProposalQA({
       {pendingAttachment && (
         <div className="mb-2 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
           {pendingAttachment.type === 'image' ? (
-            <img src={pendingAttachment.url} alt="Pending" className="w-10 h-10 rounded object-cover" />
+            <img src={pendingAttachment.preview || pendingAttachment.url} alt="Pending" className="w-10 h-10 rounded object-cover" />
           ) : (
             <LinkIcon className="w-4 h-4 text-blue-600" />
           )}

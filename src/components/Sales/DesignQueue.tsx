@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sparkles, Clock, CheckCircle, AlertCircle, User, Calendar, FileText, Layers, Package, ExternalLink, MessageSquare, RefreshCw, Search, Loader, Send, Archive, PenTool, Trash2, CreditCard as Edit2, X, Save, ChevronDown, ChevronUp, Info, Plus, Zap, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { nameFilters, searchBriefCustomers } from '../../lib/designBriefSearch';
 import { useAuth } from '../../contexts/AuthContext';
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
@@ -15,6 +17,7 @@ interface CatalogProduct {
   default_labor_hours: number | null;
   category: string | null;
   manufacturer: string | null;
+  model_number?: string | null;
   thumbnail_url: string | null;
   item_type: string | null;
 }
@@ -34,6 +37,7 @@ interface LineItem {
 
 interface Room {
   name: string;
+  description?: string;
   lineItems: LineItem[];
 }
 
@@ -117,8 +121,9 @@ function countMatchedItems(rooms?: Room[]): { matched: number; total: number } {
   let total = 0;
   for (const room of rooms) {
     for (const item of room.lineItems) {
+      if (item.itemType === 'labor') continue;
       total++;
-      if (item.matchedProductId || item.matchConfidence === 'ai') matched++;
+      if (item.matchedProductId) matched++;
     }
   }
   return { matched, total };
@@ -128,39 +133,56 @@ interface ProductPickerProps {
   onSelect: (product: CatalogProduct) => void;
   onClose: () => void;
   currentProductId?: string | null;
+  suggestedQuery?: string;
+  matchingCount?: number;
+  onApplyMatching?: (product: CatalogProduct) => void;
 }
 
-function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerProps) {
-  const [query, setQuery] = useState('');
+function ProductPicker({ onSelect, onClose, currentProductId, suggestedQuery = '', matchingCount = 0, onApplyMatching }: ProductPickerProps) {
+  const { profile } = useAuth();
+  const productRequestRef = useRef(0);
+  const [moreProducts, setMoreProducts] = useState(false);
+  const [query, setQuery] = useState(suggestedQuery);
   const [results, setResults] = useState<CatalogProduct[]>([]);
+  const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
-    searchProducts('');
+    searchProducts(suggestedQuery);
+    return () => { productRequestRef.current += 1; if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
   async function searchProducts(q: string) {
+    const request = ++productRequestRef.current;
     setLoading(true);
-    const query_builder = supabase
-      .from('products')
-      .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, thumbnail_url, item_type')
-      .eq('is_active', true)
-      .order('name')
-      .limit(20);
-
-    if (q.trim()) {
-      query_builder.ilike('name', `%${q}%`);
+    setSearchError('');
+    try {
+      if (!profile?.organization_id) throw new Error('Organization required');
+      let builder = supabase.from('products')
+        .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, category, manufacturer, model_number, thumbnail_url, item_type')
+        .eq('organization_id', profile.organization_id).eq('is_active', true);
+      const tokens = q.trim().split(/\s+/).filter(token => !['pair', 'pairs', 'the', 'for', 'with', 'need', 'each', 'inch', 'inches'].includes(token.toLowerCase()));
+      for (const filter of nameFilters(tokens.join(' '), ['name', 'manufacturer', 'model_number', 'category'])) builder = builder.or(filter);
+      const { data, error } = await builder.order('name').order('id').limit(100);
+      if (request !== productRequestRef.current) return;
+      if (error) throw error;
+      setResults(data || []);
+      setMoreProducts(data?.length === 100);
+    } catch {
+      if (request !== productRequestRef.current) return;
+      setResults([]);
+      setSearchError('Catalog search failed. Please retry.');
+    } finally {
+      if (request === productRequestRef.current) setLoading(false);
     }
-
-    const { data } = await query_builder;
-    setResults(data || []);
-    setLoading(false);
   }
 
   function handleQuery(val: string) {
+    productRequestRef.current += 1;
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => searchProducts(val), 200);
@@ -176,7 +198,7 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
             type="text"
             value={query}
             onChange={e => handleQuery(e.target.value)}
-            placeholder="Search products by name..."
+            placeholder="Search by size, type, brand, or model..."
             className="flex-1 text-sm outline-none text-gray-800 placeholder-gray-400"
           />
           {loading && <Loader className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" />}
@@ -186,15 +208,20 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-          {results.length === 0 && !loading && (
+          {searchError && <p role="alert" className="px-4 py-3 text-sm text-red-700">{searchError} <button onClick={() => searchProducts(query)} className="underline">Retry</button></p>}
+          {moreProducts && <p className="px-4 py-2 text-xs text-gray-500">Showing 100 matches. Add a brand or model to narrow your search.</p>}
+          {results.length === 0 && !loading && !searchError && (
             <div className="py-8 text-center text-sm text-gray-400">
               {query ? `No products found for "${query}"` : 'No products in catalog'}
             </div>
           )}
           {results.map(product => (
-            <button
+            <div
               key={product.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(product)}
+              onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onSelect(product); } }}
               className={`w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors flex items-center gap-3 ${
                 currentProductId === product.id ? 'bg-blue-50' : ''
               }`}
@@ -209,7 +236,7 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                 <p className="text-xs text-gray-500 truncate">
-                  {[product.manufacturer, product.category].filter(Boolean).join(' · ')}
+                  {[product.manufacturer, product.model_number, product.category].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
@@ -220,10 +247,16 @@ function ProductPicker({ onSelect, onClose, currentProductId }: ProductPickerPro
                 )}
                 {product.unit && <p className="text-xs text-gray-400">{product.unit}</p>}
               </div>
+              {product.name.toLowerCase().includes('pair') && (
+                <span className="text-[10px] text-amber-700 max-w-24">Sold as pair — verify quantity</span>
+              )}
+              {matchingCount > 1 && onApplyMatching && (
+                <button type="button" onClick={event => { event.stopPropagation(); onApplyMatching(product); }} className="px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 hover:bg-blue-100 flex-shrink-0">Apply to {matchingCount}</button>
+              )}
               {currentProductId === product.id && (
                 <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
               )}
-            </button>
+            </div>
           ))}
         </div>
 
@@ -262,9 +295,19 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContact, setSelectedContact] = useState<ConvertContact | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const searchRequestRef = useRef(0);
+  const [customerSearchError, setCustomerSearchError] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [title, setTitle] = useState(brief.ai_summary?.title || '');
+  // Design/SOW preview remains available even when catalog equipment is incomplete.
+  const unresolvedEquipment = (brief.ai_summary?.rooms || []).flatMap(room =>
+    (room.lineItems || []).filter(item =>
+      item.itemType !== 'labor' && (!item.matchedProductId || (item.overridePrice ?? null) === 0)
+    ).map(item => `${room.name}: ${item.description}`)
+  );
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -306,32 +349,23 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   async function searchContacts(q: string) {
-    if (!q.trim()) { setContacts([]); setShowDropdown(false); return; }
+    const request = ++searchRequestRef.current;
+    if (!q.trim()) { setContacts([]); setShowDropdown(false); setSearchLoading(false); return; }
     setSearchLoading(true);
-    const [{ data: contactsData }, { data: leadsData }] = await Promise.all([
-      supabase
-        .from('contacts')
-        .select('id, full_name, contact_name, first_name, last_name, company_name, tax_rate, tax_environment, tax_project_type')
-        .or(`full_name.ilike.%${q}%,contact_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,company_name.ilike.%${q}%`)
-        .limit(8),
-      supabase
-        .from('leads')
-        .select('id, contact_name, company_name')
-        .or(`contact_name.ilike.%${q}%,company_name.ilike.%${q}%`)
-        .limit(5),
-    ]);
-    const fromContacts: ConvertContact[] = (contactsData || []).map(c => ({ ...c, source: 'contact' as const }));
-    const fromLeads: ConvertContact[] = (leadsData || []).map(l => ({
-      id: l.id,
-      contact_name: l.contact_name,
-      company_name: l.company_name,
-      source: 'lead' as const,
-    }));
-    const combined = [...fromContacts, ...fromLeads];
-    combined.sort((a, b) => getContactName(a).localeCompare(getContactName(b)));
-    setContacts(combined);
-    setShowDropdown(combined.length > 0);
-    setSearchLoading(false);
+    setCustomerSearchError(false);
+    try {
+      const result = await searchBriefCustomers(supabase, profile?.organization_id || '', q);
+      if (request !== searchRequestRef.current) return;
+      setContacts(result.contacts);
+      setCustomerSearchError(result.failed);
+      setShowDropdown(true);
+    } catch {
+      if (request !== searchRequestRef.current) return;
+      setCustomerSearchError(true);
+      setShowDropdown(true);
+    } finally {
+      if (request === searchRequestRef.current) setSearchLoading(false);
+    }
   }
 
   function getContactName(c: ConvertContact) {
@@ -339,6 +373,8 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   function handleContactSearch(val: string) {
+    searchRequestRef.current += 1;
+    setContacts([]);
     setContactSearch(val);
     if (selectedContact) setSelectedContact(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -346,139 +382,43 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
   }
 
   async function handleCreate() {
-    if (!selectedContact) return;
+    if (!selectedContact || creating) return;
+    setCreateError('');
     setCreating(true);
 
     try {
-      const rooms = brief.ai_summary?.rooms || [];
-
-      let contactId = selectedContact.id;
-      let taxEnvironment = brief.ai_summary?.taxEnvironment || selectedContact.tax_environment || 'residential';
-      let taxProjectType = brief.ai_summary?.taxProjectType || selectedContact.tax_project_type || 'general_installation_repair';
-      let taxRate = selectedContact.tax_rate || 0;
-
-      if (selectedContact.source === 'lead') {
-        const { data: existingContact } = await supabase
-          .from('contacts')
-          .select('id, tax_rate, tax_environment, tax_project_type')
-          .eq('contact_name', selectedContact.contact_name || '')
-          .maybeSingle();
-
-        if (existingContact) {
-          contactId = existingContact.id;
-          taxEnvironment = brief.ai_summary?.taxEnvironment || existingContact.tax_environment || 'residential';
-          taxProjectType = brief.ai_summary?.taxProjectType || existingContact.tax_project_type || 'general_installation_repair';
-          taxRate = existingContact.tax_rate || 0;
-        } else {
-          const { data: newContact, error: contactError } = await supabase
-            .from('contacts')
-            .insert({
-              contact_name: selectedContact.contact_name || selectedContact.company_name || 'Unknown',
-              company_name: selectedContact.company_name || null,
-              contact_type: 'person',
-            })
-            .select('id')
-            .single();
-
-          if (contactError || !newContact) throw new Error('Failed to promote lead to contact');
-          contactId = newContact.id;
-
-          await supabase
-            .from('leads')
-            .update({ status: 'converted' })
-            .eq('id', selectedContact.id);
-        }
-
-        await supabase
-          .from('design_briefs')
-          .update({ contact_id: contactId, lead_id: null })
-          .eq('id', brief.id);
+      const { data: currentBrief, error: briefCheckError } = await supabase
+        .from('design_briefs').select('linked_proposal_id').eq('id', brief.id).single();
+      if (briefCheckError) throw briefCheckError;
+      if (currentBrief?.linked_proposal_id) {
+        onCreated(currentBrief.linked_proposal_id);
+        return;
       }
+      const contactId = selectedContact.source === 'lead' ? null : selectedContact.id;
+      const taxEnvironment = brief.ai_summary?.taxEnvironment || selectedContact.tax_environment || 'residential';
+      const taxProjectType = brief.ai_summary?.taxProjectType || selectedContact.tax_project_type || 'general_installation_repair';
+      const taxRate = selectedContact.tax_rate || 0;
 
-      const { data: newProposal, error: proposalError } = await supabase
-        .from('proposals')
-        .insert({
-          contact_id: contactId,
-          title: title || `Design Brief - ${getContactName(selectedContact)}`,
-          status: 'designing',
-          tax_environment: taxEnvironment,
-          tax_project_type: taxProjectType,
-          tax_rate: taxRate,
-          created_by: profile?.id,
-        })
-        .select('id')
-        .single();
-
-      if (proposalError || !newProposal) throw new Error('Failed to create proposal');
-
-      for (let roomIndex = 0; roomIndex < rooms.length; roomIndex++) {
-        const room = rooms[roomIndex];
-
-        const { data: newRoom, error: roomError } = await supabase
-          .from('proposal_rooms')
-          .insert({
-            proposal_id: newProposal.id,
-            name: room.name,
-            sort_order: roomIndex,
-          })
-          .select('id')
-          .single();
-
-        if (!roomError && newRoom && room.lineItems?.length > 0) {
-          const productIds = room.lineItems
-            .map(li => li.matchedProductId)
-            .filter((id): id is string => !!id);
-
-          const productMap = new Map<string, CatalogProduct>();
-
-          if (productIds.length > 0) {
-            const { data: catalogProducts } = await supabase
-              .from('products')
-              .select('id, name, our_price, cost, unit, default_qty, default_labor_hours, item_type, category, manufacturer, thumbnail_url')
-              .in('id', productIds);
-            if (catalogProducts) {
-              for (const p of catalogProducts) {
-                productMap.set(p.id, p as CatalogProduct);
-              }
-            }
-          }
-
-          const lineItemInserts = room.lineItems.map((li, liIndex) => {
-            const product = li.matchedProductId ? productMap.get(li.matchedProductId) : null;
-            const unitPrice = li.overridePrice ?? product?.our_price ?? 0;
-            const cost = product?.cost ?? 0;
-            const qty = li.overrideQuantity ?? li.quantity ?? product?.default_qty ?? 1;
-            const laborHours = li.laborHours ?? product?.default_labor_hours ?? null;
-            const lineTotal = qty * unitPrice;
-
-            return {
-              proposal_id: newProposal.id,
-              room_id: newRoom.id,
-              product_id: li.matchedProductId || null,
-              description: li.matchedProductName || li.description,
-              quantity: qty,
-              unit: li.unit || product?.unit || 'EA',
-              cost,
-              unit_price: unitPrice,
-              line_total: lineTotal,
-              item_type: li.itemType || 'material',
-              labor_hours: laborHours,
-              sort_order: liIndex,
-            };
-          });
-
-          await supabase.from('proposal_line_items').insert(lineItemInserts);
+      // One database transaction: row lock, idempotency, rooms, items and brief link.
+      const { data: proposalId, error: conversionError } = await supabase.rpc(
+        'design_brief_convert',
+        {
+          p_brief: brief.id,
+          p_contact: contactId,
+          p_lead: selectedContact.source === 'lead' ? selectedContact.id : null,
+          p_title: title || `Design Brief - ${getContactName(selectedContact)}`,
+          p_tax_environment: taxEnvironment,
+          p_tax_type: taxProjectType,
+          p_tax_rate: taxRate,
         }
+      );
+      if (conversionError || !proposalId) {
+        throw conversionError || new Error('Unable to create proposal');
       }
-
-      await supabase
-        .from('design_briefs')
-        .update({ linked_proposal_id: newProposal.id, status: 'building' })
-        .eq('id', brief.id);
-
-      onCreated(newProposal.id);
+      onCreated(proposalId);
     } catch (err) {
       console.error('Error creating proposal:', err);
+      setCreateError(err instanceof Error ? err.message : 'Failed to create proposal. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -498,6 +438,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
         </div>
 
         <div className="p-5 space-y-4">
+          {createError && <p role="alert" className="text-sm text-red-700 bg-red-50 rounded-lg p-3">{createError}</p>}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Proposal Title</label>
             <input
@@ -551,6 +492,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
                 {searchLoading && (
                   <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
                 )}
+                {customerSearchError && <p role="alert" className="text-sm text-red-700">Customer search failed. <button className="underline" onClick={() => searchContacts(contactSearch)}>Retry</button></p>}
                 {showDropdown && !selectedContact && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto">
                     {contacts.map(c => (
@@ -602,6 +544,15 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
             )}
           </div>
 
+          {unresolvedEquipment.length > 0 && (
+            <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+              <p className="font-semibold">{unresolvedEquipment.length} equipment item(s) still need catalog matching or pricing.</p>
+              <p className="mt-1 text-xs">You can keep reviewing the design and scope of work. Assign verified products and prices in Design Queue before creating the proposal.</p>
+              <ul className="mt-2 list-disc pl-5 text-xs max-h-24 overflow-y-auto">
+                {unresolvedEquipment.map((item, i) => <li key={i}>{item}</li>)}
+              </ul>
+            </div>
+          )}
           {brief.ai_summary?.rooms && (
             <div className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
               <p className="text-xs font-medium text-gray-600 mb-1.5">Will create:</p>
@@ -624,7 +575,7 @@ function ConvertToProposalModal({ brief, onClose, onCreated }: ConvertToProposal
           </button>
           <button
             onClick={handleCreate}
-            disabled={!selectedContact || creating}
+            disabled={!selectedContact || creating || unresolvedEquipment.length > 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors"
           >
             {creating ? (
@@ -659,6 +610,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
 
   const [pickerOpen, setPickerOpen] = useState<{ roomIndex: number; itemIndex: number } | null>(null);
   const [savingMatches, setSavingMatches] = useState(false);
+  const matchSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingMatchSaves = useRef(0);
+  const [matchSaveError, setMatchSaveError] = useState(false);
   const [localRooms, setLocalRooms] = useState<Room[] | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [rerunningAI, setRerunningAI] = useState(false);
@@ -815,10 +769,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     try {
       const { error } = await supabase
         .from('design_briefs')
-        .update({ raw_notes: editNotesDraft })
+        .update({ raw_notes: editNotesDraft, ai_summary: null, status: 'draft', submitted_at: null })
         .eq('id', selectedBrief.id);
       if (error) throw error;
-      const updated = { ...selectedBrief, raw_notes: editNotesDraft };
+      const updated = { ...selectedBrief, raw_notes: editNotesDraft, ai_summary: null, status: 'draft' as const, submitted_at: null };
+      setLocalRooms(null);
       setBriefs(prev => prev.map(b => b.id === selectedBrief.id ? updated : b));
       setSelectedBrief(updated);
       setEditingNotes(false);
@@ -830,7 +785,9 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   }
 
   async function handleRerunAI() {
-    if (!selectedBrief || !selectedBrief.raw_notes.trim()) return;
+    if (!selectedBrief || !selectedBrief.raw_notes.trim() || savingMatches) return;
+    const reviewedItems = (localRooms || selectedBrief.ai_summary?.rooms || []).flatMap(room => room.lineItems || []).filter(item => item.matchedProductId || item.matchConfidence === 'designer');
+    if (reviewedItems.length && !(await requestConfirmation(`Re-generating the design will replace ${reviewedItems.length} reviewed catalog selections. Continue?`))) return;
     setRerunningAI(true);
     setRerunError('');
     try {
@@ -873,9 +830,37 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     }
   }
 
-  function handleProductSelected(product: CatalogProduct) {
+  async function confirmCatalogPackage(product: CatalogProduct, items: LineItem[]): Promise<boolean> {
+    if (!/\bpair\b/i.test(product.name)) return true;
+    const counts = items.map(item => Number(item.quantity));
+    const allEven = counts.every(count => Number.isFinite(count) && count > 0 && count % 2 === 0);
+    if (!allEven) {
+      notify('This catalog product is sold as a pair. At least one room has an odd or invalid speaker count. Verify the packaging and quantities before assigning.', { tone: 'warning' });
+      return false;
+    }
+    return requestConfirmation(
+      `"${product.name}" is sold as a pair. Convert each selected room's physical speaker count to half as many catalog pairs? Example: 2 speakers become 1 pair. Cancel to leave the design unchanged.`
+    );
+  }
+
+  function applyCatalogSelection(item: LineItem, product: CatalogProduct): LineItem {
+    const soldAsPair = /\bpair\b/i.test(product.name);
+    const physicalCount = Number(item.quantity);
+    return {
+      ...item,
+      matchedProductId: product.id,
+      matchedProductName: product.name,
+      matchConfidence: 'designer',
+      unit: product.unit || 'EA',
+      overrideQuantity: soldAsPair ? physicalCount / 2 : physicalCount,
+    };
+  }
+
+  async function handleProductSelected(product: CatalogProduct) {
     if (!pickerOpen || !localRooms) return;
     const { roomIndex, itemIndex } = pickerOpen;
+    const selected = localRooms[roomIndex]?.lineItems[itemIndex];
+    if (!selected || !(await confirmCatalogPackage(product, [selected]))) return;
 
     const updated = localRooms.map((room, ri) => {
       if (ri !== roomIndex) return room;
@@ -883,17 +868,34 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
         ...room,
         lineItems: room.lineItems.map((item, li) => {
           if (li !== itemIndex) return item;
-          return {
-            ...item,
-            matchedProductId: product.id,
-            matchedProductName: product.name,
-            matchConfidence: 'designer' as const,
-            unit: item.unit || product.unit || 'EA',
-          };
+          return applyCatalogSelection(item, product);
         }),
       };
     });
 
+    setLocalRooms(updated);
+    setPickerOpen(null);
+    saveMatchesToBrief(updated);
+  }
+
+  async function handleApplyToMatching(product: CatalogProduct) {
+    if (!pickerOpen || !localRooms) return;
+    const target = localRooms[pickerOpen.roomIndex]?.lineItems[pickerOpen.itemIndex];
+    if (!target || target.itemType === 'labor') return;
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const key = normalize(target.description);
+    const targets = localRooms.flatMap(room => room.lineItems.filter(item =>
+      item.itemType !== 'labor' && normalize(item.description) === key
+    ));
+    if (!(await confirmCatalogPackage(product, targets))) return;
+    const updated = localRooms.map(room => ({
+      ...room,
+      lineItems: room.lineItems.map(item =>
+        item.itemType !== 'labor' && normalize(item.description) === key
+          ? applyCatalogSelection(item, product)
+          : item
+      ),
+    }));
     setLocalRooms(updated);
     setPickerOpen(null);
     saveMatchesToBrief(updated);
@@ -916,29 +918,38 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
     saveMatchesToBrief(updated);
   }
 
-  async function saveMatchesToBrief(rooms: Room[]) {
+  function saveMatchesToBrief(rooms: Room[]) {
     if (!selectedBrief) return;
+    const briefId = selectedBrief.id;
+    pendingMatchSaves.current += 1;
     setSavingMatches(true);
+    setMatchSaveError(false);
+    matchSaveQueue.current = matchSaveQueue.current.catch(() => {}).then(async () => {
     try {
-      const updatedSummary = { ...selectedBrief.ai_summary, rooms };
-      const { error } = await supabase
+      const { data: current, error: readError } = await supabase
+        .from('design_briefs').select('ai_summary, linked_proposal_id').eq('id', briefId).single();
+      if (readError) throw readError;
+      if (current.linked_proposal_id) throw new Error('This brief has already been converted.');
+      const updatedSummary = { ...current.ai_summary, rooms };
+      const { data: saved, error } = await supabase
         .from('design_briefs')
         .update({ ai_summary: updatedSummary, status: 'building' })
-        .eq('id', selectedBrief.id);
+        .eq('id', briefId)
+        .is('linked_proposal_id', null)
+        .select('ai_summary')
+        .single();
       if (error) throw error;
-
-      const updated = {
-        ...selectedBrief,
-        ai_summary: updatedSummary,
-        status: 'building' as const,
-      };
-      setBriefs(prev => prev.map(b => b.id === selectedBrief.id ? updated : b));
-      setSelectedBrief(updated);
+      setBriefs(prev => prev.map(b => b.id === briefId ? { ...b, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : b));
+      setSelectedBrief(prev => prev?.id === briefId ? { ...prev, ai_summary: saved.ai_summary as ProposalPrefill, status: 'building' as const } : prev);
     } catch (err) {
       console.error('Error saving matches:', err);
+      setMatchSaveError(true);
+      notify('Could not save catalog selections. Please retry before converting this brief.', { tone: 'error' });
     } finally {
-      setSavingMatches(false);
+      pendingMatchSaves.current -= 1;
+      setSavingMatches(pendingMatchSaves.current > 0);
     }
+    });
   }
 
   function handleConvertCreated(proposalId: string) {
@@ -958,7 +969,7 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   const isCreator = (brief: DesignBrief) => brief.created_by === profile?.id;
 
   const canEdit = (brief: DesignBrief) =>
-    (isCreator(brief) && (brief.status === 'draft' || brief.status === 'submitted')) || isAdmin;
+    !brief.linked_proposal_id && brief.status !== 'archived' && (isCreator(brief) || isAdmin);
 
   const canDelete = (brief: DesignBrief) =>
     (isCreator(brief) && (brief.status === 'draft' || brief.status === 'submitted')) || isAdmin;
@@ -993,11 +1004,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
   ] : [];
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full min-w-0 bg-gray-50">
       {/* Left panel */}
-      <div className="w-80 lg:w-96 flex-shrink-0 flex flex-col bg-white border-r border-gray-200">
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-3">
+      <div className={`${selectedBrief ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 min-w-0 flex-shrink-0 flex-col bg-white border-r border-gray-200`}>
+        <div className="p-3 sm:p-4 border-b border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-white" />
@@ -1009,11 +1020,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               {onNewBrief && (
                 <button
                   onClick={onNewBrief}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
                   title="New Design Brief"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1053,11 +1064,11 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="bg-amber-50 rounded-lg px-3 py-2 text-center border border-amber-100">
               <p className="text-lg font-bold text-amber-700">{activeCount}</p>
-              <p className="text-xs text-amber-600">Awaiting</p>
+              <p className="text-xs text-amber-700">Awaiting Review</p>
             </div>
             <div className="bg-green-50 rounded-lg px-3 py-2 text-center border border-green-100">
               <p className="text-lg font-bold text-green-700">{readyCount}</p>
-              <p className="text-xs text-green-600">Ready</p>
+              <p className="text-xs text-green-700">Ready to Convert</p>
             </div>
           </div>
 
@@ -1067,23 +1078,23 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search briefs..."
+              placeholder="Search design briefs..."
               className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
           </div>
 
-          <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-gray-100 rounded-lg p-0.5 overflow-x-auto">
             {[
-              { key: 'active', label: 'Active' },
+              { key: 'all', label: 'All' },
+              { key: 'active', label: 'Awaiting' },
               { key: 'ready', label: 'Ready' },
               { key: 'drafts', label: 'Drafts', badge: draftCount > 0 ? draftCount : null },
               { key: 'mine', label: 'Mine' },
-              { key: 'all', label: 'All' },
             ].map(f => (
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                className={`flex-1 text-xs py-1.5 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ${
+                className={`flex-1 min-w-fit px-2 text-xs py-2 rounded-md font-medium transition-colors flex items-center justify-center gap-1 ${
                   statusFilter === f.key
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
@@ -1106,14 +1117,21 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
               <Loader className="w-5 h-5 text-gray-400 animate-spin" />
             </div>
           ) : filteredBriefs.length === 0 ? (
-            <div className="text-center py-10 px-4">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="w-6 h-6 text-gray-400" />
+            <div className="text-center py-12 px-4 sm:px-6">
+              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-7 h-7 text-blue-500" />
               </div>
-              <p className="text-sm font-medium text-gray-600 mb-1">No briefs found</p>
-              <p className="text-xs text-gray-400">
-                {statusFilter === 'active' ? 'No briefs awaiting design review' : 'Try a different filter'}
+              <p className="text-base font-semibold text-gray-800 mb-1">
+                {briefs.length === 0 ? 'No design briefs yet' : 'No matching design briefs'}
               </p>
+              <p className="text-sm text-gray-500 mb-5">
+                {briefs.length === 0 ? 'Create your first design brief to get started.' : 'Try a different search or filter.'}
+              </p>
+              {onNewBrief && briefs.length === 0 && (
+                <button type="button" onClick={onNewBrief} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl px-5 py-3">
+                  <Plus className="w-4 h-4" /> New Design Brief
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -1222,7 +1240,12 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`${selectedBrief ? 'block' : 'hidden md:block'} min-w-0 flex-1 overflow-y-auto`}>
+        {selectedBrief && (
+          <button type="button" onClick={() => setSelectedBrief(null)} className="md:hidden flex items-center gap-2 px-4 py-3 text-sm font-medium text-blue-700 bg-white border-b border-gray-200 w-full">
+            <span aria-hidden="true">←</span> All design briefs
+          </button>
+        )}
         {!selectedBrief ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-sm px-4">
@@ -1281,16 +1304,18 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                 {isAdmin && !selectedBrief.linked_proposal_id && selectedBrief.status !== 'archived' && (
                   <button
                     onClick={() => setShowConvertModal(true)}
+                    disabled={savingMatches || rerunningAI || matchSaveError}
+                    title={matchSaveError ? 'Resolve the failed catalog save before converting' : savingMatches ? 'Wait for catalog selections to finish saving' : undefined}
                     className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     <Zap className="w-3.5 h-3.5" />
                     Convert to Proposal
                   </button>
                 )}
-                {isAdmin && selectedBrief.status !== 'archived' && selectedBrief.raw_notes && (
+                {isAdmin && !selectedBrief.linked_proposal_id && selectedBrief.status !== 'archived' && selectedBrief.raw_notes && (
                   <button
                     onClick={handleRerunAI}
-                    disabled={rerunningAI}
+                    disabled={rerunningAI || savingMatches}
                     className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 text-white text-sm font-medium rounded-lg transition-colors"
                     title="Re-process notes with AI"
                   >
@@ -1536,6 +1561,12 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                         </span>
                       </div>
 
+                      {room.description && (
+                        <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/40">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Proposed scope of work</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{room.description}</p>
+                        </div>
+                      )}
                       <div className="divide-y divide-gray-50">
                         {room.lineItems.map((item, li) => {
                           const isMatched = !!item.matchedProductId;
@@ -1636,8 +1667,8 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
                       <p className="text-sm font-medium text-blue-900">Ready to create the proposal?</p>
                       <p className="text-xs text-blue-600 mt-0.5">
                         {allMatched
-                          ? 'All products matched. Convert this layout into a full proposal.'
-                          : `${total - matched} item${total - matched !== 1 ? 's' : ''} still unmatched — you can still convert and assign later in the proposal builder.`}
+                          ? 'All equipment matched. Review pricing before creating the proposal.'
+                          : `${total - matched} equipment item${total - matched !== 1 ? 's' : ''} still unmatched — assign catalog products before creating the proposal.`}
                       </p>
                     </div>
                     <button
@@ -1727,7 +1758,15 @@ export default function DesignQueue({ onNavigateToProposal, onNewBrief }: Design
       {pickerOpen && (
         <ProductPicker
           onSelect={handleProductSelected}
+          onApplyMatching={handleApplyToMatching}
+          matchingCount={(() => {
+            const item = localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex];
+            if (!item || item.itemType === 'labor') return 0;
+            const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return localRooms?.reduce((count, room) => count + room.lineItems.filter(candidate => candidate.itemType !== 'labor' && normalize(candidate.description) === normalize(item.description)).length, 0) || 0;
+          })()}
           onClose={() => setPickerOpen(null)}
+          suggestedQuery={localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.description || ''}
           currentProductId={
             localRooms?.[pickerOpen.roomIndex]?.lineItems?.[pickerOpen.itemIndex]?.matchedProductId
           }

@@ -1,4 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { Building2, Building, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw, Check, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -6,11 +8,15 @@ import { CompanySettings as CompanySettingsType, CompanyOffice } from '../../lib
 import { TIMEZONE_OPTIONS, clearTimezoneCache } from '../../lib/timezoneUtils';
 import { validateSubdomain } from '../../lib/subdomainConfig';
 import ConfirmModal from '../ui/ConfirmModal';
+import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCardIdentity';
+import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
-export function CompanySettings() {
+export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' | 'email' }) {
+  const { profile } = useAuth();
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingFooterLogo, setUploadingFooterLogo] = useState(false);
@@ -18,15 +24,20 @@ export function CompanySettings() {
   const geocodeTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const [companyName, setCompanyName] = useState('');
+  const [printAccentColor, setPrintAccentColor] = useState('#334155');
   const [website, setWebsite] = useState('');
   const [portalUrl, setPortalUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [footerLogoUrl, setFooterLogoUrl] = useState('');
+  const [cardBannerUrl, setCardBannerUrl] = useState<string | null>(null);
+  const [uploadingCardBanner, setUploadingCardBanner] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState('');
   const [orgId, setOrgId] = useState<string | null>(null);
   const [timezone, setTimezone] = useState('America/Chicago');
   const [fromEmail, setFromEmail] = useState('');
   const [fromName, setFromName] = useState('');
   const [replyToEmail, setReplyToEmail] = useState('');
+  const [welcomeSupportEmail, setWelcomeSupportEmail] = useState('');
   const [photographerEmail, setPhotographerEmail] = useState('');
   const [ccFeeEnabled, setCcFeeEnabled] = useState(false);
   const [ccFeeType, setCcFeeType] = useState<'percentage' | 'flat'>('percentage');
@@ -35,16 +46,6 @@ export function CompanySettings() {
   const [ccFeeLabel, setCcFeeLabel] = useState('Credit Card Convenience Fee');
   const [defaultInvoiceTermsAndConditions, setDefaultInvoiceTermsAndConditions] = useState('');
 
-  const [portalSecurityContractsEnabled, setPortalSecurityContractsEnabled] = useState(true);
-  const [portalProposalsEnabled, setPortalProposalsEnabled] = useState(true);
-  const [portalProjectsEnabled, setPortalProjectsEnabled] = useState(false);
-  const [portalAppointmentsEnabled, setPortalAppointmentsEnabled] = useState(false);
-  const [portalInvoicesEnabled, setPortalInvoicesEnabled] = useState(false);
-  const [portalMessagesEnabled, setPortalMessagesEnabled] = useState(false);
-  const [portalVipServicesEnabled, setPortalVipServicesEnabled] = useState(false);
-  const [portalTasksEnabled, setPortalTasksEnabled] = useState(true);
-  const [portalSalesOrdersEnabled, setPortalSalesOrdersEnabled] = useState(true);
-  const [enablePublicVipSignup, setEnablePublicVipSignup] = useState(false);
 
   // Project Task Auto-Completion Settings
   const [autoCompletionEnabled, setAutoCompletionEnabled] = useState(true);
@@ -58,6 +59,10 @@ export function CompanySettings() {
   const [forgotClockOutPenaltyPoints, setForgotClockOutPenaltyPoints] = useState(15);
 
   // Auto Review Follow-up Settings
+  const [autoReviewFollowupEnabled, setAutoReviewFollowupEnabled] = useState(false);
+  const [autoReviewFollowupDays, setAutoReviewFollowupDays] = useState(14);
+  const [lostFollowupEnabled,setLostFollowupEnabled]=useState(false);
+  const [lostFollowupDays,setLostFollowupDays]=useState(14);
 
   // Billing Preference Settings
   const [annualBillingEnabled, setAnnualBillingEnabled] = useState(false);
@@ -84,31 +89,42 @@ export function CompanySettings() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const footerLogoInputRef = useRef<HTMLInputElement>(null);
+  const cardBannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadSettings();
-    loadOffices();
-    loadOrganization();
-  }, []);
+    if (!profile?.organization_id) return;
+    setLoading(true);
+    void loadSettings();
+    void loadOffices();
+    void loadOrganization();
+  }, [profile?.organization_id]);
 
   async function loadSettings() {
+    setSettingsLoadError(null);
     try {
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
+        .eq('organization_id', profile?.organization_id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
       if (error) throw error;
 
-      if (data) {
+      const resolvedData = data;
+      if (!resolvedData) throw new Error(`Electronic Life company settings could not be loaded for your signed-in organization. Check that your user profile has the correct organization and that company_settings SELECT access is allowed.`);
+      if (resolvedData) {
+        const data = resolvedData;
         setSettings(data);
         setCompanyName(data.company_name);
         setWebsite(data.website || '');
         setPortalUrl(data.portal_url || '');
         setLogoUrl(data.company_logo_url || '');
+        setPrintAccentColor(data.print_accent_color || '#334155');
+        setCardBannerUrl(data.business_card_banner_url ?? null);
         setFromEmail(data.from_email || '');
         setFromName(data.from_name || '');
         setReplyToEmail(data.reply_to_email || '');
+        setWelcomeSupportEmail(data.welcome_support_email || '');
         setPhotographerEmail(data.photographer_email || '');
         setCcFeeEnabled(data.cc_convenience_fee_enabled || false);
         setCcFeeType(data.cc_convenience_fee_type || 'percentage');
@@ -117,16 +133,6 @@ export function CompanySettings() {
         setCcFeeLabel(data.cc_convenience_fee_label || 'Credit Card Convenience Fee');
         setDefaultInvoiceTermsAndConditions(data.default_invoice_terms_and_conditions || '');
 
-        setPortalSecurityContractsEnabled(data.portal_security_contracts_enabled ?? true);
-        setPortalProposalsEnabled(data.portal_proposals_enabled ?? true);
-        setPortalProjectsEnabled(data.portal_projects_enabled ?? false);
-        setPortalAppointmentsEnabled(data.portal_appointments_enabled ?? false);
-        setPortalInvoicesEnabled(data.portal_invoices_enabled ?? false);
-        setPortalMessagesEnabled(data.portal_messages_enabled ?? false);
-        setPortalVipServicesEnabled(data.portal_vip_services_enabled ?? false);
-        setPortalTasksEnabled(data.portal_tasks_enabled ?? true);
-        setPortalSalesOrdersEnabled(data.portal_sales_orders_enabled ?? true);
-        setEnablePublicVipSignup(data.enable_public_vip_signup ?? false);
 
         // Auto-completion settings
         setAutoCompletionEnabled(data.auto_completion_enabled ?? true);
@@ -140,6 +146,10 @@ export function CompanySettings() {
         setForgotClockOutPenaltyPoints(data.forgot_clock_out_penalty_points ?? 15);
 
         // Auto review follow-up settings
+        setAutoReviewFollowupEnabled(data.auto_review_followup_enabled ?? false);
+        setAutoReviewFollowupDays(data.auto_review_followup_days ?? 14);
+        setLostFollowupEnabled(data.lost_review_followup_enabled??false);
+        setLostFollowupDays(data.lost_review_followup_days??14);
         setAnnualBillingEnabled(data.annual_billing_enabled ?? false);
         setDefaultBillingPreference(data.default_billing_preference ?? 'monthly');
         setAnnualDiscountType(data.annual_discount_type ?? 'none');
@@ -154,6 +164,9 @@ export function CompanySettings() {
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+      const details = error && typeof error === 'object' ? error as { message?: string; code?: string; details?: string; hint?: string } : null;
+      const diagnostic = [details?.message, details?.code && `Code: ${details.code}`, details?.details, details?.hint].filter(Boolean).join(' — ');
+      setSettingsLoadError(diagnostic || (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }
@@ -199,12 +212,12 @@ export function CompanySettings() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notify('File size must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -236,10 +249,10 @@ export function CompanySettings() {
         .getPublicUrl(fileName);
 
       setLogoUrl(publicUrl);
-      alert('Logo uploaded successfully! Click "Save Company Info" to apply changes.');
+      notify('Logo uploaded successfully! Click "Save Company Info" to apply changes.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error uploading logo:', error);
-      alert('Failed to upload logo');
+      notify('Failed to upload logo', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -263,10 +276,10 @@ export function CompanySettings() {
               .remove([fileName]);
           }
           setLogoUrl('');
-          alert('Logo removed! Click "Save Company Info" to apply changes.');
+          notify('Logo removed! Click "Save Company Info" to apply changes.', { theme: 'blue', tone: 'info' });
         } catch (error) {
           console.error('Error removing logo:', error);
-          alert('Failed to remove logo');
+          notify('Failed to remove logo', { theme: 'blue', tone: 'error' });
         }
       },
     });
@@ -281,11 +294,11 @@ export function CompanySettings() {
     inputRef: React.RefObject<HTMLInputElement>
   ) {
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notify('File size must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -318,10 +331,10 @@ export function CompanySettings() {
       }
 
       setUrl(publicUrl);
-      alert('Logo uploaded and saved successfully!');
+      notify('Logo uploaded and saved successfully!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error uploading branding logo:', error);
-      alert('Failed to upload logo');
+      notify('Failed to upload logo', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -353,134 +366,125 @@ export function CompanySettings() {
           }
 
           setUrl('');
-          alert('Logo removed successfully!');
+          notify('Logo removed successfully!', { theme: 'blue', tone: 'success' });
         } catch (error) {
           console.error('Error removing branding logo:', error);
-          alert('Failed to remove logo');
+          notify('Failed to remove logo', { theme: 'blue', tone: 'error' });
         }
       },
     });
   }
 
+  async function saveCardBanner(nextUrl: string | null) {
+    const { error } = await supabase.rpc('set_business_card_banner', { p_url: nextUrl });
+    if (error) throw error;
+    setCardBannerUrl(nextUrl);
+    setBannerMessage('Business card artwork saved');
+  }
+
+  async function uploadCardBanner(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setBannerMessage('Choose a JPG, PNG, or WebP image under 5MB.');
+      event.target.value = '';
+      return;
+    }
+    setUploadingCardBanner(true);
+    setBannerMessage('');
+    let uploadedPath: string | null = null;
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw authError || new Error('Please sign in');
+      const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.type];
+      const path = `${user.id}/dealer-banner-${crypto.randomUUID()}.${extension}`;
+      const { error } = await supabase.storage.from('business-card-photos').upload(path, file, { upsert: false });
+      if (error) throw error;
+      uploadedPath = path;
+      const { data: { publicUrl } } = supabase.storage.from('business-card-photos').getPublicUrl(path);
+      await saveCardBanner(publicUrl);
+      // Keep the previous saved image intact until the new artwork is persisted.
+    } catch (error) {
+      if (uploadedPath) await supabase.storage.from('business-card-photos').remove([uploadedPath]);
+      console.error('Error uploading business card artwork:', error);
+      setBannerMessage('Unable to save artwork. Your previous artwork is unchanged.');
+    } finally {
+      setUploadingCardBanner(false);
+      if (cardBannerInputRef.current) cardBannerInputRef.current.value = '';
+    }
+  }
+
+  async function resetCardBanner(nextUrl: string | null) {
+    setUploadingCardBanner(true);
+    try { await saveCardBanner(nextUrl); }
+    catch (error) { console.error('Error saving card artwork:', error); setBannerMessage('Unable to save artwork. Please try again.'); }
+    finally { setUploadingCardBanner(false); }
+  }
+
   async function saveSettings() {
+    if (settingsLoadError || !settings) {
+      notify('Company information did not load. Refresh before saving.', { theme: 'blue', tone: 'error' });
+      return;
+    }
     setSaving(true);
     try {
-      if (settings) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update({
-            company_name: companyName,
-            website: website,
-            portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
-            company_logo_url: logoUrl || null,
-            from_email: fromEmail?.trim() || null,
-            from_name: fromName?.trim() || null,
-            reply_to_email: replyToEmail?.trim() || null,
-            photographer_email: photographerEmail?.trim() || null,
-            cc_convenience_fee_enabled: ccFeeEnabled,
-            cc_convenience_fee_type: ccFeeType,
-            cc_convenience_fee_percentage: ccFeePercentage / 100,
-            cc_convenience_fee_flat_amount: ccFeeFlatAmount,
-            cc_convenience_fee_label: ccFeeLabel,
-            annual_billing_enabled: annualBillingEnabled,
-            default_billing_preference: defaultBillingPreference,
-            annual_discount_type: annualDiscountType,
-            annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
-            annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
-            customer_can_change_billing_preference: customerCanChangePref,
-            staff_can_override_billing_preference: staffCanOverridePref,
-            billing_proration_rule: billingProrationRule,
-            billing_change_effective_date: billingChangeEffective,
-            default_auto_renew: defaultAutoRenew,
-            grace_period_days: gracePeriodDays,
-            portal_security_contracts_enabled: portalSecurityContractsEnabled,
-            portal_proposals_enabled: portalProposalsEnabled,
-            portal_projects_enabled: portalProjectsEnabled,
-            portal_appointments_enabled: portalAppointmentsEnabled,
-            portal_invoices_enabled: portalInvoicesEnabled,
-            portal_messages_enabled: portalMessagesEnabled,
-            portal_vip_services_enabled: portalVipServicesEnabled,
-            portal_tasks_enabled: portalTasksEnabled,
-            portal_sales_orders_enabled: portalSalesOrdersEnabled,
-            enable_public_vip_signup: enablePublicVipSignup,
-            auto_completion_enabled: autoCompletionEnabled,
-            auto_completion_requires_approval: autoCompletionRequiresApproval,
-            auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
-            auto_clock_out_enabled: autoClockOutEnabled,
-            auto_clock_out_schedule_enabled: autoClockOutEnabled,
-            auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
-            auto_clock_out_time: autoClockOutTime + ':00',
-            forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
-            default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', settings.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('company_settings')
-          .insert({
-            company_name: companyName,
-            website: website,
-            portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
-            company_logo_url: logoUrl || null,
-            from_email: fromEmail?.trim() || null,
-            from_name: fromName?.trim() || null,
-            reply_to_email: replyToEmail?.trim() || null,
-            photographer_email: photographerEmail?.trim() || null,
-            cc_convenience_fee_enabled: ccFeeEnabled,
-            cc_convenience_fee_type: ccFeeType,
-            cc_convenience_fee_percentage: ccFeePercentage / 100,
-            cc_convenience_fee_flat_amount: ccFeeFlatAmount,
-            cc_convenience_fee_label: ccFeeLabel,
-            annual_billing_enabled: annualBillingEnabled,
-            default_billing_preference: defaultBillingPreference,
-            annual_discount_type: annualDiscountType,
-            annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
-            annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
-            customer_can_change_billing_preference: customerCanChangePref,
-            staff_can_override_billing_preference: staffCanOverridePref,
-            billing_proration_rule: billingProrationRule,
-            billing_change_effective_date: billingChangeEffective,
-            default_auto_renew: defaultAutoRenew,
-            grace_period_days: gracePeriodDays,
-            portal_security_contracts_enabled: portalSecurityContractsEnabled,
-            portal_proposals_enabled: portalProposalsEnabled,
-            portal_projects_enabled: portalProjectsEnabled,
-            portal_appointments_enabled: portalAppointmentsEnabled,
-            portal_invoices_enabled: portalInvoicesEnabled,
-            portal_messages_enabled: portalMessagesEnabled,
-            portal_vip_services_enabled: portalVipServicesEnabled,
-            portal_tasks_enabled: portalTasksEnabled,
-            portal_sales_orders_enabled: portalSalesOrdersEnabled,
-            enable_public_vip_signup: enablePublicVipSignup,
-            auto_completion_enabled: autoCompletionEnabled,
-            auto_completion_requires_approval: autoCompletionRequiresApproval,
-            auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
-            auto_clock_out_enabled: autoClockOutEnabled,
-            auto_clock_out_schedule_enabled: autoClockOutEnabled,
-            auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
-            auto_clock_out_time: autoClockOutTime + ':00',
-            forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
-            default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
-          });
-
-        if (error) throw error;
+      const updates = section === 'email' ? {
+        from_email: fromEmail?.trim() || null,
+        from_name: fromName?.trim() || null,
+        reply_to_email: replyToEmail?.trim() || null,
+        welcome_support_email: welcomeSupportEmail?.trim() || null,
+        photographer_email: photographerEmail?.trim() || null,
+      } : section === 'billing' ? {
+        cc_convenience_fee_enabled: ccFeeEnabled,
+        cc_convenience_fee_type: ccFeeType,
+        cc_convenience_fee_percentage: ccFeePercentage / 100,
+        cc_convenience_fee_flat_amount: ccFeeFlatAmount,
+        cc_convenience_fee_label: ccFeeLabel,
+        annual_billing_enabled: annualBillingEnabled,
+        default_billing_preference: defaultBillingPreference,
+        annual_discount_type: annualDiscountType,
+        annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
+        annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
+        customer_can_change_billing_preference: customerCanChangePref,
+        staff_can_override_billing_preference: staffCanOverridePref,
+        billing_proration_rule: billingProrationRule,
+        billing_change_effective_date: billingChangeEffective,
+        default_auto_renew: defaultAutoRenew,
+        grace_period_days: gracePeriodDays,
+        default_invoice_terms_and_conditions: defaultInvoiceTermsAndConditions || null,
+      } : section === 'automation' ? {
+        auto_completion_enabled: autoCompletionEnabled,
+        auto_completion_requires_approval: autoCompletionRequiresApproval,
+        auto_completion_reopen_on_delete: autoCompletionReopenOnDelete,
+        auto_clock_out_enabled: autoClockOutEnabled,
+        auto_clock_out_schedule_enabled: autoClockOutEnabled,
+        auto_clock_out_cutoff_time: autoClockOutCutoffTime + ':00',
+        auto_clock_out_time: autoClockOutTime + ':00',
+        forgot_clock_out_penalty_points: forgotClockOutPenaltyPoints,
+        auto_review_followup_enabled: autoReviewFollowupEnabled,
+        auto_review_followup_days: autoReviewFollowupDays,
+        lost_review_followup_enabled:lostFollowupEnabled,
+        lost_review_followup_days:lostFollowupDays,
+      } : {
+        company_name: companyName,
+        print_accent_color: printAccentColor,
+        website: website,
+        portal_url: subdomain ? `https://${subdomain}.myjobview.com` : (portalUrl || null),
+        company_logo_url: logoUrl || null,
+      };
+      const { error } = await supabase.from('company_settings')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', settings.id);
+      if (error) throw error;
+      if (section === 'company') {
+        await saveTimezone();
+        clearTimezoneCache();
       }
-
-      window.location.reload();
-
-      // Save timezone to organizations table
-      await saveTimezone();
-
-      clearTimezoneCache();
-
-      alert('Company settings saved successfully');
-      loadSettings();
+      notify('Settings saved successfully', { theme: 'blue', tone: 'success' });
+      await loadSettings();
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -547,11 +551,11 @@ export function CompanySettings() {
         .eq('id', office.id);
 
       if (error) throw error;
-      alert('Office updated successfully');
+      notify('Office updated successfully', { theme: 'blue', tone: 'success' });
       loadOffices();
     } catch (error) {
       console.error('Error updating office:', error);
-      alert('Failed to update office');
+      notify('Failed to update office', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -584,7 +588,7 @@ export function CompanySettings() {
       loadOffices();
     } catch (error) {
       console.error('Error adding office:', error);
-      alert('Failed to add office');
+      notify('Failed to add office', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -604,7 +608,7 @@ export function CompanySettings() {
           loadOffices();
         } catch (error) {
           console.error('Error deleting office:', error);
-          alert('Failed to delete office');
+          notify('Failed to delete office', { theme: 'blue', tone: 'error' });
         }
       },
     });
@@ -692,10 +696,13 @@ export function CompanySettings() {
     />
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">Company Settings</h2>
-        <p className="text-gray-300">Manage company information displayed on business cards</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">{section === 'billing' ? 'Billing & Payments' : section === 'automation' ? 'Operational Automation' : section === 'email' ? 'Email Configuration' : 'Company Settings'}</h2>
+        <p className="text-gray-300">{section === 'billing' ? 'Manage payment fees and recurring billing' : section === 'automation' ? 'Manage task, clock-out, and follow-up automation' : section === 'email' ? 'Manage outbound email sender and reply addresses' : 'Manage company identity, branding, offices, and domain'}</p>
       </div>
 
+      {settingsLoadError && <div role="alert" className="rounded-lg border border-red-500/40 bg-red-950/30 p-4 text-red-200"><p className="font-semibold">Company information could not be loaded. Saving is disabled to protect your existing settings.</p><p className="mt-1 text-sm break-words">{settingsLoadError}</p><button type="button" className="mt-3 rounded border border-red-400/50 px-3 py-1 text-sm" onClick={() => { setLoading(true); void loadSettings(); }}>Retry loading</button></div>}
+      {section === 'company' && <CompanyDirectorySetting />}
+      {section === 'company' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <Building2 className="w-5 h-5" />
@@ -712,6 +719,12 @@ export function CompanySettings() {
             onChange={(e) => setCompanyName(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+        </div>
+
+        <div>
+          <label htmlFor="print-accent-color" className="block text-sm font-medium text-gray-700 mb-1">Agreement print accent color</label>
+          <input id="print-accent-color" type="color" value={printAccentColor} onChange={e => setPrintAccentColor(e.target.value)} className="h-10 w-20 cursor-pointer border border-gray-300 rounded" />
+          <p className="text-xs text-gray-500 mt-1">Used on security monitoring agreements. Choose your dealer's primary brand color.</p>
         </div>
 
         <div>
@@ -945,6 +958,137 @@ export function CompanySettings() {
           </p>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Company Logo
+          </label>
+
+          {logoUrl && (
+            <div className="mb-3 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <img
+                src={logoUrl}
+                alt="Company Logo"
+                className="h-16 w-auto object-contain"
+              />
+              <button
+                onClick={removeLogo}
+                className="ml-auto p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                title="Remove logo"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleLogoUpload}
+              className="hidden"
+              id="logo-upload"
+            />
+            <label
+              htmlFor="logo-upload"
+              className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                uploading
+                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                  : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+              }`}
+            >
+              <Upload className="w-5 h-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">
+                {uploading ? 'Uploading...' : 'Upload Logo Image'}
+              </span>
+            </label>
+            <p className="text-xs text-gray-500">
+              PNG, JPG or GIF. Max 5MB. Recommended: 400x100px or similar aspect ratio.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-4 space-y-6">
+          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Image className="w-5 h-5" />
+            App Branding
+          </h4>
+          <p className="text-sm text-gray-500 -mt-3">
+            The header automatically uses your Company Logo above. Upload a separate footer logo
+            here only if you want a different image in the bottom footer strip.
+          </p>
+
+          <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+            <h4 className="font-semibold text-gray-900">Business Card Artwork</h4>
+            <p className="text-sm text-gray-600">A separate banner beneath your logo and behind each employee's profile photo. Applies to all your dealer's business cards.</p>
+            <div data-theme-fixed className="max-w-sm overflow-hidden rounded-2xl bg-[#111729]" aria-label="Business card artwork preview">
+              <BusinessCardIdentity fullName="Your Team" title="Business Card Preview" email="" phone="" company={{ company_name: companyName, company_logo_url: logoUrl, website: null, business_card_banner_url: cardBannerUrl } satisfies CardBranding} />
+            </div>
+            <input ref={cardBannerInputRef} id="business-card-artwork" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadCardBanner} disabled={uploadingCardBanner} className="hidden" />
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => cardBannerInputRef.current?.click()} disabled={uploadingCardBanner} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"><Upload className="h-4 w-4" />{uploadingCardBanner ? 'Saving...' : 'Upload Card Artwork'}</button>
+              <button type="button" onClick={() => resetCardBanner('')} disabled={uploadingCardBanner} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50">Remove Artwork</button>
+              {companyName.trim().toLowerCase() === 'electronic life' && <button type="button" onClick={() => resetCardBanner(null)} disabled={uploadingCardBanner} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 disabled:opacity-50">Use Electronic Life Artwork</button>}
+            </div>
+            <p className="text-xs text-gray-500">Wide landscape image recommended (3:1). JPG, PNG, or WebP, up to 5MB. Artwork saves immediately.</p>
+            {bannerMessage && <p role="status" className="text-sm text-blue-700">{bannerMessage}</p>}
+          </div>
+
+          {/* Footer Logo */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Footer Logo</label>
+            <p className="text-xs text-gray-500">Shown in the bottom footer strip. Recommended: wide/horizontal format (e.g. 300x80px).</p>
+            {footerLogoUrl && (
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <img src={footerLogoUrl} alt="Footer Logo" className="h-8 w-auto object-contain" />
+                <button
+                  onClick={() => removeBrandingLogo('footer_logo_url', footerLogoUrl, setFooterLogoUrl)}
+                  className="ml-auto p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Remove footer logo"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <input
+              ref={footerLogoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadBrandingLogo(file, 'footer_logo_url', footerLogoUrl, setFooterLogoUrl, setUploadingFooterLogo, footerLogoInputRef);
+              }}
+              className="hidden"
+              id="footer-logo-upload"
+            />
+            <label
+              htmlFor="footer-logo-upload"
+              className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                uploadingFooterLogo
+                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                  : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+              }`}
+            >
+              <Upload className="w-4 h-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">
+                {uploadingFooterLogo ? 'Uploading...' : footerLogoUrl ? 'Replace Footer Logo' : 'Upload Footer Logo'}
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <button
+          onClick={saveSettings}
+          disabled={saving || loading || !!settingsLoadError || !settings}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+        >
+          <Save className="w-4 h-4" />
+          {saving ? 'Saving...' : 'Save Company Info'}
+        </button>
+      </div>
+
+      </>}
+      {section === 'email' && <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <div className="border-t border-gray-200 pt-4 space-y-4">
           <h4 className="font-semibold text-gray-900 flex items-center gap-2">
             <Mail className="w-5 h-5" />
@@ -1008,6 +1152,22 @@ export function CompanySettings() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              Welcome Email Support Address
+            </label>
+            <input
+              type="email"
+              value={welcomeSupportEmail}
+              onChange={(e) => setWelcomeSupportEmail(e.target.value)}
+              placeholder="admin@yourdomain.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown to employees in Welcome emails when they need help. If blank, MyJobView uses the company email, then Reply-To/From Email.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               Photographer Email
             </label>
             <input
@@ -1023,119 +1183,9 @@ export function CompanySettings() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Company Logo
-          </label>
-
-          {logoUrl && (
-            <div className="mb-3 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <img
-                src={logoUrl}
-                alt="Company Logo"
-                className="h-16 w-auto object-contain"
-              />
-              <button
-                onClick={removeLogo}
-                className="ml-auto p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                title="Remove logo"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              className="hidden"
-              id="logo-upload"
-            />
-            <label
-              htmlFor="logo-upload"
-              className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                uploading
-                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                  : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
-              }`}
-            >
-              <Upload className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">
-                {uploading ? 'Uploading...' : 'Upload Logo Image'}
-              </span>
-            </label>
-            <p className="text-xs text-gray-500">
-              PNG, JPG or GIF. Max 5MB. Recommended: 400x100px or similar aspect ratio.
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-200 pt-4 space-y-6">
-          <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Image className="w-5 h-5" />
-            App Branding
-          </h4>
-          <p className="text-sm text-gray-500 -mt-3">
-            The header automatically uses your Company Logo above. Upload a separate footer logo
-            here only if you want a different image in the bottom footer strip.
-          </p>
-
-          {/* Footer Logo */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Footer Logo</label>
-            <p className="text-xs text-gray-500">Shown in the bottom footer strip. Recommended: wide/horizontal format (e.g. 300x80px).</p>
-            {footerLogoUrl && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <img src={footerLogoUrl} alt="Footer Logo" className="h-8 w-auto object-contain" />
-                <button
-                  onClick={() => removeBrandingLogo('footer_logo_url', footerLogoUrl, setFooterLogoUrl)}
-                  className="ml-auto p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Remove footer logo"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            <input
-              ref={footerLogoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadBrandingLogo(file, 'footer_logo_url', footerLogoUrl, setFooterLogoUrl, setUploadingFooterLogo, footerLogoInputRef);
-              }}
-              className="hidden"
-              id="footer-logo-upload"
-            />
-            <label
-              htmlFor="footer-logo-upload"
-              className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                uploadingFooterLogo
-                  ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                  : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
-              }`}
-            >
-              <Upload className="w-4 h-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">
-                {uploadingFooterLogo ? 'Uploading...' : footerLogoUrl ? 'Replace Footer Logo' : 'Upload Footer Logo'}
-              </span>
-            </label>
-          </div>
-        </div>
-
-        <button
-          onClick={saveSettings}
-          disabled={saving}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Company Info'}
-        </button>
-      </div>
-
+        <button type="button" onClick={saveSettings} disabled={saving || loading || !!settingsLoadError || !settings} className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50">{saving ? 'Saving…' : 'Save Email Settings'}</button>
+      </div>}
+      {section === 'billing' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <CreditCard className="w-5 h-5" />
@@ -1458,170 +1508,11 @@ export function CompanySettings() {
         </button>
       </div>
 
+      </>}
+      {section === 'automation' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Globe className="w-5 h-5" />
-          Customer Portal Visibility
-        </h3>
-        <p className="text-sm text-gray-600">
-          Control which sections are visible to customers in the portal. Use this to enable features as you're ready to launch them.
-        </p>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input type="checkbox" id="portal-security-contracts" checked={portalSecurityContractsEnabled}
-              onChange={e => setPortalSecurityContractsEnabled(e.target.checked)} className="w-5 h-5 text-blue-600 rounded" />
-            <div className="flex-1"><label htmlFor="portal-security-contracts" className="font-medium text-gray-900 cursor-pointer">Security Contracts</label>
-              <p className="text-sm text-gray-600">Show onboarding, signed agreements, monthly charges, balances, and months remaining when the security contracts module is enabled.</p></div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-proposals"
-              checked={portalProposalsEnabled}
-              onChange={(e) => setPortalProposalsEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-proposals" className="font-medium text-gray-900 cursor-pointer">
-                Proposals
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view and approve proposals</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-tasks"
-              checked={portalTasksEnabled}
-              onChange={(e) => setPortalTasksEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-tasks" className="font-medium text-gray-900 cursor-pointer">
-                Tasks
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to submit and track punchlist items</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-sales-orders"
-              checked={portalSalesOrdersEnabled}
-              onChange={(e) => setPortalSalesOrdersEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-sales-orders" className="font-medium text-gray-900 cursor-pointer">
-                Sales Orders
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view their approved sales orders</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-projects"
-              checked={portalProjectsEnabled}
-              onChange={(e) => setPortalProjectsEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-projects" className="font-medium text-gray-900 cursor-pointer">
-                Projects
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view active project details and status</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-appointments"
-              checked={portalAppointmentsEnabled}
-              onChange={(e) => setPortalAppointmentsEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-appointments" className="font-medium text-gray-900 cursor-pointer">
-                Appointments
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view and schedule appointments</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-invoices"
-              checked={portalInvoicesEnabled}
-              onChange={(e) => setPortalInvoicesEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-invoices" className="font-medium text-gray-900 cursor-pointer">
-                Invoices
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to view and pay invoices</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-messages"
-              checked={portalMessagesEnabled}
-              onChange={(e) => setPortalMessagesEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-messages" className="font-medium text-gray-900 cursor-pointer">
-                Messages
-              </label>
-              <p className="text-sm text-gray-600">Allow customers to send and receive messages</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <input
-              type="checkbox"
-              id="portal-vip-services"
-              checked={portalVipServicesEnabled}
-              onChange={(e) => setPortalVipServicesEnabled(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="portal-vip-services" className="font-medium text-gray-900 cursor-pointer">
-                VIP Services
-              </label>
-              <p className="text-sm text-gray-600">Allow VIP customers to view upcoming service appointments</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border-2 border-yellow-300">
-            <input
-              type="checkbox"
-              id="enable-public-vip-signup"
-              checked={enablePublicVipSignup}
-              onChange={(e) => setEnablePublicVipSignup(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              <label htmlFor="enable-public-vip-signup" className="font-medium text-gray-900 cursor-pointer">
-                Enable Public VIP Self-Signup
-              </label>
-              <p className="text-sm text-gray-600">
-                Allow anonymous customers to sign up for VIP memberships on their own.
-                When disabled, the public VIP page shows "Coming Soon" and customers can only join via punchlist invites or contact you directly.
-              </p>
-            </div>
-          </div>
-        </div>
-
+        <h3 className="text-lg font-semibold text-gray-900">Operational Automation</h3>
+        <p className="text-sm text-gray-600">Configure project task completion, clock-out, and customer follow-up rules.</p>
         {/* Project Task Auto-Completion Settings */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6">
           <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
@@ -1795,16 +1686,79 @@ export function CompanySettings() {
           )}
         </div>
 
+        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6"><h2 className="text-xl font-semibold text-gray-900">Lost Opportunity Feedback Reminders</h2><p className="text-sm text-gray-600">Send one final reminder with a private questionnaire link when the customer has not provided feedback online, by phone, or by email. Staff assessments do not stop reminders.</p><label className="flex items-center gap-3 text-gray-900"><input type="checkbox" checked={lostFollowupEnabled} onChange={e=>setLostFollowupEnabled(e.target.checked)}/>Enable lost-opportunity feedback reminders</label><label className="block text-sm text-gray-700">Days after the first request<input aria-label="Lost opportunity reminder delay" type="number" min={1} max={90} value={lostFollowupDays} onChange={e=>setLostFollowupDays(Math.min(90,Math.max(1,Number(e.target.value))))} className="block mt-1 rounded border border-gray-300 p-2"/></label><p className="text-xs text-gray-500">Runs daily. Default: 14 days. At day 30 from the original request, unanswered requests are flagged for personal follow-up. No automatic email is sent at day 30.</p></div>
+        {/* Automated Follow-Up Settings */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 mt-6">
+          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+            <Mail className="w-6 h-6 text-cyan-600" />
+            Automated Follow-Up Emails
+          </h2>
+          <p className="text-sm text-gray-600">
+            Automatically send one follow-up email to customers who haven't responded to review requests, satisfaction surveys, or proposal check emails after a set number of days.
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <input
+                type="checkbox"
+                id="auto-review-followup-enabled"
+                checked={autoReviewFollowupEnabled}
+                onChange={(e) => setAutoReviewFollowupEnabled(e.target.checked)}
+                className="w-5 h-5 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+              />
+              <div className="flex-1">
+                <label htmlFor="auto-review-followup-enabled" className="font-medium text-gray-900 cursor-pointer">
+                  Enable Automated Follow-Ups
+                </label>
+                <p className="text-sm text-gray-600">
+                  When enabled, a single follow-up email is sent after the configured delay. No further automated emails are sent after that.
+                </p>
+              </div>
+            </div>
+
+            {autoReviewFollowupEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ml-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Follow-Up Delay (days)
+                  </label>
+                  <input
+                    type="number"
+                    value={autoReviewFollowupDays}
+                    onChange={(e) => setAutoReviewFollowupDays(Math.max(1, Number(e.target.value)))}
+                    min={1}
+                    max={90}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of days after the original email before the follow-up is sent
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {autoReviewFollowupEnabled && (
+            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+              <p className="text-sm text-cyan-900">
+                <strong>How it works:</strong> The follow-up job runs daily and checks for emails sent more than {autoReviewFollowupDays} days ago that haven't received a response. Each email gets exactly one follow-up, then the system stops automatically. This covers Google Review requests, Customer Satisfaction surveys, and Proposal Check emails.
+              </p>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={saveSettings}
           disabled={saving}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
         >
           <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Portal Settings'}
+          {saving ? 'Saving...' : 'Save Automation Settings'}
         </button>
       </div>
 
+      </>}
+      {section === 'company' && <>
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -2021,7 +1975,8 @@ export function CompanySettings() {
           ))}
         </div>
       </div>
-    </div>
+       </>}
+   </div>
     </>
   );
 }

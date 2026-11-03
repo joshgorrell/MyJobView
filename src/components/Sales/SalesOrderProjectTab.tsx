@@ -1,6 +1,9 @@
+import { loadProjectSummaries, type ProjectSummary } from '../../lib/projectOverview';
+import { useAuth } from '../../contexts/AuthContext';
+import ProjectTasksList from '../Projects/ProjectTasksList';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Wrench, Clock, CheckCircle, User, AlertTriangle, ChevronDown, ChevronUp, Briefcase, ListChecks, Timer, CalendarDays, Plus, MapPin, CreditCard as Edit3, Save, X, FileText, Flag, Circle, Package, StickyNote, GitBranch, Target, TrendingUp, Info, Trash2, Pencil, DollarSign, ShieldOff, GitMerge, CheckSquare, AlertCircle, ChevronRight, Search } from 'lucide-react';
+import { Wrench, Clock, User, AlertTriangle, ChevronDown, ChevronUp, Briefcase, ListChecks, Timer, CalendarDays, Plus, CreditCard as Edit3, Save, X, FileText, Flag, Package, StickyNote, GitBranch, Target, TrendingUp, Info, DollarSign, ShieldOff, GitMerge, CheckSquare, AlertCircle, ChevronRight, Search } from 'lucide-react';
 import type { SalesOrderFull } from './SalesOrderDetail';
 import { CreateProjectWorkOrderModal } from '../Production/CreateProjectWorkOrderModal';
 import { AddProjectTimeModal } from '../Projects/AddProjectTimeModal';
@@ -22,17 +25,6 @@ interface WorkOrder {
   description: string | null;
   technician?: { full_name: string } | null;
   labor_phase?: { name: string; id: string } | null;
-}
-
-interface ProjectTask {
-  id: string;
-  title: string;
-  description: string | null;
-  estimated_hours: number;
-  status: string;
-  sort_order: number;
-  labor_phase?: { name: string } | null;
-  actual_hours: number;
 }
 
 interface LaborPhase {
@@ -98,12 +90,15 @@ interface SalesOrderProjectTabProps {
   onRefresh: () => void;
 }
 
-const GOAL_PCT = 0.95;
-const PM_ALLOWANCE_PCT = 0.05;
+
 
 export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabProps) {
+  const {profile} = useAuth();
+  const [summary,setSummary] = useState<ProjectSummary|null>(null);
+  const pmPercentage=summary?.pmPercentage??5;
+  const fieldShare=1-pmPercentage/100;
+  const [summaryError,setSummaryError] = useState('');
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [laborBreakdown, setLaborBreakdown] = useState<LaborPhaseBreakdown[]>([]);
   const [soldLaborHours, setSoldLaborHours] = useState(0);
   const [partsUsed, setPartsUsed] = useState<PartUsed[]>([]);
@@ -113,17 +108,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
-  const [togglingTask, setTogglingTask] = useState<string | null>(null);
   const [showAllParts, setShowAllParts] = useState(false);
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDescription, setNewTaskDescription] = useState('');
-  const [savingTask, setSavingTask] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editTaskTitle, setEditTaskTitle] = useState('');
-  const [editTaskDescription, setEditTaskDescription] = useState('');
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
-  const [totalClockedHours, setTotalClockedHours] = useState(0);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
 
@@ -145,11 +130,10 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     if (project?.id) {
       setNotesValue(project.notes || '');
       loadProjectData();
-      loadSoldLaborHours();
     } else {
       setLoading(false);
     }
-  }, [project?.id]);
+  }, [project?.id, profile?.organization_id, order.updated_at]);
 
   async function loadLaborPhases() {
     const { data } = await supabase
@@ -160,27 +144,10 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     setLaborPhases(data || []);
   }
 
-  async function loadSoldLaborHours() {
-    if (!order.proposal_id) return;
-    try {
-      const { data } = await supabase
-        .from('proposal_line_items')
-        .select('labor_hours, labor_phase_id, labor_phase:labor_phases(id, name)')
-        .eq('proposal_id', order.proposal_id);
-
-      const total = (data || []).reduce((s, li) => s + (li.labor_hours || 0), 0);
-      setSoldLaborHours(total);
-      return data || [];
-    } catch (error) {
-      console.error('Error loading sold labor hours:', error);
-      return [];
-    }
-  }
-
   async function loadProjectData() {
     if (!project?.id) return;
     try {
-      const [woResult, taskResult, soldResult] = await Promise.all([
+      const [woResult, _taskResult, soldResult] = await Promise.all([
         supabase
           .from('work_orders')
           .select(`
@@ -191,7 +158,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             labor_phase:labor_phases!work_orders_labor_phase_id_fkey(id, name)
           `)
           .eq('project_id', project.id)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false }).overrideTypes<WorkOrder[], { merge: false }>(),
 
         supabase
           .from('project_tasks')
@@ -264,45 +231,17 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         buildLaborBreakdown(wos, soldItems, [], projectTimeEntries);
       }
 
-      const rawTasks = taskResult.data || [];
-      if (rawTasks.length > 0) {
-        const taskIds = rawTasks.map((t: any) => t.id);
-        const { data: woTasks } = await supabase
-          .from('work_order_tasks')
-          .select('id, project_task_id')
-          .in('project_task_id', taskIds);
+      if (!profile?.organization_id) throw new Error('Project labor requires an authenticated organization.');
+      const [shared] = await loadProjectSummaries(profile.organization_id,[project.id]);
+      if (!shared) throw new Error('Project labor is unavailable.');
+      setSummary(shared); setSummaryError('');
+      setSoldLaborHours(shared.soldHours);
+      setLaborBreakdown(previous=>shared.phases.map(phase=>({unassigned_sources:previous.find(row=>row.phase_id===phase.id)?.unassigned_sources,phase_id:phase.id,phase_name:phase.name+(phase.excluded?' (excluded from goal)':''),sold_hours:phase.sold_hours,goal_hours:phase.excluded?0:phase.goal_hours,actual_hours:phase.actual_hours,remaining_hours:phase.excluded?0:Math.max(0,phase.goal_hours-phase.actual_hours)})));
 
-        const woTaskIds = (woTasks || []).map((t: any) => t.id);
-        const completionsByProjectTask: Record<string, number> = {};
-
-        if (woTaskIds.length > 0) {
-          const { data: comps } = await supabase
-            .from('work_order_task_completions')
-            .select('work_order_task_id, actual_hours')
-            .in('work_order_task_id', woTaskIds);
-
-          const woTaskToProjectTask: Record<string, string> = {};
-          (woTasks || []).forEach((wt: any) => {
-            if (wt.project_task_id) woTaskToProjectTask[wt.id] = wt.project_task_id;
-          });
-
-          (comps || []).forEach((c: any) => {
-            const ptId = woTaskToProjectTask[c.work_order_task_id];
-            if (ptId) {
-              completionsByProjectTask[ptId] = (completionsByProjectTask[ptId] || 0) + (c.actual_hours || 0);
-            }
-          });
-        }
-
-        setTasks(rawTasks.map((t: any) => ({
-          ...t,
-          actual_hours: completionsByProjectTask[t.id] || 0
-        })));
-      } else {
-        setTasks([]);
-      }
     } catch (error) {
       console.error('Error loading project data:', error);
+      setSummaryError((error as Error).message || 'Project labor could not be loaded.');
+      setSummary(null);
     } finally {
       setLoading(false);
     }
@@ -372,7 +311,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     const breakdown: LaborPhaseBreakdown[] = Array.from(allPhaseIds).map(phaseId => {
       const sold = soldByPhase[phaseId] || 0;
       const actual = actualByPhase[phaseId]?.hours || 0;
-      const goal = sold * GOAL_PCT;
+      const goal = sold * fieldShare;
       const row: LaborPhaseBreakdown = {
         phase_id: phaseId === 'unassigned' ? null : phaseId,
         phase_name: actualByPhase[phaseId]?.name !== 'Unassigned' && actualByPhase[phaseId]?.name
@@ -412,11 +351,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
 
     const filtered = breakdown.filter(r => r.sold_hours > 0 || r.actual_hours > 0);
     setLaborBreakdown(filtered);
-    const allHours = [
-      ...woTimeEntries.map(te => te.total_hours || 0),
-      ...projectTimeEntries.map(te => te.total_hours || 0),
-    ];
-    setTotalClockedHours(allHours.reduce((s, h) => s + h, 0));
+
   }
 
   async function assignPhaseToSource(source: UnassignedSource, newPhaseId: string) {
@@ -437,29 +372,10 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         if (error) throw error;
       }
       await loadProjectData();
-      setShowUnassignedDrilldown(false);
     } catch (err) {
       console.error('Error assigning phase:', err);
     } finally {
       setAssigningPhaseId(null);
-    }
-  }
-
-  async function toggleTaskStatus(task: ProjectTask) {
-    if (togglingTask) return;
-    setTogglingTask(task.id);
-    const newStatus = task.status === 'completed' ? 'open' : 'completed';
-    try {
-      const { error } = await supabase
-        .from('project_tasks')
-        .update({ status: newStatus, completed_at: newStatus === 'completed' ? new Date().toISOString() : null })
-        .eq('id', task.id);
-      if (error) throw error;
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
-    } catch (error) {
-      console.error('Error toggling task:', error);
-    } finally {
-      setTogglingTask(null);
     }
   }
 
@@ -478,70 +394,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
       console.error('Error saving notes:', error);
     } finally {
       setSavingNotes(false);
-    }
-  }
-
-  async function addTask() {
-    if (!project?.id || !newTaskTitle.trim()) return;
-    setSavingTask(true);
-    try {
-      const maxSort = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) + 1 : 0;
-      const { error } = await supabase
-        .from('project_tasks')
-        .insert({
-          project_id: project.id,
-          title: newTaskTitle.trim(),
-          description: newTaskDescription.trim() || null,
-          status: 'open',
-          sort_order: maxSort,
-          estimated_hours: 0,
-        });
-      if (error) throw error;
-      setNewTaskTitle('');
-      setNewTaskDescription('');
-      setShowAddTask(false);
-      await loadProjectData();
-    } catch (error) {
-      console.error('Error adding task:', error);
-    } finally {
-      setSavingTask(false);
-    }
-  }
-
-  async function saveEditTask(taskId: string) {
-    if (!editTaskTitle.trim()) return;
-    setSavingTask(true);
-    try {
-      const { error } = await supabase
-        .from('project_tasks')
-        .update({ title: editTaskTitle.trim(), description: editTaskDescription.trim() || null })
-        .eq('id', taskId);
-      if (error) throw error;
-      setEditingTaskId(null);
-      setTasks(prev => prev.map(t => t.id === taskId
-        ? { ...t, title: editTaskTitle.trim(), description: editTaskDescription.trim() || null }
-        : t
-      ));
-    } catch (error) {
-      console.error('Error saving task:', error);
-    } finally {
-      setSavingTask(false);
-    }
-  }
-
-  async function deleteTask(taskId: string) {
-    setDeletingTaskId(taskId);
-    try {
-      const { error } = await supabase
-        .from('project_tasks')
-        .delete()
-        .eq('id', taskId);
-      if (error) throw error;
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    } finally {
-      setDeletingTaskId(null);
     }
   }
 
@@ -744,9 +596,9 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
     );
   }
 
-  const totalSoldHours = soldLaborHours;
-  const goalHours = totalSoldHours * GOAL_PCT;
-  const totalActualHours = totalClockedHours;
+  const totalSoldHours = summary?.soldHours ?? 0;
+  const goalHours = summary?.goalHours ?? 0;
+  const totalActualHours = summary?.fieldHours ?? 0;
   const remainingHours = Math.max(0, goalHours - totalActualHours);
   const usedPct = goalHours > 0 ? (totalActualHours / goalHours) * 100 : 0;
   const overGoal = totalActualHours > goalHours && goalHours > 0;
@@ -754,7 +606,6 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
 
   const completedWOs = workOrders.filter(w => w.status === 'completed').length;
   const inProgressWOs = workOrders.filter(w => w.status === 'in_progress').length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
 
   const visibleWOs = showAllWOs ? workOrders : workOrders.slice(0, 5);
   const visibleParts = showAllParts ? partsUsed : partsUsed.slice(0, 6);
@@ -769,26 +620,11 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   const overBudgetTime = overSold;
   const showChangeOrderPrompt = extraPartsExist || overBudgetTime;
 
-  const statusColors: Record<string, string> = {
-    planning: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    active: 'bg-green-500/20 text-green-400 border-green-500/30',
-    complete: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-    closed: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-  };
-
-  const jobSiteAddr = project.job_site_address
-    ? (typeof project.job_site_address === 'string'
-        ? project.job_site_address
-        : [
-            project.job_site_address.street_address,
-            project.job_site_address.city,
-            project.job_site_address.state,
-            project.job_site_address.zip_code
-          ].filter(Boolean).join(', '))
-    : null;
 
   return (
     <div className="space-y-6">
+      {summaryError && <p role="alert" className="text-red-500 p-3">{summaryError} <button onClick={()=>loadProjectData()} className="underline min-h-11">Retry</button></p>}
+      {summary && <p className="text-sm text-gray-400 px-1">Recorded field labor: {summary.fieldHours.toFixed(1)}h · Excluded labor: {summary.excludedHours.toFixed(1)}h{summary.pendingHours>0?` · ${summary.pendingHours.toFixed(1)}h awaiting time review`:''}{summary.goalHours==null?` · ${summary.budgetWarning||'No goal set'}`:''}. Labor used does not measure task completion.</p>}
 
       {/* Change Order Prompt */}
       {showChangeOrderPrompt && (
@@ -815,7 +651,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Labor Hours</h3>
             <div className="flex items-center gap-1 text-xs text-gray-600 bg-gray-800 border border-gray-700 rounded px-2 py-0.5">
               <Target className="w-3 h-3" />
-              Goal = 95% of sold
+              Field goal = {100-pmPercentage}% of sold
             </div>
           </div>
           <button
@@ -836,7 +672,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             icon={FileText}
           />
           <HourStat
-            label="Goal (95%)"
+            label={`Goal (${100-pmPercentage}%)`}
             value={goalHours > 0 ? `${goalHours.toFixed(1)}h` : '—'}
             sub="Target on-site hours"
             color="teal"
@@ -879,7 +715,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
               </span>
             )}
           </div>
-          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden">
+          <div className="bg-surface rounded-xl border border-subtle overflow-hidden">
             {/* Mobile card view */}
             <div className="md:hidden divide-y divide-gray-700/40">
               {laborBreakdown.map((row, i) => {
@@ -931,7 +767,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
                         <span className="text-gray-400 tabular-nums">{row.sold_hours.toFixed(1)}h</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-500">Goal (95%)</span>
+                        <span className="text-gray-500">Goal ({100-pmPercentage}%)</span>
                         <span className="text-teal-400 tabular-nums font-medium">{row.goal_hours.toFixed(1)}h</span>
                       </div>
                       <div className="flex justify-between">
@@ -991,7 +827,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
                   <tr className="border-b border-gray-700/60">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phase</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Sold</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-teal-600 uppercase tracking-wider">Goal (95%)</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-teal-600 uppercase tracking-wider">Goal ({100-pmPercentage}%)</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actual</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Remaining</th>
                   </tr>
@@ -1107,7 +943,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
           </div>
           <p className="text-xs text-gray-600 mt-2 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
-            Goal = 95% of sold hours. The remaining 5% is reserved for "Project Management" phase time.
+            Field goal = {100-pmPercentage}% of sold hours. The remaining {pmPercentage}% is reserved for Project Management phase time within the same quoted total.
           </p>
         </div>
       )}
@@ -1143,7 +979,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         ) : (
           <div className="space-y-2">
             {visibleWOs.map(wo => (
-              <WorkOrderCard key={wo.id} wo={wo} soldHours={soldLaborHours} onClick={() => setSelectedWorkOrderId(wo.id)} />
+              <WorkOrderCard key={wo.id} wo={wo} soldHours={soldLaborHours} fieldShare={fieldShare} onClick={() => setSelectedWorkOrderId(wo.id)} />
             ))}
             {workOrders.length > 5 && (
               <button
@@ -1193,7 +1029,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             <p className="text-gray-600 text-xs mt-1">Parts logged by techs on work orders will appear here for billing decisions</p>
           </div>
         ) : (
-          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden">
+          <div className="bg-surface rounded-xl border border-subtle overflow-hidden">
             {/* Mobile card view */}
             <div className="md:hidden divide-y divide-gray-700/40">
               {visibleParts.map(p => (
@@ -1372,188 +1208,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
         )}
       </div>
 
-      {/* Project Task Checklist */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Task Checklist</h3>
-            {tasks.length > 0 && (
-              <span className="text-xs text-gray-600">{completedTasks} of {tasks.length} completed</span>
-            )}
-          </div>
-          {!showAddTask && (
-            <button
-              onClick={() => setShowAddTask(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Task
-            </button>
-          )}
-        </div>
-
-        {tasks.length === 0 && !showAddTask ? (
-          <div className="bg-gray-900/40 rounded-xl border border-gray-700/40 border-dashed p-8 text-center">
-            <ListChecks className="w-9 h-9 text-gray-700 mx-auto mb-2" />
-            <p className="text-gray-400 text-sm font-medium">No tasks yet</p>
-            <p className="text-gray-500 text-xs mt-1">Add checklist tasks to track installation milestones. Labor costs are already included in the sales order — add a change order if extra work arises.</p>
-            <button
-              onClick={() => setShowAddTask(true)}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add First Task
-            </button>
-          </div>
-        ) : (
-          <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 divide-y divide-gray-700/50 overflow-hidden">
-            {tasks.map(task => (
-              <div key={task.id}>
-                {editingTaskId === task.id ? (
-                  <div className="px-4 py-3 bg-gray-800/40">
-                    <input
-                      type="text"
-                      value={editTaskTitle}
-                      onChange={e => setEditTaskTitle(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                      placeholder="Task title"
-                      autoFocus
-                    />
-                    <input
-                      type="text"
-                      value={editTaskDescription}
-                      onChange={e => setEditTaskDescription(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-                      placeholder="Description (optional)"
-                    />
-                    <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => setEditingTaskId(null)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 rounded-lg transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => saveEditTask(task.id)}
-                        disabled={savingTask || !editTaskTitle.trim()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors"
-                      >
-                        {savingTask
-                          ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          : <Save className="w-3.5 h-3.5" />
-                        }
-                        Save
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800/30 transition-colors group">
-                    <button
-                      onClick={() => toggleTaskStatus(task)}
-                      disabled={togglingTask === task.id}
-                      className="shrink-0 transition-transform active:scale-90"
-                      title={task.status === 'completed' ? 'Mark incomplete — task will reappear on work orders' : 'Mark complete'}
-                    >
-                      {togglingTask === task.id ? (
-                        <div className="w-5 h-5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-                      ) : task.status === 'completed' ? (
-                        <CheckCircle className="w-5 h-5 text-green-400" />
-                      ) : (
-                        <Circle className="w-5 h-5 text-gray-600 group-hover:text-gray-400 transition-colors" />
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-sm font-medium ${task.status === 'completed' ? 'text-gray-500 line-through' : 'text-white'}`}>
-                          {task.title}
-                        </span>
-                        {task.labor_phase?.name && (
-                          <span className="px-1.5 py-0.5 bg-gray-800 text-gray-400 rounded text-xs border border-gray-700">{task.labor_phase.name}</span>
-                        )}
-                      </div>
-                      {task.description && (
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{task.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => {
-                          setEditingTaskId(task.id);
-                          setEditTaskTitle(task.title);
-                          setEditTaskDescription(task.description || '');
-                        }}
-                        className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Edit task"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        disabled={deletingTaskId === task.id}
-                        className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Delete task"
-                      >
-                        {deletingTaskId === task.id
-                          ? <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                          : <Trash2 className="w-3.5 h-3.5" />
-                        }
-                      </button>
-                    </div>
-                    {task.estimated_hours > 0 && (
-                      <div className="text-right text-xs shrink-0 tabular-nums text-gray-500">
-                        {task.estimated_hours.toFixed(1)}h est.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Add Task Inline Form */}
-            {showAddTask && (
-              <div className="px-4 py-3 bg-gray-800/40">
-                <input
-                  type="text"
-                  value={newTaskTitle}
-                  onChange={e => setNewTaskTitle(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addTask(); if (e.key === 'Escape') { setShowAddTask(false); setNewTaskTitle(''); setNewTaskDescription(''); } }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                  placeholder="Task title (no labor cost — sold hours already included)"
-                  autoFocus
-                />
-                <input
-                  type="text"
-                  value={newTaskDescription}
-                  onChange={e => setNewTaskDescription(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-                  placeholder="Description (optional)"
-                />
-                <div className="flex items-center gap-2 justify-end">
-                  <button
-                    onClick={() => { setShowAddTask(false); setNewTaskTitle(''); setNewTaskDescription(''); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white border border-gray-600 rounded-lg transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Cancel
-                  </button>
-                  <button
-                    onClick={addTask}
-                    disabled={savingTask || !newTaskTitle.trim()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-colors"
-                  >
-                    {savingTask
-                      ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : <Plus className="w-3.5 h-3.5" />
-                    }
-                    Add Task
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <ProjectTasksList projectId={project.id} canEdit />
 
       {/* Work Order Notes */}
       {workOrders.some(w => w.notes || w.description) && (
@@ -1563,7 +1218,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             {workOrders
               .filter(w => w.notes || w.description)
               .map(wo => (
-                <div key={wo.id} className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+                <div key={wo.id} className="bg-surface rounded-xl border border-subtle p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <StickyNote className="w-3.5 h-3.5 text-gray-600" />
                     <span className="text-xs font-mono text-gray-500">{wo.work_order_number}</span>
@@ -1596,7 +1251,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
             </button>
           )}
         </div>
-        <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+        <div className="bg-surface rounded-xl border border-subtle p-4">
           {editingNotes ? (
             <div className="space-y-3">
               <textarea
@@ -1858,7 +1513,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
       {selectedWorkOrderId && (
         <WorkOrderDetail
           workOrderId={selectedWorkOrderId}
-          onClose={() => {
+          onBack={() => {
             setSelectedWorkOrderId(null);
             loadProjectData();
           }}
@@ -1868,7 +1523,7 @@ export function SalesOrderProjectTab({ order, onRefresh }: SalesOrderProjectTabP
   );
 }
 
-function WorkOrderCard({ wo, soldHours, onClick }: { wo: WorkOrder; soldHours: number; onClick?: () => void }) {
+function WorkOrderCard({ wo, soldHours: _soldHours, fieldShare, onClick }: { wo: WorkOrder; soldHours: number; fieldShare:number; onClick?: () => void }) {
   const statusStyles: Record<string, string> = {
     completed: 'bg-green-500/20 text-green-400 border border-green-500/30',
     in_progress: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
@@ -1886,14 +1541,14 @@ function WorkOrderCard({ wo, soldHours, onClick }: { wo: WorkOrder; soldHours: n
 
   const actualH = wo.actual_hours || 0;
   const estH = wo.estimated_hours || 0;
-  const goalH = estH * GOAL_PCT;
+  const goalH = estH * fieldShare;
   const overGoal = actualH > goalH && goalH > 0;
   const overEst = actualH > estH && estH > 0;
 
   return (
     <div
       onClick={onClick}
-      className={`bg-gray-900/50 rounded-xl border border-gray-700/50 p-4 transition-colors ${onClick ? 'cursor-pointer hover:border-blue-500/50 hover:bg-gray-800/40' : 'hover:border-gray-600'}`}
+      className={`bg-surface rounded-xl border border-subtle p-4 transition-colors ${onClick ? 'cursor-pointer hover:border-blue-500/50 hover:bg-gray-800/40' : 'hover:border-gray-600'}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -2026,7 +1681,7 @@ function HoursProgressBar({ soldHours, goalHours, actualHours }: { soldHours: nu
         <span>0h</span>
         <span className="flex items-center gap-1 text-teal-600">
           <Target className="w-3 h-3" />
-          {goalHours.toFixed(1)}h goal (95%)
+          {goalHours.toFixed(1)}h field goal
         </span>
         <span className="flex items-center gap-1">
           <Flag className="w-3 h-3" />
@@ -2078,7 +1733,7 @@ function HourStat({ icon: Icon, label, value, sub, color }: {
     : color === 'red' ? 'text-red-600'
     : 'text-gray-600';
   return (
-    <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 p-4">
+    <div className="bg-surface rounded-xl border border-subtle p-4">
       <div className="flex items-center gap-2 mb-2">
         <Icon className={`w-4 h-4 ${iconColor}`} />
         <span className="text-xs text-gray-500">{label}</span>

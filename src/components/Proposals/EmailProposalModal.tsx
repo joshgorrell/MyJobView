@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, X, FileText, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info } from 'lucide-react';
+import { loadProposalDocument } from '../../lib/proposalDocument';
+import { useState, useEffect } from 'react';
+import { Mail, X, Send, User, AlertCircle, ChevronDown, ChevronUp, Paperclip, CheckSquare, Square, Loader2, Info, Pencil, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface EmailProposalModalProps {
@@ -79,12 +80,20 @@ export function EmailProposalModal({
 }: EmailProposalModalProps) {
   const [toEmail, setToEmail] = useState(contactEmail);
   const [ccEmails, setCcEmails] = useState('');
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
+  const [bccEmails, setBccEmails] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'idle' | 'loading_docs' | 'sending'>('idle');
   const [error, setError] = useState('');
+  const [includePromisePage, setIncludePromisePage] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showAttachments, setShowAttachments] = useState(true);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const [docAvailability, setDocAvailability] = useState<DocumentAvailability | null>(null);
   const [docsLoading, setDocsLoading] = useState(true);
@@ -100,7 +109,15 @@ export function EmailProposalModal({
   useEffect(() => {
     loadDefaults();
     loadDocumentAvailability();
+    void loadSavedTemplate();
   }, []);
+
+  async function loadSavedTemplate() {
+    const {data, error} = await supabase.from('proposals').select('report_template_id,include_promise_page').eq('id', proposalId).maybeSingle();
+    if (error) { setError('Unable to load saved proposal template.'); return; }
+    setSelectedTemplateId(data?.report_template_id || null);
+    setIncludePromisePage(data?.include_promise_page ?? true);
+  }
 
   async function loadDefaults() {
     const { data: settings } = await supabase
@@ -109,7 +126,7 @@ export function EmailProposalModal({
       .maybeSingle();
     const companyName = settings?.company_name || 'Your Company';
     setSubject(`Proposal #${proposalNumber} from ${companyName}`);
-    setMessage(`Dear ${contactName},\n\nPlease review your proposal #${proposalNumber}. We've carefully prepared this proposal to meet your needs and look forward to working with you.\n\nYou can view your proposal online using the secure link in this email.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards`);
+    setMessage(`Dear ${contactName},\n\nPlease review your proposal #${proposalNumber}. We've carefully prepared this proposal to meet your needs and look forward to working with you.\n\nYour proposal is attached when the Proposal attachment option is selected.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards`);
   }
 
   async function loadDocumentAvailability() {
@@ -135,11 +152,39 @@ export function EmailProposalModal({
     }
   }
 
+  useEffect(() => {
+    if (!previewMode) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewHtml('');
+    supabase.functions.invoke('send-proposal-email', {
+      body: { proposalId, subject, message, previewOnly: true },
+    }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error || !data?.html) {
+        setError('Unable to load the branded email preview.');
+        setPreviewMode(false);
+      } else {
+        setPreviewHtml(data.html);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setError('Unable to load the branded email preview.');
+        setPreviewMode(false);
+      }
+    }).finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [previewMode, proposalId]);
+
   const attachmentCount = Object.values(attachments).filter(Boolean).length;
 
   const handleSend = async () => {
-    if (!toEmail) {
-      setError('Please enter a recipient email address');
+    const recipients = toEmail.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const ccRecipients = ccEmails.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    const bccRecipients = bccEmails.split(/[;,\n]+/).map(email => email.trim()).filter(Boolean);
+    if (!recipients.length || [...recipients, ...ccRecipients, ...bccRecipients].some(email => !emailPattern.test(email))) {
+      setError('Enter valid recipient email addresses, separated by commas.');
       return;
     }
 
@@ -152,18 +197,11 @@ export function EmailProposalModal({
 
       setStep('loading_docs');
 
-      // Generate proposal PDF if selected
+      // Attach the actual document; generation failures stop the send.
       if (attachments.proposal) {
-        const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-proposal-pdf', {
-          body: { proposalId },
-        });
-        if (!pdfError && pdfData?.base64) {
-          emailAttachments.push({
-            filename: `Proposal-${proposalNumber}.pdf`,
-            content: pdfData.base64,
-          });
-          sentAttachmentsRecord.proposal = true;
-        }
+        const document = await loadProposalDocument(proposalId, proposalNumber, includePromisePage, selectedTemplateId);
+        emailAttachments.push({ filename: document.filename, content: document.content });
+        sentAttachmentsRecord.proposal = true;
       }
 
       // Terms & Conditions
@@ -213,8 +251,9 @@ export function EmailProposalModal({
       const { error: emailError } = await supabase.functions.invoke('send-proposal-email', {
         body: {
           proposalId,
-          toEmail,
-          ccEmails: ccEmails.split(',').map(e => e.trim()).filter(Boolean),
+          toEmail: recipients,
+          ccEmails: ccRecipients,
+          bccEmails: bccRecipients,
           subject,
           message,
           attachments: emailAttachments,
@@ -244,7 +283,7 @@ export function EmailProposalModal({
               <Mail className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-white">Send Proposal</h2>
+              <h2 className="text-base sm:text-lg font-semibold text-white">Email Proposal</h2>
               <p className="text-xs text-gray-400">#{proposalNumber}</p>
             </div>
           </div>
@@ -266,7 +305,20 @@ export function EmailProposalModal({
             </div>
           )}
 
-          {/* To */}
+          {previewMode ? (
+            <div className="rounded-xl border border-gray-600 bg-white overflow-hidden">
+              <div className="bg-gray-900 px-5 py-3 text-white text-sm">
+                <span className="font-semibold">To:</span> {toEmail}
+                <div><span className="font-semibold">Subject:</span> {subject}</div>
+              </div>
+              {previewLoading ? <div className="p-8 text-gray-700 text-center">Loading branded email preview...</div> :
+                <iframe title="Branded proposal email preview" sandbox="" srcDoc={previewHtml}
+                  className="w-full h-[420px] bg-white" />}
+              <p className="px-4 py-2 text-xs text-gray-600 bg-gray-100">Attachments are selected in the editor.</p>
+            </div>
+          ) : (
+          <>
+          {/* To — supports one or multiple addresses */}
           <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
               To <span className="text-red-400">*</span>
@@ -274,20 +326,27 @@ export function EmailProposalModal({
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
-                type="email"
+                type="text"
+                inputMode="email"
                 value={toEmail}
                 onChange={(e) => setToEmail(e.target.value)}
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="customer@example.com"
+                placeholder="customer@example.com, manager@example.com"
                 disabled={loading}
               />
             </div>
           </div>
 
+          <p className="text-xs text-gray-400">Separate multiple To addresses with commas.</p>
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setShowCc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showCc}>Cc</button>
+            <button type="button" onClick={() => setShowBcc(value => !value)} className="min-h-[44px] px-2 text-sm text-blue-300 hover:text-blue-200" aria-expanded={showBcc}>Bcc</button>
+          </div>
+
           {/* CC */}
-          <div>
+          {showCc && <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">
-              CC (optional)
+              Cc (optional)
             </label>
             <input
               type="text"
@@ -298,7 +357,12 @@ export function EmailProposalModal({
               disabled={loading}
             />
             <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
-          </div>
+          </div>}
+
+          {showBcc && <div>
+            <label htmlFor="proposal-bcc" className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Bcc (optional)</label>
+            <input id="proposal-bcc" type="text" value={bccEmails} onChange={event => setBccEmails(event.target.value)} disabled={loading} placeholder="email1@example.com, email2@example.com" className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2.5 text-sm text-white focus:ring-2 focus:ring-blue-500" />
+          </div>}
 
           {/* Subject */}
           <div>
@@ -364,7 +428,7 @@ export function EmailProposalModal({
                 </div>
 
                 <AttachmentToggle
-                  label="Proposal PDF"
+                  label="Printable proposal"
                   description="Full proposal with line items, pricing, and totals"
                   enabled={attachments.proposal}
                   available={true}
@@ -372,6 +436,7 @@ export function EmailProposalModal({
                   onChange={(val) => setAttachments(prev => ({ ...prev, proposal: val }))}
                 />
 
+                {attachments.proposal && <label className="flex items-start gap-3 rounded-lg border border-sky-700/50 bg-sky-900/20 p-3 text-sm text-gray-200"><input type="checkbox" checked={includePromisePage} onChange={e => setIncludePromisePage(e.target.checked)} className="mt-1" /><span><span className="block font-medium">Include Our Promise to You</span><span className="block text-xs text-gray-400">Include Electronic Life’s promise as a separate page in the printable proposal.</span></span></label>}
                 <AttachmentToggle
                   label="Terms & Conditions"
                   description="Contract terms attached to this proposal"
@@ -408,6 +473,8 @@ export function EmailProposalModal({
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer */}
@@ -419,9 +486,14 @@ export function EmailProposalModal({
           >
             Cancel
           </button>
+          <button type="button" onClick={() => setPreviewMode(value => !value)} disabled={loading}
+            className="px-4 py-2.5 text-sm text-blue-200 border border-blue-500/50 rounded-lg hover:bg-blue-500/10 flex items-center gap-2">
+            {previewMode ? <Pencil className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {previewMode ? 'Edit' : 'Preview'}
+          </button>
           <button
             onClick={handleSend}
-            disabled={loading || !toEmail || !subject || !message}
+            disabled={loading || previewLoading || !previewMode || !previewHtml || !toEmail || !subject || !message}
             className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
@@ -438,7 +510,7 @@ export function EmailProposalModal({
                   Send Email
                   {attachmentCount > 0 && (
                     <span className="ml-1.5 text-blue-200 font-normal">
-                      + {attachmentCount} PDF{attachmentCount !== 1 ? 's' : ''}
+                      + {attachmentCount} attachment{attachmentCount !== 1 ? 's' : ''}
                     </span>
                   )}
                 </span>

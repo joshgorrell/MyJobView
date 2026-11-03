@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Package, Loader2, Hash, Tag, ChevronDown, ChevronRight, LayoutList, Clock, Wrench, Building2, LayoutGrid, List, Columns2 as Columns, Check, Printer, AlertCircle, ShoppingCart, Layers, X } from 'lucide-react';
@@ -29,11 +30,6 @@ function fmt(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function effectiveCost(item: GridLineItem): number | null {
-  if (item.cost != null && item.cost !== 0) return item.cost;
-  if (item.cost === 0 && item.product_id && item.products?.cost != null) return item.products.cost;
-  return item.cost;
-}
 
 function isVisibleItem(item: GridLineItem): boolean {
   const t = item.item_type?.toLowerCase();
@@ -106,7 +102,7 @@ function summarizeDuplicates(items: ProductLineItem[]): ProductLineItem[] {
         line_total: totalLine,
         labor_hours: totalLaborHrs || null,
         labor_total: totalLaborTotal || null,
-        _roomName: null,
+        _roomName: undefined,
       });
     }
   });
@@ -245,7 +241,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     });
   }
 
-  function toggleSelectSection(sectionKey: string, sectionItemIds: string[]) {
+  function toggleSelectSection(_sectionKey: string, sectionItemIds: string[]) {
     setSelectedIds(prev => {
       const next = new Set(prev);
       const allSelected = sectionItemIds.length > 0 && sectionItemIds.every(id => next.has(id));
@@ -268,7 +264,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) { alert('You must be signed in to request parts'); return; }
+      if (!userId) { notify('You must be signed in to request parts', { theme: 'violet', tone: 'warning' }); return; }
 
       const { data: req, error: reqError } = await supabase
         .from('product_requests')
@@ -297,10 +293,10 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
         });
       if (itemError) throw itemError;
 
-      alert('Parts request created successfully! Purchasing has been notified.');
+      notify('Parts request created successfully! Purchasing has been notified.', { theme: 'violet', tone: 'success' });
       setRequestingItem(null);
     } catch (err: any) {
-      alert(`Error creating parts request: ${err.message}`);
+      notify(`Error creating parts request: ${err.message}`, { theme: 'violet', tone: 'error' });
     } finally {
       setRequestSaving(false);
     }
@@ -309,7 +305,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
   async function submitBulkPartRequest(selected: ProductLineItem[]) {
     const requestable = selected.filter(i => i.product_id && i.quantity && isVisibleItem(i) && !i.is_hidden);
     if (requestable.length === 0) {
-      alert('No requestable products selected.');
+      notify('No requestable products selected.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -317,7 +313,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      if (!userId) { alert('You must be signed in to request parts'); return; }
+      if (!userId) { notify('You must be signed in to request parts', { theme: 'violet', tone: 'warning' }); return; }
 
       // Group by vendor so each vendor gets its own clean request.
       const byVendor = new Map<string, ProductLineItem[]>();
@@ -373,10 +369,10 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
         createdCount++;
       }
 
-      alert(`Created ${createdCount} parts request${createdCount !== 1 ? 's' : ''} (${byVendor.size} vendor${byVendor.size !== 1 ? 's' : ''}). Purchasing has been notified.`);
+      notify(`Created ${createdCount} parts request${createdCount !== 1 ? 's' : ''} (${byVendor.size} vendor${byVendor.size !== 1 ? 's' : ''}). Purchasing has been notified.`, { theme: 'violet', tone: 'success' });
       clearSelection();
     } catch (err: any) {
-      alert(`Error creating parts requests: ${err.message}`);
+      notify(`Error creating parts requests: ${err.message}`, { theme: 'violet', tone: 'error' });
     } finally {
       setBulkRequestSaving(false);
     }
@@ -418,7 +414,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
     <div className="space-y-4 pb-20">
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Package className="w-4 h-4 text-blue-400" />
             <span className="text-xs text-gray-400">Line Items</span>
@@ -426,7 +422,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           <div className="text-lg font-bold text-white">{displayItems.length}</div>
           <div className="text-[10px] text-gray-600 mt-0.5">{summarize ? 'summarized' : 'total items'}</div>
         </div>
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Hash className="w-4 h-4 text-teal-400" />
             <span className="text-xs text-gray-400">Quantity</span>
@@ -434,7 +430,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           <div className="text-lg font-bold text-white">{fmt(totalQty)}</div>
           <div className="text-[10px] text-gray-600 mt-0.5">units total</div>
         </div>
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-amber-400" />
             <span className="text-xs text-gray-400">Labor Hours</span>
@@ -442,7 +438,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           <div className="text-lg font-bold text-white">{fmt(totalLaborHours)}</div>
           <div className="text-[10px] text-gray-600 mt-0.5">${fmt(totalLaborTotal)} labor</div>
         </div>
-        <div className="bg-gray-800 rounded-lg border border-gray-700 p-3">
+        <div className="bg-surface rounded-lg border border-subtle p-3">
           <div className="flex items-center gap-2 mb-2">
             <Tag className="w-4 h-4 text-green-400" />
             <span className="text-xs text-gray-400">Line Total</span>
@@ -929,10 +925,10 @@ function CleanItemRow({
   onClickItem,
   onSkuClick,
   stockMap,
-  requestingItem,
+  requestingItem: _requestingItem,
   setRequestingItem,
-  submitPartRequest,
-  requestSaving,
+  submitPartRequest: _submitPartRequest,
+  requestSaving: _requestSaving,
   selected,
   onToggleSelect,
 }: {

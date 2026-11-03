@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Building2, ChevronRight, DollarSign, Columns3, AlertCircle, RotateCw } from 'lucide-react';
+import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Building2, ChevronRight, Columns3, AlertCircle, RotateCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Contact, ContactTag, Profile, CompanyOffice } from '../../lib/types';
+import { Contact } from '../../lib/types';
 import { ContactForm } from './ContactForm';
 import { ContactDetail } from './ContactDetail';
 import { useAuth } from '../../contexts/AuthContext';
@@ -74,7 +74,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
   const [temperatureFilter, setTemperatureFilter] = useState<'all' | 'on_fire' | 'hot' | 'warm' | 'cold'>('all');
   const [temperatureCounts, setTemperatureCounts] = useState({ on_fire: 0, hot: 0, warm: 0, cold: 0 });
   const [showContactTypesHelp, setShowContactTypesHelp] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
+  const [_totalCount, setTotalCount] = useState(0);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
@@ -166,7 +166,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
       setContacts(data?.contacts ?? []);
       setTotalCount(data?.total ?? 0);
 
-      void countsPromise.then(({ data: counts, error }) => {
+      void Promise.resolve(countsPromise).then(({ data: counts, error }) => {
         if (error || requestId !== currentRequestId.current || !counts) return;
         const typedCounts = counts as Record<string, number>;
         setTypeCounts({
@@ -342,7 +342,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <p className="text-sm text-secondary mb-4">The contacts list is taking too long to load. This is usually a temporary issue.</p>
           <button
             onClick={() => loadContacts(displayLimit, searchQuery)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-primary rounded-md hover:bg-blue-700 transition-colors font-medium"
           >
             <RotateCw className="w-4 h-4" />
             Retry
@@ -361,7 +361,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             <button
               onClick={() => setViewFilter('my')}
               className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                viewFilter === 'my' ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:text-primary hover:bg-surface'
+                viewFilter === 'my' ? 'bg-blue-600 text-primary shadow-sm' : 'text-secondary hover:text-primary hover:bg-surface'
               }`}
             >
               Mine
@@ -369,7 +369,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             <button
               onClick={() => setViewFilter('all')}
               className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                viewFilter === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:text-primary hover:bg-surface'
+                viewFilter === 'all' ? 'bg-blue-600 text-primary shadow-sm' : 'text-secondary hover:text-primary hover:bg-surface'
               }`}
             >
               All
@@ -435,7 +435,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           {canEdit ? (
             <button
               onClick={() => setShowContactForm(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 active:bg-blue-800 transition-colors font-medium flex-shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-primary rounded-md hover:bg-blue-700 active:bg-blue-800 transition-colors font-medium flex-shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">New Contact</span>
@@ -458,7 +458,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             }`}
           >
             All
-            <span className={`ml-0.5 text-xs ${typeFilter === 'all' ? 'text-gray-300' : 'text-muted'}`}>
+            <span className={`ml-0.5 text-xs ${typeFilter === 'all' ? 'text-muted' : 'text-muted'}`}>
               {typeCounts.all}
             </span>
           </button>
@@ -466,7 +466,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('customer')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'customer' ? 'bg-green-600 text-white' : 'bg-surface text-secondary hover:bg-elevated'
+              typeFilter === 'customer' ? 'bg-green-600 text-primary' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             <UserCheck className="w-3 h-3" />
@@ -477,7 +477,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('prospect')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'prospect' ? 'bg-blue-600 text-white' : 'bg-surface text-secondary hover:bg-elevated'
+              typeFilter === 'prospect' ? 'bg-blue-600 text-primary' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             <Target className="w-3 h-3" />
@@ -491,7 +491,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
           <button
             onClick={() => handleTypeFilterChange('lead')}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
-              typeFilter === 'lead' ? 'bg-amber-600 text-white' : 'bg-surface text-secondary hover:bg-elevated'
+              typeFilter === 'lead' ? 'bg-amber-600 text-primary' : 'bg-surface text-secondary hover:bg-elevated'
             }`}
           >
             <Sparkles className="w-3 h-3" />
@@ -512,7 +512,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
 
           {(typeFilter === 'prospect' || typeFilter === 'lead') && (
             <>
-              <div className="w-px h-4 bg-gray-300 mx-0.5" />
+              <div className="w-px h-4 bg-elevated mx-0.5" />
               <button
                 onClick={() => setTemperatureFilter('all')}
                 className={`px-2 py-1 text-xs rounded-md font-medium transition-all ${
@@ -525,7 +525,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 onClick={() => setTemperatureFilter('on_fire')}
                 disabled={temperatureCounts.on_fire === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'on_fire' ? 'bg-orange-600 text-white' :
+                  temperatureFilter === 'on_fire' ? 'bg-orange-600 text-primary' :
                   temperatureCounts.on_fire === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-attentionSoft text-attention hover:bg-elevated'
                 }`}
               >
@@ -536,7 +536,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 onClick={() => setTemperatureFilter('hot')}
                 disabled={temperatureCounts.hot === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'hot' ? 'bg-red-600 text-white' :
+                  temperatureFilter === 'hot' ? 'bg-red-600 text-primary' :
                   temperatureCounts.hot === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-dangerSoft text-danger hover:bg-elevated'
                 }`}
               >
@@ -548,7 +548,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 onClick={() => setTemperatureFilter('warm')}
                 disabled={temperatureCounts.warm === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'warm' ? 'bg-amber-700 text-white' :
+                  temperatureFilter === 'warm' ? 'bg-amber-700 text-primary' :
                   temperatureCounts.warm === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-warningSoft text-warning hover:bg-elevated'
                 }`}
               >
@@ -560,7 +560,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 onClick={() => setTemperatureFilter('cold')}
                 disabled={temperatureCounts.cold === 0}
                 className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded-md font-medium transition-all ${
-                  temperatureFilter === 'cold' ? 'bg-blue-600 text-white' :
+                  temperatureFilter === 'cold' ? 'bg-blue-600 text-primary' :
                   temperatureCounts.cold === 0 ? 'bg-surface text-muted cursor-not-allowed' : 'bg-infoSoft text-info hover:bg-elevated'
                 }`}
               >
@@ -634,10 +634,10 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <th className="px-3 py-2 w-8"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-subtle">
                   {personContacts.length > 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-1 bg-surface border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-surface/70 border-b border-subtle">
                         <div className="flex items-center gap-1.5">
                           <Users className="w-3 h-3 text-muted" />
                           <span className="text-xs font-semibold text-muted uppercase tracking-wider">People</span>
@@ -650,43 +650,18 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <tr
                       key={contact.id}
                       onClick={() => selectContact(contact)}
-                      className="hover:bg-surface cursor-pointer transition-colors"
+                      className="hover:bg-elevated/60 cursor-pointer transition-colors"
                     >
                       {visibleColumns.name && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact) ?? undefined}>
                                 {getDisplayName(contact)}
                               </span>
                               {contact.company_name && (
                                 <span className="text-xs text-muted truncate hidden xl:inline max-w-[120px]" title={contact.company_name}>{contact.company_name}</span>
                               )}
-                              {(() => {
-                                const contactType = getContactType(contact);
-                                if (contactType === 'lead') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Sparkles className="w-2.5 h-2.5" />
-                                      Lead
-                                    </span>
-                                  );
-                                } else if (contactType === 'prospect') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Target className="w-2.5 h-2.5" />
-                                      Prospect
-                                    </span>
-                                  );
-                                } else {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full whitespace-nowrap">
-                                      <UserCheck className="w-2.5 h-2.5" />
-                                      Customer
-                                    </span>
-                                  );
-                                }
-                              })()}
                               {(() => {
                                 const contactType = getContactType(contact);
                                 const temperature = contact.temperature;
@@ -710,7 +685,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                               )}
                             </div>
                             {contact.business_card_photo && (
-                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" title="Business card scanned" />
+                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0"><title>{"Business card scanned"}</title></Camera>
                             )}
                           </div>
                         </td>
@@ -718,18 +693,18 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       {visibleColumns.phone && (
                         <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {contact.phone ? (
-                            <a href={`tel:${contact.phone}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{contact.phone}</a>
+                            <a href={`tel:${contact.phone}`} className="text-xs text-secondary hover:text-primary hover:underline transition-colors">{contact.phone}</a>
                           ) : (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted text-xs">—</span>
                           )}
                         </td>
                       )}
                       {visibleColumns.email && (
                         <td className="px-3 py-1.5 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
                           {contact.email ? (
-                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[160px] block">{contact.email}</a>
+                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-secondary hover:text-primary hover:underline truncate max-w-[180px] block transition-colors">{contact.email}</a>
                           ) : (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted text-xs">—</span>
                           )}
                         </td>
                       )}
@@ -747,32 +722,32 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                               <span className="text-xs font-medium text-amber-600">{formatCurrency(contact.balance_due)}</span>
                             )
                           ) : (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted text-xs">—</span>
                           )}
                         </td>
                       )}
                       {visibleColumns.lastContact && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
                           <span className="text-xs text-secondary">
-                            {contact.last_contact_date ? new Date(contact.last_contact_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.last_contact_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
+                            {contact.last_contact_date ? new Date(contact.last_contact_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.last_contact_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-muted">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.nextFollowUp && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
                           <span className="text-xs text-secondary">
-                            {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
+                            {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-muted">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.assignedRep && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-muted">—</span>}</span>
                         </td>
                       )}
                       {visibleColumns.office && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-muted">—</span>}</span>
                         </td>
                       )}
                       <td className="px-3 py-1.5 text-right w-8">
@@ -782,7 +757,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                   ))}
                   {businessContacts.length > 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-1 bg-surface border-b border-gray-100">
+                      <td colSpan={9} className="px-3 py-1 bg-surface/70 border-b border-subtle">
                         <div className="flex items-center gap-1.5">
                           <Building2 className="w-3 h-3 text-muted" />
                           <span className="text-xs font-semibold text-muted uppercase tracking-wider">Businesses</span>
@@ -795,40 +770,15 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                     <tr
                       key={contact.id}
                       onClick={() => selectContact(contact)}
-                      className="hover:bg-surface cursor-pointer transition-colors"
+                      className="hover:bg-elevated/60 cursor-pointer transition-colors"
                     >
                       {visibleColumns.name && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-                              <span className="customer-link font-medium text-sm truncate max-w-[160px]" title={getDisplayName(contact)}>
+                              <span className="font-semibold text-sm text-primary hover:text-accent truncate max-w-[190px] transition-colors" title={getDisplayName(contact) ?? undefined}>
                                 {getDisplayName(contact)}
                               </span>
-                              {(() => {
-                                const contactType = getContactType(contact);
-                                if (contactType === 'lead') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Sparkles className="w-2.5 h-2.5" />
-                                      Lead
-                                    </span>
-                                  );
-                                } else if (contactType === 'prospect') {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
-                                      <Target className="w-2.5 h-2.5" />
-                                      Prospect
-                                    </span>
-                                  );
-                                } else {
-                                  return (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full whitespace-nowrap">
-                                      <UserCheck className="w-2.5 h-2.5" />
-                                      Customer
-                                    </span>
-                                  );
-                                }
-                              })()}
                               {contact.portal_access_enabled && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 rounded-full whitespace-nowrap">
                                   <Shield className="w-2.5 h-2.5" />
@@ -837,7 +787,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                               )}
                             </div>
                             {contact.business_card_photo && (
-                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" title="Business card scanned" />
+                              <Camera className="w-3.5 h-3.5 text-blue-500 flex-shrink-0"><title>{"Business card scanned"}</title></Camera>
                             )}
                           </div>
                         </td>
@@ -845,18 +795,18 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                       {visibleColumns.phone && (
                         <td className="px-3 py-1.5 hidden md:table-cell whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {contact.phone ? (
-                            <a href={`tel:${contact.phone}`} className="text-xs text-blue-600 hover:text-blue-800 hover:underline">{contact.phone}</a>
+                            <a href={`tel:${contact.phone}`} className="text-xs text-secondary hover:text-primary hover:underline transition-colors">{contact.phone}</a>
                           ) : (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted text-xs">—</span>
                           )}
                         </td>
                       )}
                       {visibleColumns.email && (
                         <td className="px-3 py-1.5 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
                           {contact.email ? (
-                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[160px] block">{contact.email}</a>
+                            <a href={`mailto:${contact.email}`} title={contact.email} className="text-xs text-secondary hover:text-primary hover:underline truncate max-w-[180px] block transition-colors">{contact.email}</a>
                           ) : (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted text-xs">—</span>
                           )}
                         </td>
                       )}
@@ -874,32 +824,32 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                               <span className="text-xs font-medium text-amber-600">{formatCurrency(contact.balance_due)}</span>
                             )
                           ) : (
-                            <span className="text-gray-300 text-xs">—</span>
+                            <span className="text-muted text-xs">—</span>
                           )}
                         </td>
                       )}
                       {visibleColumns.lastContact && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
                           <span className="text-xs text-secondary">
-                            {contact.last_contact_date ? new Date(contact.last_contact_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.last_contact_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
+                            {contact.last_contact_date ? new Date(contact.last_contact_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.last_contact_date).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-muted">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.nextFollowUp && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
                           <span className="text-xs text-secondary">
-                            {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-gray-300">—</span>}
+                            {contact.next_follow_up ? new Date(contact.next_follow_up).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(contact.next_follow_up).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }) : <span className="text-muted">—</span>}
                           </span>
                         </td>
                       )}
                       {visibleColumns.assignedRep && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.assigned_rep_name || ''}>{contact.assigned_rep_name || <span className="text-muted">—</span>}</span>
                         </td>
                       )}
                       {visibleColumns.office && (
                         <td className="px-3 py-1.5 hidden xl:table-cell whitespace-nowrap">
-                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-gray-300">—</span>}</span>
+                          <span className="text-xs text-secondary truncate max-w-[100px] block" title={contact.office_name || ''}>{contact.office_name || <span className="text-muted">—</span>}</span>
                         </td>
                       )}
                       <td className="px-3 py-1.5 text-right w-8">
@@ -1092,7 +1042,7 @@ function ContactTypesHelpModal({ onClose }: { onClose: () => void }) {
         <div className="p-6 border-t border-subtle bg-surface flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             Got it
           </button>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, Unlock, X, Globe2, GitBranch } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 

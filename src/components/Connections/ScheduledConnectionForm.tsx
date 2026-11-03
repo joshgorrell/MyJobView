@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, AlertCircle, Check } from 'lucide-react';
+import { X, Calendar, User, AlertCircle, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -114,7 +115,7 @@ export function ScheduledConnectionForm({ schedule, onClose, onSuccess }: Schedu
     e.preventDefault();
 
     if (!formData.prospect_id) {
-      alert('Please select a prospect');
+      notify('Please select a prospect', { theme: 'cyan', tone: 'warning' });
       return;
     }
 
@@ -156,7 +157,7 @@ export function ScheduledConnectionForm({ schedule, onClose, onSuccess }: Schedu
       onSuccess();
     } catch (error) {
       console.error('Error saving schedule:', error);
-      alert('Failed to save schedule. Please try again.');
+      notify('Failed to save schedule. Please try again.', { theme: 'cyan', tone: 'error' });
     } finally {
       setLoading(false);
     }

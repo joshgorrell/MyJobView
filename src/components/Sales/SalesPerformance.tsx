@@ -14,9 +14,7 @@ import {
   Zap,
   Star,
   CheckCircle,
-  Briefcase,
-  Filter
-} from 'lucide-react';
+  Briefcase} from 'lucide-react';
 
 interface PerformanceMetrics {
   dealsClosed: number;
@@ -307,7 +305,7 @@ export function SalesPerformance() {
   }
 
   const myRank = leaderboard.findIndex(entry => entry.id === profile?.id) + 1;
-  const myLeaderboardEntry = leaderboard.find(entry => entry.id === profile?.id);
+
   const rankBadge = getRankBadge(myRank);
   const topPerformer = leaderboard[0];
 

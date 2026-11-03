@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import Flow from '../Flow/Flow';
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, TrendingUp, CreditCard as Edit2, Save, X, Trash2, AlertCircle, Camera, Image as ImageIcon, MapPin, CheckCircle2, MessageSquare, Hash, Users, Send, Shield, Eye, DollarSign, Clock, FileText, Wrench, ListTodo, Plus, Video, Receipt, Target, Sparkles, UserCheck, RefreshCw, Flame, Thermometer, ExternalLink, Navigation, Zap } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, Tag, Calendar, User, CreditCard as Edit2, Save, X, Trash2, AlertCircle, Camera, Image as ImageIcon, MapPin, CheckCircle2, MessageSquare, Hash, Users, Send, Shield, Eye, DollarSign, Clock, ListTodo, Plus, Video, Receipt, Target, Sparkles, UserCheck, Flame, Thermometer, ExternalLink, Navigation, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Contact, ContactTag, Profile, CompanyOffice, Task, DiscussionPost } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,6 +21,7 @@ import ConnectionForm from '../Connections/ConnectionForm';
 import { PortalPreviewModal } from '../Shared/PortalPreviewModal';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
 import { CompetitorSelector } from './CompetitorSelector';
+import {ContactPaymentsCredits} from './ContactPaymentsCredits';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Connection {
@@ -119,7 +121,9 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [connections, setConnections] = useState<Connection[]>([]);
   const [sendingPortalInvite, setSendingPortalInvite] = useState(false);
   const [portalAccessEnabled, setPortalAccessEnabled] = useState((contact as any).portal_access_enabled || false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow'>('overview');
+  const [punchlistExpirationEmailsEnabled, setPunchlistExpirationEmailsEnabled] = useState((contact as any).punchlist_expiration_emails_enabled !== false);
+  const [savingPunchlistExpirationEmails, setSavingPunchlistExpirationEmails] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow' | 'payments_credits'>('overview');
   const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
@@ -293,7 +297,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .in('role', ['sales', 'admin'])
+      .eq('is_sales_rep', true)
       .eq('is_active', true)
       .order('full_name');
 
@@ -458,11 +462,11 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
       // Show success feedback
       const tempLabel = temperatureLabels[newTemperature] || newTemperature;
-      alert(`Temperature updated to ${tempLabel}`);
+      notify(`Temperature updated to ${tempLabel}`, { theme: 'blue', tone: 'success' });
 
     } catch (error) {
       console.error('Error updating temperature:', error);
-      alert('Failed to update temperature. Please try again.');
+      notify('Failed to update temperature. Please try again.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -503,12 +507,12 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       const result = await offlineSupabaseUpdate('contacts', updateData, contact.id);
       if (result.error) throw result.error;
 
-      alert(`Contact successfully converted to ${target}!`);
+      notify(`Contact successfully converted to ${target}!`, { theme: 'blue', tone: 'success' });
       setShowConversionModal(false);
       onConverted();
     } catch (error) {
       console.error('Error converting contact:', error);
-      alert('Failed to convert contact');
+      notify('Failed to convert contact', { theme: 'blue', tone: 'error' });
     } finally {
       setConvertingContact(false);
     }
@@ -558,11 +562,11 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
   async function handleUpdate() {
     if (!editData.office_id) {
-      alert('Office Location is required. Please select an office.');
+      notify('Office Location is required. Please select an office.', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (!editData.is_tax_exempt && (!editData.tax_jurisdiction_id || editData.tax_jurisdiction_id === '')) {
-      alert('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically, or check the Tax Exempt box if this contact is exempt.');
+      notify('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically, or check the Tax Exempt box if this contact is exempt.', { theme: 'blue', tone: 'warning' });
       return;
     }
     try {
@@ -675,18 +679,40 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         }
       }
 
-      alert('Contact updated successfully!');
+      notify('Contact updated successfully!', { theme: 'blue', tone: 'success' });
       setEditing(false);
       onBack();
     } catch (error) {
       console.error('Error updating contact:', error);
-      alert('Failed to update contact');
+      notify('Failed to update contact', { theme: 'blue', tone: 'error' });
+    }
+  }
+
+  async function handleTogglePunchlistExpirationEmails() {
+    if (savingPunchlistExpirationEmails) return;
+    const nextValue = !punchlistExpirationEmailsEnabled;
+    setSavingPunchlistExpirationEmails(true);
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .update({ punchlist_expiration_emails_enabled: nextValue })
+        .eq('id', contact.id)
+        .select('punchlist_expiration_emails_enabled')
+        .single();
+      if (error) throw error;
+      setPunchlistExpirationEmailsEnabled(data.punchlist_expiration_emails_enabled);
+      notify(data.punchlist_expiration_emails_enabled ? 'Expiration reminders enabled' : 'Expiration reminders disabled', { theme: 'blue', tone: 'success' });
+    } catch (error) {
+      console.error('Error updating expiration reminders:', error);
+      notify('Could not update expiration reminders', { theme: 'blue', tone: 'error' });
+    } finally {
+      setSavingPunchlistExpirationEmails(false);
     }
   }
 
   async function handleTogglePortalAccess() {
     if (!contact.email) {
-      alert('Contact must have an email address to enable portal access');
+      notify('Contact must have an email address to enable portal access', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -700,21 +726,21 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       if (error) throw error;
 
       setPortalAccessEnabled(newValue);
-      alert(newValue ? 'Portal access enabled' : 'Portal access disabled');
+      notify(newValue ? 'Portal access enabled' : 'Portal access disabled', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error toggling portal access:', error);
-      alert('Failed to update portal access');
+      notify('Failed to update portal access', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function handleSendPortalInvite() {
     if (!contact.email) {
-      alert('Contact must have an email address to send portal invite');
+      notify('Contact must have an email address to send portal invite', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!portalAccessEnabled && !punchlistAccess?.has_access) {
-      alert('Please enable portal access or grant trial access first');
+      notify('Please enable portal access or grant trial access first', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -728,19 +754,19 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ email: contact.email }),
+        body: JSON.stringify({ email: contact.email, organizationId: profile?.organization_id }),
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || data.success !== true) {
         throw new Error(data.error || 'Failed to send portal invite');
       }
 
-      alert('Portal login link sent successfully!');
+      notify('Portal login link sent successfully!', { theme: 'blue', tone: 'success' });
     } catch (error: any) {
       console.error('Error sending portal invite:', error);
-      alert(error.message || 'Failed to send portal invite');
+      notify(error.message || 'Failed to send portal invite', { theme: 'blue', tone: 'error' });
     } finally {
       setSendingPortalInvite(false);
     }
@@ -748,7 +774,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
   function handleViewAsCustomer() {
     if (!portalAccessEnabled && !punchlistAccess?.has_access) {
-      alert('Portal access must be enabled or trial access granted for this contact first');
+      notify('Portal access must be enabled or trial access granted for this contact first', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -779,7 +805,8 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
       const { data, error } = await supabase.rpc('grant_punchlist_access_directly', {
         p_contact_id: contact.id,
-        p_days: 90
+        p_days: 90,
+        p_project_id: null
       });
 
       if (error) throw error;
@@ -787,16 +814,16 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
       const result = data[0];
 
       if (result.is_renewal) {
-        alert('Punchlist access renewed for 90 days!');
+        notify('Punchlist access renewed for 90 days!', { theme: 'blue', tone: 'success' });
       } else {
-        alert('Punchlist access granted for 90 days!');
+        notify('Punchlist access granted for 90 days!', { theme: 'blue', tone: 'success' });
       }
 
       // Reload access info
       await loadPunchlistAccess();
     } catch (error: any) {
       console.error('Error granting punchlist access:', error);
-      alert(error.message || 'Failed to grant punchlist access');
+      notify(error.message || 'Failed to grant punchlist access', { theme: 'blue', tone: 'error' });
     } finally {
       setGrantingPunchlistAccess(false);
     }
@@ -854,13 +881,13 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
             onBack();
           } catch (error) {
             console.error('Error deleting contact:', error);
-            alert('Failed to delete contact. Please try again or contact support if the issue persists.');
+            notify('Failed to delete contact. Please try again or contact support if the issue persists.', { theme: 'blue', tone: 'error' });
           }
         }
       });
     } catch (error) {
       console.error('Error deleting contact:', error);
-      alert('Failed to delete contact. Please try again or contact support if the issue persists.');
+      notify('Failed to delete contact. Please try again or contact support if the issue persists.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -916,7 +943,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         const { data: allSalesReps } = await supabase
           .from('profiles')
           .select('id, email, email_leads, notify_on_fishbowl')
-          .eq('role', 'sales')
+          .eq('is_sales_rep', true)
           .eq('is_active', true);
 
         if (allSalesReps && allSalesReps.length > 0) {
@@ -954,11 +981,11 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         }
       }
 
-      alert('Contact converted to lead successfully!');
+      notify('Contact converted to lead successfully!', { theme: 'blue', tone: 'success' });
       onConverted();
     } catch (error) {
       console.error('Error converting to lead:', error);
-      alert('Failed to convert contact to lead');
+      notify('Failed to convert contact to lead', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -1027,7 +1054,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                         name="contact_type"
                         value="person"
                         checked={editData.contact_type === 'person'}
-                        onChange={(e) => setEditData({ ...editData, contact_type: 'person' })}
+                        onChange={(_e) => setEditData({ ...editData, contact_type: 'person' })}
                         className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-sm font-medium text-gray-700">Person</span>
@@ -1038,7 +1065,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                         name="contact_type"
                         value="business"
                         checked={editData.contact_type === 'business'}
-                        onChange={(e) => setEditData({ ...editData, contact_type: 'business' })}
+                        onChange={(_e) => setEditData({ ...editData, contact_type: 'business' })}
                         className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-sm font-medium text-gray-700">Business</span>
@@ -1175,6 +1202,10 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                     onClick={() => {
                       setEditing(false);
                       setEditData({
+                        tax_jurisdiction_id: (contact as any).tax_jurisdiction_id || '',
+                        is_prospect: contact.is_prospect,
+                        electrician_name: (contact as any).electrician_name || '',
+                        electrician_notes: (contact as any).electrician_notes || '',
                         contact_type: (contact as any).contact_type || 'person',
                         company_name: contact.company_name || '',
                         first_name: contact.first_name || '',
@@ -1248,6 +1279,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                 Overview
               </div>
             </button>
+            <button onClick={() => setActiveTab('payments_credits')} className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'payments_credits' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}><span className="flex items-center gap-2"><DollarSign className="w-4 h-4" />Payments &amp; Credits</span></button>
             <button
               onClick={() => setActiveTab('history')}
               className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors touch-manipulation whitespace-nowrap ${
@@ -1306,62 +1338,53 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         </div>
 
         <div className="p-4 sm:p-6">
-          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'overview' ? (
+          {activeTab === 'flow' ? (<Flow contactId={contact.id} />) : activeTab === 'payments_credits' ? (<ContactPaymentsCredits contactId={contact.id} />) : activeTab === 'overview' ? (
             <div className="space-y-4">
               {/* Quick Actions */}
               <div className="pb-3 border-b border-gray-200">
-                <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-2">Quick Actions</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                  <button
-                    onClick={() => setShowCreateProposal(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span className="truncate">Proposal</span>
-                  </button>
-                  <button
-                    onClick={() => setShowDesignBrief(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors touch-manipulation"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span className="truncate">Design Brief</span>
-                  </button>
-                  <button
-                    onClick={handleCreateInvoiceClick}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <Receipt className="w-3.5 h-3.5" />
-                    <span className="truncate">Invoice</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCreateWorkOrder(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <Wrench className="w-3.5 h-3.5" />
-                    <span className="truncate">Work Order</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCreateAppointment(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-blue-300 text-blue-700 rounded-md hover:bg-blue-50 hover:border-blue-400 transition-colors touch-manipulation"
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span className="truncate">Appointment</span>
-                  </button>
-                  <button
-                    onClick={() => setShowCreateTask(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <ListTodo className="w-3.5 h-3.5" />
-                    <span className="truncate">Task</span>
-                  </button>
-                  <button
-                    onClick={() => setShowConvertForm(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors touch-manipulation"
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="truncate">Lead</span>
-                  </button>
-                </div>
+                <label htmlFor="contact-quick-actions" className="sr-only">Quick Actions</label>
+                <select
+                  id="contact-quick-actions"
+                  defaultValue=""
+                  onChange={(event) => {
+                    const action = event.currentTarget.value;
+                    event.currentTarget.value = '';
+
+                    switch (action) {
+                      case 'proposal':
+                        setShowCreateProposal(true);
+                        break;
+                      case 'design-brief':
+                        setShowDesignBrief(true);
+                        break;
+                      case 'invoice':
+                        handleCreateInvoiceClick();
+                        break;
+                      case 'work-order':
+                        setShowCreateWorkOrder(true);
+                        break;
+                      case 'appointment':
+                        setShowCreateAppointment(true);
+                        break;
+                      case 'task':
+                        setShowCreateTask(true);
+                        break;
+                      case 'lead':
+                        setShowConvertForm(true);
+                        break;
+                    }
+                  }}
+                  className="w-full sm:w-auto min-w-48 px-3 py-2 text-sm font-medium border border-gray-300 text-gray-700 bg-white rounded-md hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 touch-manipulation"
+                >
+                  <option value="" disabled>Quick Actions…</option>
+                  <option value="proposal">Create Proposal</option>
+                  <option value="design-brief">Create Design Brief</option>
+                  <option value="invoice">Create Invoice</option>
+                  <option value="work-order">Create Work Order</option>
+                  <option value="appointment">Schedule Appointment</option>
+                  <option value="task">Create Task</option>
+                  <option value="lead">Create Lead</option>
+                </select>
               </div>
 
               {/* Prospect Statistics */}
@@ -1616,7 +1639,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                                         await loadCompetitorRelationships();
                                       } catch (error) {
                                         console.error('Error removing competitor:', error);
-                                        alert('Failed to remove competitor');
+                                        notify('Failed to remove competitor', { theme: 'blue', tone: 'error' });
                                       }
                                     }
                                   })}
@@ -2414,8 +2437,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
             )}
           </div>
 
-          {/* Account Credits */}
-          <ContactAccountCredits contactId={contact.id} />
+
 
           {/* Mentions & Hashtags */}
           <div className="border-t border-gray-200 pt-6">
@@ -2675,6 +2697,22 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
                           )}
                         </p>
                       </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 sm:p-4">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={punchlistExpirationEmailsEnabled}
+                          onChange={handleTogglePunchlistExpirationEmails}
+                          disabled={savingPunchlistExpirationEmails}
+                          className="mt-1 h-4 w-4 accent-blue-600 disabled:opacity-50"
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-gray-800">Send Test &amp; Tune and VIP expiration reminders</span>
+                          <span className="block text-xs text-gray-600 mt-1">Turn off for test customers or customers who should not receive renewal reminders. Does not change portal access or VIP coverage.</span>
+                        </span>
+                      </label>
                     </div>
 
                     <div className="space-y-4">
@@ -3304,155 +3342,6 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
         onCancel={() => setConfirmModal(null)}
       />
-    </div>
-  );
-}
-
-interface AccountCredit {
-  id: string;
-  amount: number;
-  amount_applied: number;
-  amount_remaining: number;
-  status: string;
-  notes: string | null;
-  created_at: string;
-  sales_order_id: string | null;
-  source_invoice_id: string | null;
-  sales_order?: { order_number: string } | null;
-  source_invoice?: { invoice_number: string } | null;
-}
-
-function ContactAccountCredits({ contactId }: { contactId: string }) {
-  const [credits, setCredits] = useState<AccountCredit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const { data } = await supabase
-          .from('customer_account_credits')
-          .select(`
-            id, amount, amount_applied, amount_remaining, status, notes, created_at,
-            sales_order_id, source_invoice_id,
-            sales_order:sales_orders(order_number),
-            source_invoice:invoices(invoice_number)
-          `)
-          .eq('contact_id', contactId)
-          .order('created_at', { ascending: false });
-        setCredits((data as AccountCredit[]) || []);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [contactId]);
-
-  if (loading) return null;
-
-  const openCredits = credits.filter(c => c.status === 'open');
-  const otherCredits = credits.filter(c => c.status !== 'open');
-  const totalAvailable = openCredits.reduce((s, c) => s + (c.amount_remaining || 0), 0);
-
-  if (credits.length === 0) return null;
-
-  function fmt(n: number) {
-    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  const displayedOther = showAll ? otherCredits : [];
-
-  return (
-    <div className="border-t border-gray-200 pt-6">
-      <h3 className="text-xs sm:text-sm font-medium text-gray-700 uppercase tracking-wide pb-2 border-b border-gray-200 mb-3 flex items-center gap-2">
-        <DollarSign className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-green-600" />
-        Account Credits
-        {totalAvailable > 0 && (
-          <span className="ml-auto text-sm font-semibold text-green-700 normal-case tracking-normal">
-            ${fmt(totalAvailable)} available
-          </span>
-        )}
-      </h3>
-
-      {openCredits.length === 0 && (
-        <p className="text-sm text-gray-500">No open credits on account.</p>
-      )}
-
-      <div className="space-y-2">
-        {openCredits.map(credit => (
-          <div key={credit.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-green-800">
-                    ${fmt(credit.amount_remaining)} remaining
-                  </span>
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200 font-medium">
-                    Open
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  Issued {new Date(credit.created_at).toLocaleDateString()}
-                  {credit.amount_applied > 0 && (
-                    <> · ${fmt(credit.amount_applied)} of ${fmt(credit.amount)} applied</>
-                  )}
-                </div>
-                {credit.source_invoice && (
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    From Invoice #{credit.source_invoice.invoice_number}
-                    {credit.sales_order && (
-                      <> · SO #{credit.sales_order.order_number}</>
-                    )}
-                  </div>
-                )}
-                {credit.notes && (
-                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">{credit.notes}</p>
-                )}
-              </div>
-              <div className="shrink-0 text-right">
-                <div className="text-base font-bold text-green-700">${fmt(credit.amount)}</div>
-                <div className="text-xs text-gray-400">original</div>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {otherCredits.length > 0 && (
-          <button
-            onClick={() => setShowAll(v => !v)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-1"
-          >
-            {showAll ? 'Hide' : `Show ${otherCredits.length} applied/voided credit${otherCredits.length > 1 ? 's' : ''}`}
-          </button>
-        )}
-
-        {displayedOther.map(credit => (
-          <div key={credit.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 opacity-70">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-700">${fmt(credit.amount)}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                    credit.status === 'fully_applied'
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                      : 'bg-gray-200 text-gray-500 border border-gray-300'
-                  }`}>
-                    {credit.status === 'fully_applied' ? 'Applied' : 'Voided'}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {new Date(credit.created_at).toLocaleDateString()}
-                  {credit.source_invoice && (
-                    <> · Invoice #{credit.source_invoice.invoice_number}</>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

@@ -1,21 +1,31 @@
-import { useState, useEffect } from 'react';
-import { X, Upload, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { createPortal } from 'react-dom';
+import { useCompletion } from '../../hooks/useCompletion';
+import { CompletionDialog } from './CompletionDialog';
+import { notify } from '../../lib/feedback';
 import { gpsTrackingService } from '../../lib/gpsTracking';
+import { saveClockEventGps } from '../../lib/clockEventGps';
+import { getOrganizationTimezone, formatDateInTimezone } from '../../lib/timezoneUtils';
+import { useState, useEffect, useRef } from 'react';
+import { X, Camera, Award, AlertCircle, WifiOff, CheckCircle, Clock, Mail } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { offlineSupabaseUpdate } from '../../lib/offlineSupport';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
 
 interface ClockOutModalProps {
   type: 'daily' | 'job';
   entryId: string;
   technicianId: string;
   workOrderId?: string;
+  allowCompletion?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClose, onSuccess }: ClockOutModalProps) {
+export function ClockOutModal({ type, entryId, technicianId, workOrderId, allowCompletion=true, onClose, onSuccess }: ClockOutModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const completion = useCompletion(onSuccess);
+  useEffect(() => { const previous = document.activeElement as HTMLElement | null; dialogRef.current?.focus(); return () => { previous?.focus(); }; }, []);
   const [notes, setNotes] = useState('');
+  const [verifiedClockOut, setVerifiedClockOut] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -52,7 +62,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           contact:contacts(email)
         `)
         .eq('id', workOrderId)
-        .maybeSingle();
+        .maybeSingle().overrideTypes<{ type: string; contact: { email: string | null } | null }, { merge: false }>();
 
       if (error) throw error;
 
@@ -75,6 +85,8 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
   }
 
   async function handleClockOut() {
+    if (uploading || completion.completed) return;
+    if (!verifiedClockOut) { setError('Confirm that you want to stop this timer before clocking out.'); return; }
     // Enforce minimum 20 characters for job clock out
     if (type === 'job' && noteChars < 20) {
       setError('Job notes must be at least 20 characters. Please describe what work was completed.');
@@ -85,11 +97,14 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
     setError(null);
 
     try {
+      const capture = gpsTrackingService.captureLocationForClockEvent(true);
       // 1. Update the clock entry immediately (non-blocking)
       const tableName = type === 'daily' ? 'daily_clock_entries' : 'time_entries';
       const updateData: any = {
         clock_out: new Date().toISOString(),
       };
+
+      if (type === 'job') updateData.status = 'submitted';
 
       if (notes.trim()) {
         updateData.notes = notes.trim();
@@ -101,7 +116,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       }
 
       // Mark job as complete if selected
-      if (type === 'job' && jobStatus === 'complete') {
+      if (type === 'job' && allowCompletion && jobStatus === 'complete') {
         updateData.marked_complete = true;
       }
 
@@ -112,14 +127,16 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       );
 
       if (updateError) throw updateError;
+      void saveClockEventGps(entryId, type === 'daily' ? 'daily_clock_entries' : 'time_entries', true, capture)
+        .catch(error => console.error('Clock-out GPS could not be saved:', error));
 
       // 1.5. Update work order status to completed if marked complete
-      if (type === 'job' && workOrderId && jobStatus === 'complete') {
+      if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete') {
         const { error: woError } = await supabase
           .from('work_orders')
           .update({
             status: 'completed',
-            actual_completion_date: new Date().toISOString().split('T')[0],
+            actual_completion_date: formatDateInTimezone(new Date().toISOString(), await getOrganizationTimezone()),
           })
           .eq('id', workOrderId);
 
@@ -142,7 +159,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           const fileExt = photo.name.split('.').pop();
           const fileName = `${workOrderId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-          const { error: uploadError, data: uploadData } = await supabase.storage
+          const { error: uploadError, data: _uploadData } = await supabase.storage
             .from('job-photos')
             .upload(fileName, photo);
 
@@ -169,7 +186,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
       }
 
       // 3. Send feedback email if requested (only if online and job is marked complete)
-      if (type === 'job' && workOrderId && jobStatus === 'complete' && sendFeedbackEmail && navigator.onLine) {
+      if (type === 'job' && workOrderId && allowCompletion && jobStatus === 'complete' && sendFeedbackEmail && navigator.onLine) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
@@ -205,64 +222,12 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
         }
       }
 
-      // Stop GPS tracking when clocking out
-      // This stops tracking for both daily clock and job clock outs
-      gpsTrackingService.stopTracking();
-
-      // Capture GPS location silently in background (non-blocking) for all clock-outs
-      gpsTrackingService.captureLocationForClockEvent(true).then(async (gpsResult) => {
-        try {
-          // Calculate GPS quality score
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy,
-            p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms,
-            p_refined: false,
-            p_original_accuracy: null
-          });
-
-          const qualityScore = scoreData || 0;
-
-          const gpsData = {
-            clock_out_latitude: gpsResult.latitude,
-            clock_out_longitude: gpsResult.longitude,
-            clock_out_gps_accuracy: gpsResult.accuracy,
-            clock_out_gps_capture_method: gpsResult.method,
-            clock_out_gps_duration_ms: gpsResult.duration_ms,
-            clock_out_gps_attempted_at: gpsResult.attempted_at,
-            clock_out_gps_captured_at: gpsResult.captured_at,
-            clock_out_gps_quality_score: qualityScore,
-          };
-
-          const clockTable = type === 'daily' ? 'daily_clock_entries' as const : 'time_entries' as const;
-
-          await supabase
-            .from(clockTable)
-            .update(gpsData)
-            .eq('id', entryId);
-
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, true, clockTable).catch(() => {});
-          }
-
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, true, clockTable);
-          }
-        } catch (error) {
-          // Silently fail - GPS metadata is not critical
-          console.error('GPS metadata update failed:', error);
-        }
-      }).catch(() => {
-        // Silently fail - GPS capture is best-effort only
-      });
-
       // Show offline notification if applicable
       if (!navigator.onLine) {
-        alert('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.');
+        notify('You clocked out offline. Your data will sync when you reconnect. Photos will be uploaded when online.', { theme: 'blue', tone: 'info' });
       }
 
-      onSuccess();
-      onClose();
+      completion.complete();
     } catch (err: any) {
       console.error('Error clocking out:', err);
       setError(err.message || 'Failed to clock out');
@@ -292,13 +257,22 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
     });
   }
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+  if (completion.completed) return createPortal(<CompletionDialog title={type === 'daily' ? 'Day complete. You’re clocked out!' : 'Job time saved!'} theme="emerald" onContinue={completion.finish} />, document.body);
+  return createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[70]">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={type === 'daily' ? 'Clock out for the day' : 'Stop job time'} onKeyDown={e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!uploading) onClose(); }
+        if (e.key === 'Tab') {
+          const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input,textarea,select') || []).filter(el => el.getClientRects().length);
+          const first = controls[0], last = controls[controls.length - 1];
+          if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { e.preventDefault(); last?.focus(); }
+          else if (!e.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { e.preventDefault(); first?.focus(); }
+        }
+      }} className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90dvh] overflow-y-auto outline-none">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              Clock Out {type === 'daily' ? '- End of Day' : '- Complete Job'}
+              {type==='daily'?'Clock Out - End of Day':allowCompletion?'Clock Out - Complete Job':'Stop Job Time'}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               {type === 'daily' ? 'Add notes to earn points!' : 'Add notes and photos to earn points!'}
@@ -344,7 +318,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           </div>
 
           {/* Job Status Selection - Only for job clock out */}
-          {type === 'job' && workOrderId && (
+          {type === 'job' && workOrderId && allowCompletion && (
             <div className="border-2 border-gray-200 rounded-lg p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-3">
@@ -466,7 +440,7 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
           </div>
 
           {/* Photos Section - Only for job clock out */}
-          {type === 'job' && workOrderId && (
+          {type === 'job' && workOrderId && allowCompletion && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Job Photos (Optional - 1 point per photo with description)
@@ -534,6 +508,11 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
             </div>
           )}
 
+          <label className="flex items-start gap-3 rounded-xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 cursor-pointer">
+            <input type="checkbox" className="mt-1 h-5 w-5" checked={verifiedClockOut} onChange={e => setVerifiedClockOut(e.target.checked)} />
+            <span><strong>Verify clock-out</strong><br />I confirm I am stopping {type === 'daily' ? 'my Daily Clock for the day' : 'this Job Time timer'} now. {type === 'daily' ? 'All job and internal timers and breaks must already be stopped.' : 'My recorded time and notes will be submitted for review.'}</span>
+          </label>
+
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
@@ -545,10 +524,10 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
             </button>
             <button
               onClick={handleClockOut}
-              disabled={uploading || (type === 'job' && !notesValid)}
+              disabled={uploading || !verifiedClockOut || (type === 'job' && !notesValid)}
               className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              {uploading ? 'Clocking Out...' : 'Clock Out'}
+              {uploading ? 'Clocking Out...' : 'Verify & Clock Out'}
             </button>
           </div>
           {type === 'job' && !notesValid && (
@@ -559,5 +538,5 @@ export function ClockOutModal({ type, entryId, technicianId, workOrderId, onClos
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }

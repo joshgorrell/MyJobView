@@ -1,5 +1,7 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Download, Trash2, Eye, File, Image, FileText, Video, Music } from 'lucide-react';
+import ConfirmModal from '../ui/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 
 interface FileAttachment {
@@ -28,6 +30,7 @@ export function FileAttachmentsList({
 }: FileAttachmentsListProps) {
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; path: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,7 +90,7 @@ export function FileAttachmentsList({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading file:', error);
-      alert('Failed to download file');
+      notify('Failed to download file', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -100,7 +103,7 @@ export function FileAttachmentsList({
       window.open(data.publicUrl, '_blank');
     } catch (error) {
       console.error('Error viewing file:', error);
-      alert('Failed to view file');
+      notify('Failed to view file', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -133,7 +136,7 @@ export function FileAttachmentsList({
       }
     } catch (error) {
       console.error('Error deleting file:', error);
-      alert('Failed to delete file');
+      notify('Failed to delete file', { theme: 'blue', tone: 'error' });
     } finally {
       setDeleting(null);
     }

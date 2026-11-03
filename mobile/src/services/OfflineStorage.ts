@@ -2,6 +2,36 @@ import * as SQLite from 'expo-sqlite';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from './supabase';
 
+/**
+ * Evaluate the activity state at the original offline punch, not at replay time.
+ * A timer closed after the punch still overlaps; one started afterward does not.
+ * Query errors must fail closed so payroll evidence remains pending.
+ */
+export async function hasOverlappingActivityAtClockOut(
+  technicianId: string, shiftId: string, clockOutAt: string
+): Promise<boolean> {
+  const { data: breaks, error: breakError } = await supabase
+    .from('daily_clock_breaks')
+    .select('id')
+    .eq('daily_clock_entry_id', shiftId)
+    .lt('break_start', clockOutAt)
+    .or(`break_end.is.null,break_end.gt.${clockOutAt}`)
+    .limit(1);
+  if (breakError) throw breakError;
+  if (breaks?.length) return true;
+
+  const { data: activities, error: activityError } = await supabase
+    .from('time_entries')
+    .select('id')
+    .eq('technician_id', technicianId)
+    .lt('clock_in', clockOutAt)
+    .or(`clock_out.is.null,clock_out.gt.${clockOutAt}`)
+    .in('status', ['draft', 'submitted', 'approved'])
+    .limit(1);
+  if (activityError) throw activityError;
+  return !!activities?.length;
+}
+
 interface PendingBreadcrumb {
   id: string;
   technician_id: string;
@@ -35,12 +65,26 @@ interface PendingClockEvent {
 class OfflineStorage {
   private db: SQLite.SQLiteDatabase | null = null;
   private syncInProgress = false;
+  private initializing: Promise<void> | null = null;
 
   async initialize() {
+    if (this.initializing) return this.initializing;
+    this.initializing = this.initializeDatabase().catch(error => {
+      this.initializing = null;
+      this.db = null;
+      throw error;
+    });
+    return this.initializing;
+  }
+
+  private async initializeDatabase() {
     this.db = await SQLite.openDatabaseAsync('fieldops_offline.db');
 
     // Create tables
     await this.db.execAsync(`
+      CREATE TABLE IF NOT EXISTS pending_clock_gps (
+        id TEXT PRIMARY KEY, entry_id TEXT NOT NULL, technician_id TEXT NOT NULL, data_json TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS pending_breadcrumbs (
         id TEXT PRIMARY KEY,
         technician_id TEXT NOT NULL,
@@ -72,6 +116,29 @@ class OfflineStorage {
         clock_out_photo_url TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS cached_employee_clock_policy (
+        technician_id TEXT PRIMARY KEY,
+        timezone TEXT NOT NULL,
+        basis TEXT NOT NULL,
+        daily_clock INTEGER NOT NULL,
+        fetched_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS cached_daily_clock_shifts (
+        id TEXT PRIMARY KEY,
+        technician_id TEXT NOT NULL,
+        entry_date TEXT NOT NULL,
+        clock_in TEXT NOT NULL,
+        clock_out TEXT,
+        status TEXT NOT NULL,
+        office_id TEXT,
+        notes TEXT,
+        sync_state TEXT NOT NULL,
+        cached_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cached_daily_clock_shifts_tech
+        ON cached_daily_clock_shifts(technician_id, clock_in);
 
       CREATE TABLE IF NOT EXISTS pending_geofence_events (
         id TEXT PRIMARY KEY,
@@ -118,9 +185,9 @@ class OfflineStorage {
   }
 
   async saveBreadcrumb(breadcrumb: PendingBreadcrumb) {
-    if (!this.db) throw new Error('Database not initialized');
+    if (!this.db) await this.initialize();
 
-    await this.db.runAsync(
+    await this.db!.runAsync(
       `INSERT INTO pending_breadcrumbs (
         id, technician_id, daily_clock_entry_id, latitude, longitude,
         altitude, accuracy, altitude_accuracy, heading, speed,
@@ -146,10 +213,180 @@ class OfflineStorage {
     );
   }
 
-  async saveClockEvent(event: PendingClockEvent) {
-    if (!this.db) throw new Error('Database not initialized');
+  async saveEmployeeClockPolicy(technicianId: string, policy: {
+    timezone: string; basis: string; dailyClock: boolean;
+  }) {
+    if (!this.db) await this.initialize();
+    await this.db!.runAsync(
+      `INSERT OR REPLACE INTO cached_employee_clock_policy
+       (technician_id, timezone, basis, daily_clock, fetched_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [technicianId, policy.timezone, policy.basis, policy.dailyClock ? 1 : 0, new Date().toISOString()]
+    );
+  }
 
-    await this.db.runAsync(
+  async getEmployeeClockPolicy(technicianId: string) {
+    if (!this.db) await this.initialize();
+    const policy = await this.db!.getFirstAsync<{
+      timezone: string; basis: string; daily_clock: number; fetched_at: string;
+    }>('SELECT timezone, basis, daily_clock, fetched_at FROM cached_employee_clock_policy WHERE technician_id = ?', [technicianId]);
+    return policy ? {
+      timezone: policy.timezone, basis: policy.basis,
+      dailyClock: policy.daily_clock === 1, fetchedAt: policy.fetched_at,
+    } : null;
+  }
+
+  // Local shift snapshots are scoped to the signed-in technician. They are not
+  // authoritative payroll entries until the server confirms synchronization.
+  async saveLocalClockShift(shift: {
+    id: string; technician_id: string; entry_date: string; clock_in: string;
+    clock_out?: string | null; status: string; office_id?: string | null;
+    notes?: string | null; sync_state: 'synced' | 'pending' | 'conflict';
+  }) {
+    if (!this.db) await this.initialize();
+    await this.db!.runAsync(
+      `INSERT INTO cached_daily_clock_shifts
+        (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, sync_state, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          entry_date = excluded.entry_date,
+          clock_in = excluded.clock_in,
+          clock_out = excluded.clock_out,
+          status = excluded.status,
+          office_id = excluded.office_id,
+          notes = excluded.notes,
+          sync_state = excluded.sync_state,
+          cached_at = CURRENT_TIMESTAMP
+        WHERE cached_daily_clock_shifts.sync_state = 'synced'
+          AND cached_daily_clock_shifts.technician_id = excluded.technician_id`,
+      [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
+        shift.clock_out ?? null, shift.status, shift.office_id ?? null,
+        shift.notes ?? null, shift.sync_state]
+    );
+  }
+
+  async getLocalActiveClockShift(technicianId: string) {
+    if (!this.db) await this.initialize();
+    return this.db!.getFirstAsync<{
+      id: string; technician_id: string; entry_date: string; clock_in: string;
+      clock_out: string | null; status: string; office_id: string | null;
+      notes: string | null; sync_state: string;
+    }>(
+      `SELECT id, technician_id, entry_date, clock_in, clock_out, status,
+        office_id, notes, sync_state FROM cached_daily_clock_shifts
+        WHERE technician_id = ? AND clock_out IS NULL
+        ORDER BY clock_in DESC LIMIT 1`,
+      [technicianId]
+    );
+  }
+
+  // A pending or conflicting completed shift must remain visible even when
+  // the server no longer has an open shift to return.
+  async getUnresolvedClockShift(technicianId: string) {
+    if (!this.db) await this.initialize();
+    return this.db!.getFirstAsync<{
+      id: string; technician_id: string; entry_date: string; clock_in: string;
+      clock_out: string | null; status: string; office_id: string | null;
+      notes: string | null; sync_state: string;
+    }>(
+      `SELECT * FROM cached_daily_clock_shifts
+       WHERE technician_id = ? AND sync_state IN ('pending', 'conflict')
+       ORDER BY clock_in DESC LIMIT 1`,
+      [technicianId]
+    );
+  }
+
+  async getLocalClockShift(technicianId: string, shiftId: string) {
+    if (!this.db) await this.initialize();
+    return this.db!.getFirstAsync<{
+      id: string; technician_id: string; entry_date: string; clock_in: string;
+      clock_out: string | null; status: string; office_id: string | null;
+      notes: string | null; sync_state: string;
+    }>(
+      'SELECT * FROM cached_daily_clock_shifts WHERE technician_id = ? AND id = ?',
+      [technicianId, shiftId]
+    );
+  }
+
+  // Called only after the UI has established that the device is offline.
+  // Persist shift and outbound event in one SQLite transaction to avoid
+  // losing either half of a clock operation during an app interruption.
+  async recordOfflineClockTransition(shift: {
+    id: string; technician_id: string; entry_date: string; clock_in: string;
+    clock_out?: string | null; status: 'clocked_in' | 'clocked_out';
+    office_id?: string | null; notes?: string | null;
+  }) {
+    if (!this.db) await this.initialize();
+    const policy = await this.getEmployeeClockPolicy(shift.technician_id);
+    const age = policy ? Date.now() - Date.parse(policy.fetchedAt) : Infinity;
+    if (!policy?.dailyClock || !Number.isFinite(age) || age < 0 || age > 24 * 60 * 60 * 1000) {
+      throw new Error('A recently verified daily clock policy is required before offline clocking.');
+    }
+    if (!shift.clock_in || !Number.isFinite(Date.parse(shift.clock_in)) ||
+        (shift.clock_out && (!Number.isFinite(Date.parse(shift.clock_out)) ||
+          Date.parse(shift.clock_out) <= Date.parse(shift.clock_in)))) {
+      throw new Error('Invalid shift timestamps');
+    }
+    await this.db!.withExclusiveTransactionAsync(async tx => {
+      const existing = await tx.getFirstAsync<{ id: string; clock_out: string | null }>(
+        'SELECT id, clock_out FROM cached_daily_clock_shifts WHERE technician_id = ? AND clock_out IS NULL LIMIT 1',
+        [shift.technician_id]
+      );
+      // Do not start another shift while any prior offline punch remains
+      // unconfirmed. A completed pending shift is still payroll evidence.
+      if (shift.status === 'clocked_in') {
+        const unresolved = await tx.getFirstAsync<{ id: string }>(
+          "SELECT id FROM cached_daily_clock_shifts WHERE technician_id = ? AND sync_state IN ('pending', 'conflict') LIMIT 1",
+          [shift.technician_id]
+        );
+        if (unresolved) {
+          throw new Error('A previous offline shift still needs synchronization or review.');
+        }
+      }
+      if (shift.status === 'clocked_out' && existing) {
+        // A cached active shift can have been synchronized already, or it
+        // can be a new offline shift. Both need the exact original start.
+        // Never allow a client-supplied timestamp to rewrite that start.
+        const cached = await tx.getFirstAsync<{ clock_in: string; sync_state: string }>(
+          'SELECT clock_in, sync_state FROM cached_daily_clock_shifts WHERE id = ? AND technician_id = ?',
+          [shift.id, shift.technician_id]
+        );
+        if (!cached || cached.sync_state === 'conflict' ||
+            Date.parse(cached.clock_in) !== Date.parse(shift.clock_in)) {
+          throw new Error('Clock-out cannot alter a conflicting or mismatched local shift.');
+        }
+      }
+      if (shift.status === 'clocked_in' && existing) {
+        throw new Error('An active local shift already exists. Resolve it before clocking in again.');
+      }
+      if (shift.status === 'clocked_out' && shift.clock_out &&
+          Date.parse(shift.clock_out) > Date.now() + 60 * 1000) {
+        throw new Error('Clock-out timestamp cannot be in the future.');
+      }
+      if (shift.status === 'clocked_out' && (!existing || existing.id !== shift.id || !shift.clock_out)) {
+        throw new Error('No matching active local shift was found for clock-out.');
+      }
+      await tx.runAsync(
+        `INSERT OR REPLACE INTO pending_clock_events
+         (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
+          shift.clock_out ?? null, shift.status, shift.office_id ?? null, shift.notes ?? null]
+      );
+      await tx.runAsync(
+        `INSERT OR REPLACE INTO cached_daily_clock_shifts
+         (id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, sync_state, cached_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
+        [shift.id, shift.technician_id, shift.entry_date, shift.clock_in,
+          shift.clock_out ?? null, shift.status, shift.office_id ?? null, shift.notes ?? null]
+      );
+    });
+  }
+
+  async saveClockEvent(event: PendingClockEvent) {
+    if (!this.db) await this.initialize();
+
+    await this.db!.runAsync(
       `INSERT OR REPLACE INTO pending_clock_events (
         id, technician_id, entry_date, clock_in, clock_out, status, office_id, notes, clock_out_photo_url
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -205,7 +442,7 @@ class OfflineStorage {
           wo.work_order_number,
           wo.work_order_type,
           wo.status,
-          wo.assigned_technician_id,
+          wo.assigned_to,
           wo.scheduled_date,
           wo.address,
           wo.customer_name,
@@ -247,7 +484,39 @@ class OfflineStorage {
     return result?.count || 0;
   }
 
+  async saveClockGps(id: string, entryId: string, technicianId: string, values: Record<string, unknown>) {
+    if (!this.db) await this.initialize();
+    await this.db!.runAsync('INSERT OR REPLACE INTO pending_clock_gps(id,entry_id,technician_id,data_json) VALUES(?,?,?,?)', [id, entryId, technicianId, JSON.stringify(values)]);
+  }
+  async removeClockGps(id: string) {
+    if (this.db) await this.db.runAsync('DELETE FROM pending_clock_gps WHERE id=?', [id]);
+  }
+  private async syncClockGps() {
+    if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const rows = await this.db.getAllAsync<{id:string;entry_id:string;technician_id:string;data_json:string}>('SELECT * FROM pending_clock_gps WHERE technician_id=?', [session.user.id]);
+    for (const row of rows) {
+      // GPS evidence must never be attached to a shift whose offline clock
+      // transition is still pending or has conflicted with the server.
+      const pending = await this.db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM pending_clock_events WHERE id = ? AND technician_id = ?',
+        [row.entry_id, row.technician_id]
+      );
+      const local = await this.db.getFirstAsync<{ sync_state: string }>(
+        'SELECT sync_state FROM cached_daily_clock_shifts WHERE id = ? AND technician_id = ?',
+        [row.entry_id, row.technician_id]
+      );
+      if (pending || (local && local.sync_state !== 'synced')) continue;
+      const { data, error } = await supabase.from('daily_clock_entries')
+        .update(JSON.parse(row.data_json))
+        .eq('id', row.entry_id).eq('technician_id', row.technician_id)
+        .select('id');
+      if (!error && data?.length) await this.removeClockGps(row.id);
+    }
+  }
   async syncPendingData() {
+    if (!this.db) await this.initialize();
     if (this.syncInProgress) {
       console.log('Sync already in progress');
       return;
@@ -258,6 +527,7 @@ class OfflineStorage {
 
     try {
       await this.syncClockEvents();
+      await this.syncClockGps();
       await this.syncBreadcrumbs();
       await this.syncGeofenceEvents();
       console.log('Offline sync completed successfully');
@@ -270,14 +540,104 @@ class OfflineStorage {
 
   private async syncClockEvents() {
     if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_clock_events');
+    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_clock_events WHERE technician_id = ?', [session.user.id]);
 
     for (const event of events) {
       try {
+        // Never replay an offline clock event over an already-recorded shift.
+        // Conflicting records require explicit reconciliation, not an overwrite.
+        const { data: existing, error: lookupError } = await supabase
+          .from('daily_clock_entries')
+          .select('id, clock_in, clock_out')
+          .eq('id', event.id)
+          .maybeSingle();
+        if (lookupError) throw lookupError;
+        if (existing) {
+          // PostgreSQL timestamptz is returned in canonical form, which may
+          // differ from the ISO text originally persisted on the device.
+          const sameInstant = (a: string | null | undefined, b: string | null | undefined) =>
+            a == null || b == null ? a == null && b == null :
+              Number.isFinite(Date.parse(a)) && Date.parse(a) === Date.parse(b);
+          let reconciled = sameInstant(existing.clock_in, event.clock_in) &&
+            sameInstant(existing.clock_out, event.clock_out);
+          if (!reconciled && event.status === 'clocked_out' && event.clock_out &&
+              sameInstant(existing.clock_in, event.clock_in) && existing.clock_out == null &&
+              Date.parse(event.clock_out) > Date.parse(event.clock_in)) {
+            if (await hasOverlappingActivityAtClockOut(event.technician_id, event.id, event.clock_out)) {
+              await this.db.runAsync(
+                "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+                [event.id, event.technician_id]
+              );
+              console.warn(`Offline clock-out ${event.id} overlaps a break or activity at punch time; manual review required`);
+              continue;
+            }
+            // Close only the original, still-open, unadjusted shift. The
+            // database's existing UPDATE trigger calculates payroll hours.
+            // Do not replace administrative adjustments or approved shifts.
+            const { data: closed, error: closeError } = await supabase
+              .from('daily_clock_entries')
+              .update({ clock_out: event.clock_out, status: 'clocked_out', notes: event.notes ?? null })
+              .eq('id', event.id)
+              .eq('technician_id', event.technician_id)
+              .eq('clock_in', existing.clock_in)
+              .is('clock_out', null)
+              .eq('status', 'clocked_in')
+              .eq('admin_adjusted', false)
+              .eq('admin_reviewed', false)
+              .select('id, clock_in, clock_out');
+            if (closeError) throw closeError;
+            reconciled = !!closed?.some(row =>
+              sameInstant(row.clock_in, event.clock_in) && sameInstant(row.clock_out, event.clock_out));
+          }
+          if (reconciled) {
+            await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ? AND technician_id = ?', [event.id, event.technician_id]);
+            await this.db.runAsync(
+              "UPDATE cached_daily_clock_shifts SET sync_state = 'synced' WHERE id = ? AND technician_id = ? AND sync_state = 'pending'",
+              [event.id, event.technician_id]
+            );
+          } else {
+            await this.db.runAsync(
+              "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+              [event.id, event.technician_id]
+            );
+            console.warn(`Offline clock event ${event.id} differs from the server; manual reconciliation required`);
+          }
+          continue;
+        }
+        // An offline-created shift may conflict with a shift started on
+        // another device. Never try to insert it over an existing open shift:
+        // preserve the local punch and flag it for manual reconciliation.
+        const { data: otherOpen, error: otherOpenError } = await supabase
+          .from('daily_clock_entries')
+          .select('id')
+          .eq('technician_id', event.technician_id)
+          .is('clock_out', null)
+          .neq('id', event.id)
+          .limit(1);
+        if (otherOpenError) throw otherOpenError;
+        if (otherOpen?.length) {
+          await this.db.runAsync(
+            "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+            [event.id, event.technician_id]
+          );
+          console.warn(`Offline shift ${event.id} conflicts with another active server shift; manual reconciliation required`);
+          continue;
+        }
+        if (event.status === 'clocked_out' && event.clock_out &&
+            await hasOverlappingActivityAtClockOut(event.technician_id, event.id, event.clock_out)) {
+          await this.db.runAsync(
+            "UPDATE cached_daily_clock_shifts SET sync_state = 'conflict' WHERE id = ? AND technician_id = ?",
+            [event.id, event.technician_id]
+          );
+          console.warn(`Offline shift ${event.id} overlaps a break or activity at punch time; manual review required`);
+          continue;
+        }
         const { error } = await supabase
           .from('daily_clock_entries')
-          .upsert({
+          .insert({
             id: event.id,
             technician_id: event.technician_id,
             entry_date: event.entry_date,
@@ -293,7 +653,11 @@ class OfflineStorage {
         if (error) throw error;
 
         // Delete synced event
-        await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ?', [event.id]);
+        await this.db.runAsync('DELETE FROM pending_clock_events WHERE id = ? AND technician_id = ?', [event.id, event.technician_id]);
+        await this.db.runAsync(
+          "UPDATE cached_daily_clock_shifts SET sync_state = 'synced' WHERE id = ? AND technician_id = ? AND sync_state = 'pending'",
+          [event.id, event.technician_id]
+        );
         console.log(`Synced clock event: ${event.id}`);
       } catch (error) {
         console.error(`Failed to sync clock event ${event.id}:`, error);
@@ -303,10 +667,13 @@ class OfflineStorage {
 
   private async syncBreadcrumbs() {
     if (!this.db) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
     // Get breadcrumbs in batches
     const breadcrumbs: any[] = await this.db.getAllAsync(
-      'SELECT * FROM pending_breadcrumbs ORDER BY captured_at LIMIT 100'
+      'SELECT * FROM pending_breadcrumbs WHERE technician_id = ? ORDER BY captured_at LIMIT 100',
+      [session.user.id]
     );
 
     if (breadcrumbs.length === 0) return;
@@ -315,7 +682,7 @@ class OfflineStorage {
       // Batch insert
       const { error } = await supabase
         .from('enhanced_gps_breadcrumbs')
-        .insert(breadcrumbs.map(b => ({
+        .upsert(breadcrumbs.map(b => ({
           id: b.id,
           technician_id: b.technician_id,
           daily_clock_entry_id: b.daily_clock_entry_id,
@@ -331,7 +698,7 @@ class OfflineStorage {
           battery_level: b.battery_level,
           device_model: b.device_model,
           os_version: b.os_version,
-        })));
+        })), { onConflict: 'id', ignoreDuplicates: true });
 
       if (error) throw error;
 
@@ -345,8 +712,8 @@ class OfflineStorage {
       console.log(`Synced ${breadcrumbs.length} breadcrumbs`);
 
       // If there are more, sync again
-      const remaining = await this.getPendingBreadcrumbsCount();
-      if (remaining > 0) {
+      const remaining = await this.db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM pending_breadcrumbs WHERE technician_id = ?', [session.user.id]);
+      if ((remaining?.count ?? 0) > 0) {
         await this.syncBreadcrumbs();
       }
     } catch (error) {
@@ -357,7 +724,9 @@ class OfflineStorage {
   private async syncGeofenceEvents() {
     if (!this.db) return;
 
-    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_geofence_events');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const events: any[] = await this.db.getAllAsync('SELECT * FROM pending_geofence_events WHERE technician_id = ?', [session.user.id]);
 
     for (const event of events) {
       try {

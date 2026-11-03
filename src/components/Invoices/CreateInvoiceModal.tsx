@@ -1,3 +1,5 @@
+import { notify } from '../../lib/feedback';
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
@@ -32,6 +34,7 @@ interface Project {
 }
 
 interface LineItem {
+  is_discontinued?: boolean;
   id: string;
   product_id?: string | null;
   sku?: string;
@@ -140,7 +143,7 @@ function formatBillingOneLine(b: BillingAddress): string {
 }
 
 export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposalId, onClose, onSuccess }: CreateInvoiceModalProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [selectedContactId, setSelectedContactId] = useState(contactId || '');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState(projectId || '');
@@ -148,12 +151,14 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [dueDate, setDueDate] = useState('');
   const [dueDateAutoSet, setDueDateAutoSet] = useState(false);
   const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [customerVisible, setCustomerVisible] = useState(true);
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>('residential');
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
   ]);
   const [billToContact, setBillToContact] = useState<Contact | null>(null);
+  const [billing, setBilling] = useState<BillingAddress>({ ...EMPTY_BILLING });
   const [billingSource, setBillingSource] = useState<'customer' | 'bill_to'>('customer');
   const [editingBilling, setEditingBilling] = useState(false);
   const [transactionLocation, setTransactionLocation] = useState<'customer' | 'dealer' | 'custom'>('customer');
@@ -284,7 +289,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load data');
+      notify('Failed to load data', { theme: 'emerald', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -427,6 +432,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           product_id: product.id,
           sku: product.sku,
           description: product.name,
+          is_discontinued: product.is_discontinued,
           unit_price: price,
           cost: product.cost,
           amount: qty * price,
@@ -447,6 +453,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
         product_id: product.id,
         sku: product.sku,
         description: product.name,
+          is_discontinued: product.is_discontinued,
         quantity: 1,
         unit_price: product.our_price || 0,
         cost: product.cost,
@@ -532,12 +539,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     e.preventDefault();
 
     if (!selectedContactId) {
-      alert('Please select a customer');
+      notify('Please select a customer', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     if (lineItems.some(item => !item.description.trim())) {
-      alert('Please fill in all line item descriptions');
+      notify('Please fill in all line item descriptions', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -553,13 +560,14 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const { data: invoiceData, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
-          company_id: profile?.company_id,
+          company_id: companySettings?.id,
           contact_id: selectedContactId,
           project_id: selectedProjectId || null,
           sales_order_id: salesOrderId || null,
           invoice_date: invoiceDate,
           due_date: dueDate || null,
           status: 'draft',
+          customer_visible_on_submit: customerVisible,
           subtotal,
           tax_amount: tax,
           total,
@@ -621,21 +629,22 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           throw new Error(submitResult.errors?.join(', ') || 'Submission failed');
         }
 
-        if (action === 'submit_email') {
+        if (action === 'submit_email' && customerVisible) {
           try {
             await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoiceData.id } });
           } catch (sendErr) {
             console.error('Invoice submitted but email send failed:', sendErr);
-            alert('Invoice submitted successfully, but the email failed to send. You can resend it from the invoice detail view.');
+            notify('Invoice submitted successfully, but the email failed to send. You can resend it from the invoice detail view.', { theme: 'emerald', tone: 'error' });
           }
         }
       }
 
+      notify('Invoice created!', { theme: 'emerald', tone: 'success' });
       onSuccess(invoiceData.id);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.');
+      notify(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.', { theme: 'emerald', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -1149,6 +1158,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
 
                       {/* SKU */}
                       <div className="flex-1 min-w-0">
+                        <ProductStatusNotice product={item} />
                         <InlineProductSearch
                           value={item.sku || ''}
                           onChange={(value) => updateLineItem(item.id, 'sku', value)}
@@ -1285,6 +1295,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       {/* SKU Search */}
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-1">SKU / Search</label>
+                        <ProductStatusNotice product={item} />
                         <InlineProductSearch
                           value={item.sku || ''}
                           onChange={(value) => updateLineItem(item.id, 'sku', value)}
@@ -1435,6 +1446,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               >
                 Cancel
               </button>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={customerVisible} onChange={e=>setCustomerVisible(e.target.checked)} />Customer-visible on submission (off = internal only)</label>
               <button
                 type="submit"
                 disabled={submitting}
@@ -1455,7 +1467,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </button>
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || !customerVisible}
                 onClick={(e) => { e.preventDefault(); handleSubmit(e as any, 'submit_email'); }}
                 className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >

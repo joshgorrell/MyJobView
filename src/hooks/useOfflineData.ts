@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { offlineStorage } from '../lib/offlineStorage';
 
-interface UseOfflineDataOptions<T> {
+interface UseOfflineDataOptions {
   table: string;
   select?: string;
   filter?: (query: any) => any;
   orderBy?: { column: string; ascending?: boolean };
 }
 
-export function useOfflineData<T>({ table, select = '*', filter, orderBy }: UseOfflineDataOptions<T>) {
+export function useOfflineData<T>({ table, select = '*', filter, orderBy }: UseOfflineDataOptions) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

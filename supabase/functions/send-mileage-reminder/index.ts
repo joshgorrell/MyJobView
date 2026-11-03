@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -85,7 +86,7 @@ Deno.serve(async (req: Request) => {
 
     // Send email using Resend if API key is available
     if (RESEND_API_KEY) {
-      const res = await fetch("https://api.resend.com/emails", {
+      const res = await sendSystemEmail({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -116,31 +117,7 @@ Deno.serve(async (req: Request) => {
         }
       );
     } else {
-      // No email service configured, just log
-      console.log("Mileage reminder email would be sent to:", to_email);
-      console.log("Subject:", subject);
-      console.log("Urgency:", urgency);
-      console.log("Days since:", days_since);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Email service not configured. Email details logged.",
-          preview: {
-            to: to_email,
-            subject,
-            urgency,
-            days_since,
-            vehicle_info
-          }
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
   } catch (error) {
     console.error("Error sending mileage reminder email:", error);

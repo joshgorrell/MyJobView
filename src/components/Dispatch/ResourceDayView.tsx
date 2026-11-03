@@ -1,3 +1,11 @@
+import { TeamTimeOffPanel } from '../Shared/TeamTimeOffPanel';
+import { TeamLeave, overlapsLeave, leaveLabel } from '../../lib/timeOff';
+import { AppointmentsCalendar } from '../Appointments/AppointmentsCalendar';
+import { CALENDAR_EVENT_STYLES } from '../Shared/Calendar/calendarStyles';
+import { CALENDAR_FIRST_MINUTE, CALENDAR_LAST_MINUTE, CALENDAR_ROW_HEIGHT } from '../Shared/Calendar/CalendarTimeGrid';
+import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
+import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
+import { dateKey, loadCalendarPages } from '../../lib/workOrderScheduling';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getTechColor } from '../../lib/techColors';
@@ -6,14 +14,10 @@ import {
   rescheduleWorkOrder,
   rescheduleAppointment,
   scheduleUnscheduledWorkOrder,
-  checkPtoConflict,
   formatTime12,
   toMinutes,
-  type ConflictInfo,
 } from '../../lib/scheduling';
 import {
-  ChevronLeft,
-  ChevronRight,
   User,
   Wrench,
   AlertTriangle,
@@ -26,7 +30,6 @@ import {
   ExternalLink,
   Clock,
 } from 'lucide-react';
-import { resolveWorkOrderDurationMinutes } from '../../lib/scheduling';
 
 interface ScheduleEvent {
   id: string;
@@ -60,11 +63,7 @@ interface UnscheduledWorkOrder {
   project_name: string | null;
 }
 
-interface TimeOffEntry {
-  user_id: string;
-  start_date: string;
-  end_date: string;
-}
+
 
 interface ConfirmState {
   message: string;
@@ -77,13 +76,13 @@ interface EventPopover {
   y: number;
 }
 
-const HOUR_START = 6;
-const HOUR_END = 21;
+const HOUR_START = CALENDAR_FIRST_MINUTE / 60;
+const HOUR_END = CALENDAR_LAST_MINUTE / 60;
 const TOTAL_HOURS = HOUR_END - HOUR_START;
-const SLOT_HEIGHT = 56;
+const SLOT_HEIGHT = CALENDAR_ROW_HEIGHT * 2;
 
 function dateStr(d: Date): string {
-  return d.toISOString().split('T')[0];
+  return dateKey(d);
 }
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -113,13 +112,14 @@ function padTime(h: number, m: number): string {
 }
 
 export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, params?: Record<string, string>) => void }) {
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month' | 'gantt'>('day');
   const [anchor, setAnchor] = useState<Date>(new Date());
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [unscheduled, setUnscheduled] = useState<UnscheduledWorkOrder[]>([]);
-  const [timeOff, setTimeOff] = useState<TimeOffEntry[]>([]);
+  const [timeOff, setTimeOff] = useState<TeamLeave[]>([]);
   const [techs, setTechs] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
   const [hiddenTechs, setHiddenTechs] = useState<Set<string>>(new Set());
   const [showTechFilter, setShowTechFilter] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<ScheduleEvent | null>(null);
@@ -204,7 +204,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         .from('profiles')
         .select('id, full_name, role')
         .eq('is_active', true)
-        .in('role', ['tech', 'lead_tech'])
+        .eq('is_technician', true).eq('is_active', true)
         .order('full_name');
 
       if (error) throw error;
@@ -238,11 +238,10 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           .eq('appointment_date', start)
           .neq('status', 'cancelled'),
 
-        supabase.from('pto_requests').select('employee_id, start_date, end_date, status')
-          .in('employee_id', techIds).eq('status', 'approved')
-          .lte('start_date', end).gte('end_date', start),
+        supabase.rpc('team_time_off',{p_from:start,p_to:end}),
       ]);
 
+      if (woRes.error) throw woRes.error; if (aptRes.error) throw aptRes.error; if (ptoRes.error) throw ptoRes.error;
       const woEvents: ScheduleEvent[] = (woRes.data || []).map((wo: any) => {
         const startT = wo.scheduled_start_time || '08:00';
         let endT = wo.scheduled_end_time;
@@ -279,9 +278,10 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
       }));
 
       setEvents([...woEvents, ...aptEvents]);
-      setTimeOff((ptoRes.data || []).map((r: any) => ({ user_id: r.employee_id, start_date: r.start_date, end_date: r.end_date })));
+      setTimeOff((ptoRes.data || []).filter((r:TeamLeave)=>techIds.includes(r.employee_id)));
     } catch (e) {
       console.error('Error loading schedule data:', e);
+      setErrorMessage('Schedule could not be loaded. Refresh before scheduling.');
     } finally {
       setLoading(false);
     }
@@ -289,18 +289,18 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
 
   async function loadUnscheduled() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await loadCalendarPages(supabase
         .from('work_orders')
         .select(`
           id, work_order_number, title, priority, estimated_hours, assigned_to,
-          project:projects(project_name),
+          project:projects(name),
           contact:contacts(full_name, company_name),
           assigned_tech:profiles!work_orders_assigned_to_fkey(full_name)
         `)
-        .is('scheduled_date', null)
+        .not('is_archived', 'is', true).or('scheduled_date.is.null,scheduled_start_time.is.null,scheduled_end_time.is.null')
         .not('status', 'in', '("completed","cancelled","archived")')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .order('created_at', { ascending: false }).order('id'));
+
 
       if (error) throw error;
 
@@ -313,18 +313,21 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         assigned_to: wo.assigned_to,
         assigned_tech_name: wo.assigned_tech?.full_name || null,
         customer_name: wo.contact?.full_name || wo.contact?.company_name || null,
-        project_name: wo.project?.project_name || null,
+        project_name: wo.project?.name || null,
       }));
 
       setUnscheduled(items);
     } catch (e) {
       console.error('Error loading unscheduled work orders:', e);
+      setErrorMessage('Incomplete schedules could not be loaded. Refresh to retry.');
     }
   }
 
   function isTechOnTimeOff(techId: string): boolean {
-    return timeOff.some(t => t.user_id === techId && ds >= t.start_date && ds <= t.end_date);
+    return timeOff.some(t => t.employee_id === techId && t.leave_date === ds && t.full_day);
   }
+
+  function hasLeaveConflict(techId:string,start:number,end:number):boolean { return timeOff.some(t=>t.employee_id===techId&&t.leave_date===ds&&overlapsLeave(t,padTime(Math.floor(start/60),start%60),padTime(Math.floor(end/60),end%60))); }
 
   function getEventsForTech(techId: string): ScheduleEvent[] {
     return events.filter(e => e.technician_id === techId);
@@ -369,8 +372,8 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
     setAnchor(d);
   }
 
-  function handleSlotClick(techId: string, hour: number) {
-    const time = padTime(hour, 0);
+  function handleSlotClick(techId: string, hour: number, minute = 0) {
+    const time = padTime(hour, minute);
     setCreateModalProps({ date: ds, time, techId });
     setShowCreateModal(true);
   }
@@ -401,7 +404,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
     const endMin = Math.min(startMin + duration, HOUR_END * 60);
 
     const hasConflict = checkConflict(techId, startMin, endMin, draggedEvent?.id);
-    const hasPto = isTechOnTimeOff(techId);
+    const hasPto = hasLeaveConflict(techId,startMin,endMin);
     setDropTarget({ techId, minutes: startMin });
     setConflictAtTarget(hasConflict);
     setPtoConflictAtTarget(hasPto);
@@ -409,18 +412,21 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
 
   async function handleGridDrop(e: React.DragEvent, techId: string) {
     e.preventDefault();
-    if (!dropTarget || dropTarget.techId !== techId) return;
-
-    const startMin = dropTarget.minutes;
+    if (!draggedEvent && !draggedUnscheduled) return;
+    const startMin = getMinutesFromY(e.clientY, e.currentTarget.getBoundingClientRect());
+    const duration = draggedEvent ? toMinutes(draggedEvent.end_time) - toMinutes(draggedEvent.start_time) : (draggedUnscheduled?.estimated_hours || 2) * 60;
+    if (duration <= 0 || startMin + duration >= HOUR_END * 60) { setErrorMessage('Choose an earlier time so the full booking fits within this day.'); return; }
+    const dropConflict = checkConflict(techId, startMin, Math.min(startMin + duration, HOUR_END * 60), draggedEvent?.id);
+    const dropPtoConflict = hasLeaveConflict(techId,startMin,startMin+duration);
     const newStart = padTime(Math.floor(startMin / 60), startMin % 60);
     const techName = techs.find(t => t.id === techId)?.full_name || 'Unknown';
 
     const buildConflictMessage = (): string => {
       const parts: string[] = [];
-      if (conflictAtTarget) {
+      if (dropConflict) {
         parts.push(`Scheduling conflict at ${formatTime12(newStart)}. ${techName} already has something scheduled at this time.`);
       }
-      if (ptoConflictAtTarget) {
+      if (dropPtoConflict) {
         parts.push(`${techName} has approved PTO on this date.`);
       }
       return parts.join(' ') + ' Do you want to proceed?';
@@ -503,19 +509,18 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         }
       };
 
-      if (conflictAtTarget || ptoConflictAtTarget) {
+      if (dropConflict || dropPtoConflict) {
         setConfirmAction({
           message: buildConflictMessage(),
           onConfirm: () => doMoveForce(),
         });
       } else {
-        await doMoveNormal();
+        setConfirmAction({ message: `Move “${draggedEvent.title}” to ${ds}, ${formatTime12(newStart)} – ${formatTime12(newEnd)} for ${techName}?`, onConfirm: async () => { setConfirmAction(null); await doMoveNormal(); } });
       }
     } else if (draggedUnscheduled) {
       const duration = (draggedUnscheduled.estimated_hours || 2) * 60;
       const endMin = Math.min(startMin + duration, HOUR_END * 60);
       const newEnd = padTime(Math.floor(endMin / 60), endMin % 60);
-      const isReassign = draggedUnscheduled.assigned_to !== techId;
 
       const doScheduleNormal = async () => {
         setSchedulingId(draggedUnscheduled.id);
@@ -587,13 +592,13 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         }
       };
 
-      if (conflictAtTarget || ptoConflictAtTarget) {
+      if (dropConflict || dropPtoConflict) {
         setConfirmAction({
           message: buildConflictMessage(),
           onConfirm: () => doScheduleForce(),
         });
       } else {
-        await doScheduleNormal();
+        setConfirmAction({ message: `Schedule “${draggedUnscheduled.title}” on ${ds}, ${formatTime12(newStart)} – ${formatTime12(newEnd)} for ${techName}?`, onConfirm: async () => { setConfirmAction(null); await doScheduleNormal(); } });
       }
     }
   }
@@ -601,6 +606,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
   function handleEventDragStart(e: React.DragEvent, event: ScheduleEvent) {
     if (event.status === 'completed') return;
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', event.id);
     setDraggedEvent(event);
   }
 
@@ -620,10 +626,12 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
   const isToday = isSameDay(anchor, today);
 
   return (
-    <div className="flex flex-col h-full" onClick={() => setEventPopover(null)}>
+    <CalendarWorkspace tabHref={'/calendar?' + new URLSearchParams({ popup: 'true', view: 'technicians', viewMode: calendarView, date: ds, technicianIds: visibleTechs.map(tech => tech.id).join(',') }).toString()} className="flex flex-col h-full" onClick={() => setEventPopover(null)}>
+      <details className="mb-3 rounded-lg border border-subtle p-3"><summary className="cursor-pointer font-semibold text-primary">Team Availability · week, month & upcoming leave</summary><div className="mt-3"><TeamTimeOffPanel/></div></details>
+      {calendarView !== 'day' ? <AppointmentsCalendar embedded technicianOnly initialView={calendarView} initialDate={ds} initialTechnicianIds={visibleTechs.map(tech => tech.id)} onWorkOrderSelect={id => { if (onNavigate) onNavigate('work_orders', { workOrderId: id }); else window.location.assign(`/?tab=work_orders&workOrderId=${id}`); }} onDayView={date => { setAnchor(new Date(date + 'T12:00:00')); setCalendarView('day'); }} onDateChange={date => setAnchor(new Date(date + 'T12:00:00'))} onViewChange={view => { if (view !== 'agenda') setCalendarView(view); }} /> : <>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-1 pb-3 shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap gap-3 items-center justify-between px-1 pb-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
@@ -631,26 +639,14 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           >
             {sidebarOpen ? <X className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
           </button>
-          <div className="flex items-center gap-1">
-            <button onClick={() => navigate(-1)} className="p-1.5 rounded hover:bg-gray-800 text-gray-300 hover:text-white transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setAnchor(new Date())}
-              className="px-2.5 py-1 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-colors"
-            >
-              Today
-            </button>
-            <button onClick={() => navigate(1)} className="p-1.5 rounded hover:bg-gray-800 text-gray-300 hover:text-white transition-colors">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          <CalendarNavigation date={dateKey(anchor)} onDateChange={date => setAnchor(new Date(date + 'T12:00:00'))} onPrevious={() => navigate(-1)} onNext={() => navigate(1)} />
           <span className="text-sm font-semibold text-white ml-2">
             {anchor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarViewSwitcher value={calendarView} onChange={setCalendarView} options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'gantt', label: 'Gantt' }]} />
           <button
             onClick={() => setShowTechFilter(!showTechFilter)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
@@ -671,7 +667,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
               <button
                 key={tech.id}
                 onClick={() => toggleTechVisibility(tech.id)}
-                className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs hover:bg-gray-700 transition-colors ${isHidden ? 'opacity-40' : ''}`}
+                className={`flex flex-wrap items-center gap-2 w-full px-2 py-1.5 rounded text-xs hover:bg-gray-700 transition-colors ${isHidden ? 'opacity-40' : ''}`}
               >
                 <div className={`w-3 h-3 rounded-full ${color.dot}`} />
                 <span className="text-gray-200">{tech.full_name}</span>
@@ -687,7 +683,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         {sidebarOpen && (
           <div className="w-64 shrink-0 bg-gray-900 rounded-xl border border-gray-700 flex flex-col overflow-hidden">
             <div className="px-3 py-2.5 bg-gray-800 border-b border-gray-700 shrink-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Wrench className="w-4 h-4 text-amber-400" />
                 <h3 className="text-sm font-semibold text-white">Unscheduled</h3>
                 <span className="text-xs text-gray-400 ml-auto">{unscheduled.length}</span>
@@ -739,7 +735,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
         )}
 
         {/* Resource grid */}
-        <div className="flex-1 bg-gray-900 rounded-xl border border-gray-700 overflow-hidden flex flex-col min-w-0">
+        <div className="calendar-resource-grid flex-1 bg-white text-gray-900 rounded-lg border border-gray-200 overflow-hidden flex flex-col min-w-0">
           {visibleTechs.length === 0 ? (
             <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
               No technicians to display. Use the filter to show technicians.
@@ -747,20 +743,20 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           ) : (
             <>
               {/* Tech column headers + time grid in single scroll container */}
-              <div className="flex-1 overflow-x-auto min-h-0">
+              <div ref={scrollRef} className="flex-1 overflow-auto max-h-[min(600px,65dvh)] min-h-0" data-calendar-time-grid>
               <div className="min-w-0">
               {/* Tech column headers */}
               <div
-                className="grid shrink-0 bg-gray-800 border-b border-gray-700 sticky top-0 z-30"
-                style={{ gridTemplateColumns: `52px repeat(${visibleTechs.length}, minmax(140px, 1fr))` }}
+                className="grid shrink-0 bg-white border-b border-gray-200 sticky top-0 z-30"
+                style={{ gridTemplateColumns: `56px repeat(${visibleTechs.length}, minmax(140px, 1fr))` }}
               >
-                <div className="border-r border-gray-700" />
+                <div className="border-r border-gray-200" />
                 {visibleTechs.map(tech => {
                   const color = getTechColor(tech.id);
                   const status = getTechStatus(tech.id);
                   const eventCount = getEventsForTech(tech.id).length;
                   return (
-                    <div key={tech.id} className="px-2 py-2.5 text-center border-r border-gray-700/50">
+                    <div key={tech.id} className="px-2 py-2.5 text-center border-r border-gray-200">
                       <div className="flex items-center justify-center gap-1.5 mb-1">
                         <div className={`w-2 h-2 rounded-full ${
                           status === 'off' ? 'bg-red-500' :
@@ -769,7 +765,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                           'bg-orange-500'
                         }`} />
                         <span className={`text-xs font-semibold truncate max-w-[100px] ${color.text}`}>
-                          {tech.full_name.split(' ')[0]}
+                          {tech.full_name}
                         </span>
                       </div>
                       <div className="text-[10px] text-gray-500 capitalize">{tech.role}</div>
@@ -786,7 +782,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
               </div>
 
               {/* Scrollable time grid */}
-              <div ref={scrollRef} className="flex-1 overflow-y-auto">
+              <div className="flex-1">
                 {loading ? (
                   <div className="flex items-center justify-center h-48">
                     <Loader2 className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -796,12 +792,12 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                     ref={gridRef}
                     className="relative grid"
                     style={{
-                      gridTemplateColumns: `52px repeat(${visibleTechs.length}, minmax(140px, 1fr))`,
+                      gridTemplateColumns: `56px repeat(${visibleTechs.length}, minmax(140px, 1fr))`,
                       height: `${totalHeight}px`,
                     }}
                   >
                     {/* Hour labels */}
-                    <div className="relative border-r border-gray-700 bg-gray-900/50">
+                    <div className="relative border-r border-gray-200 bg-white">
                       {Array.from({ length: TOTAL_HOURS }, (_, i) => (
                         <div
                           key={i}
@@ -817,24 +813,23 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
 
                     {/* Tech columns */}
                     {visibleTechs.map(tech => {
-                      const color = getTechColor(tech.id);
                       const techEvents = getEventsForTech(tech.id);
                       const onPto = isTechOnTimeOff(tech.id);
 
                       return (
                         <div
                           key={tech.id}
-                          className={`relative border-r border-gray-700/50 ${onPto ? 'bg-red-500/5' : ''}`}
+                          className={`relative border-r border-gray-200 ${onPto ? 'bg-gray-50' : ''}`}
                           style={{ height: `${totalHeight}px` }}
                           onDragOver={(e) => handleGridDragOver(e, tech.id)}
-                          onDragLeave={() => { setDropTarget(null); setConflictAtTarget(false); setPtoConflictAtTarget(false); }}
+                          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setDropTarget(null); setConflictAtTarget(false); setPtoConflictAtTarget(false); } }}
                           onDrop={(e) => handleGridDrop(e, tech.id)}
                         >
                           {/* Hour grid lines */}
                           {Array.from({ length: TOTAL_HOURS }, (_, i) => (
                             <div
                               key={i}
-                              className={`absolute w-full border-t ${i === 0 ? 'border-gray-600' : 'border-gray-700/50'}`}
+                              className={`absolute w-full border-t ${i === 0 ? 'border-gray-200' : 'border-gray-200'}`}
                               style={{ top: `${i * SLOT_HEIGHT}px` }}
                             />
                           ))}
@@ -843,29 +838,22 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                           {Array.from({ length: TOTAL_HOURS }, (_, i) => (
                             <div
                               key={`half-${i}`}
-                              className="absolute w-full border-t border-dashed border-gray-700/30"
+                              className="absolute w-full border-t border-gray-100"
                               style={{ top: `${i * SLOT_HEIGHT + SLOT_HEIGHT / 2}px` }}
                             />
                           ))}
 
                           {/* PTO overlay */}
-                          {onPto && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-                              <div className="rotate-[-20deg] text-red-400/20 font-bold text-xl select-none">PTO</div>
-                            </div>
-                          )}
+                          {timeOff.filter(t=>t.employee_id===tech.id&&t.leave_date===ds).map(t=><div key={t.request_id} className="absolute w-full bg-gray-200/80 border border-gray-400 text-gray-800 pointer-events-none z-0 flex items-center justify-center text-xs" style={t.full_day?{inset:0}:{top:Math.max(0,(toMinutes(t.start_time||'08:00')-HOUR_START*60)/60*SLOT_HEIGHT),height:Math.max(16,(toMinutes(t.end_time||'17:00')-toMinutes(t.start_time||'08:00'))/60*SLOT_HEIGHT)}}>{leaveLabel(t)}</div>)}
 
                           {/* Clickable hour slots */}
-                          {!onPto && Array.from({ length: TOTAL_HOURS }, (_, i) => {
-                            const hour = HOUR_START + i;
-                            return (
-                              <div
-                                key={`slot-${i}`}
-                                className="absolute w-full cursor-pointer hover:bg-white/5 transition-colors"
-                                style={{ top: `${i * SLOT_HEIGHT}px`, height: `${SLOT_HEIGHT}px`, zIndex: 1 }}
-                                onClick={() => handleSlotClick(tech.id, hour)}
-                              />
-                            );
+                          {!onPto && Array.from({ length: TOTAL_HOURS * 2 }, (_, i) => {
+                            const hour = HOUR_START + Math.floor(i / 2), minute = i % 2 * 30;
+                            const start = hour * 60 + minute;
+                            const busy = hasLeaveConflict(tech.id,start,start+60) || techEvents.some(event => start < toMinutes(event.end_time) && start + 60 > toMinutes(event.start_time));
+                            return <button type="button" key={`slot-${i}`} aria-label={`Schedule ${tech.full_name} on ${ds} at ${formatTime12(padTime(hour, minute))}`}
+                              disabled={busy} className="absolute w-full hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 disabled:cursor-default"
+                              style={{ top: `${i * CALENDAR_ROW_HEIGHT}px`, height: `${CALENDAR_ROW_HEIGHT}px`, zIndex: 1 }} onClick={() => handleSlotClick(tech.id, hour, minute)} />;
                           })}
 
                           {/* Drop target indicator */}
@@ -903,7 +891,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
                             const top = eventTopPx(event);
                             const height = eventHeightPx(event);
                             const isWO = event.type === 'work_order';
-                            const eventColor = isWO ? color : { ...color, light: 'bg-gray-100', border: 'border-gray-400', text: 'text-gray-700' };
+                            const eventColor = CALENDAR_EVENT_STYLES[isWO ? 'work_order' : 'appointment'];
                             const isSaving = savingEventId === event.id;
 
                             return (
@@ -1000,6 +988,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           calendarContext="technicians"
           initialDate={createModalProps.date}
           initialTime={createModalProps.time}
+          initialTechnicianId={createModalProps.techId}
           onClose={() => { setShowCreateModal(false); setCreateModalProps({}); }}
           onSuccess={() => { setShowCreateModal(false); setCreateModalProps({}); loadData(); }}
         />
@@ -1060,7 +1049,7 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
 
       {/* Error toast */}
       {errorMessage && (
-        <div className="fixed bottom-4 right-4 z-50 bg-red-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2 max-w-sm">
+        <div className="fixed bottom-4 right-4 z-50 bg-red-600 text-white px-4 py-3 rounded-lg shadow-xl flex flex-wrap items-center gap-2 max-w-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span className="text-sm">{errorMessage}</span>
           <button onClick={() => setErrorMessage(null)} className="ml-auto text-white/80 hover:text-white">
@@ -1109,7 +1098,8 @@ export function ResourceDayView({ onNavigate }: { onNavigate?: (tab: string, par
           }}
         />
       )}
-    </div>
+      </>}
+    </CalendarWorkspace>
   );
 }
 
@@ -1211,7 +1201,7 @@ function RescheduleModal({
 
         {conflict && (
           <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <div className="flex items-center gap-2 text-xs text-red-300 mb-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-red-300 mb-2">
               <AlertTriangle className="w-3.5 h-3.5" />
               Scheduling conflict detected. Proceed anyway?
             </div>

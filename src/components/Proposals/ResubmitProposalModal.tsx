@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ResubmitProposalModalProps {

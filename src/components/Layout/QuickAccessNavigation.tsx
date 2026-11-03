@@ -1,9 +1,16 @@
+import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
+import { ActivityBadge } from './ActivityBadge';
+import { useEffect, useRef, useState } from 'react';
 import { Menu, Star } from 'lucide-react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useTaskCount } from '../../hooks/useTaskCount';
 import { useFishbowlCount } from '../../hooks/useFishbowlCount';
+import { useActivityCounts } from '../../hooks/useActivityCounts';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadCoworkerThreads } from '../Flow/coworkerConversations';
+import { supabase } from '../../lib/supabase';
 
 interface QuickAccessNavigationProps {
   activeModule: string;
@@ -11,9 +18,53 @@ interface QuickAccessNavigationProps {
 }
 
 export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAccessNavigationProps) {
-  const { starredModules, loading } = useDepartments();
+  const { starredModules, loading, hasModuleAccess } = useDepartments();
   const taskCount = useTaskCount();
   const fishbowlCount = useFishbowlCount();
+  const { counts: activityCounts } = useActivityCounts();
+  const { profile } = useAuth();
+  const [unreadTeamMessages, setUnreadTeamMessages] = useState(0);
+  const [unreadCustomerMessages, setUnreadCustomerMessages] = useState(0);
+  useEffect(() => {
+    if (!profile?.id || !profile.organization_id || !hasModuleAccess('messages')) { setUnreadTeamMessages(0); setUnreadCustomerMessages(0); return; }
+    let cancelled = false;
+    const organizationId = profile.organization_id;
+    const userId = profile.id;
+    const refreshMessages = async () => {
+      try {
+        const threads = await loadCoworkerThreads(organizationId, userId, {});
+        if (!cancelled) setUnreadTeamMessages(threads.reduce((total, thread) => total + thread.unread_count, 0));
+        // Customer threads already enforce their visibility through RLS.
+        const { data: customerThreads, error: threadError } = await supabase.from('message_threads')
+          .select('id').eq('organization_id', organizationId);
+        if (threadError) throw threadError;
+        const ids = (customerThreads || []).map(thread => thread.id);
+        let unread = 0;
+        for (let offset = 0; offset < ids.length; offset += 100) {
+          const { count, error } = await supabase.from('messages').select('id', { count: 'exact', head: true })
+            .in('thread_id', ids.slice(offset, offset + 100)).eq('author_type', 'customer').eq('is_internal', false).eq('is_read', false);
+          if (error) throw error;
+          unread += count || 0;
+        }
+        if (!cancelled) setUnreadCustomerMessages(unread);
+      } catch (error) { console.error('Unable to load unread team messages', error); if (!cancelled) { setUnreadTeamMessages(0); setUnreadCustomerMessages(0); } }
+    };
+    void refreshMessages();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshMessages(); }, 30000);
+    window.addEventListener('flow-views-changed', refreshMessages);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('flow-views-changed', refreshMessages); };
+  }, [profile?.id, profile?.organization_id, hasModuleAccess]);
+  const navigationRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const navigation = navigationRef.current;
+    const activeButton = navigation?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!navigation || !activeButton) return;
+    const container = navigation.getBoundingClientRect();
+    const button = activeButton.getBoundingClientRect();
+    if (button.left < container.left) navigation.scrollLeft += button.left - container.left;
+    else if (button.right > container.right) navigation.scrollLeft += button.right - container.right;
+  }, [activeModule, starredModules]);
 
   const renderIcon = (iconName: string, className: string = "w-4 h-4 sm:w-5 sm:h-5") => {
     const IconComponent = getIcon(iconName);
@@ -28,11 +79,11 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
 
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <div className="hidden lg:flex flex-shrink-0 items-center gap-1 text-brand">
+      <div className="hidden xl:flex flex-shrink-0 items-center gap-1 text-brand">
         <Star className="w-4 h-4 fill-current" />
         <span className="text-xs font-semibold uppercase tracking-wider hidden lg:inline">Favorites</span>
       </div>
-      <div className="h-5 w-px bg-subtle hidden lg:block"></div>
+      <div className="h-5 w-px bg-subtle hidden xl:block"></div>
 
       {loading ? (
         <div className="text-gray-500 text-xs italic">Loading...</div>
@@ -41,19 +92,25 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
           Click the <Star className="w-3 h-3 inline mx-1" /> on any menu item to add it here
         </div>
       ) : (
-        <nav className="flex gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
+        <nav ref={navigationRef} className="flex gap-1.5 sm:gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
           {starredModules.map((module) => {
-          const isActive = activeModule === module.module_key;
+          const isActive = activeModule === module.module_key || workspaceMenuKey(activeModule) === module.module_key;
 
           const badgeCount =
-            module.module_key === 'tasks' ? taskCount :
+            (module.module_key === 'tasks' || (module.module_key === 'feed' && hasModuleAccess('tasks'))) ? taskCount :
+            module.module_key === 'pipeline_board' ? activityCounts.pipeline_lead + (hasModuleAccess('fishbowl') ? fishbowlCount : 0) :
             module.module_key === 'fishbowl' ? fishbowlCount :
+            module.module_key === 'messages' ? unreadTeamMessages + unreadCustomerMessages :
+            module.module_key === 'test_tune' ? activityCounts.test_tune :
+            (module.module_key === 'reviews' || module.module_key === 'feedback') ? activityCounts.feedback :
+            (module.module_key === 'service_requests' || module.module_key === 'sales_service_requests') ? activityCounts.service_request :
             0;
           const showBadge = badgeCount > 0;
 
           return (
             <button
               key={module.id}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => {
                 // TV Dashboards should open in a new window for full-screen display
                 if (module.module_key === 'tv_dashboard') {
@@ -64,17 +121,13 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
                   onModuleChange(module.module_key);
                 }
               }}
-              className={`px-3 py-1.5 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
+              className={`min-h-11 px-2 sm:px-3 py-1.5 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
               title={`${module.display_name} (${module.description || 'Quick access'})`}
             >
               <div className="flex items-center gap-2">
                 {module.module_key === 'feed' ? <FlowWaveIcon className="w-4 h-4 text-lg" /> : renderIcon(module.icon, "w-4 h-4")}
-                <span className="text-sm font-semibold">{module.display_name}</span>
-                {showBadge && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg">
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                )}
+                <span className="text-xs sm:text-sm font-semibold">{module.display_name}</span>
+                {showBadge && <ActivityBadge count={badgeCount} className="absolute -top-1 -right-1 pointer-events-none" />}
               </div>
             </button>
           );

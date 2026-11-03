@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('contacts')
-      .select('id, email, first_name, last_name, portal_user_id, organization_id')
+      .select('id, email, first_name, last_name, portal_user_id, organization_id, portal_access_enabled')
       .eq('id', tokenRecord.contact_id)
       .maybeSingle();
 
@@ -66,6 +66,11 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: 'Customer account not found.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (!contact.portal_access_enabled) {
+      return new Response(JSON.stringify({ error: 'Portal access is disabled. Please contact us for assistance.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!contact.email) {
@@ -104,7 +109,7 @@ Deno.serve(async (req: Request) => {
 
       await supabaseAdmin
         .from('contacts')
-        .update({ portal_user_id: userId, portal_access_enabled: true })
+        .update({ portal_user_id: userId })
         .eq('id', contact.id);
     } else {
       const { data: existingUser, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
@@ -128,14 +133,10 @@ Deno.serve(async (req: Request) => {
         userId = newAuthUser.user.id;
         await supabaseAdmin
           .from('contacts')
-          .update({ portal_user_id: userId, portal_access_enabled: true })
+          .update({ portal_user_id: userId })
           .eq('id', contact.id);
       } else {
         await supabaseAdmin.auth.admin.updateUserById(userId, { app_metadata: portalMetadata });
-        await supabaseAdmin
-          .from('contacts')
-          .update({ portal_access_enabled: true })
-          .eq('id', contact.id);
       }
     }
 

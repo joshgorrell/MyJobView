@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { History, Eye, RotateCcw, X, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +10,7 @@ interface ProposalVersion {
   snapshot: any;
   created_at: string;
   created_by_name: string;
+  created_by?: { full_name: string } | null;
   change_summary?: string;
 }
 
@@ -21,9 +23,9 @@ interface ProposalVersionHistoryProps {
 export function ProposalVersionHistory({ proposalId, onClose, onRestore }: ProposalVersionHistoryProps) {
   const [versions, setVersions] = useState<ProposalVersion[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<ProposalVersion | null>(null);
-  const [compareVersion, setCompareVersion] = useState<ProposalVersion | null>(null);
+  const [compareVersion, _setCompareVersion] = useState<ProposalVersion | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showComparison, setShowComparison] = useState(false);
+  const [_showComparison, _setShowComparison] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export function ProposalVersionHistory({ proposalId, onClose, onRestore }: Propo
           created_by:profiles!proposal_versions_created_by_fkey(full_name)
         `)
         .eq('proposal_id', proposalId)
-        .order('version_number', { ascending: false });
+        .order('version_number', { ascending: false }).overrideTypes<ProposalVersion[], { merge: false }>();
 
       if (error) throw error;
 
@@ -89,14 +91,14 @@ export function ProposalVersionHistory({ proposalId, onClose, onRestore }: Propo
 
       if (error) throw error;
 
-      alert('Version restored successfully');
+      notify('Version restored successfully', { theme: 'violet', tone: 'success' });
       if (onRestore) {
         onRestore(version.id);
       }
       onClose();
     } catch (error) {
       console.error('Error restoring version:', error);
-      alert('Failed to restore version');
+      notify('Failed to restore version', { theme: 'violet', tone: 'error' });
     }
   }
 

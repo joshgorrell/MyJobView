@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { DollarSign, ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
+import { ArrowLeft, CreditCard, CheckCircle, AlertCircle, Clock, RefreshCw, Calendar, Info, XCircle, Phone, Mail, FileText, History, RotateCcw, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { InvoiceDetailModal } from '../Invoices/InvoiceDetailModal';
@@ -13,12 +14,13 @@ interface Invoice {
   due_date: string | null;
   status: string;
   subtotal: number;
-  tax: number;
+  tax_amount: number;
   total: number;
   amount_paid: number;
   amount_due: number;
   project_number: string | null;
   qbo_invoice_id: string | null;
+  qbo_payment_url: string | null;
 }
 
 interface RecurringSubscription {
@@ -63,6 +65,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [payingAll, setPayingAll] = useState(false);
   const [detailInvoiceId, setDetailInvoiceId] = useState<string | null>(null);
+  useEffect(()=>{const id=new URLSearchParams(window.location.search).get('invoice');if(id && invoices.some(inv=>inv.id===id)){setDetailInvoiceId(id);}},[invoices]);
   const [confirmPayAll, setConfirmPayAll] = useState(false);
   const [paymentWindowsOpened, setPaymentWindowsOpened] = useState(false);
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
@@ -115,12 +118,13 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             due_date,
             status,
             subtotal,
-            tax,
+            tax_amount,
             total,
             amount_paid,
             amount_due,
             project_id,
             qbo_invoice_id,
+            qbo_payment_url,
             security_billing_cycle_id,
             portal_visible,
             projects:project_id (
@@ -128,6 +132,8 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             )
           `)
           .eq('contact_id', profile.contact_id)
+          .eq('portal_visible',true)
+          .neq('status','draft')
           .order('invoice_date', { ascending: false }),
         supabase
           .from('recurring_subscriptions')
@@ -155,7 +161,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
             )
           `)
           .eq('contact_id', profile.contact_id)
-          .in('status', ['active', 'paused'])
+          .in('status', ['active', 'paused']).overrideTypes<RecurringSubscription[], { merge: false }>()
       ]);
 
       if (invoicesRes.error) throw invoicesRes.error;
@@ -205,18 +211,8 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         return;
       }
 
-      const { data: companySettings } = await supabase
-        .from('company_settings')
-        .select('qbo_realm_id, phone, email')
-        .maybeSingle();
-
-      if (!companySettings?.qbo_realm_id) {
-        setPaymentUnavailableInvoice(invoice);
-        return;
-      }
-
-      const paymentUrl = `https://app.qbo.intuit.com/app/paynow?invoiceId=${invoice.qbo_invoice_id}`;
-      window.open(paymentUrl, '_blank');
+      if (!invoice.qbo_payment_url || !invoice.qbo_payment_url.startsWith('https://')) {setPaymentUnavailableInvoice(invoice);return;}
+      window.open(invoice.qbo_payment_url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error('Error initiating payment:', error);
       setPaymentUnavailableInvoice(invoice);
@@ -228,24 +224,14 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     setConfirmPayAll(false);
     try {
       const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
-      const { data: companySettings } = await supabase
-        .from('company_settings')
-        .select('qbo_realm_id')
-        .maybeSingle();
-
-      if (!companySettings?.qbo_realm_id) {
-        alert('Payment processing is not configured. Please contact support.');
-        return;
-      }
-
       for (const invoice of selectedInvoices) {
-        window.open(`https://app.qbo.intuit.com/app/paynow?invoiceId=${invoice.qbo_invoice_id}`, '_blank');
+        if (invoice.qbo_payment_url?.startsWith('https://')) window.open(invoice.qbo_payment_url, '_blank', 'noopener,noreferrer');
       }
 
       setPaymentWindowsOpened(true);
     } catch (error) {
       console.error('Error initiating batch payment:', error);
-      alert('Failed to process payments. Please try again or contact support.');
+      notify('Failed to process payments. Please try again or contact support.', { theme: 'blue', tone: 'error' });
     } finally {
       setPayingAll(false);
     }
@@ -255,10 +241,10 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     if (selectedInvoiceIds.length === 0) return;
 
     const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
-    const unsyncedInvoices = selectedInvoices.filter(inv => !inv.qbo_invoice_id);
+    const unsyncedInvoices = selectedInvoices.filter(inv => !inv.qbo_payment_url);
 
     if (unsyncedInvoices.length > 0) {
-      alert(`${unsyncedInvoices.length} invoice(s) are not yet synced with QuickBooks. Please contact support.`);
+      notify(`${unsyncedInvoices.length} invoice(s) are not yet synced with QuickBooks. Please contact support.`, { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -318,6 +304,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
       const printable = {
         ...invoice,
+        tax: invoice.tax_amount,
         invoice_title: extra?.invoice_title || null,
         billing_name: extra?.billing_name || contactName || null,
         billing_address_line1: extra?.billing_address_line1 || contact?.street_address || null,
@@ -356,7 +343,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
   async function handleCancelSubscription() {
     if (!selectedSubscription || !cancelReason) {
-      alert('Please select a reason for cancellation.');
+      notify('Please select a reason for cancellation.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -373,22 +360,20 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       const result = data as { success: boolean; error?: string; effective_date?: string; will_continue_billing?: boolean };
 
       if (!result.success) {
-        alert(result.error || 'Failed to cancel subscription');
+        notify(result.error || 'Failed to cancel subscription', { theme: 'blue', tone: 'error' });
         return;
       }
 
-      alert(
-        result.will_continue_billing
+      notify(result.will_continue_billing
           ? `Your subscription has been scheduled for cancellation. Billing will continue until ${new Date(result.effective_date!).toLocaleDateString()}.`
-          : `Your subscription will be cancelled after the next billing cycle on ${new Date(result.effective_date!).toLocaleDateString()}.`
-      );
+          : `Your subscription will be cancelled after the next billing cycle on ${new Date(result.effective_date!).toLocaleDateString()}.`, { theme: 'blue', tone: 'info' });
 
       setCancelModalOpen(false);
       setSelectedSubscription(null);
       loadInvoices();
     } catch (error) {
       console.error('Error cancelling subscription:', error);
-      alert('Failed to cancel subscription. Please try again or contact support.');
+      notify('Failed to cancel subscription. Please try again or contact support.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -1019,8 +1004,9 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       {detailInvoiceId && (
         <InvoiceDetailModal
           invoiceId={detailInvoiceId}
-          onClose={() => setDetailInvoiceId(null)}
+          onClose={() => {setDetailInvoiceId(null);const url=new URL(window.location.href);url.searchParams.delete('invoice');window.history.replaceState(null,'',url.toString());}}
           readonly={true}
+          customerView={true}
         />
       )}
 

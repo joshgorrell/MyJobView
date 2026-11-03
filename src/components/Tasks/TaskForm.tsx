@@ -1,3 +1,5 @@
+import { notify } from '../../lib/feedback';
+import { AIFormFill } from '../Shared/AIFormFill';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Flag, Users, Plus, UserPlus, ListTodo } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -6,9 +8,10 @@ import { Task, Contact, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { offlineSupabaseInsert, offlineSupabaseUpdate } from '../../lib/offlineSupport';
-import { generateUsername } from '../../lib/username';
+import { generateUniqueUsername } from '../../lib/username';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import ConfirmModal from '../ui/ConfirmModal';
+import { AssignmentSearchSelect } from './AssignmentSearchSelect';
 
 interface AIPrefill {
   contactId?: string;
@@ -17,6 +20,7 @@ interface AIPrefill {
   description?: string;
   priority?: string;
   dueDate?: string;
+  assigneeId?: string;
 }
 
 interface TaskFormProps {
@@ -26,22 +30,32 @@ interface TaskFormProps {
   onClose: () => void;
   onSuccess: () => void;
   aiPrefill?: AIPrefill | null;
+  supportMode?: boolean;
 }
 
-export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill }: TaskFormProps) {
+export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill, supportMode = false }: TaskFormProps) {
   const { profile } = useAuth();
   const [formData, setFormData] = useState({
-    title: task?.title || '',
+    title: task?.title || (supportMode ? 'Support: ' : ''),
     description: task?.description || '',
-    priority: task?.priority || 'medium',
+    priority: (task?.priority || 'medium') as string,
     due_date: task?.due_date ? task.due_date.split('T')[0] : '',
     status: task?.status || 'pending',
     contact_id: (task as any)?.contact_id || contactId || '',
     reminder_date: task?.reminder_date ? new Date(task.reminder_date).toISOString().slice(0, 16) : '',
     assigned_to: task?.assigned_to || '',
+    assigned_department_id: (task as any)?.assigned_department_id || '',
+    project_id: (task as any)?.project_id || '',
+    work_order_id: (task as any)?.work_order_id || '',
+    proposal_id: (task as any)?.proposal_id || '',
   });
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [users, setUsers] = useState<Profile[]>([]);
+  const [contacts, setContacts] = useState<Pick<Contact, 'id' | 'contact_name' | 'company_name' | 'email' | 'phone'>[]>([]);
+  const [users, setUsers] = useState<Pick<Profile, 'id' | 'full_name'>[]>([]);
+  const [departments, setDepartments] = useState<Array<{ id: string; display_name: string }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [workOrders, setWorkOrders] = useState<Array<{ id: string; work_order_number: string }>>([]);
+  const [proposals, setProposals] = useState<Array<{ id: string; proposal_number: string; title: string }>>([]);
+  const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +63,8 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [showSuccess, setShowSuccess] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
-  const autoSaveKey = task ? `task_edit_${task.id}` : 'task_new';
-  const { restoreSavedData, clearSavedData } = useAutoSave({
+  const autoSaveKey = task ? `task_edit_${task.id}` : supportMode ? 'task_new_support' : 'task_new';
+  const { restoreSavedData, clearSavedData, saveNow } = useAutoSave({
     key: autoSaveKey,
     data: formData,
     enabled: !task
@@ -69,22 +83,27 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   useEffect(() => {
     loadContacts();
     loadUsers();
+    loadDepartments();
     loadPriorities();
+    loadProjects();
+    loadWorkOrders();
+    loadProposals();
 
     if (!task) {
       if (aiPrefill) {
         setFormData(prev => ({
           ...prev,
-          title: aiPrefill.title || prev.title,
+          title: supportMode && aiPrefill.title && !/^Support:/i.test(aiPrefill.title) ? `Support: ${aiPrefill.title}` : aiPrefill.title || prev.title,
           description: aiPrefill.description || prev.description,
           priority: aiPrefill.priority || prev.priority,
           due_date: aiPrefill.dueDate || prev.due_date,
           contact_id: aiPrefill.contactId || prev.contact_id,
+          assigned_to: aiPrefill.assigneeId || prev.assigned_to,
         }));
       } else {
         const savedData = restoreSavedData();
         if (savedData) {
-          setFormData(savedData);
+          setFormData(prev => ({ ...prev, ...savedData, title: supportMode && !String(savedData.title || '').trim() ? 'Support: ' : savedData.title }));
         }
       }
     }
@@ -119,6 +138,63 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     }
   }
 
+  async function loadDepartments() {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, display_name')
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error loading departments:', error);
+    }
+  }
+
+  async function loadProjects() {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('name')
+        .limit(200);
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    }
+  }
+
+  async function loadWorkOrders() {
+    try {
+      const { data, error } = await supabase
+        .from('work_orders')
+        .select('id, work_order_number')
+        .order('work_order_number', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setWorkOrders(data || []);
+    } catch (error) {
+      console.error('Error loading work orders:', error);
+    }
+  }
+
+  async function loadProposals() {
+    try {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select('id, proposal_number, title')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setProposals(data || []);
+    } catch (error) {
+      console.error('Error loading proposals:', error);
+    }
+  }
+
   async function loadPriorities() {
     try {
       const { data, error } = await supabase
@@ -136,16 +212,12 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
   async function handleCreateContact() {
     if (!newContactData.contact_name.trim()) {
-      alert('Contact name is required');
+      notify('Contact name is required', { theme: 'cyan', tone: 'warning' });
       return;
     }
 
     try {
-      const username = await generateUsername(
-        newContactData.contact_name,
-        'contacts',
-        supabase
-      );
+      const username = await generateUniqueUsername(newContactData.contact_name, supabase);
 
       const { data: newContact, error } = await supabase
         .from('contacts')
@@ -171,7 +243,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       loadContacts();
     } catch (err: any) {
       console.error('Error creating contact:', err);
-      alert('Failed to create contact: ' + err.message);
+      notify('Failed to create contact: ' + err.message, { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -179,6 +251,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     e.preventDefault();
     if (!profile) return;
 
+    if (supportMode && !formData.title.replace(/^Support:\s*/i, '').trim()) {
+      setError('Enter a short description of the support needed.');
+      return;
+    }
+    if (supportMode && !formData.contact_id) {
+      setError('Select a customer contact for this support request.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -199,6 +279,10 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
         completed_at: formData.status === 'completed' && !task?.completed_at ? new Date().toISOString() : task?.completed_at || null,
         reminder_date: formData.reminder_date ? new Date(formData.reminder_date).toISOString() : null,
         assigned_to: formData.assigned_to || null,
+        assigned_department_id: formData.assigned_department_id || null,
+        project_id: formData.project_id || null,
+        work_order_id: formData.work_order_id || null,
+        proposal_id: formData.proposal_id || null,
         points: taskPoints,
       };
 
@@ -300,8 +384,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   }
 
   function handleClose() {
-    if (!task && !false) {
-      const hasData = formData.title || formData.description;
+    if (!task) {
+      const title = supportMode ? formData.title.replace(/^Support:\s*/i, '') : formData.title;
+      const hasData = title.trim() || formData.description.trim() ||
+        formData.assigned_to || formData.assigned_department_id ||
+        formData.due_date || formData.reminder_date || formData.project_id ||
+        formData.work_order_id || formData.proposal_id ||
+        formData.contact_id !== (contactId || '') ||
+        formData.priority !== 'medium' || formData.status !== 'pending';
       if (hasData) {
         setShowDraftModal(true);
         return;
@@ -311,35 +401,43 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   }
 
   const otherUsers = users.filter(u => u.id !== profile?.id);
+  const assignmentOptions = [
+    { id: '', label: 'Anyone — open to the team', group: 'Team' },
+    ...departments.map(department => ({ id: `dept:${department.id}`, label: department.display_name, group: 'Department' })),
+    ...(profile ? [{ id: profile.id, label: `Me (${profile.full_name})`, group: 'Person' }] : []),
+    ...otherUsers.map(user => ({ id: user.id, label: user.full_name, group: 'Person' })),
+  ];
 
   return (
     <>
     <QuickActionModal
       scrollBody={false}
-      stableHeight
-      title={task ? 'Edit Task' : 'New Task'}
-      subtitle={task ? 'Update task details' : 'Assign and track a new task'}
+      title={task ? 'Edit Assignment' : supportMode ? 'New Support Request' : 'New Assignment'}
+      subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Assign and track a follow-up'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
       showSuccess={showSuccess}
-      successMessage={task ? 'Task Updated!' : 'Task Created!'}
+      successMessage={task ? 'Assignment Updated!' : supportMode ? 'Support Request Created!' : 'Assignment Created!'}
 
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
           <div className="qam-scroll overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4 space-y-4">
+            <AIFormFill kind={supportMode ? 'support' : 'task'} onFill={prefill => setFormData(previous => ({ ...previous, title: prefill.title ? (supportMode && !/^Support:/i.test(prefill.title) ? `Support: ${prefill.title}` : prefill.title) : previous.title, description: prefill.description ?? previous.description, priority: prefill.priority ?? previous.priority, due_date: prefill.dueDate ?? previous.due_date, contact_id: prefill.contactId ?? previous.contact_id }))} />
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
                 {error}
               </div>
             )}
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Task Title */}
             <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5">
-                Task Title <span className="text-red-400">*</span>
+              <label htmlFor="assignment-title" className="block text-sm font-medium text-secondary mb-1.5">
+                Assignment Title <span className="text-red-400">*</span>
               </label>
               <input
+                id="assignment-title"
                 type="text"
                 required
                 value={formData.title}
@@ -349,7 +447,31 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               />
             </div>
 
-            {/* Description */}
+            {/* Assign To */}
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-muted" />
+                Assign To
+              </label>
+              <AssignmentSearchSelect
+                options={assignmentOptions}
+                value={formData.assigned_department_id ? `dept:${formData.assigned_department_id}` : formData.assigned_to}
+                onChange={value => {
+                  if (value.startsWith('dept:')) {
+                    setFormData({ ...formData, assigned_to: '', assigned_department_id: value.slice(5) });
+                  } else {
+                    setFormData({ ...formData, assigned_to: value, assigned_department_id: '' });
+                  }
+                }}
+              />
+              <p className="text-xs text-muted mt-1">
+                Anyone is the default. Department tasks notify that department; the first person to complete one earns the points.
+              </p>
+            </div>
+
+            </div>
+
+            {/* Description - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Description
@@ -363,88 +485,10 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               />
             </div>
 
-            {/* Assign To */}
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-muted" />
-                Assign To
-              </label>
-              <select
-                value={formData.assigned_to}
-                onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              >
-                <option value="">Anyone (claimable by team)</option>
-                {profile && (
-                  <option value={profile.id}>Me ({profile.full_name})</option>
-                )}
-                {otherUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Priority + Due Date side by side */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                  <Flag className="w-4 h-4 text-muted" />
-                  Priority
-                </label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                >
-                  {priorities.length === 0 ? (
-                    <option value="medium">Medium</option>
-                  ) : (
-                    priorities.map((priority) => (
-                      <option key={priority.id} value={priority.slug}>
-                        {priority.name}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-muted" />
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Reminder */}
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-muted" />
-                Reminder
-              </label>
-              <input
-                type="datetime-local"
-                value={formData.reminder_date}
-                onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
-                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              />
-              <p className="text-xs text-muted mt-1">
-                Creates a Google Calendar reminder if connected
-              </p>
-            </div>
-
-            {/* Contact */}
+            {/* Contact - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Contact <span className="text-muted font-normal">(optional)</span>
+                Contact <span className="text-muted font-normal">{supportMode ? '(required for support)' : '(optional)'}</span>
               </label>
               <div className="flex gap-2">
                 <ContactSearchSelect
@@ -530,31 +574,130 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               </div>
             )}
 
-            {/* Status (edit only) */}
-            {task && (
+            {/* Optional job links */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-secondary mb-1.5">
-                  Status
+                  Project <span className="text-muted font-normal">(optional)</span>
                 </label>
                 <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as Task['status'] })}
+                  value={formData.project_id}
+                  onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
                   className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 >
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="">None</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">
+                  Work Order <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.work_order_id}
+                  onChange={(e) => setFormData({ ...formData, work_order_id: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {workOrders.map((w) => (
+                    <option key={w.id} value={w.id}>{w.work_order_number}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">
+                  Proposal <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <select
+                  value={formData.proposal_id}
+                  onChange={(e) => setFormData({ ...formData, proposal_id: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {proposals.map((p) => (
+                    <option key={p.id} value={p.id}>{p.proposal_number}{p.title ? ` — ${p.title}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-secondary bg-surface border border-subtle rounded-lg hover:bg-elevated transition-colors"
+            >
+              <span>{showDetails ? 'Hide details' : '+ Details'}</span>
+              <span className="text-xs text-muted">priority, due date, reminder</span>
+            </button>
+
+            {showDetails && (
+              <div className="space-y-4">
+            {/* Priority + Due Date side by side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Flag className="w-4 h-4 text-muted" />
+                  Priority
+                </label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                >
+                  {priorities.length === 0 ? (
+                    <option value="medium">Medium</option>
+                  ) : (
+                    priorities.map((priority) => (
+                      <option key={priority.id} value={priority.slug}>
+                        {priority.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-muted" />
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Reminder */}
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-1.5 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-muted" />
+                Reminder
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.reminder_date}
+                onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
+                className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              />
+              <p className="text-xs text-muted mt-1">
+                Creates a Google Calendar reminder if connected
+              </p>
+            </div>
+              </div>
             )}
+
           </div>
 
           {/* Footer buttons */}
           <div className="flex gap-3 px-4 sm:px-6 py-4 border-t border-subtle/60 flex-shrink-0">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-3 border border-subtle text-secondary rounded-xl hover:bg-surface transition-colors font-medium text-sm"
             >
               Cancel
@@ -564,7 +707,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               disabled={loading}
               className="flex-1 px-4 py-3 bg-gradient-to-r from-sky-600 to-blue-700 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm disabled:opacity-50"
             >
-              {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
+              {loading ? 'Saving...' : supportMode ? 'Create Support Request' : task ? 'Update Assignment' : 'Create Assignment'}
             </button>
           </div>
         </form>
@@ -572,13 +715,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
     <ConfirmModal
       isOpen={showDraftModal}
+      zIndex={70}
       title="Discard Draft?"
-      message="Keep draft? Your progress will be saved and you can restore it when you return."
+      message="Discard this draft, or keep it to finish when you return?"
       variant="danger"
       confirmLabel="Discard"
       cancelLabel="Keep Draft"
       onConfirm={() => { clearSavedData(); setShowDraftModal(false); onClose(); }}
-      onCancel={() => { setShowDraftModal(false); onClose(); }}
+      onCancel={() => { saveNow(); setShowDraftModal(false); onClose(); }}
     />
     </>
   );

@@ -1,3 +1,4 @@
+import { validatePrefill } from "./validation.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -20,6 +21,7 @@ interface ProposalLineItem {
 
 interface ProposalRoom {
   name: string;
+  description?: string;
   lineItems: ProposalLineItem[];
 }
 
@@ -34,10 +36,11 @@ interface ProposalPrefill {
 
 interface RequestBody {
   briefId: string;
-  notes: string;
+  notes?: string;
   contactId?: string;
   contactName?: string;
   regenerate?: boolean;
+  action?: 'preview' | 'submit';
 }
 
 Deno.serve(async (req: Request) => {
@@ -73,18 +76,43 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { briefId, notes, contactId, contactName }: RequestBody = await req.json();
+    const { briefId, contactName, action }: RequestBody = await req.json();
 
-    if (!briefId || !notes) {
-      return new Response(JSON.stringify({ error: "briefId and notes are required" }), {
+    if (!briefId || (action && !['preview', 'submit'].includes(action))) {
+      return new Response(JSON.stringify({ error: "A valid briefId and action are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Verify access through the caller's RLS policies before using the service-role client.
+    const { data: permittedBrief, error: accessError } = await supabaseUser
+      .from("design_briefs")
+      .select("id, organization_id, contact_id, raw_notes, status, linked_proposal_id, updated_at")
+      .eq("id", briefId)
+      .maybeSingle();
+    if (accessError || !permittedBrief) {
+      return new Response(JSON.stringify({ error: "Design brief not found or access denied" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (permittedBrief.linked_proposal_id || permittedBrief.status === 'archived') {
+      throw new Error('This brief is view only. Continue changes in Design Queue.');
+    }
+    if (action === 'submit') {
+      const { data, error } = await supabaseUser.rpc('design_brief_submit', { p_brief: briefId });
+      if (error) throw error;
+      return new Response(JSON.stringify({ success: true, briefId: data }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!permittedBrief.raw_notes?.trim()) throw new Error('Project notes are required.');
     const { data: settingsData } = await supabase
       .from("company_settings")
       .select("openai_api_key")
+      .eq("organization_id", permittedBrief.organization_id)
       .maybeSingle();
 
     if (!settingsData?.openai_api_key) {
@@ -94,18 +122,15 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    await supabase
-      .from("design_briefs")
-      .update({ status: "building" })
-      .eq("id", briefId);
-
     // Fetch active product catalog
-    const { data: products } = await supabase
+    const { data: products, error: catalogError } = await supabase
       .from("products")
       .select("name, item_type, unit, our_price, cost, default_qty")
+      .eq("organization_id", permittedBrief.organization_id)
       .eq("is_active", true)
       .order("name");
 
+    if (catalogError) throw new Error('Product catalog could not load. Please retry.');
     let productCatalogSection = "";
     if (products && products.length > 0) {
       const lines = products
@@ -114,9 +139,10 @@ Deno.serve(async (req: Request) => {
       productCatalogSection = `\n\nPRODUCT CATALOG (use EXACT names from this list when building the proposal):\n${lines}\n\nCRITICAL: Always use the exact product name from the catalog above as the "description" in line items. If no catalog match exists, use the name as stated in the notes.`;
     }
 
-    // Fetch customer history if a contact is linked
+    // Only the contact stored on this authorized brief may be used for history.
+    const authorizedContactId = permittedBrief.contact_id;
     let customerHistorySection = "";
-    if (contactId) {
+    if (authorizedContactId) {
       const { data: previousProposals } = await supabase
         .from("proposals")
         .select(`
@@ -138,7 +164,8 @@ Deno.serve(async (req: Request) => {
             )
           )
         `)
-        .eq("contact_id", contactId)
+        .eq("organization_id", permittedBrief.organization_id)
+        .eq("contact_id", authorizedContactId)
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -164,6 +191,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Use the saved brief rather than client-provided text as the AI source of truth.
+    const savedNotes = permittedBrief.raw_notes;
     const systemPrompt = `You are an expert AV/smart home proposal builder for a high-end installation company.
 Your job is to parse a sales rep's field notes about a customer's project and produce a structured JSON proposal prefill.
 
@@ -187,6 +216,7 @@ PROPOSALPREFILL SCHEMA:
   "rooms": [
     {
       "name": "string — room or zone name e.g. 'Family Room', 'Master Bedroom', 'Outdoor Patio'",
+      "description": "string — customer-facing scope of work for this room, describing equipment, installation, programming, and exclusions; distinguish assumptions from confirmed work",
       "lineItems": [
         {
           "description": "string — exact catalog product name or custom item name",
@@ -204,11 +234,11 @@ PROPOSALPREFILL SCHEMA:
 PARSING RULES:
 1. Extract customer name → contactSearchName
 2. Identify every room/zone/area mentioned → rooms[].name
-3. For each product mentioned: match to catalog by name, set quantity, unit=EA (or FT for cable/wire), itemType=material
+3. For each product mentioned: match to catalog by name only when the exact manufacturer/model is specified and verified; otherwise retain a generic equipment requirement for later selection. Set quantity, unit=EA (or FT for cable/wire), itemType=material. Never invent a catalog match or price. If the user says a pair, the design requirement is 2 physical speakers per room. Do not assume the catalog sells speakers individually: a catalog product labeled 'pair' may need a proposal quantity of 1 package for those 2 physical speakers. Preserve the physical requirement in the design and flag package-unit verification for the reviewer. Expand a requirement mentioned for several rooms into a separate line item in each room. Use the same concise description for identical requirements across rooms to enable bulk model selection.
 4. For labor mentions: itemType=labor, unit=HR, quantity=hours, laborHours=hours
 5. Tax environment: home/house/residence/bedroom → residential; office/warehouse/commercial → commercial
 6. Tax project type: new construction → original_construction; renovations → remodel; most residential installs → general_installation_repair
-7. Put any extra rep instructions, customer preferences, or context into the "notes" field
+7. Put any extra rep instructions, customer preferences, or context into the "notes" field. Each room.description is its proposed scope of work; do not invent confirmed customer decisions.
 8. Generate a descriptive title from the project type and customer name
 9. If the rep asks to copy a previous proposal, replicate that proposal's rooms and items exactly, applying any stated modifications`;
 
@@ -224,27 +254,25 @@ PARSING RULES:
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Parse these field notes and produce the ProposalPrefill JSON:\n\n${notes}${contactName ? `\n\nCustomer name: ${contactName}` : ""}`,
+            content: `Parse these field notes and produce the ProposalPrefill JSON:\n\n${savedNotes}${contactName ? `\n\nCustomer name: ${contactName}` : ""}`,
           },
         ],
+        response_format: { type: "json_object" },
         max_tokens: 4000,
         temperature: 0.2,
       }),
     });
 
     if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      await supabase
-        .from("design_briefs")
-        .update({ status: "submitted" })
-        .eq("id", briefId);
-      return new Response(JSON.stringify({ error: `OpenAI error: ${errText}` }), {
+      console.error("Design brief AI request failed", openaiRes.status);
+      return new Response(JSON.stringify({ error: 'AI preview failed. Your notes are saved; please retry.' }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const openaiData = await openaiRes.json();
+    if (openaiData.choices?.[0]?.finish_reason !== 'stop') throw new Error('AI preview was incomplete. Your notes are saved; try a shorter session.');
     let rawContent = openaiData.choices?.[0]?.message?.content ?? "{}";
 
     rawContent = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -253,146 +281,24 @@ PARSING RULES:
     try {
       prefill = JSON.parse(rawContent);
     } catch {
-      await supabase
-        .from("design_briefs")
-        .update({ status: "submitted" })
-        .eq("id", briefId);
       return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    await supabase
-      .from("design_briefs")
+    validatePrefill(prefill);
+    // Compare the saved version so a slow preview cannot overwrite newer notes,
+    // catalog selections, archival or a proposal created in another session.
+    const { data: saved, error: saveError } = await supabaseUser.from('design_briefs')
       .update({ ai_summary: prefill })
-      .eq("id", briefId);
-
-    let proposalId: string | null = null;
-
-    if (contactId) {
-      const { data: contact } = await supabase
-        .from("contacts")
-        .select("tax_rate, tax_environment, tax_project_type")
-        .eq("id", contactId)
-        .maybeSingle();
-
-      const { data: newProposal, error: proposalError } = await supabase
-        .from("proposals")
-        .insert({
-          contact_id: contactId,
-          title: prefill.title || `Design Brief - ${contactName || "Customer"}`,
-          status: "designing",
-          tax_environment: prefill.taxEnvironment || contact?.tax_environment || "residential",
-          tax_project_type: prefill.taxProjectType || contact?.tax_project_type || "general_installation_repair",
-          tax_rate: contact?.tax_rate || 0,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-
-      if (!proposalError && newProposal) {
-        proposalId = newProposal.id;
-
-        if (prefill.rooms && prefill.rooms.length > 0) {
-          for (let roomIndex = 0; roomIndex < prefill.rooms.length; roomIndex++) {
-            const room = prefill.rooms[roomIndex];
-
-            const { data: newRoom, error: roomError } = await supabase
-              .from("proposal_rooms")
-              .insert({
-                proposal_id: proposalId,
-                name: room.name,
-                sort_order: roomIndex,
-              })
-              .select("id")
-              .single();
-
-            if (!roomError && newRoom && room.lineItems && room.lineItems.length > 0) {
-              const productNames = room.lineItems.map((li) => li.description);
-              const { data: catalogProducts } = await supabase
-                .from("products")
-                .select("id, name, our_price, cost, unit, default_qty, default_labor_hours")
-                .in("name", productNames);
-
-              const productMap = new Map<string, { id: string; name: string; our_price: number | null; cost: number | null; unit: string | null; default_qty: number | null; default_labor_hours: number | null }>();
-              if (catalogProducts) {
-                for (const p of catalogProducts) {
-                  if (p) productMap.set(p.name, p);
-                }
-              }
-
-              const lineItemInserts = room.lineItems.map((li, liIndex) => {
-                const catalogMatch = productMap.get(li.description);
-                const unitPrice = catalogMatch?.our_price ?? 0;
-                const cost = catalogMatch?.cost ?? 0;
-                const qty = li.quantity || catalogMatch?.default_qty || 1;
-                const laborHours = li.laborHours ?? catalogMatch?.default_labor_hours ?? null;
-                const lineTotal = qty * unitPrice;
-
-                return {
-                  proposal_id: proposalId,
-                  room_id: newRoom.id,
-                  product_id: catalogMatch?.id || null,
-                  description: li.description,
-                  quantity: qty,
-                  unit: li.unit || "EA",
-                  cost: cost,
-                  unit_price: unitPrice,
-                  line_total: lineTotal,
-                  item_type: li.itemType || "material",
-                  labor_hours: laborHours,
-                  sort_order: liIndex,
-                };
-              });
-
-              await supabase.from("proposal_line_items").insert(lineItemInserts);
-            }
-          }
-        }
-
-        await supabase
-          .from("design_briefs")
-          .update({
-            linked_proposal_id: proposalId,
-            status: "submitted",
-          })
-          .eq("id", briefId);
-      }
-    } else {
-      await supabase
-        .from("design_briefs")
-        .update({ status: "submitted" })
-        .eq("id", briefId);
-    }
-
-    const { data: repProfile } = await supabase
-      .from("profiles")
-      .select("full_name, email")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const { data: admins } = await supabase
-      .from("profiles")
-      .select("id")
-      .in("role", ["admin", "manager"]);
-
-    if (admins && admins.length > 0) {
-      const repName = repProfile?.full_name || repProfile?.email || "A sales rep";
-      const customerLabel = contactName || prefill.contactSearchName || "a customer";
-      const notifications = admins.map((admin) => ({
-        user_id: admin.id,
-        type: "task_assigned",
-        title: "New Design Brief",
-        message: `${repName} submitted a design brief for ${customerLabel}. Review and build the proposal.`,
-        related_id: briefId,
-        read: false,
-      }));
-      await supabase.from("notifications").insert(notifications);
-    }
+      .eq('id', briefId).eq('updated_at', permittedBrief.updated_at)
+      .is('linked_proposal_id', null).neq('status', 'archived')
+      .select('id').single();
+    if (saveError || !saved) throw new Error('Brief changed while processing. Reopen it and regenerate the preview.');
 
     return new Response(
-      JSON.stringify({ success: true, prefill, proposalId }),
+      JSON.stringify({ success: true, prefill, proposalId: null }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

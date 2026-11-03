@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Film, Plus, Upload, Trash2, Eye, EyeOff, Globe, Lock, Clock, AlertCircle, Loader2, Square, Mic, MicOff, Camera, CameraOff, Play, Search, X, Check, CreditCard as Edit2, Users, Video } from 'lucide-react';
+import { Film, Plus, Upload, Trash2, Globe, Lock, AlertCircle, Loader2, Square, Mic, MicOff, Camera, CameraOff, Play, Search, X, Check, CreditCard as Edit2, Users, Video } from 'lucide-react';
 
 export interface LibraryVideo {
   id: string;

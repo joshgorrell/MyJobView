@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Repeat, X } from 'lucide-react';
+import { Repeat } from 'lucide-react';
 
 export interface RecurrenceRule {
   frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -16,12 +16,6 @@ interface RecurrenceSelectorProps {
   startDate?: string; // ISO date string used to pre-populate day_of_month / days_of_week
 }
 
-const FREQ_LABELS: Record<RecurrenceRule['frequency'], string> = {
-  daily: 'Day(s)',
-  weekly: 'Week(s)',
-  monthly: 'Month(s)',
-  yearly: 'Year(s)',
-};
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -29,7 +23,7 @@ const DAY_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function buildSummary(rule: RecurrenceRule | null): string {
   if (!rule) return '';
 
-  const intervalStr = rule.interval === 1 ? '' : `every ${rule.interval} `;
+
   let base = '';
 
   switch (rule.frequency) {

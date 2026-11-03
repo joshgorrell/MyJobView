@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const module={exports:{}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/workOrderScheduling.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module,exports:module.exports,Date});
+const {addDays,weekDates,overlappingBookings,schedulingError,selectionDuration,loadCalendarPages,monthDates,calendarPeriodDays}=module.exports;
+assert.equal(addDays('2026-03-08',1),'2026-03-09');
+assert.equal(addDays('2026-12-31',1),'2027-01-01');
+assert.deepEqual(Array.from(weekDates('2026-10-08')),['2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09','2026-10-10','2026-10-11']);
+const events=[{id:'job',technicianId:'a',date:'2026-10-12',start:'08:45',end:'09:15'},{id:'meeting',technicianId:'a',date:'2026-10-12',start:'10:15',end:'10:45'},{id:'pto',technicianId:'b',date:'2026-10-12',start:'00:00',end:'24:00'}];
+const at=(start,end,date='2026-10-12')=>({date,start,end});
+assert.equal(overlappingBookings(events,['a'],at('09:00','10:00')).length,1,'Partial-slot overlap blocks booking');
+assert.equal(overlappingBookings(events,['a'],at('09:30','10:30')).length,1,'Check the whole duration, not just the clicked start');
+assert.equal(overlappingBookings(events,['a'],at('09:15','10:15')).length,0,'Adjacent bookings are allowed');
+assert.equal(overlappingBookings(events,['a','b'],at('11:00','12:00')).length,1,'Every selected technician must be free');
+assert.equal(overlappingBookings(events,['b'],at('07:00','08:00','2026-10-13')).length,0);
+assert.ok(schedulingError(at('11:00','10:00')));assert.ok(schedulingError(at('11:00','11:00')));
+assert.equal(schedulingError(at('09:20','09:40')),null);
+assert.equal(selectionDuration(at('08:00','10:30')),150);
+assert.equal(selectionDuration(at('','')),60);
+console.log('Scheduling date boundaries, full-duration conflicts, team availability and manual minute precision passed.');
+
+const all=Array.from({length:1201},(_,id)=>({id}));const offsets=[];
+const paged=await loadCalendarPages({range(start,end){offsets.push(start);return Promise.resolve({data:all.slice(start,Math.min(end+1,start+100)),error:null,count:all.length})}});
+assert.equal(paged.data.length,1201);assert.equal(offsets[1],100,'Respect API caps without skipping rows');
+await assert.rejects(()=>loadCalendarPages({range(start){return Promise.resolve(start?{data:null,error:new Error('Page failed')}:{data:all.slice(0,500),error:null,count:1201})}}));
+console.log('Calendar pagination preserves every booking and rejects incomplete results.');
+
+assert.equal(monthDates('2026-10-08').length,42);assert.equal(monthDates('2026-10-08')[0],'2026-09-28');assert.equal(calendarPeriodDays('gantt'),14);assert.equal(calendarPeriodDays('week'),7);

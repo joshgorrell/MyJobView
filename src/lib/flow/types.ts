@@ -14,8 +14,12 @@ export interface FlowEvent {
   category: string;
   summary: string;
   details: string;
+  event_type?: string;
+  activity_recipient_user_id?: string | null;
   source_table: string;
   is_internal?: boolean;
+  audience_type?: 'direct' | 'department' | 'company' | null;
+  audience_department_id?: string | null;
   source_id: string;
   thread_id?: string | null;
   task_id?: string | null;

@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (existing) {
-      await supabase
+      const { error: saveError } = await supabase
         .from('quickbooks_settings')
         .update({
           access_token: tokens.access_token,
@@ -94,8 +94,9 @@ Deno.serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id);
+      if (saveError) return redirectToError(session.app_url, 'QuickBooks connection could not be saved');
     } else {
-      await supabase
+      const { error: saveError } = await supabase
         .from('quickbooks_settings')
         .insert({
           organization_id: session.organization_id,
@@ -109,6 +110,7 @@ Deno.serve(async (req: Request) => {
           auto_import_complete_data: false,
           auto_sync_enabled: false,
         });
+      if (saveError) return redirectToError(session.app_url, 'QuickBooks connection could not be saved');
     }
 
     await supabase
@@ -152,7 +154,7 @@ function redirectToSuccess(appUrl: string | null): Response {
   }
   return new Response(null, {
     status: 302,
-    headers: { ...corsHeaders, Location: `${url}/admin/settings?qbo=success` },
+    headers: { ...corsHeaders, Location: `${url.replace(/\/$/, '')}/?tab=settings&settingsTab=integrations&integration=quickbooks&qbo=success` },
   });
 }
 
@@ -166,6 +168,6 @@ function redirectToError(appUrl: string | null, message: string): Response {
   }
   return new Response(null, {
     status: 302,
-    headers: { ...corsHeaders, Location: `${url}/admin/settings?qbo=error&msg=${encodeURIComponent(message)}` },
+    headers: { ...corsHeaders, Location: `${url.replace(/\/$/, '')}/?tab=settings&settingsTab=integrations&integration=quickbooks&qbo=error` },
   });
 }

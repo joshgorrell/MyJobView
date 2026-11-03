@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ProposalLineItem, Product } from '../../lib/types';
 import { GripVertical, Trash2, Eye, EyeOff, Info, Package } from 'lucide-react';
 import ProductDetailEditModal from './ProductDetailEditModal';
@@ -57,11 +57,6 @@ export default function ProposalGridRow({
       updated.line_total = updated.quantity * updated.unit_price;
     }
 
-    if (field === 'unit_price' && calculatorMode === 'margin') {
-      const margin = updated.unit_price - (updated.cost || 0);
-      const marginPercent = updated.unit_price > 0 ? (margin / updated.unit_price) * 100 : 0;
-    }
-
     setLocalItem(updated);
   }
 
@@ -97,10 +92,10 @@ export default function ProposalGridRow({
     });
   }
 
+
   const margin = localItem.unit_price - (localItem.cost || 0);
   const marginPercent = localItem.unit_price > 0 ? (margin / localItem.unit_price) * 100 : 0;
 
-  const classColor = productClasses.find(c => c.name === (localItem as any).item_class)?.color || '#6b7280';
 
   const rowBg = coStatus === 'added'
     ? 'border-emerald-900/30 bg-emerald-950/15'
@@ -227,7 +222,7 @@ export default function ProposalGridRow({
         <input
           type="number"
           value={localItem.quantity}
-          onChange={(e) => handleFieldChange('quantity', parseFloat(e.target.value) || 0)}
+          onChange={(e) => handleFieldChange('quantity', parseFloat(String(e.target.value)) || 0)}
           onBlur={() => handleBlur('quantity')}
           onClick={(e) => e.stopPropagation()}
           className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1"
@@ -255,7 +250,7 @@ export default function ProposalGridRow({
             <input
               type="number"
               value={localItem.cost || 0}
-              onChange={(e) => handleFieldChange('cost', parseFloat(e.target.value) || 0)}
+              onChange={(e) => handleFieldChange('cost', parseFloat(String(e.target.value)) || 0)}
               onBlur={() => handleBlur('cost')}
               onClick={(e) => e.stopPropagation()}
               className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1"
@@ -273,7 +268,7 @@ export default function ProposalGridRow({
           <input
             type="number"
             value={localItem.unit_price}
-            onChange={(e) => handleFieldChange('unit_price', parseFloat(e.target.value) || 0)}
+            onChange={(e) => handleFieldChange('unit_price', parseFloat(String(e.target.value)) || 0)}
             onBlur={() => handleBlur('unit_price')}
             onClick={(e) => e.stopPropagation()}
             className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1"
@@ -303,7 +298,7 @@ export default function ProposalGridRow({
             <input
               type="number"
               value={marginPercent.toFixed(1)}
-              onChange={(e) => handleMarginPercentChange(parseFloat(e.target.value) || 0)}
+              onChange={(e) => handleMarginPercentChange(parseFloat(String(e.target.value)) || 0)}
               onClick={(e) => e.stopPropagation()}
               className={`w-full bg-transparent border-none text-right focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${
                 marginPercent >= 0 ? 'text-green-400' : 'text-red-400'
@@ -318,7 +313,7 @@ export default function ProposalGridRow({
 
       <td className="py-2 px-3 text-right font-semibold">
         {(localItem as any).is_customer_supplied ? (
-          <span className="text-amber-400">${(parseFloat(localItem.labor_total || 0)).toFixed(2)}</span>
+          <span className="text-amber-400">${(parseFloat(String(localItem.labor_total || 0))).toFixed(2)}</span>
         ) : (
           <span>${localItem.line_total.toFixed(2)}</span>
         )}

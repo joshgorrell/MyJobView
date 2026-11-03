@@ -67,6 +67,8 @@ interface PunchlistTaskDetailModalProps {
   isAdmin?: boolean;
   onClose: () => void;
   onTaskUpdated: () => void;
+  onSchedule?: () => void;
+  onRequestService?: () => void;
   onRecall?: (task: PunchlistTaskDetail) => void;
   onDelete?: (task: PunchlistTaskDetail) => void;
   onMarkComplete?: (task: PunchlistTaskDetail) => void;
@@ -90,17 +92,21 @@ export function PunchlistTaskDetailModal({
   isAdmin = false,
   onClose,
   onTaskUpdated,
+  onSchedule,
+  onRequestService,
   onRecall,
   onDelete,
   onMarkComplete,
 }: PunchlistTaskDetailModalProps) {
   const [task, setTask] = useState<PunchlistTaskDetail>(initialTask);
   const [customerNotes, setCustomerNotes] = useState(initialTask.customer_notes ?? '');
-  const [installerNotes, setInstallerNotes] = useState(initialTask.installer_notes ?? '');
+  const [installerNotes, setInstallerNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
+  const [noteError, setNoteError] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<TaskPhoto | null>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const installerTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const hasWorkOrder = !!(task.service_request?.work_order_id || task.work_order_id);
   const isLocked = hasWorkOrder;
@@ -111,21 +117,25 @@ export function PunchlistTaskDetailModal({
   useEffect(() => {
     setTask(initialTask);
     setCustomerNotes(initialTask.customer_notes ?? '');
-    setInstallerNotes(initialTask.installer_notes ?? '');
-  }, [initialTask]);
+    setInstallerNotes('');
+    if (isAdmin) {
+      supabase.from('punchlist_staff_notes').select('notes').eq('task_id', initialTask.id).maybeSingle()
+        .then(({ data }) => setInstallerNotes(data?.notes || ''));
+    }
+  }, [initialTask, isAdmin]);
 
   async function saveCustomerNotes(value: string) {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
-      setSavingNotes(true);
+      setSavingNotes(true); setNoteError('');
       try {
-        await supabase
-          .from('punchlist_tasks')
-          .update({ customer_notes: value || null })
-          .eq('id', task.id);
+        const result = await supabase.from('punchlist_tasks').update({ customer_notes: value || null }).eq('id', task.id);
+        if (result.error) throw result.error;
         setNotesSaved(true);
         setTimeout(() => setNotesSaved(false), 2000);
         onTaskUpdated();
+      } catch (error) {
+        setNoteError((error as { message?: string }).message || 'Notes could not be saved.');
       } finally {
         setSavingNotes(false);
       }
@@ -133,17 +143,17 @@ export function PunchlistTaskDetailModal({
   }
 
   async function saveInstallerNotes(value: string) {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(async () => {
-      setSavingNotes(true);
+    if (installerTimerRef.current) clearTimeout(installerTimerRef.current);
+    installerTimerRef.current = setTimeout(async () => {
+      setSavingNotes(true); setNoteError('');
       try {
-        await supabase
-          .from('punchlist_tasks')
-          .update({ installer_notes: value || null })
-          .eq('id', task.id);
+        const result = await supabase.rpc('save_punchlist_staff_note', { p_task_id: task.id, p_notes: value || null });
+        if (result.error) throw result.error;
         setNotesSaved(true);
         setTimeout(() => setNotesSaved(false), 2000);
         onTaskUpdated();
+      } catch (error) {
+        setNoteError((error as { message?: string }).message || 'Notes could not be saved.');
       } finally {
         setSavingNotes(false);
       }
@@ -330,7 +340,7 @@ export function PunchlistTaskDetailModal({
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                     <MessageSquare className="w-3.5 h-3.5" />
-                    Installer Notes
+                    Internal Work Notes
                   </p>
                   {savingNotes && (
                     <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -348,7 +358,7 @@ export function PunchlistTaskDetailModal({
                 <textarea
                   value={installerNotes}
                   onChange={(e) => handleInstallerNotesChange(e.target.value)}
-                  placeholder="Notes for the technician or installer about this task…"
+                  placeholder="Internal instructions and notes for your team…"
                   rows={3}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 resize-none leading-relaxed bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 />
@@ -356,18 +366,7 @@ export function PunchlistTaskDetailModal({
               </div>
             )}
 
-            {/* Customer view — read-only installer notes */}
-            {!isAdmin && task.installer_notes && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5" />
-                  Notes from Our Team
-                </p>
-                <p className="text-sm text-gray-700 leading-relaxed bg-amber-50 rounded-lg p-3 border border-amber-200">
-                  {task.installer_notes}
-                </p>
-              </div>
-            )}
+            {noteError && <p role="alert" className="text-sm text-red-600">{noteError}</p>}
 
             {/* Work order link */}
             {workOrder && (
@@ -407,7 +406,7 @@ export function PunchlistTaskDetailModal({
           </div>
 
           {/* Footer actions */}
-          {(onRecall || onDelete || onMarkComplete) && task.status !== 'completed' && (
+          {(onSchedule || onRequestService || onRecall || onDelete || onMarkComplete) && task.status !== 'completed' && (
             <div className="flex-shrink-0 border-t border-gray-200 px-4 sm:px-6 py-4">
               {isLocked ? (
                 <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
@@ -415,7 +414,18 @@ export function PunchlistTaskDetailModal({
                   A work order is scheduled — contact your Service Manager to cancel or make changes.
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-2 justify-end">
+                <div className="space-y-2">
+                  {isAdmin && (task.status === 'draft' || canAct) && (onSchedule || onRequestService) && <div className="flex gap-2">
+                    {onSchedule && (!task.service_request || task.service_request.status === 'open') && <button onClick={onSchedule}
+                      className="flex-1 min-h-11 flex items-center justify-center gap-1.5 px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+                      <Calendar className="w-4 h-4" />Schedule
+                    </button>}
+                    {onRequestService && task.status === 'draft' && !task.service_request_id && <button onClick={onRequestService}
+                      className="flex-1 min-h-11 flex items-center justify-center gap-1.5 px-2 py-2 bg-surface border border-strong text-primary rounded-lg text-sm font-semibold">
+                      <Send className="w-4 h-4" />Request Service
+                    </button>}
+                  </div>}
+                  <div className="flex flex-wrap gap-2 justify-end">
                   {onRecall && canAct && (
                     <button
                       onClick={() => onRecall(task)}
@@ -437,12 +447,13 @@ export function PunchlistTaskDetailModal({
                   {onMarkComplete && (
                     <button
                       onClick={() => onMarkComplete(task)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-elevated hover:bg-surface text-primary border border-subtle rounded-lg text-sm font-medium transition-colors"
                     >
                       <CheckCheck className="w-4 h-4" />
                       Mark Complete
                     </button>
                   )}
+                  </div>
                 </div>
               )}
             </div>

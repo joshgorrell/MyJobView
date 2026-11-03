@@ -27,6 +27,7 @@ interface ScheduleItem {
   technician_name: string;
   customer_name?: string;
   priority?: string;
+  estimated_hours?: number | null;
 }
 
 interface Technician {
@@ -193,6 +194,7 @@ export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChan
         status,
         priority,
         assigned_to,
+        estimated_hours,
         contact_id,
         contacts (
           full_name,
@@ -220,6 +222,7 @@ export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChan
       technician_id: wo.assigned_to,
       technician_name: wo.profiles?.full_name || 'Unknown',
       customer_name: wo.contacts?.full_name || wo.contacts?.company_name || 'Unknown',
+      estimated_hours: wo.estimated_hours,
       priority: wo.priority
     }));
   }
@@ -492,7 +495,7 @@ export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChan
     handleTimeSlotClick(date, timeSlot, hasItems, techId);
   }
 
-  function handleSlotMouseEnter(date: Date, timeSlot: string, hasItems: boolean, techId?: string) {
+  function handleSlotMouseEnter(date: Date, timeSlot: string, hasItems: boolean, _techId?: string) {
     if (!isDragging || hasItems || !selectedSlot || !dragStartSlot) return;
 
     const dateStr = date.toISOString().split('T')[0];
@@ -721,7 +724,7 @@ export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChan
                           dayEnd.setHours(23, 59, 59, 999);
 
                           const dayItems = techItems.filter(item => {
-                            const itemDate = new Date(item.start_date);
+                            const itemDate = new Date(item.date);
                             return itemDate >= dayStart && itemDate <= dayEnd;
                           });
 
@@ -829,7 +832,7 @@ export function ScheduleViewer({ selectedTechnicianIds, selectedDate, onDateChan
 
                 {/* Time grid - Hours displayed vertically like Google Calendar */}
                 <div className="relative" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-                  {TIME_SLOTS.map((timeSlot, idx) => (
+                  {TIME_SLOTS.map((timeSlot, _idx) => (
                     <div
                       key={timeSlot}
                       className="grid gap-px bg-gray-100"

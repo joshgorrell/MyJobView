@@ -1,0 +1,114 @@
+name: Build MJV iOS (EAS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Check remote version, initialize it to 5, or launch production build'
+        required: true
+        type: choice
+        options:
+          - check
+          - initialize
+          - build
+        default: check
+      version_counter_checked:
+        description: 'For build only: I verified remote iOS build number is 5 or higher'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mjv-ios-production-build
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    if: ${{ inputs.action == 'check' || inputs.action == 'initialize' || (inputs.action == 'build' && inputs.version_counter_checked) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Expo token exists
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an Expo access token as repository Actions secret EXPO_TOKEN."
+            exit 1
+          fi
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install EAS CLI via npm
+        run: npm install --global eas-cli@latest
+      - name: Verify Expo authentication
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas whoami
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+      - name: Verify mobile TypeScript
+        working-directory: mobile
+        run: npx tsc --noEmit
+      - name: Initialize EAS remote iOS build number to 5
+        if: ${{ inputs.action == 'initialize' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        working-directory: mobile
+        run: |
+          # Use a real PTY and send CR, not LF, to avoid NUL injection by script(1).
+          python3 - <<'PY'
+          import os, pty, select, subprocess, sys, time
+          master, slave = pty.openpty()
+          proc = subprocess.Popen(
+              ['eas', 'build:version:set', '--platform', 'ios', '--profile', 'production'],
+              stdin=slave, stdout=slave, stderr=slave, close_fds=True)
+          os.close(slave)
+          transcript = b''
+          sent = False
+          deadline = time.monotonic() + 90
+          while time.monotonic() < deadline:
+              ready, _, _ = select.select([master], [], [], 0.5)
+              if ready:
+                  try:
+                      chunk = os.read(master, 8192)
+                  except OSError:
+                      break
+                  if not chunk:
+                      break
+                  transcript += chunk
+                  sys.stdout.buffer.write(chunk)
+                  sys.stdout.buffer.flush()
+                  if not sent and b'What version would you like to initialize it with?' in transcript:
+                      os.write(master, b'5\r')
+                      sent = True
+              if proc.poll() is not None:
+                  break
+          if proc.poll() is None:
+              proc.terminate()
+              proc.wait(timeout=5)
+              raise SystemExit('EAS version initialization timed out')
+          os.close(master)
+          raise SystemExit(proc.returncode)
+          PY
+      - name: Show EAS remote iOS build version
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        working-directory: mobile
+        run: eas build:version:get --platform ios --profile production --non-interactive
+      - name: Start production iOS build
+        if: ${{ inputs.action == 'build' && inputs.version_counter_checked }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        working-directory: mobile
+        run: eas build --platform ios --profile production --auto-submit --non-interactive --no-wait

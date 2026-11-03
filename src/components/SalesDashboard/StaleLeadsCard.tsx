@@ -10,9 +10,10 @@ function formatCurrency(value: number): string {
 interface StaleLeadsCardProps {
   leads: StaleLead[];
   onNavigateToPipeline?: () => void;
+  onLeadClick?: (id: string) => void;
 }
 
-export function StaleLeadsCard({ leads, onNavigateToPipeline }: StaleLeadsCardProps) {
+export function StaleLeadsCard({ leads, onNavigateToPipeline, onLeadClick }: StaleLeadsCardProps) {
   if (leads.length === 0) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -43,7 +44,7 @@ export function StaleLeadsCard({ leads, onNavigateToPipeline }: StaleLeadsCardPr
       </div>
       <div className="space-y-2">
         {leads.map((lead) => (
-          <div key={lead.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+          <button type="button" onClick={() => onLeadClick?.(lead.id)} key={lead.id} className="w-full text-left flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800 truncate">
                 {lead.contactName || lead.companyName || 'Unknown'}
@@ -58,7 +59,7 @@ export function StaleLeadsCard({ leads, onNavigateToPipeline }: StaleLeadsCardPr
                 {lead.daysSinceContact >= 999 ? 'Never contacted' : `${lead.daysSinceContact}d ago`}
               </span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </div>

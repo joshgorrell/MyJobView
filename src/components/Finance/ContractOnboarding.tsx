@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
+import { staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
 import { Search, CheckCircle, AlertCircle, FileText, Calendar, User, DollarSign, XCircle, MessageSquare, BarChart2, List, Upload, Shield, ArrowRight } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
@@ -10,6 +12,7 @@ interface Contract {
   contact: any;
   template: any;
   status: string;
+  onboarding_revision?: number;
   created_at: string;
   customer_completed_at: string;
   approved_at: string;
@@ -43,27 +46,20 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [confirmApproveContract, setConfirmApproveContract] = useState<Contract | null>(null);
   const [activeTab, setActiveTab] = useState<'contracts' | 'stats'>('contracts');
-  const [stats, setStats] = useState({
-    totalCancelled: 0,
-    cancelledThisMonth: 0,
-    averageContractDuration: 0
-  });
-
   const statusColumns: StatusColumn[] = [
     { key: 'pending_approval', label: 'Awaiting Approval', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
+    { key: 'approved', label: 'Approved — Awaiting Activation', icon: Shield, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
     { key: 'active', label: 'Active', icon: FileText, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
     { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
   ];
 
   useEffect(() => {
     loadContracts();
-    loadCancellationStats();
 
     const channel = supabase
       .channel('contract_management_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'security_contracts' }, () => {
         loadContracts();
-        loadCancellationStats();
       })
       .subscribe();
 
@@ -82,11 +78,11 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
           template:security_contract_templates(*),
           cancelled_by_profile:profiles!cancelled_by_user_id(full_name, first_name, last_name)
         `)
-        .in('status', ['pending_approval', 'active', 'cancelled'])
+        .in('status', ['pending_approval', 'customer_completed', 'approved', 'rejected', 'active', 'cancelled'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setContracts(data || []);
+      setContracts((data || []).map(c => c.status === 'rejected' ? {...c,status:'pending_approval'} : c));
     } catch (error) {
       console.error('Error loading contracts:', error);
     } finally {
@@ -94,54 +90,16 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
     }
   }
 
-  async function loadCancellationStats() {
-    try {
-      const { data: cancelledContracts, error } = await supabase
-        .from('security_contracts')
-        .select('created_at, cancelled_at, activated_at')
-        .eq('status', 'cancelled');
-
-      if (error) throw error;
-
-      const now = new Date();
-      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-      const cancelledThisMonth = (cancelledContracts || []).filter(c =>
-        c.cancelled_at && new Date(c.cancelled_at) >= firstOfMonth
-      ).length;
-
-      let totalDuration = 0;
-      let count = 0;
-      (cancelledContracts || []).forEach(c => {
-        if (c.activated_at && c.cancelled_at) {
-          const duration = new Date(c.cancelled_at).getTime() - new Date(c.activated_at).getTime();
-          totalDuration += duration;
-          count++;
-        }
-      });
-
-      const averageDurationMs = count > 0 ? totalDuration / count : 0;
-      const averageDurationMonths = averageDurationMs / (1000 * 60 * 60 * 24 * 30);
-
-      setStats({
-        totalCancelled: cancelledContracts?.length || 0,
-        cancelledThisMonth,
-        averageContractDuration: Math.round(averageDurationMonths * 10) / 10
-      });
-    } catch (error) {
-      console.error('Error loading cancellation stats:', error);
-    }
-  }
-
   function getContractsByStatus(status: string) {
     return contracts.filter(c => {
+      const effectiveStatus = c.status === 'customer_completed' ? 'pending_approval' : c.status;
       const matchesSearch = searchTerm === '' ||
         c.contact?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.contact?.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesUnclassified = !showUnclassifiedOnly || !c.account_type;
 
-      return c.status === status && matchesSearch && matchesUnclassified;
+      return effectiveStatus === status && matchesSearch && matchesUnclassified;
     });
   }
 
@@ -171,23 +129,13 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
 
   async function handleApproveContract(contract: Contract) {
     try {
-      const { error } = await supabase
-        .from('security_contracts')
-        .update({
-          status: 'active',
-          approved_at: new Date().toISOString(),
-          activated_at: new Date().toISOString()
-        })
-        .eq('id', contract.id);
+      await staffSecurityOnboarding('approve', contract.id, { revision: contract.onboarding_revision || 0 });
 
-      if (error) throw error;
-
-      alert('Security contract approved and activated successfully!');
+      notify('Security contract approved. Open it to complete activation.', { theme: 'emerald', tone: 'info' });
       loadContracts();
-      loadCancellationStats();
     } catch (error) {
       console.error('Error approving contract:', error);
-      alert('Failed to approve security contract');
+      notify('Failed to approve security contract', { theme: 'emerald', tone: 'error' });
     }
   }
 
@@ -237,25 +185,25 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="security-onboarding-controls p-3 sm:p-4 lg:p-5">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Shield className="w-6 h-6 text-blue-400" />
+          <h1 className="text-lg sm:text-xl font-bold text-white flex items-start sm:items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-400 shrink-0 mt-1 sm:mt-0" />
             Security Contract Management
           </h1>
-          <p className="text-gray-300 mt-1">Review, approve, activate, and manage security monitoring contracts</p>
+          <p className="text-sm text-gray-300 mt-1">Review, approve, activate, and manage security monitoring contracts</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 lg:flex gap-2 w-full lg:w-auto">
         {onNavigateToOnboarding && (
-          <button onClick={onNavigateToOnboarding} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
+          <button onClick={onNavigateToOnboarding} className="flex items-center justify-center gap-2 px-2 sm:px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium">
             <ArrowRight className="w-4 h-4" /> Create New Contract
           </button>
         )}
         {onNavigateToImport && (
           <button
             onClick={onNavigateToImport}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            className="flex items-center justify-center gap-2 px-2 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
           >
             <Upload className="w-4 h-4" />
             Import Security Contracts
@@ -264,10 +212,10 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </div>
       </div>
 
-      <div className="flex gap-1 mb-6 bg-white/10 rounded-lg p-1 w-fit">
+      <div className="grid grid-cols-2 gap-1 mb-4 bg-white/10 rounded-lg p-1 w-full sm:w-fit">
         <button
           onClick={() => setActiveTab('contracts')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'contracts'
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-300 hover:text-white'
@@ -278,7 +226,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </button>
         <button
           onClick={() => setActiveTab('stats')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'stats'
               ? 'bg-white text-gray-900 shadow-sm'
               : 'text-gray-300 hover:text-white'
@@ -292,52 +240,22 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
       {activeTab === 'stats' && <SecurityAccountStats />}
 
       {activeTab === 'contracts' && <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-red-600 font-medium mb-1">Total Cancelled</p>
-              <p className="text-3xl font-bold text-red-900">{stats.totalCancelled}</p>
-            </div>
-            <XCircle className="w-10 h-10 text-red-600 opacity-50" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-orange-600 font-medium mb-1">Cancelled This Month</p>
-              <p className="text-3xl font-bold text-orange-900">{stats.cancelledThisMonth}</p>
-            </div>
-            <AlertCircle className="w-10 h-10 text-orange-600 opacity-50" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-purple-600 font-medium mb-1">Avg Contract Duration</p>
-              <p className="text-3xl font-bold text-purple-900">{stats.averageContractDuration} mo</p>
-            </div>
-            <Calendar className="w-10 h-10 text-purple-600 opacity-50" />
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+      <div className="mb-4 flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
+            aria-label="Search contracts"
             placeholder="Search by customer name or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           />
         </div>
         <button
           onClick={() => setShowUnclassifiedOnly(!showUnclassifiedOnly)}
-          className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 font-medium text-sm transition-colors whitespace-nowrap ${
+          aria-pressed={showUnclassifiedOnly}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg border font-medium text-sm transition-colors whitespace-nowrap ${
             showUnclassifiedOnly
               ? 'border-amber-500 bg-amber-50 text-amber-700'
               : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
@@ -354,45 +272,45 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-3 items-start">
         {statusColumns.map((column) => {
           const Icon = column.icon;
           const columnContracts = getContractsByStatus(column.key);
 
           return (
-            <div key={column.key} className="flex flex-col">
-              <div className={`${column.bgColor} ${column.borderColor} border-2 rounded-t-lg p-4`}>
-                <div className="flex items-center justify-between">
+            <div key={column.key} className="flex min-w-0 flex-col">
+              <div className={`${column.bgColor} ${column.borderColor} border rounded-t-lg px-3 py-2.5`}>
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Icon className={`w-6 h-6 ${column.color}`} />
-                    <h3 className={`font-bold text-lg ${column.color}`}>{column.label}</h3>
+                    <Icon className={`w-4 h-4 shrink-0 ${column.color}`} />
+                    <h3 className={`font-semibold text-sm ${column.color}`}>{column.label}</h3>
                   </div>
-                  <span className={`${column.color} font-bold text-2xl`}>
+                  <span className={`${column.color} font-semibold text-sm rounded-full bg-white/70 px-2 py-0.5`}>
                     {columnContracts.length}
                   </span>
                 </div>
               </div>
 
-              <div className={`flex-1 ${column.bgColor} ${column.borderColor} border-2 border-t-0 rounded-b-lg p-4 space-y-4 min-h-[600px]`}>
+              <div className={`flex-1 ${column.bgColor} ${column.borderColor} border border-t-0 rounded-b-lg p-2 space-y-2`}>
                 {columnContracts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Icon className={`w-12 h-12 ${column.color} opacity-50 mx-auto mb-2`} />
-                    <p className="font-medium">No security contracts</p>
+                  <div className="text-center py-5 text-sm text-gray-500">
+                    <Icon className={`w-5 h-5 ${column.color} opacity-50 mx-auto mb-2`} />
+                    <p className="font-medium">{searchTerm || showUnclassifiedOnly ? 'No matching contracts' : 'No security contracts'}</p>
                   </div>
                 ) : (
                   columnContracts.map((contract) => {
                     return (
                       <div
                         key={contract.id}
-                        className="bg-white border-2 border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-lg transition-all"
+                        className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-all"
                       >
-                        <div className="flex items-start gap-4 mb-4">
-                          <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                            <User className="w-6 h-6 text-white" />
+                        <div className="flex items-start gap-2 mb-3">
+                          <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                            <User className="w-4 h-4 text-white" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <h4 className="font-bold text-base text-gray-900">
+                              <h4 className="font-semibold text-sm text-gray-900">
                                 {contract.contact?.full_name || 'Unknown'}
                               </h4>
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
@@ -421,7 +339,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                           </div>
                         </div>
 
-                        <div className="space-y-2.5 mb-4">
+                        <div className="space-y-2 mb-3">
                           <div className="flex items-start gap-2 text-sm text-gray-700">
                             <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" />
                             <span className="font-medium break-words">{contract.template?.name || 'No template'}</span>
@@ -488,7 +406,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                         </div>
 
                         {contract.notes && (
-                          <p className="text-sm text-gray-600 mb-4 p-3 bg-gray-50 rounded border border-gray-200 line-clamp-3">
+                          <p className="text-sm text-gray-600 mb-3 p-2 bg-gray-50 rounded border border-gray-200 line-clamp-3">
                             {contract.notes}
                           </p>
                         )}
@@ -497,7 +415,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
                           {contract.status === 'pending_approval' && (
                             <button
                               onClick={() => setConfirmApproveContract(contract)}
-                              className="w-full px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                             >
                               <CheckCircle className="w-4 h-4" />
                               Approve & Activate
@@ -506,7 +424,7 @@ export default function ContractOnboarding({ onNavigateToImport, onNavigateToOnb
 
                           <button
                             onClick={() => setSelectedContract(contract)}
-                            className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                            className="w-full px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                           >
                             <FileText className="w-4 h-4" />
                             View Details

@@ -7,15 +7,16 @@ const corsHeaders = {
 };
 
 interface VCardRequest {
-  fullName: string;
+  fullName?: string;
   title?: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
   company?: string;
   website?: string;
   linkedinUrl?: string;
   photoUrl?: string;
   bio?: string;
+  url?: string;
 }
 
 function generateVCardData(data: VCardRequest): string {
@@ -87,9 +88,9 @@ Deno.serve(async (req: Request) => {
   try {
     const data: VCardRequest = await req.json();
 
-    if (!data.fullName || !data.email || !data.phone) {
+    if (!data.url && (!data.fullName || !data.email || !data.phone)) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: fullName, email, phone" }),
+        JSON.stringify({ error: "Missing required card information" }),
         {
           status: 400,
           headers: {
@@ -100,8 +101,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const vcardData = generateVCardData(data);
-    const qrCodeDataUrl = await generateQRCode(vcardData);
+    const qrCodeDataUrl = await generateQRCode(data.url || generateVCardData(data));
 
     return new Response(
       JSON.stringify({ qrCode: qrCodeDataUrl }),

@@ -1,0 +1,80 @@
+{
+  "engine": "PGlite 0.3.14",
+  "localAuthInterface": true,
+  "nativeAuthService": false,
+  "serverVersion": "17.5",
+  "appliedCounts": {
+    "keys": 531,
+    "checks": 525,
+    "foreignKeys": 1163,
+    "indexes": 1893
+  },
+  "definitionsCompared": 4112,
+  "exactDefinitionsMatched": 4111,
+  "definitionMismatches": [
+    {
+      "stage": "checks",
+      "identity": "public.proposal_loss_feedback",
+      "name": "proposal_loss_feedback_reasons_check",
+      "differingFields": [
+        "definition"
+      ]
+    }
+  ],
+  "reusedIndexes": 531,
+  "failures": [],
+  "deferred": [
+    {
+      "stage": "constraints",
+      "identity": "public.change_orders",
+      "name": "sales_credit_change_order",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.invoice_line_item_sources",
+      "name": "sales_credit_work_order_link",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.invoices",
+      "name": "sales_credit_invoice",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.proposals",
+      "name": "sales_credit_proposal",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.recurring_invoices",
+      "name": "sales_credit_recurring_link",
+      "reason": "constraint-trigger-review"
+    },
+    {
+      "stage": "constraints",
+      "identity": "public.sales_orders",
+      "name": "sales_credit_order",
+      "reason": "constraint-trigger-review"
+    }
+  ],
+  "prerequisiteAppliedCounts": {
+    "schemas": 6,
+    "routines": 793,
+    "defaults": 2534
+  },
+  "prerequisiteDefinitionsCompared": 3327,
+  "prerequisiteFailures": [],
+  "fullBaseline": false,
+  "runtimeTestsAllowed": false,
+  "restoreApproved": false,
+  "quoteReady": false,
+  "productionWrites": false,
+  "capturedOn": "2026-10-30",
+  "sourcePostgresVersion": "17.6",
+  "sourceDataCopied": false,
+  "nativeSupabaseRestore": false
+}

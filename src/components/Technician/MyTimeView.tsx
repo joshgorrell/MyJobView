@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { AttendanceBadge, useAttendanceResults } from '../Shared/AttendanceBadge';
+import { notify } from '../../lib/feedback';
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
+import { MyJobTimeView } from './MyJobTimeView';
+import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Clock, Calendar, Coffee, Lock, AlertCircle, Edit2, XCircle, CheckCircle, Clock3 } from 'lucide-react';
@@ -28,7 +33,11 @@ interface TimeRequest {
 
 export function MyTimeView() {
   const { profile } = useAuth();
+  const policy = useEmployeeTimePolicy();
+  const [timezone,setTimezone]=useState('America/Chicago');
+  useEffect(()=>{void getOrganizationTimezone().then(setTimezone);},[]);
   const [entries, setEntries] = useState<ClockEntry[]>([]);
+  const attendance = useAttendanceResults(entries.map(e => e.id));
   const [requests, setRequests] = useState<Record<string, TimeRequest>>({});
   const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<ClockEntry | null>(null);
@@ -36,7 +45,7 @@ export function MyTimeView() {
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
-    if (profile?.id) {
+    if (profile?.id && policy.ready && policy.basis === 'daily_clock') {
       loadEntries();
       loadRequests();
 
@@ -65,7 +74,7 @@ export function MyTimeView() {
         channel.unsubscribe();
       };
     }
-  }, [profile?.id]);
+  }, [profile?.id, policy.ready, policy.basis]);
 
   async function loadEntries() {
     try {
@@ -76,7 +85,7 @@ export function MyTimeView() {
         .from('daily_clock_entries')
         .select('*')
         .eq('technician_id', profile?.id)
-        .gte('entry_date', sevenDaysAgo.toISOString().split('T')[0])
+        .gte('entry_date', formatDateInTimezone(sevenDaysAgo.toISOString(),await getOrganizationTimezone()))
         .order('entry_date', { ascending: false });
 
       if (error) throw error;
@@ -123,7 +132,7 @@ export function MyTimeView() {
       loadRequests();
     } catch (error) {
       console.error('Error cancelling request:', error);
-      alert('Failed to cancel request');
+      notify('Failed to cancel request', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -171,6 +180,9 @@ export function MyTimeView() {
         return null;
     }
   }
+
+  if (policy.loading || !policy.ready) return <p className="text-secondary">Loading time configuration…</p>;
+  if (policy.basis !== 'daily_clock') return <MyJobTimeView salary={policy.basis === 'salary'} />;
 
   if (loading) {
     return (
@@ -226,7 +238,7 @@ export function MyTimeView() {
                     <div className="flex items-center gap-3 mb-3">
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <div>
-                        <div className="font-semibold text-gray-900">
+                        <div className="flex items-center gap-2"><AttendanceBadge result={attendance[entry.id]} /><div className="font-semibold text-gray-900">
                           {new Date(entry.entry_date).toLocaleDateString('en-US', {
                             weekday: 'long',
                             month: 'long',
@@ -234,7 +246,7 @@ export function MyTimeView() {
                             year: 'numeric'
                           })}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        </div><div className="text-xs text-gray-500">
                           {daysDiff === 0 ? 'Today' :
                            daysDiff === 1 ? 'Yesterday' :
                            `${daysDiff} days ago`}
@@ -251,7 +263,7 @@ export function MyTimeView() {
                             {new Date(entry.clock_in).toLocaleTimeString('en-US', {
                               hour: 'numeric',
                               minute: '2-digit',
-                              hour12: true
+                              hour12: true, timeZone:timezone
                             })}
                           </span>
                         </div>
@@ -265,7 +277,7 @@ export function MyTimeView() {
                               new Date(entry.clock_out).toLocaleTimeString('en-US', {
                                 hour: 'numeric',
                                 minute: '2-digit',
-                                hour12: true
+                                hour12: true, timeZone:timezone
                               })
                             ) : (
                               <span className="text-blue-600">Still Clocked In</span>

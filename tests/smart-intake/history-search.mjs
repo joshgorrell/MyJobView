@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/smart-intake/history-search.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+assert.equal(exports.sanitizeHistorySearch({limit:999}).limit,100);
+assert.equal(exports.sanitizeHistorySearch({search:' hello%_() '}).search,'hello');
+assert.throws(()=>exports.sanitizeHistorySearch({from:'2026-11-02',to:'2026-10-01'}));
+console.log('History filter validation passed');

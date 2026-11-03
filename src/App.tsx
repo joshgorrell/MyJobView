@@ -1,7 +1,16 @@
+import { notify } from './lib/feedback';
+import { recordPageVisit } from './lib/pageVisitTracking';
+import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
+import { PasswordSetup } from './components/Auth/PasswordSetup';
+import { canManageTimeOff } from './lib/timeOff';
+import { WorkspaceTabs } from './components/Shared/WorkspaceTabs';
+import { pageFromLocation, workspacePage, workspaceUrl, isPortalProposalRoute } from './lib/workspaceRoutes';
+import { resolveLegacyPage } from './lib/permissionCatalog';
+import { syncVisitEvents } from './lib/jobOffline';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DepartmentProvider, useDepartments } from './contexts/DepartmentContext';
-import { TenantProvider, useTenant } from './contexts/TenantContext';
+import { TenantProvider } from './contexts/TenantContext';
 import { LoginForm } from './components/Auth/LoginForm';
 import { Header } from './components/Layout/Header';
 import { QuickAccessNavigation } from './components/Layout/QuickAccessNavigation';
@@ -15,16 +24,20 @@ import { ToastProvider } from './components/Shared/Toast';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 import { BrandedLoading } from './components/Shared/BrandedLoading';
 import { AIAssistant } from './components/AIAssistant/AIAssistant';
-import type { ProposalPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { ProposalPrefill, LeadPrefill, ServiceRequestPrefill, SecurityContractPrefill } from './components/AIAssistant/AIAssistant';
+import type { SalesRecord } from './lib/salesDashboardRecords';
 import type { SalesRepAIContext } from './components/SalesDashboard/SalesDashboardPage';
-import { X, LogOut, FileText, TrendingUp } from 'lucide-react';
+import { LogOut, FileText, TrendingUp } from 'lucide-react';
 import { offlineStorage } from './lib/offlineStorage';
 import { syncManager } from './lib/syncManager';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { supabase } from './lib/supabase';
 import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
+import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
+const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
+const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
 // Lazy load components
@@ -38,6 +51,7 @@ const MasterFeed = lazy(() => import('./components/Feed/MasterFeed').then(m => (
 const QuickFlowUpdateModal = lazy(() => import('./components/Flow/QuickFlowUpdateModal').then(m => ({ default: m.QuickFlowUpdateModal })));
 const FishbowlView = lazy(() => import('./components/Fishbowl/FishbowlView').then(m => ({ default: m.FishbowlView })));
 const BusinessCardPage = lazy(() => import('./components/BusinessCard/BusinessCardPage').then(m => ({ default: m.BusinessCardPage })));
+const CompanyDirectory = lazy(() => import('./components/CompanyDirectory/CompanyDirectory').then(m => ({ default: m.CompanyDirectory })));
 const MyCardView = lazy(() => import('./components/BusinessCard/MyCardView').then(m => ({ default: m.MyCardView })));
 const Settings = lazy(() => import('./components/Admin/Settings').then(m => ({ default: m.Settings })));
 const PointsAndRewards = lazy(() => import('./components/Admin/PointsAndRewards').then(m => ({ default: m.PointsAndRewards })));
@@ -46,8 +60,8 @@ const DepartmentManager = lazy(() => import('./components/Admin/DepartmentManage
 const GPSDiagnostics = lazy(() => import('./components/Admin/GPSDiagnostics').then(m => ({ default: m.GPSDiagnostics })));
 const ContactCSVImport = lazy(() => import('./components/Admin/ContactCSVImport').then(m => ({ default: m.ContactCSVImport })));
 const SecurityContractCSVImport = lazy(() => import('./components/Admin/SecurityContractCSVImport').then(m => ({ default: m.SecurityContractCSVImport })));
-const MaintenanceAgreements = lazy(() => import('./components/Finance/MaintenanceAgreements'));
-const EquipmentWarrantyAgreements = lazy(() => import('./components/Finance/EquipmentWarrantyAgreements'));
+
+
 const HistoricalSalesImport = lazy(() => import('./components/Admin/HistoricalSalesImport').then(m => ({ default: m.HistoricalSalesImport })));
 const DailySalesReportImport = lazy(() => import('./components/Admin/DailySalesReportImport').then(m => ({ default: m.DailySalesReportImport })));
 const TasksView = lazy(() => import('./components/Tasks/TasksView').then(m => ({ default: m.TasksView })));
@@ -55,14 +69,12 @@ const TaskForm = lazy(() => import('./components/Tasks/TaskForm').then(m => ({ d
 const UserPreferences = lazy(() => import('./components/Settings/UserPreferences').then(m => ({ default: m.UserPreferences })));
 const HowItWorks = lazy(() => import('./components/Help/HowItWorks').then(m => ({ default: m.HowItWorks })));
 const ProposalsView = lazy(() => import('./components/Proposals/ProposalsView'));
-const ConnectionsView = lazy(() => import('./components/Connections/ConnectionsView'));
 const ImprovementsView = lazy(() => import('./components/Improvements/ImprovementsView').then(m => ({ default: m.ImprovementsView })));
 const RecurView = lazy(() => import('./components/Recur/RecurView'));
 const DispatchConsole = lazy(() => import('./components/Dispatch/DispatchConsole').then(m => ({ default: m.DispatchConsole })));
 const ServiceRequestConsole = lazy(() => import('./components/Dispatch/ServiceRequestConsole').then(m => ({ default: m.ServiceRequestConsole })));
 const TravelBonusQueue = lazy(() => import('./components/Dispatch/TravelBonusQueue').then(m => ({ default: m.TravelBonusQueue })));
 const ProjectWorkOrdersQueue = lazy(() => import('./components/Dispatch/ProjectWorkOrdersQueue').then(m => ({ default: m.ProjectWorkOrdersQueue })));
-const DispatchCustomerComms = lazy(() => import('./components/Dispatch/DispatchCustomerComms').then(m => ({ default: m.DispatchCustomerComms })));
 const WorkOrdersList = lazy(() => import('./components/Production/WorkOrdersList').then(m => ({ default: m.WorkOrdersList })));
 const WorkOrderDetail = lazy(() => import('./components/Production/WorkOrderDetail').then(m => ({ default: m.WorkOrderDetail })));
 const ChangeOrdersView = lazy(() => import('./components/Production/ChangeOrdersView').then(m => ({ default: m.ChangeOrdersView })));
@@ -71,7 +83,7 @@ const TechnicianWorkCenter = lazy(() => import('./components/Production/Technici
 const ProductionManagerDashboard = lazy(() => import('./components/Production/ProductionManagerDashboard').then(m => ({ default: m.ProductionManagerDashboard })));
 const PartsRequestManagement = lazy(() => import('./components/Production/PartsRequestManagement').then(m => ({ default: m.PartsRequestManagement })));
 const JobPhotosGallery = lazy(() => import('./components/Production/JobPhotosGallery').then(m => ({ default: m.JobPhotosGallery })));
-const TechStats = lazy(() => import('./components/Production/TechStats').then(m => ({ default: m.TechStats })));
+
 const InventoryDashboard = lazy(() => import('./components/Inventory/InventoryDashboard').then(m => ({ default: m.InventoryDashboard })));
 const PurchaseOrders = lazy(() => import('./components/Inventory/PurchaseOrders').then(m => ({ default: m.PurchaseOrders })));
 const ServiceBillingQueue = lazy(() => import('./components/Service/ServiceBillingQueue').then(m => ({ default: m.ServiceBillingQueue })));
@@ -80,22 +92,20 @@ const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopo
 const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
 const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
-const SalesActivity = lazy(() => import('./components/Sales/SalesActivity').then(m => ({ default: m.SalesActivity })));
-const SalesPerformance = lazy(() => import('./components/Sales/SalesPerformance').then(m => ({ default: m.SalesPerformance })));
+
 const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').then(m => ({ default: m.SalesOrdersView })));
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
 const ReviewsView = lazy(() => import('./components/Sales/ReviewsView'));
 const SalesServiceRequestsView = lazy(() => import('./components/Sales/SalesServiceRequestsView').then(m => ({ default: m.SalesServiceRequestsView })));
 const IndividualDashboard = lazy(() => import('./components/Dashboard/IndividualDashboard').then(m => ({ default: m.IndividualDashboard })));
-const TeamLeaderboard = lazy(() => import('./components/Dashboard/TeamLeaderboard').then(m => ({ default: m.TeamLeaderboard })));
+
 const ProjectsView = lazy(() => import('./components/Projects/ProjectsView'));
 const InvoicesView = lazy(() => import('./components/Invoices/InvoicesView').then(m => ({ default: m.InvoicesView })));
 const CommissionsPage = lazy(() => import('./components/Commissions/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
-const MessagesView = lazy(() => import('./components/Messages/MessagesView').then(m => ({ default: m.MessagesView })));
 const PunchlistAdminDashboard = lazy(() => import('./components/Production/PunchlistAdminDashboard').then(m => ({ default: m.PunchlistAdminDashboard })));
 const TestTunePerformanceDashboard = lazy(() => import('./components/Production/TestTunePerformanceDashboard').then(m => ({ default: m.TestTunePerformanceDashboard })));
 const VIPPlanManagement = lazy(() => import('./components/Finance/VIPPlanManagement').then(m => ({ default: m.VIPPlanManagement })));
-const BonusApprovalDashboard = lazy(() => import('./components/Finance/BonusApprovalDashboard').then(m => ({ default: m.BonusApprovalDashboard })));
+
 const TestTuneSettings = lazy(() => import('./components/Admin/TestTuneSettings').then(m => ({ default: m.TestTuneSettings })));
 const PortalPunchlist = lazy(() => import('./components/Portal/PortalPunchlist').then(m => ({ default: m.PortalPunchlist })));
 const PortalVIPMembership = lazy(() => import('./components/Portal/PortalVIPMembership').then(m => ({ default: m.PortalVIPMembership })));
@@ -104,20 +114,22 @@ const PortalSignup = lazy(() => import('./components/Portal/PortalSignup').then(
 const PortalDashboard = lazy(() => import('./components/Portal/PortalDashboard').then(m => ({ default: m.PortalDashboard })));
 const PortalContactUs = lazy(() => import('./components/Portal/PortalContactUs').then(m => ({ default: m.PortalContactUs })));
 const PortalProposals = lazy(() => import('./components/Portal/PortalProposals').then(m => ({ default: m.PortalProposals })));
-const DailyClock = lazy(() => import('./components/Technician/DailyClock').then(m => ({ default: m.DailyClock })));
+const FinanceTimeWorkspace = lazy(() => import('./components/Finance/FinanceTimeWorkspace').then(m => ({ default: m.FinanceTimeWorkspace })));
+const EmployeeTimeClock = lazy(() => import('./components/Technician/EmployeeTimeClock').then(m => ({ default: m.EmployeeTimeClock })));
 const TimeClockHistory = lazy(() => import('./components/Dispatch/TimeClockHistory').then(m => ({ default: m.TimeClockHistory })));
 const ContractManagement = lazy(() => import('./components/Finance/ContractOnboarding'));
 const SecurityOnboarding = lazy(() => import('./components/Finance/SecurityOnboarding'));
 const FinanceDashboard = lazy(() => import('./components/Finance/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })));
+const ServiceApprovalPage = lazy(() => import('./components/Portal/ServiceApprovalPage'));
 const SecurityOnboardingPortal = lazy(() => import('./components/Portal/SecurityOnboardingPortal'));
 const PortalLogin = lazy(() => import('./components/Portal/PortalLogin').then(m => ({ default: m.PortalLogin })));
 const AuthBridge = lazy(() => import('./components/Auth/AuthBridge').then(m => ({ default: m.AuthBridge })));
 const AuthCallback = lazy(() => import('./components/Auth/AuthCallback').then(m => ({ default: m.AuthCallback })));
 const SalesTaxReports = lazy(() => import('./components/Finance/SalesTaxReports').then(m => ({ default: m.default })));
-const SalesTaxInstructions = lazy(() => import('./components/Finance/SalesTaxInstructions').then(m => ({ default: m.default })));
+
+const TechStats = lazy(() => import('./components/Production/TechStats').then(m=>({default:m.TechStats})));
 const TimeClockManagement = lazy(() => import('./components/Admin/TimeClockManagement').then(m => ({ default: m.TimeClockManagement })));
 
-const PTOManagement = lazy(() => import('./components/Admin/PTOManagement').then(m => ({ default: m.PTOManagement })));
 const MyTimeOff = lazy(() => import('./components/Dispatch/MyTimeOff').then(m => ({ default: m.MyTimeOff })));
 const StickyNotes = lazy(() => import('./components/Sales/StickyNotes').then(m => ({ default: m.default })));
 const DesignQueue = lazy(() => import('./components/Sales/DesignQueue'));
@@ -138,11 +150,8 @@ const AddProjectTimeModal = lazy(() => import('./components/Projects/AddProjectT
 // Loading component
 function LoadingFallback() {
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-3"></div>
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-      </div>
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-[3px] border-blue-500 border-t-transparent"></div>
     </div>
   );
 }
@@ -155,11 +164,12 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
   useEffect(() => {
     let cancelled = false;
     if (!profile?.organization_id) return;
-    supabase
+    Promise.resolve(supabase
       .from('company_settings')
-      .select(`${moduleKey}`)
+      .select(moduleKey)
       .eq('organization_id', profile.organization_id)
       .maybeSingle()
+      .overrideTypes<Record<string, boolean>, { merge: false }>())
       .then(({ data }) => {
         if (cancelled) return;
         setAllowed(data?.[moduleKey] ?? false);
@@ -179,43 +189,68 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 }
 
 function AppContent() {
-  const { user, profile, loading, isPasswordRecovery, isPortalUser, updatePassword, signOut } = useAuth();
+  const { user, profile, loading, isPasswordRecovery, isPortalUser, signOut } = useAuth();
   const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
+  const [directoryEnabled, setDirectoryEnabled] = useState(false);
+  useEffect(() => { if (!profile?.id) return; let active=true; const refresh=()=>{void supabase.rpc('company_directory_enabled').then(({data,error})=>{if(active)setDirectoryEnabled(!error && Boolean(data));});};refresh();window.addEventListener('company-directory-changed',refresh);return()=>{active=false;window.removeEventListener('company-directory-changed',refresh)};},[profile?.id]);
   const openAIAssistantRef = useRef<(() => void) | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showMessageForm, setShowMessageForm] = useState(false);
+  const [aiLeadPrefill, setAiLeadPrefill] = useState<LeadPrefill | null>(null);
+  const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
+  const [showServiceTypePicker, setShowServiceTypePicker] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
+  const [showSupportTaskForm, setShowSupportTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [openThreadId, setOpenThreadId] = useState<string | null>(null);
-  const [openProposalId, setOpenProposalId] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('leadId'));
+  const [openTaskId, setOpenTaskId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('taskId'));
+  const [openFlowThreadId, setOpenFlowThreadId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('threadId'));
+  const openSalesDashboardRecord = (record: SalesRecord) => {
+    if (record.kind === 'proposal') { setOpenProposalId(record.id); setActiveTab('proposals'); }
+    else if (record.kind === 'lead') { setSelectedLeadId(record.id); }
+    else if (record.kind === 'order') { setOpenSalesOrderId(record.id); setActiveTab('sales_orders'); }
+    else if (record.kind === 'contact') { const url = new URL(window.location.href); url.searchParams.set('contactId', record.id); window.history.replaceState({}, '', url); setActiveTab('contacts'); }
+  };
+  const navigateSalesDashboard = (tab: string, recordId?: string) => {
+    if (recordId && tab === 'work_orders') setSelectedWorkOrderId(recordId);
+    if (recordId && tab === 'pipeline_board') { setSelectedLeadId(recordId); return; }
+    setActiveTab(tab);
+  };
+  const [openProposalId, setOpenProposalId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('proposalId'));
   const [aiProposalPrefill, setAiProposalPrefill] = useState<ProposalPrefill | null>(null);
   const [aiServiceRequestPrefill, setAiServiceRequestPrefill] = useState<ServiceRequestPrefill | null>(null);
   const [showAiSecurityContractModal, setShowAiSecurityContractModal] = useState(false);
   const [aiSecurityContractPrefill, setAiSecurityContractPrefill] = useState<SecurityContractPrefill | null>(null);
-  const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(null);
+  const [openSalesOrderId, setOpenSalesOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('openOrderId'));
   const [invoiceContactFilter, setInvoiceContactFilter] = useState<string | null>(null);
-  const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(null);
+  const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('coId'));
   const [salesRepAIContext, setSalesRepAIContext] = useState<SalesRepAIContext | null>(null);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(() => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('workOrderId');
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    // First check URL parameters, then localStorage, default to 'feed'
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlTab = urlParams.get('tab');
-    return urlTab || localStorage.getItem('activeTab') || 'feed';
+  const [activeTab, setActiveTabState] = useState<string>(() => {
+    return pageFromLocation(window.location, 'feed');
   });
+  const setActiveTab = React.useCallback((tab: string) => {
+    const page = resolveLegacyPage(tab);
+    const current = new URL(window.location.href);
+    if (profile && !isPortalUser && (current.pathname === '/' || workspacePage(current.pathname))) {
+      const next = workspaceUrl(current, page);
+      if (next && pageFromLocation(current) !== page) {
+        window.history.pushState({}, '', next);
+        setCurrentPath(window.location.pathname);
+      }
+    }
+    setActiveTabState(page);
+  }, [profile, isPortalUser]);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('departmentSidebarOpen');
     return saved !== null ? saved === 'true' : false;
@@ -237,10 +272,18 @@ function AppContent() {
     });
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [currentHash, setCurrentHash] = useState(window.location.hash);
-  const [newPassword, setNewPassword] = useState('');
-  const [resetError, setResetError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [_currentHash, setCurrentHash] = useState(window.location.hash);
+
+  // Record a visit only when the logical workspace page changes, not on each render.
+  const lastTrackedPage = useRef('');
+  useEffect(() => {
+    if (!user?.id || !profile?.organization_id || isPortalUser || loading) return;
+    const path = window.location.pathname;
+    const page = path === '/' || workspacePage(path) ? 'workspace/' + activeTab : path;
+    if (lastTrackedPage.current === page) return;
+    lastTrackedPage.current = page;
+    void recordPageVisit(user.id, profile.organization_id, page);
+  }, [user?.id, profile?.organization_id, isPortalUser, loading, activeTab, currentPath]);
 
   const notificationCount = useNotificationCount();
 
@@ -255,11 +298,11 @@ function AppContent() {
 
     const recordPage = () => {
       const sessionId = (window as any).__currentSessionId || null;
-      supabase.rpc('update_session_activity', {
+      Promise.resolve(supabase.rpc('update_session_activity', {
         p_user_id: user.id,
         p_page: activeTab,
         p_session_id: sessionId,
-      }).then(() => {}).catch(() => {});
+      })).then(() => {}).catch(() => {});
     };
 
     recordPage();
@@ -291,6 +334,8 @@ function AppContent() {
   // Check if we're in standalone/popout mode (no header/nav)
   const isStandalone = new URLSearchParams(window.location.search).get('standalone') === 'true';
 
+  useEffect(()=>{if(!profile?.id)return;const sync=()=>{syncVisitEvents(profile.id).catch(console.error);};sync();window.addEventListener('online',sync);return()=>window.removeEventListener('online',sync);},[profile?.id]);
+
   // Initialize state from URL on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -304,7 +349,7 @@ function AppContent() {
     if (urlProposalId) setOpenProposalId(urlProposalId);
     if (urlLeadId) setSelectedLeadId(urlLeadId);
     if (urlTaskId) setOpenTaskId(urlTaskId);
-    if (urlThreadId) setOpenThreadId(urlThreadId);
+    if (urlThreadId) setOpenFlowThreadId(urlThreadId);
     if (urlCoId) setOpenChangeOrderId(urlCoId);
     if (urlSalesOrderId) setOpenSalesOrderId(urlSalesOrderId);
   }, []);
@@ -325,14 +370,13 @@ function AppContent() {
       const currentTab = activeTabRef.current;
       if (!currentTab || currentTab === 'feed') return;
 
-      if (currentTab === 'settings' && profile.role === 'admin') return;
+      if ((currentTab === 'settings' || currentTab.startsWith('settings_')) && profile.role === 'admin') return;
       if (currentTab === 'daily_sales_report_import' && profile.role === 'admin') return;
-      if (currentTab === 'preferences') return;
+      if (currentTab === 'preferences' || currentTab === 'company_directory') return;
 
       const hasAccess = checkModuleAccessRef.current(currentTab);
       if (!hasAccess) {
         setActiveTab('feed');
-        localStorage.setItem('activeTab', 'feed');
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -345,7 +389,6 @@ function AppContent() {
 
       // Restore state from URL when using browser back/forward
       const urlParams = new URLSearchParams(window.location.search);
-      const urlTab = urlParams.get('tab');
       const urlProposalId = urlParams.get('proposalId');
       const urlLeadId = urlParams.get('leadId');
       const urlTaskId = urlParams.get('taskId');
@@ -354,16 +397,12 @@ function AppContent() {
       const urlSalesOrderId = urlParams.get('openOrderId');
       const urlWorkOrderId = urlParams.get('workOrderId');
 
-      if (urlTab) {
-        setActiveTab(urlTab);
-      } else {
-        setActiveTab('feed');
-      }
+      setActiveTabState(pageFromLocation(window.location));
 
       setOpenProposalId(urlProposalId);
       setSelectedLeadId(urlLeadId);
       setOpenTaskId(urlTaskId);
-      setOpenThreadId(urlThreadId);
+      setOpenFlowThreadId(urlThreadId);
       setOpenChangeOrderId(urlCoId);
       setOpenSalesOrderId(urlSalesOrderId);
       setSelectedWorkOrderId(urlWorkOrderId);
@@ -383,21 +422,11 @@ function AppContent() {
 
   // Save active tab to localStorage and update URL whenever state changes
   useEffect(() => {
-    localStorage.setItem('activeTab', activeTab);
-
-    // Skip URL manipulation for standalone routes that don't use tab-based navigation
-    const standaloneRoutes = ['/kiosk', '/portal', '/business-card', '/public', '/eula', '/privacy', '/auth-bridge', '/auth-callback'];
-    if (standaloneRoutes.some(r => currentPath.startsWith(r))) return;
-
-    // Update URL to persist state across refreshes
+    if (!profile || isPortalUser || isPasswordRecovery || loading) return;
+    if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) return;
+    if (currentPath !== '/' && !workspacePage(currentPath)) return;
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Update tab parameter
-    if (activeTab && activeTab !== 'feed') {
-      urlParams.set('tab', activeTab);
-    } else {
-      urlParams.delete('tab');
-    }
+    urlParams.delete('tab');
 
     // Update opened item parameters
     if (openProposalId) {
@@ -418,8 +447,8 @@ function AppContent() {
       urlParams.delete('taskId');
     }
 
-    if (openThreadId) {
-      urlParams.set('threadId', openThreadId);
+    if (openFlowThreadId) {
+      urlParams.set('threadId', openFlowThreadId);
     } else {
       urlParams.delete('threadId');
     }
@@ -443,19 +472,28 @@ function AppContent() {
     }
 
     // Update the URL without reloading the page
-    const newUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams.toString()}` : window.location.pathname;
-    window.history.replaceState({}, '', newUrl);
-  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath]);
+    const location = new URL(window.location.href);
+    location.search = urlParams.toString();
+    const newUrl = workspaceUrl(location, activeTab);
+    if (newUrl) {
+      window.history.replaceState({}, '', newUrl);
+      setCurrentPath(window.location.pathname);
+    }
+  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath, profile, isPortalUser, isPasswordRecovery, loading]);
 
   // Close all modals when switching tabs to prevent overlay issues
   useEffect(() => {
     setShowContactForm(false);
     setShowLeadForm(false);
-    setShowMessageForm(false);
+    if (activeTab !== 'feed') setCreateInternalChatRequested(false);
     setShowServiceRequestForm(false);
     setShowTaskForm(false);
     setShowJobMediaUpload(false);
   }, [activeTab]);
+
+  if (currentPath === '/shared/proposal') {
+    return <Suspense fallback={<LoadingFallback />}><SharedProposalPage /></Suspense>;
+  }
 
   if (loading) {
     return <BrandedLoading message="Loading your workspace..." />;
@@ -469,6 +507,7 @@ function AppContent() {
     '/portal',
     '/portal/dashboard',
     '/portal/security',
+    '/portal/service-approval',
     '/portal/punchlist',
     '/portal/proposals',
     '/portal/vip-membership',
@@ -476,6 +515,7 @@ function AppContent() {
     '/portal/membership',
     '/portal/signup',
     '/lost-opportunity-review',
+    '/proposal-check-response',
     '/security-onboarding',
     '/onboarding',
     '/login',
@@ -508,6 +548,10 @@ function AppContent() {
   }
   // --- END PORTAL USER ISOLATION ---
 
+  if (currentPath === '/proposal-check-response') {
+    return <Suspense fallback={<LoadingFallback />}><ProposalCheckResponse /></Suspense>;
+  }
+
   if (currentPath === '/lost-opportunity-review') {
     return <Suspense fallback={<LoadingFallback />}><LostOpportunityForm /></Suspense>;
   }
@@ -521,6 +565,10 @@ function AppContent() {
         <SecurityOnboardingPortal token={token || undefined} />
       </Suspense>
     );
+  }
+
+  if (currentPath === '/portal/service-approval') {
+    return <Suspense fallback={<LoadingFallback />}><ServiceApprovalPage /></Suspense>;
   }
 
   if (currentPath === '/portal/dashboard') {
@@ -580,8 +628,7 @@ function AppContent() {
     );
   }
 
-  if (currentPath === '/proposals' || currentPath.startsWith('/proposals/') ||
-      currentPath === '/portal/proposals' || currentPath.startsWith('/portal/proposals/')) {
+  if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) {
     return (
       <Suspense fallback={<LoadingFallback />}>
         <PortalModuleGuard moduleKey="portal_proposals_enabled">
@@ -628,17 +675,16 @@ function AppContent() {
     return null;
   }
 
-  // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
-
-  const cardMatch = currentPath.match(/^\/card\/(.+)$/);
-  if (cardMatch) {
-    if (!user || !profile) return <LoginForm />;
+  const publicCardSlug = workspacePage(currentPath) ? null : getBusinessCardSlugFromLocation(currentPath, window.location.hostname);
+  if (publicCardSlug) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <BusinessCardPage slug={cardMatch[1]} isOwnCard={false} />
+        <BusinessCardPage slug={publicCardSlug} isOwnCard={false} />
       </Suspense>
     );
   }
+
+  // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
 
   if (currentPath === '/calendar') {
     if (!user || !profile) return <LoginForm />;
@@ -695,11 +741,11 @@ function AppContent() {
     if (!user || !profile) return <LoginForm />;
     if (!['admin', 'manager', 'sales_manager'].includes(profile.role)) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
-            <TrendingUp size={64} className="mx-auto text-gray-600 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access the Sales TV Dashboard.</p>
+            <TrendingUp size={64} className="mx-auto text-muted mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+            <p className="text-muted">You don't have permission to access the Sales TV Dashboard.</p>
           </div>
         </div>
       );
@@ -718,18 +764,18 @@ function AppContent() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const soId = urlParams.get('id');
-    const soActiveTab = urlParams.get('activeTab') as 'scope' | 'primary_scope' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions' | null;
+    const soActiveTab = urlParams.get('activeTab') as 'tasks' | 'scope' | 'primary_scope' | 'billing' | 'change_orders' | 'project' | 'reports' | 'stats' | 'commissions' | null;
 
     if (!soId) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
-          <p className="text-gray-400">No sales order specified.</p>
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
+          <p className="text-muted">No sales order specified.</p>
         </div>
       );
     }
 
     return (
-      <div className="h-screen bg-gray-900 flex flex-col overflow-auto p-6">
+      <div className="theme-workspace h-screen bg-workspace flex flex-col overflow-auto p-3 sm:p-6">
         <Suspense fallback={<LoadingFallback />}>
           <SalesOrderDetail orderId={soId} onBack={() => window.close()} isStandalone={true} initialTab={soActiveTab ?? undefined} />
         </Suspense>
@@ -749,11 +795,11 @@ function AppContent() {
 
     if (!checkModuleAccess('proposals')) {
       return (
-        <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="theme-workspace h-screen bg-workspace flex items-center justify-center">
           <div className="text-center">
-            <FileText size={64} className="mx-auto text-gray-600 mb-4" />
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">You don't have permission to access Proposals.</p>
+            <FileText size={64} className="mx-auto text-muted mb-4" />
+            <h2 className="text-2xl font-bold text-primary mb-2">Access Denied</h2>
+            <p className="text-muted">You don't have permission to access Proposals.</p>
           </div>
         </div>
       );
@@ -764,7 +810,7 @@ function AppContent() {
     const proposalId = urlParams.get('id');
 
     return (
-      <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
+      <div className="theme-workspace h-screen bg-workspace flex flex-col overflow-hidden">
         <Suspense fallback={<LoadingFallback />}>
           <ProposalsView isStandalone={!!proposalId} openProposalId={proposalId} />
         </Suspense>
@@ -772,83 +818,18 @@ function AppContent() {
     );
   }
 
-  if (!user || !profile) {
+  if (isPasswordRecovery || !user || !profile) {
     // If already logged in on root domain with redirect_to, send to bridge
     const redirectParam = new URLSearchParams(window.location.search).get('redirect_to');
-    if (user && redirectParam && isValidReturnHost(redirectParam)) {
-      const returnPath = new URLSearchParams(window.location.search).get('return_path') || window.location.pathname;
+    if (!isPasswordRecovery && user && redirectParam && isValidReturnHost(redirectParam)) {
+      const returnPath = new URLSearchParams(window.location.search).get('return_path') || (window.location.pathname + window.location.search + window.location.hash);
       const bridgeUrl = new URL('/auth-bridge', window.location.origin);
       bridgeUrl.searchParams.set('return_to', redirectParam);
       bridgeUrl.searchParams.set('path', returnPath);
       window.location.replace(bridgeUrl.toString());
       return <LoadingFallback />;
     }
-    if (isPasswordRecovery) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-          <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold text-white mb-6">Reset Your Password</h2>
-
-            {resetSuccess ? (
-              <div className="text-center">
-                <div className="p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-green-300 text-sm mb-4">
-                  Password updated successfully!
-                </div>
-                <p className="text-gray-300 mb-4">You can now sign in with your new password.</p>
-                <button
-                  onClick={() => {
-                    window.location.href = '/';
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
-                >
-                  Go to Sign In
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setResetError(null);
-                try {
-                  await updatePassword(newPassword);
-                  setResetSuccess(true);
-                  window.history.replaceState(null, '', window.location.pathname);
-                } catch (error: any) {
-                  setResetError(error?.message || 'Failed to update password');
-                }
-              }}>
-                {resetError && (
-                  <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm mb-4">
-                    {resetError}
-                  </div>
-                )}
-
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter new password"
-                    minLength={6}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 transition-all"
-                >
-                  Update Password
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      );
-    }
+    if (isPasswordRecovery) return <PasswordSetup />;
     return <LoginForm />;
   }
 
@@ -866,19 +847,20 @@ function AppContent() {
   }
 
   return (
-    <div className="workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
+    <div className="theme-workspace workspace-shell min-h-screen bg-workspace flex flex-col overflow-hidden">
       <OfflineIndicator />
+      <EmployeeWelcomeOnboarding />
       {!isStandalone && (
         <>
           <Header
             onCreateContact={() => setShowContactForm(true)}
             onCreateLead={() => setShowLeadForm(true)}
-            onCreateMessage={() => { setShowMessageForm(true); setActiveTab('messages'); }}
+            onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
-            onCreateServiceRequest={() => setShowServiceRequestForm(true)}
+            onCreateServiceRequest={() => setShowServiceTypePicker(true)}
             onCreateTask={() => {
-              setShowTaskForm(true);
-              setActiveTab('tasks');
+              setAiTaskPrefill(null);
+              setShowAiTaskForm(true);
             }}
             onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
@@ -888,8 +870,8 @@ function AppContent() {
               setActiveTab('tasks');
             }}
             onMessageClick={(threadId) => {
-              setOpenThreadId(threadId);
-              setActiveTab('messages');
+              setOpenFlowThreadId(threadId);
+              setActiveTab('feed');
             }}
             onProposalClick={(proposalId) => {
               setOpenProposalId(proposalId);
@@ -922,18 +904,18 @@ function AppContent() {
         />
       )}
 
-      <div className={`flex-1 min-h-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
+      <div className={`flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden transition-all duration-300 ${!isStandalone && sidebarPinned ? 'sm:pl-64' : ''}`}>
         {!isStandalone && bookmarksVisible && starredModules.length > 0 && (
           <div className="border-b border-subtle bg-canvas px-3 sm:px-4 lg:px-5 py-1.5">
             <QuickAccessNavigation activeModule={activeTab} onModuleChange={setActiveTab} />
           </div>
         )}
         <main
-          className={`min-h-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
+          className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>
-          {activeTab === 'time' && <DailyClock key={activeTab} />}
+          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
             <ContactsView
               key={activeTab}
@@ -947,17 +929,30 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'leads' && checkModuleAccess('leads') && <LeadsHistory key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'feed' && checkModuleAccess('feed') && <MasterFeed key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'fishbowl' && checkModuleAccess('fishbowl') && <FishbowlView key={activeTab} onLeadClick={(leadId) => setSelectedLeadId(leadId)} />}
-          {activeTab === 'connections' && checkModuleAccess('connections') && <ConnectionsView key={activeTab} />}
-          {(activeTab === 'proposals' || activeTab === 'sales') && (() => {
-            // Show loading while departments are still loading
-            if (departmentsLoading) {
-              return false;
-            }
-            return checkModuleAccess('proposals');
-          })() && (
+          {(activeTab === 'feed' || activeTab === 'tasks') && (checkModuleAccess('feed') || checkModuleAccess('messages') || checkModuleAccess('tasks')) && (
+            <MasterFeed
+              key={activeTab}
+              initialTaskView={activeTab === 'tasks' && checkModuleAccess('tasks')}
+              tasksContent={checkModuleAccess('tasks') ? <TasksView initialShowForm={showTaskForm} onFormClose={() => setShowTaskForm(false)} openTaskId={openTaskId} onTaskOpened={() => setOpenTaskId(null)} /> : undefined}
+              onLeadClick={setSelectedLeadId}
+              createRequested={createInternalChatRequested}
+              onCreateOpened={() => setCreateInternalChatRequested(false)}
+              openThreadId={openFlowThreadId}
+              onThreadSelected={setOpenFlowThreadId}
+              onOpenProposal={(proposalId, threadId) => {
+                setOpenProposalId(proposalId);
+                setActiveTab('proposals');
+                if (threadId) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('openQA', 'true');
+                  url.searchParams.set('threadId', threadId);
+                  window.history.pushState({}, '', url);
+                }
+              }}
+            />
+          )}
+
+          {(activeTab === 'proposals' || activeTab === 'sales') && checkModuleAccess('proposals') && (
             <ProposalsView
               key={activeTab}
               openProposalId={openProposalId}
@@ -974,26 +969,12 @@ function AppContent() {
               autoThreadId={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('threadId') : null}
             />
           )}
-          {activeTab === 'messages' && checkModuleAccess('messages') && (
-            <MessagesView
-              key={activeTab}
-              createRequested={showMessageForm}
-              onCreateOpened={() => setShowMessageForm(false)}
-              openThreadId={openThreadId}
-              onThreadOpened={() => setOpenThreadId(null)}
-              onOpenProposal={(proposalId, threadId) => {
-                setOpenProposalId(proposalId);
-                setActiveTab('proposals');
-                if (threadId) {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('openQA', 'true');
-                  url.searchParams.set('threadId', threadId);
-                  window.history.pushState({}, '', url);
-                }
-              }}
-            />
-          )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
+          {activeTab === 'labor_dashboard' && profile.role==='admin' && <TechStats key={activeTab}/>}
+          {['payroll', 'time_approval'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Review', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
+            ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
+          ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
             <InvoicesView
@@ -1057,8 +1038,9 @@ function AppContent() {
                 setOpenProposalId(proposalId);
                 setActiveTab('proposals');
               }}
+              onOpenRecord={openSalesDashboardRecord}
               onRepContextChange={setSalesRepAIContext}
-              onNavigateToTab={(tab) => setActiveTab(tab)}
+              onNavigateToTab={navigateSalesDashboard}
             />
           )}
           {activeTab === 'sales_orders' && checkModuleAccess('sales_orders') && (
@@ -1072,10 +1054,13 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={(tab) => setActiveTab(tab)} />}
-          {activeTab === 'sales_activity' && checkModuleAccess('sales_activity') && <SalesActivity key={activeTab} />}
-          {activeTab === 'pipeline_board' && checkModuleAccess('pipeline_board') && <PipelineBoard key={activeTab} />}
-          {activeTab === 'prospects' && checkModuleAccess('prospects') && <ProspectsPage key={activeTab} />}
+          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onOpenRecord={openSalesDashboardRecord} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={navigateSalesDashboard} />}
+          {['pipeline_board', 'prospects', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
+            ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
+            ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
+            ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Fishbowl', content: <FishbowlView onLeadClick={setSelectedLeadId} /> }] : []),
+          ]} />}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
           {activeTab === 'sticky-notes' && checkModuleAccess('sticky-notes') && <StickyNotes key={activeTab} />}
@@ -1100,7 +1085,7 @@ function AppContent() {
           {activeTab === 'project_work_orders' && checkModuleAccess('work_orders') && <ProjectWorkOrdersQueue key={activeTab} />}
           {activeTab === 'job_status' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_status" />}
           {activeTab === 'job_acceptance' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="job_acceptance" />}
-          {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchCustomerComms key={activeTab} />}
+          {activeTab === 'customer_comms' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="communications" />}
           {activeTab === 'tech_skills' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_skills" />}
           {activeTab === 'daily_clock' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'daily_clock_sessions' && checkModuleAccess('daily_clock') && <TimeClockHistory key={activeTab} onNavigate={setActiveTab} initialTab="sessions" />}
@@ -1124,27 +1109,18 @@ function AppContent() {
 
           {activeTab === 'portal_punchlist' && checkModuleAccess('punchlist') && <PortalPunchlist key={activeTab} />}
 
-          {activeTab === 'tasks' && checkModuleAccess('tasks') && (
-            <TasksView
-              key={activeTab}
-              initialShowForm={showTaskForm}
-              onFormClose={() => setShowTaskForm(false)}
-              openTaskId={openTaskId}
-              onTaskOpened={() => setOpenTaskId(null)}
-            />
-          )}
+          {activeTab === 'company_directory' && directoryEnabled && <CompanyDirectory key={activeTab} />}
           {activeTab === 'mycard' && <MyCardView key={activeTab} />}
           {activeTab === 'help' && <HowItWorks key={activeTab} />}
           {activeTab === 'improvements' && <ImprovementsView key={activeTab} />}
 
           {activeTab === 'feature_suggestions' && <ImprovementsView key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
 
           {activeTab === 'preferences' && (
             <div key={activeTab} className="max-w-4xl mx-auto">
               <div className="bg-canvas text-primary rounded-xl shadow-sm border border-subtle p-4 sm:p-6">
-                <UserPreferences />
+                <UserPreferences directoryEnabled={directoryEnabled} onOpenDirectory={() => setActiveTab('company_directory')} />
               </div>
             </div>
           )}
@@ -1165,15 +1141,14 @@ function AppContent() {
 
           {activeTab === 'rewards_dashboard' && checkModuleAccess('rewards_dashboard') && <RewardsDashboard key={activeTab} />}
 
-          {activeTab === 'time_clock_management' && profile.role === 'admin' && <TimeClockManagement key={activeTab} />}
-
+          {activeTab === 'time_clock_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} onLaborDashboard={()=>setActiveTab('tech_stats')} />}
 
 
           {activeTab === 'vehicle-tracking' && (profile.role === 'admin' || profile.role === 'manager') && <VehicleManagement key={activeTab} />}
 
           {activeTab === 'my_mileage' && <MileageEntryForm key={activeTab} />}
 
-          {activeTab === 'pto_management' && profile.role === 'admin' && <PTOManagement key={activeTab} />}
+          {activeTab === 'pto_management' && canManageTimeOff(profile.role) && <TimeClockManagement key={activeTab} initialTab="timeoff" />}
 
           {activeTab === 'bug_management' && checkModuleAccess('bug_management') && <BugManagement key={activeTab} />}
 
@@ -1191,7 +1166,7 @@ function AppContent() {
 
           {activeTab === 'daily_sales_report_import' && profile.role === 'admin' && <DailySalesReportImport key={activeTab} />}
 
-          {activeTab === 'my_time_off' && <MyTimeOff key={activeTab} />}
+          {activeTab === 'my_time_off' && checkModuleAccess('my_time_off') && <MyTimeOff key={activeTab} />}
         </Suspense>
 
         {/* MyJobView removed - features available in department modules */}
@@ -1200,13 +1175,13 @@ function AppContent() {
       </div>
 
       {!isStandalone && (
-        <footer className="bg-gray-900/50 border-t border-purple-500/30 mt-8 sm:mt-12 py-4 sm:py-6">
+        <footer className="bg-canvas/50 border-t border-subtle mt-8 sm:mt-12 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4">
             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
               <button
                 onClick={signOut}
-                className="inline-flex items-center gap-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg transition-colors justify-center"
+                className="inline-flex items-center gap-2 px-4 py-2 text-secondary hover:text-primary hover:bg-elevated rounded-lg transition-colors justify-center"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4 flex-shrink-0" />
@@ -1254,13 +1229,27 @@ function AppContent() {
       {showLeadForm && (
         <Suspense fallback={null}>
           <LeadForm
-            onClose={() => setShowLeadForm(false)}
+            aiPrefill={aiLeadPrefill}
+            onClose={() => { setShowLeadForm(false); setAiLeadPrefill(null); }}
             onSuccess={() => {
               setShowLeadForm(false);
+              setAiLeadPrefill(null);
               setActiveTab('feed');
             }}
           />
         </Suspense>
+      )}
+
+      {showServiceTypePicker && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowServiceTypePicker(false); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="service-type-heading" className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-subtle bg-canvas p-5 text-primary shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-muted">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded-lg p-2 text-muted hover:bg-surface" aria-label="Close">✕</button></div>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Service</span><span className="text-sm text-muted">On-site work, repairs, troubleshooting, or dispatch</span></button>
+              <button type="button" onClick={() => { setShowServiceTypePicker(false); setAiTaskPrefill(null); setShowSupportTaskForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Support</span><span className="text-sm text-muted">Customer assistance and remote support</span></button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showServiceRequestForm && (
@@ -1270,9 +1259,20 @@ function AppContent() {
             onSuccess={() => {
               setShowServiceRequestForm(false);
               setAiServiceRequestPrefill(null);
-              setActiveTab('dispatch_dashboard');
+              setActiveTab('feed');
             }}
             aiPrefill={aiServiceRequestPrefill}
+          />
+        </Suspense>
+      )}
+
+      {showSupportTaskForm && (
+        <Suspense fallback={null}>
+          <TaskForm
+            supportMode
+            aiPrefill={aiTaskPrefill}
+            onClose={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
+            onSuccess={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
           />
         </Suspense>
       )}
@@ -1337,29 +1337,33 @@ function AppContent() {
           onRegisterOpen={(fn) => { openAIAssistantRef.current = fn; }}
           onAction={(action) => {
             const actionModule: Record<string, string> = {
-              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks',
+              CREATE_CONTACT: 'contacts', CREATE_LEAD: 'leads', CREATE_TASK: 'tasks', CREATE_SUPPORT_REQUEST: 'tasks',
               CREATE_SERVICE_REQUEST: 'service_requests', CREATE_MESSAGE: 'messages',
               CREATE_PROPOSAL: 'proposals', CREATE_SECURITY_CONTRACT: 'security_onboarding',
               OPEN_PROPOSAL: 'proposals',
             };
             const requiredModule = action.type === 'NAVIGATE_TO' ? action.tab : actionModule[action.type];
             if (!requiredModule || !checkModuleAccess(requiredModule)) {
-              window.alert('That action is not available with your current permissions.');
+              notify('That action is not available with your current permissions.', { theme: 'blue', tone: 'info' });
               return;
             }
             if (action.type === 'CREATE_CONTACT') {
               setShowContactForm(true);
             } else if (action.type === 'CREATE_LEAD') {
+              setAiLeadPrefill((action.prefill as LeadPrefill | undefined) ?? null);
               setShowLeadForm(true);
             } else if (action.type === 'CREATE_TASK') {
               if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
               setShowAiTaskForm(true);
+            } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
+              setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
+              setShowSupportTaskForm(true);
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);
             } else if (action.type === 'CREATE_MESSAGE') {
-              setShowMessageForm(true);
-              setActiveTab('messages');
+              setCreateInternalChatRequested(true);
+              setActiveTab('feed');
             } else if (action.type === 'CREATE_PROPOSAL') {
               if (action.prefill) setAiProposalPrefill(action.prefill as ProposalPrefill);
               setActiveTab('proposals');
@@ -1367,7 +1371,7 @@ function AppContent() {
               if (action.prefill) setAiSecurityContractPrefill(action.prefill as SecurityContractPrefill);
               setShowAiSecurityContractModal(true);
             } else if (action.type === 'NAVIGATE_TO' && action.tab) {
-              setActiveTab(action.tab);
+              setActiveTab(action.tab === 'messages' ? 'feed' : action.tab);
             } else if (action.type === 'OPEN_PROPOSAL' && action.proposalId) {
               setOpenProposalId(action.proposalId);
               setActiveTab('proposals');

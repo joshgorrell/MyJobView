@@ -1,3 +1,5 @@
+import { ActionRewards } from '../Rewards/ActionRewards';
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Award, Plus, Edit2, Trash2, Save, X, DollarSign, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +16,10 @@ interface PointsConfig {
   lead_claimed_points: number;
   lead_converted_points: number;
   manual_entry_points_loss: number;
+  attendance_early_points: number;
+  attendance_on_time_points: number;
+  attendance_late_points: number;
+  attendance_very_late_points: number;
 }
 
 interface Reward {
@@ -66,9 +72,14 @@ export function PointsAndRewards() {
     lead_claimed_points: 15,
     lead_converted_points: 50,
     manual_entry_points_loss: 10,
+    attendance_early_points: 10,
+    attendance_on_time_points: 5,
+    attendance_late_points: -5,
+    attendance_very_late_points: -10,
   });
 
   const [photoUploadPoints, setPhotoUploadPoints] = useState(1);
+  const [forgotClockOutPenalty, setForgotClockOutPenalty] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -77,7 +88,7 @@ export function PointsAndRewards() {
   async function loadData() {
     try {
       const [configResult, rewardsResult, redemptionsResult, companySettings] = await Promise.all([
-        supabase.from('points_configuration').select('*').single(),
+        supabase.from('points_configuration').select('*').eq('organization_id', profile?.organization_id).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('rewards_catalog').select('*').order('created_at', { ascending: false }),
         supabase
           .from('reward_redemptions')
@@ -87,25 +98,36 @@ export function PointsAndRewards() {
             rewards_catalog(name)
           `)
           .order('created_at', { ascending: false }),
-        supabase.from('company_settings').select('id, photo_upload_points').eq('organization_id', profile?.organization_id).maybeSingle(),
+        supabase.from('company_settings').select('id, photo_upload_points, forgot_clock_out_penalty_points').eq('organization_id', profile?.organization_id).maybeSingle(),
       ]);
 
+      for (const result of [configResult, rewardsResult, redemptionsResult, companySettings]) {
+        if (result.error) throw result.error;
+      }
       if (configResult.data) {
         setPointsConfig(configResult.data);
         setPointsForm({
           task_completion_points: configResult.data.task_completion_points,
           question_answer_points: configResult.data.question_answer_points,
-          contact_created_points: configResult.data.contact_created_points || 5,
-          connection_logged_points: configResult.data.connection_logged_points || 10,
-          lead_created_points: configResult.data.lead_created_points || 20,
-          lead_claimed_points: configResult.data.lead_claimed_points || 15,
-          lead_converted_points: configResult.data.lead_converted_points || 50,
-          manual_entry_points_loss: configResult.data.manual_entry_points_loss || 10,
+          contact_created_points: configResult.data.contact_created_points ?? 5,
+          connection_logged_points: configResult.data.connection_logged_points ?? 10,
+          lead_created_points: configResult.data.lead_created_points ?? 20,
+          lead_claimed_points: configResult.data.lead_claimed_points ?? 15,
+          lead_converted_points: configResult.data.lead_converted_points ?? 50,
+          manual_entry_points_loss: configResult.data.manual_entry_points_loss ?? 10,
+          attendance_early_points: configResult.data.attendance_early_points ?? 10,
+          attendance_on_time_points: configResult.data.attendance_on_time_points ?? 5,
+          attendance_late_points: configResult.data.attendance_late_points ?? -5,
+          attendance_very_late_points: configResult.data.attendance_very_late_points ?? -10,
         });
       }
 
       if (companySettings.data?.photo_upload_points !== undefined) {
         setPhotoUploadPoints(companySettings.data.photo_upload_points);
+      }
+
+      if (companySettings.data?.forgot_clock_out_penalty_points != null) {
+        setForgotClockOutPenalty(companySettings.data.forgot_clock_out_penalty_points);
       }
 
       setRewards(rewardsResult.data || []);
@@ -121,49 +143,55 @@ export function PointsAndRewards() {
     try {
       // Save points configuration
       if (pointsConfig) {
-        await supabase
+        const { error } = await supabase
           .from('points_configuration')
           .update(pointsForm)
           .eq('id', pointsConfig.id);
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from('points_configuration')
-          .insert([{ ...pointsForm, company_id: profile?.id }]);
+          .insert([{ ...pointsForm, company_id: profile?.id, organization_id: profile?.organization_id }]);
+        if (error) throw error;
       }
 
       // Save photo upload points to company settings
-      const { data: settings } = await supabase
+      const { data: settings, error: settingsError } = await supabase
         .from('company_settings')
         .select('id')
         .eq('organization_id', profile?.organization_id)
         .maybeSingle();
 
+      if (settingsError) throw settingsError;
       if (settings?.id) {
-        await supabase
+        const { error } = await supabase
           .from('company_settings')
-          .update({ photo_upload_points: photoUploadPoints })
+          .update({ photo_upload_points: photoUploadPoints, forgot_clock_out_penalty_points: forgotClockOutPenalty })
           .eq('id', settings.id);
+        if (error) throw error;
       }
 
-      alert('Points configuration saved!');
+      notify('Points configuration saved!', { theme: 'blue', tone: 'success' });
       loadData();
     } catch (error) {
       console.error('Error saving points config:', error);
-      alert('Failed to save points configuration');
+      notify('Failed to save points configuration', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function saveReward() {
     try {
       if (editingReward) {
-        await supabase
+        const { error } = await supabase
           .from('rewards_catalog')
           .update(rewardForm)
           .eq('id', editingReward.id);
+        if (error) throw error;
       } else {
-        await supabase
+        const { error } = await supabase
           .from('rewards_catalog')
-          .insert([{ ...rewardForm, company_id: profile?.id }]);
+          .insert([{ ...rewardForm, company_id: profile?.id, organization_id: profile?.organization_id }]);
+        if (error) throw error;
       }
 
       setShowRewardForm(false);
@@ -179,34 +207,33 @@ export function PointsAndRewards() {
       loadData();
     } catch (error) {
       console.error('Error saving reward:', error);
-      alert('Failed to save reward');
+      notify('Failed to save reward', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function deleteReward(id: string) {
     try {
-      await supabase.from('rewards_catalog').delete().eq('id', id);
+      const { error } = await supabase.from('rewards_catalog').update({ available: false }).eq('id', id);
+      if (error) throw error;
       loadData();
     } catch (error) {
       console.error('Error deleting reward:', error);
-      alert('Failed to delete reward');
+      notify('Failed to delete reward', { theme: 'blue', tone: 'error' });
     }
   }
 
   async function updateRedemptionStatus(id: string, status: string) {
     try {
-      await supabase
-        .from('reward_redemptions')
-        .update({
-          status,
-          fulfilled_at: status === 'fulfilled' ? new Date().toISOString() : null,
-        })
-        .eq('id', id);
+      const { error } = await supabase.rpc('set_reward_redemption_status', {
+        p_redemption_id: id,
+        p_status: status,
+      });
+      if (error) throw error;
 
       loadData();
     } catch (error) {
       console.error('Error updating redemption:', error);
-      alert('Failed to update redemption status');
+      notify('Failed to update redemption status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -233,7 +260,7 @@ export function PointsAndRewards() {
         <h2 className="text-xl sm:text-2xl font-bold text-white">Points & Rewards System</h2>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-700">
+      <div className="flex flex-wrap gap-2 border-b border-gray-700">
         <button
           onClick={() => setActiveTab('points')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -271,7 +298,8 @@ export function PointsAndRewards() {
 
       {activeTab === 'points' && (
         <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Points Values</h3>
+          <ActionRewards admin onTimePoints={pointsForm.attendance_on_time_points} />
+          <h3 className="text-lg sm:text-xl font-semibold text-white my-4">Other Activity Values</h3>
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Activity Points</h3>
@@ -426,6 +454,42 @@ export function PointsAndRewards() {
                     className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Points awarded when answering a question</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Attendance & Punctuality</h3>
+              <p className="text-sm text-gray-400 mb-4">Configure daily arrival rewards and deductions. Positive values award points; negative values deduct points.</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                {([
+                  ['attendance_early_points', '15+ Minutes Early', 'Default: +10'],
+                  ['attendance_on_time_points', 'Early / On Time', 'Default: +5'],
+                  ['attendance_late_points', 'Up to 15 Minutes Late', 'Default: -5'],
+                  ['attendance_very_late_points', 'More Than 15 Minutes Late', 'Default: -10'],
+                ] as const).map(([key, label, description]) => (
+                  <div key={key}>
+                    <label htmlFor={key} className="block text-sm font-medium text-gray-300 mb-2">{label}</label>
+                    <input id={key} type="number" step="1" value={pointsForm[key]}
+                      onChange={e => setPointsForm(previous => ({ ...previous, [key]: Number.parseInt(e.target.value, 10) || 0 }))}
+                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500" />
+                    <p className="text-xs text-gray-500 mt-1">{description}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="forgot-clock-out-penalty" className="block text-sm font-medium text-gray-300 mb-2">Forgotten Clock-Out Penalty</label>
+                  <input
+                    id="forgot-clock-out-penalty"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={forgotClockOutPenalty}
+                    onChange={e => setForgotClockOutPenalty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="w-full px-4 py-2 bg-gray-900 border border-red-700 text-white rounded-lg focus:ring-2 focus:ring-red-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Points deducted when an employee forgets to clock out. Uses the existing company setting.</p>
                 </div>
               </div>
             </div>
@@ -652,10 +716,10 @@ export function PointsAndRewards() {
 
       <ConfirmModal
         isOpen={confirmDeleteId !== null}
-        title="Delete Reward"
-        message="Are you sure you want to delete this reward?"
+        title="Archive Reward"
+        message="Are you sure you want to archive this reward?"
         variant="danger"
-        confirmLabel="Delete"
+        confirmLabel="Archive"
         onConfirm={() => {
           if (confirmDeleteId) deleteReward(confirmDeleteId);
           setConfirmDeleteId(null);

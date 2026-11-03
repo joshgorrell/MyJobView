@@ -108,8 +108,8 @@ function TrendIcon({ current, previous }: { current: number | null; previous: nu
   if (current === null || previous === null) return <Minus className="w-4 h-4 text-gray-400" />;
   const delta = ((current - previous) / previous) * 100;
   if (Math.abs(delta) < 5) return <Minus className="w-4 h-4 text-gray-400" />;
-  if (delta > 0) return <TrendingUp className="w-4 h-4 text-red-500" title={`+${delta.toFixed(0)}% vs prior period`} />;
-  return <TrendingDown className="w-4 h-4 text-emerald-500" title={`${delta.toFixed(0)}% vs prior period`} />;
+  if (delta > 0) return <TrendingUp className="w-4 h-4 text-red-500"><title>{`+${delta.toFixed(0)}% vs prior period`}</title></TrendingUp>;
+  return <TrendingDown className="w-4 h-4 text-emerald-500"><title>{`${delta.toFixed(0)}% vs prior period`}</title></TrendingDown>;
 }
 
 interface KPICardProps {
@@ -194,7 +194,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ServiceRequestAnalytics() {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const [rows, setRows] = useState<AnalyticsRow[]>([]);
   const [prevRows, setPrevRows] = useState<AnalyticsRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -422,13 +422,13 @@ export function ServiceRequestAnalytics() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-4 sm:space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <BarChart2 className="w-6 h-6 text-blue-400" />
-            <h1 className="text-2xl font-bold text-white">SR Response Analytics</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-white">SR Response Analytics</h1>
           </div>
           <p className="text-sm text-gray-400">
             Track service request response times: scheduling, customer contact, and completion
@@ -483,16 +483,16 @@ export function ServiceRequestAnalytics() {
           </div>
 
           {dateRange === 'custom' && (
-            <div className="flex items-center gap-2">
-              <div>
+            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto min-w-0">
+              <div className="min-w-0">
                 <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
                 <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
-                  className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg" />
+                  className="w-full min-w-0 min-h-11 px-2 py-1.5 text-base sm:text-sm border border-gray-300 rounded-lg" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
                 <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
-                  className="px-2 py-1.5 text-sm border border-gray-300 rounded-lg" />
+                  className="w-full min-w-0 min-h-11 px-2 py-1.5 text-base sm:text-sm border border-gray-300 rounded-lg" />
               </div>
             </div>
           )}
@@ -584,7 +584,7 @@ export function ServiceRequestAnalytics() {
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
-                  formatter={(value: number, name: string) => [`${value}h`, name]}
+                  formatter={(value: number = 0, name: string = '') => [`${value}h`, name]}
                   contentStyle={{ fontSize: 12 }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -607,7 +607,7 @@ export function ServiceRequestAnalytics() {
           <span className="text-sm text-gray-500">{sorted.length} total</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>

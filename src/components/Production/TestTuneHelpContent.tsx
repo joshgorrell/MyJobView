@@ -7,7 +7,7 @@ interface TestTuneHelpContentProps {
   canViewAdminControls: boolean;
 }
 
-export function TestTuneHelpContent({ userRole, canViewBonusAmounts, canViewPMMetrics, canViewAdminControls }: TestTuneHelpContentProps) {
+export function TestTuneHelpContent({ userRole, canViewBonusAmounts, canViewPMMetrics: _canViewPMMetrics, canViewAdminControls: _canViewAdminControls }: TestTuneHelpContentProps) {
   const isTech = userRole === 'tech' || userRole === 'lead_tech' || userRole === 'technician';
   const isSales = userRole === 'sales' || userRole === 'sales_rep' || userRole === 'sales_manager';
   const isManager = userRole === 'manager' || userRole === 'sales_manager' || userRole === 'service_manager';

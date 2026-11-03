@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { User, Mail, Phone, Linkedin, Globe, MapPin, QrCode, Download, X, Copy, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -10,7 +11,7 @@ interface LiveCardViewProps {
 
 export function LiveCardView({ cardId, onClose }: LiveCardViewProps) {
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [companySettings, setCompanySettings] = useState<Pick<CompanySettings, 'company_name' | 'company_logo_url' | 'website'> | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export function LiveCardView({ cardId, onClose }: LiveCardViewProps) {
   async function loadCompanyInfo() {
     try {
       const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').maybeSingle(),
+        supabase.from('company_settings').select('company_name, company_logo_url, website').maybeSingle(),
         supabase.from('company_offices').select('*').order('display_order', { ascending: true })
       ]);
 
@@ -89,7 +90,7 @@ export function LiveCardView({ cardId, onClose }: LiveCardViewProps) {
       setShowQRModal(true);
     } catch (error) {
       console.error('Error generating QR code:', error);
-      alert('Failed to generate QR code');
+      notify('Failed to generate QR code', { theme: 'blue', tone: 'error' });
     } finally {
       setLoadingQR(false);
     }
@@ -131,7 +132,7 @@ export function LiveCardView({ cardId, onClose }: LiveCardViewProps) {
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Error copying vCard:', error);
-      alert('Failed to copy contact card');
+      notify('Failed to copy contact card', { theme: 'blue', tone: 'error' });
     }
   }
 

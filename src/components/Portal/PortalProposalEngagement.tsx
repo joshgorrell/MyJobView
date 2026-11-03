@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapPin, MessageSquare, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -37,9 +37,6 @@ export function PortalProposalEngagement() {
   const [message, setMessage] = useState('');
   const [location, setLocation] = useState<PortalLocation | null>(null);
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
-  const activityId = useRef<string | null>(null);
-  const activeSeconds = useRef(0);
-  const lastTick = useRef(Date.now());
 
   useEffect(() => {
     const readRoute = () => setProposalId(proposalIdFromPath(window.location.pathname));
@@ -54,9 +51,6 @@ export function PortalProposalEngagement() {
   useEffect(() => {
     setMessage('');
     setLocation(null);
-    activityId.current = null;
-    activeSeconds.current = 0;
-    lastTick.current = Date.now();
     if (!proposalId) return;
 
     let cancelled = false;
@@ -78,57 +72,12 @@ export function PortalProposalEngagement() {
         }
       }
 
-      await new Promise(resolve => window.setTimeout(resolve, 1200));
-      const { data: view } = await supabase
-        .from('proposal_activity')
-        .select('id,duration_seconds')
-        .eq('proposal_id', proposalId)
-        .eq('activity_type', 'viewed')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!cancelled && view?.id) {
-        activityId.current = view.id;
-        activeSeconds.current = Math.max(0, view.duration_seconds || 0);
-        lastTick.current = Date.now();
-      }
+
     };
     void load();
     return () => { cancelled = true; };
   }, [proposalId]);
 
-  useEffect(() => {
-    if (!proposalId) return;
-
-    const flush = async () => {
-      if (!activityId.current) return;
-      const now = Date.now();
-      if (document.visibilityState === 'visible') {
-        const delta = Math.min(20, Math.max(0, Math.round((now - lastTick.current) / 1000)));
-        activeSeconds.current += delta;
-      }
-      lastTick.current = now;
-      await supabase.rpc('update_proposal_activity_duration', {
-        p_activity_id: activityId.current,
-        p_duration_seconds: activeSeconds.current,
-      });
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') void flush();
-      else lastTick.current = Date.now();
-    };
-    const onPageHide = () => { void flush(); };
-    const timer = window.setInterval(() => { void flush(); }, 15000);
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onPageHide);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', onPageHide);
-      void flush();
-    };
-  }, [proposalId]);
 
   if (!proposalId || ((!message || dismissedFor === proposalId) && !location)) return null;
 

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+const source = fs.readFileSync('src/lib/smart-intake/channel-routing.ts','utf8');
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+const support = { destination:'support@electroniclife.com',purpose:'support',organizationId:'dealer',enabled:true };
+const leads = { ...support,destination:'leads@electroniclife.com',purpose:'sales' };
+assert.equal(exports.determineIntakeRoute(support,'service').destination,'service_queue');
+assert.equal(exports.determineIntakeRoute(support,'task').destination,'task_queue');
+assert.equal(exports.determineIntakeRoute(leads,'sales').destination,'lead_queue');
+assert.equal(exports.determineIntakeRoute(support,'sales').action,'review');
+assert.equal(exports.determineIntakeRoute(leads,'service').action,'review');
+assert.equal(exports.determineIntakeRoute({...support,enabled:false},'service').action,'reject');
+console.log('Dealer-branded channel routing contract passed');

@@ -133,7 +133,7 @@ CREATE TABLE department_modules(organization_id uuid,module_key text,is_active b
 INSERT INTO department_modules VALUES('${org}','contract_management',true);
 CREATE TABLE invoices(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),company_id uuid,organization_id uuid,contact_id uuid,invoice_number text,invoice_date date,due_date date,invoice_type text,source_type text,status text,subtotal numeric,total numeric,amount_due numeric,billing_name text,billing_address_line1 text,billing_city text,billing_state text,billing_zip text,jobsite_address text,jobsite_city text,jobsite_state text,jobsite_zip text,tax_environment text,tax_project_type text,notes text);
 CREATE TABLE invoice_line_items(id uuid DEFAULT gen_random_uuid(),invoice_id uuid,organization_id uuid,description text,quantity numeric,unit_price numeric,amount numeric,sort_order int,item_type text,is_taxable boolean,tax_classification_id uuid);
-CREATE TABLE payments(id uuid DEFAULT gen_random_uuid(),company_id uuid,organization_id uuid,invoice_id uuid,amount numeric,payment_method text,payment_processor text,processor_transaction_id text,reference_number text,notes text,qbo_payment_id text,synced_at timestamptz);
+CREATE TABLE payments(created_at timestamptz DEFAULT now(),id uuid DEFAULT gen_random_uuid(),company_id uuid,organization_id uuid,invoice_id uuid,amount numeric,payment_method text,payment_processor text,processor_transaction_id text,reference_number text,notes text,qbo_payment_id text,synced_at timestamptz);
 CREATE FUNCTION calculate_tax_context(text,uuid) RETURNS jsonb LANGUAGE sql AS $$ SELECT jsonb_build_object('tax_calculation_status',coalesce(current_setting('test.tax_status',true),'ready')) $$;
 CREATE FUNCTION submit_invoice(p_id uuid) RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN UPDATE public.invoices SET status='submitted',invoice_number='INV-TEST' WHERE id=p_id; RETURN '{"success":true}'::jsonb; END $$;
 `);
@@ -191,5 +191,7 @@ assert.ok(revised.contract_terms.includes('initial monitoring term is 36 months'
 assert.ok(!revised.contract_terms.includes('Old multi-year renewal surcharge'));
 assert.ok((await db.query("select contract_terms from security_contract_templates where id='1546a013-6a30-4aed-b58a-70dd74a6ec25'")).rows[0].contract_terms.includes('Old multi-year renewal surcharge'),'Original template remains intact');
 await assert.rejects(db.query('update security_contract_templates set is_active=true where id=$1',[revised.id]),'Unfinished legal draft cannot be activated');
+const { testStaff } = await import('./staff.mjs');
+await testStaff(db,{id,org,contact,otherContact,template,form,role,rpc});
 await db.close();
 console.log('Security onboarding database tests passed: ownership, expiry, safe drafts, revisions, atomic signing, immutable copy, required verified AutoPay, Admin-only mail billing/$7 fee, portal visibility/summary, recurring billing idempotency, advance notices, pending/settled payments, webhook deduplication, tax blocking, and revocation.');

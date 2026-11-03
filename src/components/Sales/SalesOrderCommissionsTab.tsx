@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   DollarSign, TrendingUp, Clock, CheckCircle, Users, Briefcase,
-  Loader2, AlertCircle, Percent, PenTool, ChevronDown, ChevronUp,
+  Loader2, AlertCircle, PenTool, ChevronDown, ChevronUp,
   Receipt, Sparkles, ArrowRight
 } from 'lucide-react';
 import type { SalesOrderFull, ChangeOrderSummary } from './SalesOrderDetail';
@@ -71,7 +71,7 @@ export function SalesOrderCommissionsTab({ order, changeOrders }: SalesOrderComm
   const { profile } = useAuth();
   const [records, setRecords] = useState<CommissionRecord[]>([]);
   const [settings, setSettings] = useState<CommissionSettings | null>(null);
-  const [employeeConfigs, setEmployeeConfigs] = useState<EmployeeConfig[]>([]);
+  const [_employeeConfigs, setEmployeeConfigs] = useState<EmployeeConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDetail, setShowDetail] = useState(false);
 

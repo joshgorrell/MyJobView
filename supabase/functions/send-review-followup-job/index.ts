@@ -1,3 +1,5 @@
+import { sendLostFeedbackReminders } from './lostFeedback.ts';
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings } from '../_shared/emailTemplates.ts';
 
@@ -85,18 +87,12 @@ function buildFollowUpSatisfactionEmail(params: {
   ];
 
   const makeButton = (r: typeof ratings[0]) => `
-    <td align="center" style="padding:6px;">
-      <a href="${makeRatingUrl(r.key)}" style="display:block;text-decoration:none;width:120px;height:130px;border-radius:12px;overflow:hidden;background:${r.bg};">
-        <table cellpadding="0" cellspacing="0" width="120" style="width:120px;height:130px;border-radius:12px;background:${r.bg};">
-          <tr><td align="center" width="120" height="54" style="padding:14px 8px 4px;vertical-align:bottom;">
-            <span style="font-size:28px;line-height:28px;display:block;height:28px;">${r.emoji}</span>
-          </td></tr>
-          <tr><td align="center" width="120" height="32" style="padding:4px 6px 0;vertical-align:middle;">
-            <span style="color:#ffffff;font-size:11px;font-weight:700;display:block;line-height:14px;">${r.label}</span>
-          </td></tr>
-          <tr><td align="center" width="120" height="44" style="padding:2px 6px 14px;vertical-align:top;">
-            <span style="color:rgba(255,255,255,0.8);font-size:10px;line-height:13px;display:block;">${r.desc}</span>
-          </td></tr>
+    <td align="center" valign="top" style="padding:6px;">
+      <a href="${makeRatingUrl(r.key)}" style="display:block;text-decoration:none;width:120px;border-radius:12px;background:${r.bg};">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="120" style="width:120px;border-radius:12px;background:${r.bg};">
+          <tr><td align="center" style="padding:16px 8px 8px;"><span style="display:block;font-size:28px;line-height:32px;">${r.emoji}</span></td></tr>
+          <tr><td align="center" height="36" style="padding:0 8px;vertical-align:middle;"><span style="display:block;color:#ffffff;font-size:13px;font-weight:700;line-height:16px;">${r.key === 'needs_attention' ? 'Needs<br>Attention' : r.label}</span></td></tr>
+          <tr><td align="center" height="32" style="padding:6px 8px 16px;vertical-align:top;"><span style="display:block;color:#ffffff;font-size:11px;line-height:16px;">${r.key === 'okay' ? 'Room to improve' : r.key === 'needs_attention' ? 'Please contact me' : r.desc}</span></td></tr>
         </table>
       </a>
     </td>`;
@@ -148,21 +144,80 @@ function buildFollowUpSatisfactionEmail(params: {
 </html>`;
 }
 
+function buildFollowUpProposalCheckEmail(params: {
+  customerName: string;
+  companyName: string;
+  companyEmail: string;
+  companyLogoUrl?: string;
+  originalSubject: string;
+  responseUrl: string;
+}): string {
+  const logoBlock = params.companyLogoUrl
+    ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
+    : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${params.companyName}</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Quick check-in on your proposal</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+      <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #06b6d4;">
+        <div style="margin-bottom:20px;">${logoBlock}</div>
+        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:26px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How Did We Do?</h1>
+        <p style="color:#94a3b8;margin:0;font-size:15px;">Your thoughts on our proposal matter to us</p>
+      </td></tr>
+      <tr><td style="background:#ffffff;padding:44px 44px 36px;">
+        <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName || 'there'},</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">We sent you a proposal check email about <strong style="color:#0e7490;">${params.originalSubject}</strong> a while back and wanted to follow up. We'd really value your feedback — it takes less than a minute and helps us serve you better.</p>
+        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">Click below to let us know how you felt about our proposal:</p>
+        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 32px 0;">
+          <a href="${params.responseUrl}" style="display:inline-block;background:#0e7490;color:#ffffff;text-decoration:none;padding:16px 48px;border-radius:10px;font-size:17px;font-weight:700;letter-spacing:0.01em;">Share Your Feedback</a>
+        </td></tr></table>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><tr><td style="padding:18px 22px;">
+          <p style="color:#0f172a;font-size:13px;margin:0 0 5px 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">This is our final follow-up</p>
+          <p style="color:#475569;font-size:14px;margin:0;line-height:1.6;">Just a quick click is all it takes. Your input directly helps our team grow.</p>
+        </td></tr></table>
+      </td></tr>
+      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 44px;text-align:center;border-top:1px solid #334155;">
+        <p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${params.companyName}</p>
+        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${params.companyEmail}</p>` : ''}
+        <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">Thank you for your time.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const authHeader = req.headers.get('Authorization') || '';
+  const cronSecret = Deno.env.get('CRON_SECRET') || '';
+  if (!((supabaseServiceKey && authHeader === `Bearer ${supabaseServiceKey}`) || (cronSecret && authHeader === `Bearer ${cronSecret}`))) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   try {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      supabaseServiceKey
     );
 
     const { data: allSettings, error: settingsErr } = await supabaseAdmin
       .from('company_settings')
-      .select('organization_id, auto_review_followup_enabled, auto_review_followup_days')
-      .eq('auto_review_followup_enabled', true);
+      .select('organization_id, auto_review_followup_enabled, auto_review_followup_days, lost_review_followup_enabled, lost_review_followup_days')
+      .or('auto_review_followup_enabled.eq.true,lost_review_followup_enabled.eq.true');
 
     if (settingsErr) {
       console.error('Error fetching company settings:', settingsErr);
@@ -180,22 +235,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const sharedSettings = await getCompanySettings(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
 
     let totalSent = 0;
     let totalErrors = 0;
 
     for (const orgSettings of allSettings) {
       const orgId = orgSettings.organization_id;
+      const sharedSettings = await getCompanySettings(Deno.env.get('SUPABASE_URL')!, supabaseServiceKey, orgId);
+      const lost = await sendLostFeedbackReminders(supabaseAdmin, sendSystemEmail, sharedSettings, orgSettings, supabaseServiceKey);
+      totalSent += lost.sent; totalErrors += lost.errors;
+      if (!orgSettings.auto_review_followup_enabled) continue;
       const followUpDays = orgSettings.auto_review_followup_days ?? 14;
       const cutoffDate = new Date(Date.now() - followUpDays * 24 * 60 * 60 * 1000).toISOString();
 
       const { data: reviewRows, error: reviewErr } = await supabaseAdmin
         .from('review_requests')
-        .select('id, contact_id, recipient_email, recipient_name, method, contacts:contact_id(contact_name, first_name, email)')
+        .select('id, contact_id, recipient_email, recipient_name, method, contacts:contact_id(contact_name, full_name, first_name, last_name, company_name, email)')
         .eq('organization_id', orgId)
         .eq('request_type', 'customer_review')
         .eq('review_completed', false)
@@ -216,7 +271,7 @@ Deno.serve(async (req: Request) => {
           const recipientEmail = contact?.email || row.recipient_email;
           if (!recipientEmail) continue;
 
-          const customerName = contact?.first_name || contact?.contact_name || row.recipient_name || '';
+          const customerName = row.recipient_name || contact?.contact_name || contact?.full_name || contact?.company_name || [contact?.first_name, contact?.last_name].filter(Boolean).join(' ') || '';
 
           const REVIEW_URL = 'https://g.page/r/CZzvVUth7kuyEBM/review';
           const emailHtml = buildFollowUpReviewEmail({
@@ -228,13 +283,13 @@ Deno.serve(async (req: Request) => {
             reviewUrl: REVIEW_URL,
           });
 
-          const firstName = customerName.split(' ')[0];
+          const firstName = customerName;
           const subject = firstName
             ? `One last ask, ${firstName} — we'd love your review`
             : `One last ask — we'd love your review`;
 
           if (resendApiKey) {
-            const emailResponse = await fetch('https://api.resend.com/emails', {
+            const emailResponse = await sendSystemEmail({
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${resendApiKey}`,
@@ -256,7 +311,7 @@ Deno.serve(async (req: Request) => {
               continue;
             }
           } else {
-            console.log('[demo] Would send follow-up review email to', recipientEmail, 'for record', row.id);
+            throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
           }
 
           await supabaseAdmin
@@ -302,13 +357,13 @@ Deno.serve(async (req: Request) => {
             responseToken: row.response_token,
           });
 
-          const firstName = (row.customer_name || '').split(' ')[0];
+          const firstName = row.customer_name || '';
           const subject = firstName
             ? `Still waiting to hear from you, ${firstName}!`
             : 'Still waiting to hear from you!';
 
           if (resendApiKey) {
-            const emailResponse = await fetch('https://api.resend.com/emails', {
+            const emailResponse = await sendSystemEmail({
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${resendApiKey}`,
@@ -330,7 +385,7 @@ Deno.serve(async (req: Request) => {
               continue;
             }
           } else {
-            console.log('[demo] Would send follow-up satisfaction email to', row.customer_email, 'for record', row.id);
+            throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
           }
 
           await supabaseAdmin
@@ -342,6 +397,94 @@ Deno.serve(async (req: Request) => {
         } catch (err) {
           console.error('Error processing satisfaction row', row.id, err);
           totalErrors++;
+        }
+      }
+
+      // --- Proposal Check follow-ups ---
+      const { data: proposalRows, error: proposalErr } = await supabaseAdmin
+        .from('proposal_check_emails')
+        .select('id, organization_id, contact_id, recipient_email, recipient_name, subject, proposal_id, response_token')
+        .eq('organization_id', orgId)
+        .eq('auto_followup_enabled', true)
+        .is('follow_up_sent_at', null)
+        .eq('status', 'sent')
+        .lte('sent_at', cutoffDate)
+        .not('response_token', 'is', null);
+
+      if (proposalErr) {
+        console.error('Error fetching proposal_check_emails for org', orgId, proposalErr);
+        totalErrors++;
+      } else {
+        const emailIds = (proposalRows ?? []).map((r: any) => r.id);
+        let respondedIds = new Set<string>();
+        if (emailIds.length > 0) {
+          const { data: events } = await supabaseAdmin
+            .from('proposal_check_events')
+            .select('email_id')
+            .in('email_id', emailIds)
+            .in('kind', ['choice', 'response']);
+          if (events) {
+            respondedIds = new Set(events.map((e: any) => e.email_id));
+          }
+        }
+        for (const row of (proposalRows ?? [])) {
+          try {
+            if (respondedIds.has(row.id)) continue;
+            if (!row.recipient_email) continue;
+
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+            const responseUrl = `${supabaseUrl}/functions/v1/proposal-check-response?token=${row.response_token || ''}`;
+
+            const html = buildFollowUpProposalCheckEmail({
+              customerName: row.recipient_name || '',
+              companyName: sharedSettings.company_name,
+              companyEmail: sharedSettings.company_email,
+              companyLogoUrl: sharedSettings.company_logo_url,
+              originalSubject: row.subject || 'your proposal',
+              responseUrl,
+            });
+
+            const firstName = row.recipient_name || '';
+            const subject = firstName
+              ? `Quick check-in on your proposal, ${firstName}`
+              : 'Quick check-in on your proposal';
+
+            if (resendApiKey) {
+              const emailResponse = await sendSystemEmail({
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${resendApiKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  from: sharedSettings.from_address,
+                  to: row.recipient_email,
+                  reply_to: sharedSettings.reply_to_email,
+                  subject,
+                  html,
+                }),
+              });
+
+              if (!emailResponse.ok) {
+                const errText = await emailResponse.text();
+                console.error('Resend error for proposal check', row.id, errText);
+                totalErrors++;
+                continue;
+              }
+            } else {
+              throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
+            }
+
+            await supabaseAdmin
+              .from('proposal_check_emails')
+              .update({ follow_up_sent_at: new Date().toISOString() })
+              .eq('id', row.id);
+
+            totalSent++;
+          } catch (err) {
+            console.error('Error processing proposal check row', row.id, err);
+            totalErrors++;
+          }
         }
       }
     }

@@ -1,0 +1,25 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db=new PGlite();
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+await db.exec(`CREATE ROLE authenticated;CREATE ROLE anon;CREATE ROLE service_role;CREATE SCHEMA auth;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid',true),'')::uuid$$;
+CREATE TABLE public.profiles(id uuid PRIMARY KEY,role text,is_active boolean,organization_id uuid);
+CREATE TABLE auth.users(id uuid PRIMARY KEY,encrypted_password text);
+INSERT INTO profiles VALUES('${id(1)}','admin',true,'${id(10)}'),('${id(2)}','tech',true,'${id(10)}'),('${id(3)}','admin',true,'${id(20)}'),('${id(4)}','admin',false,'${id(10)}');
+INSERT INTO auth.users VALUES('${id(2)}','old-password');GRANT SELECT ON profiles TO authenticated;`);
+await db.exec(await readFile('supabase/migrations/20261005180043_employee_welcome_email_tracking.sql','utf8'));
+await db.exec(`INSERT INTO public.user_account_email_status(user_id)VALUES('${id(2)}');UPDATE auth.users SET encrypted_password='pre-welcome' WHERE id='${id(2)}';`);
+assert.equal((await db.query('SELECT activated_at FROM user_account_email_status')).rows[0].activated_at,null);
+await db.exec(`UPDATE user_account_email_status SET welcome_sent_at=now() WHERE user_id='${id(2)}';UPDATE auth.users SET encrypted_password='chosen-password' WHERE id='${id(2)}';`);
+const activated=(await db.query('SELECT activated_at FROM user_account_email_status')).rows[0].activated_at;
+assert.ok(activated);
+await db.exec(`UPDATE auth.users SET encrypted_password='another-password' WHERE id='${id(2)}';`);
+assert.equal((await db.query('SELECT activated_at FROM user_account_email_status')).rows[0].activated_at.toISOString(),activated.toISOString());
+async function as(user,sql){await db.exec(`RESET ROLE;SELECT set_config('test.uid','${user}',false);SET ROLE authenticated;`);return db.query(sql);}
+assert.equal((await as(id(1),'SELECT * FROM user_account_email_status')).rows.length,1);
+for(const actor of [id(2),id(3),id(4)])assert.equal((await as(actor,'SELECT * FROM user_account_email_status')).rows.length,0);
+await assert.rejects(()=>as(id(1),"UPDATE user_account_email_status SET activated_at=now()"));
+await assert.rejects(()=>as(id(2),'SELECT private.record_account_password_setup()'));
+await db.close();console.log('Account activation, immutable first activation, admin-only status, tenant isolation and protected writes passed.');

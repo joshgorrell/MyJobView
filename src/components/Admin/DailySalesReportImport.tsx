@@ -52,7 +52,7 @@ function parseSpreadsheet(file: File): Promise<DailyRow[]> {
         const workbook = XLSX.read(event.target?.result, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-        const parsed = rows.map((row) => {
+        const parsed = rows.map((row): DailyRow | null => {
           const values = Object.entries(row);
           const get = (names: string[]): unknown => values.find(([key]) => names.includes(key.toLowerCase().replace(/[^a-z]/g, '')))?.[1];
           const rawDate = get(['date', 'salesdate', 'invoicedate']);

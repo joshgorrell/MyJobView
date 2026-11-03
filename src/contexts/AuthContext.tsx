@@ -1,15 +1,19 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, passwordRecoveryLink } from '../lib/supabase';
+import { verifyPasswordRecovery } from '../lib/passwordRecovery';
 import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
+import { browserInstallationId } from '../lib/sessionDevices';
 import { isValidReturnHost } from '../lib/crossDomainAuth';
+import { MJV_IDLE_TIMEOUT_MS, MJV_IDLE_WARNING_MS, remainingIdleMs, mayResetOnReload } from '../lib/sessionInactivity';
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   companySettings: CompanySettings | null;
   setProfileAvatar: (url: string | null) => void;
+  setProfileTheme: (userId: string, theme: Profile['ui_theme']) => void;
   loading: boolean;
   isPasswordRecovery: boolean;
   isPortalUser: boolean;
@@ -23,57 +27,51 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// A navigation reload should only be counted once, even if tracking restarts on tab focus.
+let reloadActivityHandled = false;
+// Prevent the idle watchdog from treating a successful interactive login as an old session.
+let interactiveSignInInProgress = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const setProfileAvatar = (url: string | null) => setProfile(current => current ? { ...current, avatar_url: url } : current);
+  const setProfileTheme = useCallback((userId: string, theme: Profile['ui_theme']) => {
+    setProfile(current => current?.id === userId ? { ...current, ui_theme: theme } : current);
+  }, []);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(passwordRecoveryLink.active);
+  const recoveryVerifiedRef = useRef(false);
   const [isPortalUser, setIsPortalUser] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const sessionTrackingGenerationRef = useRef(0);
+
+  // Refs mirror the state values so the onAuthStateChange closure (which
+  // is created once on mount) can read the *current* profile/loading state
+  // instead of the stale captured values. Without this, INITIAL_SESSION
+  // re-fires (e.g. when a tab regains focus) see profile as always-null
+  // and flip loading back to true, unmounting the entire app.
+  const profileRef = useRef<Profile | null>(null);
+  const loadingProfileRef = useRef(false);
+  profileRef.current = profile;
+  loadingProfileRef.current = loadingProfile;
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setIsPasswordRecovery(true);
-      setLoading(false);
-      return;
-    }
+    const recoveryLink = passwordRecoveryLink.active;
+    if (recoveryLink) setIsPasswordRecovery(true);
 
-    // Wrap getSession in a timeout so a hanging session fetch doesn't
-    // leave the app on the loading screen indefinitely.
+    // The auth listener owns INITIAL_SESSION. Calling getSession() separately
+    // raced with it and could start duplicate profile/session initialization.
     const sessionTimeout = setTimeout(() => {
       console.error('Session initialization timed out after 15 seconds');
-      setUser(null);
-      setProfile(null);
-      setCompanySettings(null);
       setLoading(false);
       setLoadingProfile(false);
     }, 15000);
 
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        clearTimeout(sessionTimeout);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          loadProfile(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch((error) => {
-        clearTimeout(sessionTimeout);
-        console.error('Session initialization error:', error);
-        setUser(null);
-        setProfile(null);
-        setCompanySettings(null);
-        setLoading(false);
-        setLoadingProfile(false);
-      });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') clearTimeout(sessionTimeout);
       if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordRecovery(true);
         setUser(session?.user ?? null);
@@ -87,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         setCompanySettings(null);
         setCurrentSessionId(null);
-        setIsPasswordRecovery(false);
+        setIsPasswordRecovery(recoveryLink);
         setIsPortalUser(false);
         setLoading(false);
         setLoadingProfile(false);
@@ -100,20 +98,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (recoveryLink) {
+          setUser(session.user);
+          setIsPasswordRecovery(true);
+          setLoading(false);
+          return;
+        }
         setUser(session.user);
         setIsPasswordRecovery(false);
-        setLoading(true);
-        loadProfile(session.user.id);
+        // Only flip loading to true on the initial mount. If the app is
+        // already loaded (e.g. a token refresh re-fires INITIAL_SESSION
+        // after the tab regains focus), keep the current UI mounted so
+        // users don't lose unsaved form state.
+        if (!profileRef.current && !loadingProfileRef.current) {
+          setLoading(true);
+          loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
+        }
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname);
         }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(sessionTimeout); subscription.unsubscribe(); };
   }, []);
 
-  async function loadProfile(userId: string) {
+  useEffect(() => {
+    const refresh = () => { if (user) void loadProfile(user.id, isPortalUser); };
+    window.addEventListener('permissions-changed', refresh);
+    return () => window.removeEventListener('permissions-changed', refresh);
+  }, [user?.id, isPortalUser]);
+
+  async function loadProfile(userId: string, portalUser: boolean) {
     if (loadingProfile) return;
 
     setLoadingProfile(true);
@@ -127,9 +143,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 10000);
 
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const portalUser = currentUser?.user_metadata?.is_portal_user === true;
-
       setIsPortalUser(portalUser);
 
       const { data, error } = await supabase
@@ -147,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         setLoadingProfile(false);
         if (!portalUser) await supabase.auth.signOut();
+        else void startSessionTracking(userId).catch(() => {});
         return;
       }
 
@@ -156,6 +170,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           clearTimeout(timeoutId);
           setLoading(false);
           setLoadingProfile(false);
+          // Customer portal accounts may not have a staff profile. Enforce the
+          // same idle timeout even when session analytics cannot be recorded.
+          void startSessionTracking(userId).catch(() => {});
           return;
         }
         console.error('Profile not found for user:', userId);
@@ -170,11 +187,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
 
       Promise.all([
-        supabase
+        Promise.resolve(supabase
           .from('company_settings')
           .select('*')
           .eq('organization_id', data.organization_id)
-          .maybeSingle()
+          .maybeSingle())
           .then(({ data: settings, error: settingsError }) => {
             if (!settingsError && settings) {
               setCompanySettings(settings);
@@ -213,7 +230,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    interactiveSignInInProgress = true;
+    let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'];
+    let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['error'];
+    try {
+      ({ data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password }));
+    } catch (signInError) {
+      interactiveSignInInProgress = false;
+      throw signInError;
+    }
+    if (error || !data?.user || !data.session) interactiveSignInInProgress = false;
 
     if (error) throw error;
 
@@ -228,6 +254,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'Please enable cookies and site data in your browser settings.'
       );
     }
+
+    // Explicit login begins a new idle window, even after an earlier expired session.
+    localStorage.setItem(`mjv-last-interaction:${data.user.id}`, String(Date.now()));
+    interactiveSignInInProgress = false;
 
     const urlParams = new URLSearchParams(window.location.search);
     const redirectTo = urlParams.get('redirect_to');
@@ -272,8 +302,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resetPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+    const redirect = new URL('/', window.location.origin);
+    redirect.searchParams.set('account_setup', 'reset');
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirect.toString(),
     });
 
     if (error) {
@@ -298,6 +330,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function updatePassword(newPassword: string) {
+    if (passwordRecoveryLink.active && !recoveryVerifiedRef.current) {
+      const verifiedUser = await verifyPasswordRecovery(supabase, passwordRecoveryLink);
+      recoveryVerifiedRef.current = true;
+      setUser(verifiedUser);
+      // Remove credentials from the address bar after verification succeeds.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.hash = '';
+      cleanUrl.searchParams.delete('code');
+      window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
+    }
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
     });
@@ -311,12 +353,152 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function startSessionTracking(userId: string) {
     try {
       cleanupSessionTracking();
+      const trackingGeneration = ++sessionTrackingGenerationRef.current;
 
-      const deviceInfo = parseUserAgent(navigator.userAgent);
+      const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const;
+      // Always install idle enforcement before session analytics. An analytics
+      // RPC failure must never disable the logout security policy.
+        // Inactivity is based on interactions within MJV, not other browser tabs.
+        // Persist across reloads and tabs in this browser to prevent timer resets.
+        const idleKey = `mjv-last-interaction:${userId}`;
+        const inactivityLimitMs = MJV_IDLE_TIMEOUT_MS;
+        const warningMs = MJV_IDLE_TIMEOUT_MS - MJV_IDLE_WARNING_MS;
+        const readLastInteraction = () => Number(localStorage.getItem(idleKey)) || 0;
+        const dismissWarning = () => document.getElementById('mjv-idle-warning')?.remove();
+        let idleSigningOut = false;
+        const expireSession = () => {
+          if (idleSigningOut) return;
+          idleSigningOut = true;
+          dismissWarning();
+          void (async () => {
+            try {
+              const sessionId = (window as any).__currentSessionId as string | undefined;
+              if (sessionId) {
+                // Best-effort session-history close. Never let a stalled network
+                // request prevent the local authentication logout.
+                await Promise.race([
+                  supabase.rpc('end_user_session', { p_user_id: userId, p_session_id: sessionId }),
+                  new Promise(resolve => setTimeout(resolve, 1500)),
+                ]);
+              }
+            } catch (error) {
+              console.error('Could not close idle session record:', error);
+            } finally {
+              await supabase.auth.signOut();
+            }
+          })();
+        };
+        const recordIdleInteraction = () => {
+          if (idleSigningOut) return;
+          if (remainingIdleMs(readLastInteraction()) === 0) {
+            expireSession();
+            return;
+          }
+          localStorage.setItem(idleKey, String(Date.now()));
+          dismissWarning();
+        };
+        const trackIdleInteraction = (event: Event) => {
+          // Do not dismiss the modal on pointerdown/keydown before the
+          // Log Out Now button can receive its click or keyboard activation.
+          if ((event.target as Element | null)?.closest?.('#mjv-idle-logout')) return;
+          if (event.isTrusted) recordIdleInteraction();
+        };
+        const previousActivity = readLastInteraction();
+        if (interactiveSignInInProgress || !previousActivity) {
+          localStorage.setItem(idleKey, String(Date.now()));
+        }
+        // Navigation Timing identifies reloads but cannot distinguish a manual
+        // browser refresh from an automatic one. Never revive an expired session.
+        if (!reloadActivityHandled) {
+          reloadActivityHandled = true;
+          const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+          if (mayResetOnReload(navigation?.type, previousActivity, Date.now(), document.visibilityState === 'visible')) {
+            recordIdleInteraction();
+          }
+        }
+        interactionEvents.forEach(event => document.addEventListener(event, trackIdleInteraction, { passive: true }));
 
-      const { data, error } = await supabase.rpc('start_user_session', {
-        p_user_id: userId,
-        p_ip_address: null,
+        const showWarning = () => {
+          if (document.getElementById('mjv-idle-warning')) return;
+          const overlay = document.createElement('div');
+          overlay.id = 'mjv-idle-warning';
+          overlay.setAttribute('role', 'alertdialog');
+          overlay.setAttribute('aria-modal', 'true');
+          overlay.setAttribute('aria-labelledby', 'mjv-idle-title');
+          overlay.setAttribute('aria-describedby', 'mjv-idle-description');
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.65);padding:16px';
+          const box = document.createElement('div');
+          box.style.cssText = 'width:min(100%,440px);border-radius:16px;background:var(--background,#fff);color:var(--foreground,#111827);padding:28px;box-shadow:0 24px 70px rgba(0,0,0,.35);text-align:center';
+          const title = document.createElement('h2');
+          title.id = 'mjv-idle-title';
+          title.textContent = 'Your session is about to expire';
+          title.style.cssText = 'font-size:22px;font-weight:700;margin:0 0 12px';
+          const description = document.createElement('p');
+          description.id = 'mjv-idle-description';
+          description.textContent = 'You have been inactive in MyJobView. Interact anywhere in MJV to stay signed in. Unsaved changes may be lost if your session expires.';
+          description.style.cssText = 'font-size:14px;line-height:1.6;margin:0 0 18px';
+          const countdown = document.createElement('p');
+          countdown.id = 'mjv-idle-countdown';
+          countdown.setAttribute('aria-live', 'off');
+          countdown.style.cssText = 'font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;margin:0 0 20px';
+          const stay = document.createElement('button');
+          stay.type = 'button';
+          stay.textContent = 'Stay Signed In';
+          stay.style.cssText = 'background:#2563eb;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:600;cursor:pointer;margin:4px';
+          stay.addEventListener('click', recordIdleInteraction);
+          const logout = document.createElement('button');
+          logout.id = 'mjv-idle-logout';
+          logout.type = 'button';
+          logout.textContent = 'Log Out Now';
+          logout.style.cssText = 'background:transparent;color:inherit;border:1px solid #9ca3af;border-radius:8px;padding:12px 18px;cursor:pointer;margin:4px';
+          logout.addEventListener('click', expireSession);
+          box.append(title, description, countdown, stay, logout);
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+          // Pointer, touch, keyboard and wheel interactions are already
+          // handled by the document listeners, including clicks on this modal.
+          stay.focus();
+        };
+        const checkIdle = () => {
+          if (idleSigningOut) return;
+          const remainingMs = remainingIdleMs(readLastInteraction());
+          if (remainingMs <= 0) {
+            expireSession();
+          } else if (remainingMs <= inactivityLimitMs - warningMs) {
+            showWarning();
+            const countdown = document.getElementById('mjv-idle-countdown');
+            if (countdown) {
+              const seconds = Math.ceil(remainingMs / 1000);
+              countdown.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} remaining`;
+            }
+          } else {
+            dismissWarning();
+          }
+        };
+        const idleCheck = setInterval(checkIdle, 1000);
+        // Timers are throttled while a laptop sleeps or MJV is backgrounded.
+        // Check immediately on return; do not reset idle time on focus.
+        window.addEventListener('focus', checkIdle);
+        document.addEventListener('visibilitychange', checkIdle);
+        checkIdle();
+        const priorCleanup = (window as any).__sessionInteractionCleanup;
+        (window as any).__sessionInteractionCleanup = () => {
+          priorCleanup?.();
+          clearInterval(idleCheck);
+          window.removeEventListener('focus', checkIdle);
+          document.removeEventListener('visibilitychange', checkIdle);
+          document.getElementById('mjv-idle-warning')?.remove();
+          interactionEvents.forEach(event => document.removeEventListener(event, trackIdleInteraction));
+        };
+
+      if (idleSigningOut) return;
+
+
+
+      const deviceInfo = parseUserAgent(navigator.userAgent, navigator.maxTouchPoints);
+
+      const { data, error } = await supabase.rpc('start_browser_session', {
+        p_browser_id: browserInstallationId(),
         p_user_agent: navigator.userAgent,
         p_device_type: deviceInfo.deviceType,
         p_browser_name: deviceInfo.browserName,
@@ -327,6 +509,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         p_device_vendor: deviceInfo.deviceVendor
       });
 
+      // Another login, tab transition, or sign-out may have superseded this RPC.
+      if (trackingGeneration !== sessionTrackingGenerationRef.current) return;
       if (error) {
         return;
       }
@@ -342,9 +526,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }).catch(() => {});
         }, 0);
 
-        // Update activity every 5 minutes
+        // A visible, unattended tab is not evidence of work. Only send a
+        // heartbeat when the user interacted recently while the tab was visible.
+        // Do not collect keys, pointer coordinates, or interaction content.
+        let lastInteractionAt = 0;
+        const noteInteraction = () => {
+          if (document.visibilityState === 'visible') lastInteractionAt = Date.now();
+        };
+        interactionEvents.forEach(event => document.addEventListener(event, noteInteraction, { passive: true }));
+        const idleCleanup = (window as any).__sessionInteractionCleanup;
+        (window as any).__sessionInteractionCleanup = () => {
+          idleCleanup?.();
+          interactionEvents.forEach(event => document.removeEventListener(event, noteInteraction));
+        };
+
         const activityInterval = setInterval(async () => {
-          if (document.visibilityState === 'visible') {
+          if (document.visibilityState === 'visible' && Date.now() - lastInteractionAt <= 5 * 60 * 1000) {
             try {
               await supabase.rpc('update_session_activity', {
                 p_user_id: userId,
@@ -364,11 +561,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const handleVisibilityChange = async () => {
           if (document.visibilityState === 'visible') {
             try {
-              await supabase.rpc('update_session_activity', {
-                p_user_id: userId,
-                p_page: null,
-                p_session_id: data
-              });
+              await startSessionTracking(userId);
             } catch (err) {
               console.error('⚠️ Error updating session activity on visibility change:', err);
             }
@@ -377,36 +570,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         (window as any).__visibilityHandler = handleVisibilityChange;
 
-        // Handle visibility change to hidden — mark session inactive when tab is closed
-        // We use visibilitychange instead of beforeunload because beforeunload fires
-        // on every SPA navigation (React router), killing sessions constantly.
-        const handleHide = () => {
-          if (document.visibilityState === 'hidden') {
-            try {
-              const sessionIdToEnd = (window as any).__currentSessionId;
-              const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/end_user_session`;
-              const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-              const { data: { session } } = (supabase.auth as any)._session
-                ? { data: { session: (supabase.auth as any)._session } }
-                : { data: { session: null } };
-              const token = session?.access_token || anonKey;
-              const blob = new Blob(
-                [JSON.stringify({ p_session_id: sessionIdToEnd })],
-                { type: 'application/json' }
-              );
-              const headers = new Headers({
-                'Authorization': `Bearer ${token}`,
-                'apikey': anonKey,
-                'Content-Type': 'application/json',
-              });
-              fetch(url, { method: 'POST', headers, body: blob, keepalive: true }).catch(() => {});
-            } catch (err) {
-              // non-critical
-            }
-          }
-        };
-        document.addEventListener('visibilitychange', handleHide);
-        (window as any).__hideHandler = handleHide;
         (window as any).__currentSessionId = data;
       }
     } catch (error) {
@@ -416,6 +579,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   function cleanupSessionTracking() {
+    sessionTrackingGenerationRef.current++;
+    if ((window as any).__sessionInteractionCleanup) {
+      (window as any).__sessionInteractionCleanup();
+      delete (window as any).__sessionInteractionCleanup;
+    }
     // Clear intervals and event listeners
     if ((window as any).__activityInterval) {
       clearInterval((window as any).__activityInterval);
@@ -450,7 +618,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, companySettings, setProfileAvatar, loading, isPasswordRecovery, isPortalUser, signIn, signUp, signOut, resetPassword, resendConfirmation, updatePassword }}>
+    <AuthContext.Provider value={{ user, profile, companySettings, setProfileAvatar, setProfileTheme, loading, isPasswordRecovery, isPortalUser, signIn, signUp, signOut, resetPassword, resendConfirmation, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

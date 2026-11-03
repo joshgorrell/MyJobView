@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Clock, Users, Eye, Monitor, Calendar, TrendingUp } from 'lucide-react';
+import { Activity, Clock, Users, Eye, TrendingUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatDistanceToNow } from '../../lib/utils';
 

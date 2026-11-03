@@ -1,0 +1,232 @@
+import { build } from "esbuild";
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+  mkdir,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createServer } from "node:http";
+import assert from "node:assert/strict";
+const { chromium } = await import(
+  process.env.USER_SETUP_PLAYWRIGHT_MODULE || "playwright"
+);
+const dir = await mkdtemp(join(tmpdir(), "mjv-flow-workspace-"));
+const fixture = `import{useState}from'react';export const useAuth=()=>({profile:{id:'rep',organization_id:'org',full_name:'Josh'},user:{id:'rep'}});export const useDepartments=()=>({hasModuleAccess:()=>true});window.calls=[];window.fail=false;
+const records=Array.from({length:50},(_,i)=>({id:i+1,created_at:new Date(Date.now()-i*60000).toISOString(),customer_name:'Customer with a long company name '+i,project_name:'Home theater project',actor_name:'Josh Gorrell',category:'sales',source_table:i===0?'proposals':'connections',source_id:i===0?'00000000-0000-0000-0000-000000000040':'interaction-'+i,event_type:i===0?'proposal_first_opened':'connections.insert',summary:i===0?'Customer first opened proposal PRO-100':'Phone call: a longer note about the next steps for the customer',details:'Original notes',viewed:false}));
+export function useFlow(filters){const [events,setEvents]=useState(records);return{events,loading:false,loadingMore:false,hasMore:false,error:'',pending:0,connected:true,refresh:async()=>window.calls.push({name:'refresh'}),markViewed:async(ids)=>setEvents(old=>old.map(e=>ids.includes(e.id)?{...e,viewed:true}:e))};}
+export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>Promise.resolve({data:[],error:null}).then(a,b);return()=>q;}});return q;},channel(){const c={on(){return c},subscribe(){return c},unsubscribe(){}};return c;},removeChannel(){},async rpc(name,input){window.calls.push({name,input});if(name==='search_flow_targets')return{data:[{kind:'contact',id:'c1',label:'Test Customer'}],error:null};return window.fail?{error:{message:'Fixture save rejected'}}:{data:'new',error:null};}};`;
+const source = `import React from'react';import{createRoot}from'react-dom/client';import Flow from'./src/components/Flow/Flow';createRoot(document.getElementById('root')).render(<Flow tasksContent={<div data-testid="task-tools">Assigned tasks and comments</div>} initialTaskView={new URLSearchParams(location.search).has('task')} openThreadId={new URLSearchParams(location.search).get('thread')}/>);`;
+const server = createServer(async (req, res) => {
+  const file = req.url.startsWith("/app.js")
+    ? "app.js"
+    : req.url.startsWith("/style.css")
+      ? "style.css"
+      : "index.html";
+  res.setHeader(
+    "Content-Type",
+    file.endsWith(".js")
+      ? "text/javascript"
+      : file.endsWith(".css")
+        ? "text/css"
+        : "text/html",
+  );
+  res.end(await readFile(join(dir, file)));
+});
+let browser;
+try {
+  await build({
+    stdin: { contents: source, resolveDir: process.cwd(), loader: "tsx" },
+    bundle: true,
+    format: "iife",
+    jsx: "automatic",
+    outfile: join(dir, "app.js"),
+    plugins: [
+      {
+        name: "fixture",
+        setup(b) {
+          b.onResolve(
+            {
+              filter:
+                /contexts\/(AuthContext|DepartmentContext)$|supabase$|lib\/flow\/useFlow$/,
+            },
+            () => ({ path: "fixture", namespace: "fixture" }),
+          );
+          b.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({
+            contents: fixture,
+            resolveDir: process.cwd(),
+          }));
+        },
+      },
+    ],
+  });
+  const css = (await readdir("dist/assets")).find(
+    (p) => p.startsWith("index-") && p.endsWith(".css"),
+  );
+  await writeFile(
+    join(dir, "style.css"),
+    (await readFile("dist/assets/" + css, "utf8")) +
+      "\n" +
+      (await readFile(join(dir, "app.css"), "utf8")),
+  );
+  await writeFile(
+    join(dir, "index.html"),
+    '<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="style.css"><style>body{margin:0}.shell{height:100dvh;display:flex;flex-direction:column}header.chrome{height:100px;flex-shrink:0}.workspace{display:flex;flex:1;min-height:0}aside{width:256px;flex-shrink:0}main{min-width:0;flex:1;overflow:auto;padding:16px}main>#root{min-width:0}@media(max-width:800px){aside{display:none}}</style></head><body><div class="shell theme-workspace"><header class="chrome">Application header and bookmarks</header><div class="workspace"><aside>Department sidebar</aside><main><div id="root"></div></main></div></div><script src="app.js"></script></body></html>',
+  );
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const url = "http://127.0.0.1:" + server.address().port;
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
+    args: ["--no-sandbox"],
+  });
+  const page = await browser.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  for (const [width, height] of [
+    [1366, 768],
+    [1440, 900],
+    [1280, 600],
+    [1024, 768],
+    [768, 900],
+    [390, 844],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.goto(url);
+    await page.locator(".flow-row").first().waitFor();
+    await page.waitForTimeout(150);
+    const bounds = await page.evaluate(() => ({
+      card: document.querySelector(".flow").getBoundingClientRect().toJSON(),
+      main: document.querySelector("main").getBoundingClientRect().toJSON(),
+      scroll: document.querySelector(".flow-content").scrollHeight,
+      client: document.querySelector(".flow-content").clientHeight,
+      mainScroll: document.querySelector("main").scrollHeight,
+      mainClient: document.querySelector("main").clientHeight,
+      contentOverflow: getComputedStyle(document.querySelector(".flow-content")).overflowY,
+      overflow: document.documentElement.scrollWidth > innerWidth,
+    }));
+    assert.equal(bounds.overflow, false);
+    assert.ok(
+      bounds.card.bottom > bounds.main.bottom,
+      JSON.stringify({ width, bounds }),
+    );
+    assert.ok(bounds.client > 200, JSON.stringify({ width, bounds }));
+    assert.equal(bounds.contentOverflow, "visible");
+    assert.ok(bounds.scroll <= bounds.client + 1);
+    assert.ok(bounds.mainScroll > bounds.mainClient);
+    await page.locator("main").evaluate(el => { el.scrollTop = el.scrollHeight; });
+    assert.ok(await page.locator("main").evaluate(el => el.scrollTop > 0));
+    await page.locator("main").evaluate(el => { el.scrollTop = 0; });
+    await page.locator('.flow-row').first().locator('.flow-row-main').click();
+    const activityLink = page.getByRole('link', { name: 'View Activity ↗', exact: true });
+    assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalActivity'), 'true');
+    assert.equal(new URL(await activityLink.getAttribute('href'), url).searchParams.get('proposalId'), '00000000-0000-0000-0000-000000000040');
+    await page.locator('.flow-row').first().locator('.flow-row-main').click();
+    const plus = page.getByRole("button", {
+      name: "Create in Flow",
+      exact: true,
+    });
+    await plus.click();
+    const dialog = page.getByRole("dialog", {
+      name: "Create in Flow",
+      exact: true,
+    });
+    await dialog.waitFor();
+    assert.equal(
+      await dialog.getByRole("button", { name: /Message Teammates/ }).count(),
+      1,
+    );
+    await dialog.evaluate(async el => { await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished)); });
+    const box = await dialog.boundingBox();
+    assert.ok(
+      box.x >= 0 &&
+        box.x + box.width <= width &&
+        box.y >= 0 &&
+        box.y + box.height <= height + 1,
+      JSON.stringify({ width, height, box }),
+    );
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(
+      await plus.evaluate((el) => document.activeElement === el),
+      true,
+    );
+    await plus.click();
+    await page.getByRole("button", { name: /Activity Calls/ }).click();
+    await page
+      .getByRole("textbox", { name: "Find a customer, project, or work order" })
+      .fill("Test");
+    await page.getByRole("button", { name: "Test Customer contact" }).click();
+    const notes = page.getByRole("textbox", { name: "Interaction notes" });
+    await notes.fill("Customer asked for the next steps");
+    await page.evaluate(() => (window.fail = true));
+    await page
+      .getByRole("button", { name: "Save interaction", exact: true })
+      .click();
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "Fixture save rejected" })
+      .waitFor();
+    assert.equal(await notes.inputValue(), "Customer asked for the next steps");
+    await page.evaluate(() => (window.fail = false));
+    await page
+      .getByRole("button", { name: "Save interaction", exact: true })
+      .click();
+    await page.getByRole("dialog").waitFor({ state: "detached" });
+    assert.ok(
+      await page.evaluate(() =>
+        window.calls.some(
+          (c) =>
+            c.name === "save_flow_interaction" &&
+            c.input.p_scope.contact_id === "c1",
+        ),
+      ),
+    );
+    if (process.env.FLOW_SCREENSHOT_DIR) {
+      await mkdir(process.env.FLOW_SCREENSHOT_DIR, { recursive: true });
+      await page.goto(url);
+      await page.locator(".flow-row").first().waitFor();
+      await page.screenshot({
+        path: join(
+          process.env.FLOW_SCREENSHOT_DIR,
+          "flow-workspace-" + width + ".png",
+        ),
+      });
+      await plus.click();
+      await page.getByRole("dialog").waitFor();
+      await page.waitForTimeout(500);
+      await page.screenshot({
+        path: join(
+          process.env.FLOW_SCREENSHOT_DIR,
+          "flow-create-" + width + ".png",
+        ),
+      });
+    }
+    console.log(
+      width +
+        "x" +
+        height +
+        ": workspace/sidebar fit, scrolling, modal/focus, retained errors and logging passed",
+    );
+  }
+  // A task notification must win over a conversation parameter retained in the URL.
+  await page.goto(url + '?task=1&thread=old-thread');
+  await page.getByTestId('task-tools').waitFor();
+  assert.equal(await page.locator('.flow-customer-inbox').count(), 0);
+  assert.equal(await page.locator('.flow-column-head').count(), 0);
+  await page.goto(url);
+  await page.getByRole('combobox', { name: 'Flow view', exact: true }).selectOption('tasks');
+  await page.getByTestId('task-tools').waitFor();
+  await page.getByRole('combobox', { name: 'Flow view', exact: true }).selectOption('all');
+  await page.locator('.flow-row').first().waitFor();
+  assert.equal(await page.getByTestId('task-tools').count(), 0);
+  console.log('Mobile Tasks tab, return to activity, and stale conversation/task notification precedence pass');
+  assert.deepEqual(errors, []);
+} finally {
+  await browser?.close();
+  await new Promise((r) => server.close(r));
+  await rm(dir, { recursive: true, force: true });
+}

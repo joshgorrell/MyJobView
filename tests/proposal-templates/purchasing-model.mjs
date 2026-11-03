@@ -1,0 +1,6 @@
+import assert from'node:assert/strict';import{readFile}from'node:fs/promises';import{transform}from'esbuild';import vm from'node:vm';
+const{code}=await transform(await readFile('src/components/Inventory/CreatePurchaseOrderModal.tsx','utf8'),{loader:'tsx'});
+const start=code.indexOf('const addProduct = (product) => {');assert.ok(start>=0);const open=code.indexOf('{',start);let depth=1,end=open+1;for(;depth;end++){if(code[end]==='{')depth++;if(code[end]==='}')depth--;}
+let lines=[];const context=vm.createContext({lineItems:lines,setLineItems:fn=>{lines=fn(lines);context.lineItems=lines},setSearchTerm:()=>{},setSearchResults:()=>{},setShowSearch:()=>{},product:{id:'speaker',name:'Ceiling speaker',manufacturer_model_number:'Theater alias',sku:'MFR-REAL-ORDERING-9',cost:41}});
+vm.runInContext(code.slice(start,end)+';addProduct(product);',context);assert.equal(lines[0].model_number,'MFR-REAL-ORDERING-9');assert.notEqual(lines[0].model_number,context.product.manufacturer_model_number);assert.equal(lines[0].unit_cost,41);
+vm.runInContext('addProduct(product)',context);assert.equal(lines.length,1);assert.equal(lines[0].quantity,2);assert.equal(lines[0].model_number,'MFR-REAL-ORDERING-9');console.log('Actual purchase-order selection uses ordering SKU, preserves its line snapshot, cost and repeated quantity.');

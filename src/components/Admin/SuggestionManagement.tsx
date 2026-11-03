@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Lightbulb, CheckCircle, XCircle, Eye, MessageSquare, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -54,10 +55,10 @@ export function SuggestionManagement() {
       setSelectedSuggestion(null);
       setAdminNotes('');
       loadSuggestions();
-      alert('Suggestion updated successfully!');
+      notify('Suggestion updated successfully!', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error updating suggestion:', error);
-      alert('Failed to update suggestion');
+      notify('Failed to update suggestion', { theme: 'blue', tone: 'error' });
     } finally {
       setUpdatingStatus(false);
     }

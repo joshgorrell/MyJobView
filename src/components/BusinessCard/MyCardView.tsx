@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, Upload, X, Save, User, Mail, Phone, Linkedin, Globe, MapPin, Send, Check, Edit3, Eye, ExternalLink } from 'lucide-react';
+import { CreditCard, Upload, X, Save, User, Mail, Phone, Linkedin, Globe, MapPin, Send, Check, Edit3, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BusinessCard, CompanySettings, CompanyOffice } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,7 +9,7 @@ import ConfirmModal from '../ui/ConfirmModal';
 export function MyCardView() {
   const { user, profile } = useAuth();
   const [card, setCard] = useState<BusinessCard | null>(null);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [companySettings, setCompanySettings] = useState<Pick<CompanySettings, 'company_name' | 'company_logo_url' | 'website' | 'business_card_banner_url'> | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,7 +68,7 @@ export function MyCardView() {
   async function loadCompanyInfo() {
     try {
       const [settingsResult, officesResult] = await Promise.all([
-        supabase.from('company_settings').select('*').eq('organization_id', profile?.organization_id).maybeSingle(),
+        supabase.from('company_settings').select('company_name, company_logo_url, website, business_card_banner_url').eq('organization_id', profile?.organization_id).maybeSingle(),
         supabase.from('company_offices').select('*').order('display_order', { ascending: true })
       ]);
 
@@ -83,12 +84,12 @@ export function MyCardView() {
     if (!file || !user) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      notify('Please select an image file', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notify('File size must be less than 5MB', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -101,13 +102,13 @@ export function MyCardView() {
         const oldFileName = photoUrl.split('/').pop();
         if (oldFileName) {
           await supabase.storage
-            .from('business_card_photos')
+            .from('business-card-photos')
             .remove([`${user.id}/${oldFileName}`]);
         }
       }
 
       const { error: uploadError } = await supabase.storage
-        .from('business_card_photos')
+        .from('business-card-photos')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -116,13 +117,13 @@ export function MyCardView() {
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('business_card_photos')
+        .from('business-card-photos')
         .getPublicUrl(fileName);
 
       setPhotoUrl(publicUrl);
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert('Failed to upload photo');
+      notify('Failed to upload photo', { theme: 'blue', tone: 'error' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -138,13 +139,13 @@ export function MyCardView() {
       const fileName = photoUrl.split('/').pop();
       if (fileName) {
         await supabase.storage
-          .from('business_card_photos')
+          .from('business-card-photos')
           .remove([`${user.id}/${fileName}`]);
       }
       setPhotoUrl('');
     } catch (error) {
       console.error('Error removing photo:', error);
-      alert('Failed to remove photo');
+      notify('Failed to remove photo', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -184,12 +185,12 @@ export function MyCardView() {
         if (error) throw error;
       }
 
-      alert('Business card saved successfully!');
+      notify('Business card saved successfully!', { theme: 'blue', tone: 'success' });
       setIsEditing(false);
       await loadCard();
     } catch (error) {
       console.error('Error saving card:', error);
-      alert('Failed to save business card');
+      notify('Failed to save business card', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -242,7 +243,7 @@ export function MyCardView() {
       setTimeout(() => setSent(false), 5000);
     } catch (error) {
       console.error('Error sending card:', error);
-      alert('Failed to send business card. Please try again.');
+      notify('Failed to send business card. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSending(false);
     }
@@ -438,6 +439,8 @@ export function MyCardView() {
       </div>
     );
   }
+
+  if (!card) return null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

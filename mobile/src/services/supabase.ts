@@ -2,8 +2,26 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const configuredSupabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL || '').trim();
+
+// Supabase JS appends /auth/v1/token; the configured URL must be the project root.
+function validateSupabaseProjectUrl(value: string): string {
+  if (!value) throw new Error('Mobile authentication is not configured: missing EXPO_PUBLIC_SUPABASE_URL.');
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Mobile authentication is misconfigured: invalid Supabase project URL.');
+  }
+  if (parsed.protocol !== 'https:' || !parsed.hostname || parsed.username || parsed.password ||
+      parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('Mobile authentication is misconfigured: Supabase URL must be the HTTPS project root, not an API endpoint path.');
+  }
+  return parsed.origin;
+}
+const supabaseUrl = validateSupabaseProjectUrl(configuredSupabaseUrl);
+const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '').trim();
+if (!supabaseAnonKey) throw new Error('Mobile authentication is not configured: missing EXPO_PUBLIC_SUPABASE_ANON_KEY.');
 
 // Custom storage for secure token persistence
 const ExpoSecureStoreAdapter = {

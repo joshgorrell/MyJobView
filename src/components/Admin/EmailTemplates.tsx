@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Save, AlertCircle, Check, Eye, X } from 'lucide-react';
+import { Mail, Save, AlertCircle, Eye, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../Shared/Toast';
 

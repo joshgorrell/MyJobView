@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { requestConfirmation } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, Trash2, GripVertical, Save } from 'lucide-react';
 
@@ -15,7 +16,7 @@ export default function ClassManager() {
   const [classes, setClasses] = useState<ProposalClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showNewForm, setShowNewForm] = useState(false);
+  const [_showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
     loadClasses();
@@ -78,7 +79,7 @@ export default function ClassManager() {
   }
 
   async function deleteClass(id: string) {
-    if (!confirm('Delete this class? Items using this class will have it removed.')) return;
+    if (!(await requestConfirmation('Delete this class? Items using this class will have it removed.', { theme: 'violet' }))) return;
 
     try {
       const { error } = await supabase
@@ -116,7 +117,7 @@ export default function ClassManager() {
       </p>
 
       <div className="space-y-2">
-        {classes.map((cls, index) => (
+        {classes.map((cls, _index) => (
           <div
             key={cls.id}
             className="bg-gray-900 rounded-lg p-4 flex items-center gap-4"

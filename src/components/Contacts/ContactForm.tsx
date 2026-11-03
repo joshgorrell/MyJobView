@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, AtSign, AlertCircle, Upload, Scan, FileText, CircleUser as UserCircle2, Zap, Users, TrendingUp, UserCheck, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
@@ -40,12 +41,7 @@ function clearDraft() {
   localStorage.removeItem(DRAFT_KEY);
 }
 
-export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactFormProps) {
-  const { profile } = useAuth();
-
-  const draft = loadDraft();
-
-  const [formData, setFormData] = useState(draft?.formData ?? {
+const DEFAULT_CONTACT_FORM = {
     contact_type: 'person' as 'person' | 'business',
     company_name: '',
     first_name: '',
@@ -69,13 +65,20 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
     tax_jurisdiction_id: '',
     default_payment_terms: 'Net 10',
     accepts_po: false,
-  });
+  };
+
+export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactFormProps) {
+  const { profile } = useAuth();
+
+  const draft = loadDraft();
+
+  const [formData, setFormData] = useState<typeof DEFAULT_CONTACT_FORM>(draft?.formData ?? DEFAULT_CONTACT_FORM);
   const [businessCardPhoto, setBusinessCardPhoto] = useState<File | null>(null);
   const [businessCardPhotoPreview, setBusinessCardPhotoPreview] = useState<string | null>(null);
   const [taxCertificateFile, setTaxCertificateFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [_uploadingPhoto, setUploadingPhoto] = useState(false);
   const [salesStatus, setSalesStatus] = useState<'customer' | 'prospect' | 'lead'>(draft?.salesStatus ?? initialSalesStatus ?? 'customer');
   const [leadDestination, setLeadDestination] = useState<'fishbowl' | 'assign'>(draft?.leadDestination ?? 'fishbowl');
   const [assignedTo, setAssignedTo] = useState<string>(draft?.assignedTo ?? '');
@@ -241,7 +244,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
 
       setCheckingUsername(true);
       try {
-        const { data, error } = await supabase
+        const { data, error: _error } = await supabase
           .from('contacts')
           .select('username')
           .eq('username', formData.username)
@@ -475,51 +478,51 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
     // Validate required fields based on contact type
     if (formData.contact_type === 'person') {
       if (!formData.first_name || formData.first_name.trim() === '') {
-        alert('First name is required for person contacts.');
+        notify('First name is required for person contacts.', { theme: 'blue', tone: 'warning' });
         return;
       }
       if (!formData.last_name || formData.last_name.trim() === '') {
-        alert('Last name is required for person contacts.');
+        notify('Last name is required for person contacts.', { theme: 'blue', tone: 'warning' });
         return;
       }
     } else if (formData.contact_type === 'business') {
       if (!formData.company_name || formData.company_name.trim() === '') {
-        alert('Company name is required for business contacts.');
+        notify('Company name is required for business contacts.', { theme: 'blue', tone: 'warning' });
         return;
       }
     }
 
     // Validate required zip code
     if (!formData.zip_code || formData.zip_code.trim() === '') {
-      alert('Zip code is required to create a contact.');
+      notify('Zip code is required to create a contact.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate office is selected
     if (!formData.office_id) {
-      alert('Office Location is required. Please select an office.');
+      notify('Office Location is required. Please select an office.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate tax rate and jurisdiction are provided if not tax exempt
     if (!formData.is_tax_exempt && (!formData.tax_rate || formData.tax_rate === '')) {
-      alert('Tax rate is required. Please wait for the automatic lookup to complete or enter it manually.');
+      notify('Tax rate is required. Please wait for the automatic lookup to complete or enter it manually.', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (!formData.is_tax_exempt && (!formData.tax_jurisdiction_id || formData.tax_jurisdiction_id === '')) {
-      alert('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically.');
+      notify('A sales tax jurisdiction is required. Please enter a valid ZIP code so the jurisdiction can be determined automatically.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate sales rep is selected
     if (!salesRepId) {
-      alert('Sales Rep is required. Please select a sales rep.');
+      notify('Sales Rep is required. Please select a sales rep.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Check if username is taken before submitting
     if (usernameAvailable === false) {
-      alert('Username is already taken. Please choose a different username or clear the field to auto-generate one.');
+      notify('Username is already taken. Please choose a different username or clear the field to auto-generate one.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -652,7 +655,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
           if (certError) throw certError;
         } catch (certError) {
           console.error('Error uploading tax certificate:', certError);
-          alert('Contact created but failed to upload tax certificate. Please add it later from the contact details page.');
+          notify('Contact created but failed to upload tax certificate. Please add it later from the contact details page.', { theme: 'blue', tone: 'error' });
         }
       }
 
@@ -711,7 +714,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
     } catch (error: any) {
       console.error('Error creating contact:', error);
       const errorMessage = error?.message || 'Unknown error';
-      alert(`Failed to create contact: ${errorMessage}`);
+      notify(`Failed to create contact: ${errorMessage}`, { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -738,6 +741,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   clearDraft();
                   setHasDraft(false);
                   setFormData({
+                    tax_jurisdiction_id: '',
                     contact_type: 'person',
                     company_name: '', first_name: '', last_name: '', title: '', username: '',
                     email: '', phone: '', business_phone: '', notes: '', tags: '', office_id: '',
@@ -773,7 +777,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   name="contact_type"
                   value="person"
                   checked={formData.contact_type === 'person'}
-                  onChange={(e) => setFormData({ ...formData, contact_type: 'person' })}
+                  onChange={(_e) => setFormData({ ...formData, contact_type: 'person' })}
                   className="w-4 h-4 text-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-secondary">Person</span>
@@ -784,7 +788,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                   name="contact_type"
                   value="business"
                   checked={formData.contact_type === 'business'}
-                  onChange={(e) => setFormData({ ...formData, contact_type: 'business' })}
+                  onChange={(_e) => setFormData({ ...formData, contact_type: 'business' })}
                   className="w-4 h-4 text-blue-500 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-secondary">Business</span>
@@ -1261,7 +1265,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
                               const file = e.target.files?.[0];
                               if (file) {
                                 if (file.size > 10 * 1024 * 1024) {
-                                  alert('File size must be less than 10MB');
+                                  notify('File size must be less than 10MB', { theme: 'blue', tone: 'warning' });
                                   return;
                                 }
                                 setTaxCertificateFile(file);
@@ -1850,7 +1854,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               setOcrConfidence(result.fieldConfidence);
             } catch (error) {
               console.error('OCR failed:', error);
-              alert('Could not read text from card. Photo saved - please enter details manually.');
+              notify('Could not read text from card. Photo saved - please enter details manually.', { theme: 'blue', tone: 'error' });
             } finally {
               setProcessingOCR(false);
             }

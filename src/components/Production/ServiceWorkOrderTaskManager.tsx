@@ -18,7 +18,7 @@ interface ServiceWorkOrderTaskManagerProps {
 
 export default function ServiceWorkOrderTaskManager({
   workOrderId,
-  workOrderGroupId,
+  workOrderGroupId: _workOrderGroupId,
   isGroupWorkOrder,
   onTasksChange
 }: ServiceWorkOrderTaskManagerProps) {
@@ -139,7 +139,7 @@ export default function ServiceWorkOrderTaskManager({
 
       {tasks.length > 0 && (
         <div className="space-y-2">
-          {tasks.map((task, index) => (
+          {tasks.map((task, _index) => (
             <div
               key={task.id}
               className="flex items-start gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg"

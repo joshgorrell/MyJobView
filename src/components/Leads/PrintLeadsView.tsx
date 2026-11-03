@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { X, Printer, User, Mail, Phone, Clock, AlertCircle, Tag, Calendar, ChevronDown } from 'lucide-react';
 
 interface Lead {
@@ -18,7 +18,7 @@ interface Lead {
   notes?: string;
   lead_source?: string;
   assigned_rep?: { id: string; full_name: string };
-  opportunity_description?: string;
+  opportunity_description?: string | null;
 }
 
 interface SalesRep {

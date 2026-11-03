@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  DollarSign, TrendingUp, Clock, CheckCircle, ArrowUpDown, Users,
-  Loader2, Calendar, ChevronDown, Download, Briefcase, PenTool,
+  DollarSign, TrendingUp, Clock, CheckCircle, Users,
+  Loader2, Briefcase, PenTool,
   Filter, X, ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';

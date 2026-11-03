@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useCompletion } from '../../hooks/useCompletion';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Copy, X, User, AlertCircle, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, User, AlertCircle, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
+
+import { QuickActionModal } from '../Shared/QuickActionModal';
 
 interface Contact {
   id: string;
@@ -28,7 +31,9 @@ export function DuplicateProposalModal({
   onSuccess,
   onOpenRevisionManager
 }: DuplicateProposalModalProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
+  const newProposalId = useRef('');
+  const completion = useCompletion(() => onSuccess(newProposalId.current));
   const [duplicationType, setDuplicationType] = useState<'same' | 'different'>('same');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<string>(currentContactId);
@@ -89,7 +94,7 @@ export function DuplicateProposalModal({
       const { data, error } = await supabase
         .from('contacts')
         .select('id, full_name, company_name, email, zip_code')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .order('full_name');
 
       if (error) throw error;
@@ -111,17 +116,6 @@ export function DuplicateProposalModal({
       setLoading(true);
       setError(null);
 
-      const { data: originalProposal, error: fetchError } = await supabase
-        .from('proposals')
-        .select(`
-          *,
-          proposal_line_items(*)
-        `)
-        .eq('id', proposalId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
       const targetContactId = duplicationType === 'same' ? currentContactId : selectedContactId;
 
       if (!targetContactId) {
@@ -141,68 +135,10 @@ export function DuplicateProposalModal({
         throw new Error('The selected contact does not have a ZIP code. A ZIP code is required for sales tax calculation. Please add a ZIP code to the contact first.');
       }
 
-      const { data: newProposal, error: insertError } = await supabase
-        .from('proposals')
-        .insert({
-          company_id: profile?.company_id,
-          contact_id: targetContactId,
-          title: newTitle,
-          description: originalProposal.description,
-          status: 'designing',
-          total: originalProposal.total,
-          valid_until: null,
-          notes: originalProposal.notes,
-          discount_amount: originalProposal.discount_amount,
-          discount_type: originalProposal.discount_type,
-          tax_rate: originalProposal.tax_rate,
-          tax_amount: originalProposal.tax_amount,
-          subtotal: originalProposal.subtotal,
-          created_by: profile?.id
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      if (includeLineItems && originalProposal.proposal_line_items?.length > 0) {
-        const lineItemsToInsert = originalProposal.proposal_line_items.map((item: any) => ({
-          proposal_id: newProposal.id,
-          product_id: item.product_id,
-          item_type: item.item_type,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          line_total: item.line_total,
-          sort_order: item.sort_order,
-          room_id: item.room_id,
-          labor_hours: item.labor_hours,
-          labor_rate: item.labor_rate,
-          labor_total: item.labor_total
-        }));
-
-        const { error: lineItemsError } = await supabase
-          .from('proposal_line_items')
-          .insert(lineItemsToInsert);
-
-        if (lineItemsError) throw lineItemsError;
-      }
-
-      await supabase
-        .from('proposal_versions')
-        .insert({
-          proposal_id: newProposal.id,
-          version_number: 1,
-          snapshot_data: {
-            title: newProposal.title,
-            description: newProposal.description,
-            total: newProposal.total,
-            status: newProposal.status
-          },
-          changed_by: profile?.id,
-          change_description: `Duplicated from proposal #${originalProposal.proposal_number}`
-        });
-
-      onSuccess(newProposal.id);
+      const {data:newId,error:copyError}=await supabase.rpc('duplicate_job_proposal',{p_source:proposalId,p_contact:targetContactId,p_title:newTitle,p_include:includeLineItems});
+      if(copyError)throw copyError;
+      newProposalId.current = newId;
+      completion.complete();
     } catch (error: any) {
       console.error('Error duplicating proposal:', error);
       setError(error.message || 'Failed to duplicate proposal');
@@ -218,27 +154,9 @@ export function DuplicateProposalModal({
   );
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg max-w-2xl w-full border border-gray-700">
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
-              <Copy className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-white">Duplicate Proposal</h2>
-              <p className="text-sm text-gray-400">Create a copy of this proposal</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
+    <QuickActionModal title="Duplicate Proposal" icon={<Copy className="w-5 h-5" />} onClose={completion.completed ? completion.finish : onClose} scrollBody={false} showSuccess={completion.completed} successMessage="Proposal duplicated!" successIcon={<Copy className="h-20 w-20" strokeWidth={1.5} />}>
+      <div className="duplicate-proposal flex flex-col min-h-0">
+        <div className="duplicate-proposal-body p-3 sm:p-4 space-y-3 overflow-y-auto min-h-0">
           {error && (
             <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-start gap-2 text-red-300 text-sm">
               <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -247,37 +165,34 @@ export function DuplicateProposalModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+            <label className="block text-sm font-medium text-gray-300 mb-1">
               Duplicate for:
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setDuplicationType('same')}
-                className={`p-4 rounded-lg border-2 transition-all ${
+                className={`p-2 rounded-lg border-2 transition-all ${
                   duplicationType === 'same'
                     ? 'border-blue-500 bg-blue-500/10'
                     : 'border-gray-600 hover:border-gray-500'
                 }`}
               >
-                <User className="w-6 h-6 text-blue-400 mb-2" />
+                <User className="hidden sm:block w-5 h-5 text-blue-400 mb-1" />
                 <div className="text-left">
                   <div className="font-medium text-white text-sm">Same Customer</div>
                   <div className="text-xs text-gray-400 mt-1">{currentContactName}</div>
-                  <div className="text-xs text-amber-400 mt-1.5 leading-snug">
-                    Revisions are recommended instead
-                  </div>
                 </div>
               </button>
 
               <button
                 onClick={() => setDuplicationType('different')}
-                className={`p-4 rounded-lg border-2 transition-all ${
+                className={`p-2 rounded-lg border-2 transition-all ${
                   duplicationType === 'different'
                     ? 'border-blue-500 bg-blue-500/10'
                     : 'border-gray-600 hover:border-gray-500'
                 }`}
               >
-                <User className="w-6 h-6 text-purple-400 mb-2" />
+                <User className="hidden sm:block w-5 h-5 text-purple-400 mb-1" />
                 <div className="text-left">
                   <div className="font-medium text-white text-sm">Different Customer</div>
                   <div className="text-xs text-gray-400 mt-1">Select from contacts</div>
@@ -287,23 +202,22 @@ export function DuplicateProposalModal({
           </div>
 
           {duplicationType === 'same' && (
-            <div className="p-4 md:p-5 bg-amber-500/20 border border-amber-500/50 rounded-lg space-y-3">
+            <div className="p-2 bg-amber-500/20 border border-amber-500/50 rounded-lg">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-400 mt-0.5" />
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 min-w-0 space-y-1">
                   <div>
                     <div className="font-semibold text-amber-200 text-sm md:text-base">
-                      Consider Using a Revision Instead
+                      Revisions are recommended
                     </div>
-                    <p className="text-amber-200/90 text-sm leading-relaxed mt-1">
-                      Duplicating a proposal for the same customer can negatively impact your sales statistics.
-                      Revisions track project iterations without inflating your proposal counts.
+                    <p className="text-amber-200/90 text-xs leading-snug mt-1">
+                      Use revisions for project changes. Duplicates count separately in your sales statistics.
                     </p>
                   </div>
 
                   <button
                     onClick={() => setShowExplanation(!showExplanation)}
-                    className="flex items-center gap-2 text-amber-200 hover:text-amber-100 transition-colors text-sm font-medium w-full md:w-auto min-h-[44px] md:min-h-0 py-2"
+                    className="flex items-center gap-2 text-amber-200 hover:text-amber-100 text-sm font-medium min-h-[44px]"
                   >
                     {showExplanation ? (
                       <>
@@ -350,14 +264,14 @@ export function DuplicateProposalModal({
                   {onOpenRevisionManager && (
                     <button
                       onClick={handleUseRevision}
-                      className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium min-h-[44px]"
+                      className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium min-h-[44px]"
                     >
                       <GitBranch className="w-4 h-4" />
                       Use Revision Instead
                     </button>
                   )}
 
-                  <div className="flex items-start gap-3 p-3 bg-amber-500/10 rounded border border-amber-500/30">
+                  <div className="flex items-center gap-2 min-h-[44px]">
                     <input
                       type="checkbox"
                       id="acknowledge-warning"
@@ -367,9 +281,9 @@ export function DuplicateProposalModal({
                     />
                     <label
                       htmlFor="acknowledge-warning"
-                      className="text-sm leading-relaxed text-amber-200 cursor-pointer flex-1"
+                      className="text-xs leading-snug text-amber-200 cursor-pointer flex-1"
                     >
-                      I understand this will create a separate proposal that counts individually in my sales statistics
+                      I understand this counts as a separate proposal.
                     </label>
                   </div>
                 </div>
@@ -391,7 +305,7 @@ export function DuplicateProposalModal({
 
           {duplicationType === 'different' && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Select Customer
               </label>
               <input
@@ -401,7 +315,7 @@ export function DuplicateProposalModal({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
               />
-              <div className="max-h-48 overflow-y-auto border border-gray-600 rounded-lg">
+              <div className="max-h-28 sm:max-h-40 overflow-y-auto border border-gray-600 rounded-lg">
                 {filteredContacts.length === 0 ? (
                   <div className="p-4 text-center text-gray-400 text-sm">
                     No contacts found
@@ -439,7 +353,7 @@ export function DuplicateProposalModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">
               New Proposal Title
             </label>
             <input
@@ -466,10 +380,10 @@ export function DuplicateProposalModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-700">
+        <div className="flex shrink-0 items-center justify-end gap-2 p-3 border-t border-gray-700">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
             disabled={loading}
           >
             Cancel
@@ -482,7 +396,7 @@ export function DuplicateProposalModal({
               (duplicationType === 'same' && !currentContactHasZip) ||
               (duplicationType === 'same' && !acknowledgedWarning)
             }
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {loading ? (
               <>
@@ -498,6 +412,6 @@ export function DuplicateProposalModal({
           </button>
         </div>
       </div>
-    </div>
+    </QuickActionModal>
   );
 }

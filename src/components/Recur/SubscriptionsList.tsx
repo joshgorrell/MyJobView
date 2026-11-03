@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { notify } from '../../lib/feedback';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, CreditCard as Edit2, Pause, Play, X, Calendar, Shield, Award, List, Search } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
@@ -77,7 +78,7 @@ export default function SubscriptionsList({ planType }: SubscriptionsListProps) 
       await loadSubscriptions();
     } catch (error) {
       console.error('Error toggling subscription status:', error);
-      alert('Failed to update subscription status');
+      notify('Failed to update subscription status', { theme: 'blue', tone: 'error' });
     }
   }
 

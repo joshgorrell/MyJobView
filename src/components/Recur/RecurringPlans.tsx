@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { notify } from '../../lib/feedback';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Plus, CreditCard as Edit2, Trash2, DollarSign, Search } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
@@ -66,7 +67,7 @@ export default function RecurringPlans({ planType }: RecurringPlansProps) {
       await loadPlans();
     } catch (error) {
       console.error('Error toggling plan status:', error);
-      alert('Failed to update plan status');
+      notify('Failed to update plan status', { theme: 'blue', tone: 'error' });
     }
   }
 

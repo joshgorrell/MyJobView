@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Shield, Edit2, Users, Lock, AlertCircle, Key } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { UserPermissionOverrides } from './UserPermissionOverrides';
+import { UserModuleAccess } from './UserModuleAccess';
+import { notifyPermissionsChanged } from '../../lib/permissionCatalog';
 
 interface UserWithRole {
   id: string;
@@ -84,6 +85,7 @@ export function PermissionsManagement() {
 
       if (error) throw error;
 
+      notifyPermissionsChanged();
       await loadData();
       showMessage('success', 'User role updated successfully');
     } catch (error) {
@@ -278,7 +280,7 @@ export function PermissionsManagement() {
                           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm"
                         >
                           <Lock className="w-4 h-4" />
-                          Manage Overrides
+                          Manage Page Access
                         </button>
                       </div>
                     </td>
@@ -298,7 +300,7 @@ export function PermissionsManagement() {
             <div>
               <div className="font-semibold text-gray-900 mb-1">Role-Based Access</div>
               <div className="text-gray-600">
-                Configure role permissions in the <strong>Roles</strong> tab to set department and module access for all users with that role.
+                Configure role permissions in the <strong>Roles</strong> tab to set page defaults for all users with that role; individual overrides and action permissions remain separate.
               </div>
             </div>
           </div>
@@ -325,7 +327,7 @@ export function PermissionsManagement() {
 
       {/* Permission Overrides Modal */}
       {showOverridesModal && selectedUser && (
-        <UserPermissionOverrides
+        <UserModuleAccess
           userId={selectedUser.id}
           userName={selectedUser.full_name}
           userRoleId={selectedUser.role_id}

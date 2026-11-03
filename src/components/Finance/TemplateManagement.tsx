@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { FileText, Plus, Edit2, Trash2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import TemplateBuilder from './TemplateBuilder';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -53,7 +54,7 @@ export default function TemplateManagement() {
       loadTemplates();
     } catch (error) {
       console.error('Error toggling template:', error);
-      alert('Failed to update template');
+      notify('Failed to update template', { theme: 'emerald', tone: 'error' });
     }
   }
 
@@ -68,7 +69,7 @@ export default function TemplateManagement() {
       loadTemplates();
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('Failed to delete template');
+      notify('Failed to delete template', { theme: 'emerald', tone: 'error' });
     }
   }
 

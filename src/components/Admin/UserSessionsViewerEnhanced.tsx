@@ -178,14 +178,14 @@ const DEVICE_PRESET_NICKNAMES = [
   { label: 'Conf. Room TV', icon: 'tv', color: '#6366F1' },
 ];
 
-export function UserSessionsViewerEnhanced() {
+export function SessionAdvancedTools({ initialTab = 'schedule' }: { initialTab?: 'usage' | 'schedule' }) {
   const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
-  const [userStats, setUserStats] = useState<UserStats[]>([]);
+  const [_userStats, setUserStats] = useState<UserStats[]>([]);
   const [locationStats, setLocationStats] = useState<LocationStats[]>([]);
   const [deviceStats, setDeviceStats] = useState<DeviceStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'all'>('today');
-  const [activeTab, setActiveTab] = useState<'active' | 'users' | 'usage' | 'locations' | 'devices' | 'schedule'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'users' | 'usage' | 'locations' | 'devices' | 'schedule'>(initialTab);
   const [pageUsage, setPageUsage] = useState<any[]>([]);
   const [departmentUsage, setDepartmentUsage] = useState<any[]>([]);
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
@@ -374,7 +374,7 @@ export function UserSessionsViewerEnhanced() {
       }
     });
 
-    const usersWithStats = profiles.map(profile => {
+    const usersWithStats: UserStats[] = profiles.map(profile => {
       const lastSession = lastSessionMap[profile.id] || null;
       return {
         user_id: profile.id,
@@ -509,8 +509,6 @@ export function UserSessionsViewerEnhanced() {
   }
 
   async function loadActiveSessions() {
-    await supabase.rpc('cleanup_stale_sessions');
-
     const { data, error } = await supabase
       .from('user_sessions')
       .select(`
@@ -522,6 +520,7 @@ export function UserSessionsViewerEnhanced() {
         )
       `)
       .eq('is_active', true)
+      .gte('last_activity', new Date(Date.now() - 30 * 60_000).toISOString())
       .order('last_activity', { ascending: false });
 
     if (error) {
@@ -998,66 +997,13 @@ export function UserSessionsViewerEnhanced() {
     );
   }
 
-  const totalActiveUsers = new Set(activeSessions.map(s => s.user_id)).size;
-  const totalTimeToday = userStats.reduce((sum, user) => sum + user.total_time_seconds, 0);
-  const uniqueLocations = new Set(activeSessions.map(s => s.ip_address).filter(Boolean)).size;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-gray-900">
           <Activity className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-bold">User Sessions</h2>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Active Now</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{totalActiveUsers}</p>
-            </div>
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="w-5 h-5 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">All Users</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{allUsers.length}</p>
-            </div>
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Locations</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{uniqueLocations}</p>
-            </div>
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <MapPin className="w-5 h-5 text-orange-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Session Time ({timeRange})</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{formatTotalTime(totalTimeToday)}</p>
-            </div>
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <Clock className="w-5 h-5 text-gray-600" />
-            </div>
-          </div>
+          <h2 className="text-xl font-bold">Session Settings & Reports</h2>
         </div>
       </div>
 
@@ -1066,52 +1012,10 @@ export function UserSessionsViewerEnhanced() {
           <div className="px-3 sm:px-6 py-3 sm:py-4">
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <button
-                onClick={() => setActiveTab('active')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'active'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="hidden sm:inline">Active Sessions</span>
-                <span className="sm:hidden">Active</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'users'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <span className="hidden sm:inline">All Users</span>
-                <span className="sm:hidden">Users</span>
-              </button>
-              <button
                 onClick={() => setActiveTab('usage')}
                 className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${activeTab === 'usage' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >
                 Usage Analytics
-              </button>
-              <button
-                onClick={() => setActiveTab('locations')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'locations'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Locations
-              </button>
-              <button
-                onClick={() => setActiveTab('devices')}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-                  activeTab === 'devices'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Devices
               </button>
               <button
                 onClick={() => setActiveTab('schedule')}
@@ -1122,8 +1026,8 @@ export function UserSessionsViewerEnhanced() {
                 }`}
               >
                 <CalendarClock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Logout Schedule</span>
-                <span className="sm:hidden">Schedule</span>
+                <span className="hidden sm:inline">Session Security</span>
+                <span className="sm:hidden">Security</span>
                 {schedule?.enabled && (
                   <span className="inline-flex items-center justify-center w-2 h-2 rounded-full bg-green-400" />
                 )}
@@ -1873,8 +1777,8 @@ export function UserSessionsViewerEnhanced() {
                   <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
                     <div className="text-sm text-blue-800">
-                      <p className="font-medium mb-1">How scheduled logout works</p>
-                      <p>When enabled, all user sessions will be forcibly terminated at the configured time each day. This revokes active authentication tokens so users must log back in. Useful for enforcing end-of-day security policies or daily session resets.</p>
+                      <p className="font-medium mb-1">Legacy daily logout (read-only)</p>
+                      <p>The legacy midnight schedule is being retired in a coordinated rollout of the 60-minute MJV inactivity policy. These legacy settings are read-only and cannot be re-enabled from this page. Manual administrator logout remains available below.</p>
                     </div>
                   </div>
 
@@ -1882,7 +1786,7 @@ export function UserSessionsViewerEnhanced() {
                     <div className="space-y-5">
                       <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                         <Settings className="w-4 h-4 text-gray-500" />
-                        Schedule Configuration
+                        Legacy Schedule Configuration
                       </h3>
 
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -1891,6 +1795,8 @@ export function UserSessionsViewerEnhanced() {
                           <p className="text-sm text-gray-500 mt-0.5">Automatically log out all users at the scheduled time</p>
                         </div>
                         <button
+                          disabled
+                          aria-label="Legacy daily logout is read-only"
                           onClick={() => setEditEnabled(!editEnabled)}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
                         >
@@ -1903,6 +1809,7 @@ export function UserSessionsViewerEnhanced() {
                         <input
                           type="time"
                           value={editTime}
+                          disabled
                           onChange={(e) => setEditTime(e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         />
@@ -1917,6 +1824,7 @@ export function UserSessionsViewerEnhanced() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
                         <select
                           value={editTimezone}
+                          disabled
                           onChange={(e) => setEditTimezone(e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                         >
@@ -1932,6 +1840,7 @@ export function UserSessionsViewerEnhanced() {
                         <input
                           type="text"
                           value={editLabel}
+                          disabled
                           onChange={(e) => setEditLabel(e.target.value)}
                           placeholder="e.g. End of business day logout"
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
@@ -1954,13 +1863,13 @@ export function UserSessionsViewerEnhanced() {
 
                       <button
                         onClick={saveSchedule}
-                        disabled={scheduleSaving}
+                        disabled
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
                       >
                         {scheduleSaving ? (
                           <><RotateCcw className="w-4 h-4 animate-spin" /> Saving...</>
                         ) : (
-                          <><CheckCircle className="w-4 h-4" /> Save Schedule</>
+                          <><CheckCircle className="w-4 h-4" /> Read-only Legacy Schedule</>
                         )}
                       </button>
                     </div>
@@ -2153,3 +2062,5 @@ export function UserSessionsViewerEnhanced() {
     </div>
   );
 }
+
+export { UserSessionsDashboard as UserSessionsViewerEnhanced } from './UserSessionsDashboard';

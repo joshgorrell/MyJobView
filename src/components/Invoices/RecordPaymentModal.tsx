@@ -1,3 +1,5 @@
+import { CompletionDialog } from '../Shared/CompletionDialog';
+import { useCompletion } from '../../hooks/useCompletion';
 import { useState, useEffect } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -8,7 +10,7 @@ interface RecordPaymentModalProps {
   invoice: {
     id: string;
     invoice_number: string;
-    contact_id: string;
+    contact_id: string | null;
     total: number;
     amount_paid: number;
     amount_due: number;
@@ -26,6 +28,7 @@ const METHOD_OPTIONS = [
 ];
 
 export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymentModalProps) {
+  const completion = useCompletion(onSuccess);
   const [amount, setAmount] = useState(invoice.amount_due.toFixed(2));
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState('check');
@@ -127,6 +130,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
           invoice_id: invoice.id,
           contact_id: invoice.contact_id,
           amount: totalWithFee,
+          convenience_fee_amount: convenienceFee,
           payment_date: paymentDate,
           payment_method: paymentMethod,
           reference_number: referenceNumber || null,
@@ -163,7 +167,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
         }
       }
 
-      onSuccess();
+      completion.complete();
     } catch (err) {
       console.error('Error recording payment:', err);
       setError(err instanceof Error ? err.message : 'Failed to record payment');
@@ -171,6 +175,8 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
       setLoading(false);
     }
   }
+
+  if (completion.completed) return <CompletionDialog title="Payment recorded!" theme="emerald" kind="payment" onContinue={completion.finish} />;
 
   return (
     <div

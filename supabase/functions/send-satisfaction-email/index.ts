@@ -1,5 +1,24 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings } from '../_shared/emailTemplates.ts';
+
+function injectNoteIntoHtml(html: string, note: string): string {
+    if (!note.trim()) return html;
+    const noteBlock = `
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+        <tr>
+          <td style="background:#f8fafc;border-left:4px solid #06b6d4;border-radius:0 8px 8px 0;padding:16px 20px;">
+            <p style="color:#0c4a6e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px 0;">Personal Note</p>
+            <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;white-space:pre-wrap;">${note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          </td>
+        </tr>
+      </table>`;
+    const insertBefore = '<p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">';
+    if (html.includes(insertBefore)) {
+      return html.replace(insertBefore, noteBlock + insertBefore);
+    }
+    return html.replace('</body>', noteBlock + '</body>');
+  }
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,18 +51,12 @@ function buildSatisfactionEmail(params: {
   ];
 
   const makeButton = (r: typeof ratings[0]) => `
-    <td align="center" style="padding:6px;">
-      <a href="${makeRatingUrl(r.key)}" style="display:block;text-decoration:none;width:120px;height:130px;border-radius:12px;overflow:hidden;background:${r.bg};">
-        <table cellpadding="0" cellspacing="0" width="120" style="width:120px;height:130px;border-radius:12px;background:${r.bg};">
-          <tr><td align="center" width="120" height="54" style="width:120px;height:54px;padding:14px 8px 4px;vertical-align:bottom;mso-line-height-rule:exactly;">
-            <span style="font-size:28px;line-height:28px;mso-line-height-rule:exactly;display:block;height:28px;">${r.emoji}</span>
-          </td></tr>
-          <tr><td align="center" width="120" height="32" style="width:120px;height:32px;padding:4px 6px 0;vertical-align:middle;mso-line-height-rule:exactly;">
-            <span style="color:#ffffff;font-size:11px;font-weight:700;display:block;line-height:14px;mso-line-height-rule:exactly;">${r.label}</span>
-          </td></tr>
-          <tr><td align="center" width="120" height="44" style="width:120px;height:44px;padding:2px 6px 14px;vertical-align:top;mso-line-height-rule:exactly;">
-            <span style="color:rgba(255,255,255,0.8);font-size:10px;line-height:13px;mso-line-height-rule:exactly;display:block;">${r.desc}</span>
-          </td></tr>
+    <td align="center" valign="top" style="padding:6px;">
+      <a href="${makeRatingUrl(r.key)}" style="display:block;text-decoration:none;width:120px;border-radius:12px;background:${r.bg};">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="120" style="width:120px;border-radius:12px;background:${r.bg};">
+          <tr><td align="center" style="padding:16px 8px 8px;"><span style="display:block;font-size:28px;line-height:32px;">${r.emoji}</span></td></tr>
+          <tr><td align="center" height="36" style="padding:0 8px;vertical-align:middle;"><span style="display:block;color:#ffffff;font-size:13px;font-weight:700;line-height:16px;">${r.key === 'needs_attention' ? 'Needs<br>Attention' : r.label}</span></td></tr>
+          <tr><td align="center" height="32" style="padding:6px 8px 16px;vertical-align:top;"><span style="display:block;color:#ffffff;font-size:11px;line-height:16px;">${r.key === 'okay' ? 'Room to improve' : r.key === 'needs_attention' ? 'Please contact me' : r.desc}</span></td></tr>
         </table>
       </a>
     </td>`;
@@ -66,7 +79,9 @@ function buildSatisfactionEmail(params: {
     ? `It’s been about a year since your system was completed. We’d love a quick check-in on how everything is working for you. This is also a great time to schedule a system checkup and ask about available service or protection plans.`
     : params.surveyType === 'post_test_tune'
       ? `Your Test & Tune period has wrapped up. After living with the system and giving us a chance to make adjustments, we’d love to know how the overall experience went.`
-      : `Your project is substantially complete. Before Test & Tune begins, we’d love a quick read on how our team did and whether there’s anything that needs our attention.`;
+      : params.surveyType === 'job_completion'
+        ? `Your project is substantially complete. Before Test & Tune begins, we’d love a quick read on how our team did and whether there’s anything that needs our attention.`
+        : `Now that our work is finished, we’d love to know how we did. Please choose a rating below and share any feedback. If we earned a Good or Excellent rating, we’d appreciate a 5-star Google review.`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -144,7 +159,7 @@ Deno.serve(async (req: Request) => {
       user = data.user;
     }
 
-    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'manual', projectId, salesOrderId, previewOnly = false } = await req.json();
+    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'manual', projectId, salesOrderId, previewOnly = false, customSubject, personalNote } = await req.json();
 
     if (!customerEmail && !resendRecordId) {
       return new Response(JSON.stringify({ error: 'Customer email is required' }), {
@@ -179,7 +194,7 @@ Deno.serve(async (req: Request) => {
       const appUrl = appUrlFromClient || settings.app_url || Deno.env.get('APP_URL') || 'https://app.electroniclife.com';
       const previewToken = crypto.randomUUID();
       const previewName = customerName || 'Valued Customer';
-      const emailHtml = buildSatisfactionEmail({
+      let emailHtml = buildSatisfactionEmail({
         customerName: previewName,
         companyName: settings.company_name,
         companyEmail: settings.company_email,
@@ -189,8 +204,8 @@ Deno.serve(async (req: Request) => {
         responseToken: previewToken,
         surveyType,
       });
-      const firstName = previewName.split(' ')[0];
-      const subject = surveyType === 'one_year'
+      const firstName = previewName;
+      let subject = surveyType === 'one_year'
         ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
         : surveyType === 'post_test_tune'
           ? (firstName ? `How did Test & Tune go, ${firstName}?` : 'How did Test & Tune go?')
@@ -219,6 +234,7 @@ Deno.serve(async (req: Request) => {
       record = existing;
     } else {
       const responseToken = crypto.randomUUID();
+      const openToken = crypto.randomUUID() + crypto.randomUUID();
 
       const { data: inserted, error: insertError } = await supabaseAdmin
         .from('customer_satisfaction')
@@ -232,6 +248,7 @@ Deno.serve(async (req: Request) => {
           lead_tech_id: leadTechId || null,
           lead_tech_name: leadTechName || '',
           response_token: responseToken,
+          open_token: openToken,
           created_by: user?.id || null,
           survey_type: surveyType,
           project_id: projectId || null,
@@ -260,7 +277,7 @@ Deno.serve(async (req: Request) => {
     const finalCustomerName = record.customer_name || customerName || '';
     const finalCustomerEmail = record.customer_email || customerEmail || '';
 
-    const emailHtml = buildSatisfactionEmail({
+    let emailHtml = buildSatisfactionEmail({
       customerName: finalCustomerName,
       companyName: settings.company_name,
       companyEmail: settings.company_email,
@@ -271,24 +288,28 @@ Deno.serve(async (req: Request) => {
       surveyType,
     });
 
-    const firstName = finalCustomerName.split(' ')[0];
-    const subject = surveyType === 'one_year'
+    const firstName = finalCustomerName;
+    let subject = surveyType === 'one_year'
       ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
       : surveyType === 'post_test_tune'
         ? (firstName ? `How did Test & Tune go, ${firstName}?` : 'How did Test & Tune go?')
         : (firstName ? `How did we do, ${firstName}?` : 'How did we do?');
 
+    if (typeof customSubject === 'string' && customSubject.trim()) subject = customSubject.trim().slice(0, 200);
+    if (typeof personalNote === 'string') emailHtml = injectNoteIntoHtml(emailHtml, personalNote.slice(0, 5000));
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const pixelUrl = `${supabaseUrl}/functions/v1/email-open-track?token=${record.response_token}&type=satisfaction`;
+    const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
+    emailHtml = emailHtml.includes('</body>') ? emailHtml.replace('</body>', pixel + '</body>') : emailHtml + pixel;
+
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     if (!resendApiKey) {
-      console.log('Demo mode: satisfaction email would be sent to', finalCustomerEmail);
-      return new Response(
-        JSON.stringify({ success: true, message: 'Email service not configured (demo mode)', recordId: record.id }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
+    const emailResponse = await sendSystemEmail({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,

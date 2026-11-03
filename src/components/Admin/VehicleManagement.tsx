@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Car, Plus, CreditCard as Edit, Trash2, User, Calendar, TrendingUp, AlertCircle, Gauge } from 'lucide-react';
+import { Car, Plus, CreditCard as Edit, Trash2, User, TrendingUp, AlertCircle, Gauge } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Vehicle {
@@ -197,7 +198,7 @@ export default function VehicleManagement() {
       loadVehicles();
     } catch (error) {
       console.error('Error saving vehicle:', error);
-      alert('Error saving vehicle. Please try again.');
+      notify('Error saving vehicle. Please try again.', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -219,7 +220,7 @@ export default function VehicleManagement() {
       loadAssignments();
     } catch (error) {
       console.error('Error saving assignment:', error);
-      alert('Error saving assignment. Please try again.');
+      notify('Error saving assignment. Please try again.', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -237,7 +238,7 @@ export default function VehicleManagement() {
       loadAssignments();
     } catch (error) {
       console.error('Error ending assignment:', error);
-      alert('Error ending assignment. Please try again.');
+      notify('Error ending assignment. Please try again.', { theme: 'blue', tone: 'error' });
     }
   };
 
@@ -252,7 +253,7 @@ export default function VehicleManagement() {
       loadVehicles();
     } catch (error) {
       console.error('Error deleting vehicle:', error);
-      alert('Error deleting vehicle. Please try again.');
+      notify('Error deleting vehicle. Please try again.', { theme: 'blue', tone: 'error' });
     }
   };
 

@@ -1,0 +1,18 @@
+CREATE ROLE authenticated;CREATE ROLE anon;CREATE ROLE service_role;
+CREATE SCHEMA auth;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT NULLIF(current_setting('test.uid',true),'')::uuid$$;
+CREATE FUNCTION public.user_has_module_access(uuid,text) RETURNS boolean LANGUAGE sql AS $$SELECT current_setting('test.module',true) IS DISTINCT FROM 'denied'$$;
+CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,first_name text,last_name text,full_name text,is_sales_rep boolean,is_active boolean DEFAULT true,role text);
+CREATE TABLE organizations(id uuid PRIMARY KEY,timezone text);
+CREATE TABLE contacts(id uuid PRIMARY KEY,organization_id uuid,assigned_to uuid,full_name text,company_name text);
+CREATE TABLE proposals(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,status text,subtotal numeric,total numeric,tax_amount numeric);
+CREATE TABLE sales_orders(id uuid PRIMARY KEY,organization_id uuid,created_by uuid,contact_id uuid,proposal_id uuid,status text,booked_at timestamptz,contract_total numeric);
+CREATE TABLE change_orders(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid,status text,is_billable boolean,change_amount numeric,tax_amount numeric);
+CREATE TABLE projects(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid);
+CREATE TABLE invoices(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,invoice_type text,source_type text,status text,project_id uuid,sales_order_id uuid,proposal_id uuid,billed_from_proposal boolean,work_order_billing_request_id uuid,security_billing_cycle_id uuid,invoice_date date,subtotal numeric,total numeric,tax_amount numeric);
+CREATE TABLE work_order_invoice_links(id uuid PRIMARY KEY,organization_id uuid,invoice_id uuid);
+CREATE TABLE security_contracts(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,created_by_user_id uuid);
+CREATE TABLE security_billing_cycles(id uuid PRIMARY KEY,organization_id uuid,contract_id uuid);
+CREATE TABLE recurring_subscriptions(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,created_by uuid);
+CREATE TABLE recurring_invoices(id uuid PRIMARY KEY,organization_id uuid,subscription_id uuid,invoice_id uuid,amount numeric);
+SET TIME ZONE 'UTC';

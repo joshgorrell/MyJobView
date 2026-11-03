@@ -1,6 +1,14 @@
 [functions.session-location]
 verify_jwt = true
 
+# Public opaque-token image endpoint; no customer data is returned.
+[functions.email-open-track]
+verify_jwt = false
+
+# Public opaque-token redirect endpoint; validates destination is a Google URL.
+[functions.email-click-track]
+verify_jwt = false
+
 [functions.send-proposal-email]
 verify_jwt = true
 
@@ -217,6 +225,9 @@ verify_jwt = true
 [functions.send-push-notification]
 verify_jwt = true
 
+[functions.send-mobile-push-notification]
+verify_jwt = true
+
 [functions.send-review-request-sms]
 verify_jwt = false
 
@@ -256,4 +267,36 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.lost-opportunity-review]
+verify_jwt = false
+
+# Supabase Auth signs Send Email Hook requests; handleAuthEmail verifies the signature.
+[functions.send-auth-email]
+verify_jwt = false
+
+[functions.invoice-portal-delivery]
+verify_jwt = false
+
+# Public opaque-token image endpoint; no customer data is returned.
+[functions.proposal-check-open]
+verify_jwt = false
+
+[functions.proposal-check-response]
+verify_jwt = false
+
+[functions.process-test-tune-starts]
+verify_jwt = false
+
+# Authenticated staff create or revoke share links.
+[functions.manage-proposal-share-link]
+verify_jwt = true
+
+# Public opaque-token endpoint validates the share link and returns limited proposal data.
+[functions.view-shared-proposal]
+verify_jwt = false
+
+
+[functions.service-approval-payment-methods]
+verify_jwt = false
+
+[functions.send-service-approval]
 verify_jwt = false

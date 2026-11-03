@@ -1,9 +1,9 @@
+import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus, Filter, MessageSquare, ChevronDown, ChevronUp, HelpCircle, X, Search } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus, Filter, MessageSquare, ChevronUp, HelpCircle, X, Search } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { Task, Lead } from '../../lib/types';
-import { formatDistanceToNow } from '../../lib/utils';
 import { TaskForm } from './TaskForm';
 import { TaskComments } from './TaskComments';
 import { TaskWatchers } from './TaskWatchers';
@@ -19,7 +19,7 @@ interface TasksViewProps {
 export function TasksView({ initialShowForm = false, onFormClose, openTaskId, onTaskOpened }: TasksViewProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [leads, setLeads] = useState<Record<string, Lead>>({});
+  const [leads, setLeads] = useState<Record<string, Pick<Lead, 'id' | 'company_name' | 'contact_name'>>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(initialShowForm);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
@@ -34,6 +34,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; isDiscussion?: boolean } | null>(null);
   const [viewFilter, setViewFilter] = useState<'my' | 'all'>('my');
   const [canViewAllTasks, setCanViewAllTasks] = useState<boolean>(false);
+  const [myDepartmentIds, setMyDepartmentIds] = useState<string[]>([]);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -143,11 +144,25 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           *,
           profiles!tasks_user_id_fkey(full_name),
           assigned_profile:profiles!tasks_assigned_to_fkey(full_name),
+          assigned_department:departments!tasks_assigned_department_id_fkey(id, display_name),
           contacts(full_name, company_name, phone)
         `);
 
+      const { data: departmentRows, error: departmentError } = await supabase.rpc('get_my_task_department_ids');
+      if (departmentError) throw departmentError;
+      const accessibleDepartmentIds = (departmentRows || []).map((row: any) => row.department_id);
+      setMyDepartmentIds(accessibleDepartmentIds);
+
       if (viewFilter === 'my') {
-        tasksQuery = tasksQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id}`);
+        const myFilters = [
+          `user_id.eq.${profile.id}`,
+          `assigned_to.eq.${profile.id}`,
+          'and(assigned_to.is.null,assigned_department_id.is.null)'
+        ];
+        if (accessibleDepartmentIds.length > 0) {
+          myFilters.push(`assigned_department_id.in.(${accessibleDepartmentIds.join(',')})`);
+        }
+        tasksQuery = tasksQuery.or(myFilters.join(','));
       }
 
       const { data: tasksData, error: tasksError } = await tasksQuery
@@ -163,7 +178,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
         .is('parent_id', null);
 
       if (viewFilter === 'my') {
-        discussionQuery = discussionQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id}`);
+        discussionQuery = discussionQuery.or(`user_id.eq.${profile.id},assigned_to.eq.${profile.id},assigned_to.is.null`);
       }
 
       const { data: discussionTasks, error: discussionError } = await discussionQuery
@@ -172,7 +187,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       if (discussionError) throw discussionError;
 
       // Fetch profile data for discussion tasks
-      const userIds = [...new Set(discussionTasks?.map((t: any) => t.user_id) || [])];
+      const userIds = [...new Set((discussionTasks || []).flatMap((t: any) => [t.user_id, t.assigned_to]).filter(Boolean))];
       const { data: profilesData } = userIds.length > 0
         ? await supabase.from('profiles').select('id, full_name').in('id', userIds)
         : { data: [] };
@@ -196,6 +211,10 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           created_at: post.created_at,
           updated_at: post.updated_at,
           profiles: postProfile,
+          assigned_to: post.assigned_to || null,
+          assigned_profile: post.assigned_to ? profilesMap.get(post.assigned_to) : null,
+          assigned_department_id: null,
+          assigned_department: null,
           _isDiscussionTask: true,
           _discussionPost: post
         };
@@ -212,7 +231,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           .select('id, company_name, contact_name')
           .in('id', leadIds);
 
-        const leadsMap: Record<string, Lead> = {};
+        const leadsMap: Record<string, Pick<Lead, 'id' | 'company_name' | 'contact_name'>> = {};
         leadsData?.forEach((lead) => { leadsMap[lead.id] = lead; });
         setLeads(leadsMap);
       }
@@ -247,75 +266,28 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       const newStatus = task.status === 'completed' ? 'pending' : 'completed';
 
       if (isDiscussionTask) {
-        // Handle discussion post task
-        const updateData: any = {
-          is_completed: newStatus === 'completed',
-          completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-          completed_by: newStatus === 'completed' ? profile?.id : null
-        };
-
-        const { error } = await supabase
-          .from('discussion_posts')
-          .update(updateData)
-          .eq('id', task.id);
-
+        // Database transaction owns completion, points, reversals and notifications.
+        const { error } = await supabase.rpc('set_discussion_task_completion', {
+          p_post_id: task.id,
+          p_complete: newStatus === 'completed'
+        });
         if (error) throw error;
-
-        if (newStatus === 'completed' && profile) {
-          const { data: pointsConfig } = await supabase
-            .from('points_configuration')
-            .select('task_completion_points')
-            .single();
-
-          const postPoints = (task as any)._discussionPost?.points || pointsConfig?.task_completion_points || 10;
-
-          await supabase.from('points_transactions').insert([{
-            user_id: profile.id,
-            points_amount: postPoints,
-            transaction_type: 'task_completion',
-            reference_id: task.id,
-            description: `Completed task: ${task.title.substring(0, 50)}...`,
-          }]);
-
-          await supabase.from('notifications').insert([{
-            user_id: profile.id,
-            type: 'points_earned',
-            title: `+${postPoints} Points!`,
-            body: `You earned ${postPoints} points for completing a task`,
-          }]);
-        }
       } else {
-        // Handle regular task
-        const updateData: any = {
-          status: newStatus,
-          completed_at: newStatus === 'completed' ? new Date().toISOString() : null
-        };
-
-        if (newStatus === 'completed' && !(task as any).assigned_to && !(task as any).claimed_by) {
-          updateData.claimed_by = profile?.id;
-        }
-
-        const { error } = await supabase
-          .from('tasks')
-          .update(updateData)
-          .eq('id', task.id);
-
-        if (error) throw error;
-
-        if (newStatus === 'completed' && profile) {
-          const pointsToAward = (task as any).points || 10;
-          await supabase.rpc('award_points', {
-            p_user_id: profile.id,
-            p_points: pointsToAward,
-            p_reason: `Completed task: ${task.title}`
-          });
+        // Regular tasks complete atomically in the database so only the first
+        // eligible user can claim an open/department task and receive points.
+        if (newStatus === 'completed') {
+          const { error } = await supabase.rpc('complete_task_atomic', { p_task_id: task.id });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.rpc('reopen_task_atomic', { p_task_id: task.id });
+          if (error) throw error;
         }
       }
 
       loadTasks();
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task status');
+      notify('Failed to update assignment status', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -335,7 +307,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
   }
 
   const priorityConfig = {
-    low: { color: 'text-gray-400', bg: 'bg-gray-500/20', label: 'Low' },
+    low: { color: 'text-muted', bg: 'bg-elevated', label: 'Low' },
     medium: { color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'Medium' },
     high: { color: 'text-orange-400', bg: 'bg-orange-500/20', label: 'High' },
     urgent: { color: 'text-red-400', bg: 'bg-red-500/20', label: 'Urgent' },
@@ -345,7 +317,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
     pending: { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Pending' },
     in_progress: { color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'In Progress' },
     completed: { color: 'text-green-400', bg: 'bg-green-500/20', label: 'Completed' },
-    cancelled: { color: 'text-gray-400', bg: 'bg-gray-500/20', label: 'Cancelled' },
+    cancelled: { color: 'text-muted', bg: 'bg-elevated', label: 'Cancelled' },
   };
 
   function calculateAging(createdAt: string, completedAt?: string | null): string {
@@ -377,12 +349,13 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       const descriptionMatch = task.description?.toLowerCase().includes(search);
       const assignedUserName = (task as any).assigned_user_name?.toLowerCase();
       const assignedUserMatch = assignedUserName?.includes(search);
+      const assignedDepartmentMatch = (task as any).assigned_department?.display_name?.toLowerCase().includes(search);
       const leadMatch = task.lead_id && leads[task.lead_id]
         ? (leads[task.lead_id].company_name?.toLowerCase().includes(search) ||
            leads[task.lead_id].contact_name?.toLowerCase().includes(search))
         : false;
 
-      if (!titleMatch && !descriptionMatch && !assignedUserMatch && !leadMatch) {
+      if (!titleMatch && !descriptionMatch && !assignedUserMatch && !assignedDepartmentMatch && !leadMatch) {
         return false;
       }
     }
@@ -390,24 +363,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
     return true;
   });
 
-  const completedTasks = filteredTasks.filter(t => t.status === 'completed' && t.completed_at);
-  const avgCompletionTime = completedTasks.length > 0
-    ? completedTasks.reduce((sum, task) => {
-        const diffMs = new Date(task.completed_at!).getTime() - new Date(task.created_at).getTime();
-        return sum + diffMs;
-      }, 0) / completedTasks.length
-    : 0;
 
-  const avgDays = Math.floor(avgCompletionTime / (1000 * 60 * 60 * 24));
-  const avgHours = Math.floor((avgCompletionTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const avgMinutes = Math.floor((avgCompletionTime % (1000 * 60 * 60)) / (1000 * 60));
 
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading tasks...</p>
+          <p className="text-muted">Loading assignments...</p>
         </div>
       </div>
     );
@@ -423,27 +386,27 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               onClick={() => setViewFilter('my')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                 viewFilter === 'my'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-blue-600 text-primary'
+                  : 'bg-elevated text-secondary hover:bg-elevated'
               }`}
             >
-              My Tasks
+              My Assignments
             </button>
             {canViewAllTasks && (
               <button
                 onClick={() => setViewFilter('all')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
                   viewFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    ? 'bg-blue-600 text-primary'
+                    : 'bg-elevated text-secondary hover:bg-elevated'
                 }`}
               >
-                All Tasks
+                All Assignments
               </button>
             )}
             <button
               onClick={() => setShowHelp(true)}
-              className="inline-flex items-center gap-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm"
+              className="inline-flex items-center gap-1 px-3 py-2 bg-elevated text-secondary rounded-lg hover:bg-elevated transition-colors font-medium text-sm"
               title="Help & Instructions"
             >
               <HelpCircle className="w-4 h-4" />
@@ -453,10 +416,10 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 setEditingTask(undefined);
                 setShowForm(true);
               }}
-              className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm ml-auto"
+              className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm ml-auto"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Task</span>
+              <span className="hidden sm:inline">New Assignment</span>
               <span className="sm:hidden">New</span>
             </button>
           </div>
@@ -464,19 +427,19 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           {/* Search bar - full width on mobile */}
           <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+              <Search className="h-4 w-4 text-muted" />
             </div>
             <input
               type="text"
-              placeholder="Search tasks..."
+              placeholder="Search assignments..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-9 py-2 text-sm bg-canvas text-primary placeholder:text-muted border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-secondary"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -484,24 +447,24 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
+            <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer hover:text-primary transition-colors">
               <input
                 type="checkbox"
                 checked={showCompleted}
                 onChange={(e) => setShowCompleted(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                className="w-4 h-4 rounded border-subtle text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
-              Show completed tasks
+              Show completed assignments
             </label>
           </div>
         </div>
       </div>
 
       {filteredTasks.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <Clock className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-          <p className="text-gray-300">Create your first task to get started</p>
+        <div className="text-center py-12 bg-surface rounded-lg border-2 border-dashed border-subtle">
+          <Clock className="w-12 h-12 mx-auto mb-3 text-muted" />
+          <h3 className="text-lg font-medium text-primary mb-2">No assignments found</h3>
+          <p className="text-muted">Create your first assignment to get started</p>
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -512,9 +475,12 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               const isDiscussionTask = (task as any)._isDiscussionTask;
               const isOwner = profile?.id === task.user_id;
               const isAssigned = profile?.id === (task as any).assigned_to;
+              const isDepartmentTask = !!(task as any).assigned_department_id;
+              const isMyDepartmentTask = isDepartmentTask && myDepartmentIds.includes((task as any).assigned_department_id);
+              const isOpenTeamTask = !(task as any).assigned_to && !(task as any).assigned_department_id;
               const isAdmin = profile?.role === 'admin';
               const canEdit = isOwner || isAdmin;
-              const canInteract = isOwner || isAssigned || isAdmin;
+              const canInteract = isOwner || isAssigned || isMyDepartmentTask || isOpenTeamTask || isAdmin;
               const canDelete = isOwner || isAdmin;
               const lead = task.lead_id ? leads[task.lead_id] : null;
 
@@ -527,12 +493,12 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                 <div
                   key={task.id}
                   id={`task-${task.id}`}
-                  className={`bg-white rounded-lg border transition-all hover:shadow-sm ${
+                  className={`bg-canvas rounded-lg border transition-all hover:shadow-sm ${
                     task.status === 'completed'
                       ? 'border-green-200 bg-green-50/30'
                       : isOverdue
                       ? 'border-red-300 bg-red-50'
-                      : 'border-gray-200 hover:border-blue-300'
+                      : 'border-subtle hover:border-blue-300'
                   }`}
                 >
                   {/* Priority stripe */}
@@ -540,7 +506,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                     task.priority === 'urgent' ? 'bg-red-500' :
                     task.priority === 'high' ? 'bg-orange-400' :
                     task.priority === 'medium' ? 'bg-blue-400' :
-                    'bg-gray-200'
+                    'bg-elevated'
                   }`} />
 
                   <div className="px-3 py-2">
@@ -556,14 +522,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                           {task.status === 'completed' ? (
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                           ) : (
-                            <Circle className="w-4 h-4 text-gray-400 hover:text-green-500 transition-colors" />
+                            <Circle className="w-4 h-4 text-muted hover:text-green-500 transition-colors" />
                           )}
                         </button>
                       )}
 
                       {/* Title */}
                       <span className={`flex-1 min-w-0 text-sm font-medium leading-tight truncate ${
-                        task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-900'
+                        task.status === 'completed' ? 'line-through text-muted' : 'text-primary'
                       }`}>
                         {task.title}
                       </span>
@@ -574,7 +540,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                           task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
                           task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
                           task.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-500'
+                          'bg-surface text-muted'
                         }`}>
                           <Flag className="w-2.5 h-2.5" />
                           {priority.label}
@@ -586,7 +552,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         )}
                         {task.due_date && (
                           <span className={`px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5 ${
-                            isOverdue ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                            isOverdue ? 'bg-red-100 text-red-700' : 'bg-surface text-muted'
                           }`}>
                             <Calendar className="w-2.5 h-2.5" />
                             {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -598,6 +564,16 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                             → {(task as any).assigned_profile.full_name.split(' ')[0]}
                           </span>
                         )}
+                        {(task as any).assigned_department && (
+                          <span className="px-1.5 py-0.5 rounded font-medium bg-cyan-100 text-cyan-700 truncate max-w-[110px]">
+                            → {(task as any).assigned_department.display_name}
+                          </span>
+                        )}
+                        {!(task as any).assigned_profile && !(task as any).assigned_department && task.status !== 'completed' && (
+                          <span className="px-1.5 py-0.5 rounded font-medium bg-surface text-secondary">
+                            Anyone
+                          </span>
+                        )}
                         {task.status === 'completed' && task.completed_at && (
                           <span className="text-green-600 font-medium">{calculateAging(task.created_at, task.completed_at)}</span>
                         )}
@@ -607,15 +583,15 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         <button
                           onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Discuss"
+                          className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Comments"
                         >
                           <MessageSquare className="w-3.5 h-3.5" />
                         </button>
                         {canEdit && (
                           <button
-                            onClick={() => { setEditingTask(task); setSelectedLeadId(task.lead_id); setShowForm(true); }}
-                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            onClick={() => { setEditingTask(task); setSelectedLeadId(task.lead_id ?? ''); setShowForm(true); }}
+                            className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="Edit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -624,25 +600,25 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         {canDelete && (
                           <button
                             onClick={() => setConfirmDelete({ id: task.id, isDiscussion: isDiscussionTask })}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            className="p-1 text-muted hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {expandedTaskId === task.id ? <ChevronUp className="w-3 h-3 text-gray-400" /> : null}
+                        {expandedTaskId === task.id ? <ChevronUp className="w-3 h-3 text-muted" /> : null}
                       </div>
                     </div>
 
                     {/* Secondary row: context + meta (compact) */}
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 pl-6 text-xs text-gray-400">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 pl-6 text-xs text-muted">
                       {(customerName || lead) && (
                         <span className="text-blue-600 font-medium truncate">
                           {customerName || lead?.company_name || lead?.contact_name}
                         </span>
                       )}
                       {task.profiles?.full_name && (
-                        <span className="text-gray-500">{task.profiles.full_name}</span>
+                        <span className="text-muted">{task.profiles.full_name}</span>
                       )}
                       <span>{createdDateStr}</span>
                       {/* Mobile badges */}
@@ -650,7 +626,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                         task.priority === 'urgent' ? 'bg-red-100 text-red-700' :
                         task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
                         task.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-500'
+                        'bg-surface text-muted'
                       }`}>
                         <Flag className="w-2.5 h-2.5" />
                         {priority.label}
@@ -661,14 +637,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                     {/* Description - only shown if task expanded */}
                     {task.description && expandedTaskId === task.id && (
                       <p className={`text-xs mt-1.5 pl-6 leading-relaxed ${
-                        task.status === 'completed' ? 'text-gray-400' : 'text-gray-600'
+                        task.status === 'completed' ? 'text-muted' : 'text-secondary'
                       }`}>
                         {task.description}
                       </p>
                     )}
 
                     {expandedTaskId === task.id && (
-                      <div className="mt-3 pt-3 border-t border-gray-100 space-y-4">
+                      <div className="mt-3 pt-3 border-t border-subtle space-y-4">
                         <TaskWatchers taskId={task.id} />
                         <TaskComments taskId={task.id} />
                       </div>
@@ -703,17 +679,17 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
       {showHelp && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="bg-canvas rounded-xl shadow-2xl w-full max-w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-canvas border-b border-subtle px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <HelpCircle className="w-6 h-6 text-blue-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">Tasks Help & Instructions</h2>
+                <h2 className="text-2xl font-bold text-primary">Assignments Help & Instructions</h2>
               </div>
               <button
                 onClick={() => setShowHelp(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-secondary hover:bg-surface rounded-lg transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -721,34 +697,34 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
             <div className="p-6 space-y-6">
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Plus className="w-5 h-5 text-blue-600" />
-                  Creating Tasks
+                  Creating Assignments
                 </h3>
-                <p className="text-gray-700">
-                  Click the <span className="font-semibold text-blue-600">New Task</span> button to create a new task. Fill in the title, description, priority, due date, and optionally assign it to a team member or link it to a lead.
+                <p className="text-secondary">
+                  Click the <span className="font-semibold text-blue-600">New Assignment</span> button to create a new assignment. Fill in the title, description, priority, due date, and optionally assign it to a team member or link it to a lead.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Edit2 className="w-5 h-5 text-blue-600" />
-                  Editing & Updating Tasks
+                  Editing & Updating Assignments
                 </h3>
-                <p className="text-gray-700">
-                  Click the <span className="font-semibold">Edit Task</span> button to modify a task. You can update any field including reassigning the task to someone else. Tasks created from Team Pulse discussions are now fully editable.
+                <p className="text-secondary">
+                  Click the <span className="font-semibold">Edit</span> button to modify an assignment. You can update any field including reassigning it to someone else. Assignments created from Team Pulse discussions are now fully editable.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-blue-600" />
-                  Task Discussions & Comments
+                  Assignment Discussions & Comments
                 </h3>
-                <p className="text-gray-700">
-                  Click the <span className="font-semibold">Discuss</span> button on any task to expand the collaboration panel where you can:
+                <p className="text-secondary">
+                  Click the <span className="font-semibold">Discuss</span> button on any assignment to expand the collaboration panel where you can:
                 </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li><span className="font-semibold">Add Comments:</span> Share updates, ask questions, or provide feedback</li>
                   <li><span className="font-semibold">Edit Your Comments:</span> Use the edit icon to modify your comments</li>
                   <li><span className="font-semibold">Delete Comments:</span> Remove your own comments if needed</li>
@@ -757,14 +733,14 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <span className="text-cyan-400 font-bold text-xl">@</span>
                   Mentioning Team Members
                 </h3>
-                <p className="text-gray-700">
-                  Type <span className="font-mono bg-gray-100 px-2 py-1 rounded text-cyan-600">@</span> in any comment to see a dropdown of team members. Select someone to mention them:
+                <p className="text-secondary">
+                  Type <span className="font-mono bg-surface px-2 py-1 rounded text-cyan-600">@</span> in any comment to see a dropdown of team members. Select someone to mention them:
                 </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
                   <li>Mentioned users receive instant notifications</li>
                   <li>They're automatically added as watchers on the task</li>
                   <li>Mentions are highlighted in cyan for easy visibility</li>
@@ -772,62 +748,62 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Circle className="w-5 h-5 text-blue-600" />
-                  Watching Tasks
+                  Watching Assignments
                 </h3>
-                <p className="text-gray-700">
-                  Click the <span className="font-semibold">Watch</span> button to follow a task and receive notifications about all updates and comments.
+                <p className="text-secondary">
+                  Click the <span className="font-semibold">Watch</span> button to follow an assignment and receive notifications about all updates and comments.
                 </p>
-                <p className="text-gray-700 font-semibold">You're automatically added as a watcher when you:</p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                  <li>Create a task</li>
-                  <li>Get assigned to a task</li>
-                  <li>Comment on a task</li>
-                  <li>Are mentioned in a task or comment</li>
+                <p className="text-secondary font-semibold">You're automatically added as a watcher when you:</p>
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
+                  <li>Create an assignment</li>
+                  <li>Get assigned to an assignment</li>
+                  <li>Comment on an assignment</li>
+                  <li>Are mentioned in an assignment or comment</li>
                 </ul>
-                <p className="text-gray-700">
+                <p className="text-secondary">
                   Click <span className="font-semibold">Unwatch</span> at any time to stop receiving notifications.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Filter className="w-5 h-5 text-blue-600" />
                   Filtering & Viewing
                 </h3>
-                <p className="text-gray-700">
-                  Use the filter options to find specific tasks:
+                <p className="text-secondary">
+                  Use the filter options to find specific assignments:
                 </p>
-                <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                  <li><span className="font-semibold">My Tasks:</span> See only tasks you created or are assigned to</li>
-                  <li><span className="font-semibold">All Tasks:</span> View all company tasks (if you have permission)</li>
-                  <li><span className="font-semibold">Filter by Lead:</span> Show tasks linked to a specific lead</li>
-                  <li><span className="font-semibold">Filter by Status:</span> View tasks by their current status</li>
-                  <li><span className="font-semibold">Show Completed:</span> Toggle to show or hide completed tasks</li>
+                <ul className="list-disc list-inside space-y-2 text-secondary ml-4">
+                  <li><span className="font-semibold">My Assignments:</span> See only assignments you created or are assigned to</li>
+                  <li><span className="font-semibold">All Assignments:</span> View all company assignments (if you have permission)</li>
+                  <li><span className="font-semibold">Filter by Lead:</span> Show assignments linked to a specific lead</li>
+                  <li><span className="font-semibold">Filter by Status:</span> View assignments by their current status</li>
+                  <li><span className="font-semibold">Show Completed:</span> Toggle to show or hide completed assignments</li>
                 </ul>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  Task Status & Completion
+                  Assignment Status & Completion
                 </h3>
-                <p className="text-gray-700">
-                  Click <span className="font-semibold text-green-600">Mark as Complete</span> to finish a task, or <span className="font-semibold text-blue-600">Mark as Incomplete</span> to reopen it. Completed tasks show completion time and can be filtered out.
+                <p className="text-secondary">
+                  Click <span className="font-semibold text-green-600">Mark as Complete</span> to finish an assignment, or <span className="font-semibold text-blue-600">Mark as Incomplete</span> to reopen it. Completed assignments show completion time and can be filtered out.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary flex items-center gap-2">
                   <Flag className="w-5 h-5 text-red-600" />
                   Priority Levels
                 </h3>
-                <p className="text-gray-700">
-                  Set task priority to help your team focus on what matters most:
+                <p className="text-secondary">
+                  Set assignment priority to help your team focus on what matters most:
                 </p>
                 <div className="flex flex-wrap gap-2 ml-4">
-                  <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-medium">Low</span>
+                  <span className="px-3 py-1 rounded-full bg-surface text-secondary text-sm font-medium">Low</span>
                   <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">Medium</span>
                   <span className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm font-medium">High</span>
                   <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-medium">Urgent</span>
@@ -840,15 +816,15 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
                   Pro Tip: Team Pulse Integration
                 </h3>
                 <p className="text-blue-800">
-                  Tasks created from Team Pulse discussions automatically link back to the original conversation. Use this to track action items from team discussions. These tasks are now fully editable just like regular tasks!
+                  Assignments created from Team Pulse discussions automatically link back to the original conversation. Use this to track action items from team discussions. These are now fully editable just like regular assignments!
                 </p>
               </section>
             </div>
 
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4">
+            <div className="sticky bottom-0 bg-surface border-t border-subtle px-6 py-4">
               <button
                 onClick={() => setShowHelp(false)}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                className="w-full px-6 py-3 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               >
                 Got it, thanks!
               </button>
@@ -859,8 +835,8 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
       <ConfirmModal
         isOpen={confirmDelete !== null}
-        title="Delete Task"
-        message="Are you sure you want to delete this task? This cannot be undone."
+        title="Delete Assignment"
+        message="Are you sure you want to delete this assignment? This cannot be undone."
         variant="danger"
         confirmLabel="Delete"
         onConfirm={() => {

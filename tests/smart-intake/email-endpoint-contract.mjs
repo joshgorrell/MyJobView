@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const source = fs.readFileSync('supabase/functions/smart-intake-email/index.ts', 'utf8');
+assert.match(source, /SMART_INTAKE_EMAIL_ENABLED/);
+assert.match(source, /SMART_INTAKE_EMAIL_WEBHOOK_SECRET/);
+assert.match(source, /intake_destinations/);
+assert.match(source, /intake_items/);
+assert.doesNotMatch(source, /from\(["']contacts["']\)\.insert/);
+assert.doesNotMatch(source, /from\(["']leads["']\)\.insert/);
+console.log('Staged intake endpoint contract passed');

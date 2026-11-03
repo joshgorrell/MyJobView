@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { FileText, DollarSign, Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus } from 'lucide-react';
 
 interface ProjectInvoicesProps {
   projectId: string;

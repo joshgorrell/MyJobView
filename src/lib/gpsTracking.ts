@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { updateClockEntryAddress } from './reverseGeocode';
 
 interface GPSPoint {
   latitude: number;
@@ -26,12 +25,6 @@ interface GPSCaptureResult {
   captured_at: string | null;
 }
 
-interface PreWarmedLocation {
-  position: GeolocationPosition;
-  capturedAt: number;
-  accuracy: number;
-}
-
 class GPSTrackingService {
   private watchId: number | null = null;
   private isTracking: boolean = false;
@@ -39,13 +32,10 @@ class GPSTrackingService {
   private syncInterval: NodeJS.Timeout | null = null;
   private recordInterval: NodeJS.Timeout | null = null;
   private lastPosition: GeolocationPosition | null = null;
-  private lastCaptureTime: number = 0;
-  private technicianId: string | null = null;
   private dailyClockEntryId: string | null = null;
   private workOrderId: string | null = null;
   private permissionState: PermissionState | null = null;
   private permissionChecked: boolean = false;
-  private preWarmedLocation: PreWarmedLocation | null = null;
   private preWarmInterval: NodeJS.Timeout | null = null;
   private isPreWarming: boolean = false;
   private refinementWatchId: number | null = null;
@@ -123,7 +113,7 @@ class GPSTrackingService {
     }
   }
 
-  async captureLocationForClockEvent(isClockOut: boolean = false): Promise<GPSCaptureResult> {
+  async captureLocationForClockEvent(_isClockOut: boolean = false): Promise<GPSCaptureResult> {
     const startTime = Date.now();
     const attemptedAt = new Date().toISOString();
 
@@ -139,21 +129,10 @@ class GPSTrackingService {
       };
     }
 
-    // Try to use pre-warmed location if available and fresh
-    if (this.preWarmedLocation && (Date.now() - this.preWarmedLocation.capturedAt) < 30000) {
-      // Pre-warmed location is less than 30 seconds old
-      if (this.preWarmedLocation.accuracy < 100) {
-        // Good accuracy, use it immediately
-        return {
-          latitude: this.preWarmedLocation.position.coords.latitude,
-          longitude: this.preWarmedLocation.position.coords.longitude,
-          accuracy: this.preWarmedLocation.position.coords.accuracy,
-          method: 'high_accuracy',
-          duration_ms: Date.now() - startTime,
-          attempted_at: attemptedAt,
-          captured_at: new Date(this.preWarmedLocation.position.timestamp).toISOString()
-        };
-      }
+    const permission = await this.getPermissionState();
+    this.permissionState = permission === 'unknown' ? null : permission;
+    if (this.permissionState === 'denied') {
+      return {latitude:null,longitude:null,accuracy:null,method:'failed',duration_ms:Date.now()-startTime,attempted_at:attemptedAt,captured_at:null};
     }
 
     // Attempt 1: High accuracy with extended timeout (15 seconds)
@@ -163,9 +142,10 @@ class GPSTrackingService {
         ...result,
         duration_ms: Date.now() - startTime,
         attempted_at: attemptedAt,
-        captured_at: new Date().toISOString()
+        captured_at: result.captured_at
       };
     } catch (highAccError1) {
+      if ((highAccError1 as GeolocationPositionError)?.code === 1) return {latitude:null,longitude:null,accuracy:null,method:'failed',duration_ms:Date.now()-startTime,attempted_at:attemptedAt,captured_at:null};
       console.log('First high-accuracy attempt failed, trying network...');
 
       // Attempt 2: Network-based with longer timeout (8 seconds)
@@ -175,9 +155,10 @@ class GPSTrackingService {
           ...result,
           duration_ms: Date.now() - startTime,
           attempted_at: attemptedAt,
-          captured_at: new Date().toISOString()
+          captured_at: result.captured_at
         };
       } catch (networkError) {
+          if ((networkError as GeolocationPositionError)?.code === 1) return {latitude:null,longitude:null,accuracy:null,method:'failed',duration_ms:Date.now()-startTime,attempted_at:attemptedAt,captured_at:null};
         console.log('Network attempt failed, trying second high-accuracy...');
 
         // Attempt 3: Second high accuracy attempt (10 seconds)
@@ -187,13 +168,14 @@ class GPSTrackingService {
             ...result,
             duration_ms: Date.now() - startTime,
             attempted_at: attemptedAt,
-            captured_at: new Date().toISOString()
+            captured_at: result.captured_at
           };
         } catch (highAccError2) {
+          if ((highAccError2 as GeolocationPositionError)?.code === 1) return {latitude:null,longitude:null,accuracy:null,method:'failed',duration_ms:Date.now()-startTime,attempted_at:attemptedAt,captured_at:null};
           console.log('Second high-accuracy failed, trying cached...');
 
-          // Attempt 4: Use cached location if recent (within 2 minutes)
-          if (this.lastPosition && (Date.now() - this.lastCaptureTime) < 120000) {
+          // Only use a reading from the last 30 seconds.
+          if (this.lastPosition && (Date.now() - this.lastPosition.timestamp) < 30000) {
             return {
               latitude: this.lastPosition.coords.latitude,
               longitude: this.lastPosition.coords.longitude,
@@ -213,7 +195,7 @@ class GPSTrackingService {
               ...result,
               duration_ms: Date.now() - startTime,
               attempted_at: attemptedAt,
-              captured_at: new Date().toISOString()
+              captured_at: result.captured_at
             };
           } catch (emergencyError) {
             // All attempts failed
@@ -232,7 +214,7 @@ class GPSTrackingService {
     }
   }
 
-  private tryHighAccuracyGPS(timeout: number): Promise<{ latitude: number; longitude: number; accuracy: number; method: 'high_accuracy' }> {
+  private tryHighAccuracyGPS(timeout: number): Promise<{ latitude: number; longitude: number; accuracy: number; method: 'high_accuracy'; captured_at: string }> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error('High accuracy timeout'));
@@ -242,13 +224,14 @@ class GPSTrackingService {
         (position) => {
           clearTimeout(timeoutId);
           this.lastPosition = position;
-          this.lastCaptureTime = Date.now();
+
           localStorage.removeItem('gps_permission_declined');
           resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
-            method: 'high_accuracy'
+            method: 'high_accuracy',
+            captured_at: new Date(position.timestamp).toISOString()
           });
         },
         (error) => {
@@ -261,13 +244,13 @@ class GPSTrackingService {
         {
           enableHighAccuracy: true,
           timeout: timeout,
-          maximumAge: 60000
+          maximumAge: 0
         }
       );
     });
   }
 
-  private tryNetworkGPS(timeout: number): Promise<{ latitude: number; longitude: number; accuracy: number; method: 'network' }> {
+  private tryNetworkGPS(timeout: number): Promise<{ latitude: number; longitude: number; accuracy: number; method: 'network'; captured_at: string }> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error('Network timeout'));
@@ -277,12 +260,13 @@ class GPSTrackingService {
         (position) => {
           clearTimeout(timeoutId);
           this.lastPosition = position;
-          this.lastCaptureTime = Date.now();
+
           resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
-            method: 'network'
+            method: 'network',
+            captured_at: new Date(position.timestamp).toISOString()
           });
         },
         (error) => {
@@ -292,25 +276,26 @@ class GPSTrackingService {
         {
           enableHighAccuracy: false,
           timeout: timeout,
-          maximumAge: 60000
+          maximumAge: 0
         }
       );
     });
   }
 
-  private tryEmergencyGPS(): Promise<{ latitude: number; longitude: number; accuracy: number; method: 'emergency' }> {
+  private tryEmergencyGPS(): Promise<{ latitude: number; longitude: number; accuracy: number; method: 'emergency'; captured_at: string }> {
     return new Promise((resolve, reject) => {
       // Try to get ANY location, even if accuracy is poor
       // No timeout - wait as long as needed
       navigator.geolocation.getCurrentPosition(
         (position) => {
           this.lastPosition = position;
-          this.lastCaptureTime = Date.now();
+
           resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
-            method: 'emergency'
+            method: 'emergency',
+            captured_at: new Date(position.timestamp).toISOString()
           });
         },
         (error) => {
@@ -319,7 +304,7 @@ class GPSTrackingService {
         {
           enableHighAccuracy: false,
           timeout: 30000, // 30 second max for emergency
-          maximumAge: 300000 // Accept location up to 5 minutes old
+          maximumAge: 0 // A clock event requires a fresh reading
         }
       );
     });
@@ -327,18 +312,7 @@ class GPSTrackingService {
 
   // Pre-warm GPS before user clicks clock-in button
   startPreWarming() {
-    if (this.isPreWarming || !navigator.geolocation) return;
-
-    console.log('Starting GPS pre-warming...');
-    this.isPreWarming = true;
-
-    // Get initial location
-    this.updatePreWarmedLocation();
-
-    // Refresh every 15 seconds while pre-warming is active
-    this.preWarmInterval = setInterval(() => {
-      this.updatePreWarmedLocation();
-    }, 15000);
+    // Location capture is restricted to explicit clock actions.
   }
 
   stopPreWarming() {
@@ -353,109 +327,8 @@ class GPSTrackingService {
     }
   }
 
-  private async updatePreWarmedLocation() {
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 5000
-          }
-        );
-      });
-
-      this.preWarmedLocation = {
-        position,
-        capturedAt: Date.now(),
-        accuracy: position.coords.accuracy
-      };
-
-      console.log(`GPS pre-warmed: accuracy ${position.coords.accuracy.toFixed(1)}m`);
-    } catch (error) {
-      console.log('GPS pre-warming failed:', error);
-    }
-  }
-
-  async startPostCaptureRefinement(entryId: string, isClockOut: boolean = false, tableName: 'daily_clock_entries' | 'time_entries' = 'daily_clock_entries') {
-    if (!navigator.geolocation) return;
-
-    const startTime = Date.now();
-    const refinementDuration = 60000;
-    let bestPosition: GeolocationPosition | null = null;
-    let originalAccuracy: number | null = null;
-
-    try {
-      const { data } = await supabase
-        .from(tableName)
-        .select(isClockOut ? 'clock_out_gps_accuracy' : 'clock_in_gps_accuracy')
-        .eq('id', entryId)
-        .single();
-
-      if (data) {
-        originalAccuracy = isClockOut ? data.clock_out_gps_accuracy : data.clock_in_gps_accuracy;
-      }
-    } catch (error) {
-      return;
-    }
-
-    if (!originalAccuracy) return;
-
-    this.refinementWatchId = navigator.geolocation.watchPosition(
-      async (position) => {
-        const elapsed = Date.now() - startTime;
-
-        if (elapsed > refinementDuration) {
-          if (this.refinementWatchId !== null) {
-            navigator.geolocation.clearWatch(this.refinementWatchId);
-            this.refinementWatchId = null;
-          }
-          return;
-        }
-
-        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy * 0.5) {
-          if (position.coords.accuracy < originalAccuracy * 0.5) {
-            bestPosition = position;
-
-            const updateData: Record<string, unknown> = {};
-            if (isClockOut) {
-              updateData.clock_out_latitude = position.coords.latitude;
-              updateData.clock_out_longitude = position.coords.longitude;
-              updateData.clock_out_gps_accuracy = position.coords.accuracy;
-              updateData.clock_out_gps_refined = true;
-              updateData.clock_out_gps_refined_at = new Date().toISOString();
-              updateData.clock_out_gps_original_accuracy = originalAccuracy;
-            } else {
-              updateData.clock_in_latitude = position.coords.latitude;
-              updateData.clock_in_longitude = position.coords.longitude;
-              updateData.clock_in_gps_accuracy = position.coords.accuracy;
-              updateData.clock_in_gps_refined = true;
-              updateData.clock_in_gps_refined_at = new Date().toISOString();
-              updateData.clock_in_gps_original_accuracy = originalAccuracy;
-            }
-
-            try {
-              await supabase
-                .from(tableName)
-                .update(updateData)
-                .eq('id', entryId);
-
-              updateClockEntryAddress(entryId, position.coords.latitude, position.coords.longitude, isClockOut, tableName).catch(() => {});
-            } catch (error) {
-              console.error('Failed to save GPS refinement:', error);
-            }
-          }
-        }
-      },
-      () => {},
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
+  async startPostCaptureRefinement(_entryId: string, _isClockOut = false, _tableName: 'daily_clock_entries' | 'time_entries' = 'daily_clock_entries') {
+    // Retired: later positions must never replace the clock-action reading.
   }
 
   stopPostCaptureRefinement() {
@@ -466,61 +339,21 @@ class GPSTrackingService {
     }
   }
 
-  async startTracking(technicianId: string, dailyClockEntryId?: string, workOrderId?: string): Promise<boolean> {
-    if (this.isTracking) {
-      this.dailyClockEntryId = dailyClockEntryId;
-      this.workOrderId = workOrderId;
-      return true;
-    }
-
-    if (!navigator.geolocation) {
-      return false;
-    }
-
-    const state = await this.getPermissionState();
-    if (state === 'denied') {
-      return false;
-    }
-
-    this.technicianId = technicianId;
-    this.dailyClockEntryId = dailyClockEntryId;
-    this.workOrderId = workOrderId;
-    this.isTracking = true;
-
-    this.watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        this.lastPosition = position;
-        this.lastCaptureTime = Date.now();
-        localStorage.removeItem('gps_permission_declined');
-      },
-      (error) => {
-        if (error.code === 1) {
-          localStorage.setItem('gps_permission_declined', 'true');
-          this.stopTracking();
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 30000,
-        maximumAge: 60000
-      }
-    );
-
-    this.recordInterval = setInterval(() => {
-      if (this.lastPosition) {
-        this.recordBreadcrumb(this.lastPosition);
-      }
-    }, 120000); // Record breadcrumb every 2 minutes
-
-    this.syncInterval = setInterval(() => {
-      this.syncOfflineQueue();
-    }, 60000);
-
-    return true;
+  async startTracking(_technicianId: string, _dailyClockEntryId?: string, _workOrderId?: string): Promise<boolean> {
+    // Retired: web clock actions record one reading, never a location trail.
+    return false;
   }
 
-  stopTracking() {
+  stopTracking(context?: 'daily' | 'job') {
     if (!this.isTracking) return;
+    if (context === 'job') {
+      this.workOrderId = null;
+      if (this.dailyClockEntryId) return;
+    }
+    if (context === 'daily') {
+      this.dailyClockEntryId = null;
+      if (this.workOrderId) return;
+    }
 
     if (this.watchId !== null) {
       navigator.geolocation.clearWatch(this.watchId);
@@ -540,39 +373,12 @@ class GPSTrackingService {
     this.syncOfflineQueue();
 
     this.isTracking = false;
-    this.technicianId = null;
     this.dailyClockEntryId = null;
     this.workOrderId = null;
   }
 
   updateWorkOrder(workOrderId: string | null) {
-    this.workOrderId = workOrderId;
-  }
-
-  private async recordBreadcrumb(position: GeolocationPosition) {
-    if (!this.technicianId) return;
-
-    const point: QueuedGPSPoint = {
-      technician_id: this.technicianId,
-      daily_clock_entry_id: this.dailyClockEntryId,
-      work_order_id: this.workOrderId,
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-      speed: position.coords.speed ?? undefined,
-      heading: position.coords.heading ?? undefined,
-      recorded_at: new Date(position.timestamp).toISOString()
-    };
-
-    if (navigator.onLine) {
-      try {
-        await this.saveBreadcrumb(point);
-      } catch (error) {
-        this.addToQueue(point);
-      }
-    } else {
-      this.addToQueue(point);
-    }
+    this.workOrderId = workOrderId ?? null;
   }
 
   private async saveBreadcrumb(point: QueuedGPSPoint) {
@@ -591,11 +397,6 @@ class GPSTrackingService {
       });
 
     if (error) throw error;
-  }
-
-  private addToQueue(point: QueuedGPSPoint) {
-    this.offlineQueue.push(point);
-    this.saveOfflineQueue();
   }
 
   private async syncOfflineQueue() {

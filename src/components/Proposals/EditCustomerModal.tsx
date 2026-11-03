@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Contact } from '../../lib/types';
 import { X, Save, Search, User, AlertCircle } from 'lucide-react';
@@ -16,7 +17,7 @@ interface EditCustomerModalProps {
 export default function EditCustomerModal({ contactId, proposalId, onSave, onClose }: EditCustomerModalProps) {
   const [activeTab, setActiveTab] = useState<'edit' | 'reassign'>('edit');
   const [contact, setContact] = useState<Contact | null>(null);
-  const [proposal, setProposal] = useState<any>(null);
+  const [_proposal, setProposal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,7 +108,7 @@ export default function EditCustomerModal({ contactId, proposalId, onSave, onClo
       }
     } catch (error) {
       console.error('Error loading contact:', error);
-      alert('Failed to load contact information');
+      notify('Failed to load contact information', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -153,7 +154,7 @@ export default function EditCustomerModal({ contactId, proposalId, onSave, onClo
 
   async function handleSaveEdit() {
     if (!formData.first_name || !formData.last_name) {
-      alert('First name and last name are required');
+      notify('First name and last name are required', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -269,7 +270,7 @@ export default function EditCustomerModal({ contactId, proposalId, onSave, onClo
       onClose();
     } catch (error: any) {
       console.error('Error saving customer:', error);
-      alert(`Failed to save customer information: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to save customer information: ${error?.message || 'Unknown error'}`, { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -301,7 +302,7 @@ export default function EditCustomerModal({ contactId, proposalId, onSave, onClo
       onClose();
     } catch (error) {
       console.error('Error reassigning proposal:', error);
-      alert('Failed to reassign proposal');
+      notify('Failed to reassign proposal', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

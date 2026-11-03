@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { requestConfirmation } from '../../lib/feedback';
+import { CalendarNavigation, CalendarViewSwitcher } from '../Shared/Calendar/CalendarControls';
+import { CalendarWorkspace } from '../Shared/Calendar/CalendarWorkspace';
+import { dateKey } from '../../lib/workOrderScheduling';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   Users,
   Calendar,
   Clock,
   MapPin,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Edit2,
   Trash2,
@@ -42,19 +44,19 @@ interface CrewJob {
   project_name: string;
   customer_name: string;
   location: string;
-  estimated_hours: number;
+  estimated_duration: number;
   required_techs: number;
 }
 
 export function CrewScheduleView() {
   const [crews, setCrews] = useState<Crew[]>([]);
   const [jobs, setJobs] = useState<CrewJob[]>([]);
-  const [technicians, setTechnicians] = useState<CrewMember[]>([]);
+  const [_technicians, setTechnicians] = useState<CrewMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [showCrewManager, setShowCrewManager] = useState(false);
-  const [editingCrew, setEditingCrew] = useState<Crew | null>(null);
+  const [_editingCrew, _setEditingCrew] = useState<Crew | null>(null);
   const [draggedJob, setDraggedJob] = useState<string | null>(null);
 
   useEffect(() => {
@@ -190,7 +192,7 @@ export function CrewScheduleView() {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, role')
-      .in('role', ['tech', 'lead_tech'])
+      .eq('is_technician', true)
       .eq('is_active', true)
       .order('full_name');
 
@@ -203,14 +205,14 @@ export function CrewScheduleView() {
     let end = new Date(currentDate);
 
     if (viewMode === 'week') {
-      start.setDate(start.getDate() - start.getDay());
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
       end = new Date(start);
       end.setDate(end.getDate() + 6);
     }
 
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0]
+      start: dateKey(start),
+      end: dateKey(end)
     };
   }
 
@@ -243,22 +245,24 @@ export function CrewScheduleView() {
   }
 
   function getJobsForCrewAndDate(crewId: string, date: Date) {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = dateKey(date);
     return jobs.filter(j => j.crew_id === crewId && j.scheduled_date === dateStr);
   }
 
   async function handleDrop(crewId: string, date: Date) {
     if (!draggedJob) return;
 
+    if (!(await requestConfirmation('Confirm this schedule move?', { theme: 'blue' }))) return;
+
     try {
       const job = jobs.find(j => j.id === draggedJob);
-      const newDate = date.toISOString().split('T')[0];
+      const newDate = dateKey(date);
       const newStart = job?.scheduled_start_time || '08:00';
       const newEnd = job?.scheduled_end_time || '17:00';
 
       const result = await rescheduleWorkOrder(draggedJob, newDate, newStart, newEnd, undefined);
       if (!result.success && result.conflict) {
-        if (!confirm('Scheduling conflict detected. Proceed anyway?')) {
+        if (!(await requestConfirmation('Scheduling conflict detected. Proceed anyway?', { theme: 'blue' }))) {
           return;
         }
         await rescheduleWorkOrder(draggedJob, newDate, newStart, newEnd, undefined, { force: true });
@@ -310,65 +314,18 @@ export function CrewScheduleView() {
   const days = getDaysInView();
   const unassignedCrewJobs = jobs.filter(j => !j.crew_id);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading crew schedule...</div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-4">
+    <CalendarWorkspace loading={loading} className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
           <h2 className="text-xl sm:text-2xl font-bold text-white">Crew Schedule</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('prev')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-4 py-2 text-sm font-medium bg-white hover:bg-gray-100 rounded-lg"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => navigate('next')}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+          <CalendarNavigation date={dateKey(currentDate)} onDateChange={date => setCurrentDate(new Date(date + 'T12:00:00'))} onPrevious={() => navigate('prev')} onNext={() => navigate('next')} />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex bg-white rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('day')}
-              className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-                viewMode === 'day'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Day
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-                viewMode === 'week'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Week
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <CalendarViewSwitcher value={viewMode} onChange={setViewMode} options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} />
           <button
             onClick={() => setShowCrewManager(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -382,7 +339,7 @@ export function CrewScheduleView() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="w-5 h-5 text-blue-600" />
             </div>
@@ -393,7 +350,7 @@ export function CrewScheduleView() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <Calendar className="w-5 h-5 text-green-600" />
             </div>
@@ -404,7 +361,7 @@ export function CrewScheduleView() {
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
               <AlertCircle className="w-5 h-5 text-yellow-600" />
             </div>
@@ -453,7 +410,7 @@ export function CrewScheduleView() {
                 </td>
                 {days.map(date => {
                   const dateJobs = unassignedCrewJobs.filter(
-                    j => j.scheduled_date === date.toISOString().split('T')[0]
+                    j => j.scheduled_date === dateKey(date)
                   );
                   return (
                     <td
@@ -488,7 +445,7 @@ export function CrewScheduleView() {
               {crews.map(crew => (
                 <tr key={crew.id} className="hover:bg-gray-50">
                   <td className="sticky left-0 bg-white px-4 py-3 border-r border-gray-200 z-10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                           <Users className="w-4 h-4 text-blue-600" />
@@ -601,6 +558,6 @@ export function CrewScheduleView() {
           </div>
         </div>
       )}
-    </div>
+    </CalendarWorkspace>
   );
 }

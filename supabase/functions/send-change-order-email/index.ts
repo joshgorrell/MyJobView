@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -130,7 +131,6 @@ Deno.serve(async (req: Request) => {
 </html>`;
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY');
 
     if (RESEND_API_KEY) {
       const emailPayload: any = {
@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
       if (ccEmails && ccEmails.length > 0) emailPayload.cc = ccEmails;
       if (settings?.reply_to_email) emailPayload.reply_to = settings.reply_to_email;
 
-      const res = await fetch('https://api.resend.com/emails', {
+      const res = await sendSystemEmail({
         method: 'POST',
         headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(emailPayload),
@@ -152,29 +152,8 @@ Deno.serve(async (req: Request) => {
         const err = await res.text();
         throw new Error(`Resend error: ${err}`);
       }
-    } else if (SENDGRID_API_KEY) {
-      const personalizations: any[] = [{ to: [{ email: toEmail }] }];
-      if (ccEmails && ccEmails.length > 0) personalizations[0].cc = ccEmails.map((e: string) => ({ email: e }));
-
-      const sgPayload = {
-        personalizations,
-        from: { email: fromEmail, name: fromName },
-        subject: subject || `Change Order ${co.change_order_number} — ${co.title}`,
-        content: [{ type: 'text/html', value: htmlBody }],
-      };
-
-      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(sgPayload),
-      });
-
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`SendGrid error: ${err}`);
-      }
     } else {
-      console.log('No email provider configured — email would have been sent to:', toEmail);
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
 
     await serviceClient.from('change_orders').update({

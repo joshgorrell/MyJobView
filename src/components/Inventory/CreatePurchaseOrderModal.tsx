@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { X, Plus, Trash2, Search, Package, Mail, AlertCircle, Building2, User, MapPin } from 'lucide-react';
+import { notify } from '../../lib/feedback';
+import ProductStatusNotice from '../Products/ProductStatusNotice';
+import {useAuth} from '../../contexts/AuthContext';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Plus, Trash2, Search, Package, AlertCircle, Building2, User, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 
 interface CreatePurchaseOrderModalProps {
+  initialQuote?: boolean;
   onClose: () => void;
   onSuccess: () => void;
   presetShipToOfficeId?: string;
@@ -45,6 +49,7 @@ interface Contact {
 }
 
 interface Product {
+  is_discontinued?: boolean;
   id: string;
   name: string;
   sku: string | null;
@@ -53,6 +58,7 @@ interface Product {
 }
 
 interface POLineItem {
+  is_discontinued?: boolean;
   product_id: string | null;
   product_name: string;
   model_number: string | null;
@@ -79,11 +85,14 @@ function formatAddressLines(
   };
 }
 
-export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOfficeId, presetShipToContactId, sourceNote }: CreatePurchaseOrderModalProps) {
+export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOfficeId, presetShipToContactId, sourceNote, initialQuote=false }: CreatePurchaseOrderModalProps) {
+  const retry=useRef(crypto.randomUUID());
+  const [additionalVendors,setAdditionalVendors]=useState<string[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [selectedVendor, setSelectedVendor] = useState('');
+ const {profile}=useAuth();
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
   const [expectedDate, setExpectedDate] = useState('');
@@ -97,7 +106,8 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
   const [showSearch, setShowSearch] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [showCostPrompt, setShowCostPrompt] = useState<string | null>(null);
+  const [discontinuedOverride, setDiscontinuedOverride] = useState(false);
+  const [, setShowCostPrompt] = useState<string | null>(null);
 
   // Bill To
   const [billToOfficeId, setBillToOfficeId] = useState('');
@@ -124,9 +134,9 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
 
   const loadInitialData = async () => {
     const [vendorsRes, warehousesRes, officesRes] = await Promise.all([
-      supabase.from('vendors').select('id, vendor_name, email').eq('is_active', true).order('vendor_name'),
-      supabase.from('warehouses').select('id, name').order('name'),
-      supabase.from('company_offices').select('id, office_name, address_line1, address_line2, city, state, zip, is_headquarters').order('office_name'),
+      supabase.from('vendors').select('id, vendor_name, email').eq('organization_id',profile?.organization_id).eq('is_active', true).order('vendor_name'),
+      supabase.from('warehouses').select('id, name').eq('organization_id',profile?.organization_id).order('name'),
+      supabase.from('company_offices').select('id, office_name, address_line1, address_line2, city, state, zip, is_headquarters').eq('organization_id',profile?.organization_id).order('office_name'),
     ]);
     if (vendorsRes.data) setVendors(vendorsRes.data);
     if (warehousesRes.data) {
@@ -189,6 +199,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
     const { data } = await supabase
       .from('contacts')
       .select('id, first_name, last_name, company_name, address, city, state, zip')
+      .eq('organization_id',profile?.organization_id)
       .eq('id', contactId)
       .maybeSingle();
     if (data) {
@@ -204,11 +215,13 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
     }
     const { data } = await supabase
       .from('products')
-      .select('id, name, sku, cost, vendors:default_vendor_id(vendor_name)')
+      .select('id, name, sku, cost, is_discontinued, vendors:default_vendor_id(vendor_name)')
+      .eq('organization_id',profile?.organization_id)
+      .eq('is_active', true)
       .ilike('name', `%${term}%`)
       .limit(10);
-    setSearchResults(data || []);
-  }, []);
+    setSearchResults((data || []).map(p=>({...p,vendors:Array.isArray(p.vendors)?p.vendors[0]||null:p.vendors})));
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     const timer = setTimeout(() => searchProducts(searchTerm), 300);
@@ -223,10 +236,11 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
     const { data } = await supabase
       .from('contacts')
       .select('id, first_name, last_name, company_name, address, city, state, zip')
+      .eq('organization_id',profile?.organization_id)
       .or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,company_name.ilike.%${term}%`)
       .limit(10);
     setContactSearchResults(data || []);
-  }, []);
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     const timer = setTimeout(() => searchContacts(contactSearchTerm), 300);
@@ -282,6 +296,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
       ));
     } else {
       setLineItems(items => [...items, {
+        is_discontinued: product.is_discontinued,
         product_id: product.id,
         product_name: product.name,
         model_number: product.sku,
@@ -327,60 +342,23 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
     if (lineItems.length === 0) { setError('Please add at least one line item'); return; }
     if (lineItems.some(li => !li.product_name.trim())) { setError('All line items need a product name'); return; }
 
+    if (lineItems.some(item => item.is_discontinued) && !discontinuedOverride) { setError('Confirm the discontinued item override after verifying vendor stock.'); return; }
     setSaving(true);
     try {
-      const { data: po, error: poError } = await supabase
-        .from('purchase_orders')
-        .insert({
-          vendor_id: selectedVendor,
-          warehouse_id: selectedWarehouse,
-          status: 'draft',
-          order_date: orderDate,
-          expected_date: expectedDate || null,
-          subtotal,
-          tax_amount: taxAmount || 0,
-          shipping_cost: shippingCost || 0,
-          total,
-          internal_note: internalNote || null,
-          external_note: externalNote || null,
-          bill_to_office_id: billToOfficeId,
-          bill_to_name: billToSnapshot.name || null,
-          bill_to_address: billToSnapshot.address || null,
-          bill_to_city: billToSnapshot.city || null,
-          bill_to_state: billToSnapshot.state || null,
-          bill_to_zip: billToSnapshot.zip || null,
-          ship_to_office_id: shipToMode === 'office' ? shipToOfficeId : null,
-          ship_to_contact_id: shipToMode === 'customer' ? shipToContactId : null,
-          ship_to_name: shipToSnapshot.name || null,
-          ship_to_address: shipToSnapshot.address || null,
-          ship_to_city: shipToSnapshot.city || null,
-          ship_to_state: shipToSnapshot.state || null,
-          ship_to_zip: shipToSnapshot.zip || null,
-        })
-        .select()
-        .single();
-
-      if (poError) throw poError;
-
-      const poItemsData = lineItems.map(li => ({
-        po_id: po.id,
-        product_id: li.product_id,
-        product_name: li.product_name,
-        model_number: li.model_number,
-        quantity: li.quantity,
-        unit_price: li.unit_cost,
-        total_price: li.quantity * li.unit_cost,
-      }));
-
-      const { error: itemsError } = await supabase.from('po_items').insert(poItemsData);
-      if (itemsError) throw itemsError;
-
+      const {error:poError}=await supabase.rpc('create_request_purchase_document',{
+        p_items:lineItems.map(li=>({product_id:li.product_id,product_name:li.product_name,model_number:li.model_number,quantity:li.quantity,unit_price:li.unit_cost,job_reference:'Stock'})),
+        p_vendor_ids:[selectedVendor,...additionalVendors.filter(id=>id!==selectedVendor)],p_warehouse_id:selectedWarehouse,p_quote:initialQuote,p_retry:retry.current,
+        p_header:{discontinued_override:discontinuedOverride,office_id:billToOfficeId,order_date:orderDate,ship_to_office_id:shipToMode==='office'?shipToOfficeId:null,ship_to_contact_id:shipToMode==='customer'?shipToContactId:null,expected_date:expectedDate,internal_note:internalNote,external_note:externalNote,shipping_cost:shippingCost,tax_amount:taxAmount,
+        ship_to_name:shipToSnapshot.name,ship_to_address:shipToSnapshot.address,ship_to_city:shipToSnapshot.city,ship_to_state:shipToSnapshot.state,ship_to_zip:shipToSnapshot.zip}
+      });
+      if(poError)throw poError;
       for (const li of lineItems) {
-        if (li.update_master_cost && li.product_id) {
+        if (!initialQuote && li.update_master_cost && li.product_id) {
           await supabase.from('products').update({ cost: li.unit_cost }).eq('id', li.product_id);
         }
       }
 
+      notify('Purchase order saved!', { theme: 'amber', tone: 'success' });
       onSuccess();
     } catch (err: any) {
       setError(err.message || 'Failed to create purchase order');
@@ -393,7 +371,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <h2 className="text-xl font-bold text-gray-900">Create Purchase Order</h2>
+          <h2 className="text-xl font-bold text-gray-900">{initialQuote?'Create Quote Request':'Create Purchase Order'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -442,6 +420,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
             </div>
           </div>
 
+          {initialQuote&&<fieldset className="border rounded p-3"><legend className="text-sm font-medium">Additional vendors to quote</legend><div className="flex flex-wrap gap-3">{vendors.filter(v=>v.id!==selectedVendor).map(v=><label key={v.id} className="text-sm"><input type="checkbox" checked={additionalVendors.includes(v.id)} onChange={()=>setAdditionalVendors(ids=>ids.includes(v.id)?ids.filter(id=>id!==v.id):[...ids,v.id])}/> {v.vendor_name}</label>)}</div></fieldset>}
           {/* Bill To */}
           <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
             <div className="flex items-center gap-2 mb-3">
@@ -605,6 +584,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+              <label className="my-2 flex items-start gap-2 text-xs text-red-600"><input type="checkbox" aria-label="Override discontinued items" checked={discontinuedOverride} onChange={event => setDiscontinuedOverride(event.target.checked)} /><span>Override discontinued items — purchasing has confirmed the vendor still has stock.</span></label>
               {showSearch && searchResults.length > 0 && (
                 <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {searchResults.map(product => (
@@ -614,7 +594,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                       className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left"
                     >
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{product.name}</div><ProductStatusNotice product={product} />
                         {product.sku && <div className="text-xs text-gray-500">SKU: {product.sku}</div>}
                       </div>
                       {product.cost != null && (
@@ -638,7 +618,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-3 py-2 text-left font-medium text-gray-600">Product</th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">SKU/Model</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Ordering SKU</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Qty</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Unit Cost</th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">Total</th>
@@ -650,6 +630,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                     {lineItems.map((li, index) => (
                       <tr key={index} className="hover:bg-gray-50">
                         <td className="px-3 py-2">
+                          <ProductStatusNotice product={li} />
                           <input
                             type="text"
                             value={li.product_name}
@@ -663,7 +644,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
                             type="text"
                             value={li.model_number || ''}
                             onChange={e => updateLineItem(index, 'model_number', e.target.value)}
-                            placeholder="SKU"
+                            placeholder="Manufacturer / distributor SKU"
                             className="w-24 px-2 py-1 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
@@ -802,7 +783,7 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
               disabled={saving}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save as Draft'}
+              {saving ? 'Saving...' : initialQuote?'Save Quote Request':'Save as Draft'}
             </button>
           </div>
         </div>

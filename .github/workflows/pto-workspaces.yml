@@ -1,0 +1,53 @@
+name: Time Clock and PTO checks
+on:
+  pull_request:
+    paths:
+      - 'src/components/Layout/DailyLaunchpad.tsx'
+      - 'src/components/Layout/TimeClockModal.tsx'
+      - 'src/components/Layout/QuickClockButton.tsx'
+      - 'src/components/Production/WorkOrderTimeControl.tsx'
+      - 'src/components/Shared/ClockOutModal.tsx'
+      - 'src/components/Shared/AttendanceBadge.tsx'
+      - 'src/components/Admin/PTORoutingSettings.tsx'
+      - 'src/components/Technician/**'
+      - 'src/lib/clockEventGps.ts'
+      - 'tests/employee-time/**'
+      - 'mobile/src/services/ClockEventGps.ts'
+      - 'mobile/src/services/OfflineStorage.ts'
+      - 'mobile/src/screens/TimeClockScreen.tsx'
+      - 'src/components/Admin/PTOManagement.tsx'
+      - 'src/components/Admin/TimeClockManagement.tsx'
+      - 'src/components/Dispatch/MyTimeOff.tsx'
+      - 'src/components/Dispatch/ResourceDayView.tsx'
+      - 'src/components/Dispatch/TechStatusDashboard.tsx'
+      - 'src/components/Shared/TeamTimeOffPanel.tsx'
+      - 'src/lib/timeOff.ts'
+      - 'supabase/migrations/*pto*'
+      - 'tests/pto/**'
+      - '.github/workflows/pto-workspaces.yml'
+permissions:
+  contents: read
+jobs:
+  pto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:employee-time
+      - run: npm run test:employee-time:browser
+      - run: npm run test:pto
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: time-clock-pto-mobile-preview
+          path: |
+            test-artifacts/time-clock/*.png
+            /tmp/pto-request-mobile.png
+            /tmp/pto-command-mobile.png
+          if-no-files-found: ignore

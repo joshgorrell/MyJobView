@@ -1,0 +1,9 @@
+import {build} from 'esbuild';import assert from 'node:assert/strict';import {PGlite} from '@electric-sql/pglite';import {readFile} from 'node:fs/promises';
+const result=await build({entryPoints:['src/lib/accessoryPricing.ts'],bundle:true,format:'esm',write:false,platform:'node'});const {accessoryPricing}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+const accessory={our_price:30,default_labor_hours:.5,labor_phases:{default_price:100}};
+assert.deepEqual(accessoryPricing({quantity:2,accessory},3),{quantity:6,price:30,hours:.5,rate:100,material:180,labor:300,total:480});
+assert.equal(accessoryPricing({quantity:2,unit_price_override:0,labor_hours_override:0,accessory}).total,0,'Zero removes price/labor without falling back');
+assert.equal(accessoryPricing({quantity:2,unit_price_override:50,labor_hours_override:1,labor_rate_override:75,accessory}).total,250);
+const db=new PGlite();await db.exec('create table product_accessories(id int primary key);insert into product_accessories values(1);');await db.exec(await readFile('supabase/migrations/20261012165901_product_accessory_pricing_defaults.sql','utf8'));assert.equal((await db.query('select quantity from product_accessories')).rows[0].quantity,'1');
+for(const [column,value]of [['quantity','0'],['quantity','-1'],['quantity',"'NaN'"],['unit_price_override','-1'],['labor_hours_override',"'Infinity'"],['labor_rate_override','-1']])await assert.rejects(db.exec(`update product_accessories set ${column}=${value} where id=1`));
+await db.exec('update product_accessories set quantity=2,unit_price_override=0,labor_hours_override=0,labor_rate_override=null');await db.close();console.log('Accessory pricing: quantities, null defaults, free accessories, labor removal, installed totals, and database constraints pass');

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import * as SecureStore from 'expo-secure-store';
+import { NotificationService } from '../services/NotificationService';
+import { locationTrackingService } from '../services/LocationTrackingService';
 
 interface Profile {
   id: string;
@@ -10,6 +11,7 @@ interface Profile {
   requires_daily_clock: boolean;
   primary_office_id: string | null;
   employment_type: string | null;
+  organization_id: string | null;
 }
 
 interface AuthContextType {
@@ -36,6 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setLoading(false);
       }
+    }).catch(error => {
+      console.error('Failed to restore mobile session:', error);
+      setLoading(false);
     });
 
     // Listen for auth changes
@@ -62,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
       setProfile(data);
+
+      // Register push token now that we have the profile
+      void NotificationService.registerTokenWithServer(userId, data.organization_id).catch(e =>
+        console.error('Push token registration failed:', e)
+      );
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
@@ -77,13 +87,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error) throw error;
 
-    // Store session flag
-    await SecureStore.setItemAsync('session', 'true');
+    setSession(data.session);
   }
 
   async function signOut() {
+    await locationTrackingService.stopTracking();
+    await NotificationService.unregisterToken().catch(() => {});
     await supabase.auth.signOut();
-    await SecureStore.deleteItemAsync('session');
+    setSession(null);
     setProfile(null);
   }
 

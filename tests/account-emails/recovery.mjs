@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
+const dir=await mkdtemp(tmpdir()+'/mjv-recovery-');
+try {
+ await build({entryPoints:['src/lib/passwordRecovery.ts'],bundle:true,platform:'node',format:'esm',outfile:dir+'/recovery.mjs'});
+ const {parsePasswordRecoveryLink:parse,verifyPasswordRecovery:verify,invalidRecoveryMessage}=await import(pathToFileURL(dir+'/recovery.mjs'));
+ const welcome=parse(new URL('https://app.example/?account_setup=welcome#account_token_hash=welcome-hash'));
+ assert.equal(welcome.active,true);assert.equal(welcome.welcome,true);
+ const reset=parse(new URL('https://app.example/?account_setup=reset#account_token_hash=reset-hash'));
+ assert.equal(reset.active,true);assert.equal(reset.welcome,false);
+ const old=parse(new URL('https://app.example/#type=recovery&access_token=old-access&refresh_token=old-refresh'));
+ assert.equal(old.active,true);
+ const pkce=parse(new URL('https://app.example/?code=old-code'), 'verifier/PASSWORD_RECOVERY');
+ assert.equal(pkce.active,true);
+ assert.equal(parse(new URL('https://app.example/?code=google-code'),'google-verifier').active,false,'OAuth remains outside recovery');
+ const expired=parse(new URL('https://app.example/#error=access_denied&error_code=otp_expired&error_description=Expired'));
+ assert.equal(expired.error,invalidRecoveryMessage);
+ const calls=[];const success={data:{session:{access_token:'session'},user:{id:'employee'}},error:null};
+ const client={auth:Object.fromEntries(['verifyOtp','setSession','exchangeCodeForSession'].map(name=>[name,async input=>{calls.push({name,input});return success;}]))};
+ assert.equal(calls.length,0,'Parsing links must not consume tokens');
+ await verify(client,welcome);assert.deepEqual(calls.pop(),{name:'verifyOtp',input:{token_hash:'welcome-hash',type:'recovery'}});
+ await verify(client,reset);assert.deepEqual(calls.pop(),{name:'verifyOtp',input:{token_hash:'reset-hash',type:'recovery'}});
+ await verify(client,old);assert.deepEqual(calls.pop(),{name:'setSession',input:{access_token:'old-access',refresh_token:'old-refresh'}});
+ await verify(client,pkce);assert.deepEqual(calls.pop(),{name:'exchangeCodeForSession',input:'old-code'});
+ await assert.rejects(()=>verify(client,expired),{message:invalidRecoveryMessage});assert.equal(calls.length,0);
+ await assert.rejects(()=>verify(client,parse(new URL('https://app.example/?account_setup=welcome'))),{message:invalidRecoveryMessage});
+ const rejected={auth:{verifyOtp:async()=>({data:{session:null,user:null},error:{code:'otp_expired'}})}};
+ await assert.rejects(()=>verify(rejected,welcome),{message:invalidRecoveryMessage});
+ console.log('Explicit recovery verification, welcome/reset links, legacy hash/PKCE, OAuth isolation and expired links passed.');
+} finally {await rm(dir,{recursive:true,force:true});}

@@ -1,3 +1,5 @@
+import { notify } from '../../lib/feedback';
+import { accessoryPricing } from '../../lib/accessoryPricing';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -200,7 +202,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
           )
         `)
         .in('status', ['planning', 'active'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).overrideTypes<SalesOrder[], { merge: false }>();
 
       if (error) throw error;
       setSalesOrders(data || []);
@@ -268,7 +270,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
           )
         `)
         .eq('id', selectedSalesOrder)
-        .single();
+        .single().overrideTypes<{ contract_total: number; proposal: { id: string; tax_environment: string | null; tax_project_type: string | null; tax_rate: number | null; contact: { tax_rate: number | null; is_tax_exempt: boolean | null } | null; proposal_settings: ProposalSettings[] } | null }, { merge: false }>();
 
       if (error) throw error;
 
@@ -481,11 +483,11 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       const { data: accessories } = await supabase
         .from('product_accessories')
         .select(`
-          accessory_product_id,
+          accessory_product_id, quantity, unit_price_override, labor_hours_override, labor_rate_override,
           is_default_selected,
           sort_order,
           accessory:products!product_accessories_accessory_product_id_fkey(
-            id, name, description, retail_price, item_type
+            id, name, description, retail_price, our_price, item_type, default_labor_hours, labor_phase_id, labor_phases(name,default_price)
           )
         `)
         .eq('parent_product_id', productId)
@@ -497,9 +499,10 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
         const parentIdx = index;
         const accessoryItems: LineItem[] = defaultAccessories.map((acc, i) => {
           const accProduct = acc.accessory as any;
-          const accUnitPrice = accProduct.retail_price || 0;
-          const accQty = 1;
-          const accTotal = accQty * accUnitPrice;
+          const pricing = accessoryPricing(acc, updated[parentIdx].new_quantity || 1);
+          const accUnitPrice = pricing.price;
+          const accQty = pricing.quantity;
+          const accTotal = pricing.material;
           return {
             action_type: updated[parentIdx].action_type,
             product_id: accProduct.id,
@@ -509,11 +512,13 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
             new_quantity: accQty,
             new_unit_price: accUnitPrice,
             new_total: accTotal,
-            labor_hours: 0,
-            labor_rate: 0,
-            labor_total: 0,
+            labor_phase_id: accProduct.labor_phase_id || undefined,
+            labor_phase_name: accProduct.labor_phases?.name || undefined,
+            labor_hours: pricing.hours,
+            labor_rate: pricing.rate,
+            labor_total: pricing.labor,
             is_taxable: true,
-            change_amount: updated[parentIdx].action_type === 'add' ? accTotal : -accTotal,
+            change_amount: updated[parentIdx].action_type === 'add' ? pricing.total : -pricing.total,
             sort_order: updated.length + i,
             parent_index: parentIdx,
           };
@@ -588,7 +593,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
   async function handleSave(submit: boolean) {
     if (!selectedSalesOrder || !title || lineItems.length === 0) {
-      alert('Please fill in all required fields and add at least one line item');
+      notify('Please fill in all required fields and add at least one line item', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -806,7 +811,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       handleClose();
     } catch (error: any) {
       console.error('Error creating change order:', error);
-      alert('Failed to create change order: ' + (error?.message || String(error)));
+      notify('Failed to create change order: ' + (error?.message || String(error)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -837,7 +842,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
 
   async function handleCreateDraft() {
     if (!selectedSalesOrder || !title) {
-      alert('Please enter a title for the change order');
+      notify('Please enter a title for the change order', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -906,7 +911,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       handleClose();
     } catch (error: any) {
       console.error('Error creating change order:', error);
-      alert('Failed to create change order: ' + (error?.message || String(error)));
+      notify('Failed to create change order: ' + (error?.message || String(error)), { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -1137,7 +1142,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                         className={`p-4 border rounded-lg space-y-3 ${
                           isAccessory
                             ? 'ml-4 sm:ml-8 border-blue-200 bg-blue-50/30 border-l-4 border-l-blue-400'
-                            : item.action_type === 'remove' || item.action_type === 'remove_scope'
+                            : item.action_type === 'remove'
                               ? 'border-red-200 bg-red-50/40 border-l-4 border-l-red-400'
                               : item.action_type === 'add'
                                 ? 'border-blue-200 bg-blue-50/40 border-l-4 border-l-blue-400'

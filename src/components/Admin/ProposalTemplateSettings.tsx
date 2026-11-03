@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Save, Grid, Tag, FileText } from 'lucide-react';
+import { Plus, Trash2, Grid, Tag, FileText } from 'lucide-react';
 import ProposalTemplateManager from '../Proposals/ProposalTemplateManager';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -22,7 +23,7 @@ export function ProposalTemplateSettings() {
   const [areas, setAreas] = useState<AreaTemplate[]>([]);
   const [classes, setClasses] = useState<ClassTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [_saving, _setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'pdftemplates' | 'areas' | 'classes'>('pdftemplates');
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; action: 'area' | 'class' } | null>(null);
 
@@ -78,7 +79,7 @@ export function ProposalTemplateSettings() {
       }
     } catch (error) {
       console.error('Error adding area:', error);
-      alert('Failed to add area');
+      notify('Failed to add area', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -93,7 +94,7 @@ export function ProposalTemplateSettings() {
       setAreas(areas.filter(a => a.id !== id));
     } catch (error) {
       console.error('Error deleting area:', error);
-      alert('Failed to delete area');
+      notify('Failed to delete area', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -121,7 +122,7 @@ export function ProposalTemplateSettings() {
       }
     } catch (error) {
       console.error('Error adding class:', error);
-      alert('Failed to add class');
+      notify('Failed to add class', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -136,7 +137,7 @@ export function ProposalTemplateSettings() {
       setClasses(classes.filter(c => c.id !== id));
     } catch (error) {
       console.error('Error deleting class:', error);
-      alert('Failed to delete class');
+      notify('Failed to delete class', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -266,7 +267,7 @@ export function ProposalTemplateSettings() {
 
           {/* Areas List */}
           <div className="space-y-2">
-            {areas.map((area, index) => (
+            {areas.map((area, _index) => (
               <div
                 key={area.id}
                 className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50"

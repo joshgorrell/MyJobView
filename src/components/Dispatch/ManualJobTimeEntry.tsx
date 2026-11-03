@@ -1,3 +1,6 @@
+import { notify } from '../../lib/feedback';
+import { createTimestampInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
+import { canManageTime } from '../../lib/employeeTimePolicy';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,7 +19,7 @@ interface WorkOrder {
   type: string;
   project?: {
     project_number: string;
-    title: string;
+    name: string;
   };
 }
 
@@ -49,7 +52,7 @@ interface JobTimeEntry {
   };
   work_order?: {
     work_order_number: string;
-    title: string;
+    name: string;
   };
 }
 
@@ -84,13 +87,20 @@ export function ManualJobTimeEntry({
   );
   const [workOrderId, setWorkOrderId] = useState(entryToEdit?.work_order_id || preselectedWorkOrderId || '');
   const [projectId, setProjectId] = useState('');
-  const [entryDate, setEntryDate] = useState(entryToEdit?.entry_date || new Date().toISOString().split('T')[0]);
-  const [clockIn, setClockIn] = useState(entryToEdit?.clock_in ? new Date(entryToEdit.clock_in).toISOString().slice(0, 16) : '');
-  const [clockOut, setClockOut] = useState(entryToEdit?.clock_out ? new Date(entryToEdit.clock_out).toISOString().slice(0, 16) : '');
+  const [timezone,setTimezone] = useState('');
+  const [entryDate, setEntryDate] = useState(entryToEdit?.entry_date || '');
+  const [clockIn, setClockIn] = useState('');
+  const [clockOut, setClockOut] = useState('');
   const [breakMinutes, setBreakMinutes] = useState(entryToEdit?.break_minutes || 0);
   const [notes, setNotes] = useState(entryToEdit?.notes || '');
 
   useEffect(() => {
+    void getOrganizationTimezone().then(tz => {
+      setTimezone(tz);
+      setEntryDate(entryToEdit?.entry_date || formatDateInTimezone(new Date().toISOString(),tz));
+      if(entryToEdit?.clock_in) setClockIn(formatDateInTimezone(entryToEdit.clock_in,tz,"yyyy-MM-dd'T'HH:mm"));
+      if(entryToEdit?.clock_out) setClockOut(formatDateInTimezone(entryToEdit.clock_out,tz,"yyyy-MM-dd'T'HH:mm"));
+    });
     loadTechnicians();
     loadWorkOrders();
     loadProjects();
@@ -121,14 +131,14 @@ export function ManualJobTimeEntry({
           title,
           status,
           type,
-          project:projects(project_number, title)
+          project:projects(project_number, name)
         `)
         .in('status', ['assigned', 'in_progress', 'pending'])
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setWorkOrders(data || []);
+      setWorkOrders((data || []) as unknown as WorkOrder[]);
     } catch (error) {
       console.error('Error loading work orders:', error);
     }
@@ -151,17 +161,17 @@ export function ManualJobTimeEntry({
         .limit(100);
 
       if (error) throw error;
-      setProjects(data || []);
+      setProjects((data || []) as unknown as Project[]);
     } catch (error) {
       console.error('Error loading projects:', error);
     }
   }
 
   function calculateTotalHours(): number {
-    if (!clockIn || !clockOut) return 0;
+    if (!clockIn || !clockOut || !timezone) return 0;
 
-    const start = new Date(clockIn);
-    const end = new Date(clockOut);
+    const start = new Date(createTimestampInTimezone(clockIn.slice(0,10),clockIn.slice(11),timezone));
+    const end = new Date(createTimestampInTimezone(clockOut.slice(0,10),clockOut.slice(11),timezone));
     const diffMs = end.getTime() - start.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     const hoursAfterBreaks = diffHours - (breakMinutes / 60);
@@ -171,38 +181,41 @@ export function ManualJobTimeEntry({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canManageTime(profile?.role)) { notify('Use a time request or the Work Order to record your time.', { theme: 'blue', tone: 'info' }); return; }
 
     if (!technicianId) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (entryMode === 'work_order' && !workOrderId) {
-      alert('Please select a work order');
+      notify('Please select a work order', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (entryMode === 'project' && !projectId) {
-      alert('Please select a project');
+      notify('Please select a project', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     if (!clockIn) {
-      alert('Please enter clock in time');
+      notify('Please enter clock in time', { theme: 'blue', tone: 'warning' });
       return;
     }
 
+    if (!timezone || entryDate !== clockIn.slice(0,10)) { notify('Use the clock-in date as the work date.', { theme: 'blue', tone: 'info' }); return; }
+    if (clockOut && new Date(createTimestampInTimezone(clockOut.slice(0,10),clockOut.slice(11),timezone)) <= new Date(createTimestampInTimezone(clockIn.slice(0,10),clockIn.slice(11),timezone))) { notify('Clock out must be after clock in.', { theme: 'blue', tone: 'warning' }); return; }
     setLoading(true);
     try {
       const totalHours = calculateTotalHours();
       const isInternalType = entryMode === 'shop_time' || entryMode === 'training';
-      const status = isInternalType ? 'submitted' : (clockOut ? 'completed' : 'draft');
+      const status = isInternalType ? 'submitted' : (clockOut ? 'submitted' : 'draft');
 
       const entryData: any = {
         technician_id: technicianId,
         entry_date: entryDate,
-        clock_in: new Date(clockIn).toISOString(),
-        clock_out: clockOut ? new Date(clockOut).toISOString() : null,
+        clock_in: createTimestampInTimezone(clockIn.slice(0,10),clockIn.slice(11),timezone),
+        clock_out: clockOut ? createTimestampInTimezone(clockOut.slice(0,10),clockOut.slice(11),timezone) : null,
         total_hours: totalHours,
         break_minutes: breakMinutes,
         notes: notes || null,
@@ -239,21 +252,21 @@ export function ManualJobTimeEntry({
           .eq('id', entryToEdit.id);
 
         if (error) throw error;
-        alert('Time entry updated successfully');
+        notify('Time entry updated successfully', { theme: 'blue', tone: 'success' });
       } else {
         const { error } = await supabase
           .from('time_entries')
           .insert(entryData);
 
         if (error) throw error;
-        alert('Time entry created successfully');
+        notify('Time entry created successfully', { theme: 'blue', tone: 'success' });
       }
 
       onSave();
       onClose();
     } catch (error: any) {
       console.error('Error saving job time entry:', error);
-      alert(error.message || 'Failed to save job time entry');
+      notify(error.message || 'Failed to save job time entry', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -262,6 +275,8 @@ export function ManualJobTimeEntry({
   const totalHours = calculateTotalHours();
   const selectedWorkOrder = workOrders.find(wo => wo.id === workOrderId);
   const selectedProject = projects.find(p => p.id === projectId);
+
+  if (!canManageTime(profile?.role)) return <div role="alert" className="p-4">Manual entry requires time-management permission. Use Request Time for non-work-order hours.<button onClick={onClose}>Close</button></div>;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -384,7 +399,7 @@ export function ManualJobTimeEntry({
                 </select>
                 {selectedWorkOrder?.project && (
                   <p className="text-xs text-gray-600 mt-1">
-                    Project: {selectedWorkOrder.project.project_number} - {selectedWorkOrder.project.title}
+                    Project: {selectedWorkOrder.project.project_number} - {selectedWorkOrder.project.name}
                   </p>
                 )}
                 {(entryToEdit || preselectedWorkOrderId) && (
@@ -472,7 +487,7 @@ export function ManualJobTimeEntry({
                 value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)}
                 required
-                max={new Date().toISOString().split('T')[0]}
+                max={timezone ? formatDateInTimezone(new Date().toISOString(),timezone) : undefined}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -567,7 +582,7 @@ export function ManualJobTimeEntry({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !timezone}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               <Save className="w-4 h-4" />

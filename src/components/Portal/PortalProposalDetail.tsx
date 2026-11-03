@@ -1,12 +1,15 @@
+import { proposalLineAmounts } from '../../../supabase/functions/_shared/proposalLineAmounts';
+import { ProposalPromise } from './ProposalPromise';
+import { notify, requestConfirmation } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, Pause, ChevronDown, ChevronUp, CreditCard, Printer, Phone, Mail, RotateCcw, Edit3 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MessageSquare, Download, AlertCircle, Clock, DollarSign, Package, FileText, Layers, Video, Play, ChevronUp, CreditCard, Printer, RotateCcw } from 'lucide-react';
+import { useProposalEngagement } from '../../hooks/useProposalEngagement';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalApprovalModal } from './ProposalApprovalModal';
 import { ProposalQA } from '../Proposals/ProposalQA';
 import { ProposalReactivationRequest } from './ProposalReactivationRequest';
 import { buildPortalInvoicePrintHTML, openInvoicePrint, type PrintableCompanyInfo } from '../../lib/portalInvoicePrint';
-import AreaScopeEditor from '../Proposals/AreaScopeEditor';
 
 interface ProposalRecording {
   id: string;
@@ -30,20 +33,10 @@ function formatDuration(seconds: number | null): string {
 function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRecording; signedUrl?: string; logoUrl?: string | null }) {
   const [expanded, setExpanded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
+  const [_playing, setPlaying] = useState(false);
 
   const videoSrc = recording.storage_path ? signedUrl : recording.video_url || undefined;
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (playing) {
-      videoRef.current.pause();
-      setPlaying(false);
-    } else {
-      videoRef.current.play();
-      setPlaying(true);
-    }
-  };
 
   if (!videoSrc) return null;
 
@@ -67,6 +60,7 @@ function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRec
             <span className="text-xs text-blue-300 font-mono">{formatDuration(recording.duration_seconds)}</span>
           )}
           <button
+            data-engagement-action={expanded ? undefined : "video_opened"}
             onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors"
           >
@@ -107,6 +101,8 @@ function VideoPlayer({ recording, signedUrl, logoUrl }: { recording: ProposalRec
 }
 
 interface Proposal {
+  contact_id?: string | null;
+  contact_name?: string | null;
   id: string;
   proposal_number: string;
   title: string;
@@ -129,6 +125,7 @@ interface Proposal {
   discount_amount: number;
   project_management_amount: number;
   current_portal_version?: number | null;
+  include_promise_page?: boolean | null;
 }
 
 interface ProposalRoom {
@@ -152,12 +149,14 @@ interface LineItem {
   is_hidden: boolean;
   parent_item_id: string | null;
   product_id: string | null;
-  products: { image_url: string | null } | null;
+  products: { image_url: string | null; item_color?: string | null; sku?: string | null; manufacturer_model_number?: string | null } | null;
 }
 
 interface ReportTemplate {
   show_quantity: boolean;
   show_unit_price: boolean;
+  show_installed_price?: boolean;
+  show_item_color?: boolean;
   show_line_item_total: boolean;
   show_manufacturer: boolean;
   show_sku: boolean;
@@ -218,29 +217,37 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const declineRequestId = useRef(crypto.randomUUID());
+  const changeRequestId = useRef(crypto.randomUUID());
   const [comment, setComment] = useState('');
   const [declineReason, setDeclineReason] = useState('');
+  const [declineNotes, setDeclineNotes] = useState('');
+  const [declinePromiseAcknowledged, setDeclinePromiseAcknowledged] = useState(false);
+  const [repContact, setRepContact] = useState<{ name: string; email: string | null; phone: string | null; phone_kind?: 'office' | 'rep' } | null>(null);
+  const [activeDecisionForm, setActiveDecisionForm] = useState<'changes' | 'decline' | null>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showQA, setShowQA] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [animate, setAnimate] = useState(false);
+  const [templateLoadError, setTemplateLoadError] = useState('');
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [recordings, setRecordings] = useState<ProposalRecording[]>([]);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [promiseCompanyName, setPromiseCompanyName] = useState('');
   const [orgLogoUrl, setOrgLogoUrl] = useState<string | null>(null);
   const [relatedInvoices, setRelatedInvoices] = useState<PortalInvoice[]>([]);
   const [printingInvoiceId, setPrintingInvoiceId] = useState<string | null>(null);
   const [paymentUnavailableInvoice, setPaymentUnavailableInvoice] = useState<PortalInvoice | null>(null);
   const [qaContext, setQaContext] = useState<{ roomId: string | null; lineItemId: string | null; label: string | null }>({ roomId: null, lineItemId: null, label: null });
-  const [messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
-  const [unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
+  const [_messagesByContext, setMessagesByContext] = useState<Record<string, boolean>>({});
+  const [_unreadByContext, setUnreadByContext] = useState<Record<string, number>>({});
   const [showReactivationModal, setShowReactivationModal] = useState(false);
   const [reactivationSent, setReactivationSent] = useState(false);
-  const [editingScopeRoom, setEditingScopeRoom] = useState<ProposalRoom | null>(null);
+
+  const engagementRoot = useProposalEngagement(proposalId, !previewMode && !hideExpiration && !loading && proposal?.id === proposalId);
 
   useEffect(() => {
     loadProposalDetails();
-    if (!previewMode) trackProposalView();
     setTimeout(() => setAnimate(true), 100);
   }, [proposalId]);
 
@@ -277,6 +284,23 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     } catch {}
   }
 
+  async function downloadProposal() {
+    if (previewMode) return;
+    const documentWindow = window.open('', '_blank');
+    if (!documentWindow) { notify('Please allow a new window to print or save your proposal as PDF.', { theme: 'blue', tone: 'warning' }); return; }
+    documentWindow.opener = null;
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', { body: { proposalId } });
+      if (error || typeof data !== 'string') throw error || new Error('Proposal document unavailable');
+      documentWindow.document.open(); documentWindow.document.write(data); documentWindow.document.close();
+      documentWindow.focus(); documentWindow.print();
+      await trackProposalDownload();
+    } catch (error) {
+      documentWindow.close();
+      notify('Unable to prepare the proposal document. Please retry.', { theme: 'blue', tone: 'error' });
+    }
+  }
+
   async function trackProposalDownload() {
     if (previewMode) return;
     try {
@@ -297,7 +321,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           clientInfo = { ...clientInfo, ...data };
         }
       } catch {}
-      await supabase.from('proposal_activity').insert({
+      const { error } = await supabase.from('proposal_activity').insert({
         proposal_id: proposalId,
         activity_type: 'downloaded',
         user_agent: clientInfo.userAgent,
@@ -309,66 +333,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           os: clientInfo.os
         }
       });
-    } catch {}
-  }
-
-  async function trackProposalView() {
-    try {
-      // Get client IP and device information from edge function
-      let clientInfo = {
-        ip: 'Unknown',
-        userAgent: navigator.userAgent,
-        deviceType: 'desktop',
-        browser: 'Unknown',
-        os: 'Unknown'
-      };
-
-      try {
-        const { data: { supabaseUrl } } = await supabase.auth.getSession();
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-client-ip`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          clientInfo = { ...clientInfo, ...data };
-        }
-      } catch (ipError) {
-        console.error('Failed to get IP information:', ipError);
-        // Continue with default values
-      }
-
-      // Insert activity record with IP and device information
-      await supabase.from('proposal_activity').insert({
-        proposal_id: proposalId,
-        activity_type: 'viewed',
-        user_agent: clientInfo.userAgent,
-        ip_address: clientInfo.ip,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          deviceType: clientInfo.deviceType,
-          browser: clientInfo.browser,
-          os: clientInfo.os
-        }
-      });
-
-      // Update proposal status from 'sent' to 'portal' (skip in preview mode)
-      if (!previewMode) {
-        await supabase
-          .from('proposals')
-          .update({ status: 'portal' })
-          .eq('id', proposalId)
-          .eq('status', 'sent');
-      }
-    } catch (error) {
-      console.error('Error tracking view:', error);
-    }
+      if (error) console.warn('Proposal download activity could not be recorded', error);
+    } catch (error) { console.warn('Proposal download activity failed', error); }
   }
 
   async function loadProposalDetails() {
+    setTemplateLoadError('');
     try {
       const [proposalRes, roomsRes, itemsRes] = await Promise.all([
         supabase
@@ -386,7 +356,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           .order('sort_order'),
         supabase
           .from('proposal_line_items')
-          .select('*, products(image_url)')
+          .select('*, products(image_url,item_color,sku,manufacturer_model_number)')
           .eq('proposal_id', proposalId)
           .order('sort_order'),
       ]);
@@ -397,30 +367,39 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
       if (proposalRes.data) {
         setProposal(proposalRes.data);
+        setRepContact(null);
+        void supabase.rpc('get_customer_proposal_representative', { p_proposal_id: proposalId })
+          .then(({ data, error }) => { if (!error && data) setRepContact(data); });
         setRooms(roomsRes.data || []);
         setLineItems(itemsRes.data || []);
 
-        // Fetch organization logo for video overlay
+        setPromiseCompanyName('');
+        setOrgLogoUrl(null);
+        // Load the proposal organization’s branding
         if (proposalRes.data.organization_id) {
           supabase
             .from('organizations')
-            .select('header_logo_url')
+            .select('name, header_logo_url, logo_url')
             .eq('id', proposalRes.data.organization_id)
             .maybeSingle()
             .then(({ data: orgData }) => {
-              if (orgData?.header_logo_url) setOrgLogoUrl(orgData.header_logo_url);
+              setPromiseCompanyName(orgData?.name || '');
+              setOrgLogoUrl(orgData?.header_logo_url || orgData?.logo_url || null);
             });
         }
 
-        // Load template settings — use override ID (from sales order) if provided, else fall back to proposal's own template
+        // Resolve only this authorized proposal's template, including a valid order override.
         const effectiveTemplateId = templateOverrideId !== undefined ? templateOverrideId : proposalRes.data.report_template_id;
-        if (effectiveTemplateId) {
-          const { data: templateData, error: templateError } = await supabase
-            .from('proposal_report_templates')
-            .select('*')
-            .eq('id', effectiveTemplateId)
-            .maybeSingle();
-
+        {
+          const { data: resolved, error: templateError } = await supabase.rpc('get_proposal_display_template', {
+            p_proposal_id: proposalId,
+            p_template_id: effectiveTemplateId ?? null,
+          });
+          if (templateError) {
+            setTemplateLoadError('The proposal display settings could not be loaded. Please retry.');
+            return;
+          }
+          const templateData = resolved?.template;
           if (!templateError && templateData) {
             setTemplate(templateData);
           } else {
@@ -429,6 +408,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             setTemplate({
               show_quantity: true,
               show_unit_price: true,
+              show_installed_price: true,
+              show_item_color: false,
               show_line_item_total: true,
               show_manufacturer: true,
               show_sku: true,
@@ -444,25 +425,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               show_product_images: true,
             });
           }
-        } else {
-          // No template assigned, show everything
-          setTemplate({
-            show_quantity: true,
-            show_unit_price: true,
-            show_line_item_total: true,
-            show_manufacturer: true,
-            show_sku: true,
-            show_model_number: true,
-            show_labor_hours: true,
-            show_labor_rate: true,
-            show_labor_total: true,
-            show_area_descriptions: true,
-            show_area_subtotals: true,
-            show_tax_breakdown: true,
-            show_accepted_payment_methods: true,
-            show_payment_instructions: true,
-            show_product_images: true,
-          });
         }
 
         if (proposalRes.data.contacts) {
@@ -560,6 +522,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   function handleApprove() {
+    if (previewMode) return;
     setShowApprovalModal(true);
   }
 
@@ -569,6 +532,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
   }
 
   async function handleInvoicePayment(invoice: PortalInvoice) {
+    if (previewMode) return;
     if (!invoice.qbo_invoice_id) {
       setPaymentUnavailableInvoice(invoice);
       return;
@@ -635,114 +599,64 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     }
   }
 
+  function recordDecisionStep(step: 'decline_started' | 'decline_to_changes' | 'decline_to_approval' | 'decline_acknowledged' | 'decline_cancelled' | 'change_request_submitted') {
+    if (previewMode) return;
+    void supabase.rpc('record_proposal_decision_step', { p_proposal_id: proposalId, p_step: step })
+      .then(({ error, data }) => { if (error || data !== true) console.warn('Proposal decision breadcrumb was not recorded', error); });
+  }
+
   async function handleDecline() {
+    if (previewMode) return;
     if (!proposal) return;
-    if (!declineReason) {
-      alert('Please select a reason for declining this proposal.');
+    if (!declinePromiseAcknowledged) {
+      notify('Please review Our Promise before declining.', { theme: 'blue', tone: 'warning' });
       return;
     }
-    if (!confirm('Are you sure you want to decline this proposal?')) return;
+    if (!declineReason) {
+      notify('Please select a reason for declining this proposal.', { theme: 'blue', tone: 'warning' });
+      return;
+    }
+    if (!(await requestConfirmation('Are you sure you want to decline this proposal?', { theme: 'blue' }))) return;
 
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('proposals')
-        .update({
-          status: 'declined',
-          decline_reason: declineReason,
-          decline_notes: comment.trim() || null,
-          declined_at: new Date().toISOString(),
-          declined_by: 'customer',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', proposalId);
+      const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+        p_proposal_id: proposalId, p_expected_version: proposal.current_portal_version ?? 0,
+        p_request_id: declineRequestId.current, p_action: 'decline',
+        p_details: { reason: declineReason, notes: declineNotes.trim(), promise_acknowledged: declinePromiseAcknowledged },
+      });
+      if (error || data?.status !== 'declined') throw error || new Error('Decline was not recorded');
 
-      if (error) throw error;
-
-      // Log activity
-      await supabase.from('proposal_activity').insert({
-        proposal_id: proposalId,
-        activity_type: 'declined',
-        metadata: { reason: declineReason, notes: comment.trim() || null, by: 'customer' },
-      }).throwOnError().catch(() => {});
-
-      alert('Proposal declined. We will be in touch shortly.');
+      notify('Proposal declined. We will be in touch shortly.', { theme: 'blue', tone: 'info' });
       onBack();
     } catch (error) {
       console.error('Error declining proposal:', error);
-      alert('Failed to decline proposal. Please try again.');
+      notify('Failed to decline proposal. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleSubmitChangeRequest() {
+    if (previewMode) return;
     if (!proposal || !comment.trim() || comment === 'open') return;
 
     setSubmitting(true);
     try {
-      // Find or create the proposal message thread
-      let { data: existingThread } = await supabase
-        .from('message_threads')
-        .select('id')
-        .eq('proposal_id', proposalId)
-        .eq('context_type', 'proposal')
-        .maybeSingle();
-
-      let threadId = existingThread?.id;
-
-      if (!threadId) {
-        const { data: proposalData } = await supabase
-          .from('proposals')
-          .select('proposal_number, created_by, contact_id')
-          .eq('id', proposalId)
-          .single();
-
-        if (proposalData) {
-          const { data: newThread, error: createError } = await supabase
-            .from('message_threads')
-            .insert({
-              subject: `Q&A: Proposal ${proposalData.proposal_number}`,
-              context_type: 'proposal',
-              context_id: proposalId,
-              proposal_id: proposalId,
-              contact_id: proposalData.contact_id,
-              assigned_sales_rep_id: proposalData.created_by,
-              visibility: 'public',
-              created_by: proposalData.contact_id,
-            })
-            .select('id')
-            .single();
-
-          if (createError) throw createError;
-          threadId = newThread?.id;
-        }
-      }
-
-      if (!threadId) throw new Error('Could not find or create message thread');
-
-      const { error: msgError } = await supabase
-        .from('messages')
-        .insert({
-          thread_id: threadId,
-          author_id: proposal.contact_id || null,
-          author_name: proposal.contact_name || 'Customer',
-          author_type: 'customer',
-          body: comment.trim(),
-          is_internal: false,
-          is_read: false,
-          context_room_id: null,
-          context_line_item_id: null,
-          context_label: null,
-        });
-
-      if (msgError) throw msgError;
-
+      const { data, error } = await supabase.rpc('submit_customer_proposal_decision', {
+        p_proposal_id: proposalId, p_expected_version: proposal.current_portal_version ?? 0,
+        p_request_id: changeRequestId.current, p_action: 'request_changes', p_details: { message: comment.trim() },
+      });
+      if (error || !data?.thread_id) throw error || new Error('Change request was not recorded');
+      changeRequestId.current = crypto.randomUUID();
       setComment('');
+      setActiveDecisionForm(null);
+      setDeclinePromiseAcknowledged(false);
       setShowQA(true);
+      notify('Your change request was sent to the proposal conversation.', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error submitting change request:', error);
-      alert('Failed to send feedback. Please try again.');
+      notify(error instanceof Error && /representative|route this request/.test(error.message) ? error.message : 'Failed to send feedback. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -758,6 +672,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       </div>
     );
   }
+
+  if (templateLoadError) return <div role="alert" className="p-6 text-center">{templateLoadError}<button type="button" onClick={loadProposalDetails} className="ml-3 underline">Retry</button></div>;
 
   if (!proposal) {
     return (
@@ -839,6 +755,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                   </button>
                   <button
                     onClick={() => setShowReactivationModal(true)}
+                    disabled={previewMode}
+                    title={previewMode ? "Customer actions are disabled in preview" : undefined}
                     className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors w-full sm:w-auto flex items-center justify-center gap-2"
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -849,7 +767,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             )}
           </div>
         </div>
-        {showReactivationModal && proposal && (
+        {!previewMode && showReactivationModal && proposal && (
           <ProposalReactivationRequest
             proposalId={proposal.id}
             proposalNumber={proposal.proposal_number}
@@ -864,10 +782,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
     );
   }
 
-  const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed';
+  const canTakeAction = proposal.status === 'sent' || proposal.status === 'viewed' || proposal.status === 'portal';
 
   return (
-    <div className={previewMode ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
+    <div ref={engagementRoot} className={previewMode ? 'bg-gray-50' : 'min-h-screen bg-gray-50'}>
       {/* Header — only shown in standalone mode */}
       {!previewMode && (
       <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
@@ -905,7 +823,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               </div>
             </div>
             <button
-              onClick={trackProposalDownload}
+              data-engagement-action="download_clicked"
+              aria-label="Download PDF"
+              disabled={previewMode}
+              onClick={downloadProposal}
               className="flex items-center gap-2 px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px] flex-shrink-0"
             >
               <Download className="w-4 h-4" />
@@ -917,9 +838,11 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       )}
 
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${animate ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        {!previewMode && !hideExpiration && <p className="mb-4 text-xs text-gray-500">Proposal visits, approximate active viewing time, and selected interactions are shared with your provider to help with follow-up.</p>}
+        {proposal.include_promise_page !== false && <ProposalPromise companyName={promiseCompanyName} logoUrl={orgLogoUrl} />}
+        <div className="grid grid-cols-1 xl:grid-cols-3 items-start gap-6 xl:gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="xl:col-span-2 min-w-0 space-y-6">
             {/* Revision Notice */}
             {proposal.revision_notes && proposal.renewal_count > 0 && (
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-xl p-4 sm:p-6 shadow-md">
@@ -950,7 +873,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Full Proposal Video Recordings */}
             {recordings.filter(r => r.recording_scope === 'full_proposal').map(recording => (
-              <div key={recording.id} style={{ animation: animate ? 'slideInUp 0.4s ease-out both' : 'none' }}>
+              <div data-engagement-section="video" key={recording.id} style={{ animation: animate ? 'slideInUp 0.4s ease-out both' : 'none' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <Video className="w-4 h-4 text-blue-500" />
                   <span className="text-sm font-semibold text-gray-700">Proposal Walkthrough Video</span>
@@ -973,6 +896,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               return (
                 <div
                   key={room.id}
+                  data-engagement-section={`room:${room.id}`}
                   className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300"
                   style={{
                     animation: animate ? `slideInUp 0.5s ease-out ${roomIndex * 0.1}s both` : 'none'
@@ -985,16 +909,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <Package className="w-5 h-5 text-blue-400" />
                       </div>
                       <h3 className="text-lg sm:text-xl font-bold text-white flex-1">{room.name}</h3>
-                      {previewMode && proposal?.status === 'draft' && (
-                        <button
-                          onClick={() => setEditingScopeRoom(room)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-300 hover:text-white hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-400 rounded-lg transition-all"
-                          title="Edit scope of work for this area"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">{room.description ? 'Edit Scope' : 'Add Scope'}</span>
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -1044,6 +958,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                             {template?.show_unit_price && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Price</th>
                             )}
+                            {template?.show_installed_price !== false && !hideCostsOverride && (
+                              <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Installed</th>
+                            )}
                             {template?.show_line_item_total && !hideCostsOverride && (
                               <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Total</th>
                             )}
@@ -1067,9 +984,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 </td>
                               )}
                               <td className="py-4">
-                                <div className="flex items-center gap-2">
+                                <div className="min-w-0 space-y-1 break-words">
                                   <p className="text-sm font-semibold text-gray-900">{item.description}</p>
+                                  {template?.show_model_number && item.products?.manufacturer_model_number && <p className="mt-1 text-xs text-gray-500">Model: {item.products.manufacturer_model_number}</p>}
+                                  {template?.show_sku && item.products?.sku && <p className="mt-1 text-xs text-gray-500">SKU: {item.products.sku}</p>}
                                 </div>
+                                {template?.show_item_color && item.products?.item_color && <p className="mt-1 text-xs text-gray-500">Color: {item.products.item_color}</p>}
                               </td>
                               {template?.show_quantity && (
                                 <td className="text-center py-4 text-sm text-gray-700 font-medium">{item.quantity}</td>
@@ -1078,6 +998,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 <td className="text-right py-4 text-sm text-gray-700">
                                   {formatCurrency(item.unit_price)}
                                 </td>
+                              )}
+                              {template?.show_installed_price !== false && !hideCostsOverride && (
+                                <td className="text-right py-4 text-sm font-bold text-gray-900">{formatCurrency(proposalLineAmounts(item).installed )}</td>
                               )}
                               {template?.show_line_item_total && !hideCostsOverride && (
                                 <td className="text-right py-4 text-sm font-bold text-gray-900">
@@ -1095,7 +1018,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                                 1 +
                                 (template?.show_quantity ? 1 : 0) +
                                 (template?.show_unit_price && !hideCostsOverride ? 1 : 0) +
-                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) - 1
+                                (template?.show_line_item_total && !hideCostsOverride ? 1 : 0) +
+                                (template?.show_installed_price !== false && !hideCostsOverride ? 1 : 0) - 1
                               } className="pt-4 pb-4 pr-4 text-right font-bold text-gray-900 text-sm uppercase tracking-wide">
                                 Room Subtotal:
                               </td>
@@ -1120,7 +1044,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               const unassignedSubtotal = unassignedItems.reduce((sum, item) => sum + (item.line_total || 0), 0);
               const showImages = template?.show_product_images !== false && unassignedItems.some(item => item.products?.image_url);
               return (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
+                <div data-engagement-section="scope" className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300">
                   {hasRooms && (
                     <div className="bg-gradient-to-r from-amber-700 to-amber-800 px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -1214,7 +1138,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
             {/* Additional Notes */}
             {proposal.notes && (
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-4 sm:p-6 shadow-md">
+              <div data-engagement-section="notes" className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-2xl p-4 sm:p-6 shadow-md">
                 <div className="flex items-start gap-3">
                   <div className="bg-blue-500/10 p-2 rounded-lg">
                     <FileText className="w-5 h-5 text-blue-600" />
@@ -1229,7 +1153,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
           </div>
 
           {/* Sidebar */}
-          <div className="lg:sticky lg:top-20 lg:self-start space-y-6">
+          <div className="min-w-0 space-y-6">
             {/* Proposal Summary Card */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-6">
@@ -1241,7 +1165,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
 
               {/* Total Amount */}
               {!hideCostsOverride && (
-              <div className="mb-6">
+              <div data-engagement-section="pricing" className="mb-6">
                 <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
                   <div className="text-center">
                     <div className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Total Investment</div>
@@ -1260,10 +1184,21 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
               )}
 
+              {repContact && <section aria-label="Your representative" className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm">
+                <p className="font-semibold text-gray-900 break-words">Your representative: {repContact.name}</p>
+                <div className="mt-3 flex flex-wrap gap-4">
+                  {repContact.phone && <a className="text-blue-700 underline" href={`tel:${repContact.phone.replace(/[^+0-9]/g, '')}`}>{repContact.phone_kind === 'office' ? 'Call the office' : 'Call your representative'}</a>}
+                  {repContact.email && <a className="text-blue-700 underline" href={`mailto:${repContact.email}`}>Email your representative</a>}
+                </div>
+              </section>}
+
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div data-engagement-section="actions" className="space-y-3">
                 <button
+                  data-engagement-action="question_clicked"
                   onClick={() => setShowQA(true)}
+                  disabled={previewMode}
+                  title={previewMode ? "Customer actions are disabled in preview" : undefined}
                   className="w-full px-4 py-3.5 border-2 border-blue-500 text-blue-600 rounded-xl hover:bg-blue-50 flex items-center justify-center gap-2 font-bold transition-all duration-200 hover:scale-105"
                 >
                   <MessageSquare className="w-5 h-5" />
@@ -1273,8 +1208,9 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 {canTakeAction && (
                   <>
                     <button
+                      data-engagement-action="approval_clicked"
                       onClick={handleApprove}
-                      disabled={submitting}
+                      disabled={previewMode || submitting}
                       className="w-full px-4 py-3.5 bg-green-600 text-white rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-bold transition-colors shadow-sm"
                     >
                       <CheckCircle className="w-5 h-5" />
@@ -1282,7 +1218,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     </button>
 
                     <button
-                      onClick={() => setComment(comment ? '' : 'open')}
+                      data-engagement-action="change_request_clicked"
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'changes' ? null : 'changes'); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
+                      aria-expanded={activeDecisionForm === 'changes'}
+                      aria-controls="proposal-change-request-form"
+                      disabled={previewMode}
+                      title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 font-bold transition-all duration-200"
                     >
                       <MessageSquare className="w-5 h-5" />
@@ -1290,7 +1231,12 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                     </button>
 
                     <button
-                      onClick={() => setDeclineReason(declineReason ? '' : 'open')}
+                      data-engagement-action="decline_clicked"
+                      onClick={() => { setActiveDecisionForm(activeDecisionForm === 'decline' ? null : 'decline'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); recordDecisionStep(activeDecisionForm === 'decline' ? 'decline_cancelled' : 'decline_started'); }}
+                      aria-expanded={activeDecisionForm === 'decline'}
+                      aria-controls="proposal-decline-form"
+                      disabled={previewMode}
+                      title={previewMode ? "Customer actions are disabled in preview" : undefined}
                       className="w-full px-4 py-3.5 border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 flex items-center justify-center gap-2 font-medium transition-all duration-200"
                     >
                       <XCircle className="w-5 h-5" />
@@ -1331,8 +1277,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             </div>
 
             {/* Request Changes / Comments Section */}
-            {comment && comment !== '' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            {activeDecisionForm === 'changes' && (
+              <div id="proposal-change-request-form" role="region" aria-label="Request proposal changes" className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   Request Changes / Questions
@@ -1346,7 +1292,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 />
                 <button
                   onClick={handleSubmitChangeRequest}
-                  disabled={submitting || !comment.trim() || comment === 'open'}
+                  disabled={previewMode || submitting || !comment.trim() || comment === 'open'}
                   className="w-full mt-3 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 font-bold transition-colors"
                 >
                   {submitting ? 'Sending...' : 'Submit Feedback'}
@@ -1355,13 +1301,27 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
             )}
 
             {/* Decline Section */}
-            {declineReason && (
-              <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
+            {activeDecisionForm === 'decline' && (
+              <div id="proposal-decline-form" role="region" aria-label="Decline proposal" className="bg-white rounded-2xl shadow-sm border-2 border-red-200 p-4 sm:p-6">
                 <h3 className="text-sm font-bold text-red-800 mb-1 flex items-center gap-2">
                   <XCircle className="w-4 h-4" />
                   Decline This Proposal
                 </h3>
-                <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>
+                {!declinePromiseAcknowledged && (
+                  <div data-engagement-section="promise" className="rounded-xl border border-blue-200 bg-blue-50 p-4 mb-4 space-y-3">
+                    <p className="text-sm font-bold text-blue-950">The Best Price. Guaranteed.</p>
+                    <p className="text-sm text-blue-900">We want your proposal to be the perfect fit. Changes are easy, and we guarantee the best price against any competitor for the same scope of work. If you've received a better quote, give us the opportunity to match or beat it. Would you like us to make an adjustment?</p>
+                    <button type="button" data-engagement-action="decline_to_changes_clicked" onClick={() => { setActiveDecisionForm('changes'); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_changes'); }} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">I'd Like to Request Changes</button>
+                    <button type="button" data-engagement-action="decline_to_approval_clicked" onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); recordDecisionStep('decline_to_approval'); handleApprove(); }} disabled={previewMode || submitting} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50">Actually, I'd Like to Approve</button>
+                    {(repContact?.email || repContact?.phone) && <div className="flex flex-wrap justify-center gap-3 text-sm">
+                      {repContact.phone && <a href={`tel:${repContact.phone.replace(/[^+0-9]/g, '')}`} data-engagement-action="decline_rep_call_clicked" className="font-semibold text-blue-800 underline underline-offset-2">{repContact.phone_kind === 'office' ? 'Call the office' : `Call ${repContact.name}`}</a>}
+                      {repContact.email && <a href={`mailto:${repContact.email}?subject=${encodeURIComponent('Question about proposal ' + proposal.proposal_number)}`} data-engagement-action="decline_rep_email_clicked" className="font-semibold text-blue-800 underline underline-offset-2">Email {repContact.name}</a>}
+                    </div>}
+                    <button type="button" data-engagement-action="decline_continue_clicked" onClick={() => { setDeclinePromiseAcknowledged(true); recordDecisionStep('decline_acknowledged'); }} className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm font-medium text-blue-900 hover:bg-blue-100">I Understand, but I Still Want to Decline</button>
+                  </div>
+                )}
+                {declinePromiseAcknowledged && <p className="text-xs text-gray-500 mb-4">Please let us know why so we can improve our service.</p>}
+                {declinePromiseAcknowledged && <>
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Reason <span className="text-red-500">*</span></label>
                   <select
@@ -1384,8 +1344,8 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 <div className="mb-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Additional comments <span className="text-gray-400">(optional)</span></label>
                   <textarea
-                    value={comment === 'open' ? '' : comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    value={declineNotes}
+                    onChange={(e) => setDeclineNotes(e.target.value)}
                     placeholder="Any additional details..."
                     rows={3}
                     className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-400 focus:border-transparent text-sm resize-none"
@@ -1393,19 +1353,20 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                 </div>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setDeclineReason(''); setComment(''); }}
+                    onClick={() => { setActiveDecisionForm(null); setDeclinePromiseAcknowledged(false); setDeclineReason(''); setDeclineNotes(''); setComment(''); }}
                     className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 font-medium text-sm transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleDecline}
-                    disabled={submitting || !declineReason || declineReason === 'open'}
+                    disabled={previewMode || submitting || !declinePromiseAcknowledged || !declineReason || declineReason === 'open'}
                     className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50 font-bold text-sm transition-colors"
                   >
                     {submitting ? 'Submitting...' : 'Confirm Decline'}
                   </button>
                 </div>
+                </>}
               </div>
             )}
 
@@ -1443,7 +1404,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <p className="text-sm font-medium text-amber-800">Deposit Invoice Ready</p>
                       </div>
                       <button
+                        data-engagement-action="payment_clicked"
                         onClick={() => depositInvoice && handleInvoicePayment(depositInvoice)}
+                        disabled={previewMode}
+                        title={previewMode ? "Customer actions are disabled in preview" : undefined}
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors"
                       >
                         <CreditCard className="w-4 h-4" />
@@ -1540,7 +1504,10 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
                         <div className="flex gap-2">
                           {!isPaid && (
                             <button
+                              data-engagement-action="payment_clicked"
                               onClick={() => handleInvoicePayment(inv)}
+                              disabled={previewMode}
+                              title={previewMode ? "Customer actions are disabled in preview" : undefined}
                               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
@@ -1571,7 +1538,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       </main>
 
       {/* Approval Modal */}
-      {showApprovalModal && proposal && (
+      {!previewMode && showApprovalModal && proposal && (
         <ProposalApprovalModal
           proposalId={proposalId}
           proposalNumber={proposal.proposal_number}
@@ -1581,7 +1548,7 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
       )}
 
       {/* Q&A Chat */}
-      {showQA && (
+      {!previewMode && showQA && (
         <ProposalQA
           proposalId={proposalId}
           isPortal={true}
@@ -1617,23 +1584,6 @@ export function PortalProposalDetail({ proposalId, onBack, backLabel, previewMod
               Close
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Scope of Work editor — only in preview/draft mode, rendered above the preview overlay */}
-      {editingScopeRoom && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-          <AreaScopeEditor
-            roomId={editingScopeRoom.id}
-            roomName={editingScopeRoom.name}
-            currentDescription={editingScopeRoom.description}
-            currentShowScope={editingScopeRoom.show_scope}
-            onClose={() => setEditingScopeRoom(null)}
-            onSave={() => {
-              setEditingScopeRoom(null);
-              loadProposalDetails();
-            }}
-          />
         </div>
       )}
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { StickyNote, Plus, Pin, Archive, Trash2, MessageSquare, CheckSquare, X, Edit2 } from 'lucide-react';
@@ -34,7 +35,7 @@ export default function StickyNotes() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newNote, setNewNote] = useState({ content: '', color: 'yellow' as const });
+  const [newNote, setNewNote] = useState({ content: '', color: 'yellow' as StickyNote['color'] });
   const [editingNote, setEditingNote] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -153,10 +154,10 @@ export default function StickyNotes() {
         archived: true
       });
 
-      alert('Sticky note converted to task!');
+      notify('Sticky note converted to task!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error converting to task:', error);
-      alert('Failed to convert to task');
+      notify('Failed to convert to task', { theme: 'violet', tone: 'error' });
     }
   };
 
@@ -179,10 +180,10 @@ export default function StickyNotes() {
         archived: true
       });
 
-      alert('Sticky note converted to discussion post!');
+      notify('Sticky note converted to discussion post!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error converting to discussion:', error);
-      alert('Failed to convert to discussion');
+      notify('Failed to convert to discussion', { theme: 'violet', tone: 'error' });
     }
   };
 

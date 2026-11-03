@@ -1,5 +1,7 @@
+import { notify } from '../../lib/feedback';
+import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
 import { X, Package, Plus, Check, Loader2, Copy, ArrowLeft, Search, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,7 +23,7 @@ interface AddItemToAreasModalProps {
   onRoomsUpdate?: (rooms: ProposalRoom[]) => void;
 }
 
-interface MasterProductFull extends Product {
+interface MasterProductFull extends Omit<Product, 'category' | 'subcategory'> {
   manufacturer_model_number?: string | null;
   manufacturer?: { name: string } | null;
   vendor?: { vendor_name: string } | null;
@@ -90,7 +92,7 @@ export default function AddItemToAreasModal({
   const [localRooms, setLocalRooms] = useState<ProposalRoom[]>(initialRooms);
   const [selectedRooms, setSelectedRooms] = useState<Set<string>>(
     new Set(defaultAreaIds?.length ? defaultAreaIds.filter(id => initialRooms.some(room => room.id === id))
-      : activeAreaId ? [activeAreaId] : initialRooms.length === 1 ? [initialRooms[0].id] : [])
+      : activeAreaId ? [activeAreaId] : [])
   );
   const [newAreaName, setNewAreaName] = useState('');
   const [creatingArea, setCreatingArea] = useState(false);
@@ -163,7 +165,7 @@ export default function AddItemToAreasModal({
       .select(`
         id, sku, name, description, unit, unit_price, cost, our_price,
         default_labor_hours, image_url, product_link, manufacturer_model_number,
-        item_type, is_taxable, labor_phase_id, class_id, sales_description,
+        item_type, is_taxable, is_active, is_discontinued, labor_phase_id, class_id, sales_description,
         manufacturer:manufacturers(name),
         vendor:vendors!products_default_vendor_id_fkey(vendor_name),
         category:product_categories(name),
@@ -171,7 +173,7 @@ export default function AddItemToAreasModal({
         labor_phase:labor_phases(name, default_price)
       `)
       .eq('id', productId)
-      .maybeSingle();
+      .maybeSingle().overrideTypes<MasterProductFull, { merge: false }>();
     if (data) setMasterProduct(data as MasterProductFull);
   }
 
@@ -211,7 +213,7 @@ export default function AddItemToAreasModal({
       item_type: ((product as any).item_type || 'material') as 'material' | 'labor' | 'other',
       task_notes: '',
       show_task_notes: false,
-      is_taxable: product.is_taxable !== undefined ? product.is_taxable : true,
+      is_taxable: product.is_taxable ?? true,
       is_hidden: false,
       is_customer_supplied: false,
       display_mode: 'itemized',
@@ -227,7 +229,7 @@ export default function AddItemToAreasModal({
         handleProductSelect(product);
         setShowNewProductForm(false);
       } else {
-        alert('The product was saved, but could not be loaded into this proposal. Close and reopen Add Item to try again.');
+        notify('The product was saved, but could not be loaded into this proposal. Close and reopen Add Item to try again.', { theme: 'violet', tone: 'error' });
       }
     }
   }
@@ -256,7 +258,7 @@ export default function AddItemToAreasModal({
       setSelectedRooms(new Set([data.id]));
       setNewAreaName('');
     } catch (err: any) {
-      alert('Failed to create area: ' + err.message);
+      notify('Failed to create area: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCreatingArea(false);
     }
@@ -275,13 +277,14 @@ export default function AddItemToAreasModal({
       setEditingAreaId(null);
       setEditingAreaName('');
     } catch (err: any) {
-      alert('Failed to rename area: ' + err.message);
+      notify('Failed to rename area: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCreatingArea(false);
     }
   }
 
-  function addPendingAccessory(product: Product) {
+  function addPendingAccessory(product: Product | null) {
+    if (!product) return;
     const acc: PendingAccessory = {
       tempId: `pending-${Date.now()}-${Math.random()}`,
       product,
@@ -335,13 +338,13 @@ export default function AddItemToAreasModal({
   }
 
   async function handleSave() {
-    if (!selectedProduct) { alert('Please select a product'); return; }
+    if (!selectedProduct) { notify('Please select a product', { theme: 'violet', tone: 'warning' }); return; }
     if (localRooms.length > 0 && selectedRooms.size === 0) {
-      alert('Select the room or area for this item before adding it.');
+      notify('Select the room or area for this item before adding it.', { theme: 'violet', tone: 'warning' });
       return;
     }
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before saving.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -406,7 +409,7 @@ export default function AddItemToAreasModal({
       setTimeout(() => { onItemsAdded(); }, 600);
     } catch (err: any) {
       setSaving(false);
-      alert('Failed to add items: ' + err.message);
+      notify('Failed to add items: ' + err.message, { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -461,7 +464,7 @@ export default function AddItemToAreasModal({
   } : null;
 
   const modal = (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+    <div className="theme-workspace fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* Header */}
@@ -532,7 +535,7 @@ export default function AddItemToAreasModal({
                       >
                         <Package className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 text-sm">{product.name}</div>
+                          <div className="font-medium text-gray-900 text-sm">{product.name}</div><ProductStatusNotice product={product} />
                           {(product.categoryName || product.subcategoryName || product.vendorName) && <div className="text-xs text-blue-700 mt-0.5">
                             {[product.categoryName, product.subcategoryName, product.vendorName].filter(Boolean).join(' · ')}
                           </div>}
@@ -782,7 +785,7 @@ export default function AddItemToAreasModal({
       )}
 
       {showAccessorySelector && (
-        <ProductSelector onSelect={addPendingAccessory} onClose={() => setShowAccessorySelector(false)} />
+        <ProductSelector showCreateActions={false} onSelect={addPendingAccessory} onClose={() => setShowAccessorySelector(false)} />
       )}
 
       <ConfirmModal

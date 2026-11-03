@@ -1,7 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Shield, Check, X, Save, AlertCircle, Building, Layers, Plus, CreditCard as Edit2, Trash2, LayoutGrid, PenLine, Copy } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import ConfirmModal from '../ui/ConfirmModal';
+import { Fragment, useEffect, useState } from "react";
+import { Shield, Save, Plus, Pencil, Trash2 } from "lucide-react";
+import { supabase } from "../../lib/supabase";
+import {
+  effectiveModuleAccess,
+  isPermissionModule,
+  notifyPermissionsChanged,
+  permissionLabel,
+  uniquePermissionModules,
+} from "../../lib/permissionCatalog";
+import ConfirmModal from "../ui/ConfirmModal";
 
 interface Role {
   id: string;
@@ -11,868 +18,548 @@ interface Role {
   is_system_role: boolean;
   is_active: boolean;
 }
-
 interface Department {
   id: string;
-  name: string;
   display_name: string;
-  icon: string;
-  color: string;
-  sort_order: number;
 }
-
 interface Module {
   id: string;
   department_id: string;
   module_key: string;
   display_name: string;
   description: string | null;
-  icon: string;
-  sort_order: number;
-  parent_module_id: string | null;
+  is_active: boolean;
 }
-
-interface RoleDepartmentAccess {
-  role_id: string;
-  department_id: string;
-  has_access: boolean;
-}
-
-interface RoleModuleAccess {
-  role_id: string;
-  module_id: string;
-  has_access: boolean;
+interface Snapshot {
+  revision: number;
+  modules: { module_id: string; has_access: boolean }[];
 }
 
 export function RolePermissionManagement() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [departmentAccess, setDepartmentAccess] = useState<Map<string, boolean>>(new Map());
-  const [moduleAccess, setModuleAccess] = useState<Map<string, boolean>>(new Map());
+  const [selectedRole, setSelectedRole] = useState("");
+  const [loadedRole, setLoadedRole] = useState("");
+  const [revision, setRevision] = useState(0);
+  const [access, setAccess] = useState<Map<string, boolean>>(new Map());
+  const [matrix, setMatrix] = useState<Map<string, Map<string, boolean>>>(
+    new Map(),
+  );
+  const [view, setView] = useState<"edit" | "matrix">("edit");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [confirmDeleteRole, setConfirmDeleteRole] = useState<Role | null>(null);
-  const [roleForm, setRoleForm] = useState({
-    role_key: '',
-    display_name: '',
-    description: ''
-  });
-  const [viewMode, setViewMode] = useState<'edit' | 'matrix'>('edit');
-  const [allRoleModuleAccess, setAllRoleModuleAccess] = useState<Map<string, Set<string>>>(new Map());
-  const [loadingMatrix, setLoadingMatrix] = useState(false);
-  const [matrixLoaded, setMatrixLoaded] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const [pendingRole, setPendingRole] = useState("");
+  const [roleForm, setRoleForm] = useState<Role | null | undefined>(undefined);
+  const [name, setName] = useState("");
+  const [key, setKey] = useState("");
+  const [description, setDescription] = useState("");
+  const [deleteRole, setDeleteRole] = useState<Role | null>(null);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      supabase.from("roles").select("*").order("display_name"),
+      supabase
+        .from("departments")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order"),
+      supabase
+        .from("department_modules")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order"),
+      supabase
+        .from("role_module_access")
+        .select("role_id, module_id, has_access"),
+    ])
+      .then(([r, d, m, grants]) => {
+        if (cancelled) return;
+        for (const result of [r, d, m, grants])
+          if (result.error) throw result.error;
+        setRoles(r.data || []);
+        setDepartments(d.data || []);
+        setModules((m.data || []).filter(isPermissionModule));
+        setSelectedRole((current) =>
+          (r.data || []).some((role) => role.id === current)
+            ? current
+            : r.data?.[0]?.id || "",
+        );
+        const next = new Map<string, Map<string, boolean>>();
+        for (const grant of grants.data || []) {
+          if (!next.has(grant.role_id)) next.set(grant.role_id, new Map());
+          next.get(grant.role_id)!.set(grant.module_id, grant.has_access);
+        }
+        setMatrix(next);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || "Unable to load permissions.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reload]);
 
   useEffect(() => {
-    if (selectedRole) {
-      loadRolePermissions(selectedRole);
-    }
-  }, [selectedRole]);
-
-  useEffect(() => {
-    if (viewMode === 'matrix') loadMatrixData();
-  }, [viewMode, loadMatrixData]);
-
-  async function loadData() {
-    try {
-      const [rolesRes, deptRes, modulesRes] = await Promise.all([
-        supabase.from('roles').select('*').order('role_key'),
-        supabase.from('departments').select('*').order('sort_order'),
-        supabase.from('department_modules').select('*').order('department_id, sort_order')
-      ]);
-
-      if (rolesRes.error) throw rolesRes.error;
-      if (deptRes.error) throw deptRes.error;
-      if (modulesRes.error) throw modulesRes.error;
-
-      setRoles(rolesRes.data || []);
-      setDepartments(deptRes.data || []);
-      setModules(modulesRes.data || []);
-
-      if (rolesRes.data && rolesRes.data.length > 0) {
-        setSelectedRole(rolesRes.data[0].id);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      showMessage('error', 'Failed to load roles and permissions');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const loadMatrixData = useCallback(async () => {
-    if (matrixLoaded) return;
-    setLoadingMatrix(true);
-    try {
-      const { data, error } = await supabase
-        .from('role_module_access')
-        .select('role_id, module_id, has_access');
-      if (error) throw error;
-      const map = new Map<string, Set<string>>();
-      (data || []).forEach(row => {
-        if (!row.has_access) return;
-        if (!map.has(row.role_id)) map.set(row.role_id, new Set());
-        map.get(row.role_id)!.add(row.module_id);
-      });
-      setAllRoleModuleAccess(map);
-      setMatrixLoaded(true);
-    } catch (err) {
-      console.error('Error loading matrix data:', err);
-    } finally {
-      setLoadingMatrix(false);
-    }
-  }, [matrixLoaded]);
-
-  async function loadRolePermissions(roleId: string) {    try {
-      const [deptAccessRes, moduleAccessRes] = await Promise.all([
-        supabase
-          .from('role_department_access')
-          .select('department_id, has_access')
-          .eq('role_id', roleId),
-        supabase
-          .from('role_module_access')
-          .select('module_id, has_access')
-          .eq('role_id', roleId)
-      ]);
-
-      if (deptAccessRes.error) throw deptAccessRes.error;
-      if (moduleAccessRes.error) throw moduleAccessRes.error;
-
-      const deptMap = new Map<string, boolean>();
-      (deptAccessRes.data || []).forEach(item => {
-        deptMap.set(item.department_id, item.has_access);
-      });
-
-      const moduleMap = new Map<string, boolean>();
-      (moduleAccessRes.data || []).forEach(item => {
-        moduleMap.set(item.module_id, item.has_access);
-      });
-
-      setDepartmentAccess(deptMap);
-      setModuleAccess(moduleMap);
-    } catch (error) {
-      console.error('Error loading role permissions:', error);
-      showMessage('error', 'Failed to load permissions');
-    }
-  }
-
-  async function handleSavePermissions() {
     if (!selectedRole) return;
+    let cancelled = false;
+    setLoadedRole("");
+    setError("");
+    setDirty(false);
+    supabase
+      .rpc("get_role_page_permissions", { p_role_id: selectedRole })
+      .then(({ data, error: failure }) => {
+        if (cancelled) return;
+        if (failure) {
+          setError(failure.message);
+          return;
+        }
+        const snapshot = data as Snapshot;
+        setAccess(
+          new Map(
+            snapshot.modules.map((row) => [row.module_id, row.has_access]),
+          ),
+        );
+        setRevision(snapshot.revision);
+        setLoadedRole(selectedRole);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRole, reload]);
 
+  const role = roles.find((item) => item.id === selectedRole);
+  const pages = uniquePermissionModules(modules);
+  const ready = loadedRole === selectedRole && !!role && !saving;
+  const roleAccess = (
+    key: string,
+    values = access,
+    currentRole = role?.role_key || "",
+  ) => effectiveModuleAccess(key, modules, values, new Map(), currentRole);
+
+  function toggle(keys: string[], grant?: boolean) {
+    if (!ready || role?.role_key === "admin") return;
+    const next = new Map(access);
+    for (const key of keys) {
+      if (key === "settings" || key === "feature_suggestions") continue;
+      const value = grant ?? !roleAccess(key);
+      modules
+        .filter((m) => m.module_key === key)
+        .forEach((m) => next.set(m.id, value));
+    }
+    setAccess(next);
+    setDirty(true);
+    setMessage("");
+  }
+
+  async function save() {
+    if (!ready || !dirty) return;
     setSaving(true);
-    setMessage(null);
-
+    setError("");
+    setMessage("");
     try {
-      const deptInserts: RoleDepartmentAccess[] = [];
-      departmentAccess.forEach((hasAccess, deptId) => {
-        deptInserts.push({
-          role_id: selectedRole,
-          department_id: deptId,
-          has_access: hasAccess
-        });
-      });
-
-      const moduleInserts: RoleModuleAccess[] = [];
-      moduleAccess.forEach((hasAccess, moduleId) => {
-        moduleInserts.push({
-          role_id: selectedRole,
-          module_id: moduleId,
-          has_access: hasAccess
-        });
-      });
-
-      await supabase
-        .from('role_department_access')
-        .delete()
-        .eq('role_id', selectedRole);
-
-      await supabase
-        .from('role_module_access')
-        .delete()
-        .eq('role_id', selectedRole);
-
-      if (deptInserts.length > 0) {
-        const { error: deptError } = await supabase
-          .from('role_department_access')
-          .insert(deptInserts);
-
-        if (deptError) throw deptError;
-      }
-
-      if (moduleInserts.length > 0) {
-        const { error: moduleError } = await supabase
-          .from('role_module_access')
-          .insert(moduleInserts);
-
-        if (moduleError) throw moduleError;
-      }
-
-      showMessage('success', 'Permissions saved successfully');
-    } catch (error) {
-      console.error('Error saving permissions:', error);
-      showMessage('error', 'Failed to save permissions');
+      const { error: failure } = await supabase.rpc(
+        "save_role_page_permissions",
+        {
+          p_role_id: selectedRole,
+          p_expected_revision: revision,
+          p_permissions: pages
+            .filter(
+              (m) =>
+                !["settings", "feature_suggestions"].includes(m.module_key),
+            )
+            .map((m) => ({
+              module_key: m.module_key,
+              has_access: roleAccess(m.module_key),
+            })),
+        },
+      );
+      if (failure) throw failure;
+      setDirty(false);
+      setMessage(
+        "Permissions saved. Individual exceptions and action permissions were preserved.",
+      );
+      notifyPermissionsChanged();
+      setReload((value) => value + 1);
+    } catch (e: any) {
+      setError(
+        e.message ||
+          "Save failed. Your edits remain available; no permissions were replaced.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  function toggleDepartmentAccess(deptId: string) {
-    const newAccess = new Map(departmentAccess);
-    newAccess.set(deptId, !newAccess.get(deptId));
-    setDepartmentAccess(newAccess);
+  function editRole(item: Role | null) {
+    setRoleForm(item);
+    setName(item?.display_name || "");
+    setKey(item?.role_key || "");
+    setDescription(item?.description || "");
   }
 
-  function toggleModuleAccess(moduleId: string) {
-    const newAccess = new Map(moduleAccess);
-    newAccess.set(moduleId, !newAccess.get(moduleId));
-    setModuleAccess(newAccess);
-  }
-
-  function toggleAllModulesInDepartment(deptId: string, grant: boolean) {
-    const deptModules = modules.filter(m => m.department_id === deptId);
-    const newAccess = new Map(moduleAccess);
-    deptModules.forEach(module => {
-      newAccess.set(module.id, grant);
-    });
-    setModuleAccess(newAccess);
-  }
-
-  function showMessage(type: 'success' | 'error', text: string) {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 5000);
-  }
-
-  function openCreateRoleModal() {
-    setEditingRole(null);
-    setRoleForm({ role_key: '', display_name: '', description: '' });
-    setShowRoleModal(true);
-  }
-
-  function openEditRoleModal(role: Role) {
-    setEditingRole(role);
-    setRoleForm({
-      role_key: role.role_key,
-      display_name: role.display_name,
-      description: role.description
-    });
-    setShowRoleModal(true);
-  }
-
-  async function handleSaveRole() {
-    if (!roleForm.role_key || !roleForm.display_name || !roleForm.description) {
-      showMessage('error', 'Please fill in all fields');
+  async function saveRole() {
+    if (!name.trim() || !key.trim() || !description.trim()) {
+      setError("Complete the role name, key and description.");
       return;
     }
-
     setSaving(true);
-    setMessage(null);
-
-    try {
-      if (editingRole) {
-        const { error } = await supabase
-          .from('roles')
+    setError("");
+    const result = roleForm
+      ? await supabase
+          .from("roles")
           .update({
-            display_name: roleForm.display_name,
-            description: roleForm.description
+            display_name: name.trim(),
+            description: description.trim(),
           })
-          .eq('id', editingRole.id);
-
-        if (error) throw error;
-        showMessage('success', 'Role updated successfully');
-      } else {
-        const { error } = await supabase
-          .from('roles')
-          .insert({
-            role_key: roleForm.role_key.toLowerCase().replace(/\s+/g, '_'),
-            display_name: roleForm.display_name,
-            description: roleForm.description,
-            is_system_role: false,
-            is_active: true
-          });
-
-        if (error) throw error;
-        showMessage('success', 'Role created successfully');
-      }
-
-      setShowRoleModal(false);
-      await loadData();
-    } catch (error: any) {
-      console.error('Error saving role:', error);
-      if (error.message?.includes('duplicate') || error.message?.includes('unique')) {
-        showMessage('error', 'A role with this key already exists');
-      } else {
-        showMessage('error', 'Failed to save role');
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleToggleRoleActive(role: Role) {
-    if (role.is_system_role) {
-      showMessage('error', 'Cannot deactivate system roles');
+          .eq("id", roleForm.id)
+      : await supabase.from("roles").insert({
+          role_key: key.trim().toLowerCase().replace(/\s+/g, "_"),
+          display_name: name.trim(),
+          description: description.trim(),
+          is_system_role: false,
+          is_active: true,
+        });
+    setSaving(false);
+    if (result.error) {
+      setError(result.error.message);
       return;
     }
-
-    try {
-      const { error } = await supabase
-        .from('roles')
-        .update({ is_active: !role.is_active })
-        .eq('id', role.id);
-
-      if (error) throw error;
-
-      showMessage('success', `Role ${role.is_active ? 'deactivated' : 'activated'} successfully`);
-      await loadData();
-    } catch (error) {
-      console.error('Error toggling role:', error);
-      showMessage('error', 'Failed to update role');
-    }
+    setRoleForm(undefined);
+    setReload((value) => value + 1);
   }
 
-  async function handleDeleteRole(role: Role) {
-    if (role.is_system_role) {
-      showMessage('error', 'Cannot delete system roles');
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('roles')
-        .delete()
-        .eq('id', role.id);
-
-      if (error) throw error;
-
-      showMessage('success', 'Role deleted successfully');
-      if (selectedRole === role.id) {
-        setSelectedRole(roles[0]?.id || null);
-      }
-      await loadData();
-    } catch (error) {
-      console.error('Error deleting role:', error);
-      showMessage('error', 'Failed to delete role');
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-600">Loading role permissions...</div>
-      </div>
-    );
-  }
-
-  const selectedRoleData = roles.find(r => r.id === selectedRole);
-  const modulesByDepartment = departments.map(dept => ({
-    department: dept,
-    modules: modules.filter(m => m.department_id === dept.id && !m.parent_module_id)
-  }));
-
-  // Compute duplicate role groups for matrix view
-  const roleSignatures = roles.reduce<Record<string, string>>((acc, role) => {
-    const granted = allRoleModuleAccess.get(role.id);
-    const key = granted
-      ? [...granted].sort().join(',')
-      : '';
-    acc[role.id] = key;
-    return acc;
-  }, {});
-  const signatureGroups = new Map<string, string[]>();
-  Object.entries(roleSignatures).forEach(([roleId, sig]) => {
-    if (!signatureGroups.has(sig)) signatureGroups.set(sig, []);
-    signatureGroups.get(sig)!.push(roleId);
-  });
-  const duplicateGroupColor: Record<string, string> = {};
-  const groupColors = [
-    'bg-amber-100 text-amber-800 ring-amber-300',
-    'bg-rose-100 text-rose-800 ring-rose-300',
-    'bg-sky-100 text-sky-800 ring-sky-300',
-    'bg-emerald-100 text-emerald-800 ring-emerald-300',
-    'bg-violet-100 text-violet-800 ring-violet-300',
-  ];
-  let colorIdx = 0;
-  signatureGroups.forEach((roleIds, sig) => {
-    if (sig !== '' && roleIds.length > 1) {
-      const color = groupColors[colorIdx % groupColors.length];
-      colorIdx++;
-      roleIds.forEach(id => { duplicateGroupColor[id] = color; });
-    }
-  });
-  const hasDuplicates = Object.keys(duplicateGroupColor).length > 0;
-  const activeRoles = roles.filter(r => r.is_active);
-
+  if (loading && !roles.length)
+    return <p role="status">Loading role permissions…</p>;
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Role Permission Management</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Configure which departments and modules each role can access
+          <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            Role Permissions
+          </h2>
+          <p className="text-sm text-secondary">
+            Current pages and capabilities. Departments group the pages; Grant
+            All and Revoke All apply to those pages.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* View mode toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1">
-            <button
-              onClick={() => setViewMode('edit')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'edit'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <PenLine className="w-3.5 h-3.5" />
-              Edit
-            </button>
-            <button
-              onClick={() => setViewMode('matrix')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'matrix'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Matrix
-            </button>
-          </div>
-          {viewMode === 'edit' && (
-            <>
-              <button
-                onClick={openCreateRoleModal}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                New Role
-              </button>
-              <button
-                onClick={handleSavePermissions}
-                disabled={saving || !selectedRole}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Permissions'}
-              </button>
-            </>
-          )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setView(view === "edit" ? "matrix" : "edit")}
+            className="min-h-11 px-3 rounded-lg border border-subtle"
+          >
+            {view === "edit" ? "View Matrix" : "Edit Permissions"}
+          </button>
+          <button
+            onClick={() => editRole(null)}
+            className="min-h-11 px-3 rounded-lg border border-subtle flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Role
+          </button>
         </div>
       </div>
-
+      <p className="rounded-lg bg-blue-500/10 p-3 text-sm text-secondary">
+        Personal profile settings are available through the avatar. Flow:
+        Customer Messages controls customer conversations; internal Flow access
+        is separate. Invoices is one shared page. Employee-only features remain
+        subject to employment classification.
+      </p>
+      {error && (
+        <div role="alert" className="rounded-lg p-3 bg-red-500/10 text-red-600">
+          {error}
+        </div>
+      )}
       {message && (
-        <div className={`p-4 rounded-lg flex items-center gap-3 ${
-          message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <p className="font-medium">{message.text}</p>
+        <div
+          role="status"
+          className="rounded-lg p-3 bg-green-500/10 text-green-700"
+        >
+          {message}
         </div>
       )}
-
-      {/* ── MATRIX VIEW ── */}
-      {viewMode === 'matrix' && (
-        <div className="space-y-4">
-          {loadingMatrix ? (
-            <div className="flex items-center justify-center py-16 text-gray-500">
-              Loading permissions matrix...
-            </div>
-          ) : (
-            <>
-              {hasDuplicates && (
-                <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                  <Copy className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>
-                    <strong>Duplicate roles detected.</strong> Roles sharing the same color badge have identical module permissions and may be redundant.
-                  </span>
-                </div>
-              )}
-
-              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-md">
-                <table className="min-w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-4 py-3 text-left font-semibold text-gray-700 min-w-[200px] w-[200px]">
-                        Module
-                      </th>
-                      {activeRoles.map(role => {
-                        const dupColor = duplicateGroupColor[role.id];
-                        const grantedCount = allRoleModuleAccess.get(role.id)?.size ?? 0;
-                        return (
-                          <th
-                            key={role.id}
-                            className="border-b border-r last:border-r-0 border-gray-200 px-3 py-3 text-center min-w-[110px] w-[110px]"
-                          >
-                            <div className="flex flex-col items-center gap-1">
-                              <span className={`font-semibold text-xs leading-tight ${dupColor ? 'text-gray-800' : 'text-gray-700'}`}>
-                                {role.display_name}
-                              </span>
-                              {dupColor && (
-                                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ring-1 ${dupColor}`}>
-                                  Duplicate
-                                </span>
-                              )}
-                              <span className="text-[10px] text-gray-400 font-normal">
-                                {matrixLoaded ? `${grantedCount} / ${modules.filter(m => !m.parent_module_id).length}` : '—'}
-                              </span>
-                            </div>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modulesByDepartment.map(({ department, modules: deptModules }) => (
-                      <>
-                        {/* Department separator row */}
-                        <tr key={`dept-${department.id}`} className="bg-gray-100">
-                          <td
-                            colSpan={activeRoles.length + 1}
-                            className="sticky left-0 px-4 py-2 border-b border-gray-200"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: department.color }}
-                              />
-                              <span className="font-semibold text-xs uppercase tracking-wider text-gray-600">
-                                {department.display_name}
-                              </span>
-                              <span className="text-[10px] text-gray-400">
-                                {deptModules.length} module{deptModules.length !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                        {deptModules.map((mod, modIdx) => (
-                          <tr
-                            key={mod.id}
-                            className={modIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}
-                          >
-                            <td className="sticky left-0 z-10 border-b border-r border-gray-200 px-4 py-2.5 font-medium text-gray-800 bg-inherit min-w-[200px] w-[200px]">
-                              <div className="flex items-center gap-2">
-                                <Layers className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                <span className="truncate text-xs">{mod.display_name}</span>
-                              </div>
+      {view === "matrix" ? (
+        <div className="max-w-full overflow-x-auto rounded-lg border border-subtle">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr>
+                <th className="p-3 text-left">Page or capability</th>
+                {roles
+                  .filter((r) => r.is_active)
+                  .map((r) => (
+                    <th key={r.id} className="p-3 min-w-[120px]">
+                      {r.display_name}
+                    </th>
+                  ))}
+              </tr>
+            </thead>
+            <tbody>
+              {departments.map((d) => (
+                <Fragment key={d.id}>
+                  <tr>
+                    <th
+                      colSpan={roles.filter((r) => r.is_active).length + 1}
+                      className="p-3 text-left bg-elevated"
+                    >
+                      {d.display_name}
+                    </th>
+                  </tr>
+                  {pages
+                    .filter((m) => m.department_id === d.id)
+                    .map((m) => (
+                      <tr key={m.id} className="border-t border-subtle">
+                        <td className="p-3">
+                          {permissionLabel(m.module_key, m.display_name)}
+                        </td>
+                        {roles
+                          .filter((r) => r.is_active)
+                          .map((r) => (
+                            <td key={r.id} className="p-3 text-center">
+                              {roleAccess(
+                                m.module_key,
+                                matrix.get(r.id) || new Map(),
+                                r.role_key,
+                              )
+                                ? "Yes"
+                                : "No"}
                             </td>
-                            {activeRoles.map(role => {
-                              const hasAccess = allRoleModuleAccess.get(role.id)?.has(mod.id) ?? false;
-                              const dupColor = duplicateGroupColor[role.id];
-                              return (
-                                <td
-                                  key={role.id}
-                                  className={`border-b border-r last:border-r-0 border-gray-200 px-3 py-2.5 text-center ${
-                                    dupColor ? 'bg-amber-50/30' : ''
-                                  }`}
-                                >
-                                  {hasAccess ? (
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100">
-                                      <Check className="w-3.5 h-3.5 text-green-600" />
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100">
-                                      <X className="w-3 h-3 text-gray-300" />
-                                    </span>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </>
+                          ))}
+                      </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <p className="text-xs text-gray-400 text-right">
-                Matrix is read-only. Switch to Edit mode to modify permissions.
-              </p>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── EDIT VIEW ── */}
-      {viewMode === 'edit' && (
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Role Selection Sidebar */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
-              <div className="flex items-center gap-2 text-white">
-                <Shield className="w-5 h-5" />
-                <h3 className="font-semibold">Roles</h3>
-              </div>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {roles.map(role => (
-                <div
-                  key={role.id}
-                  className={`transition-colors ${
-                    selectedRole === role.id
-                      ? 'bg-blue-50 border-l-4 border-blue-600'
-                      : 'border-l-4 border-transparent'
-                  }`}
-                >
-                  <button
-                    onClick={() => setSelectedRole(role.id)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 flex items-center gap-2">
-                          {role.display_name}
-                          {role.is_system_role && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">System</span>
-                          )}
-                          {!role.is_active && (
-                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{role.description}</div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditRoleModal(role);
-                          }}
-                          className="p-1.5 hover:bg-blue-100 rounded text-blue-600"
-                          title="Edit Role"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        {!role.is_system_role && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmDeleteRole(role);
-                            }}
-                            className="p-1.5 hover:bg-red-100 rounded text-red-600"
-                            title="Delete Role"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                </div>
+                </Fragment>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
-
-        {/* Permissions Configuration */}
-        <div className="lg:col-span-3">
-          {selectedRoleData && (
-            <div className="space-y-6">
-              {/* Role Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-md p-6 text-white">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-2xl font-bold">{selectedRoleData.display_name}</h3>
-                    <p className="text-blue-100 mt-1">{selectedRoleData.description}</p>
-                  </div>
-                  <Shield className="w-12 h-12 opacity-50" />
-                </div>
-              </div>
-
-              {/* Department & Module Access */}
-              <div className="space-y-4">
-                {modulesByDepartment.map(({ department, modules: deptModules }) => (
-                  <div key={department.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                    {/* Department Header */}
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg`} style={{ backgroundColor: `${department.color}20` }}>
-                            <Building className="w-5 h-5" style={{ color: department.color }} />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900">{department.display_name}</h4>
-                            <div className="text-xs text-gray-500">
-                              {deptModules.length} module{deptModules.length !== 1 ? 's' : ''}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleAllModulesInDepartment(department.id, true)}
-                            className="px-3 py-1.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-medium transition-colors"
-                          >
-                            Grant All
-                          </button>
-                          <button
-                            onClick={() => toggleAllModulesInDepartment(department.id, false)}
-                            className="px-3 py-1.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-medium transition-colors"
-                          >
-                            Revoke All
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Modules */}
-                    <div className="divide-y divide-gray-200">
-                      {deptModules.map(module => {
-                        const hasAccess = moduleAccess.get(module.id) || false;
-                        return (
-                          <div
-                            key={module.id}
-                            className="px-6 py-4 hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <Layers className="w-4 h-4 text-gray-400" />
-                                <div>
-                                  <div className="font-medium text-gray-900">{module.display_name}</div>
-                                  {module.description && (
-                                    <div className="text-xs text-gray-500 mt-0.5">{module.description}</div>
-                                  )}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => toggleModuleAccess(module.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                                  hasAccess
-                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
-                              >
-                                {hasAccess ? (
-                                  <>
-                                    <Check className="w-4 h-4" />
-                                    Access Granted
-                                  </>
-                                ) : (
-                                  <>
-                                    <X className="w-4 h-4" />
-                                    No Access
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              Role
+              <select
+                aria-label="Role to configure"
+                disabled={saving}
+                value={selectedRole}
+                onChange={(e) =>
+                  dirty
+                    ? setPendingRole(e.target.value)
+                    : setSelectedRole(e.target.value)
+                }
+                className="min-h-11 max-w-full px-3 rounded-lg bg-canvas border border-subtle"
+              >
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.display_name}
+                    {!r.is_active ? " (inactive)" : ""}
+                  </option>
                 ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      )}
-
-      {/* Create/Edit Role Modal */}
-      {showRoleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-full sm:max-w-lg">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 rounded-t-xl">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <Shield className="w-6 h-6" />
-                {editingRole ? 'Edit Role' : 'Create New Role'}
-              </h3>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role Key {!editingRole && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="text"
-                  value={roleForm.role_key}
-                  onChange={(e) => setRoleForm({ ...roleForm, role_key: e.target.value })}
-                  disabled={!!editingRole}
-                  placeholder="e.g., dispatcher, supervisor"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {editingRole
-                    ? 'Role key cannot be changed after creation'
-                    : 'Lowercase, use underscores instead of spaces (e.g., field_supervisor)'}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Display Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={roleForm.display_name}
-                  onChange={(e) => setRoleForm({ ...roleForm, display_name: e.target.value })}
-                  placeholder="e.g., Dispatcher, Field Supervisor"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  The friendly name shown to users
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={roleForm.description}
-                  onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
-                  placeholder="Describe the role's responsibilities and access level..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {editingRole?.is_system_role && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
-                    This is a system role. Some properties cannot be modified.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex items-center justify-end gap-3">
+              </select>
+            </label>
+            <button
+              onClick={() => role && editRole(role)}
+              className="p-3 rounded-lg border border-subtle"
+              aria-label="Edit role details"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            {role && !role.is_system_role && (
               <button
-                onClick={() => setShowRoleModal(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                onClick={() => setDeleteRole(role)}
+                className="p-3 rounded-lg border border-subtle"
+                aria-label="Delete role"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {role?.role_key === "admin" && (
+            <p className="p-3 rounded-lg bg-amber-500/10 text-sm">
+              Administrators have full system access. To restrict a person,
+              assign a limited role. Administrator page defaults cannot be
+              unchecked.
+            </p>
+          )}
+          {loadedRole !== selectedRole && !error && (
+            <p role="status">Loading this role’s saved permissions…</p>
+          )}
+          <fieldset
+            disabled={!ready || role?.role_key === "admin"}
+            className="space-y-3 min-w-0"
+          >
+            {departments.map((d) => {
+              const list = pages.filter((m) => m.department_id === d.id);
+              if (!list.length) return null;
+              const editableKeys = list
+                .filter((m) => m.module_key !== "settings")
+                .map((m) => m.module_key);
+              return (
+                <section
+                  key={d.id}
+                  className="rounded-lg border border-subtle overflow-hidden"
+                >
+                  <div className="flex flex-wrap justify-between gap-2 p-3 bg-elevated">
+                    <h3 className="font-semibold">{d.display_name}</h3>
+                    <div className="flex gap-2">
+                      <button
+                        disabled={!editableKeys.length}
+                        onClick={() => toggle(editableKeys, true)}
+                        className="min-h-11 px-3 text-sm border border-subtle rounded-lg"
+                      >
+                        Grant All
+                      </button>
+                      <button
+                        disabled={!editableKeys.length}
+                        onClick={() => toggle(editableKeys, false)}
+                        className="min-h-11 px-3 text-sm border border-subtle rounded-lg"
+                      >
+                        Revoke All
+                      </button>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-subtle">
+                    {list.map((m) => (
+                      <label
+                        key={m.id}
+                        className="flex items-start justify-between gap-3 p-3"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-medium">
+                            {permissionLabel(m.module_key, m.display_name)}
+                          </span>
+                          <p className="text-xs text-secondary">
+                            {m.module_key === "settings"
+                              ? "Administrators only; company settings, users and roles."
+                              : m.module_key === "feature_suggestions"
+                                ? "Available to every signed-in user."
+                                : m.description}
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          aria-label={permissionLabel(
+                            m.module_key,
+                            m.display_name,
+                          )}
+                          disabled={[
+                            "settings",
+                            "feature_suggestions",
+                          ].includes(m.module_key)}
+                          checked={roleAccess(m.module_key)}
+                          onChange={() => toggle([m.module_key])}
+                          className="w-5 h-5 mt-1 shrink-0"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </fieldset>
+          <button
+            disabled={!ready || !dirty}
+            onClick={save}
+            className="min-h-11 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? "Saving…" : "Save Permissions"}
+          </button>
+        </>
+      )}
+      {roleForm !== undefined && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Role details"
+            className="bg-canvas p-4 sm:p-6 rounded-xl w-full max-w-lg max-h-[90dvh] overflow-y-auto space-y-3"
+          >
+            <h3 className="font-bold">{roleForm ? "Edit Role" : "New Role"}</h3>
+            <label className="block">
+              Name
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="block w-full p-2 border border-subtle rounded bg-canvas"
+              />
+            </label>
+            <label className="block">
+              Key
+              <input
+                disabled={!!roleForm}
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                className="block w-full p-2 border border-subtle rounded bg-canvas"
+              />
+            </label>
+            <label className="block">
+              Description
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="block w-full p-2 border border-subtle rounded bg-canvas"
+              />
+            </label>
+            {error && (
+              <p role="alert" className="text-red-600">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                disabled={saving}
+                onClick={() => setRoleForm(undefined)}
+                className="min-h-11 px-3"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSaveRole}
                 disabled={saving}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                onClick={saveRole}
+                className="min-h-11 px-3 bg-blue-600 text-white rounded"
               >
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : editingRole ? 'Update Role' : 'Create Role'}
+                Save Role
               </button>
             </div>
           </div>
         </div>
       )}
-
       <ConfirmModal
-        isOpen={confirmDeleteRole !== null}
+        isOpen={!!pendingRole}
+        title="Discard unsaved permissions?"
+        message="The selected role has unsaved edits. Switch roles and discard those edits?"
+        confirmLabel="Switch Role"
+        onCancel={() => setPendingRole("")}
+        onConfirm={() => {
+          setSelectedRole(pendingRole);
+          setPendingRole("");
+        }}
+      />
+      <ConfirmModal
+        isOpen={!!deleteRole}
         title="Delete Role"
-        message={`Are you sure you want to delete the role "${confirmDeleteRole?.display_name}"? This action cannot be undone.`}
+        message="Only an unused custom role can be deleted."
         variant="danger"
         confirmLabel="Delete"
-        onConfirm={() => {
-          if (confirmDeleteRole) handleDeleteRole(confirmDeleteRole);
-          setConfirmDeleteRole(null);
+        onCancel={() => setDeleteRole(null)}
+        onConfirm={async () => {
+          const result = await supabase
+            .from("roles")
+            .delete()
+            .eq("id", deleteRole!.id);
+          setDeleteRole(null);
+          if (result.error) setError(result.error.message);
+          else setReload((v) => v + 1);
         }}
-        onCancel={() => setConfirmDeleteRole(null)}
       />
     </div>
   );

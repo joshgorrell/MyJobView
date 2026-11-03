@@ -29,8 +29,8 @@ serve(async (req) => {
     const { data: requester, error: authError } = await supabaseClient.auth.getUser(token);
     if (authError || !requester.user) throw new Error('Authentication is required');
     const { data: requesterProfile } = await supabaseClient.from('profiles')
-      .select('role, organization_id').eq('id', requester.user.id).single();
-    if (requesterProfile?.role !== 'admin' || !requesterProfile.organization_id) {
+      .select('role, organization_id, is_active').eq('id', requester.user.id).single();
+    if (requesterProfile?.role !== 'admin' || requesterProfile.is_active !== true || !requesterProfile.organization_id) {
       throw new Error('Only an organization admin can create users');
     }
 
@@ -45,13 +45,17 @@ serve(async (req) => {
       role_id,
       email_leads,
       is_sales_rep,
+      is_technician,
       can_view_prospects,
+      can_create_proposals,
+      can_create_work_orders,
       can_create_purchase_orders,
       can_view_all_tasks,
       can_view_all_messages,
       can_view_all_pipeline,
       can_edit_contact_assignments,
       can_edit_products,
+      can_manage_monitoring_services,
       can_see_all_review_requests,
       can_send_lost_opportunity_reviews,
       can_view_lost_opportunity_submissions,
@@ -73,6 +77,15 @@ serve(async (req) => {
       throw new Error("Email, password, and full name are required");
     }
 
+    // Validate the role before creating an Auth account; IDs must belong to the
+    // requesting administrator's organization and match the selected role key.
+    const { data: selectedRole, error: roleError } = await supabaseClient.from('roles')
+      .select('id, role_key').eq('organization_id', requesterProfile.organization_id)
+      .eq('is_active', true).eq('id', role_id).single();
+    if (roleError || !selectedRole || selectedRole.role_key !== role) {
+      throw new Error('Select an active role from your organization');
+    }
+
     console.log("Creating user with email:", email);
 
     const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
@@ -82,6 +95,8 @@ serve(async (req) => {
       user_metadata: {
         full_name,
         email,
+        role: selectedRole.role_key,
+        organization_id: requesterProfile.organization_id,
       },
     });
 
@@ -133,21 +148,25 @@ serve(async (req) => {
       role_id: role_id || null,
       is_active: true,
       email_leads: email_leads || false,
-      is_sales_rep: is_sales_rep ?? false,
+      is_sales_rep: is_sales_rep === true,
+      is_technician: is_technician === true,
       can_view_prospects: can_view_prospects ?? false,
+      can_create_proposals: can_create_proposals ?? ['admin', 'manager', 'sales'].includes(role),
+      can_create_work_orders: can_create_work_orders ?? ['admin', 'manager'].includes(role),
       can_create_purchase_orders: can_create_purchase_orders ?? ['admin', 'manager', 'finance'].includes(role || 'sales'),
-      can_view_all_tasks: can_view_all_tasks ?? true,
+      can_view_all_tasks: can_view_all_tasks ?? ['admin', 'manager', 'service_manager'].includes(role),
       can_view_all_messages: can_view_all_messages ?? false,
-      can_view_all_pipeline: can_view_all_pipeline ?? true,
+      can_view_all_pipeline: can_view_all_pipeline ?? ['admin', 'manager'].includes(role),
       can_edit_contact_assignments: can_edit_contact_assignments ?? false,
-      can_edit_products: can_edit_products ?? true,
+      can_edit_products: can_edit_products ?? ['admin', 'manager', 'finance'].includes(role),
+      can_manage_monitoring_services: can_manage_monitoring_services ?? (role === 'admin'),
       can_see_all_review_requests: can_see_all_review_requests ?? false,
       can_send_lost_opportunity_reviews: can_send_lost_opportunity_reviews ?? ['sales','sales_v2','sales_manager','admin','manager'].includes(role || 'sales'),
       can_view_lost_opportunity_submissions: can_view_lost_opportunity_submissions ?? (role === 'admin'),
       notify_lost_opportunity_submissions: notify_lost_opportunity_submissions ?? false,
       can_edit_contacts: can_edit_contacts ?? true,
       has_calendar_access: has_calendar_access ?? true,
-      proposal_visibility_scope: proposal_visibility_scope || 'company',
+      proposal_visibility_scope: proposal_visibility_scope || (['admin', 'manager'].includes(role) ? 'company' : 'own'),
       discussion_visibility_scope: discussion_visibility_scope || 'all',
       employment_type: finalEmploymentType,
       requires_daily_clock: requiresClock,
@@ -209,24 +228,8 @@ serve(async (req) => {
       console.error("Starred modules exception:", starredErr);
     }
 
-    try {
-      await fetch(
-        `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": authHeader,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: newUser.user.email,
-            full_name,
-          }),
-        }
-      );
-    } catch (emailError) {
-      console.error("Welcome email exception:", emailError);
-    }
+    // Welcome sending is an explicit next step in UserCreatedConfirmation.
+    // Do not silently send a second welcome or swallow provider failures here.
 
     return new Response(
       JSON.stringify({ 

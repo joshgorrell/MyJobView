@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { ThumbsUp, AlertCircle, Users, TrendingUp, CheckCircle, Clock, Lock, Eye, EyeOff, MessageSquare, CheckCheck, RotateCcw } from 'lucide-react';
 
 interface SatisfactionRecord {
@@ -40,20 +41,6 @@ function scoreColor(pct: number) {
   return 'text-red-400';
 }
 
-const RADIAN = Math.PI / 180;
-function renderCustomPieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: {
-  cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number; name: string;
-}) {
-  if (percent < 0.05) return null;
-  const radius = outerRadius + 28;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  return (
-    <text x={x} y={y} fill="#9ca3af" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11}>
-      {name} {(percent * 100).toFixed(0)}%
-    </text>
-  );
-}
 
 export function CustomerSatisfactionDashboard() {
   const { profile } = useAuth();
@@ -64,6 +51,12 @@ export function CustomerSatisfactionDashboard() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [clearingId, setClearingId] = useState<string | null>(null);
   const [showCleared, setShowCleared] = useState(false);
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
+  const acknowledgeFeedback = (id: string) => {
+    if (profile?.id && profile.organization_id) {
+      void markActivitySeen(profile.id, profile.organization_id, 'feedback', id).catch(console.error);
+    }
+  };
 
   useEffect(() => {
     loadRecords();
@@ -75,6 +68,7 @@ export function CustomerSatisfactionDashboard() {
       let query = supabase
         .from('customer_satisfaction')
         .select('id, customer_name, customer_email, sales_rep_name, lead_tech_name, rating, comment, comment_public, sent_at, responded_at, follow_up_cleared_at, follow_up_cleared_by')
+        .or('survey_type.is.null,survey_type.neq.test_tune_welcome')
         .order('sent_at', { ascending: false });
 
       if (dateRange !== 'all') {
@@ -161,37 +155,6 @@ export function CustomerSatisfactionDashboard() {
 
   const overallScore = scorePercent(counts);
 
-  const pieData = [
-    { name: 'Excellent', value: counts.excellent, color: '#16a34a' },
-    { name: 'Good', value: counts.good, color: '#2563eb' },
-    { name: 'Okay', value: counts.okay, color: '#d97706' },
-    { name: 'Needs Attention', value: counts.needs_attention, color: '#dc2626' },
-  ].filter(d => d.value > 0);
-
-  const barData = [
-    { name: 'Excellent', value: counts.excellent, fill: '#16a34a' },
-    { name: 'Good', value: counts.good, fill: '#2563eb' },
-    { name: 'Okay', value: counts.okay, fill: '#d97706' },
-    { name: 'Needs Attention', value: counts.needs_attention, fill: '#dc2626' },
-  ];
-
-  function buildPersonTable(groupKey: 'sales_rep_name' | 'lead_tech_name') {
-    const map: Record<string, { excellent: number; good: number; okay: number; needs_attention: number }> = {};
-    for (const r of responded) {
-      const name = r[groupKey]?.trim() || 'Unassigned';
-      if (!map[name]) map[name] = { excellent: 0, good: 0, okay: 0, needs_attention: 0 };
-      if (r.rating === 'excellent') map[name].excellent++;
-      else if (r.rating === 'good') map[name].good++;
-      else if (r.rating === 'okay') map[name].okay++;
-      else if (r.rating === 'needs_attention') map[name].needs_attention++;
-    }
-    return Object.entries(map)
-      .map(([name, c]) => ({ name, ...c, score: scorePercent(c) }))
-      .sort((a, b) => b.score - a.score);
-  }
-
-  const salesRepTable = buildPersonTable('sales_rep_name');
-  const leadTechTable = buildPersonTable('lead_tech_name');
 
   const allNeedsAttention = responded.filter(r => r.rating === 'okay' || r.rating === 'needs_attention');
   const needsAttentionRecords = allNeedsAttention.filter(r => !r.follow_up_cleared_at);
@@ -323,6 +286,7 @@ export function CustomerSatisfactionDashboard() {
                         <Clock className="w-3 h-3" />
                         {r.responded_at ? new Date(r.responded_at).toLocaleDateString() : new Date(r.sent_at).toLocaleDateString()}
                       </span>
+                      <button type="button" aria-expanded={expandedFeedbackId === r.id} onClick={() => { setExpandedFeedbackId(current => current === r.id ? null : r.id); if (expandedFeedbackId !== r.id) acknowledgeFeedback(r.id); }} className="min-h-11 px-2.5 py-2 rounded-lg text-xs border border-gray-600 text-gray-300 hover:text-white">{expandedFeedbackId === r.id ? 'Close details' : 'View details'}</button>
                       {isAdmin && (
                         <button
                           onClick={() => clearFollowUp(r.id)}
@@ -342,6 +306,8 @@ export function CustomerSatisfactionDashboard() {
                       )}
                     </div>
                   </div>
+                  {expandedFeedbackId === r.id && (
+                    <div className="mt-2 rounded-lg border border-gray-700 p-3">
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     {r.sales_rep_name && <span>Sales: <span className="text-gray-300">{r.sales_rep_name}</span></span>}
                     {r.lead_tech_name && <span>Tech: <span className="text-gray-300">{r.lead_tech_name}</span></span>}
@@ -360,6 +326,8 @@ export function CustomerSatisfactionDashboard() {
                     <p className="mt-2 text-sm text-gray-400 bg-gray-900 rounded-lg px-3 py-2 italic">
                       "{r.comment}"
                     </p>
+                  )}
+                    </div>
                   )}
                 </div>
               );

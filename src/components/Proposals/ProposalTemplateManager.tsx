@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings } from 'lucide-react';
+import { Save, Plus, Copy, Trash2, Star, X, Eye, EyeOff, FileText, Settings, CheckCircle, LayoutGrid } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { loadProposalDocument } from '../../lib/proposalDocument';
 
 interface ReportTemplate {
+  created_at?: string;
+  updated_at?: string;
+  company_id?: string;
   id: string;
   name: string;
   description: string | null;
@@ -31,6 +36,8 @@ interface ReportTemplate {
   show_model_number: boolean;
   show_quantity: boolean;
   show_unit_price: boolean;
+  show_installed_price: boolean;
+  show_item_color: boolean;
   show_line_item_total: boolean;
   show_item_cost: boolean;
   show_markup_percentage: boolean;
@@ -134,6 +141,8 @@ const templateSections: TemplateSection[] = [
       { key: 'show_model_number', label: 'Model Number' },
       { key: 'show_quantity', label: 'Quantity' },
       { key: 'show_unit_price', label: 'Unit Price' },
+      { key: 'show_installed_price', label: 'Installed Price (Equipment + Labor)' },
+      { key: 'show_item_color', label: 'Product Color' },
       { key: 'show_line_item_total', label: 'Line Total' },
       { key: 'show_item_cost', label: 'Item Cost', description: '⚠️ Internal only - shows your cost' },
       { key: 'show_markup_percentage', label: 'Markup %', description: '⚠️ Internal only - shows your margin' },
@@ -217,8 +226,12 @@ const templateSections: TemplateSection[] = [
 ];
 
 export default function ProposalTemplateManager() {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [sampleProposals, setSampleProposals] = useState<Array<{id:string;proposal_number:string}>>([]);
+  const [sampleProposalId, setSampleProposalId] = useState('');
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -226,17 +239,23 @@ export default function ProposalTemplateManager() {
   const [saving, setSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
-  const canManage = profile?.role === 'admin' || profile?.role === 'sales_manager';
+  // Company templates are administrator-owned; managers may create personal templates.
+  const canManageCompanyTemplates = !!profile && ['admin', 'owner', 'super_admin'].includes(profile.role);
   const canEditSelected = selectedTemplate && (
-    !selectedTemplate.is_personal || selectedTemplate.created_by === profile?.id
-  ) && (selectedTemplate.is_personal || canManage);
+    selectedTemplate.is_personal ? selectedTemplate.created_by === profile?.id : canManageCompanyTemplates
+  );
   const canDeleteSelected = selectedTemplate && (
     (selectedTemplate.is_personal && selectedTemplate.created_by === profile?.id) ||
-    (!selectedTemplate.is_personal && profile?.role === 'admin')
+    (!selectedTemplate.is_personal && canManageCompanyTemplates)
   );
+
+  const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
+  const [savingDefaultTemplate, setSavingDefaultTemplate] = useState(false);
 
   useEffect(() => {
     loadTemplates();
+    loadDefaultTemplate();
+    void loadSampleProposals();
   }, []);
 
   async function loadTemplates() {
@@ -254,9 +273,74 @@ export default function ProposalTemplateManager() {
       }
     } catch (error) {
       console.error('Error loading templates:', error);
-      alert('Failed to load templates');
+      notify('Failed to load templates', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadSampleProposals() {
+    const { data, error } = await supabase.from('proposals').select('id,proposal_number').order('created_at', { ascending: false }).limit(30);
+    if (error) { setPreviewError('Unable to load sample proposals.'); return; }
+    setSampleProposals(data || []);
+    setSampleProposalId(current => current || data?.[0]?.id || '');
+  }
+
+  async function previewTemplate(template: ReportTemplate) {
+    const proposal = sampleProposals.find(p => p.id === sampleProposalId);
+    if (!proposal) { setPreviewError('Select a proposal to preview this template.'); return; }
+    const tab = window.open('', '_blank');
+    if (!tab) { setPreviewError('Please allow popups to preview templates.'); return; }
+    tab.document.body.textContent = 'Generating customer PDF preview…';
+    setPreviewingId(template.id);
+    setPreviewError('');
+    try {
+      const document = await loadProposalDocument(proposal.id, proposal.proposal_number, true, template.id);
+      const bytes = Uint8Array.from(atob(document.content), c => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: document.mimeType }));
+      tab.location.replace(url);
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (error) {
+      tab.close();
+      setPreviewError(error instanceof Error ? error.message : 'Could not preview this template.');
+    } finally { setPreviewingId(null); }
+  }
+
+  async function loadDefaultTemplate() {
+    if (!profile?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_proposal_report_template_id')
+        .eq('id', profile.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data?.default_proposal_report_template_id) {
+        setDefaultTemplateId(data.default_proposal_report_template_id);
+      }
+    } catch (error) {
+      console.error('Error loading default template:', error);
+    }
+  }
+
+  async function saveDefaultTemplate() {
+    if (!profile?.id) return;
+
+    setSavingDefaultTemplate(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_proposal_report_template_id: defaultTemplateId || null })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      notify('Default proposal template saved!', { theme: 'violet', tone: 'success' });
+    } catch (error) {
+      console.error('Error saving template preference:', error);
+      notify('Failed to save template preference', { theme: 'violet', tone: 'error' });
+    } finally {
+      setSavingDefaultTemplate(false);
     }
   }
 
@@ -280,10 +364,10 @@ export default function ProposalTemplateManager() {
 
       await loadTemplates();
       setIsEditing(false);
-      alert('Template saved successfully!');
+      notify('Template saved successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('Failed to save template');
+      notify('Failed to save template', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -292,9 +376,9 @@ export default function ProposalTemplateManager() {
   async function handleCreate(newTemplate: Partial<ReportTemplate>) {
     if (!profile) return;
 
-    // Validate: only admins/sales managers can create company-wide templates
-    if (!newTemplate.is_personal && !canManage) {
-      alert('Only admins and sales managers can create company-wide templates');
+    // Company templates require administrator authorization on the server too.
+    if (!newTemplate.is_personal && !canManageCompanyTemplates) {
+      notify('Only administrators can create company-wide templates', { theme: 'violet', tone: 'info' });
       return;
     }
 
@@ -303,9 +387,10 @@ export default function ProposalTemplateManager() {
       const { data, error } = await supabase
         .from('proposal_report_templates')
         .insert({
-          company_id: profile.company_id,
-          created_by: profile.id,
-          ...newTemplate
+          ...newTemplate,
+          company_id: companySettings?.id,
+          organization_id: profile.organization_id,
+          created_by: profile.id
         })
         .select()
         .single();
@@ -315,10 +400,10 @@ export default function ProposalTemplateManager() {
       await loadTemplates();
       setSelectedTemplate(data);
       setIsCreating(false);
-      alert('Template created successfully!');
+      notify('Template created successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error creating template:', error);
-      alert('Failed to create template');
+      notify('Failed to create template', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -360,36 +445,28 @@ export default function ProposalTemplateManager() {
 
       setSelectedTemplate(null);
       await loadTemplates();
-      alert('Template deleted successfully!');
+      notify('Template deleted successfully!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('Failed to delete template');
+      notify('Failed to delete template', { theme: 'violet', tone: 'error' });
     }
   }
 
   async function handleSetDefault() {
-    if (!selectedTemplate || !canManage || !profile) return;
+    if (!selectedTemplate || !canManageCompanyTemplates || !profile) return;
 
     try {
-      // Unset all defaults for this company
-      await supabase
-        .from('proposal_report_templates')
-        .update({ is_default: false })
-        .eq('company_id', profile.company_id);
-
-      // Set this one as default
-      const { error } = await supabase
-        .from('proposal_report_templates')
-        .update({ is_default: true })
-        .eq('id', selectedTemplate.id);
+      const { error } = await supabase.rpc('set_company_proposal_template_default', {
+        p_template_id: selectedTemplate.id,
+      });
 
       if (error) throw error;
 
       await loadTemplates();
-      alert('Default template updated!');
+      notify('Default template updated!', { theme: 'violet', tone: 'success' });
     } catch (error) {
       console.error('Error setting default:', error);
-      alert('Failed to set default template');
+      notify('Failed to set default template', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -418,6 +495,140 @@ export default function ProposalTemplateManager() {
           Create and manage templates that control what appears in customer-facing proposal PDFs.
           You can have different templates for different types of proposals (residential, commercial, service agreements, etc.)
         </p>
+      </div>
+
+      {/* Visual template gallery — PDF previews use the actual document generator. */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Template gallery</h3>
+          <p className="text-sm text-gray-600">Choose a real proposal to compare customer-facing PDF layouts. Previewing never sends or submits a proposal.</p>
+        </div>
+        <label className="block max-w-md text-sm font-medium text-gray-700">Preview using proposal
+          <select value={sampleProposalId} onChange={e => setSampleProposalId(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+            {!sampleProposals.length && <option value="">No proposals available</option>}
+            {sampleProposals.map(p => <option key={p.id} value={p.id}>#{p.proposal_number}</option>)}
+          </select>
+        </label>
+        {previewError && <p role="alert" className="text-sm text-red-700">{previewError}</p>}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {templates.map(template => (
+            <article key={template.id} className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-sm">
+              <div className="flex aspect-[4/3] items-center justify-center bg-slate-100 p-6">
+                <div className="w-36 rounded-sm border border-gray-200 bg-white p-3 shadow-md" aria-hidden="true">
+                  <div className="mb-3 h-2 w-16 rounded bg-blue-700" />
+                  <div className="mb-1 h-1.5 w-24 rounded bg-slate-300" />
+                  <div className="mb-4 h-1.5 w-16 rounded bg-slate-200" />
+                  {template.include_cover_page && <div className="mb-3 h-10 rounded bg-blue-50" />}
+                  {template.show_product_images && <div className="mb-2 h-6 rounded bg-slate-100" />}
+                  <div className="space-y-1">{[0,1,2].map(i => <div key={i} className="flex gap-2"><div className="h-1.5 flex-1 rounded bg-slate-200" /><div className="h-1.5 w-6 rounded bg-slate-300" /></div>)}</div>
+                  <div className="mt-3 ml-auto h-2 w-12 rounded bg-blue-700" />
+                </div>
+              </div>
+              <div className="space-y-3 p-4">
+                <div><h4 className="font-semibold text-gray-900">{template.name}</h4><p className="mt-1 text-xs text-gray-500">{template.description || (template.is_personal ? 'Personal template' : 'Company template')}{template.is_default ? ' · Company default' : ''}</p></div>
+                <button type="button" disabled={!sampleProposalId || previewingId !== null} onClick={() => void previewTemplate(template)} className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Eye className="h-4 w-4" />{previewingId === template.id ? 'Generating…' : 'Preview actual PDF'}</button>
+                <button type="button" onClick={() => { setSelectedTemplate(template); setIsEditing(false); }} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white">Edit template settings</button>
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500">Thumbnails are illustrative. Use Preview actual PDF to see the generated customer document.</p>
+      </section>
+
+      {/* My Default Template */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+          <LayoutGrid className="w-5 h-5 text-blue-600" />
+          My Default Template
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Choose your preferred template layout for new proposals. This will be automatically
+          selected when you review proposals before sending to customers.
+        </p>
+
+        {templates.length === 0 ? (
+          <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-600 font-medium">No templates available</p>
+            <p className="text-sm text-gray-500 mt-1">Create a template below to get started.</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2 mb-4">
+              {/* No selection option */}
+              <button
+                onClick={() => setDefaultTemplateId('')}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                  !defaultTemplateId
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  !defaultTemplateId ? 'bg-blue-100' : 'bg-gray-100'
+                }`}>
+                  <FileText className={`w-4 h-4 ${!defaultTemplateId ? 'text-blue-600' : 'text-gray-400'}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-gray-900 text-sm">Use Company Default</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Uses the default template set by your administrator</p>
+                </div>
+                {!defaultTemplateId && <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+              </button>
+
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => setDefaultTemplateId(template.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                    defaultTemplateId === template.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    defaultTemplateId === template.id ? 'bg-blue-100' : 'bg-gray-100'
+                  }`}>
+                    <LayoutGrid className={`w-4 h-4 ${defaultTemplateId === template.id ? 'text-blue-600' : 'text-gray-400'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 text-sm">{template.name}</span>
+                      {template.is_personal && (
+                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">Personal</span>
+                      )}
+                      {template.is_default && !template.is_personal && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Company Default</span>
+                      )}
+                    </div>
+                    {template.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{template.description}</p>
+                    )}
+                  </div>
+                  {defaultTemplateId === template.id && <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setDefaultTemplateId('')}
+                disabled={!defaultTemplateId}
+                className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Clear Selection
+              </button>
+              <button
+                onClick={saveDefaultTemplate}
+                disabled={savingDefaultTemplate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                {savingDefaultTemplate ? 'Saving...' : 'Save Default Template'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Template List */}
@@ -545,7 +756,7 @@ export default function ProposalTemplateManager() {
                       </>
                     ) : (
                       <>
-                        {!selectedTemplate.is_default && !selectedTemplate.is_personal && canManage && (
+                        {!selectedTemplate.is_default && !selectedTemplate.is_personal && canManageCompanyTemplates && (
                           <button
                             onClick={handleSetDefault}
                             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -723,18 +934,18 @@ export default function ProposalTemplateManager() {
                         <div className="text-sm text-gray-600">Only you can see and use this template</div>
                       </div>
                     </label>
-                    <label className={`flex items-start gap-3 p-3 border rounded-lg ${canManage ? 'border-gray-300 cursor-pointer hover:bg-gray-50' : 'border-gray-200 bg-gray-50 cursor-not-allowed'} transition-colors`}>
+                    <label className={`flex items-start gap-3 p-3 border rounded-lg ${canManageCompanyTemplates ? 'border-gray-300 cursor-pointer hover:bg-gray-50' : 'border-gray-200 bg-gray-50 cursor-not-allowed'} transition-colors`}>
                       <input
                         type="radio"
                         name="is_personal"
                         value="false"
-                        disabled={!canManage}
+                        disabled={!canManageCompanyTemplates}
                         className="mt-1"
                       />
                       <div>
-                        <div className={`font-medium ${canManage ? 'text-gray-900' : 'text-gray-500'}`}>Company-Wide Template</div>
-                        <div className={`text-sm ${canManage ? 'text-gray-600' : 'text-gray-400'}`}>
-                          {canManage ? 'Everyone in your company can use this template' : 'Only admins and sales managers can create company-wide templates'}
+                        <div className={`font-medium ${canManageCompanyTemplates ? 'text-gray-900' : 'text-gray-500'}`}>Company-Wide Template</div>
+                        <div className={`text-sm ${canManageCompanyTemplates ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {canManageCompanyTemplates ? 'Everyone in your company can use this template' : 'Only administrators can create company-wide templates'}
                         </div>
                       </div>
                     </label>

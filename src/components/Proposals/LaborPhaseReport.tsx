@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ProposalLineItem, ProposalRoom, LaborPhase } from '../../lib/types';
 import {
   X, Printer, Layers, Package, ClipboardList, CheckCircle2,
@@ -25,7 +25,7 @@ interface PhaseGroup {
 const UNASSIGNED_ID = '__unassigned__';
 
 export default function LaborPhaseReport({
-  proposalId,
+  proposalId: _proposalId,
   proposalNumber,
   customerName,
   rooms,
@@ -299,7 +299,7 @@ export default function LaborPhaseReport({
             const colorClass = getPhaseColor(phaseColorIndex.get(group.phaseId) ?? groupIdx);
             const visibleTasks = filterTasks(group.tasks);
             const completedCount = group.tasks.filter(t => t.task_completed).length;
-            const isFirstGroup = groupIdx === 0;
+
 
             return (
               <div

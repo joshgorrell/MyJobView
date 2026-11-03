@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, Plus, Copy, Replace, ChevronDown, ChevronUp, CreditCard as Edit3 } from 'lucide-react';
+import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
+import { X, Package, Save, Loader2, Check, Image as ImageIcon, Wrench, ChevronRight, ExternalLink, RefreshCw, Plus, Copy, Replace, ChevronDown, ChevronUp, CreditCard as Edit3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -19,7 +20,7 @@ interface ProposalLineItemModalProps {
   onClose: () => void;
 }
 
-interface MasterProductFull extends Product {
+interface MasterProductFull extends Omit<Product, 'category' | 'subcategory'> {
   manufacturer?: { name: string } | null;
   vendor?: { vendor_name: string } | null;
   category?: { name: string } | null;
@@ -89,7 +90,7 @@ export default function ProposalLineItemModal({
     task_notes: item.task_notes ?? '',
     show_task_notes: item.show_task_notes ?? false,
     labor_phase_id: item.labor_phase_id ?? '',
-    is_taxable: item.is_taxable !== undefined ? item.is_taxable : true,
+    is_taxable: item.is_taxable ?? true,
     is_hidden: item.is_hidden ?? false,
     is_customer_supplied: item.is_customer_supplied ?? false,
     display_mode: (item.display_mode ?? 'itemized') as 'itemized' | 'bundle' | 'collapsed',
@@ -138,7 +139,7 @@ export default function ProposalLineItemModal({
         labor_phase:labor_phases(name, default_price)
       `)
       .eq('id', item.product_id)
-      .maybeSingle();
+      .maybeSingle().overrideTypes<MasterProductFull, { merge: false }>();
     if (data) {
       setMasterProduct(data as MasterProductFull);
       setForm(f => ({ ...f, image_url: (data as MasterProductFull).image_url ?? '' }));
@@ -182,7 +183,8 @@ export default function ProposalLineItemModal({
     setCanNest(true);
   }
 
-  async function addAccessory(product: Product) {
+  async function addAccessory(product: Product | null) {
+    if (!product) return;
     const maxSort = accessories.length > 0 ? Math.max(...accessories.map(a => a.sort_order)) : 0;
     const newAcc = {
       proposal_id: proposalId,
@@ -249,7 +251,7 @@ export default function ProposalLineItemModal({
       labor_hours: masterProduct.default_labor_hours ?? f.labor_hours,
       item_type: masterProduct.item_type || f.item_type,
       labor_phase_id: masterProduct.labor_phase_id ?? f.labor_phase_id,
-      is_taxable: masterProduct.is_taxable !== undefined ? masterProduct.is_taxable : f.is_taxable,
+      is_taxable: masterProduct.is_taxable ?? f.is_taxable,
     }));
   }
 
@@ -284,7 +286,7 @@ export default function ProposalLineItemModal({
   async function copyToSelectedAreas() {
     if (selectedAreasForCopy.size === 0) return;
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before copying.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before copying.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setCopyingToAreas(true);
@@ -318,7 +320,7 @@ export default function ProposalLineItemModal({
       setSelectedAreasForCopy(new Set());
       onClose();
     } catch (err: any) {
-      alert('Failed to copy: ' + err.message);
+      notify('Failed to copy: ' + err.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCopyingToAreas(false);
     }
@@ -346,7 +348,7 @@ export default function ProposalLineItemModal({
 
   function handleSubmit(saveToMaster: boolean) {
     if (!form.is_customer_supplied && (!form.cost || form.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before saving.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -427,7 +429,7 @@ export default function ProposalLineItemModal({
   const currentImageUrl = form.image_url || masterProduct?.image_url || null;
 
   const modal = (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+    <div className="theme-workspace fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
 
         {/* Header */}
@@ -976,11 +978,11 @@ export default function ProposalLineItemModal({
       )}
 
       {showAccessorySelector && (
-        <ProductSelector onSelect={addAccessory} onClose={() => setShowAccessorySelector(false)} />
+        <ProductSelector showCreateActions={false} onSelect={addAccessory} onClose={() => setShowAccessorySelector(false)} />
       )}
 
       {showSubstituteConfirmation && selectedReplacementProduct && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+        <div className="theme-workspace fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-white mb-5">Confirm Substitution</h3>
             <div className="space-y-3 mb-6">

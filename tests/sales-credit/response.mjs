@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import{build}from'esbuild';
+const code=await build({entryPoints:['src/lib/salesPerformance.ts'],bundle:true,format:'esm',write:false});
+const{parseCompetition,parsePerformanceReport}=await import('data:text/javascript;base64,'+Buffer.from(code.outputFiles[0].text).toString('base64'));
+const base={month:'2026-10',timezone:'America/Chicago',trackingSince:'2026-10-28',leaderboard:[{rank:1,repDisplayName:'Rep',monthlyTotal:'800',isCurrentUser:true}]};
+assert.equal(parseCompetition(base).leaderboard[0].monthlyTotal,800);
+for(const total of[null,undefined,'',' ','NaN',Infinity,{}])assert.throws(()=>parseCompetition({...base,leaderboard:[{...base.leaderboard[0],monthlyTotal:total}]}));
+for(const bad of[null,{}, {error:'denied'}, {...base,leaderboard:null}])assert.throws(()=>parseCompetition(bad));
+const report={period:'month',timezone:'UTC',trackingSince:'2026-10-28',total:800,previousTotal:100,count:1,unassignedTotal:null,events:[{id:'event',source_id:'invoice',source_type:'service_invoice',effective_at:'2026-10-28',net_amount:800,customer_name:'Customer',record_kind:'invoice'}]};
+assert.equal(parsePerformanceReport(report).events[0].net_amount,800);assert.throws(()=>parsePerformanceReport({...report,count:0}));assert.throws(()=>parsePerformanceReport({...report,total:'NaN'}));assert.throws(()=>parsePerformanceReport({...report,events:[{...report.events[0],record_kind:'foreign'}]}));
+console.log('PASS: malformed RPC results do not become misleading zero totals or invalid records.');

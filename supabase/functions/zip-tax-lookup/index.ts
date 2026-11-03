@@ -57,9 +57,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get API key from company settings
+    // Read with the service role: the key column is not readable by client roles.
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     const { data: settings } = await supabaseClient

@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {Client} from 'pg';
+if(!process.env.REWARDS_DATABASE_URL) throw Error('Real PostgreSQL required for concurrency checks');
+const connect=async()=>{const c=new Client({connectionString:process.env.REWARDS_DATABASE_URL});await c.connect();return c};
+const root=await connect(),a=await connect(),b=await connect();
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+const org=id(1),alice=id(11),bob=id(12),admin=id(10);
+try{
+ for(const [c,user]of[[a,alice],[b,bob]])await c.query(`SELECT set_config('test.uid',$1,false)`,[user]);
+ await a.query('SET ROLE authenticated');await b.query('SET ROLE authenticated');
+ const seed=async(n,cost,stock)=>{await root.query('update profiles set points_earned=100 where id=ANY($1::uuid[])',[[alice,bob]]);await root.query('insert into rewards_catalog(id,organization_id,name,points_cost,stock_quantity)values($1,$2,$3,$4,$5)',[id(n),org,'Race '+n,cost,stock]);};
+ const balance=async(user)=>Number((await root.query('select points_earned from profiles where id=$1',[user])).rows[0].points_earned);
+ await seed(800,80,1);
+ let results=await Promise.allSettled([a.query('select redeem_reward_atomic($1,$2)',[id(800),id(801)]),b.query('select redeem_reward_atomic($1,$2)',[id(800),id(802)])]);
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1,'Only one employee can buy the last item');assert.equal(await balance(alice)+await balance(bob),120);
+ await seed(810,80,5);await b.query("SELECT set_config('test.uid',$1,false)",[alice]);
+ results=await Promise.allSettled([a.query('select redeem_reward_atomic($1,$2)',[id(810),id(811)]),b.query('select redeem_reward_atomic($1,$2)',[id(810),id(812)])]);
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1,'Two requests cannot overspend one balance');assert.equal(await balance(alice),20);
+ await seed(820,25,5);
+ results=await Promise.all([a.query('select redeem_reward_atomic($1,$2)',[id(820),id(821)]),b.query('select redeem_reward_atomic($1,$2)',[id(820),id(821)])]);
+ assert.equal(await balance(alice),75);assert.equal((await root.query('select stock_quantity from rewards_catalog where id=$1',[id(820)])).rows[0].stock_quantity,4);
+ await b.query("SELECT set_config('test.uid',$1,false)",[bob]);
+ await root.query('insert into tasks(id,organization_id,user_id,title,points)values($1,$2,$3,$4,19)',[id(830),org,admin,'First resolver']);
+ results=await Promise.all([a.query('select * from complete_task_atomic($1)',[id(830)]),b.query('select * from complete_task_atomic($1)',[id(830)])]);
+ assert.deepEqual(results.map(r=>r.rows[0].points_awarded).sort((x,y)=>x-y),[0,19]);
+ await seed(840,30,2);
+ await root.query(`CREATE FUNCTION private.test_fail_reward() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.reference_id='${id(840)}' OR NEW.transaction_type='reward_redemption' THEN RAISE EXCEPTION 'Injected failure';END IF;RETURN NEW;END$$;CREATE TRIGGER test_fail_reward BEFORE INSERT ON points_transactions FOR EACH ROW EXECUTE FUNCTION private.test_fail_reward()`);
+ await assert.rejects(()=>a.query('select redeem_reward_atomic($1,$2)',[id(840),id(841)]),/Injected failure/);
+ assert.equal(await balance(alice),100);assert.equal((await root.query('select stock_quantity from rewards_catalog where id=$1',[id(840)])).rows[0].stock_quantity,2);
+ assert.equal(Number((await root.query('select count(*) from reward_redemptions where request_key=$1',[id(841)])).rows[0].count),0);
+ await root.query('DROP TRIGGER test_fail_reward ON points_transactions;DROP FUNCTION private.test_fail_reward()');
+ await a.query('select redeem_reward_atomic($1,$2)',[id(840),id(841)]);assert.equal(await balance(alice),70);
+ console.log('Real PostgreSQL races: last stock, shared balance, duplicate request, first resolver, and transaction rollback passed.');
+}finally{await Promise.all([a.end(),b.end(),root.end()]);}

@@ -7,8 +7,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -101,7 +99,7 @@ export function BonusPerformanceChart({ bonuses, profileId }: BonusPerformanceCh
     bonuses.forEach(bonus => {
       const date = new Date(bonus.evaluation_date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const monthLabel = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+
       const amount = getUserBonusAmount(bonus);
 
       if (!monthlyMap.has(monthKey)) {
@@ -332,7 +330,7 @@ export function BonusPerformanceChart({ bonuses, profileId }: BonusPerformanceCh
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
               <Tooltip
-                formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                formatter={(value: number = 0) => [`$${value.toLocaleString()}`, '']}
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
               />
               <Legend />
@@ -355,7 +353,7 @@ export function BonusPerformanceChart({ bonuses, profileId }: BonusPerformanceCh
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
               <Tooltip
-                formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                formatter={(value: number = 0) => [`$${value.toLocaleString()}`, '']}
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
               />
               <Legend />
@@ -373,7 +371,7 @@ export function BonusPerformanceChart({ bonuses, profileId }: BonusPerformanceCh
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                label={({ name, percent = 0 }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                 outerRadius={window.innerWidth < 640 ? 60 : 100}
                 fill="#8884d8"
                 dataKey="amount"
@@ -383,7 +381,7 @@ export function BonusPerformanceChart({ bonuses, profileId }: BonusPerformanceCh
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => [`$${value.toLocaleString()}`, 'Total']}
+                formatter={(value: number = 0) => [`$${value.toLocaleString()}`, 'Total']}
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
               />
             </PieChart>
@@ -397,7 +395,7 @@ export function BonusPerformanceChart({ bonuses, profileId }: BonusPerformanceCh
               <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={80} />
               <Tooltip
-                formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']}
+                formatter={(value: number = 0) => [`$${value.toLocaleString()}`, 'Amount']}
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
               />
               <Bar dataKey="amount" radius={[0, 8, 8, 0]}>

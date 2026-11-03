@@ -1,3 +1,4 @@
+import workspaceThemeContrast from './scripts/workspaceThemeContrast.cjs';
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
@@ -25,9 +26,11 @@ export default {
         danger: 'rgb(var(--danger-text) / <alpha-value>)',
         dangerSoft: 'rgb(var(--danger-surface) / <alpha-value>)',
         attention: 'rgb(var(--attention-text) / <alpha-value>)',
+        accent: 'rgb(var(--accent-text) / <alpha-value>)',
+        accentSoft: 'rgb(var(--accent-surface) / <alpha-value>)',
         attentionSoft: 'rgb(var(--attention-surface) / <alpha-value>)',
       },
     },
   },
-  plugins: [],
+  plugins: [workspaceThemeContrast],
 };

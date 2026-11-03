@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -103,7 +104,8 @@ Deno.serve(async (req: Request) => {
         .eq('id', proposalId);
     }
 
-    const { data: settings } = await supabaseClient
+    // Credentials are read with the service role; client roles cannot read them.
+    const { data: settings } = await supabaseAdmin
       .from('company_settings')
       .select('company_name, company_email, from_email, from_name, reply_to_email, portal_url, twilio_account_sid, twilio_auth_token, twilio_phone_number')
       .maybeSingle();
@@ -192,7 +194,7 @@ Deno.serve(async (req: Request) => {
 
       const resendApiKey = Deno.env.get('RESEND_API_KEY');
       if (resendApiKey) {
-        const emailResponse = await fetch('https://api.resend.com/emails', {
+        const emailResponse = await sendSystemEmail({
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${resendApiKey}`,
@@ -210,8 +212,7 @@ Deno.serve(async (req: Request) => {
 
         emailSent = emailResponse.ok;
       } else {
-        console.log('Email would be sent to:', customerEmail);
-        emailSent = true; // Simulate success
+        throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
       }
     }
 

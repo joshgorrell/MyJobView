@@ -1,7 +1,7 @@
 import {useWorkOrderOptions,workOrderOptionLabel,workOrderOptionStyle} from '../../lib/workOrderOptions';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Search, Filter, Clock, Calendar, User, AlertCircle, Camera, Wrench, CheckCircle, X, Mail, MailCheck, Phone, PhoneOff, ArrowUpDown, ArrowDown, ArrowUp, Repeat } from 'lucide-react';
+import { Plus, Search, Filter, Clock, Calendar, User, AlertCircle, Camera, Wrench, CheckCircle, X, MailCheck, Phone, PhoneOff, ArrowDown, ArrowUp, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateWorkOrderModal } from './CreateWorkOrderModal';
 
@@ -10,6 +10,9 @@ interface WorkOrder {
   work_order_number: string;
   title: string;
   description: string;
+  scheduled_date?: string | null;
+  scheduled_start_time?: string | null;
+  contact?: { full_name: string | null; company_name: string | null } | null;
   work_order_type_id?: string | null;
   work_order_status_id?: string | null;
   type: string;
@@ -58,6 +61,8 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
   const workOrderOptions = useWorkOrderOptions();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [salesRepFilter, setSalesRepFilter] = useState<string[]>([]);
@@ -86,9 +91,10 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       .subscribe();
 
     return () => {
+      loadGeneration.current++;
       channel.unsubscribe();
     };
-  }, [sortDir]);
+  }, [sortDir, profile?.id, profile?.role]);
 
   async function loadUsers() {
     try {
@@ -96,7 +102,8 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       const { data: salesData } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['sales', 'sales_v2', 'admin', 'office_manager'])
+        .eq('is_sales_rep', true)
+        .eq('is_active', true)
         .order('full_name');
 
       if (salesData) setSalesReps(salesData);
@@ -105,7 +112,8 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
       const { data: techData } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['technician', 'field_tech', 'project_manager'])
+        .eq('is_technician', true)
+        .eq('is_active', true)
         .order('full_name');
 
       if (techData) setTechnicians(techData);
@@ -115,6 +123,14 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
   }
 
   async function loadWorkOrders() {
+    const generation = ++loadGeneration.current;
+    setLoading(true);
+    setLoadError(null);
+    let timeout: ReturnType<typeof setTimeout>;
+    const deadline = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => reject(new Error('Work orders took too long to load. Please retry.')), 15000);
+    });
+    const withinDeadline = <T,>(request: PromiseLike<T>) => Promise.race([request, deadline]);
     try {
       let query = supabase
         .from('work_orders')
@@ -123,6 +139,9 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
           work_order_number,
           title,
           description,
+          scheduled_date,
+          scheduled_start_time,
+          contact:contacts(full_name, company_name),
           type,
           status,
           priority,
@@ -144,18 +163,18 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
         `)
         .order('created_at', { ascending: sortDir === 'asc' });
 
-      if (profile?.role === 'technician' || profile?.role === 'field_tech') {
+      if (profile?.role === 'tech') {
         query = query.eq('assigned_to', profile.id);
       }
 
-      const { data: woData, error: woError } = await query;
+      const { data: woData, error: woError } = await withinDeadline(query.overrideTypes<Omit<WorkOrder, 'parts_count' | 'pending_parts' | 'photos_count' | 'is_completed'>[], { merge: false }>());
       if (woError) throw woError;
 
       const woList = woData || [];
       const woIds = woList.map(wo => wo.id);
 
       const [partsResult, photosResult, completionsResult] = woIds.length > 0
-        ? await Promise.all([
+        ? await withinDeadline(Promise.all([
             supabase
               .from('parts_requests')
               .select('id, status, work_order_id')
@@ -168,7 +187,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
               .from('job_completions')
               .select('id, work_order_id')
               .in('work_order_id', woIds)
-          ])
+          ]))
         : [null, null, null];
 
       const partsMap = new Map<string, { count: number; pending: number }>();
@@ -200,11 +219,13 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
         };
       });
 
-      setWorkOrders(workOrdersWithCounts);
+      if (generation === loadGeneration.current) setWorkOrders(workOrdersWithCounts);
     } catch (error) {
       console.error('Error loading work orders:', error);
+      if (generation === loadGeneration.current) setLoadError(error instanceof Error ? error.message : 'Unable to load work orders. Please retry.');
     } finally {
-      setLoading(false);
+      clearTimeout(timeout!);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }
 
@@ -273,10 +294,10 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
 
   const filteredWorkOrders = workOrders.filter(wo => {
     const matchesSearch =
-      wo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wo.work_order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wo.project?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wo.project?.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
+      (wo.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (wo.work_order_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (wo.project?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (wo.project?.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(wo.work_order_status_id || workOrderOptions.find(o=>o.kind==='status'&&o.system_key===wo.status)?.id || wo.status) || statusFilter.includes(wo.status);
     const matchesSalesRep = salesRepFilter.length === 0 || (wo.created_by && salesRepFilter.includes(wo.created_by));
@@ -299,6 +320,15 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading work orders...</div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div role="alert" className="p-4 bg-white rounded-lg space-y-3">
+        <p className="text-red-700">{loadError}</p>
+        <button onClick={() => loadWorkOrders()} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Retry</button>
       </div>
     );
   }
@@ -347,7 +377,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
             </span>
           )}
         </button>
-        {(profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'project_manager') && (
+        {(profile?.role === 'admin' || profile?.role === 'manager') && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
@@ -474,7 +504,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="font-semibold text-gray-900">{wo.work_order_number}</span>
+                    <span className="text-xs font-mono text-gray-500">{wo.work_order_number}</span>
                     <span className="text-xs text-gray-600">{workOrderOptionLabel(workOrderOptions,'type',wo.type,wo.work_order_type_id)}</span>
                     <span style={workOrderOptionStyle(workOrderOptions,'status',wo.status,wo.work_order_status_id)} className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(wo.status)}`}>
                       {workOrderOptionLabel(workOrderOptions,'status',wo.status,wo.work_order_status_id)}
@@ -514,7 +544,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
                   </div>
 
                   <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    {wo.title}
+                    {wo.contact?.company_name || wo.contact?.full_name || wo.project?.customer_name || wo.title}
                     {(wo.is_recurring_parent || wo.recurrence_parent_id) && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
                         <Repeat className="w-3 h-3" />
@@ -523,12 +553,10 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
                     )}
                   </h3>
 
-                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                    <span>{wo.project?.project_number}</span>
-                    <span>•</span>
-                    <span>{wo.project?.name}</span>
-                    <span>•</span>
-                    <span className="customer-link">{wo.project?.customer_name}</span>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-sm text-gray-600">
+                    <span>{wo.title}</span>
+                    {wo.project?.project_number && <span>· {wo.project.project_number}</span>}
+                    {wo.project?.name && <span>· {wo.project.name}</span>}
                   </div>
 
                   {wo.description && (
@@ -544,7 +572,7 @@ export function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
                     )}
                     <div className="flex items-center gap-1 text-sm text-gray-700">
                       <Calendar className="w-4 h-4" />
-                      {wo.target_completion_date ? new Date(wo.target_completion_date).toLocaleDateString() : 'No due date'}
+                      {wo.scheduled_date ? `${new Date(wo.scheduled_date + 'T00:00:00').toLocaleDateString()}${wo.scheduled_start_time ? ` · ${wo.scheduled_start_time.slice(0, 5)}` : ''}` : 'Not scheduled'}
                     </div>
                     <div className="flex items-center gap-1 text-sm text-gray-700">
                       <Clock className="w-4 h-4" />

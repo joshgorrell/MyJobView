@@ -1,3 +1,5 @@
+import { CompletionDialog } from '../Shared/CompletionDialog';
+import { useCompletion } from '../../hooks/useCompletion';
 import { useState, useEffect, useCallback } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -34,6 +36,7 @@ const METHOD_OPTIONS = [
 ];
 
 export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSuccess }: ApplyBulkPaymentModalProps) {
+  const completion = useCompletion(onSuccess);
   const [invoices, setInvoices] = useState<OpenInvoice[]>([]);
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const [totalAmount, setTotalAmount] = useState('');
@@ -238,7 +241,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
         }
       }
 
-      onSuccess();
+      completion.complete();
     } catch (err) {
       console.error('Error recording bulk payment:', err);
       setError(err instanceof Error ? err.message : 'Failed to record payment');
@@ -249,6 +252,8 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
 
   const selectedMethod = METHOD_OPTIONS.find(m => m.value === paymentMethod);
   const SelectedIcon = selectedMethod?.icon || DollarSign;
+
+  if (completion.completed) return <CompletionDialog title="Payment applied!" theme="emerald" kind="payment" onContinue={completion.finish} />;
 
   return (
     <div

@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { AttendanceBadge, useAttendanceResults } from '../Shared/AttendanceBadge';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Clock, AlertCircle, CheckCircle, AlertTriangle, Check, CreditCard as Edit2, Briefcase, Trash2, Bell, Send, MapPin, Upload, HelpCircle, X, FileText, Download, User, LayoutList, BarChart3, Wrench } from 'lucide-react';
 import { ManualTimeEntry } from './ManualTimeEntry';
@@ -172,6 +174,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const { profile, loading: authLoading } = useAuth();
   const [orgTimezone, setOrgTimezone] = useState<string>('America/Chicago');
   const [entries, setEntries] = useState<ClockEntry[]>([]);
+  const attendance = useAttendanceResults(entries.map(e => e.id));
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [alerts, setAlerts] = useState<ClockAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +182,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [leaveFilter, setLeaveFilter] = useState<string>('all'); // all, work, leave
+  const [_leaveFilter, _setLeaveFilter] = useState<string>('all'); // all, work, leave
   const [dateRange, setDateRange] = useState<'today' | 'yesterday' | 'this_week' | 'week' | 'month' | 'custom'>('this_week');
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -201,7 +204,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   const [viewingAlertGPS, setViewingAlertGPS] = useState<ClockAlert | null>(null);
   const [autoClockOutsPendingApproval, setAutoClockOutsPendingApproval] = useState<ClockEntry[]>([]);
   const [approvingAutoClockOut, setApprovingAutoClockOut] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [_currentTime, setCurrentTime] = useState(Date.now());
   const [showCSVImport, setShowCSVImport] = useState(false);
   const [showJobTimeImport, setShowJobTimeImport] = useState(false);
   const [showCSVTutorial, setShowCSVTutorial] = useState(false);
@@ -416,7 +419,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
 
   async function approveAlertClockIn(clockAlert: ClockAlert) {
     if (!clockAlert.actual_clock_in_time) {
-      window.alert('No clock-in time recorded. Please use Edit to set a time.');
+      notify('No clock-in time recorded. Please use Edit to set a time.', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -693,73 +696,16 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   async function autoClockOutSingleEntry(entry: PendingAutoClockOut) {
     setProcessingClockOut(entry.id);
     try {
-      // will_clock_out_at is already a full timestamp from the view
-      const clockOutTime = new Date(entry.will_clock_out_at).toISOString();
-
-      // Update the clock entry
-      const { error: updateError } = await supabase
-        .from('daily_clock_entries')
-        .update({
-          clock_out: clockOutTime,
-          status: 'clocked_out',
-          admin_adjusted: true,
-          adjustment_reason: 'Auto-clocked out by admin: User forgot to clock out'
-        })
-        .eq('id', entry.id);
-
-      if (updateError) throw updateError;
-
-      const { data: settings } = await supabase
-        .from('organizations')
-        .select('forgot_clock_out_penalty_points')
-        .limit(1)
-        .maybeSingle();
-
-      const penaltyPoints = settings?.forgot_clock_out_penalty_points || -15;
-
-      // Create reward log entry with penalty
-      await supabase
-        .from('clock_in_rewards_log')
-        .insert({
-          technician_id: entry.technician_id,
-          daily_clock_entry_id: entry.id,
-          event_type: 'forgot_clock_out',
-          points_awarded: penaltyPoints,
-          minutes_delta: null,
-          scheduled_time: null,
-          actual_time: null
-        });
-
-      // Apply points penalty - fetch current points first
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('points_earned')
-        .eq('id', entry.technician_id)
-        .single();
-
-      const currentPoints = profileData?.points_earned || 0;
-      await supabase
-        .from('profiles')
-        .update({
-          points_earned: currentPoints + penaltyPoints
-        })
-        .eq('id', entry.technician_id);
-
-      // Create notification
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: entry.technician_id,
-          type: 'system',
-          title: 'Auto Clock-Out Applied',
-          body: `You were automatically clocked out at ${formatTime12Hour(clockOutTime, orgTimezone)} because you forgot to clock out on ${formatLocalDate(entry.entry_date)}. Points penalty: ${penaltyPoints} points.`,
-          related_id: entry.id
-        });
+      const { error } = await supabase.rpc('admin_forgotten_clock_out', {
+        p_entry_id: entry.id,
+        p_clock_out: new Date(entry.will_clock_out_at).toISOString(),
+      });
+      if (error) throw error;
 
       Promise.all([loadEntries(), loadAlerts(), checkPendingAutoClockOuts()]);
     } catch (error) {
       console.error('Error auto-clocking out entry:', error);
-      alert('Failed to auto clock-out entry');
+      notify('Failed to auto clock-out entry', { theme: 'blue', tone: 'error' });
     } finally {
       setProcessingClockOut(null);
     }
@@ -796,7 +742,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       Promise.all([loadEntries()]);
     } catch (error) {
       console.error('Error approving offline entry:', error);
-      alert('Failed to approve offline entry');
+      notify('Failed to approve offline entry', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -813,13 +759,13 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       setEntries(prev => prev.filter(e => e.id !== entry.id));
     } catch (error) {
       console.error('Error deleting entry:', error);
-      alert('Failed to delete entry. You may not have permission to delete time entries.');
+      notify('Failed to delete entry. You may not have permission to delete time entries.', { theme: 'blue', tone: 'error' });
     } finally {
       setDeletingClockId(null);
     }
   }
 
-  async function loadEntries(isInitial = false) {
+  async function loadEntries(_isInitial = false) {
     try {
       setLoading(true);
 
@@ -912,20 +858,6 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
     }
   }
 
-  function getStatusIcon(status: string) {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'rejected':
-        return <XCircle className="w-4 h-4 text-red-600" />;
-      case 'clocked_in':
-        return <Clock className="w-4 h-4 text-blue-600" />;
-      case 'clocked_out':
-        return <CheckCircle className="w-4 h-4 text-gray-600" />;
-      default:
-        return <AlertCircle className="w-4 h-4 text-yellow-600" />;
-    }
-  }
 
   function getStatusColor(status: string) {
     switch (status) {
@@ -947,25 +879,9 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   type ClockInStatus = 'early' | 'on-time' | 'late' | 'really-late';
 
   function getClockInStatus(entry: ClockEntry): ClockInStatus | null {
-    if (!entry.technician?.standard_start_time || !entry.clock_in) return null;
-
-    const scheduledStart = entry.technician.standard_start_time;
-    const clockInTime = new Date(entry.clock_in).toTimeString().slice(0, 8);
-
-    // Parse times
-    const [schedHour, schedMin] = scheduledStart.split(':').map(Number);
-    const [clockHour, clockMin, clockSec] = clockInTime.split(':').map(Number);
-
-    // Convert to minutes for comparison
-    const scheduledMinutes = schedHour * 60 + schedMin;
-    const clockInMinutes = clockHour * 60 + clockMin;
-
-    const diffMinutes = clockInMinutes - scheduledMinutes;
-
-    if (diffMinutes < -15) return 'early';
-    if (diffMinutes <= 0) return 'on-time';
-    if (diffMinutes <= 15) return 'late';
-    return 'really-late';
+    const scored = attendance[entry.id];
+    if (!scored) return null;
+    return scored.event_type === 'early' ? 'early' : scored.event_type === 'on_time' ? 'on-time' : scored.event_type === 'late' ? 'late' : 'really-late';
   }
 
   function formatMinutesLate(minutes: number): string {
@@ -1010,18 +926,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   }
 
   function calculateMinutesLate(entry: ClockEntry): number {
-    if (!entry.technician?.standard_start_time || !entry.clock_in) return 0;
-
-    const scheduledStart = entry.technician.standard_start_time;
-    const clockInTime = new Date(entry.clock_in).toTimeString().slice(0, 8);
-
-    const [schedHour, schedMin] = scheduledStart.split(':').map(Number);
-    const [clockHour, clockMin] = clockInTime.split(':').map(Number);
-
-    const scheduledMinutes = schedHour * 60 + schedMin;
-    const clockInMinutes = clockHour * 60 + clockMin;
-
-    return clockInMinutes - scheduledMinutes;
+    return attendance[entry.id]?.minutes_delta || 0;
   }
 
   function calculateElapsedHours(entry: ClockEntry): number {
@@ -1149,7 +1054,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       {/* Page Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-white">Time Clock History</h2>
+          <h2 className="text-lg font-bold text-white">Time Clock</h2>
           {refreshing && activeTab === 'clock' && <span className="text-xs text-gray-400 animate-pulse">Updating...</span>}
         </div>
         <div className="flex items-center gap-2">
@@ -1214,46 +1119,52 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-700 w-fit">
+      <div role="tablist" aria-label="Time clock sections" className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-700 w-full sm:w-fit overflow-x-auto">
         <button
           onClick={() => setActiveTab('clock')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          role="tab"
+          aria-selected={activeTab === 'clock'}
+          className={`flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === 'clock'
               ? 'bg-gray-700 text-white shadow-sm'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
           }`}
         >
           <Clock className="w-4 h-4" />
-          Clock History
+          Daily Clock History
         </button>
         <button
           onClick={() => setActiveTab('job_time')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          role="tab"
+          aria-selected={activeTab === 'job_time'}
+          className={`flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === 'job_time'
               ? 'bg-gray-700 text-white shadow-sm'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
           }`}
         >
           <LayoutList className="w-4 h-4" />
-          Job Time History
+          Job Clock History
         </button>
         <button
           onClick={() => setActiveTab('sessions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          role="tab"
+          aria-selected={activeTab === 'sessions'}
+          className={`flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === 'sessions'
               ? 'bg-gray-700 text-white shadow-sm'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
           }`}
         >
           <Wrench className="w-4 h-4" />
-          Shop &amp; Training
+          My Time
         </button>
       </div>
 
       {/* Job Time History Tab */}
       {activeTab === 'job_time' && <JobTimeHistory />}
 
-      {/* Internal Sessions Management Tab */}
+      {/* My Time: internal shop and training sessions; additional employee records will be consolidated here. */}
       {activeTab === 'sessions' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <InternalSessionsManagement />
@@ -1296,13 +1207,13 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
               {approvingAutoClockOut === 'all' ? 'Approving...' : 'Approve All'}
             </button>
           </div>
-          <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          <div className="space-y-1.5">
             {autoClockOutsPendingApproval.map(entry => (
               <div key={entry.id} className="bg-white rounded p-2 flex items-center justify-between gap-2 text-sm">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 truncate">{entry.technician?.full_name}</div>
                   <div className="text-xs text-gray-600">
-                    {formatLocalDate(entry.entry_date)}: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : '—'}
+                    {formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} />: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : '—'}
                     <span className="font-medium ml-1">({entry.total_hours?.toFixed(2) || '0'}h)</span>
                   </div>
                 </div>
@@ -1342,13 +1253,13 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
             </h3>
             <span className="text-xs text-yellow-300/70">Will be auto-clocked out at cutoff time</span>
           </div>
-          <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          <div className="space-y-1.5">
             {pendingAutoClockOutEntries.map(entry => (
               <div key={entry.id} className="bg-white rounded p-2 flex items-center justify-between gap-2 text-sm">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-gray-900 truncate">{entry.full_name}</div>
                   <div className="text-xs text-gray-600">
-                    In: {formatLocalDate(entry.entry_date)} {formatTime12Hour(entry.clock_in, orgTimezone)}
+                    In: {formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} /> {formatTime12Hour(entry.clock_in, orgTimezone)}
                     <span className="text-orange-600 font-medium ml-1">
                       ({Math.floor(entry.hours_since_clock_in)}h)
                     </span>
@@ -1470,7 +1381,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900 text-sm truncate">{entry.technician.full_name}</div>
                     <div className="text-xs text-gray-600 space-y-0.5">
-                      <div>{formatLocalDate(entry.entry_date)}: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : 'Active'} ({entry.total_hours?.toFixed(2)}h)</div>
+                      <div>{formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} />: {formatTime12Hour(entry.clock_in, orgTimezone)} - {entry.clock_out ? formatTime12Hour(entry.clock_out, orgTimezone) : 'Active'} ({entry.total_hours?.toFixed(2)}h)</div>
                       {!entry.clock_in_latitude && <span className="text-orange-600">(No GPS)</span>}
                     </div>
                   </div>
@@ -1561,7 +1472,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                     <div className="text-xs text-gray-600 truncate flex items-center gap-1">
                       {alert.alert_type === 'really_late' ? (
                         <>
-                          <span>{formatLocalDate(alert.alert_date)} - Late: {alert.actual_clock_in_time ? formatTime12Hour(createTimestampInTimezone(alert.alert_date, alert.actual_clock_in_time, orgTimezone), orgTimezone) : 'N/A'} ({formatMinutesLate(alert.minutes_late)})</span>
+                          <span>{formatLocalDate(alert.alert_date)} - Late: {alert.actual_clock_in_time ? formatTime12Hour(createTimestampInTimezone(alert.alert_date, alert.actual_clock_in_time, orgTimezone), orgTimezone) : 'N/A'} ({formatMinutesLate(alert.minutes_late ?? 0)})</span>
                           {alert.has_gps && (
                             <button
                               onClick={(e) => {
@@ -1808,7 +1719,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-1.5 text-xs text-gray-700">{formatLocalDate(entry.entry_date)}</td>
+                    <td className="px-2 py-1.5 text-xs text-gray-700">{formatLocalDate(entry.entry_date)} <AttendanceBadge result={attendance[entry.id]} /></td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center gap-0.5">
                         <span className="text-xs text-gray-900 font-medium">{formatTime12Hour(entry.clock_in, orgTimezone)}</span>
@@ -1868,7 +1779,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                           <span className="px-1 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-300">Pending</span>
                         )}
                         {entry.auto_clocked_out && entry.auto_clock_out_approved && (
-                          <CheckCircle className="w-3 h-3 text-green-500" title="Approved" />
+                          <CheckCircle className="w-3 h-3 text-green-500"><title>{"Approved"}</title></CheckCircle>
                         )}
                         {entry.leave_type && (
                           <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${
@@ -1880,8 +1791,8 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
                             {entry.leave_type === 'jury_duty' ? 'Jury' : entry.leave_type.charAt(0).toUpperCase() + entry.leave_type.slice(1)}
                           </span>
                         )}
-                        {entry.admin_adjusted && <AlertCircle className="w-3 h-3 text-yellow-600" title="Admin adjusted" />}
-                        {entry.offline_entry && !entry.admin_reviewed && <AlertCircle className="w-3 h-3 text-orange-600" title="Offline" />}
+                        {entry.admin_adjusted && <AlertCircle className="w-3 h-3 text-yellow-600"><title>{"Admin adjusted"}</title></AlertCircle>}
+                        {entry.offline_entry && !entry.admin_reviewed && <AlertCircle className="w-3 h-3 text-orange-600"><title>{"Offline"}</title></AlertCircle>}
                       </div>
                     </td>
                     <td className="px-2 py-1.5">

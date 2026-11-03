@@ -1,0 +1,31 @@
+name: Proposal submission and sharing checks
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/Proposals/ProposalBuilderCompact.tsx'
+      - 'src/components/Proposals/PreSendValidationModal.tsx'
+      - 'src/components/Proposals/ReactivateProposalModal.tsx'
+      - 'src/components/Portal/SharedProposalPage.tsx'
+      - 'tests/proposals/**'
+      - '.github/workflows/proposal-sharing-review.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:proposal-sharing
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://test.supabase.co
+          VITE_SUPABASE_ANON_KEY: test-key

@@ -1,0 +1,92 @@
+import ConfirmModal from '../ui/ConfirmModal';
+import { useAuth } from '../../contexts/AuthContext';
+import { useEffect, useState } from 'react';
+import { Eye, RefreshCw, Trash2, Send, Mail, TrendingUp, MessageSquare } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { proposalChoices, isProposalChoice } from '../../../supabase/functions/_shared/proposalCheckOptions';
+import { ReviewStatsRow, type StatItem, ReviewFilterBar, type FilterOption } from './ReviewStats';
+interface EmailRecord {id:string;recipient_name:string;recipient_email:string;sender_name:string;reply_to:string;subject:string;variant:string;created_at:string;sent_at:string|null;opened_at:string|null;last_opened_at:string|null;status:string;proposal_id:string|null;click_count:number;interaction_count:number;message_count:number;latest_choice:string|null;confirmed_choice:string|null;last_clicked_at:string|null}
+interface Activity {id:string;kind:string;choice:string;step:string|null;message:string|null;suspected_automated:boolean;created_at:string}
+const date=(v:string|null)=>v?new Date(v).toLocaleString():'—';
+const label=(v:string|null)=>isProposalChoice(v)?proposalChoices[v].label:'—';
+const readResponseTarget=()=>{const p=new URLSearchParams(window.location.search);return {emailId:p.get('proposalCheckEmailId'),eventId:p.get('proposalCheckEventId'),receivedAt:p.get('proposalCheckReceivedAt')}};
+const clearResponseTarget=()=>{const url=new URL(window.location.href);for(const key of ['proposalCheckEmailId','proposalCheckEventId','proposalCheckReceivedAt'])url.searchParams.delete(key);window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash)};
+export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
+ const {profile}=useAuth();const canDelete=['admin','owner','super_admin'].includes(profile?.role||'');
+ const [responseTarget,setResponseTarget]=useState(readResponseTarget);const [response,setResponse]=useState<{row:EmailRecord;event:Activity}|null>(null);const [responseLoading,setResponseLoading]=useState(false);const [responseError,setResponseError]=useState('');
+ const [deleteEmailTarget,setDeleteEmailTarget]=useState<EmailRecord|null>(null);
+ const [deleteTarget,setDeleteTarget]=useState<Activity|null>(null);const [deleting,setDeleting]=useState(false);
+ const [records,setRecords]=useState<EmailRecord[]>([]);const [page,setPage]=useState(0);const [search,setSearch]=useState('');const [query,setQuery]=useState('');const [filter,setFilter]=useState('all');const [refresh,setRefresh]=useState(0);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
+ const [totals,setTotals]=useState({sent:0,opened:0,clicked:0,messages:0});const [preview,setPreview]=useState<{subject:string;html:string}|null>(null);const [timeline,setTimeline]=useState<{row:EmailRecord;events:Activity[];page:number;more:boolean}|null>(null);
+ useEffect(()=>{const changed=()=>setResponseTarget(readResponseTarget());window.addEventListener('popstate',changed);return()=>window.removeEventListener('popstate',changed)},[]);
+ useEffect(()=>{let current=true;setResponse(null);setResponseError('');
+  if(!responseTarget.emailId){setResponseLoading(false);return;}
+  setResponseLoading(true);
+  void (async()=>{try{
+   const {data:row,error:rowError}=await supabase.from('proposal_check_reporting').select('*').eq('id',responseTarget.emailId).maybeSingle();
+   if(rowError||!row)throw new Error('This response is no longer available, or you do not have access to it.');
+   let request=supabase.from('proposal_check_events').select('id,kind,choice,step,message,suspected_automated,created_at').eq('email_id',row.id).eq('kind','message');
+   if(responseTarget.eventId)request=request.eq('id',responseTarget.eventId);
+   // The event and its in-app notification are inserted in the same transaction:
+   // both created_at defaults use now(), preserving an exact identity for old alerts.
+   else if(responseTarget.receivedAt)request=request.eq('created_at',responseTarget.receivedAt);
+   else throw new Error('This notification does not identify a response.');
+   const {data:event,error:eventError}=await request.maybeSingle();
+   if(eventError||!event)throw new Error('This response is no longer available, or you do not have access to it.');
+   if(current){setPreview(null);setTimeline(null);setResponse({row,event});}
+  }catch(e){if(current)setResponseError(e instanceof Error?e.message:'Response could not load.');}finally{if(current)setResponseLoading(false);}})();
+  return()=>{current=false};
+ },[responseTarget]);
+ const closeDetails=()=>{setPreview(null);setTimeline(null);setResponse(null);clearResponseTarget()};
+ useEffect(()=>{const timer=setTimeout(()=>{setPage(0);setQuery(search)},250);return()=>clearTimeout(timer)},[search]);
+ useEffect(()=>{let current=true;setLoading(true);setError('');let request=supabase.from('proposal_check_reporting').select('*').order('created_at',{ascending:false}).range(page*50,page*50+49);const term=query.replace(/[^a-zA-Z0-9@. +\-]/g,'').slice(0,100).trim();if(term)request=request.or(`recipient_name.ilike.%${term}%,recipient_email.ilike.%${term}%`);
+ if(isProposalChoice(filter))request=request.or(`confirmed_choice.eq.${filter},and(confirmed_choice.is.null,latest_choice.eq.${filter})`);
+ if(filter==='clicked_no_message')request=request.gt('click_count',0).eq('message_count',0);
+ if(filter==='message')request=request.gt('message_count',0);if(filter==='opened')request=request.not('opened_at','is',null);
+ void request.then(({data,error})=>{if(!current)return;if(error){setError('History could not load. Please refresh.');setRecords([])}else setRecords((data||[]) as EmailRecord[]);setLoading(false)});
+ const counts=[supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).eq('status','sent'),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).not('opened_at','is',null),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).gt('click_count',0),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).gt('message_count',0)];
+ void Promise.all(counts).then(results=>{if(current){if(results.some(r=>r.error))setError('Some reporting totals could not load. Please refresh.');else setTotals({sent:results[0].count||0,opened:results[1].count||0,clicked:results[2].count||0,messages:results[3].count||0})}});return()=>{current=false};},[page,query,filter,refresh,refreshKey]);
+ useEffect(()=>{if(!preview&&!timeline&&!response)return;const close=(e:KeyboardEvent)=>{if(e.key==='Escape'){closeDetails()}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[preview,timeline,response]);
+ async function showEmail(row:EmailRecord){const {data,error}=await supabase.from('proposal_check_emails').select('email_html').eq('id',row.id).single();if(error)setError('Saved email could not load.');else setPreview({subject:row.subject,html:data.email_html})}
+ async function showTimeline(row:EmailRecord,eventPage=0){const {data,error}=await supabase.from('proposal_check_events').select('id,kind,choice,step,message,suspected_automated,created_at').eq('email_id',row.id).order('created_at',{ascending:false}).order('id',{ascending:false}).range(eventPage*50,eventPage*50+49);if(error)setError('Activity could not load.');else setTimeline({row,events:(data||[]) as Activity[],page:eventPage,more:data?.length===50})}
+ async function deleteEmailRecord(){if(!deleteEmailTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_email',email_id:deleteEmailTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Email record could not be deleted.');setDeleteEmailTarget(null);setTimeline(null);setRefresh(v=>v+1);}catch(e){setError(e instanceof Error?e.message:'Email record could not be deleted.');}finally{setDeleting(false);}}
+ async function deleteSubmission(){if(!deleteTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_submission',event_id:deleteTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Submission could not be deleted.');setDeleteTarget(null);setRefresh(v=>v+1);if(response){setResponse(null);clearResponseTarget();}if(timeline)await showTimeline(timeline.row,0);}catch(e){setError(e instanceof Error?e.message:'Submission could not be deleted.');}finally{setDeleting(false);}}
+ const proposalStats: StatItem[] = [
+  { label: 'Sent', value: totals.sent, sublabel: 'all proposal checks', icon: Send, iconColor: 'text-blue-400' },
+  { label: 'Open Detected', value: totals.opened, sublabel: 'tracking image loaded', icon: Mail, iconColor: 'text-blue-400' },
+  { label: 'Link Visits', value: totals.clicked, sublabel: 'response link clicks', icon: TrendingUp, iconColor: 'text-amber-400' },
+  { label: 'Messages Received', value: totals.messages, sublabel: 'customer replies', icon: MessageSquare, iconColor: 'text-green-400' },
+ ];
+  const proposalFilterOptions: FilterOption[] = [
+    { value: 'all', label: 'All', count: totals.sent },
+    { value: 'opened', label: 'Opened', count: totals.opened },
+    { value: 'clicked_no_message', label: 'Clicked', count: totals.clicked },
+    { value: 'message', label: 'Messages', count: totals.messages },
+    ...Object.entries(proposalChoices).map(([key, value]) => ({ value: key, label: value.label })),
+  ];
+ return <section aria-label="Proposal Check Send History" className="space-y-4 rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5">
+  <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold text-white">Proposal Check Reporting</h2><button disabled={loading} onClick={()=>setRefresh(v=>v+1)} className="flex min-h-11 items-center gap-2 text-gray-200"><RefreshCw size={18}/>Refresh</button></div>
+  <ReviewStatsRow stats={proposalStats} /><p className="text-xs text-gray-400">Totals count emails across all history you can access.</p>
+  <div className="flex flex-wrap items-center gap-3">
+    <label className="flex items-center gap-2 text-sm text-gray-300"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search customer or email" className="min-h-11 w-full sm:w-64 rounded-lg border border-gray-600 bg-gray-900 p-3 text-white"/></label>
+    <ReviewFilterBar options={proposalFilterOptions} active={filter} onChange={(v)=>{setFilter(v);setPage(0)}} />
+  </div>
+  {responseLoading&&<p role="status" className="text-blue-300">Opening customer response…</p>}{responseError&&<p role="alert" className="text-red-300">{responseError}</p>}
+  {error&&<p role="alert" className="text-red-300">{error}</p>}
+  {loading?<p role="status" className="text-gray-400">Loading history…</p>:!records.length?<p className="text-gray-400">No emails match.</p>:records.map(row=><article key={row.id} className="rounded-lg border border-gray-700 bg-gray-900 p-3 sm:p-4">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0"><h3 className="font-semibold text-white">{row.recipient_name}</h3><p className="break-all text-sm text-gray-400">{row.recipient_email}</p></div>
+      <div className="flex shrink-0 items-center gap-2"><span className="text-xs text-blue-300">{row.status==='sent'?'Sent':row.status==='failed'?'Send failed':'Pending'}</span>{canDelete&&<button aria-label={`Delete proposal check record for ${row.recipient_name}`} title="Delete email record and activity" disabled={deleting} onClick={()=>setDeleteEmailTarget(row)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-red-300 hover:bg-red-950 disabled:opacity-40"><Trash2 size={18}/></button>}</div>
+    </div>
+    <p className="mt-2"><span className={`inline-block max-w-full rounded-full border px-3 py-1 text-sm font-medium ${row.confirmed_choice||row.message_count>0?'!border-green-500/50 !bg-green-950 !text-green-300':row.latest_choice||row.click_count>0?'!border-amber-500/50 !bg-amber-950 !text-amber-300':row.opened_at?'!border-blue-500/50 !bg-blue-950 !text-blue-300':'!border-gray-500 !bg-gray-800 !text-gray-300'}`}>{row.confirmed_choice?label(row.confirmed_choice):row.latest_choice?`Link visited: ${label(row.latest_choice)} (unconfirmed)`:row.click_count>0?'Link visited (unconfirmed)':row.opened_at?'Open detected · Awaiting response':'Awaiting response'}{row.message_count>0&&` · ${row.message_count} ${row.message_count===1?'message':'messages'}`}</span></p>
+    <p className="mt-1 text-xs text-gray-400">{row.sender_name} · {date(row.sent_at||row.created_at)}</p>
+    <div className="mt-1 flex flex-wrap gap-x-4"><button onClick={()=>void showTimeline(row)} className="min-h-11 text-sm text-blue-300">Activity & messages</button><button onClick={()=>void showEmail(row)} className="flex min-h-11 items-center gap-2 text-sm text-blue-300"><Eye size={16}/>Sent email</button>{row.proposal_id&&<a className="flex min-h-11 items-center text-sm text-blue-300" href={`/?tab=proposals&proposalId=${row.proposal_id}`}>Proposal</a>}</div>
+    <details className="text-xs text-gray-400"><summary className="cursor-pointer py-2">Email & tracking details</summary><dl className="grid gap-2 pt-1 sm:grid-cols-2"><div className="sm:col-span-2">Subject: {row.subject}</div><div>Version: {row.variant==='owner'?'Owner':'Salesperson'}</div><div className="break-all">Replies to: {row.reply_to}</div><div>First open detected: {date(row.opened_at)}</div><div>Latest open detected: {date(row.last_opened_at||row.opened_at)}</div><div>Latest link visit: {date(row.last_clicked_at)}</div><div>{row.click_count} link visits · {row.interaction_count} page interactions</div></dl></details>
+  </article>)}
+  <div className="flex justify-between text-sm text-gray-300"><button disabled={!page||loading} onClick={()=>setPage(v=>v-1)} className="min-h-11 disabled:opacity-40">Previous</button><span>Page {page+1}</span><button disabled={records.length<50||loading} onClick={()=>setPage(v=>v+1)} className="min-h-11 disabled:opacity-40">Next</button></div>
+  <p className="text-xs text-gray-400">Open detected means a tracking image loaded, which privacy tools may do automatically. Link visits may include security scanners; response-page interactions and submitted messages are shown separately. No signal does not prove the email was unread. Previews do not record engagement. Tracking applies to new emails; older messages retain their available history.</p>
+  {(preview||timeline||response)&&<div role="dialog" aria-modal="true" aria-label={response?'Proposal check response':timeline?'Proposal check activity':'Saved proposal check email'} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3"><div className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-gray-600 bg-gray-900"><div className="flex shrink-0 items-center justify-between gap-3 p-4"><h3 className="font-semibold text-white">{response?response.row.recipient_name:timeline?timeline.row.recipient_name:preview?.subject}</h3><button autoFocus onClick={closeDetails} className="min-h-11 px-3 text-gray-200">Close</button></div>{preview?<iframe title="Saved sent email" sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html} className="h-[650px] max-h-[75vh] w-full bg-white"/>:<div className="overflow-auto p-4 text-gray-200">{error&&<p role="alert" className="mb-3 text-red-300">{error}</p>}{!(response?[response.event]:timeline?.events||[]).length?<p>No activity recorded.</p>:(response?[response.event]:timeline?.events||[]).map(event=><div key={event.id} className="mb-3 space-y-2 rounded-lg border border-gray-700 p-3"><p className="font-semibold">{event.kind==='message'?'Message submitted':event.kind==='interaction'?'Response page interaction':'Email link visited'}: {label(event.choice)}</p>{event.step&&<p>{event.step}</p>}{event.message&&<p className="whitespace-pre-wrap break-words">{event.message}</p>}{canDelete&&event.kind==='message'&&<button disabled={deleting} onClick={()=>setDeleteTarget(event)} className="flex min-h-11 items-center gap-2 text-sm text-red-300"><Trash2 size={16}/>Delete submission</button>}<p className="text-xs text-gray-400">{date(event.created_at)}{event.kind==='link_visit'&&(event.suspected_automated?' · Suspected automated visit':' · Unconfirmed link activity')}</p></div>)}{response&&<button className="min-h-11 text-blue-300" onClick={()=>{void showTimeline(response.row);setResponse(null);clearResponseTarget()}}>All activity & messages</button>}{timeline&&<div className="flex justify-between"><button disabled={!timeline.page} className="min-h-11 disabled:opacity-40" onClick={()=>void showTimeline(timeline.row,timeline.page-1)}>Newer activity</button><button disabled={!timeline.more} className="min-h-11 disabled:opacity-40" onClick={()=>void showTimeline(timeline.row,timeline.page+1)}>Older activity</button></div>}</div>}</div></div>}
+  <ConfirmModal isOpen={!!deleteEmailTarget} title="Delete proposal check record?" message={`Permanently remove the sent-email record and all responses and activity for ${deleteEmailTarget?.recipient_name || 'this customer'}? Existing email response links will stop working. This does not delete the customer or proposal.`} confirmLabel={deleting?'Deleting…':'Delete record'} onConfirm={()=>void deleteEmailRecord()} onCancel={()=>{if(!deleting)setDeleteEmailTarget(null)}}/>
+  <ConfirmModal isOpen={!!deleteTarget} title="Delete proposal check submission?" message="This permanently removes this customer response and its message. The original sent email and other activity stay in the report." confirmLabel={deleting?'Deleting…':'Delete submission'} onConfirm={()=>void deleteSubmission()} onCancel={()=>{if(!deleting)setDeleteTarget(null)}}/>
+ </section>;
+}

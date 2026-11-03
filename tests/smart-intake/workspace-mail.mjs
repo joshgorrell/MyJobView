@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const exports = {};
+const source = fs.readFileSync('src/lib/smart-intake/workspace-mail.ts','utf8');
+vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{exports});
+assert.equal(exports.determineWorkspaceDedupIdentity({originalMessageId:' <ABC@EXAMPLE.COM> ',forwardedMessageId:'second'}),'abc@example.com');
+assert.equal(exports.determineWorkspaceDedupIdentity({forwardedMessageId:' <fallback> '}),'fallback');
+assert.equal(exports.isIntakeLoop('bot@electroniclife.com',['bot@electroniclife.com']),true);
+assert.equal(exports.isIntakeLoop('customer@example.com',['bot@electroniclife.com']),false);
+console.log('Google Workspace message identity contract passed');

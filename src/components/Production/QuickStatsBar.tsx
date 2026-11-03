@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Activity, PlayCircle, Clock, AlertCircle, Wrench, CheckSquare } from 'lucide-react';
@@ -117,7 +117,7 @@ export function QuickStatsBar() {
   }
 
   const isTech = profile?.role === 'tech';
-  const isManager = profile?.role === 'admin' || profile?.role === 'office_manager' || profile?.role === 'production_manager';
+
 
   if (loading) {
     return (

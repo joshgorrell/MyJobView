@@ -4,9 +4,10 @@ import type { KpiCardData } from '../../lib/salesDashboardTypes';
 interface SalesKpiCardProps {
   data: KpiCardData;
   accentColor?: string;
+  onClick?: () => void;
 }
 
-export function SalesKpiCard({ data, accentColor = 'blue' }: SalesKpiCardProps) {
+export function SalesKpiCard({ data, accentColor = 'blue', onClick }: SalesKpiCardProps) {
   const colorMap: Record<string, { bg: string; text: string; border: string; iconBg: string }> = {
     blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', iconBg: 'bg-blue-100' },
     green: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', iconBg: 'bg-green-100' },
@@ -20,7 +21,7 @@ export function SalesKpiCard({ data, accentColor = 'blue' }: SalesKpiCardProps) 
   const trendColor = data.trend === 'up' ? 'text-green-600' : data.trend === 'down' ? 'text-red-600' : 'text-gray-400';
 
   return (
-    <div className={`rounded-xl border ${c.border} ${c.bg} p-5 transition-shadow hover:shadow-md`}>
+    <button type="button" onClick={onClick} className={`text-left rounded-xl border ${c.border} ${c.bg} p-5 transition-shadow hover:shadow-md`}>
       <div className="flex items-start justify-between mb-3">
         <h3 className="text-sm font-medium text-gray-600 leading-tight">{data.title}</h3>
         {data.trendPct !== null && (
@@ -37,6 +38,6 @@ export function SalesKpiCard({ data, accentColor = 'blue' }: SalesKpiCardProps) 
           {data.comparisonBadge}
         </div>
       )}
-    </div>
+    </button>
   );
 }

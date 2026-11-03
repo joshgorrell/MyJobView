@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Lock, Pencil, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { createWorkspacePortal as createPortal } from '../ui/workspacePortal';
+import { X, Lock, Pencil, Package, Save, Loader2, Check, Image as ImageIcon, Tag, Wrench, ChevronRight, ExternalLink, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
@@ -123,7 +124,7 @@ export function SalesOrderLineItemModal({
             labor_phases(id, name)
           `)
           .eq('id', lineItemId)
-          .single(),
+          .single().overrideTypes<LineItemFull, { merge: false }>(),
         supabase
           .from('labor_phases')
           .select('id, name')
@@ -169,7 +170,7 @@ export function SalesOrderLineItemModal({
             labor_phase:labor_phases(name, default_price)
           `)
           .eq('id', li.product_id)
-          .maybeSingle();
+          .maybeSingle().overrideTypes<MasterProduct, { merge: false }>();
         if (prod) {
           setMasterProduct(prod as MasterProduct);
           setForm(f => ({ ...f, image_url: prod.image_url ?? '' }));
@@ -225,7 +226,7 @@ export function SalesOrderLineItemModal({
       }, 700);
     } catch (err) {
       console.error('Error saving line item:', err);
-      alert('Failed to save changes.');
+      notify('Failed to save changes.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -252,7 +253,7 @@ export function SalesOrderLineItemModal({
   const isLabor = lineItem?.item_type === 'labor';
 
   const modal = (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+    <div className="theme-workspace fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
 
         {/* Header */}

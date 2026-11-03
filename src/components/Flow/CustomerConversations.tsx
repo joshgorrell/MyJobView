@@ -1,0 +1,1245 @@
+import { NewTeamMessage } from './NewTeamMessage';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MessageSquare, Send, X, Search, User, ArrowLeft, Loader, ImagePlus, Link as LinkIcon, ExternalLink, Clock, AlertCircle, HelpCircle } from 'lucide-react';
+import { QuickActionModal } from '../Shared/QuickActionModal';
+import { supabase } from '../../lib/supabase';
+import { resolveMessageAttachments } from '../../lib/messageAttachments';
+import { useConversationHeight } from './useConversationHeight';
+import { EnrichedThread, Message } from './conversationTypes';
+import { loadCoworkerThreads, loadCoworkerMessages, markCoworkerMessagesRead, sendCoworkerReply } from './coworkerConversations';
+import { useAuth } from '../../contexts/AuthContext';
+import { insertFlowTag, useFlowTags, TagChoice } from './useFlowTags';
+import { findEmployeeMentionCandidates, MentionPerson } from '../../lib/flow/mentionCandidates';
+
+
+interface Contact {
+  id: string;
+  contact_name: string;
+}
+
+export interface CustomerConversationsProps {
+  hideFilters?: boolean;
+  fitScreen?: boolean;
+  newMessageRequested?: number;
+  conversationType?: 'all' | 'customer' | 'coworkers';
+  includeCustomers?: boolean;
+  includeCoworkers?: boolean;
+  unreadOnly?: boolean;
+  contactId?: string;
+  projectId?: string;
+  workOrderId?: string;
+  createRequested?: boolean;
+  onCreateOpened?: () => void;
+  openThreadId?: string | null;
+  onThreadOpened?: () => void;
+  onThreadSelected?: (threadId: string) => void;
+  onOpenProposal?: (proposalId: string, threadId?: string) => void;
+}
+
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function extractUrl(text: string): string | null {
+  const match = text.match(URL_REGEX);
+  return match ? match[0] : null;
+}
+
+function renderAttachment(msg: Message, isOwnMessage: boolean) {
+  if (!msg.attachment_url) return null;
+
+  if (msg.attachment_type === 'image') {
+    return (
+      <div className="mt-1.5 rounded-lg overflow-hidden border border-black/10 max-w-[240px]">
+        <img src={msg.attachment_url} alt="Attachment" className="w-full h-auto max-h-[200px] object-cover" loading="lazy" />
+      </div>
+    );
+  }
+
+  if (msg.attachment_type === 'link') {
+    return (
+      <a
+        href={msg.attachment_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`mt-1.5 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+          isOwnMessage ? 'bg-blue-500/30 text-blue-50 hover:bg-blue-500/40' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        <LinkIcon className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="truncate">{msg.attachment_url}</span>
+      </a>
+    );
+  }
+
+  return null;
+}
+
+function formatTime(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+export function CustomerConversations({ fitScreen = false, newMessageRequested = 0, hideFilters = false, unreadOnly = false, conversationType = 'customer', includeCustomers = true, includeCoworkers = false, createRequested, onCreateOpened, openThreadId, onThreadOpened, onThreadSelected, onOpenProposal, contactId, projectId, workOrderId }: CustomerConversationsProps = {}) {
+  const { profile, loading: authLoading } = useAuth();
+  const loadVersion = useRef(0);
+  const loadHistoryVersion = useRef(0);
+  const showCustomers = includeCustomers && conversationType !== 'coworkers';
+  const showCoworkers = includeCoworkers && conversationType !== 'customer';
+  const [threads, setThreads] = useState<EnrichedThread[]>([]);
+  const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
+  const activeThreadId = useRef<string | null>(null);
+  activeThreadId.current = selectedThread?.id || null;
+  useEffect(() => {
+    setSelectedThread(current => current && (current.source === 'coworker' ? !showCoworkers : !showCustomers) ? null : current);
+  }, [showCoworkers, showCustomers]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [messageCursor, setMessageCursor] = useState(0);
+  const [mentionHighlight, setMentionHighlight] = useState(0);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+  const { tag: messageTag, choices: messageChoices } = useFlowTags(newMessage, messageCursor, profile?.organization_id || undefined);
+  const [showNewThread, setShowNewThread] = useState(false);
+  const [showTeamComposer, setShowTeamComposer] = useState(false);
+  useEffect(() => { if (newMessageRequested) setShowTeamComposer(true); }, [newMessageRequested]);
+  useEffect(() => {
+    if (createRequested) { setShowNewThread(true); onCreateOpened?.(); }
+  }, [createRequested, onCreateOpened]);
+  const [loading, setLoading] = useState(true);
+  const conversationSize = useConversationHeight(!fitScreen && !authLoading && !loading);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const scrollThread = useRef<string | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'customer' | 'proposals' | 'internal'>('all');
+  const [isInternal, setIsInternal] = useState(false);
+  // Only coworker posts currently persist mention recipients for notification.
+  const canMentionStaff = selectedThread?.source === 'coworker';
+  const [mentionPeople, setMentionPeople] = useState<MentionPerson[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    if (!canMentionStaff || !profile?.organization_id) { setMentionPeople([]); return; }
+    void supabase.from('profiles').select('id,username,full_name')
+      .eq('organization_id', profile.organization_id).eq('is_active', true).limit(500)
+      .then(({ data }) => { if (!cancelled) setMentionPeople((data || []).filter(p => p.full_name)); });
+    return () => { cancelled = true; };
+  }, [canMentionStaff, profile?.organization_id]);
+  const staffChoices = messageTag?.symbol === '@' && canMentionStaff ? messageChoices.filter(c => c.kind === 'person') : [];
+  const naturalCandidates = canMentionStaff && !messageTag
+    ? findEmployeeMentionCandidates(newMessage, mentionPeople).filter(candidate => candidate.end <= messageCursor && candidate.personIds.length > 0 && !candidate.text.startsWith('@'))
+    : [];
+  const naturalCandidate = naturalCandidates[naturalCandidates.length - 1];
+  function confirmNaturalMention(person: MentionPerson) {
+    if (!naturalCandidate || !person.username) return;
+    const replacement = '@' + person.username;
+    const next = newMessage.slice(0, naturalCandidate.start) + replacement + newMessage.slice(naturalCandidate.end);
+    const cursor = naturalCandidate.start + replacement.length;
+    setNewMessage(next); setMessageCursor(cursor);
+    requestAnimationFrame(() => { messageInput.current?.focus(); messageInput.current?.setSelectionRange(cursor, cursor); });
+  }
+  function chooseMessageMention(choice: TagChoice) {
+    if (!messageTag || choice.kind !== 'person') return;
+    const inserted = insertFlowTag(newMessage, messageCursor, messageTag.start, choice);
+    setNewMessage(inserted.text); setMessageCursor(inserted.cursor); setMentionHighlight(0);
+    requestAnimationFrame(() => { messageInput.current?.focus(); messageInput.current?.setSelectionRange(inserted.cursor, inserted.cursor); });
+  }
+  const [uploading, setUploading] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; preview?: string; type: 'image' | 'link' } | null>(null);
+  const [firstImage, setFirstImage] = useState<File | null>(null);
+  const [contactSearch, setContactSearch] = useState('');
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [relatedRecords, setRelatedRecords] = useState<{id: string; label: string}[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
+
+  const [replyContextLabel, setReplyContextLabel] = useState<string | null>(null);
+  const [showQuestionSummary, setShowQuestionSummary] = useState(true);
+  const [newThreadForm, setNewThreadForm] = useState({
+    subject: '',
+    contact_id: contactId || '',
+    context_type: 'contact' as 'contact' | 'proposal' | 'project',
+    context_id: '',
+    visibility: 'public' as 'internal' | 'public',
+    first_message: '',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setRelatedRecords([]);
+    if (!showNewThread || newThreadForm.context_type === 'contact' || !newThreadForm.contact_id || !profile?.organization_id) return;
+    setLoadingRelated(true);
+    const table = newThreadForm.context_type === 'proposal' ? 'proposals' : 'projects';
+    const columns = table === 'proposals' ? 'id, proposal_number, title' : 'id, name';
+    supabase.from(table).select(columns).eq('organization_id', profile.organization_id).eq('contact_id', newThreadForm.contact_id).then(({data, error}) => {
+      if (cancelled) return;
+      setRelatedRecords(error ? [] : (data || []).map((record: any) => ({id: record.id, label: record.name || [record.proposal_number, record.title].filter(Boolean).join(' — ') || record.id})));
+      setLoadingRelated(false);
+    });
+    return () => { cancelled = true; };
+  }, [showNewThread, newThreadForm.context_type, newThreadForm.contact_id, profile?.organization_id]);
+
+  useEffect(() => { setSelectedThread(null); openedRequest.current = null; }, [contactId, projectId, workOrderId]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadThreads = useCallback(async () => {
+    if (!profile?.organization_id) {
+      setLoadError('Your company could not be identified. Reload the page to try again.');
+      setLoading(false);
+      return;
+    }
+    const version = ++loadVersion.current;
+    try {
+      setLoadError('');
+
+      let query = showCustomers ? supabase
+        .from('message_threads')
+        .select(`
+          id, subject, context_type, context_id, proposal_id, visibility,
+          created_by, last_message_at, assigned_sales_rep_id, organization_id, contact_id
+        `)
+        .eq('organization_id', profile.organization_id)
+        .order('last_message_at', { ascending: false }) : null;
+
+      if (contactId && query) query = query.eq('contact_id', contactId);
+      if (query && projectId && !workOrderId) {
+        const { data: orders, error: ordersError } = await supabase.from('work_orders').select('id').eq('project_id', projectId).eq('organization_id', profile.organization_id);
+        if (ordersError) throw ordersError;
+        query = query.in('context_type', ['project', 'work_order']).in('context_id', [projectId, ...(orders || []).map(w => w.id)]);
+      }
+      if (workOrderId && query) query = query.eq('context_type', 'work_order').eq('context_id', workOrderId);
+
+      // Row-level security resolves customer, project, service, and executive access.
+      // Filtering here by the assigned sales rep would hide a rep's other customer threads.
+
+      const { data: threadsData, error } = query ? await query : { data: [], error: null };
+      if (error) throw error;
+
+      const enriched: EnrichedThread[] = [];
+
+      for (const thread of threadsData || []) {
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('thread_id', thread.id);
+
+        const { data: lastMsg } = await supabase
+          .from('messages')
+          .select('body, author_type, created_at, context_label, attachment_url, attachment_type')
+          .eq('thread_id', thread.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const { data: customerMsgs } = await supabase
+          .from('messages')
+          .select('id, is_read, created_at')
+          .eq('thread_id', thread.id)
+          .eq('author_type', 'customer')
+          .eq('is_internal', false);
+
+        const unreadCount = customerMsgs?.filter(m => !m.is_read).length || 0;
+
+        const { data: lastRepResponse } = await supabase
+          .from('messages')
+          .select('created_at')
+          .eq('thread_id', thread.id)
+          .eq('author_type', 'staff')
+          .eq('is_internal', false)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let contactName = '';
+        let proposalNumber = '';
+        let proposalTitle = '';
+        let proposalStatus = '';
+        let repName = '';
+
+        if (thread.contact_id) {
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('full_name')
+            .eq('id', thread.contact_id)
+            .maybeSingle();
+          contactName = contact?.full_name || '';
+        }
+
+        if (thread.proposal_id) {
+          const { data: proposal } = await supabase
+            .from('proposals')
+            .select('proposal_number, title, status, created_by, creator:profiles!proposals_created_by_fkey(full_name)')
+            .eq('id', thread.proposal_id)
+            .maybeSingle();
+          if (proposal) {
+            proposalNumber = proposal.proposal_number || '';
+            proposalTitle = proposal.title || '';
+            proposalStatus = proposal.status || '';
+            repName = (proposal.creator as any)?.full_name || '';
+          }
+        }
+
+        let relatedContextName = '';
+        if (thread.context_id && ['project', 'work_order'].includes(thread.context_type)) {
+          const table = thread.context_type === 'project' ? 'projects' : 'work_orders';
+          const { data: context } = await supabase.from(table).select(table === 'projects' ? 'name' : 'title,work_order_number').eq('id', thread.context_id).maybeSingle();
+          relatedContextName = (context as any)?.name || [(context as any)?.work_order_number, (context as any)?.title].filter(Boolean).join(' · ');
+        }
+        enriched.push({
+          id: thread.id,
+          subject: thread.subject || '',
+          context_type: thread.context_type || '',
+          context_id: thread.context_id,
+          proposal_id: thread.proposal_id,
+          visibility: thread.visibility || 'internal',
+          created_by: thread.created_by,
+          last_message_at: thread.last_message_at,
+          assigned_sales_rep_id: thread.assigned_sales_rep_id,
+          organization_id: thread.organization_id,
+          contact_id: thread.contact_id,
+          message_count: count || 0,
+          last_message_preview: lastMsg?.body || '',
+          last_message_author_type: lastMsg?.author_type || 'staff',
+          contact_name: contactName,
+          proposal_number: proposalNumber,
+          proposal_title: proposalTitle,
+          proposal_status: proposalStatus,
+          rep_name: repName,
+          unread_count: unreadCount,
+          last_rep_response_at: lastRepResponse?.created_at || null,
+          last_customer_message_at: customerMsgs?.map(m => m.created_at).sort().reverse()[0] || null,
+          related_context_name: relatedContextName,
+          context_label: lastMsg?.context_label || null,
+          attachment_url: lastMsg?.attachment_url || null,
+          attachment_type: lastMsg?.attachment_type || null,
+        });
+      }
+
+      if (showCoworkers) enriched.push(...await loadCoworkerThreads(profile.organization_id, profile.id, { contactId, projectId, workOrderId }));
+      enriched.sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));
+      if (version !== loadVersion.current) return;
+      setThreads(enriched);
+      setSelectedThread(current => current ? enriched.find(t => t.id === current.id && t.source === current.source) || null : null);
+      return enriched;
+    } catch (error) {
+      console.error('Error loading threads:', error);
+      if (version === loadVersion.current) { setLoadError('Unable to load conversations. Please try again.'); }
+    } finally {
+      if (version === loadVersion.current) setLoading(false);
+    }
+  }, [profile?.id, profile?.organization_id, contactId, projectId, workOrderId, showCustomers, showCoworkers]);
+
+  async function loadContacts() {
+    const { data } = await supabase
+      .from('contacts')
+      .select('id, contact_name, full_name')
+      .eq('organization_id', profile?.organization_id)
+      .order('full_name');
+    if (data) setContacts(data.map(c => ({ id: c.id, contact_name: c.full_name || c.contact_name || '' })));
+  }
+
+  useEffect(() => {
+    if (!authLoading && profile) {
+      loadThreads();
+      if (showCustomers) loadContacts();
+    } else if (!authLoading && !profile) {
+      setLoading(false);
+    }
+    return () => { loadVersion.current++; };
+  }, [authLoading, profile?.id, profile?.organization_id, loadThreads]);
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!profile?.organization_id) return;
+
+    const channel = supabase
+      .channel(`flow-conversations-${contactId || projectId || workOrderId || 'all'}-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => { loadThreads(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_threads' },
+        () => { loadThreads(); }
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'discussion_posts', filter: `organization_id=eq.${profile.organization_id}` }, () => { if (showCoworkers) void loadThreads(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'flow_event_views', filter: `user_id=eq.${profile.id}` }, () => { if (showCoworkers) void loadThreads(); })
+      .subscribe();
+    const timer = window.setInterval(() => { void loadThreads(); }, 30000);
+    return () => { window.clearInterval(timer); supabase.removeChannel(channel); };
+  }, [profile?.organization_id, loadThreads]);
+
+  // Clear drafts between conversations and guard late responses from another thread.
+  useEffect(() => {
+    setMessages([]); setNewMessage(''); setPendingAttachment(null); setReplyContextLabel(null);
+    setIsInternal(selectedThread?.visibility === 'internal');
+  }, [selectedThread?.id, selectedThread?.source]);
+  useEffect(() => {
+    if (!selectedThread) return;
+    let cancelled = false;
+    const reload = async () => { if (!cancelled) await loadMessages(selectedThread.id, selectedThread.source); };
+    void reload();
+    const table = selectedThread.source === 'coworker' ? 'discussion_posts' : 'messages';
+    const channel = supabase.channel(`flow-thread-${table}-${selectedThread.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table, filter: table === 'messages' ? `thread_id=eq.${selectedThread.id}` : `organization_id=eq.${profile?.organization_id}` }, () => void reload()).subscribe();
+    const timer = window.setInterval(() => void reload(), 30000);
+    return () => { cancelled = true; loadHistoryVersion.current++; window.clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [selectedThread?.id, selectedThread?.source, selectedThread?.root_ids?.join(',')]);
+
+  const openedRequest = useRef<string | null>(null);
+  // Auto-select thread when openThreadId is provided
+  useEffect(() => {
+    if (openThreadId && threads.length > 0 && openedRequest.current !== openThreadId) {
+      const thread = threads.find(t => t.id === openThreadId || t.root_ids?.includes(openThreadId));
+      if (thread) {
+        openedRequest.current = openThreadId;
+        setSelectedThread(thread);
+        onThreadOpened?.();
+      }
+    }
+  }, [openThreadId, threads, selectedThread, onThreadOpened]);
+
+  // Scroll to bottom and mark as read
+  useEffect(() => {
+    const history = historyRef.current;
+    const key = selectedThread ? `${selectedThread.source || 'customer'}:${selectedThread.id}` : null;
+    if (history && (scrollThread.current !== key || followLatest.current)) history.scrollTo({ top: history.scrollHeight, behavior: 'auto' });
+    if (scrollThread.current !== key) followLatest.current = true;
+    scrollThread.current = key;
+    if (selectedThread && messages.length > 0) {
+      markMessagesAsRead();
+    }
+  }, [messages, selectedThread]);
+
+  async function loadMessages(threadId: string, source = selectedThread?.source) {
+    const version = ++loadHistoryVersion.current;
+    try {
+      if (source === 'coworker' && profile?.organization_id) {
+        const loaded = await loadCoworkerMessages(profile.organization_id, profile.id, threadId, selectedThread?.root_ids);
+        if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setMessages(loaded);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (data) { const resolved = await resolveMessageAttachments(data as Message[]); if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setMessages(resolved); }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      if (version === loadHistoryVersion.current && activeThreadId.current === threadId) setLoadError('Unable to load this conversation. Please try again.');
+    }
+  }
+
+  async function markMessagesAsRead() {
+    if (!selectedThread) return;
+    if (selectedThread.source === 'coworker' && profile?.organization_id) {
+      const unread = messages.filter(m => !m.is_read);
+      if (!unread.length) return;
+      try {
+        await markCoworkerMessagesRead(profile.organization_id, profile.id, unread.map(m => m.id));
+        if (activeThreadId.current === selectedThread.id) setMessages(old => old.map(m => unread.some(u => u.id === m.id) ? { ...m, is_read: true } : m));
+        void loadThreads();
+      } catch { setLoadError('Viewed status could not be saved. Please try again.'); }
+      return;
+    }
+    const unreadMessages = messages.filter(m => m.author_type !== 'staff' && !m.is_read);
+    if (unreadMessages.length > 0) {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .in('id', unreadMessages.map(m => m.id));
+      if (error) return;
+      await supabase.from('notifications').update({ is_read: true }).eq('user_id', profile?.id).eq('related_id', selectedThread.id).in('type', ['message', 'message_mention']);
+      if (activeThreadId.current === selectedThread.id) setMessages(old => old.map(m => unreadMessages.some(u => u.id === m.id) ? { ...m, is_read: true } : m));
+      loadThreads();
+    }
+  }
+
+  async function handleImageUpload(file: File) {
+    if (!file || !selectedThread) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const fileName = `${Date.now()}.${ext}`;
+      const path = `${profile?.organization_id || 'unknown'}/${selectedThread.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('message-attachments')
+        .upload(path, file, { contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('message-attachments').getPublicUrl(path);
+      const [resolved] = await resolveMessageAttachments([{attachment_url: urlData.publicUrl, attachment_type: 'image'}]);
+      if (activeThreadId.current === selectedThread.id) setPendingAttachment({ url: urlData.publicUrl, preview: resolved.attachment_url || undefined, type: 'image' });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      notify('Failed to upload image. Please try again.', { theme: 'cyan', tone: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSendMessage() {
+    if (!selectedThread || (!newMessage.trim() && !pendingAttachment) || sending || !profile?.organization_id) return;
+
+    setSending(true);
+    try {
+      const body = newMessage.trim();
+      const urlInBody = extractUrl(body);
+      let attachmentUrl: string | null = pendingAttachment?.url || null;
+      let attachmentType: 'image' | 'link' | null = pendingAttachment?.type || null;
+
+      if (!pendingAttachment && urlInBody) {
+        attachmentUrl = urlInBody;
+        attachmentType = 'link';
+      }
+
+      if (selectedThread.source === 'coworker') {
+        await sendCoworkerReply(profile.organization_id, profile.id, selectedThread.id, body);
+      } else {
+      const { error } = await supabase.from('messages').insert({
+        thread_id: selectedThread.id,
+        author_id: profile.id,
+        author_name: profile.full_name,
+        author_type: 'staff',
+        body,
+        is_internal: selectedThread.visibility === 'internal' || isInternal,
+        is_read: selectedThread.visibility === 'internal' || isInternal,
+        attachment_url: attachmentUrl,
+        attachment_type: attachmentType,
+        context_label: replyContextLabel,
+      });
+
+      if (error) throw error;
+      }
+
+      if (activeThreadId.current === selectedThread.id) {
+        followLatest.current = true;
+        setNewMessage('');
+        setIsInternal(selectedThread.visibility === 'internal');
+        setPendingAttachment(null);
+        setReplyContextLabel(null);
+        await loadMessages(selectedThread.id);
+      }
+      await loadThreads();
+    } catch (error) {
+      console.error('Error sending message:', error);
+      notify('Failed to send message', { theme: 'cyan', tone: 'error' });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleCreateThread() {
+    if (!newThreadForm.subject.trim() || !(newThreadForm.context_id || (newThreadForm.context_type === 'contact' && newThreadForm.contact_id)) || !newThreadForm.first_message.trim() || !profile) {
+      notify('Please fill in all fields', { theme: 'cyan', tone: 'warning' });
+      return;
+    }
+
+    setSending(true);
+    try {
+      let contactId = null;
+      if (newThreadForm.context_type === 'contact') {
+        contactId = newThreadForm.contact_id || newThreadForm.context_id;
+      } else if (newThreadForm.context_type === 'proposal') {
+        const { data: proposal } = await supabase
+          .from('proposals')
+          .select('contact_id')
+          .eq('id', newThreadForm.context_id)
+          .maybeSingle();
+        contactId = proposal?.contact_id || null;
+      } else if (newThreadForm.context_type === 'project') {
+        const { data: project } = await supabase.from('projects').select('contact_id').eq('id', newThreadForm.context_id).eq('organization_id', profile.organization_id).maybeSingle();
+        contactId = project?.contact_id || null;
+      }
+
+      const { data: thread, error: threadError } = await supabase
+        .from('message_threads')
+        .insert({
+          subject: newThreadForm.subject.trim(),
+          context_type: newThreadForm.context_type,
+          context_id: newThreadForm.context_id || newThreadForm.contact_id,
+          proposal_id: newThreadForm.context_type === 'proposal' ? newThreadForm.context_id : null,
+          contact_id: contactId,
+          visibility: newThreadForm.visibility,
+          created_by: profile.id,
+          organization_id: profile.organization_id,
+          assigned_sales_rep_id: profile.id,
+        })
+        .select()
+        .single();
+
+      if (threadError) throw threadError;
+
+      let firstAttachment = extractUrl(newThreadForm.first_message);
+      let firstAttachmentType: 'image' | 'link' | null = firstAttachment ? 'link' : null;
+      if (firstImage) {
+        const path = `${profile.organization_id}/${thread.id}/${crypto.randomUUID()}.${firstImage.name.split('.').pop() || 'png'}`;
+        const { error: uploadError } = await supabase.storage.from('message-attachments').upload(path, firstImage, { contentType: firstImage.type });
+        if (uploadError) throw uploadError;
+        firstAttachment = supabase.storage.from('message-attachments').getPublicUrl(path).data.publicUrl;
+        firstAttachmentType = 'image';
+      }
+      const { error: messageError } = await supabase.from('messages').insert({
+        thread_id: thread.id,
+        author_id: profile.id,
+        author_name: profile.full_name,
+        author_type: 'staff',
+        body: newThreadForm.first_message.trim(),
+        is_internal: newThreadForm.visibility === 'internal',
+        is_read: newThreadForm.visibility === 'internal',
+        attachment_url: firstAttachment,
+        attachment_type: firstAttachmentType,
+      });
+
+      if (messageError) throw messageError;
+
+      setShowNewThread(false);
+      setFirstImage(null);
+      setNewThreadForm({ subject: '', contact_id: '', context_type: 'contact', context_id: '', visibility: 'public', first_message: '' });
+      const enriched = await loadThreads();
+      const created = enriched?.find(t => t.id === thread.id);
+      if (created) { setSelectedThread(created); onThreadSelected?.(created.id); }
+
+    } catch (error) {
+      console.error('Error creating thread:', error);
+      notify('Failed to create thread', { theme: 'cyan', tone: 'error' });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const filteredThreads = threads.filter((t) => {
+    if (t.source === 'coworker' ? !showCoworkers : !showCustomers) return false;
+    if (unreadOnly && !t.unread_count) return false;
+    const matchesSearch =
+      t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.proposal_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.last_message_preview?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.related_context_name?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (filterCategory === 'customer') {
+      return matchesSearch && t.visibility === 'public';
+    }
+    if (filterCategory === 'proposals') {
+      return matchesSearch && t.proposal_id !== null;
+    }
+    if (filterCategory === 'internal') {
+      return matchesSearch && (t.visibility === 'internal' || (t.proposal_id === null && t.visibility !== 'public'));
+    }
+    return matchesSearch;
+  });
+
+  async function openSentTeamMessage(id: string) {
+    setShowTeamComposer(false); setSearchQuery('');
+    const loaded = await loadThreads();
+    const thread = loaded?.find(t => t.source === 'coworker' && (t.id === id || t.root_ids?.includes(id)));
+    if (thread) {
+      followLatest.current = true;
+      setSelectedThread(thread);
+      if (activeThreadId.current === thread.id) await loadMessages(thread.id, thread.source);
+    }
+  }
+  // Only select automatically on a wide inbox. Narrow screens start with the list.
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (loading || loadError || selectedThread || openThreadId || autoSelected.current) return;
+    if (filteredThreads.length && (conversationSize.ref.current?.clientWidth || 0) > 700) {
+      autoSelected.current = true;
+      setSelectedThread(filteredThreads[0]);
+    }
+  }, [loading, loadError, threads, selectedThread, openThreadId, conversationType, unreadOnly]);
+
+  const stats = {
+    total: threads.length,
+    unanswered: threads.filter(t => t.source !== 'coworker' && !!t.last_customer_message_at && (!t.last_rep_response_at || t.last_customer_message_at > t.last_rep_response_at)).length,
+    unread: threads.filter(t => t.unread_count > 0).length,
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-secondary text-sm">Loading messages...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`customer-conversations w-full min-w-0 px-1 sm:px-3 py-1 sm:py-2 ${fitScreen ? 'customer-conversations--fit' : ''}`}>
+      {loadError && <div role="alert" className="p-2 text-sm text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }} className="underline">Retry</button></div>}
+      {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId || t.root_ids?.includes(openThreadId)) && <p role="alert" className="p-2 text-sm text-secondary">This conversation is unavailable or you do not have access.</p>}
+      {/* Stats bar — compact inline strip */}
+      {!hideFilters && <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} items-center gap-3 sm:gap-4 mb-1.5 px-0.5`}>
+        <div className="flex items-center gap-1.5">
+          <MessageSquare className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+          <span className="text-sm font-bold text-primary">{stats.total}</span>
+          <span className="text-xs text-secondary">total</span>
+        </div>
+        <div className="w-px h-4 bg-border-subtle" />
+        <div className="flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 text-orange-600 flex-shrink-0" />
+          <span className="text-sm font-bold text-orange-600">{stats.unanswered}</span>
+          <span className="text-xs text-secondary">unanswered</span>
+        </div>
+        <div className="w-px h-4 bg-border-subtle" />
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
+          <span className="text-sm font-bold text-red-600">{stats.unread}</span>
+          <span className="text-xs text-secondary">unread</span>
+        </div>
+      </div>}
+
+      <div ref={conversationSize.ref} style={fitScreen ? undefined : { height: conversationSize.height }} className={`conversation-workspace ${selectedThread ? 'conversation-workspace--selected' : ''} min-h-0 min-w-0 flex gap-2`}>
+        {threads.length === 0 ? <div className="conversation-start bg-surface rounded-lg border border-subtle">
+          {loadError ? <div className="p-5 text-center"><h2 className="text-lg font-semibold">Conversations are unavailable</h2><p className="mt-2 text-sm text-secondary">Try loading your messages again.</p><button type="button" onClick={() => void loadThreads()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Reload conversations</button></div> : <>
+            <div className="shrink-0 px-4 pt-4"><h2 className="text-lg font-semibold text-primary">Start a conversation</h2><p className="mt-1 text-sm text-secondary">{showCoworkers ? 'Choose a person or department, then write your message.' : 'Start a customer conversation.'}</p></div>
+            {!showTeamComposer && !showNewThread && <NewTeamMessage inline scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={showCoworkers} canCustomer={showCustomers}
+              onClose={() => {}} onCustomer={() => setShowNewThread(true)} onSent={openSentTeamMessage} />}
+          </>}
+        </div> : <>
+        {/* Threads List */}
+        <div className={`conversation-list flex min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col`}>
+          <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm sm:text-base font-semibold text-primary flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+                {conversationType === 'customer' ? 'Customer conversations' : conversationType === 'coworkers' ? 'Coworker conversations' : 'Conversations'}
+              </h2>
+
+            </div>
+
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search threads..."
+                className="w-full pl-10 pr-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-canvas text-primary text-sm"
+              />
+            </div>
+
+            {!hideFilters && <div className="flex gap-2">
+              <button
+                onClick={() => setFilterCategory('all')}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'all' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterCategory('customer')}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'customer' ? 'bg-green-100 text-green-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
+                }`}
+              >
+                Customer
+              </button>
+              <button
+                onClick={() => setFilterCategory('proposals')}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'proposals' ? 'bg-blue-100 text-blue-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
+                }`}
+              >
+                Proposals
+              </button>
+              <button
+                onClick={() => setFilterCategory('internal')}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-lg transition-colors touch-manipulation active:scale-95 ${
+                  filterCategory === 'internal' ? 'bg-orange-100 text-orange-700 font-medium' : 'bg-elevated text-secondary hover:bg-surface'
+                }`}
+              >
+                Internal
+              </button>
+            </div>}
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {filteredThreads.length === 0 ? (
+              <div className="p-6 text-center text-secondary">
+                <MessageSquare className="w-10 h-10 mx-auto mb-2 text-muted" />
+                <p className="text-sm">{searchQuery ? 'No conversations match your search.' : unreadOnly ? 'You’re caught up. No unread conversations.' : 'No conversations in this view.'}</p>
+                {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Clear search</button>}
+              </div>
+            ) : (
+              <div className="divide-y divide-border-subtle">
+                {filteredThreads.map((thread) => {
+                  const hasResponse = !thread.last_customer_message_at || (!!thread.last_rep_response_at && thread.last_rep_response_at >= thread.last_customer_message_at);
+                  const isUrgent = !hasResponse && new Date().getTime() - new Date(thread.last_message_at).getTime() > 3600000;
+
+                  return (
+                    <button
+                      key={thread.id}
+                      onClick={() => { setSelectedThread(thread); if (!thread.source) onThreadSelected?.(thread.id); setShowQuestionSummary(true); }}
+                      className={`w-full p-2.5 sm:p-3 text-left hover:bg-elevated active:bg-surface transition-colors touch-manipulation ${
+                        selectedThread?.id === thread.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
+                      } ${thread.unread_count > 0 ? 'bg-blue-50/50' : ''}`}
+                    >
+                      <div className="flex items-start justify-between mb-1 gap-2">
+                        <h3 className="font-medium text-primary line-clamp-1 text-sm">{thread.subject}</h3>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {thread.unread_count > 0 && (
+                            <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-medium rounded-full">
+                              {thread.unread_count}
+                            </span>
+                          )}
+                          <span
+                            className={`px-2 py-0.5 text-xs rounded-full ${
+                              thread.visibility === 'internal' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                            }`}
+                          >
+                            {thread.source === 'coworker' ? thread.audience_label : thread.visibility === 'internal' ? 'Internal' : 'Customer'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {thread.proposal_number && (
+                        <p className="text-xs font-medium text-blue-600 mb-1">{thread.proposal_number}</p>
+                      )}
+
+                      {thread.related_context_name && !thread.contact_name && <p className="text-xs text-secondary mb-1 truncate">{thread.related_context_name}</p>}
+                      {thread.contact_name && (
+                        <p className="text-sm text-secondary mb-1 flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          {thread.contact_name}
+                        </p>
+                      )}
+
+                      {thread.context_label && !thread.related_context_name && (
+                        <div className="flex items-center gap-1 mb-1">
+                          <HelpCircle className="w-3 h-3 text-blue-500" />
+                          <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                            Re: {thread.context_label}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-2 mb-1">
+                        {thread.attachment_type === 'image' && thread.attachment_url && (
+                          <img src={thread.attachment_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                        )}
+                        <p className="text-sm text-secondary line-clamp-2">{thread.source === 'coworker' ? '' : thread.last_message_author_type === 'customer' ? 'Customer: ' : 'Staff: '}{thread.last_message_preview}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-2">
+                          {!hasResponse && (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                              isUrgent ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              Unanswered
+                            </span>
+                          )}
+                          
+                        </div>
+                        <span className="text-xs text-muted">{formatTime(thread.last_message_at)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Messages Panel */}
+        <div className={`conversation-panel flex flex-1 min-h-0 min-w-0 bg-surface rounded-lg border border-subtle flex-col overflow-hidden`}>
+          {selectedThread ? (
+            <>
+              <div className="shrink-0 p-2.5 sm:p-3 border-b border-subtle">
+                <div className="flex items-center gap-2">
+                  <button
+                    aria-label="Back to conversations"
+                    onClick={() => setSelectedThread(null)}
+                    className="conversation-back p-1.5 hover:bg-elevated active:bg-surface rounded-lg touch-manipulation"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-secondary" />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-sm sm:text-base font-semibold text-primary truncate">{selectedThread.subject}</h2>
+                    {selectedThread.source === 'coworker' && <p className="text-xs text-secondary truncate">{selectedThread.audience_label} · {selectedThread.related_context_name}</p>}
+                    {selectedThread.contact_name && (
+                      <p className="text-xs text-secondary truncate">{selectedThread.contact_name}</p>
+                    )}
+                  </div>
+                  {selectedThread.source === 'coworker' && ['task', 'question'].includes(selectedThread.discussion_type || '') && <a href={`?tab=feed&postId=${selectedThread.id}`} title="Open discussion actions" className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5 shrink-0"><ExternalLink className="w-3.5 h-3.5" /><span className="hidden sm:inline">Open discussion</span></a>}
+                  {selectedThread.proposal_id && onOpenProposal && (
+                    <button
+                      onClick={() => onOpenProposal(selectedThread.proposal_id!, selectedThread.id)}
+                      className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1.5 flex-shrink-0"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Open Proposal</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div ref={historyRef} onScroll={e => { const el = e.currentTarget; followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64; }} className="conversation-history flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3 space-y-2">
+                {messages.map((message) => {
+                  const isOwnMessage = message.author_id === profile?.id || (selectedThread.source !== 'coworker' && message.author_type === 'staff');
+
+                  return (
+                    <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] sm:max-w-[70%] space-y-0.5`}>
+                        <div className="flex items-center gap-2 px-1">
+                          <span className="text-xs font-medium text-secondary">{message.author_name}</span>
+                          <span className="text-xs text-muted">{formatTime(message.created_at)}</span>
+                          {message.is_internal && selectedThread.source !== 'coworker' && (
+                            <span className="text-xs font-medium text-orange-600">Internal</span>
+                          )}
+                        </div>
+                        {message.context_label && (
+                          <div className={`flex items-center gap-1 px-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                              isOwnMessage ? 'bg-blue-100 text-blue-700' : 'bg-elevated text-secondary'
+                            }`}>
+                              <MessageSquare className="w-2.5 h-2.5" />
+                              Re: {message.context_label}
+                            </span>
+                          </div>
+                        )}
+                        <div
+                          className={`rounded-lg p-2.5 ${
+                            isOwnMessage ? 'bg-blue-600 text-white' : 'bg-elevated text-primary'
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap text-sm break-words">{message.body}</p>
+                          {renderAttachment(message, isOwnMessage)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Unanswered questions summary for proposal threads */}
+                {selectedThread.proposal_id && !isInternal && (() => {
+                  const customerMessages = messages.filter(m => m.author_type === 'customer' && !m.is_internal);
+                  const lastStaffIdx = (() => {
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                      if (messages[i].author_type === 'staff' && !messages[i].is_internal) return i;
+                    }
+                    return -1;
+                  })();
+                  const unanswered = customerMessages.filter((_, idx) => {
+                    const msgIdx = messages.indexOf(customerMessages[idx]);
+                    return msgIdx > lastStaffIdx;
+                  });
+                  if (unanswered.length === 0 || !showQuestionSummary) return null;
+                  const grouped = unanswered.reduce((acc, m) => {
+                    const key = m.context_label || 'General';
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(m);
+                    return acc;
+                  }, {} as Record<string, Message[]>);
+
+                  return (
+                    <div className="mx-2.5 sm:mx-3 mt-2 mb-1 rounded-lg border border-blue-200 bg-blue-50/60 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-1.5 bg-blue-100/50">
+                        <div className="flex items-center gap-2">
+                          <HelpCircle className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-semibold text-blue-900">
+                            {unanswered.length} unanswered question{unanswered.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setShowQuestionSummary(false)}
+                          className="text-blue-400 hover:text-blue-600 p-1"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="p-2 space-y-1.5 max-h-28 overflow-y-auto">
+                        {Object.entries(grouped).map(([label, msgs]) => (
+                          <div key={label}>
+                            {label !== 'General' && (
+                              <p className="text-xs font-medium text-blue-700 mb-0.5 flex items-center gap-1">
+                                <MessageSquare className="w-3 h-3" />
+                                {label}
+                              </p>
+                            )}
+                            {msgs.map(m => (
+                              <p key={m.id} className="text-xs text-secondary line-clamp-2 pl-2.5 border-l-2 border-blue-200">
+                                {m.body}
+                              </p>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-3 py-1.5 bg-blue-100/30 border-t border-blue-200/50">
+                        <p className="text-xs text-blue-600">
+                          Your reply below will be sent to the customer and will address all open questions.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Reply context tag selector for proposal threads */}
+                {selectedThread.proposal_id && !isInternal && (() => {
+                  const contextLabels = [...new Set(
+                    messages
+                      .filter(m => m.author_type === 'customer' && m.context_label)
+                      .map(m => m.context_label!)
+                  )];
+                  if (contextLabels.length === 0) return null;
+                  return (
+                    <div className="mx-2.5 sm:mx-3 mt-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-secondary">Tag reply to:</span>
+                      <button
+                        onClick={() => setReplyContextLabel(null)}
+                        className={`text-xs px-2.5 py-1 rounded-full transition-colors ${
+                          !replyContextLabel ? 'bg-blue-600 text-white' : 'bg-elevated text-secondary hover:bg-surface'
+                        }`}
+                      >
+                        General
+                      </button>
+                      {contextLabels.map(label => (
+                        <button
+                          key={label}
+                          onClick={() => setReplyContextLabel(label)}
+                          className={`text-xs px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 ${
+                            replyContextLabel === label ? 'bg-blue-600 text-white' : 'bg-elevated text-secondary hover:bg-surface'
+                          }`}
+                        >
+                          <MessageSquare className="w-2.5 h-2.5" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+              </div>
+
+              {/* Composer */}
+              <div className="conversation-reply shrink-0 p-2.5 sm:p-3 border-t border-subtle">
+                {pendingAttachment && (
+                  <div className="mb-1.5 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
+                    {pendingAttachment.type === 'image' ? (
+                      <img src={pendingAttachment.preview || pendingAttachment.url} alt="Pending" className="w-9 h-9 rounded object-cover" />
+                    ) : (
+                      <LinkIcon className="w-4 h-4 text-blue-600" />
+                    )}
+                    <span className="text-xs text-blue-700 flex-1 truncate">Attachment ready</span>
+                    <button type="button" onClick={() => setPendingAttachment(null)} className="text-secondary hover:text-primary">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                {replyContextLabel && (
+                  <div className="mb-1.5 flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-xs text-blue-700 font-medium">Re: {replyContextLabel}</span>
+                    <button type="button" onClick={() => setReplyContextLabel(null)} className="text-blue-400 hover:text-blue-600 ml-auto">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                {selectedThread.source !== 'coworker' && <div className="mb-1.5">
+                  <label className="flex items-center gap-2 text-xs sm:text-sm text-secondary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedThread.visibility === 'internal' || isInternal}
+                      disabled={selectedThread.visibility === 'internal'}
+                      onChange={(e) => setIsInternal(e.target.checked)}
+                      className="rounded border-subtle text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Internal note (customer won't see this)</span>
+                  </label>
+                </div>}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                    e.target.value = '';
+                  }}
+                />
+                {naturalCandidate && staffChoices.length === 0 && <div className="mb-1.5 max-h-36 overflow-auto rounded border border-blue-200 bg-canvas p-2 text-sm" aria-label="Possible teammate mention">
+                  <div className="mb-1 text-secondary">Mention a teammate? Select to notify; leave unchanged for plain text.</div>
+                  {mentionPeople.filter(p => naturalCandidate.personIds.includes(p.id) && p.username).map(p => <button key={p.id} type="button" onClick={() => confirmNaturalMention(p)} className="mr-2 mb-1 rounded bg-blue-50 px-3 py-2 text-blue-700 hover:bg-blue-100">@{p.username} · {p.full_name}</button>)}
+                </div>}
+                {staffChoices.length > 0 && <div className="mb-1.5 max-h-36 overflow-auto rounded border border-blue-200 bg-canvas" role="listbox" aria-label="Mention teammates">{staffChoices.map((choice, index) => <button key={choice.id} type="button" role="option" aria-selected={index === mentionHighlight} onClick={() => chooseMessageMention(choice)} className={`block w-full px-3 py-2 text-left text-sm ${index === mentionHighlight ? 'bg-blue-50 text-blue-700' : 'text-primary'}`}>@{choice.kind === 'person' ? choice.username : ''} · {choice.label}</button>)}</div>}
+                <div className="flex gap-2 items-end">
+                  {selectedThread.source !== 'coworker' && <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || sending}
+                    className="px-2.5 py-2 border border-subtle rounded-lg hover:bg-elevated disabled:opacity-50 transition-colors flex items-center"
+                    title="Attach image"
+                  >
+                    {uploading ? <Loader className="w-4 h-4 animate-spin text-secondary" /> : <ImagePlus className="w-4 h-4 text-secondary" />}
+                  </button>}
+                  <textarea
+                    ref={messageInput}
+                    value={newMessage}
+                    onChange={(e) => { setNewMessage(e.target.value); setMessageCursor(e.target.selectionStart); setMentionHighlight(0); }}
+                    onSelect={e => setMessageCursor(e.currentTarget.selectionStart)}
+                    onKeyDown={(e) => {
+                      if (staffChoices.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); setMentionHighlight(i => (i + (e.key === 'ArrowDown' ? 1 : staffChoices.length - 1)) % staffChoices.length); return; }
+                      if (staffChoices.length && (e.key === 'Enter' || e.key === 'Tab')) { e.preventDefault(); chooseMessageMention(staffChoices[Math.min(mentionHighlight, staffChoices.length - 1)]); return; }
+                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder={selectedThread.source === 'coworker' ? 'Reply… Type @ to mention a teammate' : isInternal ? 'Internal note…' : 'Type your message…'}
+                    rows={2}
+                    className="min-w-0 flex-1 px-3 py-2 border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-base bg-canvas text-primary"
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={(!newMessage.trim() && !pendingAttachment) || sending}
+                    className="px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 touch-manipulation min-w-[44px] justify-center"
+                    title="Send message"
+                  >
+                    {sending ? <Loader className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" /> : <Send className="w-5 h-5 sm:w-4 sm:h-4" />}
+                    <span className="hidden sm:inline">Send</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-secondary">
+              <div className="text-center">
+                <MessageSquare className="w-14 h-14 mx-auto mb-3 text-muted" />
+                <p className="text-sm">{filteredThreads.length ? 'Open a conversation or start a new message.' : searchQuery ? 'Try another name or clear your search.' : 'Start a new message to keep the conversation going.'}</p>
+                <button type="button" onClick={() => setShowTeamComposer(true)} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 text-white">Start a new message</button>
+              </div>
+            </div>
+          )}
+        </div>
+        </>}
+      </div>
+
+      {showTeamComposer && <NewTeamMessage scope={{ contactId, projectId, workOrderId }} threads={threads} canTeam={showCoworkers} canCustomer={showCustomers}
+        onClose={() => setShowTeamComposer(false)} onCustomer={() => { setShowTeamComposer(false); setShowNewThread(true); }}
+        onSent={openSentTeamMessage} />}
+      {/* New Thread Modal */}
+      {showNewThread && (
+        <QuickActionModal title="New Message" subtitle="Start a customer conversation or add an internal customer note"
+          icon={<MessageSquare className="w-5 h-5" />} accentColor="from-teal-600 to-cyan-700"
+          onClose={() => setShowNewThread(false)} scrollBody={false}>
+            <div className="qam-scroll flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Subject</label>
+                <input
+                  type="text"
+                  value={newThreadForm.subject}
+                  onChange={(e) => setNewThreadForm({ ...newThreadForm, subject: e.target.value })}
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter subject..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Related To</label>
+                <select
+                  value={newThreadForm.context_type}
+                  onChange={(e) => setNewThreadForm({ ...newThreadForm, context_type: e.target.value as 'contact' | 'proposal' | 'project', context_id: '' })}
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="contact">Contact</option>
+                  <option value="proposal">Proposal</option>
+                  <option value="project">Project</option>
+                </select>
+              </div>
+
+              {(
+                <div>
+                  <label className="block text-sm font-medium text-secondary mb-1.5">Contact</label>
+                  <input aria-label="Search customers" placeholder="Search customers…" className="w-full px-3 py-2 mb-2 border border-subtle rounded-lg bg-canvas text-primary" value={contactSearch} onChange={e => setContactSearch(e.target.value)} />
+                  <select
+                    value={newThreadForm.contact_id}
+                    onChange={(e) => setNewThreadForm({ ...newThreadForm, contact_id: e.target.value, context_id: '' })}
+                    className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select a contact...</option>
+                    {contacts.filter(c => c.contact_name.toLowerCase().includes(contactSearch.toLowerCase())).map((contact) => (
+                      <option key={contact.id} value={contact.id}>{contact.contact_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {newThreadForm.context_type !== 'contact' && (
+                <div>
+                  <label className="block text-sm font-medium text-secondary mb-1.5">{newThreadForm.context_type === 'proposal' ? 'Proposal' : 'Project'}</label>
+                  <select value={newThreadForm.context_id} disabled={loadingRelated}
+                    onChange={(e) => setNewThreadForm({...newThreadForm, context_id: e.target.value})}
+                    className="w-full px-3 py-2.5 text-base bg-surface text-primary border border-strong rounded-lg">
+                    <option value="">{loadingRelated ? 'Loading…' : newThreadForm.contact_id ? 'Select a record…' : 'Choose a customer first'}</option>
+                    {relatedRecords.map(record => <option key={record.id} value={record.id}>{record.label}</option>)}
+                  </select>
+                  {!loadingRelated && !relatedRecords.length && <p className="text-sm text-muted mt-1">No accessible records found.</p>}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Visibility</label>
+                <select
+                  value={newThreadForm.visibility}
+                  onChange={(e) => setNewThreadForm({ ...newThreadForm, visibility: e.target.value as 'internal' | 'public' })}
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="public">Customer Visible</option>
+                  <option value="internal">Internal Only</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">First Message</label>
+                <textarea
+                  value={newThreadForm.first_message}
+                  onChange={(e) => setNewThreadForm({ ...newThreadForm, first_message: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  placeholder="Type your message..."
+                />
+              </div>
+              <label className="block text-sm text-secondary">Attach image
+                <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={e => setFirstImage(e.target.files?.[0] || null)} className="block w-full mt-1" />
+              </label>
+            </div>
+
+            <div className="flex gap-3 p-4 sm:p-6 border-t border-subtle flex-shrink-0">
+              <button
+                onClick={() => setShowNewThread(false)}
+                className="flex-1 px-4 py-3 sm:py-2 border border-strong text-secondary rounded-lg hover:bg-elevated active:bg-surface transition-colors touch-manipulation"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateThread}
+                disabled={sending || !newThreadForm.subject.trim() || !(newThreadForm.context_id || (newThreadForm.context_type === 'contact' && newThreadForm.contact_id)) || !newThreadForm.first_message.trim()}
+                className="flex-1 px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              >
+                {sending ? 'Creating...' : 'Create Thread'}
+              </button>
+            </div>
+        </QuickActionModal>
+      )}
+    </div>
+  );
+}

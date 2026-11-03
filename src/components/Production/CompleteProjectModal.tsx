@@ -2,20 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   X,
-  CheckCircle2,
   CheckCircle,
-  AlertCircle,
-  Star,
-  TrendingUp,
   Mail,
-  Send,
-  Clock,
   Building,
-  ChevronRight,
   ExternalLink,
-  Award,
-  ShieldCheck,
-  Calendar,
 } from 'lucide-react';
 import { useToast } from '../Shared/Toast';
 
@@ -45,24 +35,17 @@ interface CompleteProjectModalProps {
   onOpenSalesOrder?: (salesOrderId: string) => void;
 }
 
-type Step = 'confirm' | 'tt_decision' | 'sending';
-
-interface ExistingAccess {
-  type: 'vip' | 'test_and_tune' | 'none';
-  daysRemaining?: number;
-  planName?: string;
-}
+type Step = 'confirm' | 'sending';
+type CompletionChoice = 'close' | 'test_and_tune';
 
 export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSalesOrder }: CompleteProjectModalProps) {
   const toast = useToast();
   const [step, setStep] = useState<Step>('confirm');
-  const [confirmed, setConfirmed] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   const [emailAddress, setEmailAddress] = useState(customer.contact_email || '');
-  const [existingAccess, setExistingAccess] = useState<ExistingAccess>({ type: 'none' });
-  const [checkingAccess, setCheckingAccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [completionChoice, setCompletionChoice] = useState<CompletionChoice>('close');
   const [ttDays, setTtDays] = useState(90);
 
   useEffect(() => {
@@ -88,91 +71,86 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
     };
   }, [onClose, loading]);
 
-  async function checkExistingAccess() {
-    setCheckingAccess(true);
-    try {
-      // Check VIP subscription first
-      const { data: vipData } = await supabase
-        .from('recurring_subscriptions')
-        .select('id, status, recurring_plans(name)')
-        .eq('contact_id', customer.contact_id)
-        .in('status', ['active', 'trial'])
-        .maybeSingle();
 
-      if (vipData) {
-        setExistingAccess({
-          type: 'vip',
-          planName: (vipData as any).recurring_plans?.name || 'VIP Plan',
-        });
-        return;
-      }
-
-      // Check active T&T access grant
-      const { data: grantData } = await supabase
-        .from('punchlist_access_grants')
-        .select('id, expiration_date, access_type')
-        .eq('contact_id', customer.contact_id)
-        .in('status', ['active', 'suspended'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (grantData?.expiration_date) {
-        const days = Math.ceil(
-          (new Date(grantData.expiration_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
-        setExistingAccess({ type: 'test_and_tune', daysRemaining: Math.max(0, days) });
-      } else {
-        setExistingAccess({ type: 'none' });
-      }
-    } catch (err) {
-      console.error('Error checking access:', err);
-      setExistingAccess({ type: 'none' });
-    } finally {
-      setCheckingAccess(false);
+  async function handleComplete() {
+    if (completionChoice === 'test_and_tune' && sendEmail && !emailAddress.trim()) {
+      toast.error('Enter a customer email or turn off the invitation.', 'Email required');
+      return;
     }
-  }
-
-  function handleConfirmNext() {
-    if (!confirmed) return;
-    handleComplete(false);
-  }
-
-  async function handleComplete(_skipEmail: boolean) {
     setLoading(true);
     setStep('sending');
     try {
-      const today = new Date();
-      const { error: projectError } = await supabase.from('projects').update({
-        substantial_completion_date: today.toISOString().split('T')[0],
-        status: 'completed',
-      }).eq('id', customer.project_id);
-      if (projectError) throw projectError;
+      // Server transaction must validate tenant authorization and atomically
+      // complete the project, optionally activating T&T exactly once.
+      // No direct table updates here: partial completion is not acceptable.
+      const { data, error } = await supabase.rpc('complete_sales_order_project', {
+        p_project_id: customer.project_id,
+        p_choice: completionChoice,
+      });
+      if (error) throw error;
+      if (!data) throw new Error('Project completion was not confirmed');
 
-      // Day-0 Job Completion Feedback. Failure should not block substantial completion;
-      // the daily lifecycle worker retries any unsent project idempotently.
+      // Preserve the existing day-0 completion survey. The lifecycle worker
+      // retries unsent surveys; a delivery error must not undo completion.
       if (customer.contact_email) {
-        const { error: feedbackError } = await supabase.functions.invoke('send-satisfaction-email', {
-          body: {
-            contactId: customer.contact_id,
-            customerName: customer.contact_name,
-            customerEmail: customer.contact_email,
-            surveyType: 'job_completion',
-            projectId: customer.project_id,
-            salesOrderId: customer.sales_order_id || null,
+        try {
+          const { data: feedbackResult, error: feedbackError } = await supabase.functions.invoke('send-satisfaction-email', {
+            body: {
+              contactId: customer.contact_id,
+              customerName: customer.contact_name,
+              customerEmail: customer.contact_email,
+              surveyType: 'job_completion',
+              projectId: customer.project_id,
+              salesOrderId: customer.sales_order_id || null,
+            },
+          });
+          if (feedbackError || feedbackResult?.success === false) {
+            console.error('Day-0 feedback send failed; lifecycle worker may retry:', feedbackError || feedbackResult?.error);
           }
-        });
-        if (feedbackError) console.error('Day-0 feedback send failed; lifecycle worker will retry:', feedbackError);
+        } catch (feedbackError) {
+          console.error('Day-0 feedback send failed; lifecycle worker may retry:', feedbackError);
+        }
       }
 
-      if (customer.sales_order_id) {
-        const { error: salesOrderError } = await supabase.from('sales_orders').update({
-          status: 'complete',
-          completed_at: today.toISOString(),
-        }).eq('id', customer.sales_order_id);
-        if (salesOrderError) throw salesOrderError;
-      }
+      if (completionChoice === 'test_and_tune') {
+        // Activate customer access regardless of whether an email is requested.
+        // If access provisioning fails, do not send an unusable invitation.
+        try {
+          const { data: grantId, error: grantError } = await supabase.rpc('grant_customer_program', {
+            p_contact_id: customer.contact_id,
+            p_program: 'test_and_tune',
+            p_project_id: customer.project_id,
+            p_days: ttDays,
+          });
+          if (grantError) throw grantError;
+          if (!grantId) throw new Error('Customer access was not confirmed');
 
+          const { data: grant, error: grantLookupError } = await supabase
+            .from('punchlist_access_grants')
+            .select('expiration_date')
+            .eq('id', grantId)
+            .single();
+          if (grantLookupError || !grant) throw new Error('Customer access expiration could not be confirmed');
+
+          if (sendEmail) {
+            const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
+              body: {
+                contact_email: emailAddress.trim(),
+                contact_name: customer.contact_name,
+                project_name: customer.project_name,
+                expiration_date: grant.expiration_date,
+                access_type: 'test_and_tune',
+              },
+            });
+            if (inviteError || inviteResult?.success !== true) {
+              throw new Error(inviteResult?.error || inviteError?.message || 'Invitation delivery was not confirmed');
+            }
+          }
+        } catch (inviteError) {
+          console.error('Project completed; Test & Tune access or invitation requires attention:', inviteError);
+          toast.error('Project completed, but Test & Tune access or invitation needs attention. Review customer access in Test & Tune.', 'Follow-up required');
+        }
+      }
       setDone(true);
       setTimeout(() => { onComplete(); onClose(); }, 1800);
     } catch (err: any) {
@@ -216,7 +194,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
               </div>
               <h2 className="text-lg font-bold text-white mb-1">Project Marked Complete!</h2>
               <p className="text-sm text-gray-400">
-                Substantial completion recorded. Test & Tune is scheduled to begin in 7 days; staff can still intentionally invite the customer earlier from Punchlist or an invoice.
+                {completionChoice === 'close' ? 'Project closed without Test & Tune.' : 'Test & Tune activated for this project.'}
               </p>
             </div>
           )}
@@ -312,265 +290,38 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
                   </div>
                 </div>
 
-                {/* What happens next panel */}
-                <div className="bg-gray-800/50 border border-gray-700 rounded-2xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-700/60">
-                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">What happens next</p>
-                  </div>
-                  <div className="divide-y divide-gray-700/40">
-                    <div className="flex items-start gap-3 px-4 py-3">
-                      <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-white">Sales order marked complete</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          {customer.sales_order_number ? `Order #${customer.sales_order_number} ` : 'The linked sales order '}
-                          will be closed and the project status updated to completed.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 px-4 py-3">
-                      <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Award className="w-3.5 h-3.5 text-cyan-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-white">{ttDays}-Day Test &amp; Tune starts in 7 days</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          This gives the customer a week to live with the finished system before the formal Test & Tune period begins. MJV will start it once and send the welcome email automatically.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 px-4 py-3">
-                      <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-white">Punchlist can still be invited intentionally</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          Staff can still send or resend Punchlist access from the Punchlist page or while sending an invoice. Those intentional sends reuse existing access.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3 px-4 py-3">
-                      <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Mail className="w-3.5 h-3.5 text-violet-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-white">No duplicate completion invite</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                          Completing the project no longer sends a competing Test & Tune welcome email. The scheduled Day-7 lifecycle owns that automatic send.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Confirmation checkbox */}
-                <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                  confirmed ? 'border-green-600 bg-green-900/20' : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                }`}>
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
-                    confirmed ? 'border-green-500 bg-green-500' : 'border-gray-600'
-                  }`}>
-                    {confirmed && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                  </div>
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={confirmed}
-                    onChange={e => setConfirmed(e.target.checked)}
-                  />
-                  <div>
-                    <div className="text-sm font-semibold text-white">This project is substantially complete</div>
-                    <div className="text-xs text-gray-400 mt-0.5">All major work has been finished and the system is ready for use.</div>
-                  </div>
-                </label>
-
-                <button
-                  onClick={handleConfirmNext}
-                  disabled={!confirmed}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-2xl transition-colors"
-                >
-                  Mark Substantially Complete
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </>
-          )}
-
-          {/* ── Step 2: T&T Decision ─────────────────────────── */}
-          {step === 'tt_decision' && !done && (
-            <>
-              {/* Header */}
-              <div className="px-5 pt-4 pb-4 flex items-start justify-between gap-3 border-b border-gray-800">
-                <div>
-                  <h2 className="text-base font-bold text-white">Test &amp; Tune Access</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">{customer.contact_name} &middot; {customer.project_name}</p>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 text-gray-400 hover:text-white transition-colors flex-shrink-0"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="px-5 py-5 space-y-4">
-
-                {checkingAccess ? (
-                  <div className="flex items-center justify-center py-8 gap-3 text-gray-400 text-sm">
-                    <div className="w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
-                    Checking customer access...
-                  </div>
-                ) : (
-                  <>
-                    {/* Already has VIP */}
-                    {existingAccess.type === 'vip' && (
-                      <div className="bg-amber-900/20 border border-amber-700 rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Star className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                          <span className="text-sm font-semibold text-amber-300">Already a VIP Member</span>
-                        </div>
-                        <p className="text-xs text-amber-300/70 leading-relaxed">
-                          {customer.contact_name} has an active VIP membership
-                          {existingAccess.planName ? ` (${existingAccess.planName})` : ''} which already includes
-                          full punchlist access. No new T&T invite is needed.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Already has active T&T */}
-                    {existingAccess.type === 'test_and_tune' && (
-                      <div className="bg-blue-900/20 border border-blue-700 rounded-2xl p-4 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                          <span className="text-sm font-semibold text-blue-300">Already on Test &amp; Tune</span>
-                        </div>
-                        <p className="text-xs text-blue-300/70 leading-relaxed">
-                          {customer.contact_name} already has an active T&amp;T access grant
-                          {existingAccess.daysRemaining != null
-                            ? ` with ${existingAccess.daysRemaining} days remaining`
-                            : ''}.
-                        </p>
-                        <p className="text-xs text-amber-300/80 leading-relaxed bg-amber-900/20 border border-amber-700/40 rounded-xl px-3 py-2">
-                          Completing this project will <span className="font-semibold text-amber-300">reset their {ttDays}-day clock</span> — their existing access will be extended from today.
-                          Confirm below if that is intended.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* No existing access — show email option */}
-                    {existingAccess.type === 'none' && (
-                      <>
-                        <div className="bg-green-900/15 border border-green-700/60 rounded-2xl p-4 space-y-3">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
-                            <span className="text-sm font-semibold text-green-300">Grant {ttDays}-Day T&T Access</span>
-                          </div>
-                          <p className="text-xs text-gray-400 leading-relaxed">
-                            A new {ttDays}-day Test &amp; Tune access grant will be created for this customer,
-                            letting them submit punchlist items and service requests through the portal.
-                          </p>
-                        </div>
-
-                        {/* Email toggle */}
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Send Welcome Email?</p>
-                          <div className="space-y-2">
-                            <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
-                              sendEmail ? 'border-blue-600 bg-blue-900/20' : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                            }`}>
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                sendEmail ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
-                              }`}>
-                                {sendEmail && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                              </div>
-                              <input type="radio" className="sr-only" checked={sendEmail} onChange={() => setSendEmail(true)} />
-                              <div>
-                                <div className="text-sm font-medium text-white flex items-center gap-1.5">
-                                  <Send className="w-3.5 h-3.5 text-blue-400" />
-                                  Send Welcome Email
-                                </div>
-                                <div className="text-xs text-gray-400 mt-0.5">Notify them with portal link &amp; instructions</div>
-                              </div>
-                            </label>
-
-                            <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
-                              !sendEmail ? 'border-gray-500 bg-gray-800' : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                            }`}>
-                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                !sendEmail ? 'border-gray-400 bg-gray-400' : 'border-gray-600'
-                              }`}>
-                                {!sendEmail && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                              </div>
-                              <input type="radio" className="sr-only" checked={!sendEmail} onChange={() => setSendEmail(false)} />
-                              <div>
-                                <div className="text-sm font-medium text-white">Skip Email for Now</div>
-                                <div className="text-xs text-gray-400 mt-0.5">Access created silently — send from Punchlist later</div>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Email address field */}
-                        {sendEmail && (
-                          <div>
-                            <label className="block text-xs font-semibold text-gray-400 mb-1.5">
-                              <Mail className="w-3 h-3 inline mr-1" />
-                              Send to
-                            </label>
-                            <input
-                              type="email"
-                              value={emailAddress}
-                              onChange={e => setEmailAddress(e.target.value)}
-                              placeholder="customer@example.com"
-                              className="w-full px-3 py-2.5 bg-gray-800 border border-gray-600 rounded-xl text-white text-sm focus:border-blue-500 focus:outline-none"
-                            />
-                            {!emailAddress && (
-                              <p className="text-xs text-orange-400 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                No email on file. Enter an address or skip email.
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="space-y-2 pt-1">
-                      {existingAccess.type === 'none' ? (
-                        <button
-                          onClick={() => handleComplete(!sendEmail)}
-                          disabled={sendEmail && !emailAddress.trim()}
-                          className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-2xl transition-colors"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Complete Project
-                          {sendEmail ? ' & Send Email' : ''}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleComplete(true)}
-                          className="w-full flex items-center justify-center gap-2 py-3.5 bg-green-600 hover:bg-green-500 active:bg-green-700 text-white font-semibold text-sm rounded-2xl transition-colors"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Mark Complete Only
-                        </button>
+                <div className="space-y-3" role="radiogroup" aria-label="Project completion outcome">
+                  <label className="flex gap-3 rounded-xl border border-gray-700 p-4 cursor-pointer">
+                    <input type="radio" name="completionChoice" checked={completionChoice === 'close'} onChange={() => setCompletionChoice('close')} />
+                    <span><strong className="block text-white text-sm">Complete &amp; Close</strong><span className="text-xs text-gray-400">Finish this job. No Test &amp; Tune period or invitation.</span></span>
+                  </label>
+                  <label className="flex gap-3 rounded-xl border border-gray-700 p-4 cursor-pointer">
+                    <input type="radio" name="completionChoice" checked={completionChoice === 'test_and_tune'} onChange={() => setCompletionChoice('test_and_tune')} />
+                    <span><strong className="block text-white text-sm">Start Test &amp; Tune</strong><span className="text-xs text-gray-400">Start the {ttDays}-day period immediately. Existing access dates will not reset.</span></span>
+                  </label>
+                  {completionChoice === 'test_and_tune' && (
+                    <div className="rounded-xl bg-gray-800 p-4 space-y-3">
+                      <label className="flex items-center gap-2 text-sm text-white">
+                        <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} />
+                        Email customer their Test &amp; Tune invitation
+                      </label>
+                      {sendEmail && (
+                        <label className="block text-xs text-gray-400">
+                          <Mail className="inline w-3 h-3 mr-1" />Customer email
+                          <input type="email" value={emailAddress} onChange={e => setEmailAddress(e.target.value)} className="mt-2 w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white" placeholder="customer@example.com" />
+                        </label>
                       )}
-                      <button
-                        onClick={() => setStep('confirm')}
-                        className="w-full py-3 text-sm text-gray-400 hover:text-white transition-colors"
-                      >
-                        Back
-                      </button>
                     </div>
-                  </>
-                )}
+                  )}
+                </div>
+                <button onClick={handleComplete} disabled={loading || (completionChoice === 'test_and_tune' && sendEmail && !emailAddress.trim())} className="w-full py-3.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white font-semibold rounded-xl">
+                  {completionChoice === 'close' ? 'Complete & Close' : 'Start Test & Tune'}
+                </button>
+                <button onClick={onClose} className="w-full py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
               </div>
             </>
           )}
+
         </div>
       </div>
     </div>

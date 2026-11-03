@@ -1,6 +1,25 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
+
+function injectNoteIntoHtml(html: string, note: string): string {
+    if (!note.trim()) return html;
+    const noteBlock = `
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+        <tr>
+          <td style="background:#f8fafc;border-left:4px solid #06b6d4;border-radius:0 8px 8px 0;padding:16px 20px;">
+            <p style="color:#0c4a6e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px 0;">Personal Note</p>
+            <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;white-space:pre-wrap;">${note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          </td>
+        </tr>
+      </table>`;
+    const insertBefore = '<p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">';
+    if (html.includes(insertBefore)) {
+      return html.replace(insertBefore, noteBlock + insertBefore);
+    }
+    return html.replace('</body>', noteBlock + '</body>');
+  }
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,6 +59,7 @@ function buildTestTuneEmail(params: {
   accentColor: string;
 }): string {
   const { contactName, companyName, companyEmail, companyLogoUrl, portalUrl, projectName, expirationDate, offices, accentColor } = params;
+  const escapeDetail = (value: string) => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]!));
 
   const logoBlock = companyLogoUrl
     ? `<img src="${companyLogoUrl}" alt="${companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
@@ -83,7 +103,7 @@ function buildTestTuneEmail(params: {
         <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 24px 0;">Hi ${contactName},</p>
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 20px 0;">
-          Congratulations&mdash;your project is now substantially complete.
+          Congratulations&mdash;${escapeDetail(projectName)} is now substantially complete. Your complimentary VIP access through Test &amp; Tune ends ${escapeDetail(expirationDate)}.
         </p>
 
         <p style="color:#374151;font-size:16px;line-height:1.8;margin:0 0 20px 0;">
@@ -535,17 +555,24 @@ function generateSecureToken(): string {
 async function generateMagicLink(
   supabaseClient: ReturnType<typeof createClient>,
   contactEmail: string,
-  redirectTo: string
+  redirectTo: string,
+  organizationId: string,
+  deliveryKey?: string
 ): Promise<string | null> {
   try {
     const { data: contact } = await supabaseClient
       .from('contacts')
-      .select('id, first_name, last_name, portal_user_id')
-      .eq('email', contactEmail.toLowerCase())
+      .select('id, first_name, last_name, portal_user_id, organization_id')
+      .eq('email', contactEmail.toLowerCase()).eq('organization_id', organizationId)
       .maybeSingle();
 
     if (!contact) return null;
 
+    if (deliveryKey) {
+      const { data: existing } = await supabaseClient.from('portal_access_tokens').select('token')
+        .eq('contact_id', contact.id).eq('delivery_key', deliveryKey).is('invalidated_at', null).gt('expires_at', new Date().toISOString()).maybeSingle();
+      if (existing?.token) return `${redirectTo}${redirectTo.includes('?') ? '&' : '?'}portal_token=${existing.token}`;
+    }
     let userId = contact.portal_user_id;
 
     if (!userId) {
@@ -554,6 +581,7 @@ async function generateMagicLink(
         email_confirm: true,
         app_metadata: {
           contact_id: contact.id,
+          organization_id: organizationId,
           first_name: contact.first_name,
           last_name: contact.last_name,
           is_portal_user: true,
@@ -578,14 +606,7 @@ async function generateMagicLink(
         .eq('id', contact.id);
     }
 
-    // Invalidate any existing active tokens for this contact so older invite
-    // links stop working once a new invite is sent
-    await supabaseClient
-      .from('portal_access_tokens')
-      .update({ invalidated_at: new Date().toISOString() })
-      .eq('contact_id', contact.id)
-      .is('invalidated_at', null);
-
+    // Existing links remain valid if a replacement invitation fails to send.
     // Generate a 90-day portal token to match the punchlist access grant window
     const token = generateSecureToken();
     const expiresAt = new Date();
@@ -595,6 +616,7 @@ async function generateMagicLink(
       .from('portal_access_tokens')
       .insert({
         token,
+        delivery_key: deliveryKey || null,
         contact_id: contact.id,
         expires_at: expiresAt.toISOString(),
       });
@@ -635,7 +657,26 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { invite_id, contact_email, contact_name, project_name, expiration_date, access_type, preview, magic_link_only } = body;
+    const { invite_id, contact_email, contact_name, project_name, expiration_date, access_type, preview, magic_link_only, plan_id, customSubject, personalNote } = body;
+
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const serviceCall = !!serviceKey && authHeader === `Bearer ${serviceKey}`;
+    let organizationId: string | null = null;
+    if (serviceCall) {
+      organizationId = body.organization_id || null;
+    } else {
+      const { data: identity, error: identityError } = await supabaseClient.auth.getUser(authHeader.replace(/^Bearer /, ''));
+      if (identityError || !identity?.user) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+      const { data: actor } = await supabaseClient.from('profiles').select('organization_id, role, contact_id, is_active').eq('id', identity.user.id).maybeSingle();
+      if (!actor?.is_active || actor.contact_id || !['admin','manager','office_manager','sales_manager','project_manager','service_manager','sales'].includes(actor.role)) return new Response('Not authorized', { status: 403, headers: corsHeaders });
+      organizationId = actor.organization_id;
+    }
+    if (!organizationId) return new Response('Organization is required', { status: 400, headers: corsHeaders });
+    if (!preview) {
+      const { data: recipient } = await supabaseClient.from('contacts').select('id').eq('organization_id', organizationId).eq('email', contact_email?.toLowerCase()).maybeSingle();
+      if (!recipient) return new Response('Customer not found in this organization', { status: 403, headers: corsHeaders });
+    }
+    const deliveryKey = serviceCall && typeof body.delivery_key === 'string' ? body.delivery_key : undefined;
 
     if (!contact_name) {
       throw new Error("contact_name is required");
@@ -646,7 +687,8 @@ Deno.serve(async (req: Request) => {
 
     const settings = await getCompanySettings(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      organizationId
     );
 
     const rawPortalUrl = settings.subdomain
@@ -665,11 +707,12 @@ Deno.serve(async (req: Request) => {
     const needsMagicLink = !isTestAndTuneNoPortal && !preview && !!contact_email;
 
     let resolvedPortalUrl = portalUrl;
-    let resolvedSignupUrl = `${portalUrl}/membership`;
+    const signupDestination = plan_id ? `${portalUrl}/signup?plan=${encodeURIComponent(plan_id)}` : `${portalUrl}/membership`;
+    let resolvedSignupUrl = signupDestination;
 
     if (needsMagicLink) {
-      const magicLinkRedirect = isVIPSignup ? `${portalUrl}/membership` : `${portalUrl}?redirect=/portal/punchlist`;
-      const magicLink = await generateMagicLink(supabaseClient, contact_email, magicLinkRedirect);
+      const magicLinkRedirect = isVIPSignup ? signupDestination : `${portalUrl}?redirect=/portal/punchlist`;
+      const magicLink = await generateMagicLink(supabaseClient, contact_email, magicLinkRedirect, organizationId, deliveryKey);
       if (magicLink) {
         if (isVIPSignup) {
           resolvedSignupUrl = magicLink;
@@ -712,7 +755,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const resendResp = await fetch("https://api.resend.com/emails", {
+      const resendResp = await sendSystemEmail({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
         body: JSON.stringify({ from: settings.from_address, to: [contact_email], reply_to: settings.reply_to_email, subject, html: emailHtml }),
@@ -733,7 +776,8 @@ Deno.serve(async (req: Request) => {
       const vipTemplate = await getEmailTemplate(
         'vip_signup',
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        organizationId
       );
 
       if (vipTemplate) {
@@ -762,7 +806,8 @@ Deno.serve(async (req: Request) => {
       const noPortalTemplate = await getEmailTemplate(
         'punchlist_test_and_tune_no_portal',
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        organizationId
       );
 
       if (noPortalTemplate) {
@@ -789,11 +834,19 @@ Deno.serve(async (req: Request) => {
           accentColor,
         });
       }
+    } else if (access_type === 'vip_comped') {
+      const escape = (value: string) => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]!));
+      subject = `Your Complimentary VIP Membership — ${settings.company_name}`;
+      emailHtml = wrapInEmailLayout(
+        `<p>Hello ${escape(contact_name)},</p><p>Your VIP membership has been provided at no charge through ${escape(resolvedExpiration)}.</p><p>Use your customer portal to submit tasks, request service, and stay connected with our team.</p><p><a href="${escape(resolvedPortalUrl)}">Open Your VIP Portal</a></p><p>This complimentary term will not automatically bill or renew.</p>`,
+        settings.company_name, settings.company_email, accentColor, settings.company_logo_url, settings.offices,
+      );
     } else if (isTestAndTune) {
       const testTuneTemplate = await getEmailTemplate(
         'punchlist_test_and_tune',
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        organizationId
       );
 
       if (testTuneTemplate) {
@@ -826,7 +879,8 @@ Deno.serve(async (req: Request) => {
       const template = await getEmailTemplate(
         'punchlist_invite',
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        organizationId
       );
 
       if (template) {
@@ -856,6 +910,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (typeof customSubject === 'string' && customSubject.trim()) subject = customSubject.trim().slice(0, 200);
+    if (typeof personalNote === 'string') emailHtml = injectNoteIntoHtml(emailHtml, personalNote.slice(0, 5000));
+
     if (preview) {
       return new Response(
         JSON.stringify({ success: true, preview: true, subject, html: emailHtml }),
@@ -875,11 +932,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const resendResponse = await fetch("https://api.resend.com/emails", {
+    const resendResponse = await sendSystemEmail({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${RESEND_API_KEY}`,
+        ...(deliveryKey ? { 'Idempotency-Key': deliveryKey } : {}),
       },
       body: JSON.stringify({
         from: settings.from_address,

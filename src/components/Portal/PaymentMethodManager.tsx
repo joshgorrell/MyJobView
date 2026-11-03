@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CreditCard, Building2, Plus, Trash2, Check, AlertCircle } from 'lucide-react';
@@ -107,7 +108,7 @@ export function PaymentMethodManager({ contactId, onPaymentMethodAdded }: Paymen
       loadPaymentMethods();
     } catch (err: any) {
       console.error('Error setting default:', err);
-      alert('Failed to set default payment method');
+      notify('Failed to set default payment method', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -123,7 +124,7 @@ export function PaymentMethodManager({ contactId, onPaymentMethodAdded }: Paymen
       loadPaymentMethods();
     } catch (err: any) {
       console.error('Error deleting payment method:', err);
-      alert('Failed to remove payment method');
+      notify('Failed to remove payment method', { theme: 'blue', tone: 'error' });
     }
   }
 

@@ -1,0 +1,43 @@
+name: Submit existing iOS build to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Successful Expo EAS iOS build ID (from the build URL)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout MyJobView
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+      - name: Install mobile dependencies for Expo config resolution
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
+      - name: Verify Expo credentials
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Set the EXPO_TOKEN GitHub Actions secret before running this workflow."
+            exit 1
+          fi
+          eas whoami
+      - name: Submit the specified successful iOS build (no rebuild)
+        working-directory: mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas submit --platform ios --profile production --id "${{ inputs.build_id }}" --non-interactive

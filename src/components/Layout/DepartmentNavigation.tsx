@@ -1,5 +1,5 @@
 import { getIcon } from '../../lib/iconMap';
-import { Menu, ChevronDown, ChevronRight, Star } from 'lucide-react';
+import { Menu, ChevronDown, Star } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useToast } from '../Shared/Toast';
@@ -12,7 +12,7 @@ interface DepartmentNavigationProps {
 export function DepartmentNavigation({ activeModule, onModuleChange }: DepartmentNavigationProps) {
   const toast = useToast();
   const { mainDepartments, getUserModules, starredModules, starModule, unstarModule, loading } = useDepartments();
-  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
+  const [_expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,8 +58,8 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
 
   const getColorClass = (isActive: boolean) => {
     return isActive
-      ? 'text-blue-500 border-b-2 border-blue-500'
-      : 'text-gray-400 hover:text-white';
+      ? 'text-info border-b-2 border-blue-500'
+      : 'text-muted hover:text-primary';
   };
 
   const getBgColorClass = () => {
@@ -67,30 +67,16 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
   };
 
   const getActiveTextColorClass = () => {
-    return 'text-blue-500';
+    return 'text-info';
   };
 
-  const toggleDepartment = (deptId: string) => {
-    setExpandedDepartments(prev => {
-      const next = new Set(prev);
-      if (next.has(deptId)) {
-        next.delete(deptId);
-      } else {
-        next.add(deptId);
-      }
-      return next;
-    });
-  };
-
-  const handleDepartmentClick = (dept: any) => {
-    const modules = getUserModules(dept.id);
-    if (modules.length > 0) {
-      toggleDepartment(dept.id);
-    }
-  };
 
   const handleModuleClick = (moduleKey: string) => {
-    onModuleChange(moduleKey);
+    if (moduleKey === 'tv_dashboard' || moduleKey === 'sales_tv_dashboard') {
+      window.open(moduleKey === 'tv_dashboard' ? '/tv-dashboard' : '/sales-tv-dashboard', '_blank', 'noopener');
+    } else {
+      onModuleChange(moduleKey);
+    }
     // Clear any pending hover timeouts
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
@@ -141,14 +127,14 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
   };
 
   if (loading) {
-    return <div className="text-gray-400 text-sm">Loading departments...</div>;
+    return <div className="text-muted text-sm">Loading departments...</div>;
   }
 
   return (
     <nav className="hidden md:flex flex-wrap gap-2 sm:gap-4">
       {mainDepartments.map((dept) => {
         const modules = getUserModules(dept.id);
-        const isExpanded = expandedDepartments.has(dept.id);
+
         const hasActiveModule = modules.some(m => m.module_key === activeModule);
         const isOpen = openDropdown === dept.id;
 
@@ -182,7 +168,7 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
             </button>
 
             {modules.length > 0 && isOpen && (
-              <div className="absolute top-full left-0 mt-0 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-2 min-w-[240px] z-50 max-h-[calc(100vh-120px)] overflow-y-auto">
+              <div className="absolute top-full left-0 mt-0 bg-surface rounded-lg shadow-xl border border-subtle py-2 min-w-[240px] z-50 max-h-[calc(100vh-120px)] overflow-y-auto">
                 {modules.map((module) => {
                   const starred = isModuleStarred(module.id);
                   return (
@@ -191,7 +177,7 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
                       className={`flex items-center group ${
                         activeModule === module.module_key
                           ? `${getBgColorClass()}`
-                          : 'hover:bg-gray-700'
+                          : 'hover:bg-elevated'
                       }`}
                     >
                       <button
@@ -199,7 +185,7 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
                         className={`flex-1 px-4 py-2.5 text-left text-sm font-medium transition-colors flex items-center gap-3 ${
                           activeModule === module.module_key
                             ? getActiveTextColorClass()
-                            : 'text-gray-300 group-hover:text-white'
+                            : 'text-secondary group-hover:text-primary'
                         }`}
                         title={module.description || ''}
                       >
@@ -210,8 +196,8 @@ export function DepartmentNavigation({ activeModule, onModuleChange }: Departmen
                         onClick={(e) => handleStarToggle(e, module.id)}
                         className={`px-3 py-2.5 transition-colors ${
                           starred
-                            ? 'text-yellow-400 hover:text-yellow-300'
-                            : 'text-gray-500 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
+                            ? 'text-warning hover:text-warning'
+                            : 'text-muted hover:text-warning opacity-0 group-hover:opacity-100'
                         }`}
                         title={starred ? 'Remove from Quick Access' : 'Add to Quick Access'}
                       >

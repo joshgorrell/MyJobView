@@ -1,0 +1,16 @@
+{
+  "capturedOn": "2026-10-30",
+  "nativeConstraintAudit": {
+    "source_binding_matches": true,
+    "boolean_cases": 27,
+    "boolean_mismatches": 0,
+    "predicate_cases": 44,
+    "predicate_mismatches": 0,
+    "server_version": "17.6",
+    "exact_definition_equality_claimed": false,
+    "restore_approved": false,
+    "quote_ready": false
+  },
+  "authInterfaceCaptureHash": "00baafd2cc41eb04b358e87cfc1b4eb955886770b8ade3e3c408c95b67ae5b39",
+  "productionWrites": false
+}

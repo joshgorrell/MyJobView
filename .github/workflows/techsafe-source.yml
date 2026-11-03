@@ -1,0 +1,85 @@
+name: Techsafe source safeguards
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*techsafe*'
+      - 'supabase/functions/_shared/techsafe-sales-equipment.mjs'
+      - 'supabase/functions/_shared/techsafe-order-content.mjs'
+      - 'supabase/functions/_shared/techsafe-draft-eligibility.mjs'
+      - 'supabase/functions/_shared/techsafe-unit-selling-price.mjs'
+      - 'supabase/functions/_shared/techsafe-draft-candidate.mjs'
+      - 'supabase/functions/_shared/techsafe-application-evidence.mjs'
+      - 'supabase/functions/_shared/techsafe-equipment-effects.mjs'
+      - 'supabase/functions/_shared/techsafe-equipment-continuity.mjs'
+      - 'supabase/functions/_shared/techsafe-approved-rows-connection.mjs'
+      - 'scripts/techsafe/observer-preflight.sql'
+      - 'scripts/techsafe/observer-plan.sql'
+      - 'scripts/techsafe/replay-preflight.sql'
+      - 'scripts/techsafe/catalog-capture*'
+      - 'scripts/techsafe/restore-table-layer.mjs'
+      - 'scripts/techsafe/restore-definition-layer.mjs'
+      - 'scripts/techsafe/restore-constraint-layer.mjs'
+      - 'scripts/techsafe/local-auth-interface.mjs'
+      - 'scripts/techsafe/capture-auth-interface.sql'
+      - 'scripts/techsafe/constraint-boolean-audit.sql'
+      - 'scripts/techsafe/restore-access-layer.mjs'
+      - 'scripts/techsafe/restore-privilege-layer.mjs'
+      - 'scripts/techsafe/restore-trigger-layer.mjs'
+      - 'scripts/techsafe/cost-guard-preflight.sql'
+      - 'supabase/migrations/20251104191142_create_customer_pipeline.sql'
+      - 'tests/techsafe/**'
+      - '.github/workflows/techsafe-source.yml'
+      - 'src/components/Products/ProductTechsafeExclusion.tsx'
+      - 'src/components/Products/ProductDetailModal.tsx'
+      - 'package.json'
+      - 'package-lock.json'
+permissions:
+  contents: read
+jobs:
+  exclusions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node tests/techsafe/product-exclusions.mjs
+      - run: node tests/techsafe/removal-provenance.mjs
+      - run: node tests/techsafe/retry-safe-application.mjs
+      - run: node tests/techsafe/workflow-isolation.mjs
+      - run: node tests/techsafe/source-evidence-regressions.mjs
+      - run: node tests/techsafe/application-observations.mjs
+      - run: node tests/techsafe/observation-assessment.mjs
+      - run: node tests/techsafe/application-observer-hook.mjs
+      - run: node tests/techsafe/observer-preflight.mjs
+      - run: node tests/techsafe/migration-replay-preflight.mjs
+      - run: node tests/techsafe/catalog-capture.mjs
+      - run: node tests/techsafe/restore-table-layer.mjs
+      - run: node tests/techsafe/restore-definition-layer.mjs
+      - run: node tests/techsafe/restore-constraint-layer.mjs
+      - run: node tests/techsafe/local-auth-interface.mjs
+      - run: node tests/techsafe/constraint-boolean-audit.mjs
+      - run: node tests/techsafe/restore-access-layer.mjs
+      - run: node tests/techsafe/privilege-trigger-layer.mjs
+      - run: node tests/techsafe/sales-equipment.mjs
+      - run: node tests/techsafe/order-content.mjs
+      - run: node tests/techsafe/private-order-source.mjs --equipment-evidence --equipment-pairs --portal-basis --draft-eligibility --unit-selling-prices --candidate-inputs
+      - run: node tests/techsafe/unit-selling-price.mjs
+      - run: node tests/techsafe/draft-candidate.mjs
+      - run: node tests/techsafe/draft-eligibility.mjs
+      - run: node tests/techsafe/application-evidence.mjs
+      - run: node tests/techsafe/equipment-effects.mjs
+      - run: node tests/techsafe/equipment-effects-source.mjs
+      - run: node tests/techsafe/equipment-continuity.mjs
+      - run: node tests/techsafe/approved-rows-connection.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/techsafe/product-exclusions-browser.mjs
+
+
+
+
+
+

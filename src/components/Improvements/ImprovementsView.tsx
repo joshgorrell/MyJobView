@@ -1,3 +1,4 @@
+import { notify, requestText } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Bug, Plus, AlertCircle, CheckCircle, Clock, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -97,7 +98,7 @@ export function ImprovementsView() {
       loadIssues();
     } catch (error) {
       console.error('Error submitting issue:', error);
-      alert('Failed to submit issue. Please try again.');
+      notify('Failed to submit issue. Please try again.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -118,7 +119,7 @@ export function ImprovementsView() {
       setSelectedIssue(null);
     } catch (error) {
       console.error('Error updating issue:', error);
-      alert('Failed to update issue.');
+      notify('Failed to update issue.', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -465,8 +466,8 @@ export function ImprovementsView() {
                       )}
                       {selectedIssue.status !== 'resolved' && (
                         <button
-                          onClick={() => {
-                            const notes = prompt('Add resolution notes (optional):');
+                          onClick={async () => {
+                            const notes = (await requestText('Add resolution notes (optional):', '', { theme: 'blue' }));
                             updateIssueStatus(selectedIssue.id, 'resolved', notes || undefined);
                           }}
                           className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"

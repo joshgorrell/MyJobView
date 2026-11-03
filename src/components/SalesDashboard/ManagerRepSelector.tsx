@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 
 interface ManagerRepSelectorProps {
   selectedRepId: string | null;
-  onSelectRep: (repId: string) => void;
+  onSelectRep: (repId: string | null) => void;
   orgId: string;
 }
 
@@ -44,9 +44,6 @@ export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId }: Manage
 
         setReps(repOptions);
 
-        if (!selectedRepId && repOptions.length > 0) {
-          onSelectRep(repOptions[0].id);
-        }
       } catch (err) {
         console.error('Failed to load reps:', err);
       } finally {
@@ -55,7 +52,7 @@ export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId }: Manage
     }
 
     loadReps();
-  }, [orgId, selectedRepId, onSelectRep]);
+  }, [orgId]);
 
   if (loading) {
     return (
@@ -74,10 +71,12 @@ export function ManagerRepSelector({ selectedRepId, onSelectRep, orgId }: Manage
     <div className="flex items-center gap-2">
       <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
       <select
+        aria-label="Salesperson"
         value={selectedRepId || ''}
-        onChange={(e) => onSelectRep(e.target.value)}
-        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+        onChange={(e) => onSelectRep(e.target.value || null)}
+        className="min-w-0 max-w-[190px] sm:max-w-none px-2 sm:px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
       >
+        <option value="">All sales</option>
         {reps.map((rep) => (
           <option key={rep.id} value={rep.id}>
             {rep.name}

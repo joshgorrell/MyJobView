@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Lock, AlertCircle } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { BrowserDiagnostics } from '../Shared/BrowserDiagnostics';
 import { isValidReturnHost } from '../../lib/crossDomainAuth';
+import { useTenant } from '../../contexts/TenantContext';
 
 export function LoginForm() {
+  const { tenant, loading: tenantLoading } = useTenant();
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+  const dealerName = tenant?.organizationName || 'MyJobView';
+  const dealerLogo = tenant?.logoUrl && tenant.logoUrl !== failedLogoUrl ? tenant.logoUrl : null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(new URLSearchParams(window.location.search).get('password_updated') === '1' ? 'Password saved. Sign in with your new password.' : null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { signIn, signUp, resetPassword, resendConfirmation } = useAuth();
   const [returnToDealer, setReturnToDealer] = useState<string | null>(null);
@@ -33,7 +38,7 @@ export function LoginForm() {
     try {
       if (isForgotPassword) {
         await resetPassword(email);
-        setSuccess('Password reset email sent! Check your inbox for the reset link.');
+        setSuccess('If an account exists for this email, a password reset link is on its way. Check your inbox and spam folder, and use the newest email.');
         setIsForgotPassword(false);
       } else if (isSignUp) {
         await signUp(email, password);
@@ -57,7 +62,7 @@ export function LoginForm() {
       let errorMessage = error?.message || `Failed to ${isForgotPassword ? 'send reset email' : isSignUp ? 'sign up' : 'sign in'}. Please try again.`;
 
       if (errorMessage.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid email or password. If you just signed up, please check your email for a confirmation link first.';
+        errorMessage = 'The email or password is incorrect. Use Forgot password to choose a new password.';
       } else if (errorMessage.includes('Email not confirmed')) {
         errorMessage = 'Please confirm your email address before signing in. Check your inbox for the confirmation link.';
       }
@@ -70,14 +75,21 @@ export function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-8 max-w-md w-full">
-        <div className="text-center mb-8">
-          <img
-            src="/MJV_icon.PNG"
-            alt="MyJobView"
-            className="h-20 w-20 mx-auto mb-4 object-contain rounded-xl"
-          />
-          <h1 className="text-3xl font-bold text-white mb-2">MyJobView</h1>
+      <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-600/40 p-6 sm:p-8 max-w-md w-full">
+        <div className="text-center mb-6" aria-busy={tenantLoading}>
+          {tenantLoading ? (
+            <div className="h-16 mb-4 rounded-xl bg-gray-800 animate-pulse" role="status" aria-label="Loading dealer branding" />
+          ) : (
+            <>
+              <img
+                src={dealerLogo || '/MJV_icon.PNG'}
+                alt={dealerLogo ? dealerName : 'MyJobView'}
+                className={dealerLogo ? 'h-16 sm:h-20 max-w-full mx-auto mb-4 object-contain' : 'h-16 w-16 mx-auto mb-4 object-contain rounded-xl'}
+                onError={dealerLogo ? () => setFailedLogoUrl(dealerLogo) : undefined}
+              />
+              <h1 className="text-2xl font-bold text-white mb-2 break-words">{dealerName}</h1>
+            </>
+          )}
           <p className="text-gray-300">
             {isForgotPassword ? 'Reset your password' : isSignUp ? 'Create your account' : 'Sign in to your account'}
           </p>
@@ -90,11 +102,13 @@ export function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="login-email" className="block text-sm font-medium text-gray-300 mb-2">
               Email Address
             </label>
             <input
+              id="login-email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -106,11 +120,13 @@ export function LoginForm() {
 
           {!isForgotPassword && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="login-password" className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
               <input
+                id="login-password"
                 type="password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -119,6 +135,13 @@ export function LoginForm() {
                 disabled={loading}
                 minLength={6}
               />
+              {!isSignUp && (
+                <div className="mt-1 text-right">
+                  <button type="button" onClick={() => { setIsForgotPassword(true); setError(null); setSuccess(null); }} className="min-h-11 text-sm text-blue-300 hover:text-blue-200">
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -170,17 +193,20 @@ export function LoginForm() {
           </button>
         </form>
 
-        <div className="mt-6 text-center space-y-2">
+        <div className="mt-6 pt-5 border-t border-gray-700/60 flex items-center justify-center gap-x-3 text-[10px] min-[360px]:text-xs sm:text-sm">
+          <a href="/portal" className="min-h-11 inline-flex items-center whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors">
+            Customer Portal
+          </a>
           {!isForgotPassword && (
             <button
               type="button"
               onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors block w-full"
+              className="min-h-11 whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors"
             >
-              {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+              {isSignUp ? 'Back to sign in' : 'Create an account'}
             </button>
           )}
-          <button
+          {isForgotPassword && <button
             type="button"
             onClick={() => {
               setIsForgotPassword(!isForgotPassword);
@@ -188,18 +214,22 @@ export function LoginForm() {
               setError(null);
               setSuccess(null);
             }}
-            className="text-sm text-gray-400 hover:text-gray-300 transition-colors block w-full"
+            className="min-h-11 whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors"
           >
-            {isForgotPassword ? 'Back to sign in' : 'Forgot password?'}
-          </button>
+            Back to sign in
+          </button>}
           <button
             type="button"
             onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className="text-sm text-yellow-400 hover:text-yellow-300 transition-colors flex items-center justify-center gap-2 w-full"
+            className="min-h-11 whitespace-nowrap text-blue-300 hover:text-blue-200 transition-colors"
           >
-            <AlertCircle className="w-4 h-4" />
-            {showDiagnostics ? 'Hide Diagnostics' : 'Having trouble logging in?'}
+            {showDiagnostics ? 'Hide login help' : 'Login help'}
           </button>
+        </div>
+        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-gray-400">
+          <span>Powered by</span>
+          <img src="/MJV_icon.PNG" alt="" className="h-5 w-5 object-contain" />
+          <span className="font-medium">MyJobView</span>
         </div>
       </div>
 

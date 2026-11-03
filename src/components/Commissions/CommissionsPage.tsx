@@ -108,7 +108,6 @@ const approvalBadgeStyles: Record<string, string> = {
 
 export function CommissionsPage() {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager' || profile?.role === 'finance' || profile?.role === 'sales_manager';
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showHelp, setShowHelp] = useState(false);

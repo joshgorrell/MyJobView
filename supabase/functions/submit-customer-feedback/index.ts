@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
 
     const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false } });
     const { data: record, error } = await db.from("customer_satisfaction")
-      .select("id,rating,responded_at")
+      .select("id,rating,responded_at,organization_id")
       .eq("response_token", token).maybeSingle();
     if (error || !record) return new Response(JSON.stringify({ error: "Feedback link not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -28,7 +28,15 @@ Deno.serve(async (req: Request) => {
     const updated = await db.from("customer_satisfaction").update(patch).eq("id", record.id);
     if (updated.error) throw updated.error;
 
-    return new Response(JSON.stringify({ success: true, rating }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const [{ data: settings }, { data: organization }] = await Promise.all([
+      db.from("company_settings").select("company_name,company_logo_url,company_email").eq("organization_id", record.organization_id).maybeSingle(),
+      db.from("organizations").select("subdomain").eq("id", record.organization_id).maybeSingle(),
+    ]);
+    const company = {
+      name: settings?.company_name || "Our team", logoUrl: settings?.company_logo_url || "", email: settings?.company_email || "",
+      reviewUrl: organization?.subdomain === "elife" ? "https://g.page/r/CZzvVUth7kuyEBM/review" : null,
+    };
+    return new Response(JSON.stringify({ success: true, rating, company }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unable to save feedback" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }

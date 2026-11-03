@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Package, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, Package, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface InventoryItem {
@@ -24,7 +24,7 @@ interface InventoryListProps {
   onUpdate?: () => void;
 }
 
-export function InventoryList({ onUpdate }: InventoryListProps) {
+export function InventoryList({ onUpdate: _onUpdate }: InventoryListProps) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [filteredInventory, setFilteredInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -63,6 +64,7 @@ export function CreateRevisionModal({
         throw createError;
       }
 
+      notify('Revision created!', { theme: 'violet', tone: 'success' });
       onSuccess(newRevisionId);
     } catch (error: any) {
       console.error('Error creating revision:', error);

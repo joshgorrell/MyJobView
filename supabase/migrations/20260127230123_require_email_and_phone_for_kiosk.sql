@@ -1,0 +1,5 @@
+/*\n  # Require Email and Phone for Kiosk Contact Creation\n\n  1. Changes\n    - Update anonymous user insert policy to require BOTH email and phone\n    - Remove contact_type restriction that was blocking submissions\n    - Keep name requirement flexible (any name field)\n\n  2. Security\n    - Restricts anonymous users to only creating contacts (not viewing/updating)\n    - Requires both email AND phone\n    - Requires at least one form of name\n*/\n\n-- Drop the current policy\nDROP POLICY IF EXISTS "Anonymous users can create contacts for kiosk and VIP" ON contacts
+
+\n\n-- Create updated policy requiring both email and phone\nCREATE POLICY "Anonymous users can create contacts for kiosk and VIP"\n  ON contacts\n  FOR INSERT\n  TO anon\n  WITH CHECK (\n    -- Require BOTH email and phone\n    email IS NOT NULL \n    AND phone IS NOT NULL\n    AND\n    -- Require some form of name\n    (\n      contact_name IS NOT NULL \n      OR first_name IS NOT NULL \n      OR last_name IS NOT NULL\n    )\n  )
+
+

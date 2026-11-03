@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import ProductStatusNotice from '../Products/ProductStatusNotice';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Product } from '../../lib/types';
 import { Search, Package, X, Plus } from 'lucide-react';
@@ -32,6 +34,7 @@ export default function QuickAddProductModal({
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('is_active', true)
         .order('sku');
 
       if (error) throw error;
@@ -92,7 +95,7 @@ export default function QuickAddProductModal({
       setSearchQuery('');
     } catch (error) {
       console.error('Error adding product:', error);
-      alert('Failed to add product');
+      notify('Failed to add product', { theme: 'violet', tone: 'error' });
     } finally {
       setAdding(false);
     }
@@ -161,7 +164,7 @@ export default function QuickAddProductModal({
                         </span>
                       )}
                     </div>
-                    <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
+                    <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3><ProductStatusNotice product={product} />
                     {product.description && (
                       <p className="text-sm text-gray-600 line-clamp-1">
                         {product.description}

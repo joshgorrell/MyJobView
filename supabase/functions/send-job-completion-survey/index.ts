@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 
@@ -165,12 +166,12 @@ Deno.serve(async (req: Request) => {
 
     let recipientEmail = email;
     let customerFirstName = name || '';
-    let subjectName = (name || '').split(' ')[0];
+    let subjectName = name || '';
 
     if (contactId) {
       const { data: contact, error: contactError } = await supabaseAdmin
         .from('contacts')
-        .select('contact_name, first_name, last_name, email, company_name')
+        .select('contact_name, full_name, first_name, last_name, email, company_name')
         .eq('id', contactId)
         .single();
 
@@ -189,8 +190,8 @@ Deno.serve(async (req: Request) => {
       }
 
       recipientEmail = contact.email;
-      customerFirstName = contact.first_name || contact.contact_name || contact.company_name || '';
-      subjectName = contact.first_name || contact.company_name || '';
+      customerFirstName = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
+      subjectName = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
     }
 
     if (!recipientEmail) {
@@ -247,21 +248,10 @@ Deno.serve(async (req: Request) => {
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     if (!resendApiKey) {
-      console.log('Demo mode — would send survey to:', recipientEmail);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Email service not configured (demo mode)',
-          email: recipientEmail
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
 
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await sendSystemEmail({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,

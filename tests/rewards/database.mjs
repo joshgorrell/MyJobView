@@ -1,0 +1,152 @@
+process.on('uncaughtException', error => { console.error(error.message, error.code || '', error.detail || '', error.where || ''); if(error.position && error.query) console.error(error.query.slice(Math.max(0, Number(error.position)-180), Number(error.position)+100)); console.error((error.stack || '').split('\n').filter(line => line.includes('/tests/rewards/')).join('\n')); process.exit(1); });
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+let db;
+if(process.env.REWARDS_DATABASE_URL){
+ const {Client}=await import('pg');const client=new Client({connectionString:process.env.REWARDS_DATABASE_URL});await client.connect();
+ db={exec:q=>client.query(q),query:(q,p)=>client.query(q,p),close:()=>client.end()};
+}else db=new PGlite();
+const id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+const org=id(1),other=id(2),admin=id(10),alice=id(11),bob=id(12),foreign=id(20),portal=id(13),inactive=id(14);
+const sql=p=>readFile(new URL(p,import.meta.url),'utf8');
+await db.exec(await sql('./schema.sql'));
+const departmentMigration=await sql('../../supabase/migrations/20261005131500_task_department_assignment_and_atomic_completion.sql');
+await db.exec(departmentMigration.match(/CREATE OR REPLACE FUNCTION private\.user_has_department_access[\s\S]*?\$\$;/)[0]);
+for(const name of ['20261022143000_reopen_task_reverse_actual_award.sql','20261022144500_discussion_task_atomic_points.sql','20261022150000_atomic_reward_redemption.sql','20261022153000_secure_rewards_ledgers.sql','20261022170907_rewards_authoritative_workflows.sql'])await db.exec(await sql('../../supabase/migrations/'+name));
+await db.exec(`INSERT INTO organizations(id,subdomain)VALUES('${org}','elife'),('${other}','other');
+INSERT INTO profiles(id,organization_id,role,is_active,full_name)VALUES('${admin}','${org}','admin',true,'Administrator'),('${alice}','${org}','sales',true,'Alice'),('${bob}','${org}','tech',true,'Bob'),('${foreign}','${other}','admin',true,'Other admin'),('${portal}','${org}','portal_user',true,'Customer'),('${inactive}','${org}','sales',false,'Inactive');
+INSERT INTO points_configuration(organization_id)VALUES('${org}'),('${other}');INSERT INTO company_settings(organization_id)VALUES('${org}'),('${other}');`);
+const as=async user=>db.exec(`RESET ROLE;SELECT set_config('test.uid','${user||''}',false);SET ROLE authenticated;`);
+const rows=async(q,p=[]) => (await db.query(q,p)).rows;
+const scalar=async(q,p=[])=>Object.values((await rows(q,p))[0])[0];
+const denied=async(q,p=[],pattern=/authoriz|permission|not found|another|access|required|Own balance|organization|atomic|immutable/i)=>assert.rejects(()=>db.query(q,p),pattern);
+await as(alice);
+await denied('insert into points_transactions(user_id,points_amount,transaction_type) values($1,100,\'admin_adjustment\')',[alice]);
+await denied('update points_transactions set points_amount=999');
+await denied('delete from points_transactions');
+await denied('insert into reward_redemptions(user_id) values($1)',[alice]);
+await denied('update reward_redemptions set status=\'fulfilled\'');
+await denied('delete from rewards_catalog');
+await denied('select award_points($1,1000,\'Forged\')',[alice]);
+await denied('update profiles set points_earned=999 where id=$1',[alice]);
+await denied('select private.post_reward_points($1,$2,100,\'admin_adjustment\',NULL,\'Forged\',\'fake\')',[org,alice]);
+assert.equal(await scalar('select has_column_privilege(\'authenticated\',\'points_transactions\',\'points_amount\',\'INSERT\')'),false);
+await denied('select get_user_points_balance($1)',[foreign]);
+// Regular task resolution, department eligibility, duplicate completion and exact reversals.
+await db.exec('RESET ROLE');
+await db.query('insert into tasks(id,organization_id,user_id,title,assigned_to,points) values($1,$2,$3,\'Install\',$4,17)',[id(100),org,admin,alice]);
+await db.query('insert into tasks(id,organization_id,user_id,title,assigned_department_id,points) values($1,$2,$3,\'Department\',$4,8)',[id(101),org,admin,id(50)]);
+await db.query('insert into department_user_overrides values($1,$2,true)',[bob,id(50)]);
+await as(bob);await denied('select * from complete_task_atomic($1)',[id(100)]);
+await as(foreign);await denied('select * from complete_task_atomic($1)',[id(100)]);
+await as(alice);
+await denied('update tasks set completed_by=$1,status=\'completed\' where id=$2',[alice,id(100)]);
+await denied('update tasks set points=999 where id=$1',[id(100)],/creator|administrator/);
+assert.equal((await rows('select * from complete_task_atomic($1)',[id(100)]))[0].points_awarded,17);
+assert.equal((await rows('select * from complete_task_atomic($1)',[id(100)]))[0].points_awarded,0);
+assert.equal(await scalar('select get_user_points_balance($1)',[alice]),17);
+await as(admin);await db.query('update tasks set points=99 where id=$1',[id(100)]);await db.query('select reopen_task_atomic($1)',[id(100)]);await db.query('select reopen_task_atomic($1)',[id(100)]);
+await as(alice);assert.equal(await scalar('select get_user_points_balance($1)',[alice]),0);
+await db.query('select * from complete_task_atomic($1)',[id(100)]);assert.equal(await scalar('select get_user_points_balance($1)',[alice]),99);
+await as(bob);await db.query('select * from complete_task_atomic($1)',[id(101)]);assert.equal(await scalar('select get_user_points_balance($1)',[bob]),8);
+// Discussion completion and audience checks use the same server-owned ledger.
+await db.exec('RESET ROLE');
+await db.query('insert into discussion_posts(id,organization_id,user_id,post_type,content,assigned_to,points) values($1,$2,$3,\'task\',\'Test assignment\',$4,0)',[id(110),org,admin,alice]);
+await as(alice);await db.query('select set_discussion_task_completion($1,true)',[id(110)]);assert.equal(await scalar('select get_user_points_balance($1)',[alice]),99,'Explicit zero is preserved');
+await db.exec('RESET ROLE');await db.query('insert into discussion_posts(id,organization_id,user_id,post_type,content,assigned_to,points) values($1,$2,$3,\'task\',\'Awarded assignment\',$4,12)',[id(111),org,admin,alice]);
+await as(alice);await db.exec("SET test.discussion_access='false'");await denied('select set_discussion_task_completion($1,true)',[id(111)]);await db.exec("SET test.discussion_access='true'");
+await db.query('select set_discussion_task_completion($1,true)',[id(111)]);await db.query('select set_discussion_task_completion($1,true)',[id(111)]);
+assert.equal(await scalar('select get_user_points_balance($1)',[alice]),111);
+await as(admin);await db.query('update discussion_posts set points=99 where id=$1',[id(111)]);await db.query('select set_discussion_task_completion($1,false)',[id(111)]);
+await as(alice);assert.equal(await scalar('select get_user_points_balance($1)',[alice]),99);
+// Redemption: balance/stock, request identity, admin fulfillment and one cancellation refund.
+await db.exec('RESET ROLE');await db.query('insert into rewards_catalog(id,organization_id,name,points_cost,stock_quantity) values($1,$2,\'Gift card\',40,2),($3,$4,\'Other gift\',1,10)',[id(200),org,id(201),other]);
+await as(alice);await denied('select redeem_reward_atomic($1,$2)',[id(201),id(300)],/unavailable/);
+await db.query('select redeem_reward_atomic($1,$2)',[id(200),id(301)]);await db.query('select redeem_reward_atomic($1,$2)',[id(200),id(301)]);
+assert.equal(await scalar('select get_user_points_balance($1)',[alice]),59);
+assert.equal(await scalar('select stock_quantity from rewards_catalog where id=$1',[id(200)]),1);
+const redemption=await scalar('select id from reward_redemptions where request_key=$1',[id(301)]);
+await denied('select set_reward_redemption_status($1,\'approved\')',[redemption]);
+await as(foreign);await denied('select set_reward_redemption_status($1,\'approved\')',[redemption]);
+await as(admin);await db.query('select set_reward_redemption_status($1,\'approved\')',[redemption]);await db.query('select set_reward_redemption_status($1,\'cancelled\')',[redemption]);await db.query('select set_reward_redemption_status($1,\'cancelled\')',[redemption]);
+await as(alice);assert.equal(await scalar('select get_user_points_balance($1)',[alice]),99);assert.equal(await scalar('select stock_quantity from rewards_catalog where id=$1',[id(200)]),2);
+await db.query('select redeem_reward_atomic($1,$2)',[id(200),id(302)]);const fulfilled=await scalar('select id from reward_redemptions where request_key=$1',[id(302)]);
+await as(admin);await db.query('select set_reward_redemption_status($1,\'approved\')',[fulfilled]);await db.query('select set_reward_redemption_status($1,\'fulfilled\')',[fulfilled]);await denied('select set_reward_redemption_status($1,\'cancelled\')',[fulfilled],/transition/);
+await as(bob);await denied('select redeem_reward_atomic($1,$2)',[id(200),id(303)],/Insufficient/);
+for(const who of [portal,inactive,null]) {await as(who);await denied('select redeem_reward_atomic($1,$2)',[id(200),id(304)]);}
+await as(alice);await db.exec("SET test.module_access='false'");await denied('select redeem_reward_atomic($1,$2)',[id(200),id(305)]);await db.exec("SET test.module_access='true'");
+// Producers use same-organization configured amounts and server event identities.
+await db.query('insert into contacts(id,organization_id,created_by) values($1,$2,$3)',[id(400),org,alice]);
+await db.query('insert into connections(id,organization_id,user_id) values($1,$2,$3)',[id(401),org,alice]);
+await db.query('insert into leads(id,organization_id,created_by,assigned_to) values($1,$2,$3,$3)',[id(402),org,alice]);
+await db.query("update leads set status='claimed' where id=$1",[id(402)]);await db.query("update leads set status='unclaimed' where id=$1",[id(402)]);await db.query("update leads set status='claimed' where id=$1",[id(402)]);
+await db.query("update leads set status='converted' where id=$1",[id(402)]);
+await db.query('insert into job_photos(id,organization_id,technician_id) values($1,$2,$3)',[id(403),org,alice]);
+const menu=await rows('select * from get_reward_points_menu()');assert.ok(menu.length>=15);assert.equal(menu.find(r=>r.id==='job_media').points,10);assert.equal(menu.find(r=>r.id==='attendance_late').points,-5);assert.equal(menu.find(r=>r.id==='task_completion').points,null);
+assert.equal(await scalar('select count(*)::int from points_transactions where source_key=$1',['lead_claimed:'+id(402)]),1);
+// An invalid source beneficiary rolls the photo insert back, not just the points.
+await denied('insert into job_photos(id,organization_id,technician_id) values($1,$2,$3)',[id(404),org,foreign],/Invalid photo/);
+assert.equal(await scalar('select count(*)::int from job_photos where id=$1',[id(404)]),0);
+await as(admin);await db.query('select adjust_reward_points($1,7,\'Approved correction\',$2)',[bob,id(500)]);await db.query('select adjust_reward_points($1,7,\'Approved correction\',$2)',[bob,id(500)]);
+await denied('select adjust_reward_points($1,7,\'Self award\',$2)',[admin,id(501)],/Another employee/);
+await as(bob);assert.equal(await scalar('select get_user_points_balance($1)',[bob]),15);
+await db.exec('RESET ROLE;SET ROLE anon');await denied('select redeem_reward_atomic($1,$2)',[id(200),id(600)]);await denied('select set_discussion_task_completion($1,true)',[id(111)]);
+// Question awards use the live configuration, and creators cannot farm self assignments.
+await db.exec('RESET ROLE');
+await db.query("insert into discussion_posts(id,organization_id,user_id,post_type,content,assigned_to)values($1,$2,$3,'question','Help',$4)",[id(610),org,admin,alice]);
+await as(alice);await db.query('select set_discussion_task_completion($1,true)',[id(610)]);
+assert.equal(await scalar("select points_amount from points_transactions where reference_id=$1",[id(610)]),5);
+await db.query("insert into tasks(id,organization_id,user_id,title,points)values($1,$2,$3,'Own assignment',999)",[id(611),org,alice]);
+assert.equal((await rows('select * from complete_task_atomic($1)',[id(611)]))[0].points_awarded,0);
+await denied("insert into tasks(id,organization_id,user_id,title)values($1,$2,$3,'Forged creator')",[id(612),org,admin],/creator/);
+await denied("insert into points_configuration(organization_id)values($1)",[org],/row-level security/);
+await as(admin);await db.query('update points_configuration set contact_created_points=0 where organization_id=$1',[org]);
+await as(alice);assert.equal((await rows('select * from get_reward_points_menu()')).some(r=>r.id==='contact_created'),false);
+// Install the actual attendance guard too: even owner DELETE must be protected.
+const attendanceMigration=await sql('../../supabase/migrations/20261016131655_time_clock_attendance_pto_routing.sql');
+await db.exec('RESET ROLE');
+await db.exec(attendanceMigration.match(/CREATE OR REPLACE FUNCTION time_private\.guard_attendance_ledger[\s\S]*?\$\$;/)[0]);
+await db.exec('CREATE TRIGGER protect_attendance_ledger BEFORE INSERT OR UPDATE OR DELETE ON points_transactions FOR EACH ROW EXECUTE FUNCTION time_private.guard_attendance_ledger()');
+await db.exec("CREATE TABLE attendance_test_source(id uuid,organization_id uuid,user_id uuid);CREATE FUNCTION private.test_arrival() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$BEGIN INSERT INTO points_transactions(organization_id,user_id,points_amount,transaction_type,reference_id)VALUES(NEW.organization_id,NEW.user_id,10,'attendance',NEW.id);RETURN NEW;END$$;CREATE TRIGGER test_arrival AFTER INSERT ON attendance_test_source FOR EACH ROW EXECUTE FUNCTION private.test_arrival()");
+await db.query('insert into attendance_test_source values($1,$2,$3)',[id(699),org,alice]);
+await denied("delete from points_transactions where transaction_type='attendance'",[],/Attendance points/);
+// Authorized test reset is tenant-scoped and records a cutover.
+await db.exec('RESET ROLE');await db.query('update profiles set points_earned=77 where id=$1',[foreign]);
+await db.exec(await sql('../../supabase/migrations/20261022171746_reset_elife_test_rewards.sql'));
+assert.equal(await scalar('select count(*)::int from points_transactions where organization_id=$1',[org]),0);
+assert.equal(await scalar('select count(*)::int from reward_redemptions where organization_id=$1',[org]),0);
+assert.equal(await scalar('select sum(points_earned)::int from profiles where organization_id=$1',[org]),0);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[foreign]),77);
+await db.query('insert into daily_clock_entries(id,organization_id,technician_id,clock_in)values($1,$2,$3,now()-interval \'1 day\')',[id(700),org,alice]);
+await db.query('insert into attendance_test_source values($1,$2,$3)',[id(700),org,alice]);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),0,'Pre-reset attendance cannot replay');
+
+// Real deduction triggers update the balance once and respect event idempotency.
+await db.exec('CREATE TRIGGER test_manual BEFORE INSERT OR UPDATE ON daily_clock_entries FOR EACH ROW EXECUTE FUNCTION deduct_manual_entry_points();CREATE TRIGGER test_pto BEFORE INSERT ON pto_requests FOR EACH ROW EXECUTE FUNCTION deduct_same_day_callin_points()');
+await db.query("insert into daily_clock_entries(id,organization_id,technician_id,clock_in,admin_adjusted,deduct_points) values($1,$2,$3,now(),true,true)",[id(710),org,alice]);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),-10);
+await db.query('update daily_clock_entries set points_deducted=0 where id=$1',[id(710)]);assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),-10,'Manual event cannot deduct twice');
+await db.query("update company_settings set pto_same_day_callin_cutoff_time='00:00' where organization_id=$1",[org]);
+await db.query("insert into pto_policies values($1,'sick'),($2,'bereavement')",[id(711),id(712)]);
+await db.query("insert into pto_requests(id,organization_id,employee_id,status,start_date,policy_id) select $1,$2,$3,'pending',(now() AT TIME ZONE 'America/Chicago')::date,$4",[id(713),org,alice,id(711)]);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),-20,'PTO is deducted once');
+await db.query("insert into pto_requests(id,organization_id,employee_id,status,start_date,policy_id) select $1,$2,$3,'pending',(now() AT TIME ZONE 'America/Chicago')::date,$4",[id(714),org,alice,id(712)]);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),-20,'Exempt PTO has no deduction');
+// Scheduled clock-out scopes records and recipients, and excludes old test entries.
+await db.query("update company_settings set rewards_reset_at=now()-interval '36 hours' where organization_id=$1",[org]);
+for(const [n,who,tenant,hours]of[[720,alice,org,30],[721,bob,org,72],[722,foreign,other,72]])await db.query("insert into daily_clock_entries(id,organization_id,technician_id,clock_in,entry_date)values($1,$2,$3,now()-($4*interval '1 hour'),(now()-($4*interval '1 hour'))::date)",[id(n),tenant,who,hours]);
+const clock=await scalar('select auto_clock_out_forgotten_entries()');assert.equal(clock.success,true,JSON.stringify(clock));assert.equal(clock.entries_processed,2);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[alice]),-35);
+assert.equal(await scalar('select points_earned from profiles where id=$1',[bob]),0,'Historical clock entry has no penalty');
+assert.equal(await scalar('select status from daily_clock_entries where id=$1',[id(722)]),'clocked_in','Other company untouched');
+assert.equal(await scalar('select points_deducted from daily_clock_entries where id=$1',[id(721)]),0,'Historical entry reports zero deducted');
+assert.equal(await scalar("select count(*)::int from notifications n join profiles p on p.id=n.user_id where n.organization_id IS DISTINCT FROM p.organization_id"),0);
+assert.equal((await scalar('select auto_clock_out_forgotten_entries()')).entries_processed,0);
+// The admin single-entry path is atomic, tenant-bound and idempotent too.
+await db.query("insert into daily_clock_entries(id,organization_id,technician_id,clock_in)values($1,$2,$3,now()-interval '2 hours')",[id(730),org,alice]);
+await as(alice);await denied('select admin_forgotten_clock_out($1,now()-interval \'1 hour\')',[id(730)]);
+await as(foreign);await denied('select admin_forgotten_clock_out($1,now()-interval \'1 hour\')',[id(730)]);
+await as(admin);await db.exec("SET test.time_access='false'");await denied("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);await db.exec("SET test.time_access='true'");await db.query("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);await db.query("select admin_forgotten_clock_out($1,now()-interval '1 hour')",[id(730)]);
+assert.equal(await scalar('select get_user_points_balance($1)',[alice]),-50);
+await db.close();console.log('Rewards SQL: direct-write denial, tenant/role/module boundaries, resolver credit, exact reversals, zero values, idempotent redemption/refund, stock, producer awards and scoped test reset passed.');

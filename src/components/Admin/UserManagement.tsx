@@ -1,3 +1,4 @@
+import { setupSections } from './UserSetup';
 import { useEffect, useState } from 'react';
 import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, AlertCircle, UserCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -9,15 +10,29 @@ import { EditUserForm } from './EditUserForm';
 import { UserCreatedConfirmation } from './UserCreatedConfirmation';
 import { useToast } from '../Shared/Toast';
 
+interface AccountEmailStatus {
+  user_id: string;
+  welcome_sent_at: string | null;
+  welcome_error: string | null;
+  reset_sent_at: string | null;
+  reset_error: string | null;
+  activated_at: string | null;
+}
+
 interface EmployeeInfo {
   user_id: string;
-  employee_id: string;
+  id: string;
   employment_status: string;
   hire_date: string;
 }
 
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
+  const [setupReviews,setSetupReviews] = useState<Map<string,string[]>>(new Map());
+  const [setupReviewError,setSetupReviewError] = useState(false);
+  const [accountStatuses, setAccountStatuses] = useState<Map<string, AccountEmailStatus>>(new Map());
+  const [accountStatusError, setAccountStatusError] = useState(false);
+  const [sendingAccountEmail, setSendingAccountEmail] = useState<string | null>(null);
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -57,28 +72,25 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       console.log('Users loaded:', data?.length || 0);
       setUsers(data || []);
-
-      // Load employee records
-      const { data: empData } = await supabase
-        .from('employees')
-        .select('user_id, id, employment_status, hire_date');
-      const empMap = new Map<string, EmployeeInfo>();
-      (empData || []).forEach(e => empMap.set(e.user_id, e));
-      setEmployeeMap(empMap);
-
-      // Load config review status
-      const empIds = (empData || []).map(e => e.id);
-      if (empIds.length > 0) {
-        const { data: configData } = await supabase
-          .from('employee_payroll_configs')
+      setLoading(false);
+      // Independent settings metadata must not serialize initial user rendering.
+      const [statusResult, reviewResult, employeeResult] = await Promise.all([
+        supabase.from('user_account_email_status').select('*'),
+        supabase.from('user_setup_reviews').select('user_id,reviewed_sections'),
+        supabase.from('employees').select('user_id, id, employment_status, hire_date'),
+      ]);
+      setAccountStatusError(!!statusResult.error);
+      setAccountStatuses(new Map((statusResult.data || []).map(item => [item.user_id, item])));
+      setSetupReviewError(!!reviewResult.error);
+      setSetupReviews(new Map((reviewResult.data || []).map(item => [item.user_id, item.reviewed_sections])));
+      const employees = employeeResult.data || [];
+      setEmployeeMap(new Map(employees.map(item => [item.user_id, item])));
+      const employeeIds = employees.map(item => item.id);
+      if (employeeIds.length) {
+        const { data: configData } = await supabase.from('employee_payroll_configs')
           .select('employee_id, effective_to, reviewed_at')
-          .in('employee_id', empIds)
-          .is('effective_to', null);
-        const reviewMap = new Map<string, boolean>();
-        (configData || []).forEach(c => {
-          reviewMap.set(c.employee_id, !!c.reviewed_at);
-        });
-        setConfigReviewMap(reviewMap);
+          .in('employee_id', employeeIds).is('effective_to', null);
+        setConfigReviewMap(new Map((configData || []).map(item => [item.employee_id, !!item.reviewed_at])));
       }
 
     } catch (error) {
@@ -103,36 +115,28 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
     }
   }
 
-  async function sendPasswordResetEmail(email: string, userName: string) {
-    toast.confirm(`Send password reset email to ${userName} (${email})?`, async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('Not authenticated');
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email }),
-          }
-        );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to send reset email');
-        }
-
-        toast.success('Password reset email sent successfully');
-      } catch (error: any) {
-        console.error('Error sending reset email:', error);
-        toast.error(error.message || 'Failed to send reset email');
+  async function sendAccountEmail(user: Profile, kind: 'welcome' | 'reset') {
+    if (sendingAccountEmail) return;
+    setSendingAccountEmail(user.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(kind === 'welcome' ? 'send-welcome-email' : 'reset-user-password', {
+        body: { email: user.email },
+      });
+      if (error) {
+        let message = error.message;
+        try { message = (await error.context?.json())?.error || message; } catch { /* Keep invocation error. */ }
+        throw new Error(message);
       }
-    }, 'Send password reset?');
+      if (!data?.success) throw new Error(data?.error || 'Email was not sent');
+      if (data.warning) toast.error(data.warning);
+      else toast.success(`${kind === 'welcome' ? 'Welcome' : 'Password reset'} email accepted by provider`);
+      await loadUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Could not send email');
+      await loadUsers();
+    } finally {
+      setSendingAccountEmail(null);
+    }
   }
 
   async function deleteUser(userId: string, userName: string) {
@@ -175,7 +179,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading users...</div>
+        <div className="text-muted">Loading users...</div>
       </div>
     );
   }
@@ -186,13 +190,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         <div className="flex items-center gap-2 text-blue-800">
           <Users className="w-5 h-5" />
           <h2 className="text-lg font-semibold">User Management</h2>
-          <span className="ml-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+          <span className="ml-2 bg-blue-600 text-primary text-xs font-bold px-2 py-1 rounded-full">
             {users.length}
           </span>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+          className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-primary rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
         >
           <Plus className="w-4 h-4" />
           Add New User
@@ -223,13 +227,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                 </thead>
                 <tbody className="divide-y divide-amber-200">
                   {unclassified.map(u => (
-                    <tr key={u.id} className="bg-white/50">
-                      <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                    <tr key={u.id} className="bg-canvas/50">
+                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
+                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
                       <td className="px-3 py-2 text-right">
                         <button
                           onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-700 transition-colors"
+                          className="px-3 py-1 bg-amber-600 text-primary rounded text-xs font-medium hover:bg-amber-700 transition-colors"
                         >
                           Review
                         </button>
@@ -270,13 +274,13 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                 </thead>
                 <tbody className="divide-y divide-blue-200">
                   {unreviewed.map(u => (
-                    <tr key={u.id} className="bg-white/50">
-                      <td className="px-3 py-2 text-gray-900 font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-gray-600">{formatRoleName(u.role)}</td>
+                    <tr key={u.id} className="bg-canvas/50">
+                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
+                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
                       <td className="px-3 py-2 text-right">
                         <button
                           onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+                          className="px-3 py-1 bg-blue-600 text-primary rounded text-xs font-medium hover:bg-blue-700 transition-colors"
                         >
                           Review
                         </button>
@@ -290,43 +294,49 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         );
       })()}
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-canvas rounded-lg shadow-sm border border-subtle overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-surface border-b border-subtle">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">User</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Role</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted uppercase">Created</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-surface">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className={`p-1.5 rounded-lg flex-shrink-0 ${
-                        user.is_active ? 'bg-blue-100' : 'bg-gray-100'
+                        user.is_active ? 'bg-blue-100' : 'bg-surface'
                       }`}>
                         {user.role === 'admin' ? (
-                          <Shield className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <Shield className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-muted'}`} />
                         ) : (
-                          <User className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <User className={`w-4 h-4 ${user.is_active ? 'text-blue-600' : 'text-muted'}`} />
                         )}
                       </div>
                       <div className="min-w-0">
                         <div className={`font-medium text-sm ${
-                          user.is_active ? 'text-gray-900' : 'text-gray-400'
+                          user.is_active ? 'text-primary' : 'text-muted'
                         }`}>
                           {user.full_name}
                         </div>
                         <div className={`text-xs truncate ${
-                          user.is_active ? 'text-gray-500' : 'text-gray-400'
+                          user.is_active ? 'text-muted' : 'text-muted'
                         }`}>
                           {user.email}
                         </div>
+                        <div className="text-xs text-muted mt-1">
+                          {accountStatusError ? 'Welcome status unavailable' : accountStatuses.get(user.id)?.activated_at ? 'Account Activated' : accountStatuses.get(user.id)?.welcome_sent_at ? `Welcome sent ${new Date(accountStatuses.get(user.id)!.welcome_sent_at!).toLocaleString()}` : 'Welcome: Never Sent'}
+                        </div>
+                        {(accountStatuses.get(user.id)?.welcome_error || accountStatuses.get(user.id)?.reset_error) && (
+                          <div className="text-xs text-red-600 mt-1">{accountStatuses.get(user.id)?.welcome_error || accountStatuses.get(user.id)?.reset_error}</div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -335,12 +345,12 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       user.role === 'admin' ? 'bg-blue-100 text-blue-700' :
                       user.role === 'finance' ? 'bg-purple-100 text-purple-700' :
                       user.role === 'manager' ? 'bg-orange-100 text-orange-700' :
-                      user.role === 'service_manager' ? 'bg-teal-100 text-teal-700' :
-                      user.role === 'office_manager' ? 'bg-indigo-100 text-indigo-700' :
-                      user.role === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
+                      String(user.role) === 'service_manager' ? 'bg-teal-100 text-teal-700' :
+                      String(user.role) === 'office_manager' ? 'bg-indigo-100 text-indigo-700' :
+                      String(user.role) === 'project_manager' ? 'bg-cyan-100 text-cyan-700' :
                       user.role === 'sales' ? 'bg-green-100 text-green-700' :
                       user.role === 'tech' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
+                      'bg-surface text-secondary'
                     }`}>
                       {formatRoleName(user.role)}
                     </span>
@@ -352,6 +362,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       }`}>
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
+                      <button type="button" onClick={()=>setEditingUser(user)} className="text-xs text-cyan-700 underline" title={setupSections.filter(s=>!(setupReviews.get(user.id)||[]).includes(s.key)).map(s=>s.label).join(', ')}>{setupReviewError?'Setup status unavailable':setupSections.every(s=>(setupReviews.get(user.id)||[]).includes(s.key))?'Setup complete':'Needs setup review'}</button>
                       {(user as any).employment_classification === 'employee' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <UserCircle className="w-3 h-3" />
@@ -359,7 +370,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                         </span>
                       )}
                       {(user as any).employment_classification === 'non_employee' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-surface text-secondary">
                           Non-Employee
                         </span>
                       )}
@@ -378,7 +389,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted">
                       {formatDistanceToNow(user.created_at)}
                     </span>
                   </td>
@@ -392,7 +403,16 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => sendPasswordResetEmail(user.email, user.full_name)}
+                        onClick={() => sendAccountEmail(user, 'welcome')}
+                        disabled={!!sendingAccountEmail || !user.is_active}
+                        className="px-2 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded disabled:opacity-50"
+                        title="Send a secure password setup link"
+                      >
+                        {sendingAccountEmail === user.id ? 'Sending…' : accountStatuses.get(user.id)?.welcome_sent_at ? 'Resend Welcome' : 'Send Welcome'}
+                      </button>
+                      <button
+                        disabled={!!sendingAccountEmail || !user.is_active}
+                        onClick={() => sendAccountEmail(user, 'reset')}
                         className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
                         title="Reset password"
                       >
@@ -426,8 +446,8 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
 
       {users.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+        <div className="text-center py-12 text-muted">
+          <Users className="w-12 h-12 mx-auto mb-3 text-muted" />
           <p>No users found</p>
         </div>
       )}

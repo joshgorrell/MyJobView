@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +23,7 @@ interface InternalSession {
   status: string;
   predetermined_hours: number | null;
   notes: string | null;
-  assigned_profile?: { full_name: string };
+  assigned_profile?: { full_name: string } | null;
 }
 
 interface CreateInternalSessionModalProps {
@@ -80,11 +81,11 @@ export function CreateInternalSessionModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!assignedTo) {
-      alert('Please select an employee');
+      notify('Please select an employee', { theme: 'blue', tone: 'warning' });
       return;
     }
     if (usePredetermined && (!predeterminedHours || parseFloat(predeterminedHours) <= 0)) {
-      alert('Please enter valid predetermined hours');
+      notify('Please enter valid predetermined hours', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -119,7 +120,7 @@ export function CreateInternalSessionModal({
       onClose();
     } catch (err: any) {
       console.error('Error saving session:', err);
-      alert(err.message || 'Failed to save session');
+      notify(err.message || 'Failed to save session', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }

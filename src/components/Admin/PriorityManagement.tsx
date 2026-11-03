@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Flag, Plus, Edit2, Trash2, Save, X, MoveUp, MoveDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -77,7 +78,7 @@ export function PriorityManagement() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      alert('Priority name is required');
+      notify('Priority name is required', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -120,7 +121,7 @@ export function PriorityManagement() {
       loadPriorities();
     } catch (error: any) {
       console.error('Error saving priority:', error);
-      alert('Failed to save priority: ' + error.message);
+      notify('Failed to save priority: ' + error.message, { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -135,7 +136,7 @@ export function PriorityManagement() {
       loadPriorities();
     } catch (error: any) {
       console.error('Error deleting priority:', error);
-      alert('Failed to delete priority: ' + error.message);
+      notify('Failed to delete priority: ' + error.message, { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -164,7 +165,7 @@ export function PriorityManagement() {
       loadPriorities();
     } catch (error: any) {
       console.error('Error moving priority:', error);
-      alert('Failed to reorder priority: ' + error.message);
+      notify('Failed to reorder priority: ' + error.message, { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -179,7 +180,7 @@ export function PriorityManagement() {
       loadPriorities();
     } catch (error: any) {
       console.error('Error toggling priority:', error);
-      alert('Failed to update priority: ' + error.message);
+      notify('Failed to update priority: ' + error.message, { theme: 'blue', tone: 'error' });
     }
   }
 

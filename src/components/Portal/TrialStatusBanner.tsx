@@ -1,4 +1,4 @@
-import { Clock, Star, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
+import { Star, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 interface TrialStatusBannerProps {
@@ -14,7 +14,7 @@ export function TrialStatusBanner({
   program='test_and_tune',
   daysRemaining,
   expirationDate,
-  subscriptionPlanName,
+  subscriptionPlanName: _subscriptionPlanName,
   showDetails = true,
   compact = false
 }: TrialStatusBannerProps) {
@@ -68,7 +68,7 @@ export function TrialStatusBanner({
   const colors = colorClasses[statusColor];
 
   const benefits = [
-    'Create unlimited punchlist items',
+    program==='test_and_tune'?'Add project punchlist items through Test & Tune':'VIP benefits follow your offer; online requests require an active paid or complimentary plan',
     program==='test_and_tune'?'Included project adjustments and tuning':'Benefits defined by your VIP trial offer',
     'Direct communication with your team',
     'Photo documentation and tracking',

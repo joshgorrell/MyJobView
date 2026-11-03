@@ -173,13 +173,17 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
   const laborProfit = laborRevenue - laborCost;
   const laborMargin = laborRevenue > 0 ? (laborProfit / laborRevenue) * 100 : 0;
 
-  const coRevenue = stats.coLineItems.reduce((s, li) => s + (li.total_price || 0), 0);
+
   const coLaborRevenue = stats.coLineItems.reduce((s, li) => s + (li.labor_total || 0), 0);
 
   const approvedCOs = changeOrders.filter(co => co.status === 'approved');
   const totalChangeAmount = approvedCOs.reduce((sum, co) => sum + (co.change_amount || 0), 0);
 
-  const totalContractRevenue = (order.contract_total || 0) + totalChangeAmount;
+  // Use the proposal total as the baseline, NOT order.contract_total — the stored
+  // contract_total already includes approved COs, so adding totalChangeAmount on top
+  // would double-count every change order.
+  const originalTotal = order.proposal?.total ?? order.original_contract_total ?? order.contract_total ?? 0;
+  const totalContractRevenue = originalTotal + totalChangeAmount;
   const totalCost = productCost + laborCost;
   const overallProfit = totalContractRevenue - totalCost;
   const overallMargin = totalContractRevenue > 0 ? (overallProfit / totalContractRevenue) * 100 : 0;
@@ -330,7 +334,7 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
       </div>
 
       {approvedCOs.length > 0 && (
-        <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-5">
+        <div className="bg-surface rounded-lg border border-subtle p-5">
           <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
             Change Order Impact
@@ -356,7 +360,7 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
         </div>
       )}
 
-      <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-5">
+      <div className="bg-surface rounded-lg border border-subtle p-5">
         <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
           <Clock className="w-4 h-4" />
           Labor Efficiency
@@ -436,7 +440,7 @@ export function SalesOrderStatsTab({ order, changeOrders }: SalesOrderStatsTabPr
         )}
       </div>
 
-      <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-5">
+      <div className="bg-surface rounded-lg border border-subtle p-5">
         <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
           <DollarSign className="w-4 h-4" />
           Collection Status
@@ -516,7 +520,7 @@ function MetricCard({ label, value, icon: Icon, color }: {
   const textColor = colorMap[color] || 'text-white';
 
   return (
-    <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-4">
+    <div className="bg-surface rounded-lg border border-subtle p-4">
       <div className="flex items-center gap-2 mb-2">
         <Icon className={`w-4 h-4 ${textColor}`} />
         <span className="text-xs text-gray-500">{label}</span>
@@ -526,7 +530,7 @@ function MetricCard({ label, value, icon: Icon, color }: {
   );
 }
 
-function ProfitSection({ title, icon: Icon, revenue, cost, profit, margin, goal, details }: {
+function ProfitSection({ title, icon: Icon, revenue: _revenue, cost: _cost, profit: _profit, margin, goal, details }: {
   title: string;
   icon: typeof Package;
   revenue: number;
@@ -539,7 +543,7 @@ function ProfitSection({ title, icon: Icon, revenue, cost, profit, margin, goal,
   const marginColor = margin >= goal ? 'text-emerald-400' : margin >= goal * 0.75 ? 'text-amber-400' : 'text-red-400';
 
   return (
-    <div className="bg-gray-900/50 rounded-lg border border-gray-700/50 p-5">
+    <div className="bg-surface rounded-lg border border-subtle p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider flex items-center gap-2">
           <Icon className="w-4 h-4" />

@@ -1,3 +1,7 @@
+import { deleteProposalSubmission, deleteProposalEmail } from './deleteProposalSubmission.ts';
+import { proposalFollowUpEmail, proposalFollowUpContent, wrapProposalContent } from "./proposalFollowUp.ts";
+import { sendTrackedProposalCheck } from "./proposalCheckDelivery.ts";
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { validateAssessment } from "./adminReview.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { bidFileFormat, bidFileHelp, validBidFile } from "./bidFileTypes.ts";
@@ -50,6 +54,24 @@ const hash = async (v: string) =>
       await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)),
     ),
   ).map((n) => n.toString(16).padStart(2, "0")).join("");
+async function tokenFor(id: string, secret: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return [
+    ...new Uint8Array(
+      await crypto.subtle.sign(
+        "HMAC",
+        key,
+        new TextEncoder().encode("lost-feedback-reminder:" + id),
+      ),
+    ),
+  ].map((n) => n.toString(16).padStart(2, "0")).join("");
+}
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -64,14 +86,15 @@ function buildInvitationEmail(
 ): string {
   const company = escape(settings?.company_name || "Our team");
   const personal = !!settings?.invitation_owner_name;
+  const repName = settings?.invitation_rep_name;
   const introduction = personal
     ? `I’m ${escape(settings.invitation_owner_name)}, owner of ${company}.`
-    : `We’re the leadership team at ${company}.`;
+    : repName ? `I’m ${escape(repName)} with ${company}.` : `We’re the team at ${company}.`;
   const signature = personal && settings?.invitation_owner_photo_url
     ? `<p>Thank you,</p><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:14px;vertical-align:middle"><img src="${escape(settings.invitation_owner_photo_url)}" alt="${escape(settings.invitation_owner_name)}" width="72" style="display:block;width:72px;height:auto;border-radius:10px;border:0" /></td><td style="vertical-align:middle;line-height:1.5"><strong>${escape(settings.invitation_owner_name)}</strong><br><span style="font-size:14px">Owner, ${company}</span></td></tr></table>`
-    : `<p>Thank you,<br>${personal ? escape(settings.invitation_owner_name) : `${company} leadership team`}</p>`;
+    : `<p>Thank you,<br>${repName ? escape(repName) : personal ? escape(settings.invitation_owner_name) : `${company} team`}</p>`;
   const html = wrapInEmailLayout(
-    `<p>Hi ${escape(contact.first_name || contact.contact_name || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p>${signature}`,
+    `<p>Hi ${escape(contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || "there")},</p><p>${introduction} Thank you for considering us for your <strong>${escape(opportunityName)}</strong>. Since we didn’t earn your business, could you spare 30 seconds to tell ${personal ? "me" : "us"} why? Your honest feedback will help us improve.</p><p><a href="${escape(url.toString())}" style="display:inline-block;padding:16px 24px;background:#0e7490;color:white;border-radius:8px;text-decoration:none">Share Your Feedback →</a></p><p style="font-size:13px">Your feedback is shared privately with authorized company reviewers.</p>${signature}`,
     company,
     escape(settings?.company_email || ""),
     "#0e7490",
@@ -104,7 +127,7 @@ Deno.serve(async (req) => {
       }
       const token = await checked(
         await admin.from("lost_review_tokens").select("request_id,expires_at")
-          .eq("token_hash", await hash(b.token)).maybeSingle(),
+          .or(`token_hash.eq.${await hash(b.token)},followup_token_hash.eq.${await hash(b.token)}`).maybeSingle(),
       );
       if (!token || Date.parse(token.expires_at) < Date.now()) {
         return json({ error: "This review link is invalid or expired." }, 404);
@@ -298,7 +321,7 @@ Deno.serve(async (req) => {
                 }</p><p><strong>Competing bid files:</strong> ${attachments.length}</p>${emailAttachments.length ? `<p>Attached to this email${part}: ${emailAttachments.map(a => escape(a.filename)).join(", ")}</p>` : ""}<p><a href="${
                   escape(link)
                 }">View the private response and attachments in MJV</a></p>`;
-              const sent = await fetch("https://api.resend.com/emails", {
+              const sent = await sendSystemEmail({
                 method: "POST",
                 headers: {
                   Authorization: `Bearer ${key}`,
@@ -351,7 +374,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Unauthorized" }, 401);
     const profile = await checked(
       await admin.from("profiles").select(
-        "organization_id,role,is_active,can_send_lost_opportunity_reviews,can_view_lost_opportunity_submissions",
+        "organization_id,role,is_active,can_send_lost_opportunity_reviews,can_view_lost_opportunity_submissions,can_manage_customer_feedback,first_name,last_name,email",
       ).eq(
         "id",
         user.id,
@@ -365,8 +388,85 @@ Deno.serve(async (req) => {
     );
     if (!access) return json({ error: "Reviews access required" }, 403);
     const org = profile.organization_id;
+    if (b.action === "delete_proposal_check_email") {
+      const result = await deleteProposalEmail(client, admin, profile, b.email_id);
+      return json(result.body, result.status);
+    }
+    if (b.action === "delete_proposal_check_submission") {
+      const result = await deleteProposalSubmission(client, admin, profile, b.event_id);
+      return json(result.body, result.status);
+    }
+    if (["proposal_preview", "proposal_send"].includes(b.action)) {
+      const isAdmin = ["admin", "owner", "super_admin"].includes(profile.role);
+      if (!isAdmin && !profile.can_manage_customer_feedback) return json({ error: "Sending customer feedback is not permitted." }, 403);
+      if (!["sales", "owner"].includes(b.variant)) return json({ error: "Choose a follow-up version." }, 400);
+
+      // The owner variant represents Josh personally and cannot be sent under
+      // his identity by other administrators or staff with review permissions.
+      if (b.variant === "owner" &&
+          (!isAdmin || user.email?.trim().toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the owner may send the owner follow-up." }, 403);
+      }
+
+      const mode = b.recipient_mode || (b.proposal_id ? "proposal" : b.contact_id ? "customer" : "manual");
+      if (!["proposal", "customer", "manual"].includes(mode)) return json({ error: "Choose a recipient." }, 400);
+      let proposal: any = null;
+      let contact: any;
+      if (mode === "proposal") {
+        proposal = await checked(await client.from("proposals").select("id,contact_id,created_by,status,sent_at,title")
+          .eq("id", b.proposal_id).eq("organization_id", org).single());
+        if (!proposal.sent_at || !["sent", "viewed"].includes(proposal.status)) return json({ error: "Choose an open proposal that has been sent to the customer." }, 400);
+      }
+      if (mode === "manual") {
+        const name = typeof b.recipient_name === "string" ? b.recipient_name.trim() : "";
+        const email = typeof b.recipient_email === "string" ? b.recipient_email.trim() : "";
+        if (!name || name.length > 200 || /[\r\n]/.test(name) || email.length > 254 || !/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(email)) return json({ error: "Enter a customer name and a valid email address." }, 400);
+        contact = { contact_name: name, email };
+      } else {
+        contact = await checked(await client.from("contacts").select("first_name,last_name,contact_name,full_name,company_name,email")
+          .eq("id", proposal?.contact_id || b.contact_id).eq("organization_id", org).maybeSingle());
+        if (!contact) return json({ error: "Could not find that customer. They may have been deleted." }, 400);
+      }
+      if (!contact.email) return json({ error: "This customer needs an email address." }, 400);
+      const settings = await checked(await admin.from("company_settings").select("company_name,company_email,company_logo_url,from_email,app_url")
+        .eq("organization_id", org).maybeSingle());
+      if (!settings) return json({ error: "Company settings are not configured. Set up company email before sending follow-ups." }, 400);
+      const organization = await checked(await admin.from("organizations").select("subdomain").eq("id", org).maybeSingle());
+      if (!organization) return json({ error: "Organization not found." }, 400);
+      const rep = await checked(await admin.from("profiles").select("id,first_name,last_name,email,is_active")
+        .eq("id", proposal?.created_by || user.id).eq("organization_id", org).maybeSingle());
+      if (!rep) return json({ error: "Could not find the salesperson for this proposal. They may have been removed." }, 400);
+      const owner = b.variant === "owner";
+      if (owner && (organization.subdomain !== "elife" || user.email?.toLowerCase() !== "josh@electroniclife.com")) {
+        return json({ error: "Only the authorized owner can send from the owner identity." }, 403);
+      }
+      const sender = { owner, name: owner ? "Josh Gorrell" : [rep.first_name, rep.last_name].filter(Boolean).join(" "),
+        email: owner ? "josh@electroniclife.com" : rep.email,
+        photo: owner ? "https://elife.myjobview.com/images/josh-gorrell-email.jpg" : undefined };
+      if (!sender.name || !sender.email || (!owner && !rep.is_active)) return json({ error: "Configure the sender’s name and email before sending." }, 400);
+      const extendedSettings = { ...settings, owner_name: organization.subdomain === "elife" ? "Josh Gorrell" : null, owner_email: organization.subdomain === "elife" ? "josh@electroniclife.com" : null, slogan: organization.subdomain === "elife" ? "Innovate. Integrate. Inspire." : "" };
+      const defaultContent = proposalFollowUpContent(extendedSettings, contact, sender);
+      const defaultSubject = `A quick check in from ${settings.company_name || "our team"}`;
+      if (b.action === "proposal_preview") return json({ html: proposalFollowUpEmail(extendedSettings, contact, sender), content: defaultContent, subject: defaultSubject, recipient: contact.email, reply_to: sender.email, sender: sender.name, owner_name: extendedSettings.owner_name, owner_email: extendedSettings.owner_email });
+      if (typeof b.send_key !== "string" || !/^[0-9a-f-]{36}$/.test(b.send_key)) return json({ error: "Preview the email before sending." }, 400);
+      const editedSubject = typeof b.edited_subject === "string" ? b.edited_subject.trim().slice(0, 300) : "";
+      const editedContent = typeof b.edited_content === "string" ? b.edited_content.slice(0, 200000) : "";
+      const subject = editedSubject || defaultSubject;
+      const html = editedContent ? wrapProposalContent(extendedSettings, editedContent, sender) : proposalFollowUpEmail(extendedSettings, contact, sender);
+      const from = settings.from_email || settings.company_email;
+      if (!from || !Deno.env.get("RESEND_API_KEY")) return json({ error: "Configure email delivery before sending." }, 503);
+      return json(await sendTrackedProposalCheck(admin, sendSystemEmail, {
+        organization_id: org, send_key: b.send_key, sent_by: user.id, responsible_user_id: rep.id,
+        response_url: `https://${organization.subdomain || "app"}.myjobview.com/proposal-check-response`,
+        contact_id: mode === "manual" ? null : proposal?.contact_id || b.contact_id,
+        proposal_id: proposal?.id || null, variant: b.variant,
+        recipient_name: contact.contact_name || contact.first_name || contact.email,
+        recipient_email: contact.email, sender_name: sender.name,
+        reply_to: sender.email, from_address: `${sender.name.replace(/[<>\r\n]/g, "")} <${from}>`, subject, email_html: html,
+      }, Deno.env.get("SUPABASE_URL")!));
+    }
     if (["create", "preview"].includes(b.action)) {
-      if (!profile.can_send_lost_opportunity_reviews) {
+      if (!["admin", "owner", "super_admin"].includes(profile.role) && !profile.can_send_lost_opportunity_reviews) {
         return json({
           error: "Sending Lost Opportunity reviews is not permitted.",
         }, 403);
@@ -374,7 +474,7 @@ Deno.serve(async (req) => {
       // Use the user's RLS-scoped customer lookup as well as an explicit tenant check.
       const contact = await checked(
         await client.from("contacts").select(
-          "id,organization_id,email,contact_name,first_name,company_name",
+          "id,organization_id,email,contact_name,full_name,first_name,last_name,company_name",
         ).eq("id", b.contact_id).eq("organization_id", org).single(),
       );
       if (!contact.email) {
@@ -409,10 +509,29 @@ Deno.serve(async (req) => {
           400,
         );
       }
-      // Electronic Life's owner introduction is specific to its tenant.
-      if (settings && organization.subdomain === "elife") {
-        settings.invitation_owner_name = "Josh Gorrell";
-        settings.invitation_owner_photo_url = `${base}/images/josh-gorrell-email.jpg`;
+      const senderVariant = b.sender_variant || "sales";
+      if (!["sales", "owner"].includes(senderVariant)) return json({ error: "Choose a sender." }, 400);
+
+      let senderName = "";
+      let senderEmail = "";
+      if (senderVariant === "owner") {
+        senderName = "Josh Gorrell";
+        senderEmail = "josh@electroniclife.com";
+        if (settings) {
+          settings.invitation_owner_name = senderName;
+          settings.invitation_owner_photo_url = `${base}/images/josh-gorrell-email.jpg`;
+        }
+      } else {
+        let rep: any = null;
+        if (b.proposal_id) {
+          const linked = await checked(await client.from("proposals").select("created_by").eq("id", b.proposal_id).eq("contact_id", contact.id).eq("organization_id", org).single());
+          if (linked.created_by) rep = await checked(await admin.from("profiles").select("first_name,last_name,email,is_active").eq("id", linked.created_by).eq("organization_id", org).maybeSingle());
+        }
+        if (!rep) rep = profile;
+        senderName = [rep.first_name, rep.last_name].filter(Boolean).join(" ").trim();
+        senderEmail = rep.email || "";
+        if (!senderName || !senderEmail || rep.is_active === false) return json({ error: "The salesperson needs an active profile with a name and email." }, 400);
+        if (settings) settings.invitation_rep_name = senderName;
       }
       if (b.action === "preview") {
         const previewUrl = new URL("/lost-opportunity-review", base);
@@ -439,11 +558,12 @@ Deno.serve(async (req) => {
           organization_id: org,
           method: "email",
           request_type: "lost_opportunity",
-          auto_followup_enabled: false,
+          auto_followup_enabled: true,
           recipient_email: contact.email,
           recipient_name: contact.contact_name,
         }).select("id").single(),
       );
+      const openToken = crypto.randomUUID() + crypto.randomUUID();
       await checked(
         await admin.from("lost_review_details").insert({
           request_id: request.id,
@@ -451,6 +571,9 @@ Deno.serve(async (req) => {
           proposal_id: b.proposal_id || null,
           opportunity_name: b.opportunity_name.trim(),
           title: b.title.trim(),
+          open_token: openToken,
+          auto_followup_enabled: true,
+          sender_variant: senderVariant,
         }),
       );
       const token = crypto.randomUUID() + crypto.randomUUID();
@@ -469,20 +592,22 @@ Deno.serve(async (req) => {
         b.title,
         url,
       );
-      const result = await fetch("https://api.resend.com/emails", {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const pixelUrl = `${supabaseUrl}/functions/v1/email-open-track?token=${openToken}&type=lost_review`;
+      const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
+      const trackedHtml = html.includes('</body>') ? html.replace('</body>', pixel + '</body>') : html + pixel;
+      const result = await sendSystemEmail({
         method: "POST",
         headers: {
           Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: `${
-            settings?.from_name || settings?.company_name || "Our team"
-          } <${settings?.from_email || settings?.company_email}>`,
+          from: `${senderName.replace(/[<>\r\n]/g, "")} <${settings?.from_email || settings?.company_email}>`,
           to: contact.email,
-          reply_to: settings?.reply_to_email || settings?.company_email,
+          reply_to: senderEmail,
           subject: b.title,
-          html,
+          html: trackedHtml,
         }),
       });
       await checked(
@@ -504,6 +629,216 @@ Deno.serve(async (req) => {
         b.request_id,
       ).eq("organization_id", org).single(),
     );
+    if (b.action === "resend") {
+      if (!["admin", "owner", "super_admin"].includes(profile.role) && !profile.can_send_lost_opportunity_reviews)
+        return json(
+          { error: "Sending Lost Opportunity reviews is not permitted." },
+          403,
+        );
+      if (detail.responded_at)
+        return json(
+          { error: "Customer feedback has already been recorded." },
+          409,
+        );
+      if (!Deno.env.get("RESEND_API_KEY"))
+        return json({ error: "Email delivery is not configured." }, 503);
+      const request = await checked(
+        await admin
+          .from("review_requests")
+          .select("recipient_name,recipient_email")
+          .eq("id", detail.request_id)
+          .eq("organization_id", org)
+          .single(),
+      );
+      if (!request.recipient_email)
+        return json({ error: "This request has no recipient email." }, 400);
+      const settings = await checked(
+        await admin
+          .from("company_settings")
+          .select(
+            "company_name,company_email,company_logo_url,from_email,from_name,reply_to_email,app_url",
+          )
+          .eq("organization_id", org)
+          .single(),
+      );
+      const organization = await checked(
+        await admin
+          .from("organizations")
+          .select("subdomain")
+          .eq("id", org)
+          .single(),
+      );
+      const base = organization.subdomain
+        ? `https://${organization.subdomain}.myjobview.com`
+        : settings.app_url;
+      if (!base || !base.startsWith("https://"))
+        return json({ error: "Configure a secure dealer app URL." }, 400);
+      const now = new Date().toISOString();
+      const claim = await checked(
+        await admin
+          .from("lost_review_details")
+          .update({ followup_claimed_at: now })
+          .eq("request_id", detail.request_id)
+          .eq("organization_id", org)
+          .is("responded_at", null)
+          .or(
+            `followup_claimed_at.is.null,followup_claimed_at.lt.${new Date(Date.now() - 15 * 60000).toISOString()}`,
+          )
+          .select("request_id,manual_resend_history")
+          .maybeSingle(),
+      );
+      if (!claim)
+        return json(
+          {
+            error:
+              "A send is already in progress or feedback just arrived. Reload and try again.",
+          },
+          409,
+        );
+      try {
+        const token = await tokenFor(
+          detail.request_id,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        await checked(
+          await admin
+            .from("lost_review_tokens")
+            .update({
+              followup_token_hash: await hash(token),
+              expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+            })
+            .eq("request_id", detail.request_id)
+            .select("request_id")
+            .single(),
+        );
+        const url = new URL("/lost-opportunity-review", base);
+        url.searchParams.set("token", token);
+        const latest = await checked(
+          await admin
+            .from("lost_review_details")
+            .select("responded_at")
+            .eq("request_id", detail.request_id)
+            .single(),
+        );
+        if (latest.responded_at)
+          return json(
+            { error: "Customer feedback has just been recorded." },
+            409,
+          );
+        const result = await sendSystemEmail({
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": `lost-manual-${detail.request_id}-${now}`,
+          },
+          body: JSON.stringify({
+            from: `${settings.from_name || settings.company_name || "Our team"} <${settings.from_email || settings.company_email}>`,
+            to: request.recipient_email,
+            reply_to: settings.reply_to_email || settings.company_email,
+            subject: detail.title,
+            html: buildInvitationEmail(
+              settings,
+              {
+                contact_name: request.recipient_name,
+                email: request.recipient_email,
+              },
+              detail.opportunity_name,
+              detail.title,
+              url,
+            ),
+          }),
+        });
+        if (!result.ok)
+          return json(
+            { error: "Survey resend failed. Please try again." },
+            502,
+          );
+        await checked(
+          await admin
+            .from("lost_review_details")
+            .update({
+              manual_resend_history: [
+                ...(claim.manual_resend_history || []),
+                { sent_at: now, sent_by: user.id },
+              ],
+            })
+            .eq("request_id", detail.request_id)
+            .eq("organization_id", org),
+        );
+        return json({ success: true });
+      } finally {
+        await checked(
+          await admin
+            .from("lost_review_details")
+            .update({ followup_claimed_at: null })
+            .eq("request_id", detail.request_id)
+            .eq("followup_claimed_at", now),
+        );
+      }
+    }
+    if (b.action === "record_feedback") {
+      if (
+        !(["admin", "owner", "super_admin"].includes(profile.role) || profile.can_view_lost_opportunity_submissions) ||
+        !(
+          profile.can_send_lost_opportunity_reviews ||
+          ["admin", "owner", "super_admin"].includes(profile.role)
+        )
+      )
+        return json(
+          { error: "Lost Opportunity send and submission access required." },
+          403,
+        );
+      if (detail.responded_at)
+        return json(
+          {
+            error:
+              "Feedback already exists. The original customer response is preserved.",
+          },
+          409,
+        );
+      const selected = Array.isArray(b.reasons) ? [...new Set(b.reasons)] : [];
+      if (
+        !["phone", "email", "in_person"].includes(b.source) ||
+        !selected.length ||
+        selected.some((r) => !reasons.includes(r as string)) ||
+        typeof b.message !== "string" ||
+        b.message.length > 10000 ||
+        (b.recovery_message !== undefined &&
+          (typeof b.recovery_message !== "string" ||
+            b.recovery_message.length > 10000)) ||
+        !["yes", "maybe", "no"].includes(b.recoverable)
+      )
+        return json(
+          {
+            error:
+              "Choose the source, reasons, and whether the opportunity can be recovered.",
+          },
+          400,
+        );
+      const result = await admin
+        .from("lost_review_responses")
+        .insert({
+          request_id: detail.request_id,
+          reasons: selected,
+          message: b.message.trim(),
+          recoverable: b.recoverable,
+          recovery_message:
+            typeof b.recovery_message === "string"
+              ? b.recovery_message.trim()
+              : "",
+          attachments: [],
+          source: b.source,
+          recorded_by: user.id,
+        });
+      if (result.error?.code === "23505")
+        return json(
+          { error: "Feedback was just submitted. Reload to see it." },
+          409,
+        );
+      await checked(result);
+      return json({ success: true });
+    }
     if (["assessment_load", "assessment_save"].includes(b.action)) {
       if (profile.role !== "admin" || !profile.can_view_lost_opportunity_submissions) {
         return json({ error: "Admin submission access required." }, 403);
@@ -628,8 +963,13 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown action" }, 400);
   } catch (e) {
     console.error("Lost review request failed", e);
+    const message = e instanceof Error
+      ? e.message
+      : typeof e === "object" && e !== null && "message" in e && typeof e.message === "string"
+      ? e.message
+      : "Unable to process this request. Please try again.";
     return json(
-      { error: "Unable to process this request. Please try again." },
+      { error: message },
       400,
     );
   }

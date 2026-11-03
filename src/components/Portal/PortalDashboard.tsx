@@ -1,3 +1,5 @@
+import { ProposalPromise } from './ProposalPromise';
+import { formatCurrency } from '../../lib/utils';
 import { useSecurityPortalEnabled } from '../../lib/useSecurityPortalEnabled';
 import { useState, useEffect } from 'react';
 import { FileText, Briefcase, Calendar, DollarSign, MessageSquare, LogOut, Shield, XCircle, ClipboardList, Star, ArrowLeft, ChevronRight, CheckSquare, Receipt, RefreshCw } from 'lucide-react';
@@ -24,6 +26,7 @@ interface DashboardStats {
   unreadMessages: number;
   vipWorkOrders: number;
   punchlistTasks: number;
+  serviceRequests: number;
   activeSalesOrders: number;
 }
 
@@ -46,7 +49,7 @@ interface PortalModuleSettings {
 }
 
 interface PortalDashboardProps {
-  defaultModule?: 'dashboard' | 'proposals' | 'projects' | 'appointments' | 'invoices' | 'messages' | 'vip' | 'punchlist' | 'sales-orders';
+  defaultModule?: 'dashboard' | 'proposals' | 'projects' | 'appointments' | 'invoices' | 'messages' | 'vip' | 'punchlist' | 'service-requests' | 'sales-orders';
 }
 
 export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboardProps = {}) {
@@ -54,7 +57,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   const { tenant } = useTenant();
   const dealerName = tenant?.organizationName || 'Electronic Life';
   const dealerLogo = tenant?.logoUrl;
-  const [currentView, setCurrentView] = useState<string>(defaultModule);
+  const [currentView, setCurrentView] = useState<string>(()=>['invoices', 'messages'].includes(new URLSearchParams(window.location.search).get('tab') || '') ? new URLSearchParams(window.location.search).get('tab')! : defaultModule);
   const [stats, setStats] = useState<DashboardStats>({
     activeProposals: 0,
     activeProjects: 0,
@@ -63,17 +66,19 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
     unreadMessages: 0,
     vipWorkOrders: 0,
     punchlistTasks: 0,
+    serviceRequests: 0,
     activeSalesOrders: 0,
   });
   const [loading, setLoading] = useState(true);
   const [contactName, setContactName] = useState('');
   const [trialAccess, setTrialAccess] = useState<TrialAccess | null>(null);
-  const [hasVipMembership, setHasVipMembership] = useState(false);
+  const [_hasVipMembership, setHasVipMembership] = useState(false);
   const [vipSubscription, setVipSubscription] = useState<{
     status: string;
     plan_name: string;
     billing_frequency: string;
     amount: number;
+    is_complimentary?: boolean;
     next_billing_date: string;
     trial_end_date: string | null;
   } | null>(null);
@@ -107,13 +112,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
     if (!contactId) return;
 
     const refreshPunchlistCount = async () => {
-      const { count } = await supabase
-        .from('punchlist_tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('contact_id', contactId)
-        .in('status', ['draft', 'requested', 'scheduled']);
-
-      setStats(prev => ({ ...prev, punchlistTasks: count || 0 }));
+      const {data:support}=await supabase.rpc('get_customer_support',{p_contact_id:contactId});
+      if(support)setStats(prev => ({ ...prev, punchlistTasks: support.projects.reduce((sum:number,p:{tasks:Array<{status:string}>})=>sum+p.tasks.filter(t=>t.status==='open').length,0),serviceRequests:support.requests.filter((r:{status:string})=>!['closed','cancelled'].includes(r.status)).length }));
     };
 
     const subscription = supabase
@@ -231,9 +231,9 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         }
       }
 
-      const columns='status,next_billing_date,trial_end_date,plan:recurring_plans(plan_name,billing_frequency,amount)';
+      const columns='status,next_billing_date,trial_end_date,custom_amount,is_complimentary,plan:recurring_plans(plan_name,billing_frequency,amount)';
       const [paid,trial]=await Promise.all([
-        supabase.from('recurring_subscriptions').select('status,next_billing_date,trial_end_date,plan:recurring_plans!inner(plan_name,billing_frequency,amount)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
+        supabase.from('recurring_subscriptions').select('status,next_billing_date,trial_end_date,custom_amount,is_complimentary,plan:recurring_plans!inner(plan_name,billing_frequency,amount)').eq('contact_id',contactId).eq('status','active').eq('plan.plan_type','vip_plan').order('start_date',{ascending:false}).limit(1).maybeSingle(),
         supabase.from('recurring_subscriptions').select(columns).eq('contact_id',contactId).eq('status','trial').eq('trial_source','vip_trial').gte('trial_end_date',new Date().toISOString().split('T')[0]).order('start_date',{ascending:false}).limit(1).maybeSingle()
       ]);
       const vipSub=paid.data || trial.data;
@@ -244,7 +244,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           status: vipSub.status,
           plan_name: plan?.plan_name || 'VIP',
           billing_frequency: plan?.billing_frequency || '',
-          amount: plan?.amount || 0,
+          amount: vipSub.custom_amount ?? plan?.amount ?? 0,
+          is_complimentary:vipSub.is_complimentary,
           next_billing_date: vipSub.next_billing_date,
           trial_end_date: vipSub.trial_end_date,
         });
@@ -282,12 +283,13 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         supabase.from('projects').select('id', { count: 'exact', head: true }).eq('customer_id', contactId).in('status', ['planning', 'active']),
         supabase.from('appointments').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).gte('appointment_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
         supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['submitted', 'partial', 'overdue']),
-        supabase.from('message_threads').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('is_internal', false),
+        supabase.from('messages').select('id', { count: 'exact', head: true }).eq('author_type', 'staff').eq('is_internal', false).eq('is_read', false),
         supabase.from('work_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).eq('type', 'vip_program').gte('start_date', new Date().toISOString().split('T')[0]).in('status', ['scheduled', 'in_progress']),
         supabase.from('punchlist_tasks').select('id', { count: 'exact', head: true }).eq('contact_id', contactId).in('status', ['draft', 'requested', 'scheduled']),
         supabase.from('sales_orders').select('id', { count: 'exact', head: true }).eq('contact_id', contactId),
       ]);
 
+      const {data:support}=await supabase.rpc('get_customer_support',{p_contact_id:contactId});
       setStats({
         activeProposals: proposalsRes.count || 0,
         activeProjects: projectsRes.count || 0,
@@ -295,7 +297,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
         unpaidInvoices: invoicesRes.count || 0,
         unreadMessages: messagesRes.count || 0,
         vipWorkOrders: vipWorkOrdersRes.count || 0,
-        punchlistTasks: punchlistRes.count || 0,
+        punchlistTasks: support ? support.projects.reduce((sum:number,p:{tasks:Array<{status:string}>})=>sum+p.tasks.filter(t=>t.status==='open').length,0) : punchlistRes.count || 0,
+        serviceRequests: support ? support.requests.filter((r:{status:string})=>!['closed','cancelled'].includes(r.status)).length : 0,
         activeSalesOrders: salesOrdersRes.count || 0,
       });
     } catch (error) {
@@ -304,6 +307,21 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!contactId) return;
+    let cancelled = false;
+    const refreshUnread = async () => {
+      const {count, error} = await supabase.from('messages').select('id', {count: 'exact', head: true})
+        .eq('author_type', 'staff').eq('is_internal', false).eq('is_read', false);
+      if (!cancelled && !error) setStats(old => ({...old, unreadMessages: count || 0}));
+    };
+    void refreshUnread();
+    const channel = supabase.channel(`portal-message-count-${contactId}`)
+      .on('postgres_changes', {event: '*', schema: 'public', table: 'messages'}, () => void refreshUnread()).subscribe();
+    const timer = window.setInterval(() => void refreshUnread(), 30000);
+    return () => { cancelled = true; window.clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [contactId]);
 
   async function handleSignOut() {
     const isImpersonating = localStorage.getItem('admin_impersonating_contact');
@@ -337,7 +355,9 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
   }
 
   if (portalAccessLevel === 'proposal_only') {
-    return <PortalLimitedDashboard />;
+    if (currentView === 'messages' && moduleSettings.portal_messages_enabled) return <div className="min-h-screen bg-gray-50 p-4"><button onClick={() => setCurrentView('dashboard')} className="mb-4 px-3 py-2 border rounded-lg bg-white text-gray-900">Back to Portal</button><PortalMessages /></div>;
+    if(currentView==='invoices' && moduleSettings.portal_invoices_enabled) return <div className="min-h-screen bg-gray-50 p-4"><button onClick={()=>setCurrentView('dashboard')} className="mb-4 px-3 py-2 border rounded-lg bg-white text-gray-900">Back to Portal</button><PortalInvoices isEmbedded /></div>;
+    return <PortalLimitedDashboard onOpenMessages={moduleSettings.portal_messages_enabled ? () => setCurrentView('messages') : undefined} onOpenInvoices={moduleSettings.portal_invoices_enabled?()=>setCurrentView('invoices'):undefined} />;
   }
 
   const PortalHeader = ({ showBack = false }: { showBack?: boolean }) => (
@@ -398,7 +418,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           {currentView === 'invoices' && <PortalInvoices isEmbedded />}
           {currentView === 'messages' && <PortalMessages />}
           {currentView === 'vip' && <PortalVIPServices isEmbedded />}
-          {currentView === 'punchlist' && <PortalPunchlist isEmbedded />}
+          {currentView === 'punchlist' && <PortalPunchlist key="projects" isEmbedded />}
+          {currentView === 'service-requests' && <PortalPunchlist key="service" isEmbedded initialView="service" />}
           {currentView === 'sales-orders' && <PortalSalesOrders isEmbedded />}
         </main>
       </div>
@@ -429,6 +450,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{greeting}, {firstName}!</h2>
           <p className="text-gray-500 text-sm mt-1">Here's an overview of your account.</p>
         </div>
+
+        <ProposalPromise companyName={tenant?.organizationName || ''} logoUrl={dealerLogo} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {securityPortalEnabled && <DashboardTile icon={<Shield className="w-5 h-5" />} title="Security agreements"
@@ -511,12 +534,14 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
             />
           )}
 
+          {moduleSettings.portal_tasks_enabled && <DashboardTile icon={<ClipboardList className="w-5 h-5"/>} title="Service Requests" count={stats.serviceRequests} description="Online requests for active paid or comped VIP plans" color="navy" onClick={()=>setCurrentView('service-requests')}/>}
+
           {moduleSettings.portal_tasks_enabled && (
             <DashboardTile
               icon={<ClipboardList className="w-5 h-5" />}
-              title="My Punchlist"
+              title="Project Punchlist"
               count={stats.punchlistTasks}
-              description="Track your service items"
+              description="Shared items and Test & Tune adjustments"
               color="amber"
               onClick={() => setCurrentView('punchlist')}
               badge={trialAccess ? <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" /> : undefined}
@@ -549,7 +574,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                           ? 'bg-blue-100 text-blue-700'
                           : 'bg-green-100 text-green-700'
                       }`}>
-                        {vipSubscription.status === 'trial' ? 'Free Trial' : 'Active'}
+                        {vipSubscription.status === 'trial' ? 'Free Trial' : vipSubscription.is_complimentary ? 'Complimentary' : 'Active'}
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-0.5">
@@ -562,7 +587,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                             const days = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                             return `${days} day${days !== 1 ? 's' : ''} remaining — expires ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
                           })()
-                        : `Renews ${new Date(vipSubscription.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · $${vipSubscription.amount}/${vipSubscription.billing_frequency === 'yearly' ? 'yr' : vipSubscription.billing_frequency === 'monthly' ? 'mo' : vipSubscription.billing_frequency}`
+                        : `${vipSubscription.is_complimentary?'Complimentary through':'Renews'} ${new Date(vipSubscription.next_billing_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · $${vipSubscription.amount}/${vipSubscription.billing_frequency === 'yearly' ? 'yr' : vipSubscription.billing_frequency === 'monthly' ? 'mo' : vipSubscription.billing_frequency}`
                       }
                     </p>
                   </div>
@@ -585,7 +610,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-white font-bold text-base mb-1">Upgrade to VIP Membership</div>
-                  <p className="text-blue-200 text-sm leading-relaxed">Priority scheduling, unlimited punchlist access, regular maintenance visits, and dedicated support — all for one flat rate.</p>
+                  <p className="text-blue-200 text-sm leading-relaxed">Online service requests, priority scheduling, maintenance benefits, and dedicated support — all for one flat rate.</p>
                 </div>
                 <a
                   href="/portal/vip-membership"
@@ -651,7 +676,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                     <div key={sub.id} className="flex items-center justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
                       <span className="text-gray-700">{sub.plan?.plan_name || 'Recurring Service'}</span>
                       <span className="text-gray-900 font-medium">
-                        {formatCurrency(sub.custom_amount || sub.plan?.amount || 0)}
+                        {formatCurrency(sub.custom_amount ?? sub.plan?.amount ?? 0)}
                         {billingPreference === 'annual' ? '/yr' : '/mo'}
                       </span>
                     </div>

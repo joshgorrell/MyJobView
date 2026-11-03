@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const consoleSource = fs.readFileSync('src/components/Dispatch/ServiceRequestConsole.tsx','utf8');
+const historySource = fs.readFileSync('src/components/Dispatch/SmartIntakeHistory.tsx','utf8');
+assert.match(consoleSource,/SmartIntakeHistory/);
+assert.match(consoleSource,/VITE_SMART_INTAKE_UI_ENABLED/);
+assert.match(historySource,/All Activity/);
+assert.match(historySource,/Needs Attention/);
+assert.match(historySource,/loadIntakeTimeline/);
+assert.match(historySource,/No matching intake records/);
+assert.match(historySource,/Blank message body/);
+assert.doesNotMatch(historySource,/SUPABASE_SERVICE_ROLE_KEY/);
+console.log('Smart Intake Service Console UI integration contract passed');

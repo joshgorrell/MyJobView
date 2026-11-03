@@ -1,8 +1,11 @@
+import { notify } from '../../lib/feedback';
+import ProductAccessories from './ProductAccessories';
+import { normalizeBrandName } from './catalogGrouping';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Edit2 } from 'lucide-react';
+import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Category {
@@ -43,15 +46,23 @@ interface ProductFormProps {
   productId?: string;
   duplicateFromId?: string;
   readOnly?: boolean;
+  initialTab?: 'overview' | 'pricing' | 'details' | 'instructions' | 'accessories';
   onClose: () => void;
   onSave: (productData?: any) => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 
 }
 
 interface SuggestedPhoto { url: string; description: string }
 
-export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave }: ProductFormProps) {
+export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, initialTab = 'overview', onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
   const { profile } = useAuth();
+  const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>(initialTab);
+  const selectEditorTab = (tab: typeof editorTab) => {
+    setEditorTab(tab);
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  };
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -128,6 +139,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   const [newDefaultTaskPhase, setNewDefaultTaskPhase] = useState('');
 
   const [formData, setFormData] = useState({
+    is_discontinued: false,
+    is_active: true,
     // Basic Info
     manufacturer_id: '',
     manufacturer_model_number: '',
@@ -273,7 +286,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Prevent body scrolling when modal is open (mobile fix)
   useEffect(() => {
     // Store original body overflow style
-    const originalStyle = window.getComputedStyle(document.body).overflow;
+    const originalStyle = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
 
     // Prevent body scrolling
     document.body.style.overflow = 'hidden';
@@ -282,7 +296,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     // Restore on cleanup
     return () => {
       document.body.style.overflow = originalStyle;
-      document.body.style.touchAction = 'auto';
+      document.body.style.touchAction = originalTouchAction;
     };
   }, []);
 
@@ -314,7 +328,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     };
   }, [scrollPositionKey]);
 
-  // Auto-populate SKU from Model Number (unless user has manually edited it)
+  // Auto-populate ordering SKU from internal Model / Alias (unless user has manually edited it)
   useEffect(() => {
     // Only auto-populate if:
     // 1. User hasn't manually edited the SKU
@@ -370,16 +384,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   };
 
   // Format currency for display
-  const formatCurrency = (value: number): string => {
-    if (!value) return '';
-    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+
 
   // Parse currency input
-  const parseCurrency = (value: string): number => {
-    const cleaned = value.replace(/[^0-9.]/g, '');
-    return parseFloat(cleaned) || 0;
-  };
+
 
   // Calculate labor cost when hours change
   useEffect(() => {
@@ -506,6 +514,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
       const { data, error } = await supabase.from('products').select(`
         id,
+        is_discontinued,
+        is_active,
         manufacturer_id,
         manufacturer_model_number,
         sku,
@@ -539,6 +549,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       if (error) throw error;
       if (data) {
         setFormData({
+          is_discontinued: data.is_discontinued ?? false,
+          is_active: data.is_active !== false,
           manufacturer_id: data.manufacturer_id || '',
           manufacturer_model_number: data.manufacturer_model_number || '',
           sku: data.sku || '',
@@ -586,6 +598,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     try {
       const { data, error } = await supabase.from('products').select(`
         id,
+        is_discontinued,
+        is_active,
         manufacturer_id,
         manufacturer_model_number,
         sku,
@@ -619,6 +633,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       if (error) throw error;
       if (data) {
         const baseData = {
+          is_discontinued: data.is_discontinued ?? false,
+          is_active: true,
           manufacturer_id: data.manufacturer_id || '',
           manufacturer_model_number: data.manufacturer_model_number ? `${data.manufacturer_model_number}*copy*` : '',
           sku: '', // Clear SKU - user must enter a unique one
@@ -725,12 +741,19 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
   async function handleAddManufacturer() {
     if (!newItemName.trim()) return;
+    const existing = manufacturers.find(m => normalizeBrandName(m.name) === normalizeBrandName(newItemName));
+    if (existing) {
+      setFormData(prev => ({ ...prev, manufacturer_id: existing.id }));
+      setShowNewManufacturer(false);
+      setNewItemName('');
+      return;
+    }
 
     try {
       const { data, error } = await supabase
         .from('manufacturers')
         .insert({
-          name: newItemName
+          name: newItemName.trim().replace(/\s+/g, ' ')
         })
         .select()
         .single();
@@ -748,7 +771,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding manufacturer:', error);
-      alert(`Failed to add manufacturer: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add manufacturer: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -777,7 +800,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding vendor:', error);
-      alert(`Failed to add vendor: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add vendor: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
@@ -805,13 +828,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       }
     } catch (error: any) {
       console.error('Error adding color:', error);
-      alert(`Failed to add color: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to add color: ${error?.message || 'Unknown error'}`, { theme: 'amber', tone: 'error' });
     }
   }
 
   function handleImageSearch() {
     if (!formData.manufacturer_id || !formData.manufacturer_model_number) {
-      alert('Please select a manufacturer and enter a model number first');
+      notify('Please select a manufacturer and enter a model number first', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -844,7 +867,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
       setFormData(prev => ({ ...prev, image_url: publicUrl }));
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      notify('Failed to upload image', { theme: 'amber', tone: 'error' });
     } finally {
       setUploadingImage(false);
     }
@@ -897,8 +920,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
+      // Fields are split across tabs: reveal the invalid section before
+      // attempting to focus or scroll to its first error.
+      const firstError = Object.keys(newErrors)[0];
+      const errorTab = firstError === 'cost' || firstError === 'price' ? 'pricing' : 'overview';
+      selectEditorTab(errorTab);
       setTimeout(() => {
-        const firstErrorEl = document.querySelector('[data-error-field]');
+        const firstErrorEl = scrollContainerRef.current?.querySelector('[data-error-field]');
         firstErrorEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 50);
       return false;
@@ -922,11 +950,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     try {
       // Get category name from category_id
       const selectedCategory = categories.find(c => c.id === formData.category_id);
-      const selectedManufacturer = manufacturers.find(m => m.id === formData.manufacturer_id);
-      const selectedVendor = vendors.find(v => v.id === formData.default_vendor_id);
-      const selectedLaborPhase = laborPhases.find(lp => lp.id === formData.labor_phase_id);
+
 
       const productData = {
+        is_discontinued: formData.is_discontinued,
+        is_active: formData.is_active,
         manufacturer_id: formData.manufacturer_id || null,
         manufacturer_model_number: formData.manufacturer_model_number,
         item_color: formData.item_color || null,
@@ -1087,7 +1115,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     } catch (error: any) {
       console.error('Error saving product:', error);
       const errorMessage = error?.message || error?.error_description || 'Unknown error';
-      alert(`Failed to save product: ${errorMessage}`);
+      notify(`Failed to save product: ${errorMessage}`, { theme: 'amber', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -1236,17 +1264,17 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden">
+    <div className="product-form-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div
-        ref={scrollContainerRef}
-        className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto overscroll-contain touch-pan-y"
+        role="dialog" aria-modal="true" aria-labelledby="product-form-title"
+        className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl max-w-5xl w-full h-[100dvh] sm:h-[calc(100dvh-2rem)] flex flex-col min-h-0 overflow-hidden"
       >
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
+        <div className="shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <Package className="w-6 h-6 text-blue-600" />
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {readOnly ? 'View Product' : productId ? 'Edit Product' : 'New Product'}
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h2 id="product-form-title" className="text-lg sm:text-xl font-semibold text-gray-900">
+                {readOnly ? 'Product Details' : productId ? 'Product Details · Editing' : 'New Product'}
               </h2>
               {hasSavedDraft && !readOnly && (
                 <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
@@ -1255,25 +1283,37 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               )}
             </div>
           </div>
-          <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg">
+          {!readOnly && productId && <div className="flex gap-2 text-xs">{onDuplicate && <button type="button" onClick={onDuplicate} className="rounded border px-3 py-2">Duplicate</button>}{onDelete && <button type="button" onClick={onDelete} className="rounded border px-3 py-2 text-red-700">Delete</button>}</div>}
+          <button onClick={handleClose} aria-label="Close product form" className="p-3 shrink-0 hover:bg-gray-100 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <nav aria-label="Product editor sections" className="shrink-0 flex gap-1 overflow-x-auto border-b border-gray-200 bg-white px-4 sm:px-6 py-2">
+          {(['overview', 'pricing', 'details', 'instructions', 'accessories'] as const).map(tab => (
+            <button key={tab} type="button" onClick={() => selectEditorTab(tab)}
+              aria-current={editorTab === tab ? 'page' : undefined}
+              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${editorTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {{ overview: 'Overview', pricing: 'Pricing & Labor', details: 'Details', instructions: 'Instructions & Resources', accessories: 'Accessories' }[tab]}
+            </button>
+          ))}
+        </nav>
+
+        <div ref={scrollContainerRef} role="tabpanel" aria-label={`${editorTab} product fields`} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-start content-start">
+          {editorTab === 'overview' && (<React.Fragment>
           {/* AUTO-SAVE INFO */}
           {!readOnly && (
-            <div className="bg-blue-50 border border-blue-200 rounded p-2 flex items-center gap-2">
+            <div className="lg:col-span-2 flex items-center gap-2 text-gray-500">
               <Save className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-              <p className="text-xs text-blue-700">
-                Auto-saves as you type. Safe to navigate away.
+              <p className="text-xs text-gray-500">
+                Product draft saves as you type. Use Save accessory for accessory changes.
               </p>
             </div>
           )}
 
           {/* ADD FROM WEB */}
           {!readOnly && !productId && showAddFromWeb && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+            <div className="lg:col-span-2 bg-white border border-blue-200 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Globe className="w-4 h-4 text-blue-600 flex-shrink-0" />
                 <span className="text-xs font-medium text-gray-700">Import from URL</span>
@@ -1286,7 +1326,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 </button>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="url"
                   value={productUrl}
@@ -1295,7 +1335,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     setExtractError('');
                   }}
                   placeholder="Paste product URL..."
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   disabled={extracting}
                 />
                 <button
@@ -1336,7 +1376,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           {!showAddFromWeb && !readOnly && !productId && (
             <button
               onClick={() => setShowAddFromWeb(true)}
-              className="w-full p-2 border border-dashed border-gray-300 rounded hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5 text-gray-600 hover:text-blue-600"
+              className="lg:col-span-2 w-full p-3 border border-dashed border-gray-300 rounded hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center justify-center gap-1.5 text-gray-600 hover:text-blue-600"
             >
               <Globe className="w-4 h-4" />
               <span className="text-xs font-medium">Import from URL</span>
@@ -1344,21 +1384,21 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           )}
 
           {/* BASIC INFO */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Basic Information</h3>
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="sm:col-span-2 text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Basic Information</h3>
 
             {/* Manufacturer */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Manufacturer <span className="text-red-500">*</span>
+                Brand / Manufacturer <span className="text-red-500">*</span>
               </label>
               {showNewManufacturer ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter manufacturer name"
                     autoFocus
                   />
@@ -1379,15 +1419,15 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.manufacturer_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, manufacturer_id: e.target.value }))}
-                    className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                       errors.manufacturer ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
-                    <option value="">Select Manufacturer</option>
+                    <option value="">Select Brand / Manufacturer</option>
                     {manufacturers.map(m => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                     ))}
@@ -1409,7 +1449,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* Model Number */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Model Number <span className="text-red-500">*</span>
+                Model / Alias <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1426,7 +1466,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
 
             {/* Product Image */}
-            <div ref={imageSectionRef}>
+            <div ref={imageSectionRef} className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product Image
               </label>
@@ -1459,11 +1499,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                       className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700">Use photo</button>
                   </div>;
                 })()}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={handleImageSearch}
                     disabled={!formData.manufacturer_id || !formData.manufacturer_model_number}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                    className="flex-1 min-w-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
                   >
                     <Search className="w-4 h-4" />
                     Search Image
@@ -1471,7 +1511,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingImage}
-                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
+                    className="flex-1 min-w-0 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center gap-2"
                   >
                     <Upload className="w-4 h-4" />
                     {uploadingImage ? 'Uploading...' : 'Upload Image'}
@@ -1522,7 +1562,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* SKU */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU <span className="text-red-500">*</span>
+                Ordering SKU (Manufacturer / Distributor) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -1534,7 +1574,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                   errors.sku ? 'border-red-500' : 'border-gray-300'
                 }`}
-                placeholder="Auto-filled from Model Number"
+                placeholder="Initially copied from Model / Alias; editable for purchasing"
               />
               {errors.sku && (
                 <p className="text-sm text-red-600 mt-1">{errors.sku}</p>
@@ -1547,12 +1587,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Color/Finish
               </label>
               {showNewColor ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter color/finish name"
                     autoFocus
                   />
@@ -1573,11 +1613,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.item_color}
                     onChange={(e) => setFormData(prev => ({ ...prev, item_color: e.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Color/Finish</option>
                     {colors.map(c => (
@@ -1601,12 +1641,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Category <span className="text-red-500">*</span>
               </label>
               {showNewCategory ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter category name"
                     autoFocus
                   />
@@ -1627,11 +1667,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.category_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value, subcategory_id: '' }))}
-                    className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    className={`flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                       errors.category ? 'border-red-500' : 'border-gray-300'
                     }`}
                   >
@@ -1661,12 +1701,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   Subcategory
                 </label>
                 {showNewSubcategory ? (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       type="text"
                       value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter subcategory name"
                       autoFocus
                     />
@@ -1687,11 +1727,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <select
                       value={formData.subcategory_id}
                       onChange={(e) => setFormData(prev => ({ ...prev, subcategory_id: e.target.value }))}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Subcategory</option>
                       {filteredSubcategories.map(s => (
@@ -1712,14 +1752,16 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'pricing' && (<React.Fragment>
           {/* PRICING */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 flex items-center gap-2">
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
               <DollarSign className="w-5 h-5" />
               Pricing
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Cost */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1863,11 +1905,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </div>
 
           {/* INVENTORY & LABOR */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Inventory & Labor</h3>
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Inventory</h3>
 
             {/* Inventory Type and Item Type */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Inventory Type
@@ -1907,12 +1949,12 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 Default Vendor
               </label>
               {showNewVendor ? (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     value={newItemName}
                     onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter vendor name"
                     autoFocus
                   />
@@ -1933,11 +1975,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   </button>
                 </div>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     value={formData.default_vendor_id}
                     onChange={(e) => setFormData(prev => ({ ...prev, default_vendor_id: e.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Vendor</option>
                     {vendors.map(v => (
@@ -1955,6 +1997,9 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               )}
             </div>
 
+          </div>
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Labor</h3>
             {/* Labor Phase */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1976,7 +2021,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
 
             {/* Labor Hours and Cost */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Default Labor Hours
@@ -2005,9 +2050,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'details' && (<React.Fragment>
           {/* DESCRIPTIONS */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Descriptions & Instructions</h3>
+          <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Descriptions & Instructions</h3>
 
             {/* Sales Description */}
             <div>
@@ -2017,7 +2064,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               <textarea
                 value={formData.sales_description}
                 onChange={(e) => setFormData(prev => ({ ...prev, sales_description: e.target.value }))}
-                rows={3}
+                rows={5}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Description that customers will see on proposals"
               />
@@ -2034,7 +2081,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                   setFormData(prev => ({ ...prev, purchase_description: e.target.value }));
                   setUserEditedPurchaseDesc(true);
                 }}
-                rows={3}
+                rows={5}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Auto-copied from sales description, edit if needed"
               />
@@ -2043,7 +2090,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             {/* Default Install Instructions */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Default Install Instructions
+                Install Instructions
               </label>
               <input
                 type="text"
@@ -2057,6 +2104,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               />
             </div>
 
+            <p className="text-xs text-gray-500">Install instructions are a general note. Default Tasks are separate work items created for this product on the project.</p>
             {/* Default Tasks */}
             <DefaultTasksSection
               productId={productId}
@@ -2075,9 +2123,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             />
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'instructions' && (<React.Fragment>
           {/* RESOURCES */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2 flex items-center gap-2">
+          <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
               <Link2 className="w-5 h-5" />
               Resources & Links
             </h3>
@@ -2165,18 +2215,31 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'accessories' && (<React.Fragment>
           {/* Accessories Section */}
           {productId && (
-            <AccessoriesSection productId={productId} />
+            <ProductAccessories productId={productId} readOnly={readOnly} parentQuantity={Number(formData.default_qty || 1)} baseMaterial={Number(formData.our_price || 0) * Number(formData.default_qty || 1)} baseLabor={Number(formData.default_labor_hours || 0) * Number(formData.default_qty || 1) * Number(laborPhases.find(phase => phase.id === formData.labor_phase_id)?.default_price || laborRate)} />
           )}
+          </React.Fragment>)}
+          {editorTab === 'details' && !readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Product status</h3>
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Discontinue item" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold text-red-600">Discontinue item</span><span className="block text-xs text-gray-500 mt-1">Remaining stock can still be sold. Purchasing may override after confirming vendor availability.</span></span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Archive item" checked={!formData.is_active} onChange={event => setFormData(prev => ({ ...prev, is_active: !event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold">Archive item</span><span className="block text-xs text-gray-500 mt-1">Hide from the current catalog and discontinued review list. Existing records are preserved; this item cannot be added to new proposals or invoices.</span></span>
+            </label>
+          </section>}
         </div>
 
         {/* Footer Actions */}
-        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
-          <div></div>
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="shrink-0 bg-white border-t border-gray-200 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
             {saveSuccess && (
-              <div className="text-green-600 font-medium flex items-center gap-2">
+              <div className="w-full text-green-600 text-sm font-medium flex items-center gap-2">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
@@ -2184,21 +2247,21 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               </div>
             )}
             {Object.keys(errors).length > 0 && (
-              <div className="text-red-600 text-sm font-medium flex items-center gap-1.5">
+              <div className="w-full text-red-600 text-sm font-medium flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 {Object.keys(errors).length} field{Object.keys(errors).length !== 1 ? 's' : ''} require attention
               </div>
             )}
             <button
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+              className="px-4 sm:px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
             >
               Cancel
             </button>
             <button
               onClick={requestSave}
               disabled={saving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
+              className="px-4 sm:px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Product'}
@@ -2210,271 +2273,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         message="This item will show a placeholder in the catalog and documents. Add a photo now, or save without one if no useful photo exists."
         variant="warning" confirmLabel="Save without photo" cancelLabel="Add photo"
         onConfirm={() => { setShowMissingImagePrompt(false); void handleSave(); }}
-        onCancel={() => { setShowMissingImagePrompt(false); imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />
-    </div>
-  );
-}
-
-function AccessoriesSection({ productId }: { productId: string }) {
-  const [accessories, setAccessories] = useState<any[]>([]);
-  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [usedInPackages, setUsedInPackages] = useState<any[]>([]);
-  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
-
-  const isOnline = navigator.onLine;
-
-  useEffect(() => {
-    loadAccessories();
-    loadAvailableProducts();
-    loadPackages();
-  }, [productId]);
-
-  async function loadAccessories() {
-    try {
-      const { data, error } = await supabase
-        .from('product_accessories')
-        .select(`
-          id,
-          is_default_selected,
-          sort_order,
-          accessory:products!product_accessories_accessory_product_id_fkey (
-            id,
-            manufacturer_model_number,
-            our_price,
-            sku
-          )
-        `)
-        .eq('parent_product_id', productId)
-        .order('sort_order');
-
-      if (error) throw error;
-      setAccessories(data || []);
-    } catch (error) {
-      console.error('Error loading accessories:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadAvailableProducts() {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, manufacturer_model_number, our_price, sku')
-        .eq('is_active', true)
-        .neq('id', productId)
-        .order('manufacturer_model_number');
-
-      if (error) throw error;
-      setAvailableProducts(data || []);
-    } catch (error) {
-      console.error('Error loading products:', error);
-    }
-  }
-
-  async function loadPackages() {
-    try {
-      const { data, error } = await supabase
-        .from('product_package_items')
-        .select(`
-          package:product_packages (
-            id,
-            package_name
-          )
-        `)
-        .eq('product_id', productId);
-
-      if (error) throw error;
-      setUsedInPackages(data?.map((item: any) => item.package).filter(Boolean) || []);
-    } catch (error) {
-      console.error('Error loading packages:', error);
-    }
-  }
-
-  async function addAccessory(accessoryProductId: string) {
-    try {
-      const existing = accessories.find(acc => acc.accessory.id === accessoryProductId);
-      if (existing) {
-        alert('This product is already added as an accessory');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('product_accessories')
-        .insert({
-          parent_product_id: productId,
-          accessory_product_id: accessoryProductId,
-          is_default_selected: false,
-          sort_order: accessories.length
-        });
-
-      if (error) throw error;
-
-      loadAccessories();
-      setShowSearch(false);
-      setSearchTerm('');
-    } catch (error) {
-      console.error('Error adding accessory:', error);
-      alert('Failed to add accessory');
-    }
-  }
-
-  async function removeAccessory(accessoryId: string) {
-    try {
-      const { error } = await supabase
-        .from('product_accessories')
-        .delete()
-        .eq('id', accessoryId);
-
-      if (error) throw error;
-      loadAccessories();
-    } catch (error) {
-      console.error('Error removing accessory:', error);
-      alert('Failed to remove accessory');
-    }
-  }
-
-  async function toggleDefaultSelected(accessoryId: string, currentValue: boolean) {
-    try {
-      const { error } = await supabase
-        .from('product_accessories')
-        .update({ is_default_selected: !currentValue })
-        .eq('id', accessoryId);
-
-      if (error) throw error;
-      loadAccessories();
-    } catch (error) {
-      console.error('Error updating accessory:', error);
-      alert('Failed to update accessory');
-    }
-  }
-
-  const filteredProducts = searchTerm
-    ? availableProducts.filter(p =>
-        p.manufacturer_model_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : availableProducts;
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Accessories & Packages</h3>
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Accessories for this product
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowSearch(!showSearch)}
-            disabled={!isOnline}
-            className="px-2 sm:px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs sm:text-sm flex items-center gap-1 disabled:bg-gray-600 disabled:cursor-not-allowed touch-manipulation"
-            title={!isOnline ? 'Available when online' : 'Add accessory'}
-          >
-            <Plus size={12} className="sm:w-3.5 sm:h-3.5" />
-            <span className="hidden xs:inline">Add Accessory</span>
-          </button>
-        </div>
-
-        {showSearch && (
-          <div className="mb-3 p-3 bg-gray-50 border border-gray-300 rounded-lg">
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search products..."
-                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded text-sm"
-              />
-            </div>
-            <div className="max-h-48 overflow-y-auto space-y-1">
-              {filteredProducts.slice(0, 10).map(product => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => addAccessory(product.id)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
-                >
-                  <div className="font-medium text-gray-900">{product.manufacturer_model_number}</div>
-                  <div className="text-xs text-gray-500">
-                    ${Number(product.our_price).toFixed(2)} • {product.sku}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <p className="text-sm text-gray-500 text-center py-4">Loading...</p>
-        ) : accessories.length === 0 ? (
-          <p className="text-xs sm:text-sm text-gray-500 text-center py-3 sm:py-4">
-            No accessories added yet. Accessories are optional add-on products that customers can select.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {accessories.map(acc => (
-              <div key={acc.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-gray-50 border border-gray-300 rounded-lg">
-                <input
-                  type="checkbox"
-                  checked={acc.is_default_selected}
-                  onChange={() => toggleDefaultSelected(acc.id, acc.is_default_selected)}
-                  disabled={!isOnline}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-600 disabled:bg-gray-200 disabled:cursor-not-allowed flex-shrink-0"
-                  title={!isOnline ? 'Available when online' : acc.is_default_selected ? 'Default selected' : 'Optional'}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 text-sm sm:text-base truncate">
-                    {acc.accessory.manufacturer_model_number}
-                  </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    ${Number(acc.accessory.our_price).toFixed(2)} •{' '}
-                    {acc.is_default_selected ? 'Auto-selected by default' : 'Optional accessory'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setConfirmModal({ title: 'Remove Accessory', message: 'Remove this accessory?', onConfirm: () => removeAccessory(acc.id) })}
-                  disabled={!isOnline}
-                  className="text-red-600 hover:text-red-700 p-1 disabled:text-gray-400 disabled:cursor-not-allowed touch-manipulation flex-shrink-0"
-                  title={!isOnline ? 'Available when online' : 'Remove'}
-                >
-                  <X size={14} className="sm:w-4 sm:h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {usedInPackages.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Used in packages
-          </label>
-          <div className="text-sm text-gray-600 space-y-1">
-            {usedInPackages.map(pkg => (
-              <div key={pkg.id} className="flex items-center gap-2">
-                <Package size={14} className="text-gray-400" />
-                <span>{pkg.package_name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <ConfirmModal
-        isOpen={confirmModal !== null}
-        title={confirmModal?.title ?? ''}
-        message={confirmModal?.message ?? ''}
-        onConfirm={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
-        onCancel={() => setConfirmModal(null)}
-      />
+        onCancel={() => { setShowMissingImagePrompt(false); selectEditorTab('overview'); setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }} />
     </div>
   );
 }
@@ -2489,13 +2288,7 @@ interface DefaultTasksSectionProps {
     labor_phase_id: string | null;
     sort_order: number;
   }>;
-  setDefaultTasks: (tasks: Array<{
-    id: string | null;
-    title: string;
-    description: string;
-    labor_phase_id: string | null;
-    sort_order: number;
-  }>) => void;
+  setDefaultTasks: React.Dispatch<React.SetStateAction<DefaultTasksSectionProps['defaultTasks']>>;
   laborPhases: LaborPhase[];
   showAddDefaultTask: boolean;
   setShowAddDefaultTask: (v: boolean) => void;
@@ -2508,7 +2301,7 @@ interface DefaultTasksSectionProps {
 }
 
 function DefaultTasksSection({
-  productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
+  productId: _productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
   showAddDefaultTask, setShowAddDefaultTask,
   newDefaultTaskTitle, setNewDefaultTaskTitle,
   newDefaultTaskDesc, setNewDefaultTaskDesc,
@@ -2609,7 +2402,7 @@ function DefaultTasksSection({
             rows={2}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={newDefaultTaskPhase}
               onChange={e => setNewDefaultTaskPhase(e.target.value)}

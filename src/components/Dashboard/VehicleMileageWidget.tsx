@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Car, Calendar, AlertCircle, TrendingUp, CheckCircle } from 'lucide-react';
+import { Car, AlertCircle, TrendingUp } from 'lucide-react';
 
 interface Vehicle {
   id: string;
@@ -28,7 +28,7 @@ interface MileageReminder {
 export default function VehicleMileageWidget({ onNavigateToMileage }: { onNavigateToMileage: () => void }) {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [lastEntry, setLastEntry] = useState<MileageEntry | null>(null);
-  const [reminder, setReminder] = useState<MileageReminder | null>(null);
+  const [_reminder, setReminder] = useState<MileageReminder | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function VehicleMileageWidget({ onNavigateToMileage }: { onNaviga
           .eq('user_id', user.id)
           .eq('is_active', true)
           .limit(1)
-          .maybeSingle(),
+          .maybeSingle().overrideTypes<Assignment, { merge: false }>(),
         supabase
           .from('mileage_entries')
           .select('entry_date, odometer_reading')

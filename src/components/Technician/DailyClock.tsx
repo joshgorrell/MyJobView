@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
-import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, Calendar, X, AlertTriangle } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 import { gpsTrackingService } from '../../lib/gpsTracking';
-import { updateClockEntryAddress } from '../../lib/reverseGeocode';
+import { notify } from '../../lib/feedback';
+import { saveClockEventGps } from '../../lib/clockEventGps';
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../../lib/supabase';
+import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
 import { getOrganizationTimezone, formatDateInTimezone, formatTimeInTimezone } from '../../lib/timezoneUtils';
@@ -37,6 +39,7 @@ interface RewardEvent {
 
 export function DailyClock() {
   const { profile } = useAuth();
+  const timePolicy=useEmployeeTimePolicy();
   const [todayEntry, setTodayEntry] = useState<DailyClockEntry | null>(null);
   const [activeBreak, setActiveBreak] = useState<Break | null>(null);
   const [breaks, setBreaks] = useState<Break[]>([]);
@@ -47,18 +50,12 @@ export function DailyClock() {
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [leaveBalances, setLeaveBalances] = useState<Array<{ id: string; policy: { id: string; policy_name: string; pto_type: string; is_paid: boolean }; current_balance_hours: number }>>([]);
-  const [selectedLeavePolicy, setSelectedLeavePolicy] = useState('');
-  const [leaveHours, setLeaveHours] = useState('8');
-  const [leaveReason, setLeaveReason] = useState('');
-  const [submittingLeave, setSubmittingLeave] = useState(false);
   const breakMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getOrganizationTimezone().then(tz => setOrgTimezone(tz));
 
-    if (profile?.requires_daily_clock) {
+    if (timePolicy.ready && timePolicy.dailyClock) {
       loadTodaysClock();
     }
 
@@ -78,22 +75,13 @@ export function DailyClock() {
       console.error('Geolocation requires HTTPS on iOS. Current protocol:', window.location.protocol);
     }
 
-    // Start GPS pre-warming when component mounts (only if not clocked in)
-    if (!todayEntry && navigator.geolocation) {
-      gpsTrackingService.startPreWarming();
-    }
-
-    if (profile?.id) {
-      loadLeaveBalances();
-    }
 
     return () => {
       clearInterval(timer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      gpsTrackingService.stopPreWarming();
     };
-  }, [profile, todayEntry]);
+  }, [profile, timePolicy.ready, timePolicy.dailyClock]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -152,19 +140,20 @@ export function DailyClock() {
             .from('daily_clock_entries')
             .select('*')
             .eq('technician_id', profile.id)
-            .eq('entry_date', today)
+            .or(`entry_date.eq.${today},clock_out.is.null`)
             .order('clock_in', { ascending: false });
         }
       );
 
       if (error) throw error;
 
+      const ownEntries = (entries || []).filter((e: any) => e.technician_id === profile.id && (!e.clock_out || e.entry_date === today));
       // Prioritize active entry (clock_out is null) over completed entries
       let entry = null;
-      if (entries && entries.length > 0) {
+      if (ownEntries.length > 0) {
         // First, look for any active entry (clock_out is null)
-        const activeEntry = entries.find(e => !e.clock_out);
-        entry = activeEntry || entries[0]; // Fall back to most recent if all are clocked out
+        const activeEntry = ownEntries.find(e => !e.clock_out);
+        entry = activeEntry || ownEntries[0]; // Fall back to most recent if all are clocked out
       }
 
       setTodayEntry(entry);
@@ -173,11 +162,7 @@ export function DailyClock() {
         await loadBreaks(entry.id);
         await loadRewardEvent(entry.id);
 
-        if (entry.status === 'clocked_in' && !entry.clock_out && navigator.onLine) {
-          if (!gpsTrackingService.isCurrentlyTracking()) {
-            await gpsTrackingService.startTracking(profile.id, entry.id);
-          }
-        }
+
       }
     } catch (error) {
       console.error('Error loading daily clock:', error);
@@ -224,134 +209,11 @@ export function DailyClock() {
     }
   }
 
-  async function loadLeaveBalances() {
-    if (!profile?.id) return;
-    try {
-      const { data } = await supabase
-        .from('pto_balances')
-        .select(`
-          id,
-          current_balance_hours,
-          policy:pto_policies!policy_id(id, policy_name, pto_type, is_paid)
-        `)
-        .eq('employee_id', profile.id)
-        .gt('current_balance_hours', 0);
-      if (data) setLeaveBalances(data as any);
-    } catch (error) {
-      console.error('Error loading leave balances:', error);
-    }
-  }
-
-  async function submitLeaveRequest() {
-    if (!profile?.id || !selectedLeavePolicy) {
-      alert('Please select a leave type');
-      return;
-    }
-
-    const policy = leaveBalances.find(b => b.policy.id === selectedLeavePolicy);
-    if (!policy) return;
-
-    const hours = parseFloat(leaveHours);
-    if (isNaN(hours) || hours <= 0) {
-      alert('Please enter valid hours');
-      return;
-    }
-
-    if (hours > policy.current_balance_hours) {
-      alert(`You only have ${policy.current_balance_hours.toFixed(1)} hours available for ${policy.policy.policy_name}.`);
-      return;
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const isSameDay = true;
-
-    if (isSameDay && !['bereavement', 'jury_duty', 'unpaid'].includes(policy.policy.pto_type)) {
-      const confirmed = window.confirm(
-        `You are calling in for today. This will submit a ${policy.policy.pto_type} request for manager approval.\n\nIf submitted after the cutoff time, points may be deducted from your rewards balance.\n\nDo you want to proceed?`
-      );
-      if (!confirmed) return;
-    }
-
-    setSubmittingLeave(true);
-    try {
-      const { error } = await supabase
-        .from('pto_requests')
-        .insert({
-          employee_id: profile.id,
-          policy_id: selectedLeavePolicy,
-          request_type: 'hours',
-          start_date: today,
-          end_date: today,
-          total_hours: hours,
-          reason: leaveReason || `Same-day ${policy.policy.pto_type} call-in`,
-        });
-
-      if (error) throw error;
-
-      alert('Leave request submitted. Your manager will review and approve it.');
-      setShowLeaveModal(false);
-      setSelectedLeavePolicy('');
-      setLeaveHours('8');
-      setLeaveReason('');
-      loadLeaveBalances();
-    } catch (error: any) {
-      console.error('Error submitting leave request:', error);
-      alert(error.message || 'Failed to submit leave request');
-    } finally {
-      setSubmittingLeave(false);
-    }
-  }
-
   async function handleClockIn() {
     if (!profile) return;
 
     // Clock in immediately without waiting for GPS
-    const entryId = await performClockIn();
-
-    // Capture GPS location in background (non-blocking)
-    if (entryId && navigator.geolocation) {
-      gpsTrackingService.captureLocationForClockEvent(false).then(async (gpsResult) => {
-        try {
-          // Calculate GPS quality score
-          const { data: scoreData } = await supabase.rpc('calculate_gps_quality_score', {
-            p_accuracy: gpsResult.accuracy,
-            p_method: gpsResult.method,
-            p_duration_ms: gpsResult.duration_ms,
-            p_refined: false,
-            p_original_accuracy: null
-          });
-
-          // Update the clock entry with GPS metadata
-          await supabase
-            .from('daily_clock_entries')
-            .update({
-              clock_in_latitude: gpsResult.latitude,
-              clock_in_longitude: gpsResult.longitude,
-              clock_in_gps_accuracy: gpsResult.accuracy,
-              clock_in_gps_capture_method: gpsResult.method,
-              clock_in_gps_duration_ms: gpsResult.duration_ms,
-              clock_in_gps_attempted_at: gpsResult.attempted_at,
-              clock_in_gps_captured_at: gpsResult.captured_at,
-              clock_in_gps_quality_score: scoreData || 0,
-            })
-            .eq('id', entryId);
-
-          // Reverse geocode address if GPS was captured
-          if (gpsResult.latitude && gpsResult.longitude) {
-            updateClockEntryAddress(entryId, gpsResult.latitude, gpsResult.longitude, false, 'daily_clock_entries').catch(() => {});
-          }
-
-          // Start refinement if accuracy is poor (>50m)
-          if (gpsResult.accuracy && gpsResult.accuracy > 50) {
-            gpsTrackingService.startPostCaptureRefinement(entryId, false, 'daily_clock_entries');
-          }
-        } catch (error) {
-          // Silently fail - GPS metadata is not critical
-        }
-      }).catch(() => {
-        // Silently fail - GPS capture is best-effort only
-      });
-    }
+    await performClockIn();
   }
 
   async function performClockIn(): Promise<string | null> {
@@ -374,13 +236,14 @@ export function DailyClock() {
 
       // If there's already an active clock-in, prevent creating a duplicate
       if (activeEntries && activeEntries.length > 0) {
-        alert('You are already clocked in. Please clock out before clocking in again.');
+        notify('You are already clocked in. Please clock out before clocking in again.', { theme: 'blue', tone: 'warning' });
         await loadTodaysClock(); // Refresh to show the current entry
         return null;
       }
 
       const entryId = crypto.randomUUID();
 
+      const capture = gpsTrackingService.captureLocationForClockEvent();
       const clockInData = {
         id: entryId,
         technician_id: profile.id,
@@ -392,34 +255,29 @@ export function DailyClock() {
       };
 
       // Use offline-capable insert
-      const { data, error } = await offlineSupabaseInsert<any>(
+      const { error } = await offlineSupabaseInsert<any>(
         'daily_clock_entries',
         clockInData
       );
 
       if (error) throw error;
 
-      const insertedEntry = Array.isArray(data) ? data[0] : data;
-
-      // Start GPS tracking silently in the background
-      if (navigator.geolocation) {
-        gpsTrackingService.startTracking(profile.id, insertedEntry.id);
-      }
+      void saveClockEventGps(entryId, 'daily_clock_entries', false, capture).catch(error => console.error('Clock-in GPS could not be saved:', error));
 
       await loadTodaysClock();
 
       // Show offline notification
       if (!navigator.onLine) {
-        alert('You are offline. Clock-in saved locally and will sync when you\'re back online.');
+        notify('You are offline. Clock-in saved locally and will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
 
       return entryId;
     } catch (error: any) {
       console.error('Error clocking in:', error);
       if (error.code === '23505') {
-        alert('You have already clocked in today');
+        notify('You have already clocked in today', { theme: 'blue', tone: 'error' });
       } else {
-        alert('Failed to clock in: ' + error.message);
+        notify('Failed to clock in: ' + error.message, { theme: 'blue', tone: 'error' });
       }
       return null;
     }
@@ -427,9 +285,9 @@ export function DailyClock() {
 
   function handleClockOut() {
     if (!todayEntry || !profile) return;
-
+    if (Date.now() - Date.parse(todayEntry.clock_in) > 24 * 3600000) { notify('An unfinished older shift needs manager correction.', { theme: 'amber', tone: 'warning' }); return; }
     if (activeBreak) {
-      alert('Please end your break before clocking out');
+      notify('Please end your break before clocking out', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -437,7 +295,6 @@ export function DailyClock() {
   }
 
   async function handleClockOutSuccess() {
-    gpsTrackingService.stopTracking();
     await loadTodaysClock();
   }
 
@@ -461,11 +318,11 @@ export function DailyClock() {
       setShowBreakMenu(false);
 
       if (!navigator.onLine) {
-        alert('Break started offline. Will sync when you\'re back online.');
+        notify('Break started offline. Will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
     } catch (error) {
       console.error('Error starting break:', error);
-      alert('Failed to start break');
+      notify('Failed to start break', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -485,11 +342,11 @@ export function DailyClock() {
       await loadBreaks(todayEntry!.id);
 
       if (!navigator.onLine) {
-        alert('Break ended offline. Will sync when you\'re back online.');
+        notify('Break ended offline. Will sync when you\'re back online.', { theme: 'blue', tone: 'info' });
       }
     } catch (error) {
       console.error('Error ending break:', error);
-      alert('Failed to end break');
+      notify('Failed to end break', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -527,7 +384,7 @@ export function DailyClock() {
     return `${hourStr} and ${mins} ${mins === 1 ? 'minute' : 'minutes'}`;
   }
 
-  function getRewardMessage(eventType: string, points: number, delta: number): string {
+  function getRewardMessage(eventType: string, _points: number, delta: number): string {
     if (eventType === 'early') {
       return `Great! You clocked in ${Math.abs(delta)} minutes early!`;
     } else if (eventType === 'on_time') {
@@ -540,14 +397,13 @@ export function DailyClock() {
     return '';
   }
 
-  if (!profile?.requires_daily_clock) {
+  if (!timePolicy.ready || !timePolicy.dailyClock) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
         <Clock className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Daily Clock Not Required</h3>
-        <p className="text-gray-300">
-          Your employment type ({profile?.employment_type}) does not require daily clock-in/out.
-          {profile?.employment_type === 'job_time' && ' You only need to clock into specific jobs.'}
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{!timePolicy.ready?'Loading time configuration…':'Daily Clock Not Required'}</h3>
+        <p className="text-gray-600">
+          {timePolicy.ready?'Your payroll configuration does not require daily clock-in/out. Open the assigned Work Order to record job time.':'If this persists, refresh to load your payroll configuration.'}
         </p>
       </div>
     );
@@ -623,13 +479,12 @@ export function DailyClock() {
 
         <div className="text-center mb-6">
           <div className="text-6xl font-bold mb-2">
-            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone:orgTimezone })}
           </div>
           <div className="text-xl opacity-90">
             {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-
 
 
         {isOffline && (
@@ -651,15 +506,7 @@ export function DailyClock() {
               <Play className="w-8 h-8" />
               CLOCK IN
             </button>
-            {leaveBalances.length > 0 && (
-              <button
-                onClick={() => setShowLeaveModal(true)}
-                className="w-full mt-3 bg-blue-500/20 border border-blue-300/50 text-blue-100 rounded-xl py-4 text-lg font-semibold hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
-              >
-                <HeartPulse className="w-6 h-6" />
-                Clock In as Leave (Sick / Vacation)
-              </button>
-            )}
+
           </>
         )}
 
@@ -777,77 +624,6 @@ export function DailyClock() {
           </div>
         )}
       </div>
-
-      {/* Leave Request Modal */}
-      {showLeaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <HeartPulse className="w-6 h-6 text-blue-600" />\n                Clock In as Leave
-              </h3>
-              <button onClick={() => setShowLeaveModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Submit a same-day leave request. Your manager must approve it before PTO hours are paid.
-                Same-day call-ins after the cutoff time may deduct rewards points.
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type *</label>
-                <select
-                  value={selectedLeavePolicy}
-                  onChange={(e) => setSelectedLeavePolicy(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select type...</option>
-                  {leaveBalances.map(b => (
-                    <option key={b.id} value={b.policy.id}>
-                      {b.policy.policy_name} ({b.current_balance_hours.toFixed(1)} hrs available)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hours *</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  max="24"
-                  value={leaveHours}
-                  onChange={(e) => setLeaveHours(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (Optional)</label>
-                <textarea
-                  value={leaveReason}
-                  onChange={(e) => setLeaveReason(e.target.value)}
-                  rows={2}
-                  placeholder="Provide context for your call-in..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl">
-              <button onClick={() => setShowLeaveModal(false)} className="px-4 py-2 text-gray-700 hover:text-gray-900">
-                Cancel
-              </button>
-              <button
-                onClick={submitLeaveRequest}
-                disabled={submittingLeave || !selectedLeavePolicy}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submittingLeave ? 'Submitting...' : 'Submit Leave Request'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Break History */}
       {breaks.length > 0 && (

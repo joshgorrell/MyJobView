@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { X, Printer, Mail, Phone, Clock, Building2, CalendarClock, AlertCircle, MessageSquare, ChevronDown } from 'lucide-react';
 
 interface ProspectRelationship {

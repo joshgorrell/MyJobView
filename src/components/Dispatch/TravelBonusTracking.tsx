@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { formatDateInTimezone,getOrganizationTimezone } from '../../lib/timezoneUtils';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MapPin, DollarSign, Check, X, Clock, Calendar } from 'lucide-react';
+import { MapPin, DollarSign, Check, X, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatCurrency } from '../../lib/utils';
 
@@ -42,12 +43,15 @@ export function TravelBonusTracking() {
   const [travelLogs, setTravelLogs] = useState<TravelLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('pending');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
-  });
+  const [dateRange,setDateRange]=useState({start:'',end:''});
+  useEffect(()=>{void getOrganizationTimezone().then(tz=>{
+    const end=formatDateInTimezone(new Date().toISOString(),tz);
+    const anchor=new Date(end+'T12:00Z');anchor.setUTCDate(anchor.getUTCDate()-30);
+    setDateRange({start:anchor.toISOString().slice(0,10),end});
+  });},[]);
 
   useEffect(() => {
+    if(!dateRange.start || !dateRange.end) return;
     loadTravelLogs();
 
     const channel = supabase
@@ -145,7 +149,7 @@ export function TravelBonusTracking() {
     }
   };
 
-  const canApprove = profile?.role === 'admin' || profile?.role === 'office_manager';
+  const canApprove = profile?.role === 'admin' || profile?.role === 'manager';
 
   if (loading) {
     return (

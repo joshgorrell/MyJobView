@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
@@ -84,7 +85,7 @@ ${contextLine}
 <p><a href="${proposalUrl}" style="display:inline-block;padding:10px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">View & Reply</a></p>
 <p style="color:#64748b;font-size:12px;margin-top:24px;">You're receiving this because you're the assigned sales rep for this proposal.</p>`;
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
+    const emailResponse = await sendSystemEmail({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,

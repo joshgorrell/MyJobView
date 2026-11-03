@@ -1,0 +1,107 @@
+{
+  "metadataOnly": true,
+  "productionWrites": false,
+  "allMatch": true,
+  "checks": [
+    {
+      "kind": "applier",
+      "identity": "public.apply_change_order(uuid)",
+      "matchesCapture": true
+    },
+    {
+      "kind": "constraint",
+      "identity": "proposal_line_items_cost_positive",
+      "matchesCapture": true
+    },
+    {
+      "kind": "default",
+      "identity": "cost",
+      "matchesCapture": true
+    },
+    {
+      "kind": "default",
+      "identity": "is_customer_supplied",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "proposal_line_items_touch_proposal",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "recalculate_proposal_totals_trigger",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "seed_tasks_on_labor_update",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "trg_auto_compute_line_item_totals",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "trg_seed_tasks_on_line_item_insert",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "trigger_calculate_labor_total",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "trigger_update_proposal_items_hash",
+      "matchesCapture": true
+    },
+    {
+      "kind": "trigger",
+      "identity": "zz_check_catalog_product_availability",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.auto_compute_line_item_totals()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.calculate_proposal_line_item_labor()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.check_catalog_product_availability()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.seed_tasks_on_line_item_insert_trigger()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.seed_tasks_on_line_item_insert_trigger()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.touch_proposal_on_line_item_change()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.trigger_recalculate_proposal_totals()",
+      "matchesCapture": true
+    },
+    {
+      "kind": "triggerFunction",
+      "identity": "public.update_proposal_items_hash()",
+      "matchesCapture": true
+    }
+  ]
+}

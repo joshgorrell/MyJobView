@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 
@@ -167,14 +168,10 @@ Deno.serve(async (req: Request) => {
 
       const resendApiKey = Deno.env.get('RESEND_API_KEY');
       if (!resendApiKey) {
-        console.log('Bulk receipt would be sent to:', contactEmail);
-        return new Response(
-          JSON.stringify({ success: true, message: 'Email simulation (no API key)' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
       }
 
-      const emailResponse = await fetch('https://api.resend.com/emails', {
+      const emailResponse = await sendSystemEmail({
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${resendApiKey}`,
@@ -345,11 +342,7 @@ Deno.serve(async (req: Request) => {
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.log('Email would be sent to:', customerEmail, '| includePdf:', includePdf);
-      return new Response(
-        JSON.stringify({ success: true, message: 'Email simulation (no API key)' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
 
     const emailPayload: Record<string, any> = {
@@ -390,7 +383,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
+    const emailResponse = await sendSystemEmail({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,

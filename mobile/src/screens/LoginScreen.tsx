@@ -9,19 +9,49 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Image,
+  ScrollView,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabase';
+import { Colors } from '../theme/colors';
+import { Spacing, Radius, Shadows } from '../theme/styles';
+import { Logo } from '../components/Logo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
+
+  async function handleResetPassword() {
+    const address = email.trim().toLowerCase();
+    if (!address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      Alert.alert('Email required', 'Enter your account email above to reset your password.');
+      return;
+    }
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: 'https://myjobview.com/?account_setup=reset',
+      });
+      if (error) throw error;
+      Alert.alert('Check your email', 'If an account exists for that address, you will receive password reset instructions.');
+    } catch (error) {
+      Alert.alert('Reset unavailable', 'We could not request a password reset. Please try again later.');
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function handleLogin() {
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       Alert.alert('Missing Information', 'Please enter your email and password');
       return;
     }
@@ -40,211 +70,190 @@ export default function LoginScreen() {
     }
   }
 
+  const features = [
+    { title: 'GPS Workday Tracking', subtitle: 'Accuracy varies by device and conditions' },
+    { title: 'Offline Support', subtitle: 'Works without connection' },
+    { title: 'Secure Access', subtitle: 'Your company account' },
+  ];
+
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={['#3b82f6', '#2563eb', '#1e40af']}
+        colors={['#000000', '#171717', '#000000']}
         style={styles.gradient}
       >
-        <View style={styles.content}>
-          {/* Logo/Title */}
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Logo / Title */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>📍</Text>
-            </View>
-            <Text style={styles.title}>Field Ops Pro</Text>
-            <Text style={styles.subtitle}>Mobile Time Clock</Text>
+            <Logo size={88} variant="light" />
+            <Text style={styles.title}>MyJobView</Text>
+            <Text style={styles.subtitle}>Your workday. Connected.</Text>
+            <View style={styles.brandAccent} />
           </View>
 
           {/* Login Form */}
           <View style={styles.formContainer}>
+            <Text style={styles.formTitle}>Sign In</Text>
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
                 placeholder="your.email@company.com"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={Colors.gray[400]}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
                 editable={!loading}
+                textContentType="username"
+                autoComplete="email"
               />
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordRow}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.passwordInput]}
                 placeholder="Enter your password"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={Colors.gray[400]}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
+                textContentType="password"
+                autoComplete="password"
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
                 onSubmitEditing={handleLogin}
               />
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'} onPress={() => setShowPassword(value => !value)} style={styles.passwordToggle}>
+                <Text style={styles.passwordToggleText}>{showPassword ? '◉' : '◎'}</Text>
+              </TouchableOpacity>
+              </View>
             </View>
+            <TouchableOpacity onPress={handleResetPassword} disabled={resetting || loading} accessibilityRole="button" style={styles.resetLink}>
+              <Text style={styles.resetText}>{resetting ? 'Sending reset link…' : 'Forgot password?'}</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              style={[styles.loginButton, !canSubmit && styles.loginButtonDisabled]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={!canSubmit}
+              activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color="#2563eb" />
+                <ActivityIndicator color={Colors.white} />
               ) : (
                 <Text style={styles.loginButtonText}>Sign In</Text>
               )}
             </TouchableOpacity>
 
-            <View style={styles.features}>
-              <View style={styles.feature}>
-                <Text style={styles.featureIcon}>🛰️</Text>
-                <Text style={styles.featureText}>High-Precision GPS</Text>
-              </View>
-              <View style={styles.feature}>
-                <Text style={styles.featureIcon}>📱</Text>
-                <Text style={styles.featureText}>Works Offline</Text>
-              </View>
-              <View style={styles.feature}>
-                <Text style={styles.featureIcon}>🔒</Text>
-                <Text style={styles.featureText}>Biometric Security</Text>
-              </View>
+            <TouchableOpacity accessibilityRole="link" style={styles.signupLink} onPress={() => Linking.openURL('https://myjobview.com/')}>
+              <Text style={styles.resetText}>Open MyJobView on the web</Text>
+            </TouchableOpacity>
+
+            {/* Features */}
+            <View style={styles.featuresContainer}>
+              {features.map((feature, index) => (
+                <View key={index} style={styles.featureRow}>
+                  <View style={styles.featureCheck}>
+                    <View style={styles.featureCheckInner} />
+                  </View>
+                  <View>
+                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                    <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Accurate · Reliable · Secure
-            </Text>
+            <Text style={styles.footerText}>Accurate. Reliable. Secure.</Text>
           </View>
-        </View>
+        </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  gradient: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl, maxWidth: 600, alignSelf: 'center', width: '100%' },
+  header: { alignItems: 'center', marginTop: 60, gap: Spacing.md },
+  title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
+  subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
+  formContainer: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xxl,
+    padding: Spacing.xxl,
+    ...Shadows.large,
   },
-  gradient: {
-    flex: 1,
+  formTitle: { fontSize: 22, fontWeight: '700', color: Colors.gray[900], marginBottom: Spacing.xl },
+  inputContainer: { marginBottom: Spacing.xl },
+  label: { fontSize: 14, fontWeight: '600', color: Colors.gray[700], marginBottom: Spacing.sm },
+  input: {
+    backgroundColor: Colors.gray[50],
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg + 2,
+    fontSize: 16,
+    color: Colors.gray[900],
   },
-  content: {
-    flex: 1,
-    justifyContent: 'space-between',
-    padding: 24,
-  },
-  header: {
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordInput: { flex: 1, paddingRight: 48 },
+  passwordToggle: { position: 'absolute', right: 8, padding: 12 },
+  passwordToggleText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
+  signupLink: { alignSelf: 'center', paddingVertical: 14 },
+  resetLink: { alignSelf: 'flex-end', paddingVertical: 8 },
+  resetText: { color: Colors.primary[600], fontSize: 14, fontWeight: '600' },
+  loginButton: {
+    backgroundColor: '#1d4ed8',
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.lg + 4,
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: Spacing.sm,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  loginButtonDisabled: { opacity: 0.6 },
+  loginButtonText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  featuresContainer: {
+    marginTop: Spacing.xxl,
+    paddingTop: Spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: Colors.gray[200],
+    gap: Spacing.lg,
+  },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  featureCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.green[100],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
-  logoText: {
-    fontSize: 40,
+  featureCheckInner: {
+    width: 10,
+    height: 6,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: Colors.green[600],
+    transform: [{ rotate: '-45deg' }],
+    marginTop: 2,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#e0e7ff',
-  },
-  formContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#111827',
-  },
-  loginButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  features: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  feature: {
-    alignItems: 'center',
-  },
-  featureIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  featureText: {
-    fontSize: 11,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  footer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  footerText: {
-    color: '#e0e7ff',
-    fontSize: 14,
-  },
+  featureTitle: { fontSize: 14, fontWeight: '600', color: Colors.gray[800] },
+  featureSubtitle: { fontSize: 12, color: Colors.gray[400], marginTop: 1 },
+  brandAccent: { width: 64, height: 3, backgroundColor: '#b91c1c', marginTop: 8 },
+  footer: { alignItems: 'center', marginBottom: 20 },
+  footerText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '500', letterSpacing: 1 },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ContactDetail } from '../Contacts/ContactDetail';
@@ -7,7 +7,7 @@ import ConnectionForm from '../Connections/ConnectionForm';
 import PrintProspectsView from '../Leads/PrintProspectsView';
 import { CreateAppointmentModal } from '../Appointments/CreateAppointmentModal';
 import { CompetitorsList } from './CompetitorsList';
-import { Target, Plus, Search, Printer, Users, User, Building2, Mail, Phone, Clock, CalendarClock, ChevronRight, SlidersHorizontal, RefreshCw, AlertCircle, TrendingUp, CircleUser as UserCircle, CalendarPlus, Zap } from 'lucide-react';
+import { Target, Plus, Search, Printer, Users, User, Building2, Mail, Phone, Clock, ChevronRight, SlidersHorizontal, RefreshCw, TrendingUp, CircleUser as UserCircle, CalendarPlus, Zap } from 'lucide-react';
 
 interface ProspectRelationship {
   id: string;
@@ -126,6 +126,7 @@ export function ProspectsPage() {
           created_by,
           contact_type,
           notes,
+          is_prospect,
           electrician_name,
           electrician_notes,
           prospect_competitor_relationships!prospect_competitor_relationships_prospect_id_fkey(
@@ -142,7 +143,7 @@ export function ProspectsPage() {
         query = query.eq('created_by', profile.id);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.overrideTypes<Prospect[], { merge: false }>();
       if (error) throw error;
 
       const results: Prospect[] = data || [];

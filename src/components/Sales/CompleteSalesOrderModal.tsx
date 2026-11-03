@@ -1,5 +1,11 @@
+import { CompletionDialog } from '../Shared/CompletionDialog';
+import { useCompletion } from '../../hooks/useCompletion';
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import {splitQuotedLabor} from '../../lib/pmAllocation';
+import {useAuth} from '../../contexts/AuthContext';
+import {loadProjectSummaries} from '../../lib/projectOverview';
 import {
   X,
   CheckCircle2,
@@ -12,7 +18,6 @@ import {
   Mail,
   Target,
   Star,
-  TrendingUp,
   Phone,
   ShieldCheck,
 } from 'lucide-react';
@@ -47,6 +52,8 @@ type ExistingPortalAccess =
   | { type: 'none' };
 
 export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: CompleteSalesOrderModalProps) {
+  const {profile}=useAuth();
+  const completion = useCompletion(() => { onComplete(); onClose(); });
   const [loading, setLoading] = useState(false);
   const [startTestTune, setStartTestTune] = useState(true);
   const [sendPunchlistInvite, setSendPunchlistInvite] = useState(true);
@@ -56,6 +63,7 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
   const [estimatedLabor, setEstimatedLabor] = useState(0);
   const [actualLabor, setActualLabor] = useState(0);
   const [fieldLaborTarget, setFieldLaborTarget] = useState(0);
+  const [pmPercentage,setPmPercentage]=useState(5);
   const [existingAccess, setExistingAccess] = useState<ExistingPortalAccess>({ type: 'none' });
   const [checkingAccess, setCheckingAccess] = useState(true);
 
@@ -119,33 +127,30 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
       // Load estimated labor hours from proposal
       const { data: proposalData } = await supabase
         .from('sales_orders')
-        .select('proposal_id, proposals!inner(proposal_line_items(labor_hours))')
+        .select('proposal_id, pm_allocation_percentage, proposals!inner(proposal_line_items(labor_hours))')
         .eq('id', salesOrder.id)
-        .maybeSingle();
+        .maybeSingle().overrideTypes<{ proposal_id: string; pm_allocation_percentage:number|null; proposals: { proposal_line_items: { labor_hours: number | null }[] } | null }, { merge: false }>();
 
       let estimatedHrs = 0;
       if (proposalData?.proposals?.proposal_line_items) {
         estimatedHrs = proposalData.proposals.proposal_line_items.reduce(
-          (sum: number, item: { labor_hours: number }) => sum + (item.labor_hours || 0),
+          (sum: number, item: { labor_hours: number | null }) => sum + (item.labor_hours || 0),
           0
         );
       } else if (salesOrder.total_estimated_labor_hours) {
         estimatedHrs = salesOrder.total_estimated_labor_hours;
       }
       setEstimatedLabor(estimatedHrs);
-      setFieldLaborTarget(estimatedHrs * 0.95);
+      const pm=proposalData?.pm_allocation_percentage??5;
+      setPmPercentage(pm);
+      setFieldLaborTarget(splitQuotedLabor(estimatedHrs,pm).fieldHours);
 
       // Load actual hours from work_orders linked to the project
       if (salesOrder.project_id) {
-        const { data: woData } = await supabase
-          .from('work_orders')
-          .select('actual_hours')
-          .eq('project_id', salesOrder.project_id);
-
-        if (woData) {
-          const totalActual = woData.reduce((sum, wo) => sum + (wo.actual_hours || 0), 0);
-          setActualLabor(totalActual);
-        }
+        if(!profile?.organization_id) throw new Error('Authenticated company required');
+        const [summary]=await loadProjectSummaries(profile.organization_id,[salesOrder.project_id]);
+        if(!summary||summary.goalHours===null) throw new Error('Project labor target needs review');
+        setEstimatedLabor(summary.soldHours);setFieldLaborTarget(summary.goalHours);setPmPercentage(summary.pmPercentage);setActualLabor(summary.fieldHours);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -174,6 +179,7 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
         updateData.test_tune_end_date = endDate.toISOString().split('T')[0];
         updateData.total_estimated_labor_hours = estimatedLabor;
         updateData.field_labor_target_hours = fieldLaborTarget;
+        updateData.pm_labor_allocation_hours = estimatedLabor-fieldLaborTarget;
       }
 
       const { error: updateError } = await supabase
@@ -244,11 +250,10 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
         });
       }
 
-      onComplete();
-      onClose();
+      completion.complete();
     } catch (error) {
       console.error('Error completing sales order:', error);
-      alert('Failed to complete sales order. Please try again.');
+      notify('Failed to complete sales order. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -256,6 +261,8 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
 
   const endDateDisplay = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString();
   const hasExistingAccess = existingAccess.type !== 'none';
+
+  if (completion.completed) return <CompletionDialog title="Sales order complete!" theme="violet" kind="check" onContinue={completion.finish} />;
 
   return (
     <div
@@ -387,7 +394,7 @@ export function CompleteSalesOrderModal({ salesOrder, onClose, onComplete }: Com
                       <div className={`text-sm font-bold mt-0.5 ${isUnder80 ? 'text-amber-400' : 'text-green-400'}`}>{actualLabor.toFixed(1)} <span className="text-xs font-normal opacity-60">hrs</span></div>
                     </div>
                     <div className="bg-emerald-900/20 border border-emerald-700/40 rounded-xl px-3 py-2.5">
-                      <div className="text-[10px] text-emerald-500/70 uppercase tracking-wide">Target (95%)</div>
+                      <div className="text-[10px] text-emerald-500/70 uppercase tracking-wide">Field target ({100-pmPercentage}%)</div>
                       <div className="text-sm font-bold text-emerald-400 mt-0.5">{fieldLaborTarget.toFixed(1)} <span className="text-xs font-normal text-emerald-500/60">hrs</span></div>
                     </div>
                   </div>

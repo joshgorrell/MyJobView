@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, Building2, AlertCircle, Check, X } from 'lucide-react';
+import { CreditCard, Building2, AlertCircle, Check } from 'lucide-react';
 import { formatCurrency } from '../../lib/utils';
 import { calculateConvenienceFee, ConvenienceFeeSettings } from '../../lib/convenienceFee';
 import { supabase } from '../../lib/supabase';
@@ -70,7 +70,7 @@ export function PaymentMethodForm({ onSubmit, onCancel, amount }: PaymentMethodF
     try {
       await onSubmit({ ...formData, paymentType });
     } catch (err: any) {
-      setError(err.message || 'Payment failed. Please try again.');
+      setError('Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }

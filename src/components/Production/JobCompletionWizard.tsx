@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { NotesPolishButton } from '../Shared/NotesPolishButton';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import WorkOrderTasksChecklist from './WorkOrderTasksChecklist';
 import { SignaturePad } from './SignaturePad';
-import { gpsTrackingService } from '../../lib/gpsTracking';
 import { CheckCircle, Circle, Camera, AlertCircle, FileText, PenTool, Send, ChevronRight, ChevronLeft, Mail } from 'lucide-react';
 
 interface JobCompletionWizardProps {
@@ -15,6 +17,7 @@ interface WorkOrder {
   id: string;
   title: string;
   type: string;
+  project_id: string | null;
   work_order_number: string;
   work_order_type_id?: string | null;
   work_order_option?: { system_key: string } | null;
@@ -66,7 +69,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       const [woResult, photosResult] = await Promise.all([
         supabase
           .from('work_orders')
-          .select('id, title, type, work_order_number, work_order_type_id, work_order_option:work_order_options!work_order_type_id(system_key)')
+          .select('id, title, type, work_order_number, project_id, work_order_type_id, work_order_option:work_order_options!work_order_type_id(system_key)')
           .eq('id', workOrderId)
           .maybeSingle(),
         supabase
@@ -78,10 +81,11 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       if (woResult.error) throw woResult.error;
       if (!woResult.data) throw new Error('Work order not found');
 
-      setWorkOrder(woResult.data);
+      const option=Array.isArray(woResult.data.work_order_option)?woResult.data.work_order_option[0]:woResult.data.work_order_option;
+      setWorkOrder({...woResult.data,work_order_option:option});
       setJobPhotos(photosResult.data || []);
 
-      const vipByType = woResult.data.type === 'vip_program' || woResult.data.work_order_option?.system_key === 'vip_program';
+      const vipByType = woResult.data.type === 'vip_program' || option?.system_key === 'vip_program';
       if (vipByType) {
         const { data: vipVisit } = await supabase.from('vip_maintenance_visits').select('customer_not_present').eq('work_order_id', workOrderId).maybeSingle();
         setVipCustomerNotPresent(!!vipVisit?.customer_not_present);
@@ -119,7 +123,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load job completion data');
+      notify('Failed to load job completion data', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -153,13 +157,16 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
 
     if (isVipMaintenance) {
       const { data: incomplete, error: validationError } = await supabase.rpc('vip_maintenance_incomplete_sections', { p_work_order_id: workOrderId });
-      if (validationError) { alert('Unable to validate VIP Maintenance checklist.'); return; }
-      if (incomplete?.length) { alert(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`); return; }
+      if (validationError) { notify('Unable to validate VIP Maintenance checklist.', { theme: 'blue', tone: 'error' }); return; }
+      if (incomplete?.length) { notify(`VIP Maintenance is incomplete: ${incomplete.join(', ')}`, { theme: 'blue', tone: 'info' }); return; }
     }
 
     setSubmitting(true);
 
     try {
+      const {data:runningTime,error:timeError}=await supabase.from('time_entries').select('id').eq('work_order_id',workOrderId).eq('technician_id',profile.id).is('clock_out',null).maybeSingle();
+      if(timeError) throw timeError;
+      if(runningTime) throw new Error('Stop Job Time in this Work Order before completing the visit.');
       let signatureUrl = null;
 
       if (signatureDataUrl) {
@@ -189,11 +196,9 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
         }))
       };
 
-      const { error: insertError } = await supabase
-        .from('job_completions')
-        .insert({
-          work_order_id: workOrderId,
-          technician_id: profile.id,
+      const { error: completionError } = await supabase.rpc('finalize_work_order_visit', {
+        p_work_order_id: workOrderId,
+        p_completion: {
           template_id: template.id,
           checklist_data: checklistData,
           tech_notes: techNotes.trim() || null,
@@ -202,61 +207,9 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
           customer_email: customerEmail.trim() || null,
           quality_score: qualityScore,
           flagged_for_review: flagForReview
-        });
-
-      if (insertError) throw insertError;
-
-      const { error: updateError } = await supabase
-        .from('work_orders')
-        .update({ status: 'completed', actual_completion_date: new Date().toISOString().split('T')[0] })
-        .eq('id', workOrderId);
-
-      if (updateError) throw updateError;
-
-      // Capture GPS coordinates for job clock-out
-      const gpsResult = await gpsTrackingService.captureLocationForClockEvent(true);
-
-      // Update active time_entry with clock_out and GPS coordinates
-      const now = new Date();
-      const { data: activeEntry, error: fetchError } = await supabase
-        .from('time_entries')
-        .select('id, clock_in')
-        .eq('work_order_id', workOrderId)
-        .eq('technician_id', profile.id)
-        .is('clock_out', null)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.error('Error fetching active time entry:', fetchError);
-      } else if (activeEntry) {
-        const clockInTime = new Date(activeEntry.clock_in);
-        const clockOutTime = now;
-        const diffMs = clockOutTime.getTime() - clockInTime.getTime();
-        const totalHours = Math.max(0, diffMs / (1000 * 60 * 60));
-
-        const { error: timeUpdateError } = await supabase
-          .from('time_entries')
-          .update({
-            clock_out: now.toISOString(),
-            total_hours: totalHours,
-            status: 'completed',
-            clock_out_latitude: gpsResult.latitude,
-            clock_out_longitude: gpsResult.longitude,
-            clock_out_gps_accuracy: gpsResult.accuracy,
-            clock_out_gps_capture_method: gpsResult.method,
-            clock_out_gps_duration_ms: gpsResult.duration_ms,
-            clock_out_gps_attempted_at: gpsResult.attempted_at,
-            clock_out_gps_captured_at: gpsResult.captured_at
-          })
-          .eq('id', activeEntry.id);
-
-        if (timeUpdateError) {
-          console.error('Error updating time entry:', timeUpdateError);
-        }
-      }
-
-      // Stop GPS tracking
-      gpsTrackingService.stopTracking();
+        },
+      });
+      if (completionError) throw completionError;
 
       // Send feedback email if requested
       if (sendFeedbackEmail && customerEmail.trim()) {
@@ -291,9 +244,9 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       }
 
       onComplete();
-    } catch (error) {
+    } catch (error:any) {
       console.error('Error submitting job completion:', error);
-      alert('Failed to submit job completion');
+      notify((error as {message?: string}).message || 'Failed to submit job completion', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -331,7 +284,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
   return (
     <div className="bg-white rounded-xl shadow-lg max-w-2xl mx-auto">
       {/* Header */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-gray-200 bg-slate-800 rounded-t-xl">
         <h2 className="text-xl sm:text-2xl font-bold text-white">Complete Job</h2>
         <p className="text-gray-300">
           {workOrder.work_order_number}: {workOrder.title}
@@ -348,6 +301,7 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
       {/* Step Content */}
       <div className="p-6 min-h-[400px]">
         {/* Step 1: Overview */}
+        {step === 1 && workOrder && profile && <div className="mb-5"><WorkOrderTasksChecklist workOrderId={workOrderId} projectId={workOrder.project_id} currentUserId={profile.id} /></div>}
         {step === 1 && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
@@ -515,9 +469,10 @@ export function JobCompletionWizard({ workOrderId, onComplete, onCancel }: JobCo
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes (Optional)
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+                <NotesPolishButton value={techNotes} onApply={setTechNotes} />
+              </div>
               <textarea
                 value={techNotes}
                 onChange={(e) => setTechNotes(e.target.value)}

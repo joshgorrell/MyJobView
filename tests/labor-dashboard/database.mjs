@@ -1,0 +1,90 @@
+import {PGlite} from '@electric-sql/pglite';
+import {readFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db=new PGlite(),id=n=>`00000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
+await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;CREATE SCHEMA auth;CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('test.uid',true),'')::uuid$$;GRANT USAGE ON SCHEMA auth TO authenticated;GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
+CREATE TABLE organizations(id uuid PRIMARY KEY,timezone text);INSERT INTO organizations VALUES('${id(1)}','America/Chicago'),('${id(2)}','America/Chicago');
+CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,role text,is_active boolean,full_name text);INSERT INTO profiles VALUES('${id(10)}','${id(1)}','admin',true,'Admin'),('${id(11)}','${id(1)}','tech',true,'Tech'),('${id(20)}','${id(2)}','admin',true,'Other admin');GRANT SELECT ON profiles TO authenticated;
+CREATE TABLE time_entry_import_profiles(id uuid);CREATE TABLE time_entry_import_history(id uuid);
+CREATE TABLE employees(id uuid,user_id uuid,organization_id uuid,hire_date date);CREATE TABLE employee_payroll_configs(employee_id uuid,organization_id uuid,effective_from date,effective_to date);
+CREATE TABLE time_entries(technician_id uuid,entry_date date,total_hours numeric,organization_id uuid,status text,entry_type text,project_id uuid,work_order_id uuid);CREATE TABLE daily_clock_entries(technician_id uuid,entry_date date,total_hours numeric,leave_type text,status text,organization_id uuid);CREATE TABLE work_orders(id uuid,organization_id uuid,project_id uuid);CREATE TABLE sales_orders(id uuid,organization_id uuid,total_estimated_labor_hours numeric);CREATE TABLE projects(id uuid,name text,status text,sales_order_id uuid,organization_id uuid);`);
+await db.exec(await readFile('supabase/migrations/20261013161756_external_labor_dashboard.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261013173056_labor_snapshot_ordering_guard.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261013175740_labor_project_asof_guard.sql','utf8'));
+await db.exec(`INSERT INTO labor_import_sources(organization_id,source,enabled) VALUES('${id(1)}','ipoint',true),('${id(1)}','quickbooks_time',true),('${id(2)}','ipoint',true);`);
+const snapshot={kind:'technician',day:'2026-01-02',records:[{technician:'Tech',job_hours:6}],source:'iPoint Gmail verified-message',updatedAt:'2026-01-03T12:00Z'};
+async function ingest(rows=[snapshot],org=id(1)){return (await db.query(`SELECT ingest_external_labor($1,'ipoint',$2::jsonb) AS result`,[org,JSON.stringify(rows)])).rows[0].result;}
+assert.equal((await ingest()).changed,1);assert.equal((await ingest([{...snapshot,updatedAt:'2026-01-04T12:00Z'}])).changed,0);assert.equal((await db.query('SELECT count(*)::int AS n FROM external_labor_snapshots')).rows[0].n,1);
+assert.equal((await ingest([{...snapshot,records:[{technician:'Tech',job_hours:7}]}])).changed,1);assert.equal((await db.query('SELECT count(*)::int AS n FROM labor_import_batches')).rows[0].n,2);
+await assert.rejects(()=>ingest([{...snapshot,day:'2026-01-03'}, {...snapshot,records:[]}]),/Invalid or empty/);assert.equal((await db.query('SELECT count(*)::int AS n FROM external_labor_snapshots')).rows[0].n,1);
+assert.equal((await ingest([{...snapshot,updatedAt:'2026-01-01T12:00Z',records:[{technician:'Tech',job_hours:99}]}])).changed,0);assert.equal((await db.query('SELECT payload FROM external_labor_snapshots')).rows[0].payload.records[0].job_hours,7);
+await db.exec(`UPDATE labor_import_sources SET enabled=false WHERE organization_id='${id(1)}' AND source='ipoint'`);assert.equal((await ingest()).disabled,true);
+await db.exec(`UPDATE labor_import_sources SET enabled=true,native_from='2026-02-01' WHERE organization_id='${id(1)}' AND source='ipoint'`);assert.equal((await ingest([{...snapshot,day:'2026-02-01'}])).changed,0);assert.equal((await db.query('SELECT count(*)::int AS n FROM external_labor_snapshots')).rows[0].n,1);
+await db.exec(`SET ROLE authenticated;SELECT set_config('test.uid','${id(11)}',false)`);assert.equal((await db.query('SELECT * FROM external_labor_snapshots')).rows.length,0);await assert.rejects(()=>db.query(`SELECT ingest_external_labor('${id(1)}','ipoint','[]')`),/permission denied/);await assert.rejects(()=>db.query('SELECT * FROM labor_sync_credentials'),/permission denied/);await assert.rejects(()=>db.query("SELECT get_labor_dashboard('2026-01-01','2026-01-31')"),/admin access/);
+await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);assert.equal((await db.query('SELECT * FROM external_labor_snapshots')).rows.length,0);assert.equal((await db.query(`UPDATE labor_import_sources SET enabled=false WHERE organization_id='${id(1)}' RETURNING source`)).rows.length,0);
+await db.exec(`SELECT set_config('test.uid','${id(10)}',false)`);assert.equal((await db.query('SELECT * FROM external_labor_snapshots')).rows.length,1);const b=(await db.query("SELECT get_labor_dashboard('2026-01-01','2026-01-31') AS b")).rows[0].b;assert.equal(b.snapshots.length,1);assert.equal(b.snapshots[0].payload.records[0].job_hours,7);
+await db.exec('RESET ROLE');await db.exec(`INSERT INTO projects VALUES('${id(100)}','Native project','active',NULL,'${id(1)}');INSERT INTO time_entries(organization_id,project_id,total_hours,status,entry_date) VALUES('${id(1)}','${id(100)}',5,'approved',CURRENT_DATE-1),('${id(1)}','${id(100)}',99,'approved',CURRENT_DATE+5);SET ROLE authenticated;SELECT set_config('test.uid','${id(10)}',false)`);const current=(await db.query("SELECT get_labor_dashboard(CURRENT_DATE-30,CURRENT_DATE+30) AS b")).rows[0].b;assert.equal(current.native_projects[0].hours_used,5);
+await db.exec('RESET ROLE');
+await db.exec(`ALTER TABLE employee_payroll_configs ADD COLUMN compensation_type text, ADD COLUMN expected_weekly_hours numeric, ADD COLUMN work_days text[];
+ALTER TABLE time_entries ADD COLUMN clock_out timestamptz;
+INSERT INTO employees VALUES('${id(101)}','${id(11)}','${id(1)}','2026-01-01');
+INSERT INTO employee_payroll_configs VALUES('${id(101)}','${id(1)}','2026-01-01',NULL,'hourly',40,NULL);
+INSERT INTO labor_dashboard_roster(organization_id,profile_id) VALUES('${id(1)}','${id(11)}');
+INSERT INTO time_entries(technician_id,entry_date,total_hours,organization_id,status,entry_type,clock_out) VALUES
+('${id(11)}','2026-01-02',2,'${id(1)}','approved','customer_activity','2026-01-02T18:00Z'),
+('${id(11)}','2026-01-02',50,'${id(1)}','draft','work_order','2026-01-02T18:00Z'),
+('${id(11)}','2026-01-02',99,'${id(2)}','approved','work_order','2026-01-02T18:00Z');`);
+await db.exec(await readFile('supabase/migrations/20261023114939_tech_production_report.sql','utf8'));
+await db.exec(`ALTER TABLE profiles ADD COLUMN role_id uuid;
+CREATE TABLE department_modules(id uuid PRIMARY KEY,module_key text,is_active boolean);
+CREATE TABLE role_module_access(role_id uuid,module_id uuid,has_access boolean);
+CREATE TABLE user_permission_overrides(user_id uuid,module_id uuid,override_type text);
+INSERT INTO department_modules VALUES('${id(301)}','tech_stats',true);
+UPDATE profiles SET role_id='${id(401)}' WHERE id='${id(11)}';
+INSERT INTO role_module_access VALUES('${id(401)}','${id(301)}',true);`);
+await db.exec(await readFile('supabase/migrations/20261023190000_tech_production_permission_access.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261023190001_tech_production_actual_clock_breakdown.sql','utf8'));
+await db.exec(`INSERT INTO time_entries(technician_id,entry_date,total_hours,organization_id,status,entry_type,clock_out) VALUES
+('${id(11)}','2026-01-02',1,'${id(1)}','approved','shop_time','2026-01-02T19:00Z'),
+('${id(11)}','2026-01-02',0.5,'${id(1)}','approved','training','2026-01-02T19:30Z'),
+('${id(11)}','2026-01-02',40,'${id(2)}','approved','shop_time','2026-01-02T19:00Z'),
+('${id(11)}','2026-01-03',99,'${id(1)}','rejected','training','2026-01-03T19:00Z');
+INSERT INTO daily_clock_entries VALUES
+('${id(11)}','2026-01-02',8,NULL,'clocked_out','${id(1)}'),
+('${id(11)}','2026-01-02',2,'pto','approved','${id(1)}'),
+('${id(11)}','2026-01-03',8,NULL,'clocked_out','${id(1)}');`);
+await db.exec(`SET ROLE authenticated;SELECT set_config('test.uid','${id(10)}',false)`);
+const production=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(production.project_snapshot,null);assert.equal(production.native_projects.length,0);
+assert.equal(production.snapshots[0].payload.records[0].job_hours,7);
+const categorized=production.native_jobs.find(row=>row.day==='2026-01-02');
+assert.equal(categorized.hours,2,'only completed approved production in the current organization');
+assert.equal(categorized.shop_hours,1);assert.equal(categorized.training_hours,0.5);
+assert.ok(categorized.review_flags.length,'unapproved entries prevent a falsely complete reconciliation');
+assert.equal(production.native_jobs.find(row=>row.day==='2026-01-03').hours,0,'native payroll-only day has zero job clocks');
+assert.equal(production.native_jobs.find(row=>row.day==='2026-01-03').training_hours,0);assert.equal(production.native_jobs.find(row=>row.day==='2026-01-03').review_flags.length,0,'rejected entries do not block reconciliation');
+assert.equal(production.native_payroll.find(row=>row.day==='2026-01-02').hours,8,'leave excluded from actual payroll clocks');
+assert.equal(production.native_payroll.find(row=>row.day==='2026-01-02').leave_hours,2);
+assert.equal(production.configs[0].expected_weekly_hours,40);
+assert.equal(production.configs[0].employee_id,undefined,'only production availability configuration is returned');
+assert.equal(production.sources[0].enabled,undefined,'no source controls in the production feed');
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-02-01','2026-01-01')"),/Invalid date range/);
+await db.exec(`SELECT set_config('test.uid','${id(11)}',false)`);
+const managerReport=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(managerReport.snapshots[0].payload.records[0].job_hours,7,'role-granted staff see imported history');
+await db.exec('RESET ROLE');
+await db.exec(`INSERT INTO user_permission_overrides VALUES('${id(11)}','${id(301)}','revoke')`);
+await db.exec('SET ROLE authenticated');
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/Tech Stats access denied/);
+await db.exec('RESET ROLE');
+await db.exec(`UPDATE user_permission_overrides SET override_type='grant' WHERE user_id='${id(11)}'; UPDATE role_module_access SET has_access=false WHERE role_id='${id(401)}'`);
+await db.exec('SET ROLE authenticated');
+const granted=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(granted.snapshots.length,1,'user grant overrides missing role grant');
+await db.exec(`SELECT set_config('test.uid','${id(20)}',false)`);
+const isolated=(await db.query("SELECT get_tech_production('2026-01-01','2026-01-31') AS report")).rows[0].report;
+assert.equal(isolated.roster.length,0);assert.equal(isolated.snapshots.length,0);assert.equal(isolated.native_jobs[0].hours,99);assert.equal(isolated.native_jobs[0].shop_hours,40);
+await db.exec("RESET ROLE;SET ROLE anon");
+await assert.rejects(()=>db.query("SELECT get_tech_production('2026-01-01','2026-01-31')"),/permission denied/);
+console.log('Production RPC: small projection, customer production, completed records, organization isolation and effective Tech Stats permission boundary passed.');
+await db.close();console.log('Labor storage: idempotence, correction history, atomic rejection, disabling/cutover, credential isolation and cross-tenant access passed.');

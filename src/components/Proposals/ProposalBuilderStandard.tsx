@@ -1,6 +1,5 @@
-import React from 'react';
 import { ProposalRoom, ProposalLineItem } from '../../lib/types';
-import { Plus, ChevronDown, ChevronRight, GripVertical, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
 interface ProposalBuilderStandardProps {
   rooms: (ProposalRoom & { line_items: ProposalLineItem[]; expanded: boolean })[];

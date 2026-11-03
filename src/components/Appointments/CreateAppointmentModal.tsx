@@ -1,3 +1,7 @@
+import { CompletionDialog } from '../Shared/CompletionDialog';
+import { useCompletion } from '../../hooks/useCompletion';
+import { notify } from '../../lib/feedback';
+import { schedulingError, timeKey } from '../../lib/workOrderScheduling';
 import { useState, useEffect } from 'react';
 import { X, Save, Calendar, User, Lock, Unlock, Clock, Wrench, BookOpen } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
@@ -19,6 +23,7 @@ interface Project {
 }
 
 interface Technician {
+  is_technician?: boolean;
   id: string;
   full_name: string;
   email: string;
@@ -30,6 +35,7 @@ interface CreateAppointmentModalProps {
   calendarContext?: 'my' | 'technicians'; // New prop to distinguish calendar mode
   initialDate?: string; // Pre-fill date from calendar click
   initialTime?: string; // Pre-fill start time from calendar click
+  initialTechnicianId?: string;
   initialEndTime?: string; // Pre-fill end time from drag selection
   onClose: () => void;
   onSuccess: () => void;
@@ -44,10 +50,13 @@ export function CreateAppointmentModal({
   initialDate,
   initialTime,
   initialEndTime,
+  initialTechnicianId,
   onClose,
   onSuccess
 }: CreateAppointmentModalProps) {
   const { user, profile } = useAuth();
+  const completion = useCompletion(() => { onSuccess(); onClose(); });
+  const [completionMessage, setCompletionMessage] = useState('Appointment scheduled!');
 
   // Default to personal for My Calendar, customer_meeting for Technician Calendar
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(
@@ -60,7 +69,7 @@ export function CreateAppointmentModal({
   const [endTime, setEndTime] = useState(initialEndTime || '');
   const [allDay, setAllDay] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
-  const [technicianId, setTechnicianId] = useState('');
+  const [technicianId, setTechnicianId] = useState(initialTechnicianId || '');
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
@@ -92,33 +101,14 @@ export function CreateAppointmentModal({
     }
   }, [appointmentType, user, calendarContext]);
 
-  // Auto-calculate end time (1 hour after start time) snapped to 30-min increment
+  // Preserve exact minutes for direct entry and calendar selections.
   useEffect(() => {
     if (startTime && !endTime && !initialEndTime) {
-      const [hours, minutes] = startTime.split(':').map(Number);
-      const totalMinutes = hours * 60 + minutes + 60;
-      const snapped = Math.round(totalMinutes / 30) * 30;
-      const endHour = Math.floor(snapped / 60) % 24;
-      const endMin = snapped % 60;
-      setEndTime(`${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`);
+      const [hours, mins] = startTime.split(':').map(Number);
+      const end = hours * 60 + mins + 60;
+      if (end < 1440) setEndTime(timeKey(end));
     }
   }, [startTime]);
-
-  function generateTimeOptions(): { value: string; label: string }[] {
-    const options: { value: string; label: string }[] = [];
-    for (let h = 0; h < 24; h++) {
-      for (const m of [0, 30]) {
-        const value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        const period = h < 12 ? 'AM' : 'PM';
-        const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        const displayMin = m === 0 ? '00' : '30';
-        options.push({ value, label: `${displayHour}:${displayMin} ${period}` });
-      }
-    }
-    return options;
-  }
-
-  const timeOptions = generateTimeOptions();
 
   // Update title placeholder based on context and type
   const getTitlePlaceholder = () => {
@@ -147,8 +137,8 @@ export function CreateAppointmentModal({
           .order('first_name'),
         supabase
           .from('profiles')
-          .select('id, full_name, email')
-          .in('role', ['admin', 'sales', 'technician', 'service_manager'])
+          .select('id, full_name, email, is_technician')
+          .or('is_technician.eq.true,role.in.(admin,sales,technician,service_manager)')
           .eq('is_active', true)
           .order('full_name'),
       ]);
@@ -164,7 +154,7 @@ export function CreateAppointmentModal({
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      alert('Failed to load data');
+      notify('Failed to load data', { theme: 'blue', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -191,25 +181,28 @@ export function CreateAppointmentModal({
 
     // Validate customer for customer meetings (only in Technician Calendar mode)
     if (calendarContext === 'technicians' && appointmentType === 'customer_meeting' && !selectedContactId) {
-      alert('Please select a customer for customer meetings');
+      notify('Please select a customer for customer meetings', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate date
     if (!appointmentDate) {
-      alert('Please select an appointment date');
+      notify('Please select an appointment date', { theme: 'blue', tone: 'warning' });
       return;
     }
 
     // Validate times for non-all-day events
     if (!allDay && (!startTime || !endTime)) {
-      alert('Please fill in start and end times, or mark as all-day event');
+      notify('Please fill in start and end times, or mark as all-day event', { theme: 'blue', tone: 'warning' });
       return;
     }
 
+    const timeError = !allDay && schedulingError({ date: appointmentDate, start: startTime, end: endTime });
+    if (timeError) { notify(timeError, { theme: 'blue', tone: 'error' }); return; }
+
     // Validate technician for non-personal appointments (only in Technician Calendar mode)
     if (calendarContext === 'technicians' && appointmentType !== 'personal' && !technicianId) {
-      alert('Please select a technician');
+      notify('Please select a technician', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -251,20 +244,21 @@ export function CreateAppointmentModal({
             parent_appointment_id: created[0].id,
           });
         const instanceCount = typeof countResult === 'number' ? countResult : 0;
-        alert(`Appointment scheduled! ${instanceCount} recurring instance${instanceCount !== 1 ? 's' : ''} created.`);
+        setCompletionMessage(`Scheduled with ${instanceCount} recurring appointment${instanceCount !== 1 ? 's' : ''}!`);
       } else {
-        alert('Appointment created successfully!');
+        setCompletionMessage('Appointment scheduled!');
       }
 
-      onSuccess();
-      onClose();
+      completion.complete();
     } catch (error) {
       console.error('Error creating appointment:', error);
-      alert('Failed to create appointment. Please try again.');
+      notify('Failed to create appointment. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
   }
+
+  if (completion.completed) return <CompletionDialog title={completionMessage} theme="blue" kind="calendar" onContinue={completion.finish} />;
 
   if (loading) {
     return (
@@ -461,34 +455,16 @@ export function CreateAppointmentModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Time *
                 </label>
-                <select
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required={!allDay}
-                  className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-white"
-                >
-                  <option value="">Select time...</option>
-                  {timeOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                <input type="time" step="60" aria-label="Appointment start time" value={startTime} onChange={e => setStartTime(e.target.value)} required={!allDay}
+                  className="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base bg-white" />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Time *
                 </label>
-                <select
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required={!allDay}
-                  className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base bg-white"
-                >
-                  <option value="">Select time...</option>
-                  {timeOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                <input type="time" step="60" aria-label="Appointment end time" value={endTime} onChange={e => setEndTime(e.target.value)} required={!allDay}
+                  className="w-full min-h-11 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base bg-white" />
               </div>
             </div>
           )}
@@ -520,11 +496,11 @@ export function CreateAppointmentModal({
                 <select
                   value={technicianId}
                   onChange={(e) => setTechnicianId(e.target.value)}
-                  required={appointmentType !== 'personal'}
+                  required
                   className="w-full min-h-[44px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 >
                   <option value="">Select technician...</option>
-                  {technicians.map(tech => (
+                  {technicians.filter(tech => appointmentType !== 'work_order' || tech.is_technician).map(tech => (
                     <option key={tech.id} value={tech.id}>
                       {tech.full_name}
                     </option>

@@ -62,7 +62,7 @@ export default function LogProjectActivityModal({
   onClose,
   onSave,
 }: LogProjectActivityModalProps) {
-  const { profile } = useAuth();
+  const { profile, companySettings } = useAuth();
 
   const [activityType, setActivityType] = useState<ActivityType | null>(null);
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
@@ -96,7 +96,7 @@ export default function LogProjectActivityModal({
       const { error } = await supabase.from('project_activity_logs').insert({
         project_id: projectId,
         logged_by: profile?.id,
-        company_id: profile?.company_id,
+        company_id: companySettings?.id,
         activity_type: activityType,
         duration_minutes: effectiveDuration,
         notes: notes.trim(),

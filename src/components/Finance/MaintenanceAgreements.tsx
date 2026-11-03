@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 import { supabase } from '../../lib/supabase';
 import { Search, Plus, Wrench, DollarSign, Calendar, X, AlertCircle, CheckCircle, Loader2, ChevronRight } from 'lucide-react';
 import SecurityContractDetail from './SecurityContractDetail';
-import { AGREEMENT_TYPE_COLORS, SYSTEM_TYPE_LABELS, SERVICE_SCHEDULE_LABELS, type AgreementType, type SystemType } from '../../lib/types';
+import { SYSTEM_TYPE_LABELS, SERVICE_SCHEDULE_LABELS, type AgreementType, type SystemType } from '../../lib/types';
 
 interface MaintenanceAgreement {
   id: string;
@@ -37,7 +37,7 @@ export default function MaintenanceAgreements() {
       const { data, error } = await supabase
         .from('security_contracts')
         .select(`
-          id, contract_number, status, monthly_price, term_months, renewal_term_months,
+          id, contact_id, contract_number, status, monthly_price, term_months, renewal_term_months,
           billing_frequency_override, cancellation_notice_days, service_schedule, system_type,
           notes, created_at, activated_at,
           contact:contacts(id, full_name, email, phone),
@@ -45,7 +45,7 @@ export default function MaintenanceAgreements() {
           sales_order:sales_orders(id, order_number)
         `)
         .eq('agreement_type', 'maintenance')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).overrideTypes<MaintenanceAgreement[], { merge: false }>();
 
       if (error) throw error;
       setAgreements(data || []);
@@ -171,7 +171,7 @@ export default function MaintenanceAgreements() {
                       <td className="px-4 py-3 text-sm text-gray-600">{a.service_schedule ? SERVICE_SCHEDULE_LABELS[a.service_schedule] || a.service_schedule : '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 capitalize">{a.billing_frequency_override || '—'}</td>
                       <td className="px-4 py-3">
-                        {a.contact_id && <BillingPrefBadge contactId={a.contact_id} />}
+                        {a.contact?.id && <BillingPrefBadge contactId={a.contact?.id} />}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
                         ${a.monthly_price ? a.monthly_price.toFixed(2) : (a.subscription?.custom_amount || 0).toFixed(2)}
@@ -215,7 +215,7 @@ export default function MaintenanceAgreements() {
 }
 
 function CreateMaintenanceAgreementModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [step, setStep] = useState(1);
+  const [_step, _setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -324,7 +324,7 @@ function CreateMaintenanceAgreementModal({ onClose, onCreated }: { onClose: () =
 
       if (subError) throw subError;
 
-      const { data: contract, error: contractError } = await supabase
+      const { data: _contract, error: contractError } = await supabase
         .from('security_contracts')
         .insert({
           contact_id: contactId,

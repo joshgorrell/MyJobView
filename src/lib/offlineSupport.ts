@@ -68,11 +68,16 @@ export async function offlineSupabaseUpdate<T>(
         data: { ...data, id },
       });
 
-      const cached = await offlineStorage.getCachedData(table);
-      const updated = cached.map((item: any) =>
-        item.id === id ? { ...item, ...data, synced: false } : item
-      );
-      await offlineStorage.cacheData(table, updated);
+      // The durable queue is the save acknowledgment; the display cache is best effort.
+      try {
+        const cached = await offlineStorage.getCachedData(table);
+        const updated = cached.map((item: any) =>
+          item.id === id ? { ...item, ...data, synced: false } : item
+        );
+        await offlineStorage.cacheData(table, updated);
+      } catch (error) {
+        console.warn('Queued update saved, but display cache could not be refreshed:', error);
+      }
 
       return { data: { ...data, id } as any, error: null };
     } catch (error) {

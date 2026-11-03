@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useOfflineStorage } from '../../hooks/useOfflineStorage';
-import { Package, Edit2, Trash2, Plus, DollarSign, Box } from 'lucide-react';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { Package, Edit2, Trash2, Box } from 'lucide-react';
 import PackagesListView from './PackagesListView';
 import ConfirmModal from '../ui/ConfirmModal';
 
@@ -52,7 +53,7 @@ export default function PackagesList({
   const [packages, setPackages] = useState<ProductPackage[]>([]);
   const [packageItems, setPackageItems] = useState<Record<string, PackageItemWithProduct[]>>({});
   const [loading, setLoading] = useState(true);
-  const { isOnline } = useOfflineStorage();
+  const { isOnline } = useOnlineStatus();
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
@@ -126,7 +127,7 @@ export default function PackagesList({
       onRefresh();
     } catch (error) {
       console.error('Error deleting package:', error);
-      alert('Failed to delete package');
+      notify('Failed to delete package', { theme: 'amber', tone: 'error' });
     }
   }
 

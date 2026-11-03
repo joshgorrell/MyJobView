@@ -1,18 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   Calendar,
   Clock,
   User,
   MapPin,
-  Filter,
   Download,
   Printer,
   Search,
   SortAsc,
-  SortDesc,
-  ChevronDown
-} from 'lucide-react';
+  SortDesc} from 'lucide-react';
 
 interface ScheduleItem {
   id: string;
@@ -72,7 +69,7 @@ export function ScheduleListView() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['tech', 'lead_tech'])
+        .eq('is_technician', true)
         .eq('is_active', true)
         .order('full_name');
 

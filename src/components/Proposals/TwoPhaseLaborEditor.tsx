@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Wrench, X, AlertCircle, Plus, CheckCircle2, Pencil, Trash2, ClipboardList } from 'lucide-react';
@@ -33,7 +33,6 @@ export default function TwoPhaseLaborEditor({
   lineItemId,
   itemDescription,
   productId,
-  proposalId,
   onClose,
   onSave
 }: TwoPhaseLaborEditorProps) {
@@ -75,9 +74,9 @@ export default function TwoPhaseLaborEditor({
           .eq('line_item_id', lineItemId)
           .order('sort_order'),
         supabase
-          .from('project_tasks')
+          .from('proposal_tasks')
           .select('*')
-          .eq('source_line_item_id', lineItemId)
+          .eq('line_item_id', lineItemId)
           .order('created_at'),
         productId
           ? supabase
@@ -103,13 +102,13 @@ export default function TwoPhaseLaborEditor({
       if (phaseData.length === 0) {
         const { data: singleNoteData } = await supabase
           .from('proposal_line_items')
-          .select('tech_notes')
+          .select('task_notes')
           .eq('id', lineItemId)
           .maybeSingle();
-        setGeneralNotes((singleNoteData as any)?.tech_notes || '');
+        setGeneralNotes((singleNoteData as any)?.task_notes || '');
       }
 
-      setTasks(tasksRes.data || []);
+      setTasks((tasksRes.data || []).map(task => ({ ...task, status: 'open' })));
 
       const installTask = (productRes.data as any)?.default_install_task || '';
       setDefaultInstallTask(installTask);
@@ -140,7 +139,7 @@ export default function TwoPhaseLaborEditor({
       } else {
         await supabase
           .from('proposal_line_items')
-          .update({ tech_notes: generalNotes || null } as any)
+          .update({ task_notes: generalNotes || null } as any)
           .eq('id', lineItemId);
       }
       onSave();
@@ -161,32 +160,23 @@ export default function TwoPhaseLaborEditor({
       const insertData: any = {
         title: taskForm.title.trim(),
         description: taskForm.description.trim() || null,
-        status: 'open',
-        source_line_item_id: lineItemId,
+        line_item_id: lineItemId,
         sort_order: tasks.length,
         organization_id: profile?.organization_id
       };
 
-      if (proposalId) {
-        const { data: salesOrder } = await supabase
-          .from('sales_orders')
-          .select('project_id')
-          .eq('proposal_id', proposalId)
-          .maybeSingle();
-        if (salesOrder?.project_id) {
-          insertData.project_id = salesOrder.project_id;
-        }
-      }
-
+      const { data: item, error: itemError } = await supabase.from('proposal_line_items').select('proposal_id').eq('id', lineItemId).maybeSingle();
+      if (itemError || !item) throw itemError || new Error('Item not found');
+      insertData.proposal_id = item.proposal_id;
       const { data, error: insertError } = await supabase
-        .from('project_tasks')
+        .from('proposal_tasks')
         .insert(insertData)
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      setTasks(prev => [...prev, data]);
+      setTasks(prev => [...prev, { ...data, status: 'open' }]);
       setShowCreateTask(false);
       setTaskForm({ title: itemDescription || '', description: defaultInstallTask });
     } catch (err: any) {
@@ -203,7 +193,7 @@ export default function TwoPhaseLaborEditor({
     setError(null);
     try {
       const { data, error: updateError } = await supabase
-        .from('project_tasks')
+        .from('proposal_tasks')
         .update({
           title: taskForm.title.trim(),
           description: taskForm.description.trim() || null,
@@ -230,7 +220,7 @@ export default function TwoPhaseLaborEditor({
     setError(null);
     try {
       const { error: deleteError } = await supabase
-        .from('project_tasks')
+        .from('proposal_tasks')
         .delete()
         .eq('id', taskId);
 

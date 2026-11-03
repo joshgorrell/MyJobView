@@ -6,6 +6,7 @@ interface LocationContextType {
   currentLocation: Location.LocationObject | null;
   isTracking: boolean;
   locationPermission: string;
+  backgroundPermission: string;
   requestPermissions: () => Promise<boolean>;
 }
 
@@ -15,6 +16,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [locationPermission, setLocationPermission] = useState('undetermined');
+  const [backgroundPermission, setBackgroundPermission] = useState('undetermined');
 
   useEffect(() => {
     checkPermissions();
@@ -31,11 +33,17 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   async function checkPermissions() {
     const { status } = await Location.getForegroundPermissionsAsync();
     setLocationPermission(status);
+    const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
+    setBackgroundPermission(bgStatus);
   }
 
   async function requestPermissions(): Promise<boolean> {
     const { status } = await Location.requestForegroundPermissionsAsync();
     setLocationPermission(status);
+    if (status === 'granted') {
+      const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+      setBackgroundPermission(bgStatus);
+    }
     return status === 'granted';
   }
 
@@ -45,6 +53,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         currentLocation,
         isTracking,
         locationPermission,
+        backgroundPermission,
         requestPermissions,
       }}
     >

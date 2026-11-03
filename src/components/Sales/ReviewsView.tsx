@@ -1,10 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
-import { Star, Mail, QrCode, TrendingUp, Users, ExternalLink, Send, Check, Eye, X, Search, Calendar, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, ClipboardList, ThumbsUp, ChevronDown, CheckCircle, Lock } from 'lucide-react';
+import { Star, Mail, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, CheckCircle, Lock, TrendingUp } from 'lucide-react';
+import ProposalFollowUps from '../Reviews/ProposalFollowUps';
 import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
+import { ReviewStatsRow, type StatItem } from '../Reviews/ReviewStats';
+
+const jobReviewEmails = [
+  { type: 'manual', title: 'Job Review & Private Feedback', description: 'After a completed job or one-time work order. Ask how we did; Good or Excellent invites a 5-star Google review.' },
+  { type: 'job_completion', title: 'Job Completion · Day 0', description: 'At substantial completion of a project, ask how the installation went before Test & Tune begins.' },
+  { type: 'test_tune_welcome', title: 'Test & Tune Welcome · Day 7', description: 'Introduce the customer to Test & Tune and their customer portal. This is a welcome email, not a rating request.' },
+  { type: 'post_test_tune', title: 'Post-Test & Tune', description: 'After Test & Tune ends, ask about the overall experience and how the system is working.' },
+  { type: 'one_year', title: '1-Year Check-In', description: 'Check long-term satisfaction a year later and remind the customer about checkups and service options.' },
+] as const;
+type JobReviewEmailType = typeof jobReviewEmails[number]['type'];
 
 interface Contact {
   id: string;
@@ -19,7 +30,7 @@ interface ReviewRequest {
   contact_id: string;
   sent_by: string;
   sent_at: string;
-  method: 'email' | 'sms' | 'qr_code' | 'manual';
+  method: 'email' | 'sms' | 'qr_code' | 'manual' | 'survey';
   email_opened: boolean;
   link_clicked: boolean;
   clicked_at: string | null;
@@ -61,33 +72,9 @@ interface EmailPreview {
 
 const REVIEW_URL = 'https://g.page/r/CZzvVUth7kuyEBM/review';
 
-function replacePlaceholders(text: string, placeholders: Record<string, string>): string {
-  let result = text;
-  for (const [key, value] of Object.entries(placeholders)) {
-    result = result.split(`{{${key}}}`).join(value || '');
-  }
-  return result;
-}
-
-function convertTextToHtml(text: string): string {
-  let html = text;
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#3b82f6;">$1</a>');
-  html = html.replace(/^• (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul style="margin:10px 0;padding-left:20px;">$&</ul>');
-  html = html.replace(/\n\n/g, '</p><p style="margin:15px 0;line-height:1.6;">');
-  html = '<p style="margin:15px 0;line-height:1.6;">' + html + '</p>';
-  return html;
-}
 
 const EL_LOGO_URL = 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png';
 
-function wrapInEmailLayout(content: string, companyName: string, companyEmail: string, headerColor = '#0e7490', logoUrl = ''): string {
-  const resolvedLogoUrl = logoUrl || EL_LOGO_URL;
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;"><tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:32px 40px 28px;text-align:center;border-bottom:3px solid ${headerColor};"><img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" /></td></tr><tr><td style="background:#ffffff;padding:40px 40px 32px;color:#374151;font-size:16px;line-height:1.7;">${content}</td></tr><tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 40px;text-align:center;border-top:1px solid #334155;"><img src="${resolvedLogoUrl}" alt="${companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:0.85;" /><p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${companyName}</p>${companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 12px 0;">${companyEmail}</p>` : ''}<p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p></td></tr></table></td></tr></table></body></html>`;
-}
 
 function buildEmailShell(params: { companyName: string; companyEmail: string; companyLogoUrl?: string }, headerContent: string, bodyContent: string): string {
   const logoUrl = params.companyLogoUrl || EL_LOGO_URL;
@@ -116,24 +103,6 @@ function buildEmailShell(params: { companyName: string; companyEmail: string; co
 </body></html>`;
 }
 
-function buildReviewRequestEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string; reviewUrl: string }): string {
-  const header = `
-    <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">Your Opinion Matters</h1>
-    <p style="color:#94a3b8;margin:0;font-size:15px;">to us and to your community</p>
-    <div style="margin-top:20px;"><span style="font-size:24px;letter-spacing:3px;color:#f59e0b;">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>`;
-  const body = `
-    <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName},</p>
-    <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>. We take pride in every project we complete and we genuinely hope your experience exceeded your expectations.</p>
-    <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">If you have a moment, we'd be grateful if you could share your experience with others on Google. Reviews like yours help homeowners and businesses in the community find reliable, quality service.</p>
-    <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 32px 0;">
-      <a href="${params.reviewUrl}" style="display:inline-block;background:#0e7490;color:#ffffff;text-decoration:none;padding:16px 48px;border-radius:10px;font-size:17px;font-weight:700;letter-spacing:0.01em;">Leave Us a Google Review</a>
-    </td></tr></table>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><tr><td style="padding:18px 22px;">
-      <p style="color:#0f172a;font-size:13px;margin:0 0 5px 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Takes less than 2 minutes</p>
-      <p style="color:#475569;font-size:14px;margin:0;line-height:1.6;">Just a sentence or two is enough. Your words directly help our team grow.</p>
-    </td></tr></table>`;
-  return buildEmailShell(params, header, body);
-}
 
 function buildJobSurveyEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string; reviewUrl: string; companyWebsite?: string }): string {
   const websiteLink = params.companyWebsite
@@ -190,66 +159,6 @@ interface StaffProfile {
   full_name: string;
 }
 
-function buildSatisfactionEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string }): string {
-  const logoBlock = params.companyLogoUrl
-    ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
-    : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${params.companyName}</span>`;
-
-  const ratings = [
-    { label: 'Excellent', emoji: '&#128079;', bg: '#16a34a', desc: 'Everything was great' },
-    { label: 'Good', emoji: '&#128077;', bg: '#2563eb', desc: 'Happy with the results' },
-    { label: 'Okay', emoji: '&#128528;', bg: '#d97706', desc: 'Some things could improve' },
-    { label: 'Needs Attention', emoji: '&#128533;', bg: '#dc2626', desc: 'There was a problem' },
-  ];
-
-  const ratingButtons = ratings.map(r => `
-    <td align="center" style="padding:8px;">
-      <table cellpadding="0" cellspacing="0" width="120" style="border-radius:12px;overflow:hidden;background:${r.bg};">
-        <tr><td align="center" style="padding:16px 8px 8px;">
-          <span style="font-size:32px;line-height:1;">${r.emoji}</span>
-        </td></tr>
-        <tr><td align="center" style="padding:0 8px 6px;">
-          <span style="color:#ffffff;font-size:14px;font-weight:700;display:block;">${r.label}</span>
-        </td></tr>
-        <tr><td align="center" style="padding:0 8px 14px;">
-          <span style="color:rgba(255,255,255,0.8);font-size:11px;line-height:1.3;display:block;">${r.desc}</span>
-        </td></tr>
-      </table>
-    </td>`).join('');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>How did we do?</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-      <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #0e7490;">
-        <div style="margin-bottom:20px;">${logoBlock}</div>
-        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How Did We Do?</h1>
-        <p style="color:#94a3b8;margin:0;font-size:15px;">Your feedback helps us improve</p>
-      </td></tr>
-      <tr><td style="background:#ffffff;padding:44px 44px 36px;">
-        <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 16px 0;">Hi ${params.customerName || 'there'},</p>
-        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>. We hope your experience was exceptional. We'd love to hear how we did — just tap the button that best describes your experience:</p>
-        <table width="100%" cellpadding="0" cellspacing="0"><tr>${ratingButtons}</tr></table>
-        <p style="color:#9ca3af;font-size:13px;text-align:center;margin:28px 0 0 0;line-height:1.6;">Takes less than 60 seconds. Your feedback goes directly to our team.</p>
-      </td></tr>
-      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 44px;text-align:center;border-top:1px solid #334155;">
-        <p style="color:#0e7490;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${params.companyName}</p>
-        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${params.companyEmail}</p>` : ''}
-        <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
-}
 
 export default function ReviewsView() {
   const toast = useToast();
@@ -259,11 +168,12 @@ export default function ReviewsView() {
   const canRequestGoogleReviews = (profile as any)?.can_request_google_reviews ?? true;
   const canViewCustomerFeedback = isAdmin || ((profile as any)?.can_view_customer_feedback ?? canSeeAllRequests);
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
+  const canSendLostOpportunities = isAdmin || ((profile as any)?.can_send_lost_opportunity_reviews ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  type ReviewTab = 'dashboard' | 'send' | 'lost';
+  type ReviewTab = 'dashboard' | 'send' | 'lost' | 'proposal';
   const getReviewTabFromUrl = (): ReviewTab => {
     const tab = new URLSearchParams(window.location.search).get('reviewType');
-    return tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
+    return tab === 'proposal' || tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
   };
   const [activeTab, setActiveTabState] = useState<ReviewTab>(getReviewTabFromUrl);
   const setActiveTab = useCallback((tab: ReviewTab, options?: { replace?: boolean }) => {
@@ -287,7 +197,7 @@ export default function ReviewsView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activitySearch, setActivitySearch] = useState('');
   const [activityType, setActivityType] = useState<'all' | 'google' | 'feedback'>('all');
-  const [loading, setLoading] = useState(false);
+  const [_loading, _setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [useManualEntry, setUseManualEntry] = useState(false);
@@ -319,6 +229,7 @@ export default function ReviewsView() {
     conversionRate: 0
   });
 
+  const [examplePreview, setExamplePreview] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<EmailPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -384,7 +295,7 @@ export default function ReviewsView() {
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-punchlist-invite`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contact_email: email, contact_name: name || 'Valued Customer', project_name: 'your project', access_type: 'test_and_tune' })
+          body: JSON.stringify({ contact_email: email, contact_name: name || 'Valued Customer', project_name: 'your project', access_type: 'test_and_tune', customSubject: editedSubject || undefined, personalNote: personalNote.trim() || undefined })
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || result.success === false) throw new Error(result.error || 'Failed to send Test & Tune Welcome');
@@ -418,6 +329,8 @@ export default function ReviewsView() {
         leadTechName: leadTech?.full_name || '',
         appUrl: window.location.origin,
         surveyType: lifecycleType,
+        customSubject: editedSubject || undefined,
+        personalNote: personalNote.trim() || undefined,
       };
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-satisfaction-email`, {
@@ -454,24 +367,24 @@ export default function ReviewsView() {
     }
   }
 
-  async function fetchSatisfactionPreview() {
+  async function fetchSatisfactionPreview(type: JobReviewEmailType = lifecycleType, example = false) {
     setLoadingPreview(true);
     try {
-      const customerName = satUseManual ? (satManualName || 'Valued Customer') : (satContact?.contact_name || 'Valued Customer');
-      const recipientEmail = satUseManual ? satManualEmail : (satContact?.email || '');
+      const customerName = example ? 'Valued Customer' : satUseManual ? (satManualName || 'Valued Customer') : (satContact?.contact_name || 'Valued Customer');
+      const recipientEmail = example ? '' : satUseManual ? satManualEmail : (satContact?.email || '');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
-      const isTestTuneWelcome = lifecycleType === 'test_tune_welcome';
+      const isTestTuneWelcome = type === 'test_tune_welcome';
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${isTestTuneWelcome ? 'send-punchlist-invite' : 'send-satisfaction-email'}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(isTestTuneWelcome
           ? { contact_name: customerName, project_name: 'your project', access_type: 'test_and_tune', preview: true }
           : {
-              contactId: !satUseManual && satContact ? satContact.id : undefined,
+              contactId: !example && !satUseManual && satContact ? satContact.id : undefined,
               customerName,
               customerEmail: recipientEmail || 'preview@example.com',
-              surveyType: lifecycleType,
+              surveyType: type,
               appUrl: window.location.origin,
               previewOnly: true,
             }),
@@ -482,6 +395,8 @@ export default function ReviewsView() {
       setEditedSubject(data.subject);
       setPersonalNote('');
       setEditMode(false);
+      setExamplePreview(example);
+      setSendMethod('satisfaction');
       setShowPreview(true);
     } catch (err) {
       console.error('Error building lifecycle preview:', err);
@@ -517,7 +432,7 @@ export default function ReviewsView() {
 
       setRequests(reviewsRes.data || []);
       calculateStats(reviewsRes.data || []);
-      setSatisfactionHistory((satisfactionRes.data || []) as unknown as SatisfactionRecord[]);
+      setSatisfactionHistory((satisfactionRes.data || []).filter(r => r.survey_type !== 'test_tune_welcome') as unknown as SatisfactionRecord[]);
     } catch (error) {
       console.error('Error loading review requests:', error);
     }
@@ -622,7 +537,7 @@ export default function ReviewsView() {
       const templateType = 'review_request';
       const { email: recipientEmail, name: recipientName } = getRecipientInfo();
 
-      const [templateRes, settingsRes] = await Promise.all([
+      const [_templateRes, settingsRes] = await Promise.all([
         supabase
           .from('email_templates')
           .select('subject, body')
@@ -642,13 +557,6 @@ export default function ReviewsView() {
         company_website: '',
       };
 
-      const placeholders: Record<string, string> = {
-        customer_name: recipientName,
-        customer_first_name: recipientName,
-        company_name: settings.company_name,
-        review_url: REVIEW_URL,
-        company_website: (settings as any).company_website || '',
-      };
 
       let subject: string;
       let html: string;
@@ -664,6 +572,7 @@ export default function ReviewsView() {
         });
       }
 
+      setExamplePreview(false);
       setPreviewData({ subject, html, recipientEmail, recipientName });
       setEditedSubject(subject);
       setPersonalNote('');
@@ -683,7 +592,7 @@ export default function ReviewsView() {
         <tr>
           <td style="background:#f8fafc;border-left:4px solid #06b6d4;border-radius:0 8px 8px 0;padding:16px 20px;">
             <p style="color:#0c4a6e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px 0;">Personal Note</p>
-            <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;white-space:pre-wrap;">${note.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+            <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;white-space:pre-wrap;">${note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
           </td>
         </tr>
       </table>`;
@@ -756,18 +665,6 @@ export default function ReviewsView() {
         throw new Error(errorData.error || `Failed to send (${response.status})`);
       }
 
-      const { error: insertError } = await supabase
-        .from('review_requests')
-        .insert({
-          contact_id: useManualEntry ? null : selectedContact?.id,
-          recipient_email: (isEmail) && useManualEntry ? manualEmail : null,
-          recipient_name: useManualEntry ? manualName : null,
-          sent_by: profile?.id,
-          method: sendMethod
-        });
-
-      if (insertError) throw insertError;
-
       const sentName = useManualEntry
         ? (manualName || manualEmail || manualPhone)
         : (selectedContact?.contact_name || '');
@@ -789,23 +686,6 @@ export default function ReviewsView() {
     }
   }
 
-  async function recordQRCodeUse() {
-    try {
-      const { error } = await supabase
-        .from('review_requests')
-        .insert({
-          contact_id: null,
-          sent_by: profile?.id,
-          method: 'qr_code',
-          notes: 'QR code displayed to customer'
-        });
-
-      if (error) throw error;
-      loadReviewRequests();
-    } catch (error) {
-      console.error('Error recording QR code use:', error);
-    }
-  }
 
   async function markReviewReceived(request: ReviewRequest) {
     try {
@@ -929,18 +809,6 @@ export default function ReviewsView() {
           throw new Error(errorData.error || `Failed to resend review request (${response.status})`);
         }
 
-        const { error: insertError } = await supabase
-          .from('review_requests')
-          .insert({
-            contact_id: request.contact_id,
-            recipient_email: request.recipient_email,
-            recipient_name: request.recipient_name,
-            sent_by: profile?.id,
-            method: request.method
-          });
-
-        if (insertError) throw insertError;
-
         toast.success('Review request resent successfully!');
         loadReviewRequests();
       } catch (error: any) {
@@ -1062,119 +930,50 @@ export default function ReviewsView() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 px-5 py-4 text-white shadow-lg">
-        <div className="absolute -right-8 -top-12 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-        <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <MessageSquare className="w-5 h-5 text-cyan-200" />
-              <h1 className="text-xl font-bold">Feedback</h1>
-            </div>
-            <p className="mt-0.5 text-sm font-semibold text-blue-50">Listen. Learn. Improve.</p>
-            <p className="mt-0.5 max-w-2xl text-xs text-blue-100/90">Turn customer feedback into better experiences, stronger reviews, and lasting relationships.</p>
-          </div>
-          {canRequestGoogleReviews && (
-            <button onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow transition hover:bg-blue-50">
-              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-              Ask for a Google Review
+      <header className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-gray-700 pb-3">
+        <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-cyan-300" /><h1 className="text-xl font-bold text-white">Feedback</h1></div>
+        {canRequestGoogleReviews && <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-amber-300"><Star className="h-4 w-4" />Ask for a Google Review</button>}
+      </header>
+
+      <nav aria-label="Feedback sections" className="flex gap-1 overflow-x-auto border-b border-gray-700">
+        {(canViewCustomerFeedback || canManageCustomerFeedback) && <button type="button" onClick={() => {
+          if (canViewCustomerFeedback) { setGoogleOnlyMode(false); setActiveTab('dashboard'); }
+          else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }
+        }} aria-current={activeTab === 'dashboard' || activeTab === 'send' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'dashboard' || activeTab === 'send' ? 'border-amber-400 bg-amber-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+          <Star className="mr-1 hidden h-4 w-4 text-amber-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Job Reviews</span>
+        </button>}
+        {canManageCustomerFeedback && <button type="button" onClick={() => setActiveTab('proposal')} aria-current={activeTab === 'proposal' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'proposal' ? 'border-cyan-400 bg-cyan-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+          <FileText className="mr-1 hidden h-4 w-4 text-cyan-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Proposal Check</span>
+        </button>}
+        {(canViewLostOpportunities || canSendLostOpportunities) && <button type="button" onClick={() => setActiveTab('lost')} aria-current={activeTab === 'lost' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'lost' ? 'border-violet-400 bg-violet-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+          <MessageSquare className="mr-1 hidden h-4 w-4 text-violet-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Lost Opportunities</span>
+        </button>}
+      </nav>
+
+      {(activeTab === 'dashboard' || (activeTab === 'send' && !googleOnlyMode)) && canManageCustomerFeedback && (
+        <section aria-label="Job review emails" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {jobReviewEmails.map(email => <article key={email.type} className={`relative min-w-0 rounded-xl border bg-gray-800 ${activeTab === 'send' && lifecycleType === email.type ? 'border-amber-400' : 'border-gray-700'}`}>
+            <button type="button" onClick={() => { setLifecycleType(email.type); setGoogleOnlyMode(false); setSendMethod('satisfaction'); setEditedSubject(''); setPersonalNote(''); setActiveTab('send'); }} className="h-full min-h-16 min-w-0 w-full rounded-xl p-3 pr-12 text-left hover:bg-gray-700/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400">
+              <h2 className="text-sm font-semibold text-white">{email.title}</h2><p title={email.description} className="mt-1 truncate text-xs leading-relaxed text-gray-400">{email.description}</p>
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(90px,1fr))] gap-1 border-b border-gray-700">
-        {canViewCustomerFeedback && <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] transition-colors ${
-            activeTab === 'dashboard'
-              ? 'text-yellow-400 border-b-2 border-yellow-400'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <TrendingUp className="w-4 h-4 inline mr-2" />
-          Customer Feedback
-        </button>}
-        {(canRequestGoogleReviews || canManageCustomerFeedback) && <button
-          onClick={() => { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }}
-          className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] transition-colors ${
-            activeTab === 'send'
-              ? 'text-yellow-400 border-b-2 border-yellow-400'
-              : 'text-gray-400 hover:text-gray-300'
-          }`}
-        >
-          <Send className="w-4 h-4 inline mr-2" />
-          Ask / Send
-        </button>}
-        {canViewLostOpportunities && <button onClick={() => setActiveTab('lost')} className={`min-h-11 px-1 sm:px-4 py-2 text-xs sm:text-sm font-medium [overflow-wrap:normal] ${activeTab === 'lost' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-300'}`}>Lost Opportunities</button>}
-      </div>
-
-      {activeTab === 'lost' && canViewLostOpportunities && <LostOpportunityReviews />}
-
-      {/* Customer satisfaction is part of the unified Customer Feedback view. */}
-      {activeTab === 'dashboard' && canViewCustomerFeedback && (
-        <CustomerSatisfactionDashboard />
+            <button type="button" aria-label={`Preview example: ${email.title}`} title="Preview example" disabled={loadingPreview} onClick={() => void fetchSatisfactionPreview(email.type, true)} className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-50"><Eye className="h-4 w-4" /></button>
+          </article>)}
+        </section>
       )}
 
-      {/* Dashboard Tab */}
-      {activeTab === 'dashboard' && canViewCustomerFeedback && (
-        <div className="space-y-6">
-        </div>
-      )}
+      {activeTab === 'proposal' && canManageCustomerFeedback && <section aria-label="Proposal Check" className="space-y-4"><ProposalFollowUps /></section>}
 
-      {activeTab === 'dashboard' && canViewCustomerFeedback && reviewChampions.length > 0 && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div><h2 className="text-base font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Secondary view: Google review requests attributed to the employee who asked.</p></div>
-            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-            {reviewChampions.map((champion, index) => (
-              <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
-                <div className="font-semibold text-white truncate">{champion.name}</div>
-                <div className="mt-1 text-xl font-bold text-cyan-300">{champion.sent}</div>
-                <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+       {activeTab === 'lost' && (canViewLostOpportunities || canSendLostOpportunities) && <section aria-label="Lost Opportunities" className="space-y-4"><LostOpportunityReviews /></section>}
 
       {/* Send Request Tab */}
       {activeTab === 'send' && (
         <div className="space-y-6">
           <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
-              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Send Customer Communication'}</h2><p className="text-sm text-gray-400 mt-1">{googleOnlyMode ? 'Send a customer directly to your Google review page.' : 'Preview or manually send an authorized customer lifecycle communication.'}</p></div>
+              <div><h2 className="text-xl font-bold text-white">{googleOnlyMode ? 'Ask for a Google Review' : 'Ask About Their Experience'}</h2></div>
               {googleOnlyMode && canRequestGoogleReviews && qrCodeUrl && <div className="flex items-center gap-3 rounded-xl border border-gray-700 bg-gray-900/70 p-3 lg:shrink-0"><img src={qrCodeUrl} alt="Google review QR code" className="w-24 h-24 shrink-0 rounded bg-white p-1" /><div><div className="font-semibold text-white text-sm">Scan to review</div><div className="text-xs text-gray-400 mt-1 max-w-40">Customer scans this from your screen.</div></div></div>}
             </div>
-            {!googleOnlyMode && canManageCustomerFeedback && (
-              <div className="mb-6 rounded-xl border border-gray-700 bg-gray-900/50 p-4">
-                <label htmlFor="feedback-email-type" className="block text-sm font-semibold text-white mb-2">Email type</label>
-                <select id="feedback-email-type" value={lifecycleType}
-                  onChange={e => { setLifecycleType(e.target.value as typeof lifecycleType); setSendMethod('satisfaction'); }}
-                  className="min-h-11 w-full min-w-0 rounded-lg border border-gray-600 bg-gray-900 px-3 py-2 text-base text-white">
-                  <option value="manual">General Customer Feedback</option>
-                  <option value="job_completion">Job Completion Feedback · Day 0</option>
-                  <option value="test_tune_welcome">Test &amp; Tune Welcome · Day 7</option>
-                  <option value="post_test_tune">Post-Test &amp; Tune Feedback</option>
-                  <option value="one_year">1-Year Check-In</option>
-                </select>
-                <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                  {lifecycleType === 'manual'
-                    ? 'Ask for feedback at any time. Choose a customer below, preview the email, then send.'
-                    : lifecycleType === 'test_tune_welcome'
-                    ? 'Invite the customer to Test & Tune. Normally sent automatically 7 days after substantial completion.'
-                    : lifecycleType === 'job_completion'
-                    ? 'Ask how the job went at substantial completion. Normally sent automatically on Day 0.'
-                    : lifecycleType === 'post_test_tune'
-                    ? 'Ask how things are working after the configured Test & Tune period ends.'
-                    : 'Check in on long-term satisfaction and service needs one year later.'}
-                </p>
-                {lifecycleType !== 'manual' && <p className="mt-2 text-xs text-blue-300">Lifecycle emails normally send automatically. Use this form for a manual request or resend.</p>}
-              </div>
-            )}
+            {!googleOnlyMode && <div className="mb-5 flex items-center justify-between gap-3"><h3 className="text-base font-semibold text-amber-200">{jobReviewEmails.find(email => email.type === lifecycleType)?.title}</h3><button type="button" onClick={() => setActiveTab('dashboard')} className="min-h-11 rounded-lg border border-gray-600 px-3 text-sm text-gray-300">Back to emails</button></div>}
 
             {googleOnlyMode && (
               <h3 className="mb-3 text-base font-semibold text-white">Send Review Request</h3>
@@ -1191,7 +990,7 @@ export default function ReviewsView() {
                 )}
 
                 <div className="flex justify-end">
-                  <button type="button" onClick={fetchSatisfactionPreview} disabled={loadingPreview}
+                  <button type="button" onClick={() => void fetchSatisfactionPreview()} disabled={loadingPreview}
                     className="inline-flex items-center gap-2 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:border-cyan-500 hover:text-cyan-300 disabled:opacity-50">
                     <Eye className="w-4 h-4" /> Preview Email
                   </button>
@@ -1306,14 +1105,14 @@ export default function ReviewsView() {
                 </div>
 
                 <button
-                  onClick={sendSatisfactionSurvey}
+                  onClick={() => void fetchSatisfactionPreview()}
                   disabled={satSending || (!satContact && !satManualEmail)}
                   className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {satSending ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Sending...</>
                   ) : (
-                    <><Mail className="w-5 h-5" />Send Email</>
+                    <><Eye className="w-5 h-5" />Preview & Edit Email</>
                   )}
                 </button>
               </div>
@@ -1480,8 +1279,41 @@ export default function ReviewsView() {
         </div>
       )}
 
-      {/* Unified feedback activity */}
-      {activeTab === 'dashboard' && canViewCustomerFeedback && (
+      {/* Customer satisfaction is part of the unified Customer Feedback view. */}
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && (
+        <CustomerSatisfactionDashboard />
+      )}
+
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && (() => {
+        const googleStats: StatItem[] = [
+          { label: 'Requests Sent', value: stats.totalSent, sublabel: 'all Google review emails', icon: Send, iconColor: 'text-cyan-400' },
+          { label: 'Open Rate', value: `${stats.openRate.toFixed(0)}%`, sublabel: `${stats.emailsOpened} opened`, icon: Eye, iconColor: 'text-blue-400' },
+          { label: 'Click Rate', value: `${stats.clickRate.toFixed(0)}%`, sublabel: `${stats.linksClicked} clicked Google link`, icon: TrendingUp, iconColor: 'text-amber-400' },
+          { label: 'Reviews Confirmed', value: stats.reviewsCompleted, sublabel: `${stats.conversionRate.toFixed(0)}% conversion`, icon: CheckCircle, iconColor: 'text-green-400' },
+        ];
+        return <div className="space-y-2"><h3 className="text-base font-semibold text-white">Google Review Activity</h3><ReviewStatsRow stats={googleStats} /><p className="text-xs text-gray-400">Email opens and Google link clicks do not confirm that a public review was posted.</p></div>;
+      })()}
+
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && reviewChampions.length > 0 && (
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div><h2 className="text-base font-bold text-white">Review Champions</h2><p className="text-xs text-gray-400">Secondary view: Google review requests attributed to the employee who asked.</p></div>
+            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {reviewChampions.map((champion, index) => (
+              <div key={champion.name + index} className="rounded-lg bg-gray-900/70 border border-gray-700 px-4 py-3">
+                <div className="font-semibold text-white truncate">{champion.name}</div>
+                <div className="mt-1 text-xl font-bold text-cyan-300">{champion.sent}</div>
+                <div className="text-xs text-gray-400">requests · {champion.clicked} clicks</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Job review history */}
+      {(activeTab === 'dashboard' || activeTab === 'send') && canViewCustomerFeedback && (
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
           {!canSeeAllRequests && (
             <div className="px-6 py-3 bg-blue-900/30 border-b border-blue-700/50 flex items-center gap-2 text-sm text-blue-300">
@@ -1506,8 +1338,8 @@ export default function ReviewsView() {
           <div className="px-5 py-4 border-b border-gray-700 bg-gray-900/35">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-white">Request History</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Search any customer to see every Google review request and Feedback touchpoint, plus what happened next.</p>
+                <h2 className="text-lg font-bold text-white">Job Review History</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Search job review requests, private feedback, and Google review activity by customer.</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative">
@@ -1523,7 +1355,7 @@ export default function ReviewsView() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table aria-label="Feedback request history" className="block w-full lg:table">
+            <table aria-label="Job review history" className="block w-full lg:table">
               <thead className="hidden bg-gray-900 lg:table-header-group">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -1830,7 +1662,7 @@ export default function ReviewsView() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {sendMethod !== 'satisfaction' && (
+                {!examplePreview && (
                 <button
                   onClick={() => setEditMode(v => !v)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
@@ -1924,7 +1756,7 @@ export default function ReviewsView() {
                 >
                   Close
                 </button>
-                <button
+                {!examplePreview && <button
                   onClick={async () => {
                     if (sendMethod === 'satisfaction') {
                       if (await sendSatisfactionSurvey()) {
@@ -1949,7 +1781,7 @@ export default function ReviewsView() {
                       {personalNote.trim() ? 'Send with Note' : 'Send Now'}
                     </>
                   )}
-                </button>
+                </button>}
               </div>
             </div>
           </div>

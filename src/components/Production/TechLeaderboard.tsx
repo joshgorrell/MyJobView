@@ -3,13 +3,10 @@ import { supabase } from '../../lib/supabase';
 import {
   Trophy,
   Medal,
-  TrendingUp,
   Clock,
-  DollarSign,
   Award,
   Crown,
   Star,
-  Target,
   BarChart3
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -83,7 +80,7 @@ export function TechLeaderboard({ permissions }: TechLeaderboardProps) {
 
       if (bonusError) throw bonusError;
 
-      const { data: activeData, error: activeError } = await supabase
+      const { data: _activeData, error: activeError } = await supabase
         .rpc('get_test_tune_projects_for_user', {
           p_user_id: profile?.id,
           include_expired: false
@@ -107,7 +104,7 @@ export function TechLeaderboard({ permissions }: TechLeaderboardProps) {
         const hoursSaved = row.labor_savings_hours || 0;
         const fieldTarget = row.field_labor_target || 0;
         const fieldUsed = row.total_field_hours || 0;
-        const estLabor = row.total_estimated_labor || 0;
+
 
         if (!userMap.has(userId)) {
           userMap.set(userId, {
@@ -196,7 +193,7 @@ export function TechLeaderboard({ permissions }: TechLeaderboardProps) {
   };
 
   const maxHoursSaved = Math.max(...leaderboard.map(e => e.total_hours_saved), 1);
-  const maxBonus = Math.max(...leaderboard.map(e => e.total_bonus_earned + e.total_bonus_pending), 1);
+
 
   return (
     <div className="space-y-4">

@@ -64,7 +64,7 @@ export function PortalSignup() {
         .from('recurring_plans')
         .select('*')
         .eq('is_active', true)
-        .eq('plan_type', 'vip')
+        .eq('plan_type', 'vip_plan')
         .eq('show_on_portal', true)
         .order('amount');
 
@@ -85,7 +85,7 @@ export function PortalSignup() {
         .select('*')
         .eq('id', planId)
         .eq('is_active', true)
-        .eq('plan_type', 'vip')
+        .eq('plan_type', 'vip_plan')
         .eq('show_on_portal', true)
         .maybeSingle();
 
@@ -447,9 +447,9 @@ export function PortalSignup() {
                 <div className="flex-1 h-px bg-gray-300 mx-2 sm:mx-3" />
                 <div className="flex items-center gap-1 sm:gap-2">
                   <div className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center ${
-                    step === 'plan' ? 'bg-blue-600 text-white' : step === 'success' ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600'
+                    step === 'plan' ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-600'
                   }`}>
-                    {step === 'success' ? <Check className="w-5 h-5" /> : '2'}
+                    2
                   </div>
                   <span className={`text-xs sm:text-sm font-medium hidden sm:inline ${step === 'plan' ? 'text-gray-900' : 'text-gray-600'}`}>
                     Choose Plan

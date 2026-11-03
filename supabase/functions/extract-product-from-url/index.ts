@@ -24,6 +24,53 @@ interface ExtractedProduct {
   upc_code?: string;
 }
 
+function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  if (h === 'localhost' || h.endsWith('.localhost') || h === '::1') return true;
+  if (h.endsWith('.local') || h.endsWith('.internal')) return true;
+  // IPv4
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [parseInt(m[1]), parseInt(m[2])];
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+    if (a === 169 && b === 254) return true; // link-local
+  }
+  // IPv6 loopback/private
+  if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true;
+  return false;
+}
+
+function validatePublicUrl(urlStr: string): URL {
+  let parsed: URL;
+  try { parsed = new URL(urlStr); } catch { throw new Error("Invalid URL format"); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error("URL must use http or https");
+  }
+  if (isPrivateHost(parsed.hostname)) {
+    throw new Error("URLs pointing to internal addresses are not allowed");
+  }
+  return parsed;
+}
+
+async function safeFetch(urlStr: string, headers: Record<string, string>, maxRedirects = 5): Promise<Response> {
+  let currentUrl = validatePublicUrl(urlStr);
+  for (let i = 0; i <= maxRedirects; i++) {
+    const resp = await fetch(currentUrl.href, { headers, redirect: 'manual' });
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get('location');
+      if (!loc) throw new Error("Redirect without location header");
+      currentUrl = validatePublicUrl(new URL(loc, currentUrl).href);
+      continue;
+    }
+    return resp;
+  }
+  throw new Error("Too many redirects");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -51,7 +98,14 @@ Deno.serve(async (req: Request) => {
       throw new Error("Unauthorized");
     }
 
-    const { data: settings, error: settingsError } = await supabaseClient
+    // The API key column is not readable by the signed-in user's role, so it is
+    // read with the service role after the caller has been authenticated above.
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from("company_settings")
       .select("openai_api_key")
       .single();
@@ -97,17 +151,15 @@ Deno.serve(async (req: Request) => {
     // Validate URL format
     let validUrl: URL;
     try {
-      validUrl = new URL(url);
+      validUrl = validatePublicUrl(url);
     } catch {
       throw new Error("Invalid URL format");
     }
 
     // Fetch the webpage content
     console.log(`Fetching content from: ${url}`);
-    const webpageResponse = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+    const webpageResponse = await safeFetch(url, {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     });
 
     if (!webpageResponse.ok) {
@@ -241,10 +293,8 @@ ${truncatedHtml}`;
           imageUrl = new URL(imageUrl, validUrl.origin).href;
         }
 
-        const imageResponse = await fetch(imageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
+        const imageResponse = await safeFetch(imageUrl, {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         });
 
         if (imageResponse.ok) {

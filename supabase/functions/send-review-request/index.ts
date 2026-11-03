@@ -1,3 +1,4 @@
+import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
 
@@ -115,14 +116,19 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const openToken = crypto.randomUUID() + crypto.randomUUID();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const trackedClickUrl = `${supabaseUrl}/functions/v1/email-click-track?token=${openToken}&type=review&dest=${encodeURIComponent(reviewUrl)}`;
+    const pixelUrl = `${supabaseUrl}/functions/v1/email-open-track?token=${openToken}&type=review`;
+
     let recipientEmail = email;
     let customerName = name || '';
-    let subjectName = (name || '').split(' ')[0];
+    let subjectName = name || '';
 
     if (contactId) {
       const { data: contact, error: contactError } = await supabaseAdmin
         .from('contacts')
-        .select('contact_name, first_name, last_name, email, company_name')
+        .select('contact_name, full_name, first_name, last_name, email, company_name')
         .eq('id', contactId)
         .single();
 
@@ -149,8 +155,8 @@ Deno.serve(async (req: Request) => {
       }
 
       recipientEmail = contact.email;
-      customerName = contact.first_name || contact.contact_name || contact.company_name || '';
-      subjectName = contact.first_name || contact.company_name || '';
+      customerName = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
+      subjectName = contact.contact_name || contact.full_name || contact.company_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
     }
 
     if (!recipientEmail) {
@@ -182,7 +188,7 @@ Deno.serve(async (req: Request) => {
       };
 
       subject = replacePlaceholders(template.subject, placeholders);
-      const bodyText = replacePlaceholders(template.body, placeholders);
+      const bodyText = replacePlaceholders(template.body, { ...placeholders, review_url: trackedClickUrl });
       const emailBody = convertTextToHtml(bodyText);
       emailHtml = wrapInEmailLayout(
         emailBody,
@@ -200,7 +206,7 @@ Deno.serve(async (req: Request) => {
         companyEmail: settings.company_email,
         offices: settings.offices || [],
         companyLogoUrl: settings.company_logo_url || '',
-        reviewUrl,
+        reviewUrl: trackedClickUrl,
       });
     }
 
@@ -211,27 +217,33 @@ Deno.serve(async (req: Request) => {
       subject = customSubject;
     }
 
+    const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
+    emailHtml = emailHtml.includes('</body>') ? emailHtml.replace('</body>', pixel + '</body>') : emailHtml + pixel;
+
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
     if (!resendApiKey) {
-      console.log('Sending review request email to:', recipientEmail);
-      console.log('Customer name:', customerName);
-      console.log('Review URL:', reviewUrl);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Email service not configured (demo mode)',
-          email: recipientEmail
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      throw new Error('Email service is not configured: RESEND_API_KEY is missing.');
     }
 
-    const response = await fetch('https://api.resend.com/emails', {
+    const { error: insertError } = await supabaseAdmin
+      .from('review_requests')
+      .insert({
+        contact_id: contactId || null,
+        sent_by: user.id,
+        method: 'email',
+        recipient_email: recipientEmail,
+        recipient_name: customerName || null,
+        request_type: 'customer_review',
+        open_token: openToken,
+        auto_followup_enabled: true,
+      });
+
+    if (insertError) {
+      console.error('Failed to insert review_requests row:', insertError);
+    }
+
+    const response = await sendSystemEmail({
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,

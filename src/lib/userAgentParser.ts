@@ -8,7 +8,7 @@ export interface DeviceInfo {
   deviceVendor: string | null;
 }
 
-export function parseUserAgent(userAgent: string): DeviceInfo {
+export function parseUserAgent(userAgent: string, maxTouchPoints = 0): DeviceInfo {
   const ua = userAgent.toLowerCase();
 
   const deviceInfo: DeviceInfo = {
@@ -31,6 +31,15 @@ export function parseUserAgent(userAgent: string): DeviceInfo {
   const device = detectDevice(userAgent);
   deviceInfo.deviceModel = device.model;
   deviceInfo.deviceVendor = device.vendor;
+
+  // iPadOS can request desktop websites and report a Macintosh user agent.
+  if (/macintosh/i.test(userAgent) && maxTouchPoints > 1) {
+    deviceInfo.deviceType = 'tablet';
+    deviceInfo.osName = 'iPadOS';
+    deviceInfo.osVersion = '';
+    deviceInfo.deviceModel = 'iPad';
+    deviceInfo.deviceVendor = 'Apple';
+  }
 
   return deviceInfo;
 }

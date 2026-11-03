@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BillingPrefBadge } from '../Shared/BillingPrefBadge';
 import { supabase } from '../../lib/supabase';
 import { Search, Plus, ShieldCheck, DollarSign, Calendar, X, AlertCircle, CheckCircle, Loader2, ChevronRight, Package } from 'lucide-react';
@@ -37,7 +37,7 @@ export default function EquipmentWarrantyAgreements() {
       const { data, error } = await supabase
         .from('security_contracts')
         .select(`
-          id, contract_number, status, monthly_price, term_months, renewal_term_months,
+          id, contact_id, contract_number, status, monthly_price, term_months, renewal_term_months,
           billing_frequency_override, warranty_start_date, warranty_end_date, system_type,
           notes, created_at, activated_at,
           contact:contacts(id, full_name, email, phone),
@@ -45,7 +45,7 @@ export default function EquipmentWarrantyAgreements() {
           equipment:security_contract_equipment(id, equipment_type, product_id, warranty_term_months, warranty_provider, quantity)
         `)
         .eq('agreement_type', 'equipment_warranty')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }).overrideTypes<WarrantyAgreement[], { merge: false }>();
 
       if (error) throw error;
       setAgreements(data || []);
@@ -176,7 +176,7 @@ export default function EquipmentWarrantyAgreements() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 capitalize">{a.billing_frequency_override || '—'}</td>
                       <td className="px-4 py-3">
-                        {a.contact_id && <BillingPrefBadge contactId={a.contact_id} />}
+                        {a.contact?.id && <BillingPrefBadge contactId={a.contact?.id} />}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
                         ${a.monthly_price ? a.monthly_price.toFixed(2) : (a.subscription?.custom_amount || 0).toFixed(2)}

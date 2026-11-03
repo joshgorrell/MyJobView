@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import ts from 'typescript';
+const calls=[];let failure='Email delivery status unknown';
+globalThis.__serviceEmailTest={functions:{invoke:async(name,{body})=>{calls.push(body);return failure ? {error:{message:failure}} : {data:{success:true}};}}};
+const source=(await readFile('src/lib/serviceApproval.ts','utf8')).replace("import { supabase } from './supabase';",'const supabase=globalThis.__serviceEmailTest;');
+const code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const {sendServiceApproval}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+await assert.rejects(sendServiceApproval('request'),/unknown/);failure='';await sendServiceApproval('request');
+assert.equal(calls[0].deliveryId,calls[1].deliveryId,'An ambiguous failure retries the same provider operation');
+await sendServiceApproval('request');assert.notEqual(calls[1].deliveryId,calls[2].deliveryId,'An explicit resend gets a new delivery key');
+failure='Start a new invitation';await assert.rejects(sendServiceApproval('revised'),/new invitation/);failure='';await sendServiceApproval('revised');
+assert.notEqual(calls[3].deliveryId,calls[4].deliveryId,'Revised/expired terms can issue a current link after a stale attempt');
+delete globalThis.__serviceEmailTest;console.log('Service email retry safeguards passed: stable ambiguous retries, explicit resend, and stale invitation recovery.');

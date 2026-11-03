@@ -1,5 +1,6 @@
+import { requestText, notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { Calendar, CheckCircle2, X, Clock, AlertTriangle, RefreshCw, Phone, Mail, Users, MapPin } from 'lucide-react';
+import { Calendar, CheckCircle2, X, Clock, AlertTriangle, RefreshCw, Phone, Mail, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -153,7 +154,7 @@ export function PendingConnectionsWidget({ onComplete, onSkip, compact = false }
   }
 
   async function handleSkip(occurrence: PendingOccurrence) {
-    const reason = prompt('Why are you skipping this connection? (Optional)');
+    const reason = (await requestText('Why are you skipping this connection? (Optional)', '', { theme: 'cyan' }));
 
     try {
       const { error } = await supabase
@@ -171,7 +172,7 @@ export function PendingConnectionsWidget({ onComplete, onSkip, compact = false }
       onSkip(occurrence.id);
     } catch (error) {
       console.error('Error skipping occurrence:', error);
-      alert('Failed to skip occurrence');
+      notify('Failed to skip occurrence', { theme: 'cyan', tone: 'error' });
     }
   }
 

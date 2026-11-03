@@ -1,30 +1,24 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { DollarSign, CheckCircle, XCircle, ExternalLink, Download, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
+import { DollarSign, CheckCircle, XCircle, ExternalLink, Users, RefreshCw, Eye, ArrowUpDown, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { QuickBooksSettings as QBSettings } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { QuickBooksCustomerBrowser } from './QuickBooksCustomerBrowser';
 import ConfirmModal from '../ui/ConfirmModal';
 
-interface QBCustomer {
-  id: string;
-  displayName: string;
-  givenName: string | null;
-  familyName: string | null;
-  companyName: string | null;
-  email: string | null;
-  phone: string | null;
-  balance: number;
-  active: boolean;
-}
 
 export function QuickBooksSettings() {
   const { profile } = useAuth();
   const [settings, setSettings] = useState<Omit<QBSettings, 'access_token' | 'refresh_token' | 'token_expires_at'> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [invoiceItems,setInvoiceItems]=useState({service_labor:'',service_parts:''});
   const [monitoringItem, setMonitoringItem] = useState('');
   const [monitoringMessage, setMonitoringMessage] = useState('');
+  const [billingItems, setBillingItems] = useState<Array<{id:string;name:string;income_account:string}>>([]);
+  const [billingBusy, setBillingBusy] = useState(false);
   const [settingsError, setSettingsError] = useState(false);
+  const [connectionResult] = useState(() => new URLSearchParams(window.location.search).get('qbo'));
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [reconciling, setReconciling] = useState(false);
@@ -43,17 +37,6 @@ export function QuickBooksSettings() {
     loadSettings(profile.organization_id);
     loadSyncStats();
 
-    const params = new URLSearchParams(window.location.search);
-    const qboStatus = params.get('qbo');
-    if (qboStatus === 'success') {
-      alert('QuickBooks connected successfully!');
-      window.history.replaceState({}, '', '/admin/settings');
-      loadSettings(profile.organization_id);
-      loadSyncStats();
-    } else if (qboStatus === 'error') {
-      alert('Failed to connect to QuickBooks. Please try again.');
-      window.history.replaceState({}, '', '/admin/settings');
-    }
   }, [profile?.organization_id]);
 
   async function loadSettings(organizationId: string) {
@@ -61,13 +44,15 @@ export function QuickBooksSettings() {
     try {
       const { data, error } = await supabase
         .from('quickbooks_settings')
-        .select('security_monitoring_item_id, payments_enabled, id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
+        .select('service_labor_item_id,service_parts_item_id,security_monitoring_item_id, payments_enabled, id, realm_id, is_connected, environment, company_name, auto_import_customers, auto_import_complete_data, auto_sync_enabled, last_customer_sync_at, last_invoice_sync_at, last_payment_sync_at, last_reconciliation_at, last_fetch_count, last_fetch_completed_at, last_webhook_at, last_synced_at, sync_health, invoice_sync_status, payment_sync_status, customer_sync_status, last_error, organization_id, created_at, updated_at')
         .eq('organization_id', organizationId)
+        .abortSignal(AbortSignal.timeout(15000))
         .maybeSingle();
 
       if (error) throw error;
       setSettings(data);
       setMonitoringItem(data?.security_monitoring_item_id || "");
+      setInvoiceItems({service_labor:data?.service_labor_item_id || '',service_parts:data?.service_parts_item_id || ''});
     } catch (error) {
       console.error('Error loading QuickBooks settings:', error);
       setSettingsError(true);
@@ -108,7 +93,7 @@ export function QuickBooksSettings() {
       window.location.assign(data.authorizationUrl);
     } catch (error) {
       console.error('Error connecting to QuickBooks:', error);
-      alert('Failed to initiate QuickBooks connection');
+      notify('Failed to initiate QuickBooks connection', { theme: 'blue', tone: 'error' });
       setConnecting(false);
     }
   }
@@ -120,7 +105,7 @@ export function QuickBooksSettings() {
       await loadSettings(profile?.organization_id ?? '');
     } catch (error) {
       console.error('Error disconnecting QuickBooks:', error);
-      alert('Failed to disconnect QuickBooks');
+      notify('Failed to disconnect QuickBooks', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -135,10 +120,10 @@ export function QuickBooksSettings() {
         .eq('id', settings.id);
 
       await loadSettings(profile?.organization_id ?? '');
-      alert(`Auto-import of complete customers ${newValue ? 'enabled' : 'disabled'} successfully`);
+      notify(`Auto-import of complete customers ${newValue ? 'enabled' : 'disabled'} successfully`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error toggling auto-import:', error);
-      alert('Failed to update auto-import setting');
+      notify('Failed to update auto-import setting', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -153,10 +138,10 @@ export function QuickBooksSettings() {
         .eq('id', settings.id);
 
       await loadSettings(profile?.organization_id ?? '');
-      alert(`Auto-sync to QuickBooks ${newValue ? 'enabled' : 'disabled'} successfully`);
+      notify(`Auto-sync to QuickBooks ${newValue ? 'enabled' : 'disabled'} successfully`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error toggling auto-sync:', error);
-      alert('Failed to update auto-sync setting');
+      notify('Failed to update auto-sync setting', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -168,12 +153,12 @@ export function QuickBooksSettings() {
         const { data: result, error } = await supabase.functions.invoke(functionName, { body: { runType: 'manual' } });
         if (error || !result?.success) throw new Error(`The ${functionName.replace('quickbooks-sync-', '')} sync failed`);
       }
-      alert('Customer, invoice, and payment synchronization completed.');
+      notify('Customer, invoice, and payment synchronization completed.', { theme: 'blue', tone: 'success' });
       await loadSettings(profile?.organization_id ?? '');
       await loadSyncStats();
     } catch (error) {
       console.error('Error syncing QuickBooks:', error);
-      alert('QuickBooks synchronization could not be completed.');
+      notify('QuickBooks synchronization could not be completed.', { theme: 'blue', tone: 'error' });
     } finally {
       setSyncing(false);
     }
@@ -184,11 +169,11 @@ export function QuickBooksSettings() {
     try {
       const { data: result, error } = await supabase.functions.invoke('quickbooks-reconcile', { body: {} });
       if (error || !result?.success) throw new Error('Reconciliation failed');
-      alert(`Read-only reconciliation completed with ${result.counts?.discrepancies || 0} discrepancies for review.`);
+      notify(`Read-only reconciliation completed with ${result.counts?.discrepancies || 0} discrepancies for review.`, { theme: 'blue', tone: 'success' });
       await loadSettings(profile?.organization_id ?? '');
     } catch (error) {
       console.error('Error reconciling QuickBooks:', error);
-      alert('Read-only reconciliation could not be completed.');
+      notify('Read-only reconciliation could not be completed.', { theme: 'blue', tone: 'error' });
     } finally {
       setReconciling(false);
     }
@@ -206,15 +191,55 @@ export function QuickBooksSettings() {
 
   return (
     <div className="space-y-6">
+      {connectionResult === 'success' && !settingsError && settings?.is_connected && <div role="status" className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">QuickBooks authorization saved. Accounting is connected; Payments is {settings.payments_enabled ? 'connected' : 'not connected'}{settings.environment === 'sandbox' ? ' in sandbox (test mode)' : ' in production'}.</div>}
+      {connectionResult === 'error' && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">QuickBooks authorization did not complete. Your previous connection status is shown below. Try connecting again.</div>}
+      <button type="button" disabled={loading} onClick={() => { if (profile?.organization_id) void loadSettings(profile.organization_id); }} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900"><RefreshCw className="h-4 w-4" />Refresh connection status</button>
       {settings?.is_connected && <div className="rounded-lg border p-4 space-y-3">
-        <label className="block font-medium" htmlFor="security-qbo-item">Security monitoring QuickBooks sales item ID</label>
-        <input id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} className="border rounded p-2 w-full" />
-        <p className="text-sm text-gray-600">Choose the sales item configured for monitoring invoices in this QuickBooks company. Payments access and tax classification must also be configured before billing.</p>
-        <button type="button" className="rounded bg-blue-700 text-white px-4 py-2" onClick={async () => {
+        <label className="block font-medium" htmlFor="security-qbo-item">QuickBooks reference item for monitoring/service income</label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select id="security-qbo-item" value={monitoringItem} onChange={e => setMonitoringItem(e.target.value)} disabled={billingBusy || profile?.role !== 'admin'} className="min-w-0 w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 [color-scheme:light]">
+            <option value="">Choose the income reference service item</option>
+            {monitoringItem && !billingItems.some(i=>i.id===monitoringItem) && <option value={monitoringItem}>Saved reference item ({monitoringItem}) — load items to view its account</option>}
+            {billingItems.map(item=><option key={item.id} value={item.id}>{item.name} · {item.income_account}</option>)}
+          </select>
+          <button type="button" disabled={billingBusy || profile?.role !== 'admin'} className="shrink-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 disabled:opacity-50" onClick={async()=>{
+            setBillingBusy(true);setMonitoringMessage('');
+            try {
+              const {data,error}=await supabase.functions.invoke('security-qbo-billing-setup',{body:{action:'list'}});
+              if(error || data?.error) throw new Error(data?.error || 'QuickBooks service items could not be loaded. Please retry.');
+              setBillingItems(data.items);
+              if(!data.items.length) setMonitoringMessage('No eligible service items found. Create a service item with the correct income account in QuickBooks, then load items again.');
+            } catch(e) {setMonitoringMessage(e instanceof Error?e.message:'Items could not be loaded.');}
+            finally {setBillingBusy(false);}
+          }}>{billingBusy ? 'Loading…' : 'Load QuickBooks items'}</button>
+        </div>
+        <p className="text-sm text-gray-600">Select an existing QuickBooks service item whose income account should be used for new monitoring and additional service items. Invoice lines use separate items matching the services selected on the agreement; this reference item is not used to combine them. Payments access and tax classification must also be configured before billing.</p>
+        <button type="button" disabled={billingBusy || !billingItems.some(i=>i.id===monitoringItem) || profile?.role !== 'admin'} className="rounded bg-blue-700 text-white px-4 py-2 disabled:opacity-50" onClick={async () => {
           if (profile?.role !== 'admin') { setMonitoringMessage('Only Admin can configure monitoring billing.'); return; }
-          const { error } = await supabase.from('quickbooks_settings').update({ security_monitoring_item_id: monitoringItem.trim() || null }).eq('id', settings.id).eq('organization_id', profile.organization_id);
-          setMonitoringMessage(error ? error.message : 'Monitoring sales item saved.');
+          setBillingBusy(true);
+          try {
+            const {data,error}=await supabase.functions.invoke('security-qbo-billing-setup',{body:{action:'save',itemId:monitoringItem}});
+            if(error || data?.error) throw new Error(data?.error || 'Billing setup could not be saved. Please retry.');
+            setMonitoringMessage(`Saved: ${data.item.name} · ${data.item.income_account}`);
+          } catch(e) {setMonitoringMessage(e instanceof Error?e.message:'Billing setup could not be saved.');}
+          finally {setBillingBusy(false);}
         }}>Save monitoring item</button>
+        <div className="border-t pt-3 space-y-3">
+          <p className="font-medium">Invoice income items</p>
+          <p className="text-sm text-gray-600">Choose the QuickBooks service reference items for labor and parts income. Each work-order part remains a separate invoice line at its selling price.</p>
+          {(['service_labor','service_parts'] as const).map(purpose=><div key={purpose} className="flex flex-col sm:flex-row gap-2">
+            <label className="flex-1 text-sm">{purpose==='service_labor'?'Labor income':'Parts income'}
+              <select value={invoiceItems[purpose]} disabled={billingBusy || profile?.role!=='admin'} onChange={e=>setInvoiceItems(prev=>({...prev,[purpose]:e.target.value}))} className="mt-1 w-full p-3 border rounded-lg bg-white text-gray-900">
+                <option value="">Choose an income item</option>
+                {invoiceItems[purpose] && !billingItems.some(i=>i.id===invoiceItems[purpose]) && <option value={invoiceItems[purpose]}>Saved item ({invoiceItems[purpose]})</option>}
+                {billingItems.map(item=><option key={item.id} value={item.id}>{item.name} · {item.income_account}</option>)}
+              </select>
+            </label>
+            <button disabled={billingBusy || profile?.role!=='admin' || !billingItems.some(i=>i.id===invoiceItems[purpose])} className="self-end px-4 py-3 rounded bg-blue-700 text-white disabled:opacity-50" onClick={async()=>{
+              setBillingBusy(true);try {const {data,error}=await supabase.functions.invoke('security-qbo-billing-setup',{body:{action:'save',itemId:invoiceItems[purpose],purpose}});if(error || data?.error)throw new Error(data?.error || 'Could not save income item');setMonitoringMessage(`Saved ${purpose==='service_labor'?'labor':'parts'} income: ${data.item.name}`);}catch(e){setMonitoringMessage(e instanceof Error?e.message:'Could not save income item');}finally{setBillingBusy(false);}
+            }}>Save</button>
+          </div>)}
+        </div>
         {monitoringMessage && <p role="status">{monitoringMessage}</p>}
       </div>}
       {settingsError && (
@@ -298,8 +323,10 @@ export function QuickBooksSettings() {
       {isConnected && (
         <>
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm text-blue-900">Security onboarding requires QuickBooks Payments access to save cards or bank accounts and select existing payment methods. Your Intuit app and merchant account must support Payments.</p>
-            <button onClick={()=>void handleConnect(true)} disabled={connecting} className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">Connect QuickBooks Payments</button>
+            <h3 className="font-semibold text-blue-900">QuickBooks Payments: {settings?.payments_enabled ? 'Connected' : 'Not connected'}</h3>
+            {settings?.environment === 'sandbox' && <p className="text-sm text-amber-900">This connection uses the QuickBooks sandbox. It is for testing and cannot collect live customer payments.</p>}
+            <p className="text-sm text-blue-900">Connecting QuickBooks Accounting does not automatically enable payment enrollment. Security onboarding requires QuickBooks Payments access to save cards or bank accounts and select existing payment methods. Your Intuit app and merchant account must support Payments.</p>
+            <button onClick={()=>void handleConnect(true)} disabled={connecting} className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">{settings?.payments_enabled ? 'Reconnect QuickBooks Payments' : 'Connect QuickBooks Payments'}</button>
           </div>
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">

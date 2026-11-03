@@ -1,11 +1,10 @@
-import React from 'react';
 import { ProposalLineItem, Product } from '../../lib/types';
-import { X, Package, DollarSign, TrendingUp, FileText } from 'lucide-react';
+import { X, Package, TrendingUp, FileText } from 'lucide-react';
 
 interface ProposalDetailCardProps {
   item: ProposalLineItem & { products?: Product };
-  productClasses: Array<{ id: string; name: string; color: string; description: string }>;
-  laborPhases: Array<{ id: string; name: string; description: string; default_rate: number }>;
+  productClasses: Array<{ id: string; name: string; color: string; description?: string }>;
+  laborPhases: Array<{ id: string; name: string; description?: string; default_rate: number }>;
   onClose: () => void;
   onUpdate: (itemId: string, updates: Partial<ProposalLineItem>) => void;
 }

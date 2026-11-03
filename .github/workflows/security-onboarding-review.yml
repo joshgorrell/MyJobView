@@ -19,7 +19,8 @@ concurrency:
 jobs:
   verify:
     name: Build and isolated onboarding checks
-    runs-on: ubuntu-latest
+    # Hosted Ubuntu 24.04 includes Chrome/Chromium's system libraries.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       VITE_SUPABASE_URL: https://security-test.supabase.co
@@ -43,6 +44,12 @@ jobs:
       - name: Install pinned browser test runtime
         run: npm install --no-save --package-lock=false playwright@1.55.1
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        # Avoid re-installing system packages through slow Ubuntu mirrors.
+        # Launch once so a missing runtime dependency fails before the suite.
+        run: |
+          npx playwright install --only-shell chromium
+          node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({headless: true}); await browser.close();'
       - name: Mobile resume, signing and printable agreement
+        timeout-minutes: 5
         run: node tests/security-onboarding/browser.mjs

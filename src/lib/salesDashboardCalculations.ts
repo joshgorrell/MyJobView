@@ -126,7 +126,7 @@ export function computeSalesBookedKpi(data: SalesDashboardResult): KpiCardData {
   const change = pctChange(current, previous);
 
   return {
-    title: 'Sales Booked (This Quota Year)',
+    title: data.repId ? 'Sales Booked (This Quota Year)' : 'Sales Booked (This Calendar Year)',
     value: formatCurrency(current),
     supportingText: `${data.bookedSales.count} order${data.bookedSales.count !== 1 ? 's' : ''} · Avg ${formatCurrency(data.bookedSales.avgSale)}`,
     trend: trendFromPct(change),
@@ -262,8 +262,8 @@ export function computeAttentionItems(data: SalesDashboardResult): AttentionItem
   if (data.expiredProposalsCount && data.expiredProposalsCount > 0) {
     items.push({
       severity: 'warning',
-      title: `${data.expiredProposalsCount} Expired Proposal${data.expiredProposalsCount !== 1 ? 's' : ''}`,
-      description: 'Follow up on expired proposals to re-engage those customers.',
+      title: `${data.expiredProposalsCount} Stale Proposal${data.expiredProposalsCount !== 1 ? 's' : ''}`,
+      description: 'Expired proposals still need an approved or declined decision. Follow up to resolve them.',
       actionLabel: 'View Proposals',
       actionTab: 'proposals',
     });

@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { chromium } from 'playwright';
+import { mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createServer } from 'node:http';
+const dir = await mkdtemp(join(tmpdir(), 'preview-'));
+const fixture = `export const useAuth=()=>({profile:{id:'rep',organization_id:'org',role:'sales'},user:{id:'rep'}});window.writes=[];window.opens=[];window.open=(...args)=>window.opens.push(args);
+const proposal={id:'p',title:'Customer Preview Test',proposal_number:'P-100',status:new URLSearchParams(location.search).get('status')||'sent',contacts:{full_name:'Bruce Willis'},total:1500,subtotal:1500,tax:0,deposit_amount_due:500,deposit_invoice_id:'inv',expires_at:location.search.includes('expired')?'2020-01-01':'2099-01-01'};
+export const supabase={async rpc(name,args){if(name==='get_customer_proposal_representative')return {data:null,error:null};if(name==='get_proposal_display_template')return {data:{template:null,can_customize:true},error:null};window.writes.push(['rpc',name,args]);return {data:name==='start_proposal_engagement'?'visit-1':true,error:null}},from(table){let single=false;const result=()=>Promise.resolve({error:null,data:table==='proposals'?proposal:table==='proposal_rooms'?Array.from({length:8},(_,i)=>({id:'room'+i,name:'Room '+i,show_scope:true,description:'Installation scope and system details. '.repeat(30)})):table==='invoices'?[{id:'inv',invoice_number:'DEP-100',invoice_type:'deposit',status:'submitted',qbo_invoice_id:'qbo',total:500,amount_due:500,amount_paid:0}]:single?null:[]});const q=new Proxy({},{get(_,key){if(key==='then')return(a,b)=>result().then(a,b);if(key==='single'||key==='maybeSingle')return()=>{single=true;return result()};if(['insert','update','delete','upsert','rpc'].includes(key))return(...args)=>{window.writes.push([table,key,args]);return q};return()=>q}});return q}};`;
+const entry=`import React from 'react';import {createRoot} from 'react-dom/client';import {PortalProposalDetail} from './src/components/Portal/PortalProposalDetail';createRoot(document.getElementById('root')).render(<div id="preview-scroll" style={location.search.includes("overlay")?{height:"calc(100vh - 64px)",overflowY:"auto",marginTop:64}:undefined}><PortalProposalDetail proposalId="p" onBack={()=>{}} previewMode={!location.search.includes("live")} hideExpiration={location.search.includes("order")}/></div>);`;
+await build({stdin:{contents:entry,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(dir,'app.js'),plugins:[{name:'fixture',setup(b){b.onResolve({filter:/(?:^|\/)supabase(?:\.ts)?$|contexts\/AuthContext$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture}));}}]});
+const css=(await readdir('dist/assets')).find(x=>x.startsWith('index-')&&x.endsWith('.css'));
+await writeFile(join(dir,'style.css'),await readFile('dist/assets/'+css));
+await writeFile(join(dir,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>');
+const server=createServer(async(req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(join(dir,file)));});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
+try {
+ browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH,args:['--no-sandbox']});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ for(const width of [375,768,1024,1280]){await page.setViewportSize({width,height:900});await page.goto('http://127.0.0.1:'+server.address().port);await page.getByRole('button',{name:'Approve Proposal',exact:true}).waitFor();
+ for(const name of ['Approve Proposal','Ask Questions / Comment','Pay Deposit Now','Pay Now'])assert.ok(await page.getByRole('button',{name,exact:true}).isDisabled(),name);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ const layout=await page.evaluate(()=>{
+  const grid=document.querySelector('main > div');const [scope,sidebar]=grid.children;
+  const a=scope.getBoundingClientRect(),b=sidebar.getBoundingClientRect();
+  return {position:getComputedStyle(sidebar).position,scopeTop:a.top,scopeBottom:a.bottom,sidebarTop:b.top,scopeLeft:a.left,sidebarLeft:b.left};
+ });
+ assert.notEqual(layout.position,'sticky');assert.notEqual(layout.position,'fixed');
+ if(width<1280){assert.ok(layout.sidebarTop>=layout.scopeBottom);assert.equal(layout.scopeLeft,layout.sidebarLeft);}else{
+  assert.equal(layout.scopeTop,layout.sidebarTop);
+  const before=layout.sidebarTop;await page.evaluate(()=>window.scrollTo(0,400));
+  const after=await page.locator('main > div > div').nth(1).evaluate(el=>el.getBoundingClientRect().top);
+  assert.ok(after<before-300,'Sidebar scrolls with proposal instead of remaining pinned');
+ }
+ assert.deepEqual(await page.evaluate(()=>window.writes),[]);assert.deepEqual(await page.evaluate(()=>window.opens),[]);
+ console.log(width+': preview renders; approval, messages, and payments disabled; no writes, payment windows, or horizontal overflow');}
+ await page.goto('http://127.0.0.1:'+server.address().port+'?overlay');
+ await page.getByRole('button',{name:'Approve Proposal',exact:true}).waitFor();
+ const sidebar=page.locator('main > div > div').nth(1);const before=await sidebar.evaluate(el=>el.getBoundingClientRect().top);
+ await page.locator('#preview-scroll').evaluate(el=>el.scrollTop=400);
+ const after=await sidebar.evaluate(el=>el.getBoundingClientRect().top);assert.ok(after<before-300,'Sidebar scrolls inside customer preview overlay');
+ console.log('Customer preview overlay: sidebar follows scrolling');
+ await page.goto('http://127.0.0.1:'+server.address().port+'?expired');await page.getByRole('button',{name:'Request Reactivation',exact:true}).waitFor();assert.ok(await page.getByRole('button',{name:'Request Reactivation',exact:true}).isDisabled());assert.deepEqual(await page.evaluate(()=>window.writes),[]);assert.deepEqual(errors,[]);console.log('Expired preview: reactivation blocked; no browser errors');
+ await page.goto('http://127.0.0.1:'+server.address().port+'?live&status=portal');
+ await page.bringToFront();
+ await page.getByRole('button',{name:'Approve Proposal',exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Approve Proposal',exact:true}).isEnabled(),true,'Viewed proposal remains approvable');
+ await page.waitForFunction(()=>window.writes.some(row=>row[0]==='rpc'&&row[1]==='start_proposal_engagement'));
+ assert.ok(await page.locator('[data-engagement-section="room:room0"]').isVisible());
+ assert.ok(await page.getByText('Proposal visits, approximate active viewing time, and selected interactions',{exact:false}).isVisible());
+ await page.getByRole('button',{name:'Request Changes',exact:true}).click();
+ await page.waitForFunction(()=>window.writes.some(row=>row[1]==='report_proposal_engagement'&&row[2].p_clicks.change_request_clicked===1));
+ assert.equal(await page.getByRole('button',{name:'Pay Deposit Now',exact:true}).isEnabled(),true,'Payment control preserved');
+ await page.goto('http://127.0.0.1:'+server.address().port+'?live&order');
+ await page.getByRole('button',{name:'Approve Proposal',exact:true}).waitFor();
+ assert.deepEqual(await page.evaluate(()=>window.writes),[],'Sales-order viewer excluded from proposal tracking');
+ assert.deepEqual(errors,[]);console.log('Live customer viewer: annotations, analytics notice, viewed-proposal actions, click tracking, and sales-order exclusion pass');
+} finally {await browser?.close();server.close();await rm(dir,{recursive:true,force:true});}

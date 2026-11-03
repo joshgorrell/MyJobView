@@ -1,12 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { ProposalLineItem, Product, ProposalRoom } from '../../lib/types';
-import { X, Save, Plus, RefreshCw, Replace, Package, DollarSign, Box, TrendingUp, Wrench, Tag, Image as ImageIcon, CreditCard as Edit, Check, Copy, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { X, Save, Plus, RefreshCw, Replace, Package, CreditCard as Edit, Copy, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import ProductSelector from './ProductSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProductDetailModal } from '../Products/ProductDetailModal';
 import ConfirmModal from '../ui/ConfirmModal';
+
+interface MasterProduct extends Omit<Product, 'category' | 'subcategory'> {
+  category: { name: string } | null;
+  subcategory: { name: string } | null;
+}
+
+export type ReplacementProduct = Pick<Product, 'name' | 'description' | 'unit_price' | 'cost' | 'unit'> & Partial<Pick<Product, 'our_price' | 'default_labor_hours' | 'item_type' | 'labor_phase_id' | 'is_taxable' | 'class_id'>> & { id: string | null };
 
 interface LineItemEditModalProps {
   item: ProposalLineItem;
@@ -14,7 +22,7 @@ interface LineItemEditModalProps {
   onSave: (updates: Partial<ProposalLineItem>) => void;
   onSaveToMaster?: (productId: string, updates: Partial<Product>) => void;
   onUpdateAllInstances?: (productId: string, updates: Partial<ProposalLineItem>) => void;
-  onSubstituteProduct?: (oldProductId: string | null, newProduct: Product, replaceAll: boolean) => void;
+  onSubstituteProduct?: (oldProductId: string | null, newProduct: ReplacementProduct, replaceAll: boolean) => void;
   onClose: () => void;
 }
 
@@ -46,7 +54,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
     task_notes: item.task_notes || '',
     show_task_notes: item.show_task_notes ?? false,
     labor_phase_id: item.labor_phase_id || '',
-    is_taxable: item.is_taxable !== undefined ? item.is_taxable : true,
+    is_taxable: item.is_taxable ?? true,
     is_hidden: item.is_hidden || false,
     is_customer_supplied: item.is_customer_supplied || false,
   });
@@ -56,11 +64,11 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
   const [showNewClassForm, setShowNewClassForm] = useState(false);
   const [newClassName, setNewClassName] = useState('');
   const [newClassColor, setNewClassColor] = useState('#3B82F6');
-  const [masterProduct, setMasterProduct] = useState<Product | null>(null);
+  const [masterProduct, setMasterProduct] = useState<MasterProduct | null>(null);
   const [loadingMaster, setLoadingMaster] = useState(false);
   const [instanceCount, setInstanceCount] = useState(0);
   const [showProductSelector, setShowProductSelector] = useState(false);
-  const [selectedReplacementProduct, setSelectedReplacementProduct] = useState<Product | null>(null);
+  const [selectedReplacementProduct, setSelectedReplacementProduct] = useState<ReplacementProduct | null>(null);
   const [showSubstituteConfirmation, setShowSubstituteConfirmation] = useState(false);
   const [showProductDetailView, setShowProductDetailView] = useState(false);
   const [rooms, setRooms] = useState<ProposalRoom[]>([]);
@@ -167,7 +175,8 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
     }
   }
 
-  async function addAccessory(product: Product) {
+  async function addAccessory(product: Product | null) {
+    if (!product) return;
     try {
       const maxSortOrder = accessories.length > 0
         ? Math.max(...accessories.map(a => a.sort_order))
@@ -181,9 +190,9 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
         description: product.item_name,
         quantity: 1,
         unit: product.unit || 'each',
-        unit_price: product.sell_price || 0,
+        unit_price: product.our_price ?? product.unit_price ?? 0,
         cost: product.cost || 0,
-        line_total: product.sell_price || 0,
+        line_total: product.our_price ?? product.unit_price ?? 0,
         sort_order: maxSortOrder + 1,
         is_custom: false
       };
@@ -202,7 +211,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       setShowAccessorySelector(false);
     } catch (error) {
       console.error('Error adding accessory:', error);
-      alert('Failed to add accessory');
+      notify('Failed to add accessory', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -228,7 +237,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       setAccessories(accessories.filter(a => a.id !== accessoryId));
     } catch (error) {
       console.error('Error removing accessory:', error);
-      alert('Failed to remove accessory');
+      notify('Failed to remove accessory', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -309,7 +318,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
           labor_phase:labor_phases(name, default_price)
         `)
         .eq('id', item.product_id)
-        .single();
+        .single().overrideTypes<MasterProduct, { merge: false }>();
 
       if (error) throw error;
       console.log('Master product loaded with image_url:', data?.image_url);
@@ -351,7 +360,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       labor_hours: masterProduct.default_labor_hours || formData.labor_hours,
       item_type: masterProduct.item_type || formData.item_type,
       labor_phase_id: masterProduct.labor_phase_id || formData.labor_phase_id,
-      is_taxable: masterProduct.is_taxable !== undefined ? masterProduct.is_taxable : formData.is_taxable,
+      is_taxable: masterProduct.is_taxable ?? formData.is_taxable,
     });
   }
 
@@ -388,7 +397,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       unit_price: customData?.unit_price || 0,
       cost: customData?.cost || 0,
       unit: customData?.unit || 'each',
-    } as Product;
+    } satisfies ReplacementProduct;
 
     setSelectedReplacementProduct(replacementProduct);
     setShowProductSelector(false);
@@ -433,13 +442,13 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
       setNewClassColor('#3B82F6');
     } catch (error) {
       console.error('Error creating class:', error);
-      alert('Failed to create class');
+      notify('Failed to create class', { theme: 'violet', tone: 'error' });
     }
   }
 
   function handleSubmit(saveToMaster: boolean) {
     if (!formData.is_customer_supplied && (!formData.cost || formData.cost <= 0)) {
-      alert('Cost is required. Please enter a unit cost greater than $0 before saving.');
+      notify('Cost is required. Please enter a unit cost greater than $0 before saving.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSaving(true);
@@ -508,7 +517,7 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
   async function copyToSelectedAreas() {
     if (selectedAreasForCopy.size === 0) {
-      alert('Please select at least one area');
+      notify('Please select at least one area', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -553,12 +562,12 @@ export default function LineItemEditModal({ item, proposalId, onSave, onSaveToMa
 
       if (error) throw error;
 
-      alert(`Item copied to ${selectedAreasForCopy.size} area(s) successfully`);
+      notify(`Item copied to ${selectedAreasForCopy.size} area(s) successfully`, { theme: 'violet', tone: 'success' });
       setSelectedAreasForCopy(new Set());
       onClose();
     } catch (error: any) {
       console.error('Error copying to areas:', error);
-      alert('Failed to copy item: ' + error.message);
+      notify('Failed to copy item: ' + error.message, { theme: 'violet', tone: 'error' });
     } finally {
       setCopyingToAreas(false);
     }

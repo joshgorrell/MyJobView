@@ -346,7 +346,7 @@ export function JobStatusPanel() {
                       <MessageSquare className="w-4 h-4" />
                       Status History
                     </div>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                    <div className="space-y-2">
                       {statusHistory.map((history, idx) => (
                         <div
                           key={idx}

@@ -1,0 +1,18 @@
+import fs from 'node:fs';import vm from 'node:vm';import ts from 'typescript';import assert from 'node:assert/strict';
+let handler,rows=[],calls=[],disabled=false,failRead=false,failSave=false;
+const organization='bound-organization',token='a'.repeat(48);
+const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))).map(n=>n.toString(16).padStart(2,'0')).join('');
+const admin={from(table){const filters={};let selection='';const q={select(v){selection=v;return q;},eq(k,v){filters[k]=v;return q;},in(){return q;},maybeSingle:async()=>({data:filters.token_hash===hash?{organization_id:organization}:null,error:null}),single:async()=>({data:{native_from:null},error:null}),then(resolve){assert.equal(filters.organization_id,organization);resolve({data:rows.map(s=>({kind:s.kind,day:s.day,payload:s})),error:failRead?new Error('Unavailable'):null});}};return q;},async rpc(name,args){calls.push(args);assert.equal(name,'ingest_external_labor');assert.equal(args.p_organization_id,organization);if(failSave)return{data:null,error:new Error('Rejected')};rows=args.p_snapshots;return{data:{changed:1,disabled},error:null};}};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('supabase/functions/labor-dashboard-ingest/index.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:{},require:()=>({createClient:()=>admin}),Deno:{serve:f=>handler=f,env:{get:()=> 'test'}},crypto,Response,Request,TextEncoder,Set,Number,JSON});
+const post=body=>handler(new Request('https://test.invalid',{method:'POST',headers:{Authorization:'Bearer '+token},body:JSON.stringify(body)}));
+assert.equal((await handler(new Request('https://test.invalid',{method:'POST',body:'{}'}))).status,401);
+assert.equal((await handler(new Request('https://test.invalid',{method:'POST',headers:{Authorization:'Bearer '+'b'.repeat(48)},body:'{}'}))).status,401);
+const s={kind:'technician',day:'2026-10-12',records:[{technician:'Technician',job_hours:6}],source:'Verified report',updatedAt:'2026-10-13T12:00Z'};
+let r=await post({source:'ipoint',organization_id:'attacker-organization',snapshots:[s]});assert.equal(r.status,200);assert.equal((await r.json()).verified,true);assert.equal(calls.length,1);
+assert.equal((await post({source:'ipoint',snapshots:[{...s,records:[]}]})).status,400);
+assert.equal((await post({source:'ipoint',snapshots:[{...s,records:[...s.records,...s.records]}]})).status,400);
+assert.equal((await post({source:'quickbooks_time',snapshots:[s]})).status,400);
+failRead=true;assert.equal((await post({source:'ipoint',snapshots:[s]})).status,503);failRead=false;
+failSave=true;assert.equal((await post({source:'ipoint',snapshots:[s]})).status,400);failSave=false;
+disabled=true;r=await post({source:'ipoint',snapshots:[s]});assert.equal((await r.json()).disabled,true);
+console.log('Labor ingest: credential rejection, organization binding, nonempty validation, duplicate rejection, source/kind restriction and independent readback passed.');

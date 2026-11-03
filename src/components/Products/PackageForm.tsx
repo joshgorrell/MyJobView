@@ -1,6 +1,7 @@
+import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useOfflineStorage } from '../../hooks/useOfflineStorage';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { formatCurrency } from '../../lib/utils';
 import { X, Plus, Trash2, Save, Search, WifiOff, Upload, Image as ImageIcon } from 'lucide-react';
 
@@ -18,6 +19,7 @@ interface Product {
   cost: number;
   sku: string;
   category_id?: string;
+  category?: string | null;
   labor_phase_id?: string;
   default_labor_hours?: number;
   labor_cost?: number;
@@ -44,7 +46,7 @@ interface PackageItem {
   product?: Product;
 }
 
-export default function PackageForm({ packageId, readOnly = false, onClose, onSave }: PackageFormProps) {
+export default function PackageForm({ packageId, readOnly: _readOnly = false, onClose, onSave }: PackageFormProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -52,7 +54,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
-  const { isOnline } = useOfflineStorage();
+  const { isOnline } = useOnlineStatus();
 
   // Image upload state
   const [newImage, setNewImage] = useState<File | null>(null);
@@ -108,7 +110,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
           )
         `)
         .eq('is_active', true)
-        .order('manufacturer_model_number');
+        .order('manufacturer_model_number').overrideTypes<Product[], { merge: false }>();
 
       if (error) throw error;
 
@@ -122,7 +124,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
       setProducts(productsWithLaborCost);
     } catch (error) {
       console.error('Error loading products:', error);
-      alert('Failed to load products. Please try again.');
+      notify('Failed to load products. Please try again.', { theme: 'amber', tone: 'error' });
     } finally {
       setLoadingProducts(false);
     }
@@ -220,7 +222,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
       setPackageItems(itemsWithLaborCost);
     } catch (error) {
       console.error('Error loading package:', error);
-      alert('Failed to load package');
+      notify('Failed to load package', { theme: 'amber', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -230,7 +232,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        notify('Please select an image file', { theme: 'amber', tone: 'warning' });
         return;
       }
       setNewImage(file);
@@ -263,7 +265,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
       const filePath = `${fileName}`;
 
       // Upload to storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError, data: _data } = await supabase.storage
         .from('product-images')
         .upload(filePath, newImage, {
           cacheControl: '3600',
@@ -289,7 +291,7 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
   function addProduct(product: Product) {
     const existing = packageItems.find(item => item.product_id === product.id);
     if (existing) {
-      alert('This product is already in the package');
+      notify('This product is already in the package', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -399,23 +401,23 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
     }
 
     if (!formData.package_name.trim()) {
-      alert('Package name is required');
+      notify('Package name is required', { theme: 'amber', tone: 'warning' });
       return;
     }
 
     if (!formData.package_price || Number(formData.package_price) <= 0) {
-      alert('Package price is required and must be greater than 0');
+      notify('Package price is required and must be greater than 0', { theme: 'amber', tone: 'warning' });
       return;
     }
 
     if (packageItems.length === 0) {
-      alert('Add at least one product to the package');
+      notify('Add at least one product to the package', { theme: 'amber', tone: 'info' });
       return;
     }
 
     const invalidItems = packageItems.filter(item => item.quantity < 1);
     if (invalidItems.length > 0) {
-      alert('All products must have a quantity of at least 1');
+      notify('All products must have a quantity of at least 1', { theme: 'amber', tone: 'warning' });
       return;
     }
 
@@ -490,14 +492,14 @@ export default function PackageForm({ packageId, readOnly = false, onClose, onSa
           }
         } catch (error) {
           console.error('Error uploading image:', error);
-          alert('Package saved but image upload failed. You can try uploading the image again by editing the package.');
+          notify('Package saved but image upload failed. You can try uploading the image again by editing the package.', { theme: 'amber', tone: 'error' });
         }
       }
 
       onSave();
     } catch (error) {
       console.error('Error saving package:', error);
-      alert('Failed to save package');
+      notify('Failed to save package', { theme: 'amber', tone: 'error' });
     } finally {
       setSaving(false);
     }

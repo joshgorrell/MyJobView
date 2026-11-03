@@ -1,28 +1,30 @@
 {
   "expo": {
-    "name": "Field Ops Pro",
-    "slug": "field-ops-mobile",
+    "name": "MyJobView",
+    "slug": "myjobview",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000209"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fieldops.mobile",
+      "bundleIdentifier": "com.myjobview.app",
+      "buildNumber": "5",
       "infoPlist": {
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
-        "NSLocationWhenInUseUsageDescription": "Field Ops Pro needs your location while you're working to track your position and calculate travel time.",
-        "NSLocationAlwaysUsageDescription": "Field Ops Pro needs background location access to continuously track your position during work hours, even when the app is in the background.",
-        "NSCameraUsageDescription": "Field Ops Pro needs camera access to capture job site photos and completion documentation.",
-        "NSPhotoLibraryUsageDescription": "Field Ops Pro needs photo library access to save and retrieve job site photos.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MyJobView needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
+        "NSLocationWhenInUseUsageDescription": "MyJobView needs your location while you're working to track your position and calculate travel time.",
+        "NSLocationAlwaysUsageDescription": "MyJobView needs background location access to continuously track your position during work hours, even when the app is in the background.",
+        "NSCameraUsageDescription": "MyJobView needs camera access to capture job site photos and completion documentation.",
+        "NSPhotoLibraryUsageDescription": "MyJobView needs photo library access to save and retrieve job site photos.",
+        "NSFaceIDUsageDescription": "MyJobView uses Face ID to securely authenticate you when clocking in and out.",
         "UIBackgroundModes": [
           "location",
           "fetch",
@@ -33,9 +35,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2563eb"
       },
       "package": "com.fieldops.mobile",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -54,9 +57,9 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Field Ops Pro needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
-          "locationAlwaysPermission": "Field Ops Pro needs background location access to continuously track your position during work hours.",
-          "locationWhenInUsePermission": "Field Ops Pro needs your location while you're working to track your position.",
+          "locationAlwaysAndWhenInUsePermission": "MyJobView needs your location to track work hours, calculate mileage, and automatically detect when you arrive at job sites.",
+          "locationAlwaysPermission": "MyJobView needs background location access to continuously track your position during work hours.",
+          "locationWhenInUsePermission": "MyJobView needs your location while you're working to track your position.",
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
@@ -64,16 +67,21 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Field Ops Pro needs camera access to capture job site photos."
+          "cameraPermission": "MyJobView needs camera access to capture job site photos."
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#ffffff"
+          "color": "#2563eb"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7d9e3303-8b1d-416e-9ace-fd3b15d9340f"
+      }
+    }
   }
 }

@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { notify } from '../../lib/feedback';
+import { PTOManagement } from './PTOManagement';
+import { canManageTimeOff } from '../../lib/timeOff';
+import { TimeReviewPanel } from './Payroll/TimeReviewPanel';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Power, AlertCircle, RefreshCw, Save, MapPin, CheckCircle, Flag, Eye, Upload, HelpCircle, X, FileText, Download, Wrench, BookOpen, ToggleLeft, ToggleRight, Bell, User, ThumbsUp, ThumbsDown, ExternalLink, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +16,8 @@ import PayrollApprovalPanel from './Payroll/PayrollApprovalPanel';
 import PayrollCorrectionsPanel from './Payroll/PayrollCorrectionsPanel';
 import PayrollReconciliationPanel from './Payroll/PayrollReconciliationPanel';
 import { AttendanceAllocationSummary } from './Payroll/AttendanceAllocationSummary';
+
+const LaborImportControls = lazy(() => import('../Production/LaborDashboard/LaborDashboard'));
 
 interface PendingAutoClockOut {
   id: string;
@@ -87,8 +93,9 @@ interface PendingTimeRequest {
   assigned_profile: { full_name: string | null } | null;
 }
 
-export function TimeClockManagement() {
-  const { user } = useAuth();
+export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'timeoff';onLaborDashboard?:()=>void}) {
+  const { user, profile } = useAuth();
+  const admin = profile?.role === 'admin';
   const [autoClockOutSettings, setAutoClockOutSettings] = useState<AutoClockOutSettings>({
     auto_clock_out_enabled: true,
     forgot_clock_out_penalty_points: -15,
@@ -127,7 +134,7 @@ export function TimeClockManagement() {
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
   const [confirmClearAlerts, setConfirmClearAlerts] = useState(false);
   const [confirmRunAutoClockOut, setConfirmRunAutoClockOut] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'payroll'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'review' | 'payroll' | 'timeoff' | 'imports'>(initialTab || (admin ? 'settings' : 'timeoff'));
   const [selectedPayPeriodId, setSelectedPayPeriodId] = useState<string | null>(null);
   const [payrollRefreshKey, setPayrollRefreshKey] = useState(0);
 
@@ -270,17 +277,14 @@ export function TimeClockManagement() {
   async function approveTimeRequest(id: string) {
     setApprovingRequestId(id);
     try {
-      const { error } = await supabase
-        .from('internal_time_sessions')
-        .update({ status: 'scheduled', approved_by: user?.id, approved_at: new Date().toISOString() })
-        .eq('id', id);
+      const {error}=await supabase.rpc('review_internal_time',{p_session_id:id,p_action:'approve'});
       if (error) throw error;
       supabase.functions.invoke('send-time-request-notification', {
         body: { sessionId: id, direction: 'to_tech' },
       }).catch(() => {});
       await loadPendingTimeRequests();
     } catch (err: any) {
-      alert(err.message || 'Failed to approve');
+      notify(err.message || 'Failed to approve', { theme: 'blue', tone: 'error' });
     } finally {
       setApprovingRequestId(null);
     }
@@ -290,10 +294,7 @@ export function TimeClockManagement() {
     const reason = denyReasonInput[id]?.trim();
     setDenyingRequestId(id);
     try {
-      const { error } = await supabase
-        .from('internal_time_sessions')
-        .update({ status: 'denied', denial_reason: reason || null })
-        .eq('id', id);
+      const {error}=await supabase.rpc('review_internal_time',{p_session_id:id,p_action:'deny',p_notes:reason||null});
       if (error) throw error;
       supabase.functions.invoke('send-time-request-notification', {
         body: { sessionId: id, direction: 'to_tech' },
@@ -302,7 +303,7 @@ export function TimeClockManagement() {
       setDenyReasonInput(prev => { const n = { ...prev }; delete n[id]; return n; });
       await loadPendingTimeRequests();
     } catch (err: any) {
-      alert(err.message || 'Failed to deny');
+      notify(err.message || 'Failed to deny', { theme: 'blue', tone: 'error' });
     } finally {
       setDenyingRequestId(null);
     }
@@ -372,7 +373,7 @@ export function TimeClockManagement() {
       setReviewNotes('');
     } catch (error) {
       console.error('Error updating event status:', error);
-      alert('Failed to update event status');
+      notify('Failed to update event status', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -382,7 +383,7 @@ export function TimeClockManagement() {
     const pendingCount = homeClockEvents.filter(e => e.home_clock_review_status === 'pending').length;
 
     if (pendingCount === 0) {
-      alert('No pending alerts to clear');
+      notify('No pending alerts to clear', { theme: 'blue', tone: 'info' });
       return;
     }
 
@@ -404,10 +405,10 @@ export function TimeClockManagement() {
       if (error) throw error;
 
       await loadHomeClockEvents();
-      alert(`Successfully marked ${pendingCount} alert(s) as reviewed`);
+      notify(`Successfully marked ${pendingCount} alert(s) as reviewed`, { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error clearing all pending alerts:', error);
-      alert('Failed to clear all pending alerts');
+      notify('Failed to clear all pending alerts', { theme: 'blue', tone: 'error' });
     }
   }
 
@@ -443,10 +444,10 @@ export function TimeClockManagement() {
 
         if (error) throw error;
       }
-      alert('Time clock settings saved successfully');
+      notify('Time clock settings saved successfully', { theme: 'blue', tone: 'success' });
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      notify('Failed to save settings', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -490,18 +491,18 @@ export function TimeClockManagement() {
 
       const result = data;
       if (result && result.success) {
-        alert(`Successfully processed ${result.entries_processed} clock entries.\n` +
+        notify(`Successfully processed ${result.entries_processed} clock entries.\n` +
               `Total points deducted: ${result.total_points_deducted || 0}\n` +
-              `${result.admin_notified ? `Notified ${result.notification_count} admin(s).` : ''}`);
+              `${result.admin_notified ? `Notified ${result.notification_count} admin(s).` : ''}`, { theme: 'blue', tone: 'success' });
         loadPendingAutoClockOuts();
         loadRecentAutoClockOuts();
         loadAutoClockOutSettings();
       } else {
-        alert(result.message || 'Failed to run auto clock-out');
+        notify(result.message || 'Failed to run auto clock-out', { theme: 'blue', tone: 'error' });
       }
     } catch (error) {
       console.error('Error running auto clock-out:', error);
-      alert('Failed to run auto clock-out');
+      notify('Failed to run auto clock-out', { theme: 'blue', tone: 'error' });
     } finally {
       setRunningAutoClockOut(false);
     }
@@ -509,7 +510,8 @@ export function TimeClockManagement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col gap-4 items-center justify-center h-64">
+        {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open Tech Stats</button>}
         <div className="text-gray-500">Loading settings...</div>
       </div>
     );
@@ -519,19 +521,20 @@ export function TimeClockManagement() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-primary mb-1 flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-600" />
             Time Clock Command Center
           </h3>
-          <p className="text-sm text-gray-600">
-            Manage time clock settings, payroll periods, and jurisdiction review
+          <p className="text-sm text-muted">
+            Manage time clock settings, payroll periods, leave, and jurisdiction review
           </p>
         </div>
       </div>
 
+      {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open Tech Stats</button>}
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-gray-200">
-        <button
+      <div className="flex flex-wrap gap-1 border-b border-gray-200">
+        {admin && <button
           onClick={() => setActiveTab('settings')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'settings'
@@ -540,9 +543,10 @@ export function TimeClockManagement() {
           }`}
         >
           <Clock className="w-4 h-4 inline mr-1.5" />
-          Settings & Review
-        </button>
-        <button
+          Settings & Alerts
+        </button>}
+        {admin && <button onClick={()=>setActiveTab('review')} className={`px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='review'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}>Requests & Travel</button>}
+        {admin && <button
           onClick={() => setActiveTab('payroll')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'payroll'
@@ -552,10 +556,15 @@ export function TimeClockManagement() {
         >
           <DollarSign className="w-4 h-4 inline mr-1.5" />
           Payroll & Jurisdiction
-        </button>
+        </button>}
+        {admin && <button onClick={()=>setActiveTab('imports')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='imports'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Historical Imports</button>}
+        {canManageTimeOff(profile?.role) && <button onClick={()=>setActiveTab('timeoff')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='timeoff'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Time Off</button>}
       </div>
 
-      {activeTab === 'settings' && (
+      {admin && activeTab==='imports' && <Suspense fallback={<p role="status">Loading import settings…</p>}><LaborImportControls controlsOnly/></Suspense>}
+      {activeTab==='timeoff' && canManageTimeOff(profile?.role) && <PTOManagement/>}
+      {admin && activeTab==='review' && <TimeReviewPanel onPayroll={()=>setActiveTab('payroll')}/>}
+      {admin && activeTab === 'settings' && (
       <>
       <div className="flex items-center gap-2 justify-end">
         <button
@@ -573,6 +582,7 @@ export function TimeClockManagement() {
           Import CSV
         </button>
       </div>
+
 
       {/* Auto Clock-Out Settings */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-6">
@@ -761,7 +771,7 @@ export function TimeClockManagement() {
               )}
             </button>
           </div>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2">
             {pendingAutoClockOuts.map(entry => (
               <div key={entry.id} className="flex items-center justify-between bg-white border border-yellow-200 p-3 rounded">
                 <div>
@@ -800,7 +810,7 @@ export function TimeClockManagement() {
           </div>
 
           {showRecentAutoClockOuts && (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
               {recentAutoClockOuts.map((entry, idx) => (
                 <div key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-200 p-3 rounded">
                   <div className="flex-1">
@@ -886,7 +896,7 @@ export function TimeClockManagement() {
             <p>No home clock events to review</p>
           </div>
         ) : (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-3">
             {homeClockEvents.map(event => (
               <div
                 key={event.id}
@@ -1832,9 +1842,9 @@ export function TimeClockManagement() {
       </>
       )}
 
-      {activeTab === 'payroll' && (
+      {admin && activeTab === 'payroll' && (
         <div className="space-y-6">
-          <PayrollPeriodSummary 
+          <PayrollPeriodSummary
             onPeriodSelect={setSelectedPayPeriodId}
             onRefresh={() => setPayrollRefreshKey(k => k + 1)}
           />

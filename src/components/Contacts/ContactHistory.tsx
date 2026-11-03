@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, ShoppingCart, Briefcase, Wrench, MessageSquare, CheckCircle2, Calendar, DollarSign, Users, ClipboardList, AlertCircle, RefreshCw, Star, Package } from 'lucide-react';
+import { FileText, ShoppingCart, Briefcase, Wrench, CheckCircle2, Calendar, DollarSign, Users, ClipboardList, AlertCircle, RefreshCw, Star, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface ContactHistoryProps {
@@ -318,16 +318,12 @@ export function ContactHistory({ contactId, onNavigateToProposal }: ContactHisto
       if (reviewRequests) {
         reviewRequests.forEach(rr => {
           let reviewStatus = 'Pending';
-          let reviewStatusColor = 'text-gray-500';
           if (rr.review_completed) {
             reviewStatus = 'Review Completed';
-            reviewStatusColor = 'text-green-600';
           } else if (rr.link_clicked) {
             reviewStatus = 'Link Clicked';
-            reviewStatusColor = 'text-blue-600';
           } else if (rr.email_opened) {
             reviewStatus = 'Email Opened';
-            reviewStatusColor = 'text-amber-600';
           }
 
           const methodLabel = rr.method === 'qr_code' ? 'QR Code'

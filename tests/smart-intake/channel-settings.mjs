@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const source = fs.readFileSync('src/lib/smart-intake/channel-settings.ts', 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const exports = {};
+vm.runInNewContext(compiled, { exports });
+const emailOnly = { emailEnabled: true, emailAddress: 'service@example.com', emailVerified: true, smsEnabled: false, smsNumber: null, smsProvider: null, smsVerified: false };
+assert.equal(exports.canActivateEmailIntake(emailOnly), true);
+assert.equal(exports.canActivateSmsIntake(emailOnly), false);
+const disabled = { ...emailOnly, emailEnabled: false };
+assert.equal(exports.canActivateEmailIntake(disabled), false);
+const smsOnly = { ...disabled, smsEnabled: true, smsNumber: '+13165551212', smsProvider: 'twilio', smsVerified: true };
+assert.equal(exports.canActivateSmsIntake(smsOnly), true);
+console.log('Independent intake channel checks passed');

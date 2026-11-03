@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Mail, MessageSquare, Clock, User, X, FileText, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 

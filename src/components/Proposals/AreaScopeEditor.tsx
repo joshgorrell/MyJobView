@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { notify } from '../../lib/feedback';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FileText, X, Eye, EyeOff } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function AreaScopeEditor({
       onClose();
     } catch (error) {
       console.error('Error saving scope of work:', error);
-      alert('Failed to save scope of work');
+      notify('Failed to save scope of work', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }

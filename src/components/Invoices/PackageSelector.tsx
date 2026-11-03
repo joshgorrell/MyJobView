@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X, Search, Package, ChevronDown, ChevronUp } from 'lucide-react';
@@ -41,7 +41,7 @@ interface PackageSelectorProps {
 }
 
 export default function PackageSelector({ onSelectPackage, onClose }: PackageSelectorProps) {
-  const { profile } = useAuth();
+  const { profile: _profile, companySettings } = useAuth();
   const [packages, setPackages] = useState<ProductPackage[]>([]);
   const [filteredPackages, setFilteredPackages] = useState<ProductPackage[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,7 +50,7 @@ export default function PackageSelector({ onSelectPackage, onClose }: PackageSel
 
   useEffect(() => {
     loadPackages();
-  }, [profile?.company_id]);
+  }, [companySettings?.id]);
 
   useEffect(() => {
     filterPackages();
@@ -63,7 +63,7 @@ export default function PackageSelector({ onSelectPackage, onClose }: PackageSel
       const { data: packagesData, error: packagesError } = await supabase
         .from('product_packages')
         .select('*')
-        .eq('company_id', profile?.company_id)
+        .eq('company_id', companySettings?.id)
         .eq('is_active', true)
         .order('package_name');
 

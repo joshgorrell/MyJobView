@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { DollarSign, Users, TrendingUp, AlertCircle, Calendar, Shield, Award, Receipt } from 'lucide-react';
+import { DollarSign, Users, TrendingUp, Calendar, Shield, Award, Receipt } from 'lucide-react';
 
 interface DashboardStats {
   totalActiveSubscriptions: number;

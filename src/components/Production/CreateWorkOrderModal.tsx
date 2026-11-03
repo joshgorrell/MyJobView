@@ -1,16 +1,27 @@
+import { SupportPhotos } from '../Shared/SupportPhotos';
+import { SupportRequestItems } from '../Shared/SupportRequestItems';
+import { notify } from '../../lib/feedback';
 import {useWorkOrderOptions} from '../../lib/workOrderOptions';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { X, Search, Plus, User, Briefcase, Users, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, Calendar, PhoneCall, LayoutGrid, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
+import { X, Search, Plus, User, Briefcase, MapPin, AlertTriangle, Bell, Mail, MessageSquare, Link, PhoneCall, ExternalLink, Package, ChevronDown, ChevronUp, ClipboardList, Phone, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import ProjectScope from '../Projects/ProjectScope';
 import { AddressAutocomplete } from '../Shared/AddressAutocomplete';
-import { TeamAvailabilityModal } from '../Shared/TeamAvailabilityModal';
-import { AvailabilityBrowserModal } from '../Shared/AvailabilityBrowserModal';
+import { WorkOrderSchedulePicker } from './WorkOrderSchedulePicker';
+import { schedulingError } from '../../lib/workOrderScheduling';
 import { notifyTechJobAssigned } from '../../lib/dispatchNotifications';
 import { RecurrenceSelector, RecurrenceRule } from '../Shared/RecurrenceSelector';
 
 export interface ServiceRequestContext {
+  earliest_date?: string | null;
+  customer_contact_instruction?: string;
+  warranty_type?: string | null;
+  warranty_reference?: string | null;
+  warranty_notes?: string | null;
+  estimated_duration?: string | null;
+
   id: string;
   customer_name: string;
   customer_phone: string | null;
@@ -39,6 +50,7 @@ interface CreateWorkOrderModalProps {
   projectId?: string;
   contactId?: string;
   initialTechnicianIds?: string[];
+  emergency?: boolean;
   serviceRequest?: ServiceRequestContext;
 }
 
@@ -47,7 +59,8 @@ interface Task {
   title: string;
   description: string;
   estimated_hours: number;
-  project_task_id?: string; // Link to project task for auto-completion
+  project_task_id?: string;
+  visit_instructions?: string;
 }
 
 interface LaborPhase {
@@ -119,7 +132,7 @@ interface ProductResult {
   unit_price: number | null;
 }
 
-export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId, initialTechnicianIds = [], serviceRequest }: CreateWorkOrderModalProps) {
+export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId, initialTechnicianIds = [], serviceRequest, emergency = false }: CreateWorkOrderModalProps) {
   const { profile } = useAuth();
   const workOrderOptions = useWorkOrderOptions();
   const [workOrderTypeId,setWorkOrderTypeId] = useState('');
@@ -133,11 +146,20 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [warrantyWorkOrders, setWarrantyWorkOrders] = useState<WarrantyWorkOrder[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTechnicians, setSelectedTechnicians] = useState<string[]>(
-    serviceRequest?.requested_tech_ids?.length ? serviceRequest.requested_tech_ids : initialTechnicianIds
+    initialTechnicianIds
   );
-  const [showAvailabilityBrowser, setShowAvailabilityBrowser] = useState(false);
-  const [showTeamAvailability, setShowTeamAvailability] = useState(false);
+
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [technicianVisitNotes, setTechnicianVisitNotes] = useState<Record<string, string>>({});
+  const [allProjects, setAllProjects] = useState<Array<{id:string;name:string;project_number:string}>>([]);
+  const [activeTaskIds, setActiveTaskIds] = useState<string[]>([]);
+  const [technicianTaskIds, setTechnicianTaskIds] = useState<Record<string, string[]>>({});
+  const creationKey = useRef(crypto.randomUUID());
+  const submitting = useRef(false);
+  const [projectContextError, setProjectContextError] = useState('');
+  const projectContextRequest = useRef(0);
+
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDescription, setNewTaskDescription] = useState('');
   const [newTaskHours, setNewTaskHours] = useState('0');
@@ -145,6 +167,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   // Labor phase and project tasks
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>('');
+  const [taskLoadError,setTaskLoadError] = useState('');
+  const [taskLoading,setTaskLoading] = useState(false);
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [showAllProjectPhases, setShowAllProjectPhases] = useState(false);
   const [selectedProjectTasks, setSelectedProjectTasks] = useState<Set<string>>(new Set());
@@ -158,7 +182,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const [showPartsSection, setShowPartsSection] = useState(false);
   const [partSearch, setPartSearch] = useState('');
   const [partSearchResults, setPartSearchResults] = useState<ProductResult[]>([]);
-  const [partSearching, setPartSearching] = useState(false);
+  const [, setPartSearching] = useState(false);
 
   // Validation errors
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -184,14 +208,15 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     warranty_reference_id: '',
     title: serviceRequest ? `${serviceRequest.request_type === 'project' ? 'Project' : 'Service'}: ${serviceRequest.job_description.substring(0, 60)}` : '',
     description: serviceRequest?.job_description || '',
-    priority: serviceRequest?.priority === 'emergency' ? 'urgent' : serviceRequest?.priority === 'urgent' ? 'high' : 'medium',
-    start_date: serviceRequest?.requested_date || '',
+    priority: emergency ? 'urgent' : serviceRequest?.priority === 'emergency' ? 'urgent' : serviceRequest?.priority === 'urgent' ? 'high' : 'medium',
+    start_date: '',
     start_time: serviceRequest?.requested_time || '',
     end_time: '',
-    target_completion_date: '',
+    target_completion_date: serviceRequest?.requested_date?.split('T')[0] || '',
     estimated_hours: '',
-    notes: serviceRequest?.notes || '',
-    internal_notes: '',
+    // Scheduling-only messages remain on the service request; neither customer nor technician work-order notes inherit them.
+    notes: '',
+    internal_notes: serviceRequest ? [serviceRequest.earliest_date && `Do not schedule before: ${serviceRequest.earliest_date}`, serviceRequest.requested_date && `Need by: ${serviceRequest.requested_date}`, `Customer contact: ${serviceRequest.customer_contact_instruction || 'dispatch'}`, serviceRequest.estimated_duration && `Estimated duration: ${serviceRequest.estimated_duration}`, serviceRequest.warranty_type && `Warranty: ${serviceRequest.warranty_type}; ${serviceRequest.warranty_reference || ''}; ${serviceRequest.warranty_notes || ''}`].filter(Boolean).join('\n') : '',
 
     // Appointment reminders
     send_appointment_reminder: false,
@@ -205,11 +230,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     labor_category_id: '',
 
     // Customer contact confirmation
-    customer_contacted: serviceRequest?.customer_phone || serviceRequest?.customer_email ? '' : ''
+    customer_contacted: serviceRequest?.customer_contact_instruction === 'already_contacted' ? 'yes' : ''
   });
 
   useEffect(() => {
     loadTechnicians();
+    supabase.from('projects').select('id,name,project_number').order('created_at', {ascending:false}).then(({data})=>setAllProjects(data || []));
     if (contactId) {
       loadContact(contactId);
     } else if (serviceRequest?.contact_id) {
@@ -240,8 +266,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   useEffect(() => {
     if (formData.type === 'project') {
       setFormData(prev => ({ ...prev, billable_type: 'project' }));
-      // Clear tasks when switching to project type (tasks come from project master list)
-      setTasks([]);
     } else if (formData.type === 'warranty') {
       setFormData(prev => ({ ...prev, billable_type: 'warranty' }));
     } else if (formData.type === 'site_survey') {
@@ -277,6 +301,29 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     }
   }, [formData.project_id]);
 
+  useEffect(() => {
+    const request = ++projectContextRequest.current;
+    setProjectContextError('');
+    if (!formData.project_id) return;
+    supabase.from('projects').select('contact_id, job_site_address, customer_location_id').eq('id', formData.project_id).maybeSingle().then(async ({ data, error }) => {
+      if (request !== projectContextRequest.current) return;
+      if (error || !data) { setProjectContextError('Project context could not be loaded. Reselect the project to retry.'); return; }
+      if (data.contact_id) {
+        const { data: customer, error: customerError } = await supabase.from('contacts').select('*').eq('id', data.contact_id).maybeSingle();
+        if (request !== projectContextRequest.current) return;
+        if (customerError || !customer) { setProjectContextError('Project customer could not be loaded.'); return; }
+        setSelectedContact(customer);
+      }
+      const site = data.job_site_address;
+      setFormData(previous => ({ ...previous,
+        customer_address: typeof site === 'string' ? site : site?.street || site?.address || '',
+        customer_city: typeof site === 'object' ? site?.city || '' : '',
+        customer_state: typeof site === 'object' ? site?.state || '' : '',
+        customer_zip: typeof site === 'object' ? site?.zip || site?.zip_code || '' : '',
+      }));
+    });
+  }, [formData.project_id]);
+
   // Load project tasks when project or phase is selected
   useEffect(() => {
     if (formData.project_id) {
@@ -293,7 +340,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('role', ['tech', 'service_manager', 'manager', 'admin'])
+        .eq('is_technician', true)
         .eq('is_active', true)
         .order('full_name');
 
@@ -394,7 +441,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
       setSearchResults(data || []);
     } catch (error: any) {
       console.error('Error searching contacts:', error);
-      alert(`Error searching contacts: ${error?.message || 'Please try again.'}`);
+      notify(`Error searching contacts: ${error?.message || 'Please try again.'}`, { theme: 'blue', tone: 'error' });
       setSearchResults([]);
     } finally {
       setSearching(false);
@@ -502,6 +549,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
   const projectTaskRequest = useRef(0);
   async function loadProjectTasks(projectId: string, phaseId?: string) {
     const request = ++projectTaskRequest.current;
+    setTaskLoading(true); setTaskLoadError('');
     setProjectTasks([]);
     setSelectedProjectTasks(new Set());
     try {
@@ -510,8 +558,6 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         .select('id, title, description, estimated_hours, labor_phase_id, status')
         .eq('project_id', projectId)
         .eq('status', 'open')
-        .gt('estimated_hours', 0) // Only items with labor/time can be tasks
-        .not('labor_phase_id', 'is', null) // Only items with labor phase can be tasks
         .order('sort_order');
 
       // Filter by phase if selected
@@ -523,10 +569,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
       if (error) throw error;
       if (request === projectTaskRequest.current) setProjectTasks(data || []);
+      const { data: active } = await supabase.from('work_order_tasks').select('project_task_id, work_orders!inner(project_id,status)').eq('work_orders.project_id', projectId).not('work_orders.status','in','(completed,cancelled)').not('status','in','(completed,cancelled)');
+      if (request === projectTaskRequest.current) setActiveTaskIds((active || []).map(task => task.project_task_id).filter(Boolean));
     } catch (error) {
       console.error('Error loading project tasks:', error);
-      if (request === projectTaskRequest.current) setProjectTasks([]);
-    }
+      if (request === projectTaskRequest.current) {setProjectTasks([]);setTaskLoadError('Project tasks could not be loaded. Retry before saving.');}
+    } finally { if(request === projectTaskRequest.current) setTaskLoading(false); }
   }
 
   function handleToggleProjectTask(taskId: string) {
@@ -558,7 +606,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     setSelectedContact(contact);
     setSearchQuery('');
     setSearchResults([]);
-    // Auto-populate address fields from contact
+    // Linked projects resolve their own site rather than a billing address.
+    if (formData.project_id) return;
     setFormData(prev => ({
       ...prev,
       customer_address: contact.street_address || '',
@@ -584,25 +633,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     }
   }
 
-  function generateHalfHourSlots(): string[] {
-    const slots: string[] = [];
-    for (let h = 6; h <= 20; h++) {
-      slots.push(`${h.toString().padStart(2, '0')}:00`);
-      if (h < 20) slots.push(`${h.toString().padStart(2, '0')}:30`);
-    }
-    return slots;
-  }
-
-  function formatSlotLabel(time: string): string {
-    const [h, m] = time.split(':').map(Number);
-    const period = h >= 12 ? 'PM' : 'AM';
-    const hour = h % 12 || 12;
-    return `${hour}:${m.toString().padStart(2, '0')} ${period}`;
-  }
-
   function validate(): boolean {
     const errors: Record<string, string> = {};
 
+    if (serviceRequest?.earliest_date && formData.start_date && formData.start_date < serviceRequest.earliest_date) {
+      errors.start_date = 'Schedule on or after the customer’s earliest available date';
+    }
     if (!selectedContact && !showNewCustomer) {
       errors.customer = 'Please select or create a customer';
     }
@@ -624,6 +660,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     if (!formData.end_time) {
       errors.end_time = 'End time is required';
     }
+    const timeError = schedulingError({ date: formData.start_date, start: formData.start_time, end: formData.end_time });
+    if (timeError || scheduleError) errors.schedule = timeError || scheduleError || '';
     if (!formData.customer_contacted) {
       errors.customer_contacted = 'Please indicate if the customer has been contacted';
     }
@@ -636,55 +674,16 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
     if (salesOrderInTestTune && !formData.labor_category_id) {
       errors.labor_category_id = 'Labor category is required during Test & Tune period';
     }
-    if (formData.type === 'project' && formData.project_id && !selectedPhaseId) {
-      errors.labor_phase_id = 'A labor phase is required for project work orders';
-    }
+    if (projectContextError) errors.project_id = projectContextError;
+    if(formData.project_id && (taskLoading || taskLoadError)) errors.project_id = taskLoadError || 'Project tasks are still loading.';
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   }
 
-  function toggleTechnician(techId: string) {
-    setSelectedTechnicians(prev =>
-      prev.includes(techId)
-        ? prev.filter(id => id !== techId)
-        : [...prev, techId]
-    );
-  }
-
-  function handleTimeSlotClick(date: string, startTime: string, endTime: string) {
-    // Calculate 1 hour duration from start time
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const endHours = (hours + 1) % 24;
-    const calculatedEndTime = `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-
-    setFormData(prev => ({
-      ...prev,
-      start_date: date,
-      start_time: startTime,
-      end_time: calculatedEndTime,
-      estimated_hours: '1'
-    }));
-  }
-
-  function handleTeamAvailabilitySelect(technicianId: string, date: string, startTime: string, endTime: string) {
-    setSelectedTechnicians(prev => {
-      if (!prev.includes(technicianId)) return [...prev, technicianId];
-      return prev;
-    });
-    setFormData(prev => ({
-      ...prev,
-      start_date: date,
-      start_time: startTime,
-      end_time: endTime,
-      estimated_hours: '1'
-    }));
-    setShowTeamAvailability(false);
-  }
-
   function addTask() {
     if (!newTaskTitle.trim()) {
-      alert('Please enter a task title');
+      notify('Please enter a task title', { theme: 'blue', tone: 'warning' });
       return;
     }
 
@@ -707,10 +706,11 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || submitting.current) return;
 
     if (!validate()) return;
 
+    submitting.current = true;
     setLoading(true);
 
     try {
@@ -753,7 +753,12 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         company_id: profile.organization_id,
         contact_id: finalContactId,
         customer_location_id: selectedContact?.id === serviceRequest?.contact_id ? serviceRequest?.customer_location_id || null : null,
-        project_id: formData.type === 'project' ? formData.project_id : (formData.project_id || null),
+        project_id: formData.project_id || null,
+        service_location_address: formData.customer_address || null,
+        service_location_city: formData.customer_city || null,
+        service_location_state: formData.customer_state || null,
+        service_location_zip: formData.customer_zip || null,
+        address: [formData.customer_address, formData.customer_city, formData.customer_state, formData.customer_zip].filter(Boolean).join(', '),
         labor_phase_id: selectedPhaseId || null, // Store selected labor phase
         labor_category_id: formData.labor_category_id || null, // Store labor category for Test & Tune tracking
         work_order_group_id: selectedTechnicians.length > 1 ? groupId : null,
@@ -773,7 +778,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         target_completion_date: formData.target_completion_date || null,
         estimated_hours: parseFloat(formData.estimated_hours) || 0,
         notes: formData.notes,
-        internal_notes: formData.internal_notes,
+        internal_notes: [formData.internal_notes, technicianVisitNotes[techId]].filter(Boolean).join('\n'),
         send_appointment_reminder: formData.send_appointment_reminder,
         reminder_email: formData.reminder_email,
         reminder_sms: formData.reminder_sms,
@@ -785,72 +790,24 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         recurrence_rule: index === 0 && recurrenceRule !== null ? recurrenceRule : null,
       }));
 
-      const { data: createdWorkOrders, error } = await supabase
-        .from('work_orders')
-        .insert(workOrdersToCreate)
-        .select('id, work_order_number');
-
+      const assignments = workOrdersToCreate.map((workOrder, index) => ({
+        work_order: workOrder,
+        tasks: tasks.filter(task => selectedTechnicians.length === 1 || (technicianTaskIds[selectedTechnicians[index]] || []).includes(task.id)).map(task => ({
+          title: task.title, description: task.description, estimated_hours: task.estimated_hours,
+          project_task_id: task.project_task_id || null, visit_instructions: task.visit_instructions || null,
+        })),
+        parts: parts.map(({ id, ...part }) => ({ ...part, warranty_item: false })),
+      }));
+      const { data: createdWorkOrders, error } = await supabase.rpc('create_work_order_assignments', {
+        p_request_id: creationKey.current, p_assignments: assignments,
+        p_service_request_id: serviceRequest?.id || null,
+      });
       if (error) throw error;
-
-      // Create tasks for each work order if any tasks were added
-      if (tasks.length > 0 && createdWorkOrders && createdWorkOrders.length > 0) {
-        const tasksToCreate = createdWorkOrders.flatMap((wo, index) =>
-          tasks.map((task, taskIndex) => ({
-            work_order_id: wo.id,
-            title: task.title,
-            description: task.description,
-            estimated_hours: task.estimated_hours,
-            assigned_to: selectedTechnicians[index],
-            project_task_id: task.project_task_id || null, // Link to project task for auto-completion
-            status: 'pending',
-            sort_order: taskIndex
-          }))
-        );
-
-        const { error: tasksError } = await supabase
-          .from('work_order_tasks')
-          .insert(tasksToCreate);
-
-        if (tasksError) {
-          throw new Error('Work orders were created, but their task assignments could not be saved. Open the work orders to review before creating another.');
-        }
-      }
-
-      // Save parts to all created work orders
-      if (parts.length > 0 && createdWorkOrders && createdWorkOrders.length > 0) {
-        const partsToInsert = createdWorkOrders.flatMap(wo =>
-          parts.map(part => ({
-            work_order_id: wo.id,
-            product_id: part.product_id,
-            part_name: part.part_name,
-            part_sku: part.part_sku || null,
-            quantity: part.quantity,
-            unit_cost: part.unit_cost,
-            unit_price: part.unit_price,
-            warranty_item: false
-          }))
-        );
-        const { error: partsError } = await supabase
-          .from('service_parts_used')
-          .insert(partsToInsert);
-        if (partsError) {
-          console.error('Error saving parts:', partsError);
-        }
-      }
 
       // If converting from a service request, update it and send tech notifications
       if (serviceRequest && createdWorkOrders && createdWorkOrders.length > 0) {
-        await supabase
-          .from('service_requests')
-          .update({
-            status: 'scheduled',
-            work_order_id: createdWorkOrders[0].id,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', serviceRequest.id);
-
-        const contactName = selectedContact?.full_name || selectedContact?.company_name || serviceRequest.customer_name;
-        const address = serviceRequest.job_location_address || selectedContact?.street_address;
+        const contactName = selectedContact?.full_name || selectedContact?.company_name || serviceRequest?.customer_name || formData.customer_name;
+        const address = serviceRequest?.job_location_address || formData.customer_address || selectedContact?.street_address;
         for (let i = 0; i < selectedTechnicians.length; i++) {
           const wo = createdWorkOrders[i] || createdWorkOrders[0];
           await notifyTechJobAssigned(selectedTechnicians[i], {
@@ -863,48 +820,26 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         }
       }
 
-      // Generate recurring instances if recurrence was set
-      if (recurrenceRule && createdWorkOrders && createdWorkOrders.length > 0) {
-        const parentWO = createdWorkOrders[0];
-        const { data: recurData, error: recurError } = await supabase.rpc('generate_recurring_work_orders', {
-          parent_work_order_id: parentWO.id
-        });
-        if (recurError) {
-          console.error('Error generating recurring work orders:', recurError);
-        } else {
-          const count = Array.isArray(recurData) ? recurData.length : (recurData ?? 0);
-          if (count > 0) {
-            alert(`Work order created successfully! ${count} recurring instance${count !== 1 ? 's' : ''} were also generated.`);
-            onSuccess();
-            onClose();
-            return;
-          }
-        }
-      }
 
+      notify('Work order created!', { theme: 'blue', tone: 'success' });
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Error creating work order:', error);
-      alert(`Failed to create work order: ${error?.message || 'Unknown error'}`);
+      notify(`Failed to create work order: ${error?.message || 'Unknown error'}`, { theme: 'blue', tone: 'error' });
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
 
-  const workOrderTypeHelp = {
-    project: 'Installation work linked to a project/sales order. Not directly billable as dollars are in the project estimate.',
-    service: 'Billable time & materials service work. Will appear in Service Billing queue.',
-    site_survey: 'Non-billable site assessment before work begins.',
-    warranty: 'Non-billable warranty work. Must reference the original work order being covered.'
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-label="Create work order" className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between z-10">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-            {serviceRequest ? 'Convert to Work Order' : 'Create Work Order'}
+            {emergency ? 'Create Emergency Work Order' : serviceRequest ? 'Convert to Work Order' : 'Create Work Order'}
           </h2>
           <button
             onClick={onClose}
@@ -915,6 +850,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+{serviceRequest&&<div className="px-4 py-3"><SupportPhotos requestId={serviceRequest.id}/><SupportRequestItems requestId={serviceRequest.id}/></div>}
           {/* Service Request Banner - shown when converting from a service request */}
           {serviceRequest && (
             <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4">
@@ -959,10 +895,19 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             <select className="w-full p-3 border rounded-lg" value={workOrderTypeId || workOrderOptions.find(option=>option.kind==='type'&&option.system_key===formData.type)?.id || ''}
               onChange={e=>{const option=workOrderOptions.find(o=>o.id===e.target.value);if(option){setWorkOrderTypeId(option.id);setFormData({...formData,type:option.behavior as typeof formData.type});}}}>
               {!workOrderOptions.length && <option value="">{formData.type.replace(/_/g,' ')}</option>}
-              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active&&(!projectId||o.behavior==='project')).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
+              {workOrderOptions.filter(o=>o.kind==='type'&&o.is_active).map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
             </select>
           </div>
 
+          {serviceRequest && <div className="rounded-lg border border-subtle bg-surface p-3 text-sm text-secondary space-y-1">
+            <p className="font-semibold text-primary">Request scheduling instructions</p>
+            <p>{serviceRequest.customer_contact_instruction === 'requester' ? 'Requester will coordinate with customer.' : serviceRequest.customer_contact_instruction === 'already_contacted' ? 'Customer already contacted — schedule as requested.' : 'Dispatch should contact customer.'}</p>
+            {serviceRequest.earliest_date && <p>Earliest date: {serviceRequest.earliest_date}</p>}
+            {serviceRequest.requested_date && <p>Need by: {serviceRequest.requested_date} (deadline, not an appointment)</p>}
+            {!!serviceRequest.requested_tech_ids?.length && <p>Preferred tech: {serviceRequest.requested_tech_ids.map(id => technicians.find(t => t.id === id)?.full_name || 'Requested technician').join(', ')} — Dispatch makes final assignment.</p>}
+            {serviceRequest.estimated_duration && <p>Estimated duration: {serviceRequest.estimated_duration}</p>}
+            {serviceRequest.warranty_type && <p>Warranty: {serviceRequest.warranty_type} · {serviceRequest.warranty_reference} · {serviceRequest.warranty_notes}</p>}
+          </div>}
           {/* Customer Selection */}
           <div className="space-y-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -1248,6 +1193,14 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           )}
 
+          {allProjects.length > 0 && <label className="block text-sm text-primary">Choose project (loads its customer and job site)
+            <select value={formData.project_id} onChange={event=>setFormData(previous=>({...previous,project_id:event.target.value}))} className="block w-full bg-surface text-primary border border-subtle rounded-lg p-2 mt-1">
+              <option value="">No project / standalone service</option>{allProjects.map(project=><option key={project.id} value={project.id}>{project.project_number} · {project.name}</option>)}
+            </select>
+          </label>}
+          {formData.project_id && <details className="border border-subtle rounded-lg p-3"><summary className="min-h-11 text-info cursor-pointer text-sm">Open full project scope</summary><ProjectScope project={{id:formData.project_id}} /></details>}
+          {taskLoadError && <p role="alert" className="text-red-600 text-sm">{taskLoadError}<button type="button" onClick={()=>loadProjectTasks(formData.project_id,showAllProjectPhases?undefined:selectedPhaseId)} className="min-h-11 ml-2 underline">Retry</button></p>}
+          {projectContextError && <p role="alert" className="text-red-600 text-sm">{projectContextError}</p>}
           {/* Project Link - Optional for non-project types */}
           {selectedContact && formData.type !== 'project' && customerProjects.length > 0 && (
             <div className="space-y-2">
@@ -1386,88 +1339,24 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           )}
 
-          {/* Technician Selection */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Assign Technicians *
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTeamAvailability(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600 transition-colors shadow-sm"
-                  title="See all technicians' schedules side-by-side to find the best fit"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                  View Team Availability
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAvailabilityBrowser(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-                  title="Open full-screen calendar to find the best time slot"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Browse Availability
-                </button>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 -mt-2">
-              Select one or more technicians. Selecting multiple will create one linked work order per technician.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-              {technicians.length === 0 && (
-                <p className="text-sm text-gray-500 col-span-2 text-center py-2">No active technicians found</p>
-              )}
-              {technicians.map(tech => (
-                <label
-                  key={tech.id}
-                  className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
-                    selectedTechnicians.includes(tech.id)
-                      ? 'bg-blue-50 border-blue-500'
-                      : 'bg-white border-gray-300 hover:border-blue-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedTechnicians.includes(tech.id)}
-                    onChange={() => toggleTechnician(tech.id)}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium">{tech.full_name}</span>
-                </label>
-              ))}
-            </div>
-            {selectedTechnicians.length > 1 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm font-semibold text-blue-800">
-                  {selectedTechnicians.length} techs selected — {selectedTechnicians.length} linked work orders will be created
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Each technician gets their own work order. All are linked together under the same job for billing and reporting.
-                </p>
-              </div>
-            )}
-            {validationErrors.technicians && (
-              <p className="text-sm text-red-600">{validationErrors.technicians}</p>
-            )}
-          </div>
-
-          {/* Full-screen availability browser */}
-          {showAvailabilityBrowser && (
-            <AvailabilityBrowserModal
-              initialTechnicianIds={selectedTechnicians}
-              onSlotSelected={(date, start, end) => {
-                handleTimeSlotClick(date, start, end);
-              }}
-              onTechniciansSelected={(techIds) => {
-                setSelectedTechnicians(techIds);
-              }}
-              onClose={() => setShowAvailabilityBrowser(false)}
-            />
-          )}
+          <WorkOrderSchedulePicker
+            organizationId={profile?.organization_id || undefined}
+            technicians={technicians}
+            technicianIds={selectedTechnicians}
+            onTechniciansChange={(ids) => {
+              setSelectedTechnicians(ids);
+              setValidationErrors(previous => ({ ...previous, technicians: '', schedule: '' }));
+            }}
+            value={{ date: formData.start_date, start: formData.start_time, end: formData.end_time }}
+            onChange={(slot) => {
+              setFormData(previous => ({ ...previous, start_date: slot.date, start_time: slot.start, end_time: slot.end }));
+              setValidationErrors(previous => ({ ...previous, start_date: '', start_time: '', end_time: '', schedule: '' }));
+            }}
+            onValidationChange={setScheduleError}
+            earliestDate={serviceRequest?.earliest_date}
+            errors={validationErrors}
+          />
+          {validationErrors.schedule && <p role="alert" className="text-sm text-red-600">{validationErrors.schedule}</p>}
 
           {/* Work Order Details */}
           <div className="space-y-4">
@@ -1504,7 +1393,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
 
             {/* Labor Category - hidden when in project context, required for Test & Tune */}
-            {!projectId && (
+            {(
               <div className={salesOrderInTestTune ? 'p-4 bg-purple-50 border-2 border-purple-300 rounded-lg' : ''}>
                 {salesOrderInTestTune && (
                   <div className="flex items-start gap-2 mb-3 text-sm text-purple-800">
@@ -1573,93 +1462,13 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Date *
-                </label>
-                <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => {
-                    setFormData({ ...formData, start_date: e.target.value });
-                    if (validationErrors.start_date) setValidationErrors(prev => ({ ...prev, start_date: '' }));
-                  }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${validationErrors.start_date ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
-                />
-                {validationErrors.start_date && <p className="text-sm text-red-600 mt-1">{validationErrors.start_date}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Completion
-                </label>
-                <input
-                  type="date"
-                  value={formData.target_completion_date}
-                  onChange={(e) => setFormData({ ...formData, target_completion_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Half-hour time picker */}
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Start Time *
-                  {formData.start_time && <span className="ml-2 text-xs text-green-600 font-normal">Selected: {formatSlotLabel(formData.start_time)}</span>}
-                </label>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
-                  {generateHalfHourSlots().map(slot => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, start_time: slot });
-                        if (validationErrors.start_time) setValidationErrors(prev => ({ ...prev, start_time: '' }));
-                      }}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                        formData.start_time === slot
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-700'
-                      }`}
-                    >
-                      {formatSlotLabel(slot)}
-                    </button>
-                  ))}
-                </div>
-                {validationErrors.start_time && <p className="text-sm text-red-600 mt-1">{validationErrors.start_time}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  End Time *
-                  {formData.end_time && <span className="ml-2 text-xs text-green-600 font-normal">Selected: {formatSlotLabel(formData.end_time)}</span>}
-                </label>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
-                  {generateHalfHourSlots().map(slot => (
-                    <button
-                      key={slot}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, end_time: slot });
-                        if (validationErrors.end_time) setValidationErrors(prev => ({ ...prev, end_time: '' }));
-                      }}
-                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                        formData.end_time === slot
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-700'
-                      }`}
-                    >
-                      {formatSlotLabel(slot)}
-                    </button>
-                  ))}
-                </div>
-                {validationErrors.end_time && <p className="text-sm text-red-600 mt-1">{validationErrors.end_time}</p>}
-              </div>
-            </div>
-
+            <details className="border border-gray-200 rounded-lg p-3">
+              <summary className="min-h-11 flex items-center text-sm font-medium text-gray-700 cursor-pointer">Repeat or set a completion target</summary>
+              <label className="block text-sm text-gray-700 my-3">Target completion
+                <input type="date" value={formData.target_completion_date}
+                  onChange={e => setFormData({ ...formData, target_completion_date: e.target.value })}
+                  className="block w-full min-h-11 px-3 py-2 border border-gray-300 rounded-lg mt-1" />
+              </label>
             {/* Recurrence */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
@@ -1678,6 +1487,8 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                 </p>
               )}
             </div>
+
+            </details>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1706,13 +1517,33 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </div>
           </div>
 
+          {selectedTechnicians.length > 1 && <section className="space-y-3 border border-subtle rounded-lg p-4">
+            <h3 className="font-semibold text-primary">Work for each technician</h3>
+            <p className="text-sm text-secondary">Add tasks below, then select each technician's visit work. Shared work can be selected for more than one technician.</p>
+            {selectedTechnicians.map(techId => <div key={techId} className="space-y-2 border border-subtle rounded-lg p-3">
+              <h4 className="font-medium text-primary">{technicians.find(tech => tech.id === techId)?.full_name || 'Technician'}</h4>
+              <select aria-label="Copy task selection from technician" value="" onChange={event => setTechnicianTaskIds(previous => ({ ...previous, [techId]: [...(previous[event.target.value] || [])] }))} className="bg-surface text-primary border border-subtle rounded-lg p-2">
+                <option value="">Copy selection from...</option>
+                {selectedTechnicians.filter(id => id !== techId).map(id => <option key={id} value={id}>{technicians.find(tech => tech.id === id)?.full_name}</option>)}
+              </select>
+              {tasks.map(task => <label key={task.id} className="flex items-center gap-2 min-h-11 text-primary text-sm">
+                <input type="checkbox" checked={(technicianTaskIds[techId] || []).includes(task.id)} onChange={event => setTechnicianTaskIds(previous => ({ ...previous, [techId]: event.target.checked ? [...(previous[techId] || []), task.id] : (previous[techId] || []).filter(id => id !== task.id) }))} />{task.title}
+              </label>)}
+              <label className="block text-sm text-secondary">Technician visit instructions<textarea value={technicianVisitNotes[techId] || ''} onChange={event => setTechnicianVisitNotes(previous => ({ ...previous, [techId]: event.target.value }))} className="block w-full border border-subtle rounded-lg p-2 mt-1 bg-surface text-primary" /></label>
+              {!tasks.length && <p className="text-sm text-muted">No tasks added yet.</p>}
+            </div>)}
+          </section>}
+          {tasks.length > 0 && <details className="border border-subtle rounded-lg p-3"><summary className="text-sm font-medium text-primary cursor-pointer min-h-11">Task visit instructions</summary>
+            {tasks.map(task => <label key={task.id} className="block text-sm text-primary my-2">{task.title}<textarea value={task.visit_instructions || ''} onChange={event => setTasks(previous => previous.map(value => value.id === task.id ? { ...value, visit_instructions: event.target.value } : value))} placeholder="Instructions for this visit; master instructions stay unchanged" className="block w-full bg-surface text-primary border border-subtle rounded-lg p-2 mt-1" /></label>)}
+          </details>}
+
           {/* Labor Phase and Project Tasks Section - For project work orders */}
-          {formData.type === 'project' && formData.project_id && (
+          {formData.project_id && (
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4 space-y-4">
               <div>
                 <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-2">
                   <Briefcase className="w-5 h-5 text-blue-600" />
-                  Labor Phase *
+                  Labor Phase (Optional)
                 </h3>
                 <p className="text-sm text-gray-600 mb-3">
                   Choose the phase for this visit to see its unfinished tasks. Select tasks to assign them to this work order.
@@ -1724,7 +1555,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
                     validationErrors.labor_phase_id ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 >
-                  <option value="" disabled>— Select a phase —</option>
+                  <option value="">All phases</option>
                   {laborPhases.map(phase => (
                     <option key={phase.id} value={phase.id}>
                       {phase.name}
@@ -1737,6 +1568,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
               </div>
 
               <button type="button" onClick={() => { setShowAllProjectPhases(value => !value); setSelectedProjectTasks(new Set()); }} className="min-h-11 px-3 py-2 border border-blue-200 rounded-lg text-sm text-blue-700">{showAllProjectPhases ? 'Show this phase' : 'Browse all phases'}</button>
+              {activeTaskIds.length > 0 && <p className="text-sm text-amber-700">{activeTaskIds.length} task assignments are already on active visits. Selecting them again creates deliberate shared work.</p>}
               {projectTasks.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -2188,7 +2020,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
             </button>
             <button
               type="submit"
-              disabled={loading || selectedTechnicians.length === 0}
+              disabled={loading || selectedTechnicians.length === 0 || Boolean(scheduleError)}
               className="w-full sm:flex-1 px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm sm:text-base font-medium"
             >
               {loading ? 'Creating...' : `Create ${selectedTechnicians.length > 1 ? `${selectedTechnicians.length} Work Orders` : 'Work Order'}`}
@@ -2197,14 +2029,7 @@ export function CreateWorkOrderModal({ onClose, onSuccess, projectId, contactId,
         </form>
       </div>
 
-      {showTeamAvailability && (
-        <TeamAvailabilityModal
-          onClose={() => setShowTeamAvailability(false)}
-          onSelectSlot={handleTeamAvailabilitySelect}
-          initialDate={formData.start_date || undefined}
-          preSelectedTechIds={selectedTechnicians}
-        />
-      )}
+
     </div>
   );
 }

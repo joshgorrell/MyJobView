@@ -1,5 +1,8 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import {splitQuotedLabor} from '../../lib/pmAllocation';
+import {loadProjectSummaries} from '../../lib/projectOverview';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   Award,
@@ -33,6 +36,7 @@ interface TestTuneStatusPanelProps {
 }
 
 interface TestTuneData {
+  pm_allocation_percentage:number;
   test_tune_status: string | null;
   test_tune_start_date: string | null;
   test_tune_end_date: string | null;
@@ -63,7 +67,7 @@ interface ELROverrideLog {
 export function TestTuneStatusPanel({
   salesOrderId,
   salesOrderStatus,
-  initialLeadTechId,
+  initialLeadTechId: _initialLeadTechId,
   onUpdate
 }: TestTuneStatusPanelProps) {
   const { profile } = useAuth();
@@ -83,9 +87,9 @@ export function TestTuneStatusPanel({
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'finance' ||
-    profile?.role === 'sales_manager' || profile?.role === 'production_manager';
+    profile?.role === 'manager';
   const canOverrideELR = profile?.role === 'admin' || profile?.role === 'finance' ||
-    profile?.role === 'sales_manager';
+    profile?.role === 'manager';
 
   const isProjectComplete = salesOrderStatus === 'complete' || salesOrderStatus === 'completed' || salesOrderStatus === 'closed';
 
@@ -102,6 +106,8 @@ export function TestTuneStatusPanel({
           .from('sales_orders')
           .select(`
             test_tune_status,
+            pm_allocation_percentage,
+            project_id,
             test_tune_start_date,
             test_tune_end_date,
             lead_technician_id,
@@ -132,7 +138,7 @@ export function TestTuneStatusPanel({
 
       if (orderData) {
         const lineItems = (orderData as any).proposal?.line_items || [];
-        const estimatedHours = lineItems.reduce(
+        let estimatedHours = lineItems.reduce(
           (sum: number, item: any) => sum + (item.labor_hours || 0),
           0
         );
@@ -143,16 +149,25 @@ export function TestTuneStatusPanel({
 
         const { data: workOrders } = await supabase
           .from('work_orders')
-          .select('actual_hours')
+          .select('actual_hours,labor_phase_id')
           .eq('sales_order_id', salesOrderId)
           .eq('status', 'completed');
 
-        const fieldHours = workOrders?.reduce((sum, wo) => sum + (wo.actual_hours || 0), 0) || 0;
+        const {data:mapping,error:mappingError}=await supabase.from('labor_phase_performance_mapping').select('labor_phase_id,counts_against_target').eq('organization_id',profile!.organization_id);
+        if(mappingError) throw mappingError;
+        const excluded=new Set((mapping||[]).filter(p=>!p.counts_against_target).map(p=>p.labor_phase_id));
+        let fieldHours = workOrders?.filter(wo=>!excluded.has(wo.labor_phase_id)).reduce((sum, wo) => sum + (wo.actual_hours || 0), 0) || 0;
+        if((orderData as any).project_id&&profile?.organization_id){
+          const [summary]=await loadProjectSummaries(profile.organization_id,[(orderData as any).project_id]);
+          if(!summary||summary.goalHours===null)throw new Error('Project labor target needs review');
+          estimatedHours=summary.soldHours;fieldHours=summary.fieldHours;
+        }
 
         const override = (orderData as any).min_effective_labor_rate_override;
         const overrideReason = (orderData as any).min_effective_labor_rate_override_reason;
 
         setData({
+          pm_allocation_percentage:Number((orderData as any).pm_allocation_percentage??5),
           test_tune_status: orderData.test_tune_status,
           test_tune_start_date: orderData.test_tune_start_date,
           test_tune_end_date: orderData.test_tune_end_date,
@@ -205,13 +220,13 @@ export function TestTuneStatusPanel({
 
   async function handleSaveELROverride() {
     if (!elrOverrideReason.trim()) {
-      alert('A reason is required for the per-job threshold override.');
+      notify('A reason is required for the per-job threshold override.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
     const overrideValue = elrOverrideValue === '' ? null : parseFloat(elrOverrideValue);
     if (elrOverrideValue !== '' && (isNaN(overrideValue as number) || (overrideValue as number) < 0)) {
-      alert('Please enter a valid rate (or leave blank to clear the override).');
+      notify('Please enter a valid rate (or leave blank to clear the override).', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -232,7 +247,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error saving ELR override:', error);
-      alert('Failed to save threshold override.');
+      notify('Failed to save threshold override.', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingELR(false);
     }
@@ -240,7 +255,7 @@ export function TestTuneStatusPanel({
 
   async function handleClearELROverride() {
     if (!elrOverrideReason.trim()) {
-      alert('A reason is required even when clearing an override.');
+      notify('A reason is required even when clearing an override.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -262,7 +277,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error clearing ELR override:', error);
-      alert('Failed to clear threshold override.');
+      notify('Failed to clear threshold override.', { theme: 'violet', tone: 'error' });
     } finally {
       setSavingELR(false);
     }
@@ -270,7 +285,7 @@ export function TestTuneStatusPanel({
 
   async function handleStartTestTune() {
     if (!selectedTechId) {
-      alert('Please assign a Lead Technician before starting Test & Tune tracking.');
+      notify('Please assign a Lead Technician before starting Test & Tune tracking.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -298,7 +313,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error starting Test & Tune:', error);
-      alert('Failed to start Test & Tune tracking.');
+      notify('Failed to start Test & Tune tracking.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -319,7 +334,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error pausing Test & Tune:', error);
-      alert('Failed to pause Test & Tune tracking.');
+      notify('Failed to pause Test & Tune tracking.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -340,7 +355,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error resuming Test & Tune:', error);
-      alert('Failed to resume Test & Tune tracking.');
+      notify('Failed to resume Test & Tune tracking.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -348,7 +363,7 @@ export function TestTuneStatusPanel({
 
   async function handleSaveAssignment() {
     if (!selectedTechId) {
-      alert('Please select a Lead Technician.');
+      notify('Please select a Lead Technician.', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -367,7 +382,7 @@ export function TestTuneStatusPanel({
       onUpdate?.();
     } catch (error) {
       console.error('Error saving assignment:', error);
-      alert('Failed to save Lead Technician assignment.');
+      notify('Failed to save Lead Technician assignment.', { theme: 'violet', tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -431,7 +446,7 @@ export function TestTuneStatusPanel({
     ? Math.max(0, Math.ceil((new Date(data.test_tune_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  const laborTarget = data.estimated_labor_hours * 0.95;
+  const laborTarget = splitQuotedLabor(data.estimated_labor_hours,data.pm_allocation_percentage).fieldHours;
   const progressPercent = laborTarget > 0 ? Math.min(100, (data.field_hours_used / laborTarget) * 100) : 0;
   const hoursRemaining = Math.max(0, laborTarget - data.field_hours_used);
   const effectiveLaborRate = data.estimated_labor_hours > 0
@@ -532,7 +547,7 @@ export function TestTuneStatusPanel({
                   <div className="bg-gray-700/50 rounded-lg p-3">
                     <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                       <Target className="w-3.5 h-3.5" />
-                      Field Target (95%)
+                      Field Target ({100-data.pm_allocation_percentage}%)
                     </div>
                     <div className="text-sm font-semibold text-blue-400">
                       {laborTarget.toFixed(1)}h
@@ -865,7 +880,7 @@ export function TestTuneStatusPanel({
                 <UserSelector
                   selectedUserId={selectedTechId}
                   onSelect={(id) => setSelectedTechId(id)}
-                  roleFilter={['technician', 'production_manager', 'service_manager']}
+                  designation="is_technician"
                   label=""
                   placeholder="Select Lead Technician..."
                   showClearButton={false}

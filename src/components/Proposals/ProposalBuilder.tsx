@@ -1,8 +1,12 @@
+import type { ReplacementProduct } from './LineItemEditModal';
+import { notify } from '../../lib/feedback';
+import ProductStatusNotice from '../Products/ProductStatusNotice';
+import LaborRemovalChoice, { itemHasLabor, RemovalScope } from './LaborRemovalChoice';
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProposalRoom, ProposalLineItem, Product, ProposalWithDetails } from '../../lib/types';
-import { Plus, Save, Send, Eye, ChevronDown, ChevronRight, GripVertical, Trash2, Copy, BarChart3, Layers, Indent, Outdent, GitBranch, RotateCcw, ListChecks, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, GripVertical, Trash2, Copy, Indent, Outdent, RotateCcw, ListChecks, XCircle } from 'lucide-react';
 import ProductSelector from './ProductSelector';
 import ProposalSummary from './ProposalSummary';
 import ProposalLineItemModal from './ProposalLineItemModal';
@@ -34,12 +38,12 @@ interface ProposalClass {
 }
 
 export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, changeOrderId, onCORefresh, inline }: ProposalBuilderProps) {
-  const { profile } = useAuth();
+  const { profile: _profile } = useAuth();
   const isCoMode = !!changeOrderId;
   const [proposal, setProposal] = useState<ProposalWithDetails | null>(null);
   const [rooms, setRooms] = useState<(ProposalRoom & { line_items: ProposalLineItem[]; expanded: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [_saving, _setSaving] = useState(false);
   const [coLineItems, setCoLineItems] = useState<COLineItemRecord[]>([]);
   const [showProductSelector, setShowProductSelector] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -62,24 +66,14 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
     instanceCount: number;
   } | null>(null);
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
-  const [collapsedParentIds, setCollapsedParentIds] = useState<Set<string>>(new Set());
   const [showCOSummary, setShowCOSummary] = useState(false);
   const [restoringItemId, setRestoringItemId] = useState<string | null>(null);
+  const [laborChoice,setLaborChoice]=useState<((scope:RemovalScope)=>void)|null>(null);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   function getDisplayTitle(title: string) {
     // Remove "Proposal for" prefix for internal display
     return title.replace(/^Proposal for\s+/i, '');
-  }
-
-  function toggleParentCollapse(itemId: string) {
-    const newSet = new Set(collapsedParentIds);
-    if (newSet.has(itemId)) {
-      newSet.delete(itemId);
-    } else {
-      newSet.add(itemId);
-    }
-    setCollapsedParentIds(newSet);
   }
 
   function organizeItemsWithAccessories(items: ProposalLineItem[]): ProposalLineItem[] {
@@ -337,28 +331,28 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
     }
   }
 
-  function handleRoomNameKeyDown(e: React.KeyboardEvent, roomId: string) {
+  function handleRoomNameKeyDown(e: React.KeyboardEvent, _roomId: string) {
     if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       addRoom();
     }
   }
 
-  async function addLineItem(roomId: string, product: Product, customData?: Partial<ProposalLineItem>) {
+  async function addLineItem(roomId: string, product: Product | null, customData?: Partial<Pick<Product, 'description' | 'unit' | 'unit_price' | 'cost'>> & { quantity?: number; class_id?: string | null }) {
     if (!proposal) return;
 
     const newItem: any = {
       proposal_id: proposalId,
       room_id: roomId,
-      product_id: product.id,
-      description: customData?.description || product.name || '',
+      product_id: product?.id ?? null,
+      description: customData?.description || product?.name || '',
       quantity: customData?.quantity || 1,
-      unit: customData?.unit || product.unit || 'each',
-      unit_price: customData?.unit_price || product.unit_price || 0,
-      cost: customData?.cost || product.cost || 0,
+      unit: customData?.unit || product?.unit || 'each',
+      unit_price: customData?.unit_price || product?.unit_price || 0,
+      cost: customData?.cost || product?.cost || 0,
       line_total: 0,
       sort_order: rooms.find(r => r.id === roomId)?.line_items.length || 0,
-      is_custom: false,
+      is_custom: !product,
       class_id: customData?.class_id || (product as any)?.default_class_id || null
     };
 
@@ -440,7 +434,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       const hasPriceOrCostChange = isPriceChange || isCostChange;
       const isProductItem = currentItem.product_id !== null;
 
-      if (hasPriceOrCostChange && isProductItem) {
+      if (hasPriceOrCostChange && isProductItem && currentItem.product_id) {
         // Count how many times this product appears in the proposal
         const instanceCount = await countMatchingProducts(currentItem.product_id);
 
@@ -544,7 +538,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
   async function saveDescriptionEdit(itemId: string) {
     if (!editingDescriptionValue.trim()) {
-      alert('Description cannot be empty');
+      notify('Description cannot be empty', { theme: 'violet', tone: 'warning' });
       return;
     }
 
@@ -588,14 +582,16 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
             console.error('Error removing CO-added item:', err);
           }
         }
-        setConfirmModal({ title: 'Remove Item', message: 'Remove this newly-added item from the change order?', onConfirm: doRemoveCOAddedItem });
+        if(await itemHasLabor(item))setLaborChoice(()=>async (scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);if(scope==='parts_only'){const result=await supabase.rpc('keep_added_change_labor',{p_change:changeOrderId,p_item:itemId});if(result.error){notify(result.error.message, { theme: 'violet', tone: 'error' });return;}await updateCOTotals(changeOrderId!,onCORefresh);await refreshCOLineItems();await loadProposal();}else await doRemoveCOAddedItem();});
+        else setConfirmModal({ title: 'Remove Item', message: 'Remove this newly-added item from the change order?', onConfirm: doRemoveCOAddedItem });
         return;
       }
-      async function doRemoveCOScopeItem() {
+      async function doRemoveCOScopeItem(scope:RemovalScope='parts_and_labor') {
         try {
           const roomName = rooms.find(r => r.line_items.some(i => i.id === itemId))?.name || '';
           const freshRecords = await loadCOLineItems(changeOrderId!);
           await recordCOAction(changeOrderId!, itemId, 'remove', {
+            remove_scope:scope,
             description: item!.description,
             quantity: item!.quantity,
             unit_price: item!.unit_price,
@@ -615,7 +611,8 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
           console.error('Error recording CO removal:', err);
         }
       }
-      setConfirmModal({ title: 'Remove Item', message: 'Remove this item from the scope? It will be tracked as a removal in the change order.', onConfirm: doRemoveCOScopeItem });
+      if(await itemHasLabor(item)){setLaborChoice(()=>(scope:'parts_only'|'parts_and_labor')=>{setLaborChoice(null);void doRemoveCOScopeItem(scope);});}
+      else setConfirmModal({ title: 'Remove Item', message: 'Remove this item from the scope? It will be tracked as a removal in the change order.', onConfirm: doRemoveCOScopeItem });
       return;
     }
 
@@ -829,7 +826,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
       // Validate: target parent must not be nested (only top-level items can be parents)
       if (targetParent.parent_item_id) {
-        alert('Cannot nest under a nested item. Only top-level items can be parents.');
+        notify('Cannot nest under a nested item. Only top-level items can be parents.', { theme: 'violet', tone: 'warning' });
         return;
       }
 
@@ -839,7 +836,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       );
 
       if (itemsWithChildren.length > 0) {
-        alert('Cannot nest items that have children. Please unnest their children first.');
+        notify('Cannot nest items that have children. Please unnest their children first.', { theme: 'violet', tone: 'warning' });
         return;
       }
 
@@ -856,7 +853,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setSelectedItemIds(new Set());
     } catch (error) {
       console.error('Error nesting items:', error);
-      alert('Failed to nest items. Please try again.');
+      notify('Failed to nest items. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -887,7 +884,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setSelectedItemIds(new Set());
     } catch (error) {
       console.error('Error unnesting items:', error);
-      alert('Failed to unnest items. Please try again.');
+      notify('Failed to unnest items. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -928,7 +925,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
           const newPrice = (updates.unit_price ?? currentItem.unit_price);
           const newLaborTotal = updates.labor_total ?? (
             (updates.labor_hours ?? currentItem.labor_hours ?? 0) * (updates.labor_rate ?? currentItem.labor_rate ?? 0)
-          ) ?? currentItem.labor_total ?? 0;
+          );
           const newLineTotal = newQty * newPrice;
 
           await recordCOAction(changeOrderId, itemId, actionType, {
@@ -999,7 +996,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
     }
   }
 
-  async function handleSubstituteProduct(oldProductId: string | null, newProduct: Product, replaceAll: boolean) {
+  async function handleSubstituteProduct(oldProductId: string | null, newProduct: ReplacementProduct, replaceAll: boolean) {
     try {
       if (!editingItem) return;
 
@@ -1014,7 +1011,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
         labor_hours: newProduct.default_labor_hours || null,
         labor_total: laborTotal || null,
         labor_phase_id: newProduct.labor_phase_id || null,
-        is_taxable: newProduct.is_taxable !== undefined ? newProduct.is_taxable : true,
+        is_taxable: newProduct.is_taxable ?? true,
         class_id: newProduct.class_id || null,
       };
 
@@ -1058,25 +1055,10 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setEditingItem(null);
     } catch (error) {
       console.error('Error substituting product:', error);
-      alert('Failed to substitute product. Please try again.');
+      notify('Failed to substitute product. Please try again.', { theme: 'violet', tone: 'error' });
     }
   }
 
-  async function toggleClassVisibility() {
-    try {
-      const newValue = !showClassesOnScreen;
-
-      const { error } = await supabase
-        .from('proposals')
-        .update({ show_classes_on_screen: newValue })
-        .eq('id', proposalId);
-
-      if (error) throw error;
-      setShowClassesOnScreen(newValue);
-    } catch (error) {
-      console.error('Error toggling class visibility:', error);
-    }
-  }
 
   function groupItemsByClass(items: ProposalLineItem[]) {
     const grouped = new Map<string, ProposalLineItem[]>();
@@ -1172,7 +1154,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setPendingBulkUpdate(null);
     } catch (error) {
       console.error('Error updating single item:', error);
-      alert('Failed to update item. Please try again.');
+      notify('Failed to update item. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -1232,7 +1214,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
       setPendingBulkUpdate(null);
     } catch (error) {
       console.error('Error updating all instances:', error);
-      alert('Failed to update all instances. Please try again.');
+      notify('Failed to update all instances. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setBulkUpdateLoading(false);
     }
@@ -1244,13 +1226,12 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
   function renderLineItemRow(item: ProposalLineItem, depth: number = 0) {
     const hasAccessories = item.accessories && item.accessories.length > 0;
-    const isCollapsed = collapsedParentIds.has(item.id);
     const displayMode = item.display_mode || 'itemized';
 
-    const shouldShowAccessories = hasAccessories && displayMode === 'itemized' && !isCollapsed;
+    const shouldShowAccessories = hasAccessories && displayMode === 'itemized';
 
     const bundleTotal = hasAccessories && displayMode === 'bundle'
-      ? (item.line_total || 0) + item.accessories.reduce((sum, acc) => sum + (acc.line_total || 0), 0)
+      ? (item.line_total || 0) + (item.accessories ?? []).reduce((sum, acc) => sum + (acc.line_total || 0), 0)
       : item.line_total;
 
     const coRecord = isCoMode ? coLineItems.find(c => c.proposal_line_item_id === item.id) : null;
@@ -1313,15 +1294,6 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
               {isCoMode && (isAddedInCO || isModifiedInCO) && (
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isAddedInCO ? 'bg-emerald-400' : 'bg-amber-400'}`} title={isAddedInCO ? 'Added in this change order' : 'Modified in this change order'} />
               )}
-              {hasAccessories && (
-                <button
-                  onClick={() => toggleParentCollapse(item.id)}
-                  className="text-gray-400 hover:text-white flex-shrink-0 mr-1"
-                  title={isCollapsed ? 'Expand accessories' : 'Collapse accessories'}
-                >
-                  {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                </button>
-              )}
               <input
                 type="checkbox"
                 checked={selectedItemIds.has(item.id)}
@@ -1374,12 +1346,13 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
                   title="Click to edit description"
                 >
                   {item.description}
+                  <ProductStatusNotice product={item.products} />
                   {isAddedInCO && <span className="ml-2 text-xs text-emerald-400 font-normal">+New</span>}
                   {isModifiedInCO && <span className="ml-2 text-xs text-amber-400 font-normal">Edited</span>}
                 </button>
-                {hasAccessories && displayMode === 'collapsed' && isCollapsed && (
+                {hasAccessories && displayMode === 'collapsed' && (
                   <div className="text-xs text-gray-500 mt-1 px-2">
-                    Includes: {item.accessories.map(acc => acc.description).join(', ')}
+                    Includes: {(item.accessories ?? []).map(acc => acc.description).join(', ')}
                   </div>
                 )}
               </div>
@@ -1389,7 +1362,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
             <input
               type="number"
               value={item.quantity}
-              onChange={(e) => updateLineItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => updateLineItem(item.id, { quantity: parseFloat(String(e.target.value)) || 0 })}
               className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
               min="0"
               step="0.01"
@@ -1400,7 +1373,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
             <input
               type="number"
               value={item.unit_price}
-              onChange={(e) => updateLineItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => updateLineItem(item.id, { unit_price: parseFloat(String(e.target.value)) || 0 })}
               className="w-full bg-transparent border-none text-white text-right focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
               min="0"
               step="0.01"
@@ -1411,7 +1384,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
           </td>
         </tr>
 
-        {shouldShowAccessories && item.accessories.map(accessory => renderLineItemRow(accessory, depth + 1))}
+        {shouldShowAccessories && (item.accessories ?? []).map(accessory => renderLineItemRow(accessory, depth + 1))}
       </React.Fragment>
     );
   }
@@ -1544,7 +1517,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
               {onRevisionChange && (
                 <ProposalRevisionSelector
                   proposalId={proposalId}
-                  currentRevisionName={proposal.revision_name}
+                  currentRevisionName={proposal.revision_name ?? null}
                   isRevision={proposal.is_revision || false}
                   onRevisionChange={onRevisionChange}
                 />
@@ -1606,7 +1579,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
           </div>
 
           <div className="space-y-4">
-            {rooms.map((room, index) => {
+            {rooms.map((room, _index) => {
               const roomTotal = room.line_items.reduce((sum, item) => sum + (item.line_total || 0), 0);
               return (
               <div
@@ -1746,8 +1719,8 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
 
       {showProductSelector && selectedRoomId && (
         <ProductSelector
-          onSelect={(product) => {
-            addLineItem(selectedRoomId, product);
+          onSelect={(product, customData) => {
+            addLineItem(selectedRoomId, product, customData);
             setShowProductSelector(false);
             setSelectedRoomId(null);
           }}
@@ -1800,6 +1773,7 @@ export default function ProposalBuilder({ proposalId, onSave, onRevisionChange, 
         />
       )}
 
+      {laborChoice&&<LaborRemovalChoice onChoose={laborChoice} onCancel={()=>setLaborChoice(null)}/>}
       <ConfirmModal
         isOpen={confirmModal !== null}
         title={confirmModal?.title ?? ''}

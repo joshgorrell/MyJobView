@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { Calendar, Plus, Edit2, Pause, Play, Trash2, Search, Filter, Clock, RefreshCw, User, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Calendar, Plus, Edit2, Pause, Play, Trash2, Search, Clock, RefreshCw, User, AlertCircle, TrendingUp, CheckCircle2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ScheduledConnectionForm } from './ScheduledConnectionForm';
@@ -170,7 +171,7 @@ export function ScheduledConnectionsView() {
       await loadSchedules();
     } catch (error) {
       console.error('Error toggling schedule:', error);
-      alert('Failed to update schedule status');
+      notify('Failed to update schedule status', { theme: 'cyan', tone: 'error' });
     }
   }
 
@@ -198,7 +199,7 @@ export function ScheduledConnectionsView() {
       await loadSchedules();
     } catch (error) {
       console.error('Error deleting schedule:', error);
-      alert('Failed to delete schedule');
+      notify('Failed to delete schedule', { theme: 'cyan', tone: 'error' });
     }
   }
 

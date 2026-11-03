@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { DollarSign, Calendar, Percent, Package, TrendingUp, Info, Plus, Trash2, GripVertical, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -44,7 +44,7 @@ export default function DepositConfiguration({
   depositAmount,
   acceptanceMethods,
   paymentSchedule = [],
-  progressBillingType = 'completion',
+  progressBillingType: _progressBillingType = 'completion',
   progressInvoiceTerms = 'net_30',
   balancePaymentTerms = 'Upon project completion or progress',
   billingPhases: externalBillingPhases,
@@ -54,13 +54,13 @@ export default function DepositConfiguration({
   const [partsTotal, setPartsTotal] = useState(0);
   const [laborTotal, setLaborTotal] = useState(0);
   const [proposalTotal, setProposalTotal] = useState(0);
-  const [customDepositAmount, setCustomDepositAmount] = useState(depositAmount || 0);
+  const [customDepositAmount, _setCustomDepositAmount] = useState(depositAmount || 0);
   const [taxTotal, setTaxTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [billingPhases, setBillingPhases] = useState<BillingPhase[]>(externalBillingPhases || []);
   const [phasesLoaded, setPhasesLoaded] = useState(false);
   const [phaseInputValues, setPhaseInputValues] = useState<Record<number, string>>({});
-  const [customDepositInput, setCustomDepositInput] = useState(String(depositAmount || 0));
+  const [_customDepositInput, _setCustomDepositInput] = useState(String(depositAmount || 0));
 
   useEffect(() => {
     if (proposalId) {
@@ -279,13 +279,6 @@ export default function DepositConfiguration({
     }, 0);
   };
 
-  const getPhasesFixedTotal = () => {
-    const allFixed = billingPhases.every(p => p.amount_type === 'fixed');
-    const allPct = billingPhases.every(p => p.amount_type === 'percentage');
-    if (allPct) return getPhasesTotal();
-    if (allFixed) return getPhasesTotal();
-    return null;
-  };
 
   const hasOnlyPercentages = billingPhases.length > 0 && billingPhases.every(p => p.amount_type === 'percentage');
   const hasOnlyFixed = billingPhases.length > 0 && billingPhases.every(p => p.amount_type === 'fixed');

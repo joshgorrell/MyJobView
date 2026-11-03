@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import ProductStatusNotice from '../Products/ProductStatusNotice';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { Product } from '../../lib/types';
@@ -12,7 +13,7 @@ interface PreAddProductModalProps {
 }
 
 export default function PreAddProductModal({ product, targetRoomCount, onClose, onConfirm }: PreAddProductModalProps) {
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [laborPhases, setLaborPhases] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
@@ -77,7 +78,7 @@ export default function PreAddProductModal({ product, targetRoomCount, onClose, 
           {/* Product Info */}
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="text-xs font-mono text-blue-600 mb-1">{product.sku}</div>
-            <div className="font-semibold text-gray-900">{product.name}</div>
+            <div className="font-semibold text-gray-900">{product.name}</div><ProductStatusNotice product={product} />
             {product.description && (
               <div className="text-sm text-gray-600 mt-1">{product.description}</div>
             )}

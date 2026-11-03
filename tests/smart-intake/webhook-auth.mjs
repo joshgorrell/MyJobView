@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import vm from 'node:vm';
+const source = fs.readFileSync('src/lib/smart-intake/webhook-auth.ts', 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const exports = {};
+vm.runInNewContext(compiled, { exports, TextEncoder });
+assert.equal(exports.validateSharedWebhookSecret(undefined, 'token'), false);
+assert.equal(exports.validateSharedWebhookSecret('secret', null), false);
+assert.equal(exports.validateSharedWebhookSecret('secret', 'wrong'), false);
+assert.equal(exports.validateSharedWebhookSecret('secret', 'secret'), true);
+console.log('Webhook secret checks passed');

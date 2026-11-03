@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ProposalLineItem, ProposalRoom } from '../../lib/types';
 import { X, Printer, PieChart, TrendingUp, Package, DollarSign } from 'lucide-react';
@@ -21,8 +21,8 @@ interface ClassTotal {
   total: number;
 }
 
-export default function ClassSummaryReport({ proposalId, rooms, onClose }: ClassSummaryReportProps) {
-  const [classes, setClasses] = useState<ProposalClass[]>([]);
+export default function ClassSummaryReport({ proposalId: _proposalId, rooms, onClose }: ClassSummaryReportProps) {
+  const [_classes, setClasses] = useState<ProposalClass[]>([]);
   const [classTotals, setClassTotals] = useState<ClassTotal[]>([]);
   const [animate, setAnimate] = useState(false);
 
@@ -310,7 +310,7 @@ export default function ClassSummaryReport({ proposalId, rooms, onClose }: Class
                           </tr>
                         </thead>
                         <tbody>
-                          {ct.items.map((item, itemIndex) => (
+                          {ct.items.map((item, _itemIndex) => (
                             <tr
                               key={item.id}
                               className="border-b border-gray-800/50 hover:bg-white/5 transition-colors"

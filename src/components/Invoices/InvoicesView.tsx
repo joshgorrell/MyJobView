@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Plus, Search, CheckCircle, AlertCircle, Clock, Download, RefreshCw, Mail, Wrench, X, Send, Loader2, Eye, BarChart2, ExternalLink } from 'lucide-react';
+import { DollarSign, Plus, Search, CheckCircle, AlertCircle, Clock, Download, RefreshCw, Mail, Wrench, X, Send, Loader2, Eye, BarChart2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
@@ -13,11 +13,13 @@ import { InvoiceStats } from './InvoiceStats';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface Invoice {
+  updated_at: string;
   id: string;
   invoice_number: string;
   invoice_date: string;
   due_date: string | null;
   status: string;
+  portal_visible: boolean;
   total: number;
   amount_paid: number;
   amount_due: number;
@@ -79,6 +81,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           invoice_date,
           due_date,
           status,
+          portal_visible,
           total,
           amount_paid,
           amount_due,
@@ -200,7 +203,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading invoices...</p>
+          <p className="text-muted">Loading invoices...</p>
         </div>
       </div>
     );
@@ -210,13 +213,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white">Invoices</h2>
-          <p className="text-sm sm:text-base text-gray-300">Manage customer invoices and payments</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-primary">Invoices</h2>
+          <p className="text-sm sm:text-base text-muted">Manage customer invoices and payments</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowSelectCustomer(true)}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-green-600 text-primary rounded-lg hover:bg-green-700 active:bg-green-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
           >
             <DollarSign className="w-4 h-4" />
             <span className="hidden sm:inline">Apply Payment</span>
@@ -224,7 +227,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           </button>
           <button
             onClick={() => setShowCreateFromWorkOrderModal(true)}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 active:bg-teal-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-teal-600 text-primary rounded-lg hover:bg-teal-700 active:bg-teal-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
           >
             <Wrench className="w-4 h-4" />
             <span className="hidden sm:inline">From Work Order</span>
@@ -232,7 +235,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
           </button>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Create Invoice</span>
@@ -289,7 +292,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                 className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-base bg-surface text-primary border border-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Statuses</option>
-                <option value="draft">Draft</option>
+                <option value="draft">Open drafts</option>
                 <option value="submitted">Submitted</option>
                 <option value="partial">Partially Paid</option>
                 <option value="paid">Paid</option>
@@ -324,7 +327,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               {!searchTerm && statusFilter === 'all' && (
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+                  className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create Invoice
@@ -355,7 +358,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                           <p className="text-sm text-secondary">{invoice.customer_name}</p>
                         )}
                       </div>
-                      <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
+                      <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} portalVisible={invoice.portal_visible} />
                     </div>
                     <div className="flex items-center justify-between text-sm mb-3">
                       <span className="text-muted">{new Date(invoice.invoice_date).toLocaleDateString()}</span>
@@ -371,13 +374,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                         <OpenedCell stats={openStats[invoice.id]} />
                       </div>
                     )}
-                    <div className="flex items-center justify-end gap-1 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                      {invoice.status !== 'paid' && (
+                    <div className="flex items-center justify-end gap-1 pt-2 border-t border-subtle" onClick={(e) => e.stopPropagation()}>
+                      {['submitted','partial','overdue'].includes(invoice.status) && invoice.amount_due>0 && (
                         <button onClick={(e) => { e.stopPropagation(); setRecordingPaymentInvoice(invoice); }} className="p-2 text-green-600 hover:bg-green-50 rounded-lg touch-manipulation" aria-label="Record Payment">
                           <DollarSign className="w-4 h-4" />
                         </button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); handleSendInvoice(invoice); }} disabled={sendingInvoice === invoice.id} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 touch-manipulation" aria-label="Send Invoice Email">
+                      <button onClick={(e) => { e.stopPropagation(); handleSendInvoice(invoice); }} disabled={sendingInvoice === invoice.id || !invoice.portal_visible || ['draft','void'].includes(invoice.status)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-50 touch-manipulation" aria-label="Send Invoice Email">
                         {sendingInvoice === invoice.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); setConvertingInvoice(invoice); }} className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg touch-manipulation" aria-label="Convert to Recurring">
@@ -443,7 +446,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} />
+                            <StatusBadge status={invoice.status} updatedAt={invoice.updated_at} portalVisible={invoice.portal_visible} />
                           </td>
                           <td className="px-6 py-4 text-right">
                             <p className="text-sm font-medium text-primary">${(invoice.total ?? 0).toFixed(2)}</p>
@@ -456,7 +459,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                           </td>
                           <td className="px-4 sm:px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1 sm:gap-2">
-                              {invoice.status !== 'paid' && (
+                              {['submitted','partial','overdue'].includes(invoice.status) && invoice.amount_due>0 && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRecordingPaymentInvoice(invoice); }}
                                   className="p-2 sm:p-2.5 text-green-600 hover:text-green-900 hover:bg-green-50 active:bg-green-100 rounded-lg transition-colors touch-manipulation"
@@ -467,7 +470,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleSendInvoice(invoice); }}
-                                disabled={sendingInvoice === invoice.id}
+                                disabled={sendingInvoice === invoice.id || !invoice.portal_visible || ['draft','void'].includes(invoice.status)}
                                 className="p-2 sm:p-2.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors disabled:opacity-50 touch-manipulation"
                                 title="Resend Invoice Email"
                               >
@@ -608,7 +611,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
               <button
                 onClick={confirmAndSend}
                 disabled={!sendEmailOverride.trim()}
-                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 <Send className="w-4 h-4" />
                 Send Email
@@ -619,7 +622,7 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
       )}
 
       {sendSuccess && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-green-600 text-primary px-5 py-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-4">
           <CheckCircle className="w-5 h-5 flex-shrink-0" />
           <span className="text-sm font-medium">Invoice {sendSuccess} sent successfully</span>
         </div>
@@ -708,10 +711,10 @@ function OpenedCell({ stats }: { stats: InvoiceOpenStats | null }) {
   );
 }
 
-function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string }) {
+function StatusBadge({ status, updatedAt, portalVisible }: { status: string; updatedAt?: string; portalVisible?: boolean }) {
   const configs = {
-    draft: { icon: <Clock className="w-3 h-3" />, label: 'Draft', className: 'bg-surface text-secondary' },
-    submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted', className: 'bg-blue-100 text-blue-700' },
+    draft: { icon: <Clock className="w-3 h-3" />, label: 'Open — private', className: 'bg-surface text-secondary' },
+    submitted: { icon: <Send className="w-3 h-3" />, label: 'Submitted — locked', className: 'bg-blue-100 text-blue-700' },
     partial: { icon: <AlertCircle className="w-3 h-3" />, label: 'Partial', className: 'bg-yellow-100 text-yellow-700' },
     paid: { icon: <CheckCircle className="w-3 h-3" />, label: 'Paid', className: 'bg-green-100 text-green-700' },
     overdue: { icon: <AlertCircle className="w-3 h-3" />, label: 'Overdue', className: 'bg-red-100 text-red-700' },
@@ -723,16 +726,16 @@ function StatusBadge({ status, updatedAt }: { status: string; updatedAt?: string
   if (status === 'draft' && updatedAt) {
     const daysSinceUpdate = Math.floor((Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24));
     if (daysSinceUpdate > 30) {
-      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Aging Draft', className: 'bg-red-100 text-red-700' };
+      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Open — private', className: 'bg-red-100 text-red-700' };
     } else if (daysSinceUpdate >= 16) {
-      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Needs Attention', className: 'bg-amber-100 text-amber-700' };
+      config = { icon: <AlertCircle className="w-3 h-3" />, label: 'Open — private · review', className: 'bg-amber-100 text-amber-700' };
     }
   }
 
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${config.className}`}>
       {config.icon}
-      {config.label}
+      {config.label}{!['draft','void'].includes(status) && !portalVisible ? ' · Internal' : ''}
     </span>
   );
 }

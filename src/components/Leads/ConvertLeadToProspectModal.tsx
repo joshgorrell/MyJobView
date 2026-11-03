@@ -1,5 +1,6 @@
+import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
-import { X, AlertCircle, Clock, Users, Building2, Check, Calendar, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { X, AlertCircle, Clock, Users, Check, Calendar, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Lead } from '../../lib/types';
 
@@ -147,7 +148,8 @@ export function ConvertLeadToProspectModal({ lead, onClose, onSuccess }: Convert
             })
             .eq('id', data.contact_id);
         }
-        onSuccess(data.contact_id);
+        notify('Moved to prospects!', { theme: 'blue', tone: 'success' });
+      onSuccess(data.contact_id);
       } else {
         throw new Error(data?.message || 'Conversion failed');
       }

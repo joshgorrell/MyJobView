@@ -1,3 +1,5 @@
+import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
+import type { ServiceApprovalFields } from '../../lib/serviceApproval';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -6,8 +8,6 @@ import {
   Clock,
   MapPin,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   Filter,
   ChevronDown,
   ChevronUp,
@@ -15,18 +15,16 @@ import {
   FileText,
   User,
   Wrench,
-  Calendar,
   AlertTriangle,
   ListTodo,
   ClipboardList,
-  ArrowRight,
   Plus
 } from 'lucide-react';
 import { ContactLogModal } from '../Shared/ContactLogModal';
 import { ContactLogHistory } from '../Shared/ContactLogHistory';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
-interface ServiceRequest {
+interface ServiceRequest extends ServiceApprovalFields {
   id: string;
   created_at: string;
   customer_name: string;
@@ -69,7 +67,8 @@ interface ServiceRequest {
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
-  { value: 'open', label: 'Open' },
+  { value: 'open', label: 'Ready to Schedule' },
+  { value: 'pending_customer', label: 'Pending – Waiting on Customer' },
   { value: 'needs_more_info', label: 'Needs More Info' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'in_progress', label: 'In Progress' },
@@ -99,13 +98,14 @@ function getStatusColor(status: string) {
     case 'closed': return 'text-green-700 bg-green-50';
     case 'cancelled': return 'text-red-700 bg-red-50';
     case 'needs_more_info': return 'text-amber-700 bg-amber-50';
-    default: return 'text-gray-700 bg-gray-50';
+    default: return 'text-secondary bg-surface';
   }
 }
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case 'open': return 'Open';
+    case 'open': return 'Ready to Schedule';
+    case 'pending_customer': return 'Pending – Waiting on Customer';
     case 'scheduled': return 'Scheduled';
     case 'in_progress': return 'In Progress';
     case 'closed': return 'Closed';
@@ -145,7 +145,7 @@ export function SalesServiceRequestsView() {
   const [contactLogRefreshKeys, setContactLogRefreshKeys] = useState<Record<string, number>>({});
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
 
-  const isManager = profile?.role === 'admin' || profile?.role === 'sales_manager' || profile?.role === 'manager';
+  const isManager = profile?.role === 'admin' || profile?.role === 'manager';
 
   useEffect(() => {
     if (profile) loadRequests();
@@ -162,7 +162,8 @@ export function SalesServiceRequestsView() {
           job_description, billable_type, priority, status, notes,
           contact_id, source_type, kickback_reason, kicked_back_at,
           customer_contact_confirmed_at, customer_contact_confirmed_by,
-          work_order_id,
+          work_order_id, service_approval_required, service_terms, service_accepted_at, service_accepted_by, service_payment_method_id, service_waived_at, service_waived_by, service_waiver_reason,
+          service_waived_by_profile:profiles!service_requests_service_waived_by_fkey (full_name),
           contacts (id, company_name, full_name),
           contact_confirmed_by_profile:profiles!service_requests_customer_contact_confirmed_by_fkey (
             id, full_name
@@ -176,7 +177,12 @@ export function SalesServiceRequestsView() {
         .order('created_at', { ascending: false });
 
       if (!isManager) {
-        query = query.eq('created_by', profile!.id);
+        const { data: ownedContacts, error: ownershipError } = await supabase.from('contacts').select('id').eq('assigned_to', profile!.id).eq('organization_id', profile!.organization_id);
+        if (ownershipError) throw ownershipError;
+        const ownedIds = (ownedContacts || []).map(contact => contact.id);
+        query = ownedIds.length
+          ? query.or(`created_by.eq.${profile!.id},contact_id.in.(${ownedIds.join(',')})`)
+          : query.eq('created_by', profile!.id);
       }
 
       if (filterStatus !== 'all') {
@@ -189,7 +195,7 @@ export function SalesServiceRequestsView() {
         query = query.is('customer_contact_confirmed_at', null);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.overrideTypes<ServiceRequest[], { merge: false }>();
       if (error) throw error;
       setRequests(data || []);
     } catch (error) {
@@ -210,7 +216,7 @@ export function SalesServiceRequestsView() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading service requests...</div>
+        <div className="text-muted">Loading service requests...</div>
       </div>
     );
   }
@@ -219,14 +225,14 @@ export function SalesServiceRequestsView() {
     <div className="space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">My Service Requests</h2>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h2 className="text-xl font-bold text-primary">My Service Requests</h2>
+          <p className="text-sm text-muted mt-0.5">
             Track your submitted service requests and customer contact status
           </p>
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
+          className="flex items-center gap-2 px-3 py-2 bg-canvas border border-subtle rounded-lg text-sm text-secondary hover:bg-surface transition-colors shadow-sm"
         >
           <Filter className="w-4 h-4" />
           Filters
@@ -236,9 +242,9 @@ export function SalesServiceRequestsView() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-          <div className="text-2xl font-bold text-gray-900">{requests.length}</div>
-          <div className="text-xs text-gray-500 mt-0.5">Total Requests</div>
+        <div className="bg-canvas rounded-xl border border-subtle p-4 shadow-sm">
+          <div className="text-2xl font-bold text-primary">{requests.length}</div>
+          <div className="text-xs text-muted mt-0.5">Total Requests</div>
         </div>
         <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
           <div className="text-2xl font-bold text-amber-700">{pendingContactCount}</div>
@@ -258,14 +264,14 @@ export function SalesServiceRequestsView() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <div className="bg-canvas rounded-xl border border-subtle p-4 shadow-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Status</label>
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Status</label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-canvas border border-subtle rounded-lg text-sm text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {STATUS_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -273,11 +279,11 @@ export function SalesServiceRequestsView() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Customer Contact</label>
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5">Customer Contact</label>
               <select
                 value={filterContact}
                 onChange={(e) => setFilterContact(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-canvas border border-subtle rounded-lg text-sm text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {CONTACT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -290,10 +296,10 @@ export function SalesServiceRequestsView() {
 
       {/* Request list */}
       {requests.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
-          <ClipboardList className="w-14 h-14 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-1">No Service Requests</h3>
-          <p className="text-sm text-gray-400">
+        <div className="bg-canvas rounded-xl border border-subtle p-12 text-center shadow-sm">
+          <ClipboardList className="w-14 h-14 text-muted mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-secondary mb-1">No Service Requests</h3>
+          <p className="text-sm text-muted">
             {filterStatus !== 'all' || filterContact !== 'all'
               ? 'No requests match your current filters.'
               : 'You have not submitted any service requests yet.'}
@@ -310,12 +316,12 @@ export function SalesServiceRequestsView() {
             return (
               <div
                 key={request.id}
-                className={`bg-white rounded-xl border shadow-sm transition-all ${
+                className={`bg-canvas rounded-xl border shadow-sm transition-all ${
                   request.status === 'needs_more_info'
                     ? 'border-amber-300'
                     : contactConfirmed
                     ? 'border-emerald-200'
-                    : 'border-gray-200'
+                    : 'border-subtle'
                 }`}
               >
                 {/* Kickback banner */}
@@ -352,11 +358,11 @@ export function SalesServiceRequestsView() {
                           {request.status === 'needs_more_info' && <AlertTriangle className="w-3 h-3 mr-1" />}
                           {getStatusLabel(request.status)}
                         </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface text-secondary">
                           {getSourceIcon(request.source_type)}
                           {getSourceLabel(request.source_type)}
                         </span>
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-muted">
                           {new Date(request.created_at).toLocaleDateString()}
                         </span>
                       </div>
@@ -365,17 +371,17 @@ export function SalesServiceRequestsView() {
                       {request.contact_id ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); setQuickViewContactId(request.contact_id!); }}
-                          className="font-semibold text-gray-900 text-base hover:text-blue-600 transition-colors text-left"
+                          className="font-semibold text-primary text-base hover:text-blue-600 transition-colors text-left"
                         >
                           {request.customer_name}
                         </button>
                       ) : (
-                        <div className="font-semibold text-gray-900 text-base">{request.customer_name}</div>
+                        <div className="font-semibold text-primary text-base">{request.customer_name}</div>
                       )}
-                      <div className="text-sm text-gray-500 line-clamp-1 mt-0.5">{request.job_description}</div>
+                      <div className="text-sm text-muted line-clamp-1 mt-0.5">{request.job_description}</div>
 
                       {/* Meta row */}
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-400">
+                      <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted">
                         <div className="flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5" />
                           {request.job_location_address}
@@ -413,17 +419,18 @@ export function SalesServiceRequestsView() {
                   {/* Expand indicator */}
                   <div className="flex items-center justify-end mt-2">
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-gray-400" />
+                      <ChevronUp className="w-4 h-4 text-muted" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                      <ChevronDown className="w-4 h-4 text-muted" />
                     )}
                   </div>
                 </div>
 
                 {/* Expanded details */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-gray-100 pt-4 space-y-4">
+                  <div className="px-4 pb-4 border-t border-subtle pt-4 space-y-4">
 
+                    <ServiceApprovalPanel request={request} onChanged={loadRequests} />
                     {/* Customer contact status detail */}
                     <div className={`flex items-start gap-3 p-4 rounded-xl border ${
                       contactConfirmed
@@ -445,7 +452,7 @@ export function SalesServiceRequestsView() {
                                 workOrderId: request.work_order?.id,
                               });
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-primary text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             Log Contact
@@ -515,14 +522,14 @@ export function SalesServiceRequestsView() {
                     {/* Job details */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div className="space-y-2">
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Job Description</div>
-                        <div className="text-gray-800 whitespace-pre-wrap">{request.job_description}</div>
+                        <div className="text-xs font-semibold text-muted uppercase tracking-wide">Job Description</div>
+                        <div className="text-primary whitespace-pre-wrap">{request.job_description}</div>
                       </div>
                       <div className="space-y-3">
                         <div>
-                          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Location</div>
-                          <div className="flex items-start gap-1.5 text-gray-700">
-                            <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                          <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">Location</div>
+                          <div className="flex items-start gap-1.5 text-secondary">
+                            <MapPin className="w-4 h-4 text-muted shrink-0 mt-0.5" />
                             <span>
                               {request.job_location_address}
                               {request.job_location_city && <br />}
@@ -533,17 +540,17 @@ export function SalesServiceRequestsView() {
                         </div>
                         {request.contacts && (
                           <div>
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Contact</div>
-                            <div className="text-gray-700">{request.contacts.full_name}</div>
+                            <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">Contact</div>
+                            <div className="text-secondary">{request.contacts.full_name}</div>
                             {request.contacts.company_name && (
-                              <div className="text-gray-500 text-xs">{request.contacts.company_name}</div>
+                              <div className="text-muted text-xs">{request.contacts.company_name}</div>
                             )}
                           </div>
                         )}
                         {request.notes && (
                           <div>
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</div>
-                            <div className="text-gray-700">{request.notes}</div>
+                            <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">Notes</div>
+                            <div className="text-secondary">{request.notes}</div>
                           </div>
                         )}
                       </div>

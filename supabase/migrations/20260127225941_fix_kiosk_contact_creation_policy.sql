@@ -1,0 +1,5 @@
+/*\n  # Fix Kiosk Contact Creation Policy\n\n  1. Changes\n    - Update the anonymous user insert policy to be more permissive for kiosk submissions\n    - Allow kiosk forms to create contacts with just basic information\n    - Ensure phone OR email is provided (not both required)\n    - Make contact_type check more flexible\n\n  2. Security\n    - Still restricts anonymous users to only creating contacts (not viewing/updating)\n    - Requires at least one contact method (email or phone)\n    - Requires some form of name identification\n*/\n\n-- Drop the old restrictive policy\nDROP POLICY IF EXISTS "Anonymous users can create contacts for kiosk and VIP" ON contacts
+
+\n\n-- Create a more flexible policy for kiosk and VIP sign-ups\nCREATE POLICY "Anonymous users can create contacts for kiosk and VIP"\n  ON contacts\n  FOR INSERT\n  TO anon\n  WITH CHECK (\n    -- Require at least one contact method\n    (email IS NOT NULL OR phone IS NOT NULL)\n    AND\n    -- Require some form of name\n    (\n      contact_name IS NOT NULL \n      OR first_name IS NOT NULL \n      OR last_name IS NOT NULL\n    )\n  )
+
+

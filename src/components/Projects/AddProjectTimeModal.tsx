@@ -1,3 +1,6 @@
+import { createTimestampInTimezone, formatDateInTimezone, formatTimeInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
+import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
+import { ManualJobTimeRequestModal } from '../Technician/ManualJobTimeRequestModal';
 import { useState, useEffect } from 'react';
 import { Clock, Briefcase, ChevronDown } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -51,6 +54,7 @@ export function AddProjectTimeModal({
   onSave,
 }: AddProjectTimeModalProps) {
   const { profile } = useAuth();
+  const policy = useEmployeeTimePolicy();
   const [projects, setProjects] = useState<Project[]>([]);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [laborPhases, setLaborPhases] = useState<LaborPhase[]>([]);
@@ -58,7 +62,7 @@ export function AddProjectTimeModal({
   const [projectSearch, setProjectSearch] = useState('');
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [staffId, setStaffId] = useState(profile?.id || '');
-  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [entryDate, setEntryDate] = useState('');
   const [selectedDuration, setSelectedDuration] = useState<number | null>(1);
   const [customHours, setCustomHours] = useState('');
   const [isCustom, setIsCustom] = useState(false);
@@ -69,10 +73,11 @@ export function AddProjectTimeModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    void getOrganizationTimezone().then(tz => setEntryDate(d => d || formatDateInTimezone(new Date().toISOString(),tz)));
     loadStaffMembers();
     loadLaborPhases();
     if (!preselectedProjectId) loadProjects();
-  }, []);
+  }, [policy.ready, policy.canManage]);
 
   async function loadStaffMembers() {
     const { data } = await supabase
@@ -80,7 +85,7 @@ export function AddProjectTimeModal({
       .select('id, full_name')
       .not('role', 'in', '("portal_user")')
       .order('full_name');
-    setStaffMembers(data || []);
+    setStaffMembers(policy.canManage ? data || [] : data?.filter(p => p.id === profile?.id) || []);
   }
 
   async function loadLaborPhases() {
@@ -138,9 +143,12 @@ export function AddProjectTimeModal({
   }
 
   async function handleSave() {
+    if (!policy.ready || (!policy.canManage && policy.basis === 'work_allocation')) return;
     setError(null);
     const hours = getEffectiveHours();
+    if (!entryDate) { setError('Please select a work date.'); return; }
     if (!projectId) { setError('Please select a project.'); return; }
+    if (!policy.canManage && staffId !== profile?.id) { setError('You may only allocate your own time.'); return; }
     if (!staffId) { setError('Please select a staff member.'); return; }
     if (!hours) { setError('Please select or enter a valid duration.'); return; }
     if (!activityType) { setError('Please select an activity type.'); return; }
@@ -153,8 +161,8 @@ export function AddProjectTimeModal({
     setSaving(true);
     try {
       const now = new Date();
-      const [y, m, d] = entryDate.split('-').map(Number);
-      const clockOut = new Date(y, m - 1, d, now.getHours(), now.getMinutes());
+      const timezone = await getOrganizationTimezone();
+      const clockOut = new Date(createTimestampInTimezone(entryDate,formatTimeInTimezone(now.toISOString(),timezone),timezone));
       const clockIn = new Date(clockOut.getTime() - hours * 60 * 60 * 1000);
 
       const noteText = notes.trim()
@@ -174,7 +182,7 @@ export function AddProjectTimeModal({
           break_minutes: 0,
           notes: noteText,
           entry_type: 'project',
-          status: 'approved',
+          status: policy.canManage ? 'approved' : 'submitted',
           labor_phase_id: laborPhaseId,
         });
 
@@ -190,6 +198,8 @@ export function AddProjectTimeModal({
 
   const canManageOthers = profile?.role && ['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role);
 
+  if (policy.loading || !policy.ready) return <QuickActionModal title="Time configuration" icon={<Clock className="w-5 h-5" />} onClose={onClose}><p>Loading time configuration. If this persists, close and try again.</p></QuickActionModal>;
+  if (!policy.canManage && policy.basis === 'work_allocation') return <ManualJobTimeRequestModal onClose={onClose} onSubmitted={onSave} />;
   return (
     <QuickActionModal
       scrollBody={false}

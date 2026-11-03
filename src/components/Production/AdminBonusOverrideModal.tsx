@@ -1,3 +1,4 @@
+import { notify } from '../../lib/feedback';
 import { useState } from 'react';
 import { X, DollarSign, AlertCircle, Save } from 'lucide-react';
 import { applyBonusOverride } from '../../lib/testTunePermissions';
@@ -60,6 +61,7 @@ export function AdminBonusOverrideModal({
         adminNotes || undefined
       );
 
+      notify('Bonus override saved!', { theme: 'blue', tone: 'success' });
       onSuccess();
       onClose();
     } catch (err: any) {
