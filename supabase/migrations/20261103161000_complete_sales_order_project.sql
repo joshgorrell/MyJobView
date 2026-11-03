@@ -1,0 +1,3 @@
+-- Issue #440: project completion operation.
+-- TODO: implement atomic tenant-authorized project completion before merge.
+-- The client must not be deployed until this operation is implemented.
