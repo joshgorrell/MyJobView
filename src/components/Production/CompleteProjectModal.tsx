@@ -91,6 +91,28 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
       if (error) throw error;
       if (!data) throw new Error('Project completion was not confirmed');
 
+      // Preserve the existing day-0 completion survey. The lifecycle worker
+      // retries unsent surveys; a delivery error must not undo completion.
+      if (customer.contact_email) {
+        try {
+          const { data: feedbackResult, error: feedbackError } = await supabase.functions.invoke('send-satisfaction-email', {
+            body: {
+              contactId: customer.contact_id,
+              customerName: customer.contact_name,
+              customerEmail: customer.contact_email,
+              surveyType: 'job_completion',
+              projectId: customer.project_id,
+              salesOrderId: customer.sales_order_id || null,
+            },
+          });
+          if (feedbackError || feedbackResult?.success === false) {
+            console.error('Day-0 feedback send failed; lifecycle worker may retry:', feedbackError || feedbackResult?.error);
+          }
+        } catch (feedbackError) {
+          console.error('Day-0 feedback send failed; lifecycle worker may retry:', feedbackError);
+        }
+      }
+
       if (completionChoice === 'test_and_tune' && sendEmail) {
         // Use the established customer-program grant before emailing a portal link.
         // If access provisioning fails, do not send an unusable invitation.
