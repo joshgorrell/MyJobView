@@ -16,7 +16,19 @@ export function assessOriginalHistoryAnchor(bundle,binding){
   ||!['connectionId','organizationId','orderId','proposalId'].every(k=>basis.binding[k]===binding[k])
   ||!Array.isArray(basis.lines)||basis.lines.length>10000)
   return hold('original_approval_basis_unverified');
- const first=[...bundle.pairs].sort((a,b)=>BigInt(a.startedOrder)<BigInt(b.startedOrder)?-1:1)[0];
+ // Malformed or duplicate ordering evidence must hold, never throw or
+ // accidentally anchor a quote. The diagnostic is not a source authority.
+ const orderValue=value=>typeof value==='string'&&/^[1-9][0-9]{0,19}$/.test(value)?BigInt(value):null;
+ const seen=new Set();
+ for(const pair of bundle.pairs){
+  const value=object(pair)?orderValue(pair.startedOrder):null;
+  if(value===null||seen.has(value.toString()))return hold('history_anchor_order_unverified');
+  seen.add(value.toString());
+ }
+ const first=[...bundle.pairs].sort((a,b)=>{
+  const x=BigInt(a.startedOrder),y=BigInt(b.startedOrder);
+  return x<y?-1:x>y?1:0;
+ })[0];
  if(!first||basis.approvedRowsHash!==first.beforeScopeHash||
   !equipmentRowsEqual(basis.lines,first.beforeLines,binding))
   return hold('original_approval_history_gap');
