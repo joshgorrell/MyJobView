@@ -16,7 +16,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
   useEffect(() => { if (profile?.id) void markPunchlistSeen(profile.id); }, [profile?.id]);
 
   const tabs: Array<{ id: WorkspaceView; label: string; icon: typeof ClipboardList }> = [
-    { id: 'feed', label: 'Tasks & Adjustments', icon: ClipboardList },
+    { id: 'feed', label: 'Tasks', icon: ClipboardList },
     { id: 'access', label: 'Customers & Access', icon: Users },
   ];
 
@@ -27,7 +27,7 @@ export function PunchlistAdminDashboard({ onOpenSalesOrder }: { onOpenSalesOrder
           <p className="text-xs font-semibold uppercase tracking-wider text-secondary">Production · Customer Care</p>
           <h1 className="text-xl font-bold tracking-tight text-primary sm:text-2xl">Test &amp; Tune</h1>
           <p className="max-w-2xl text-xs text-secondary">
-            Track post-completion adjustments, coordinate follow-up work, and manage customer access.
+            Track post-installation punch-list items, coordinate follow-up work, and manage customer access.
           </p>
         </div>
         {hasModuleAccess('service_requests') && (

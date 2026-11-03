@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {prepareTechsafeDraftCandidate as prepare} from '../../supabase/functions/_shared/techsafe-draft-candidate.mjs';
 import {copy,digest,binding,history} from './fixtures/equipment-history.mjs';
+import {prepareTechsafeCandidateFromBundle} from '../../supabase/functions/_shared/techsafe-bundle-composition.mjs';
+import {compareTechsafeSourceReread} from '../../supabase/functions/_shared/techsafe-source-reread.mjs';
+import {assessOriginalHistoryAnchor} from '../../supabase/functions/_shared/techsafe-original-history-anchor.mjs';
 function fixture(direct=false){
  const input=history(),m=input.currentModel;
  input.basis={basisVersion:1,sourceKind:'customer_portal_approval',binding:copy(binding),approvalRef:'approval',portalVersion:1,
@@ -54,6 +57,104 @@ const unknownPrice=fixture();delete unknownPrice.currentModel.lines[0].salePrice
 const percentages=fixture();for(const key of ['pricingFacts','discount_percent','misc_parts_percent'])Object.defineProperty(percentages.currentModel,key,{get(){throw Error('Aggregate pricing must not be read');}});pass(percentages);
 const costs=fixture();for(const row of costs.currentModel.lines){Object.defineProperty(row,'cost',{get(){throw Error('Cost must not be read');}});Object.defineProperty(row.product,'retail_price',{get(){throw Error('Retail must not be read');}});}pass(costs);
 assert.equal(prepare(null,binding).valid,false);
+
+const anchorSource=fixture();
+const anchorOk=assessOriginalHistoryAnchor(anchorSource,binding);
+assert.equal(anchorOk.anchored,true,JSON.stringify(anchorOk));
+assert.equal(anchorOk.checkedApplications,8);
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(anchorOk[flag],false);
+const anchorChanged=fixture();
+anchorChanged.basis.lines[0].line.quantity='99.00';
+assert.equal(assessOriginalHistoryAnchor(anchorChanged,binding).anchored,false);
+const anchorMissing=fixture();
+anchorMissing.pairs.splice(2,1);
+assert.equal(assessOriginalHistoryAnchor(anchorMissing,binding).anchored,false);
+const anchorHash=fixture();
+anchorHash.basis.approvedRowsHash='b'.repeat(64);
+assert.equal(assessOriginalHistoryAnchor(anchorHash,binding).anchored,false);
+assert.equal(assessOriginalHistoryAnchor(null,binding).anchored,false);
+
+const bundleInput=fixture();
+const bundle={bundleVersion:1,currentModel:bundleInput.currentModel,basis:bundleInput.basis,
+ pairs:bundleInput.pairs,inputFingerprint:'a'.repeat(64),readAtEpoch:'1793448000.000000'};
+const composed=prepareTechsafeCandidateFromBundle(bundle,binding);
+assert.equal(composed.valid,true,JSON.stringify(composed));
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(composed[flag],false);
+const rejectBundle=(b,actor=binding)=>{const out=prepareTechsafeCandidateFromBundle(b,actor);
+ assert.equal(out.valid,false,JSON.stringify(out));assert.equal(out.content,null);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(out[flag],false);};
+rejectBundle(null);
+rejectBundle({...bundle,bundleVersion:2});
+rejectBundle({...bundle,inputFingerprint:'untrusted'});
+rejectBundle({...bundle,readAtEpoch:'invalid'});
+rejectBundle({...bundle,pairs:null});
+rejectBundle({...bundle,pairs:Array(1001).fill(null)});
+rejectBundle({...bundle,quoteReady:true});
+rejectBundle({...bundle,eventId:'fabricated'});
+rejectBundle({...bundle,revision:1});
+rejectBundle({...bundle,basis:null});
+
+const sameReread=compareTechsafeSourceReread(bundle,copy(bundle),binding);
+assert.equal(sameReread.matches,true,JSON.stringify(sameReread));
+assert.equal(sameReread.content,null);
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(sameReread[flag],false);
+for(const latest of [
+ null,
+ {...bundle,inputFingerprint:'b'.repeat(64)},
+ {...bundle,currentModel:{...bundle.currentModel,organizationId:'other'}},
+ {...bundle,quoteReady:true},
+ {...bundle,currentModel:{...bundle.currentModel,lines:null}},
+]){
+ const result=compareTechsafeSourceReread(bundle,latest,binding);
+ assert.equal(result.matches,false,JSON.stringify(result));
+ assert.equal(result.content,null);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(result[flag],false);
+}
+assert.equal(compareTechsafeSourceReread(null,bundle,binding).matches,false);
+
+
+for(const key of ['connectionId','organizationId','orderId','proposalId']){
+ rejectBundle({...bundle,basis:{...bundle.basis,binding:{...bundle.basis.binding,[key]:'other'}}});
+ rejectBundle({...bundle}, {...binding,[key]:'other'});
+}
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,connectionId:'other'}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,organizationId:'other'}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,order:{...bundle.currentModel.order,id:'other'}}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,order:{...bundle.currentModel.order,proposal_id:'other'}}});
+rejectBundle({...bundle,currentModel:{...bundle.currentModel,order:{...bundle.currentModel.order,organization_id:'other'}}});
+
+
+
+// Phase 2: malformed and partial source bundles must never authorize export.
+// Assert the security outcome rather than coupling these tests to diagnostic codes.
+const held=(input,actor=binding)=>{
+ const result=prepare(input,actor);
+ assert.equal(result.valid,false,JSON.stringify(result));
+ assert.equal(result.content,null);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(result[flag],false);
+};
+for(const mutate of [
+ input=>{delete input.basis;},
+ input=>{delete input.pairs;},
+ input=>{input.pairs=null;},
+ input=>{input.pairs=[...input.pairs,{...input.pairs[0],startedOrder:'not-an-order'}];},
+ input=>{input.currentModel.lines=null;},
+ input=>{input.currentModel.order.status='cancelled';},
+ input=>{input.currentModel.order.status='deleted';},
+ input=>{input.currentModel.customer=null;},
+ input=>{input.currentModel.sellingPriceContext=null;},
+ input=>{input.basis.lines=null;},
+]){
+ const input=fixture();mutate(input);held(input);
+}
+// A valid candidate is still never a source-authorized export envelope.
+const candidate=pass(fixture());
+assert.equal(candidate.scopeVerified,false);
+assert.equal(candidate.snapshotReady,false);
+assert.equal(candidate.quoteReady,false);
+assert.equal(Object.hasOwn(candidate,'revision'),false);
+assert.equal(Object.hasOwn(candidate,'eventId'),false);
+
 if(process.argv[2]){
  const {prepareImport}=await import(pathToFileURL(process.argv[2]).href);
  const receiverBinding={...binding,sourceInstanceId:'mjv',environment:'sandbox',generation:1,dealerId:'dealer',status:'active',reconciliationRequired:false};
