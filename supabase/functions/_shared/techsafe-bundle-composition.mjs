@@ -12,7 +12,8 @@ export function prepareTechsafeCandidateFromBundle(bundle,binding){
   ||!Array.isArray(bundle.pairs)||bundle.pairs.length>1000)
   return held('source_bundle_unavailable');
  // Never accept readiness/authorization flags supplied in a bundle.
- if(['scopeVerified','snapshotReady','quoteReady','authorized','eventId','revision'].some(k=>Object.hasOwn(bundle,k)))
+ if(['scopeVerified','snapshotReady','quoteReady'].some(k=>Object.hasOwn(bundle,k)&&bundle[k]!==false)||
+  ['authorized','eventId','revision'].some(k=>Object.hasOwn(bundle,k)))
   return held('source_bundle_authority_unverified');
  // Require a single trusted connection/order/proposal identity across all
  // bundle layers before passing any data to the candidate composer.
