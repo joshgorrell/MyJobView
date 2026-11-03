@@ -11,11 +11,11 @@ export function browserInstallationId(): string {
     return crypto.randomUUID();
   }
 }
-export type SessionStatus = 'Online' | 'Idle' | 'Ended';
+export type SessionStatus = 'Online' | 'Offline';
 export function sessionStatus(session: { is_active: boolean; session_end: string | null; last_activity: string }, now = Date.now()): SessionStatus {
   const age = now - Date.parse(session.last_activity);
-  if (session.session_end || !session.is_active || !Number.isFinite(age) || age >= 30 * 60_000) return 'Ended';
-  return age < 6 * 60_000 ? 'Online' : 'Idle';
+  if (session.session_end || !session.is_active || !Number.isFinite(age) || age >= 30 * 60_000) return 'Offline';
+  return age < 6 * 60_000 ? 'Online' : 'Offline';
 }
 export function sessionDeviceKey(session: { device_signature?: string | null; user_id: string; device_type: string | null; browser_name: string | null; os_name: string | null }) {
   return session.device_signature || `legacy:${session.user_id}:${session.device_type || 'unknown'}|${session.browser_name || 'unknown'}|${session.os_name || 'unknown'}`;

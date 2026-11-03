@@ -46,6 +46,7 @@ interface ProductFormProps {
   productId?: string;
   duplicateFromId?: string;
   readOnly?: boolean;
+  initialTab?: 'overview' | 'pricing' | 'details' | 'instructions' | 'accessories';
   onClose: () => void;
   onSave: (productData?: any) => void;
   onDuplicate?: () => void;
@@ -55,8 +56,13 @@ interface ProductFormProps {
 
 interface SuggestedPhoto { url: string; description: string }
 
-export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
+export default function SinglePageProductForm({ productId, duplicateFromId, readOnly = false, initialTab = 'overview', onClose, onSave, onDuplicate, onDelete }: ProductFormProps) {
   const { profile } = useAuth();
+  const [editorTab, setEditorTab] = useState<'overview' | 'pricing' | 'details' | 'instructions' | 'accessories'>(initialTab);
+  const selectEditorTab = (tab: typeof editorTab) => {
+    setEditorTab(tab);
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  };
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -914,8 +920,13 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
+      // Fields are split across tabs: reveal the invalid section before
+      // attempting to focus or scroll to its first error.
+      const firstError = Object.keys(newErrors)[0];
+      const errorTab = firstError === 'cost' || firstError === 'price' ? 'pricing' : 'overview';
+      selectEditorTab(errorTab);
       setTimeout(() => {
-        const firstErrorEl = document.querySelector('[data-error-field]');
+        const firstErrorEl = scrollContainerRef.current?.querySelector('[data-error-field]');
         firstErrorEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 50);
       return false;
@@ -1256,14 +1267,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     <div className="product-form-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-hidden">
       <div
         role="dialog" aria-modal="true" aria-labelledby="product-form-title"
-        className="bg-white text-gray-900 rounded-none sm:rounded-2xl shadow-2xl max-w-5xl w-full h-[100dvh] sm:h-auto sm:max-h-[92dvh] flex flex-col min-h-0 overflow-hidden"
+        className="bg-white text-gray-900 rounded-none sm:rounded-xl shadow-2xl max-w-5xl w-full h-[100dvh] sm:h-[calc(100dvh-2rem)] flex flex-col min-h-0 overflow-hidden"
       >
         <div className="shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Package className="w-6 h-6 text-blue-600" />
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h2 id="product-form-title" className="text-lg sm:text-xl font-semibold text-gray-900">
-                {readOnly ? 'View Product' : productId ? 'Edit Product' : 'New Product'}
+                {readOnly ? 'Product Details' : productId ? 'Product Details · Editing' : 'New Product'}
               </h2>
               {hasSavedDraft && !readOnly && (
                 <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
@@ -1278,7 +1289,18 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           </button>
         </div>
 
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 bg-gray-50 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        <nav aria-label="Product editor sections" className="shrink-0 flex gap-1 overflow-x-auto border-b border-gray-200 bg-white px-4 sm:px-6 py-2">
+          {(['overview', 'pricing', 'details', 'instructions', 'accessories'] as const).map(tab => (
+            <button key={tab} type="button" onClick={() => selectEditorTab(tab)}
+              aria-current={editorTab === tab ? 'page' : undefined}
+              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium ${editorTab === tab ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {{ overview: 'Overview', pricing: 'Pricing & Labor', details: 'Details', instructions: 'Instructions & Resources', accessories: 'Accessories' }[tab]}
+            </button>
+          ))}
+        </nav>
+
+        <div ref={scrollContainerRef} role="tabpanel" aria-label={`${editorTab} product fields`} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-3 sm:p-4 bg-gray-50/50 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 items-start content-start">
+          {editorTab === 'overview' && (<React.Fragment>
           {/* AUTO-SAVE INFO */}
           {!readOnly && (
             <div className="lg:col-span-2 flex items-center gap-2 text-gray-500">
@@ -1730,6 +1752,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'pricing' && (<React.Fragment>
           {/* PRICING */}
           <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -2026,6 +2050,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'details' && (<React.Fragment>
           {/* DESCRIPTIONS */}
           <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Descriptions & Instructions</h3>
@@ -2097,6 +2123,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             />
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'instructions' && (<React.Fragment>
           {/* RESOURCES */}
           <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
             <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
@@ -2187,11 +2215,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
             </div>
           </div>
 
+          </React.Fragment>)}
+          {editorTab === 'accessories' && (<React.Fragment>
           {/* Accessories Section */}
           {productId && (
             <ProductAccessories productId={productId} readOnly={readOnly} parentQuantity={Number(formData.default_qty || 1)} baseMaterial={Number(formData.our_price || 0) * Number(formData.default_qty || 1)} baseLabor={Number(formData.default_labor_hours || 0) * Number(formData.default_qty || 1) * Number(laborPhases.find(phase => phase.id === formData.labor_phase_id)?.default_price || laborRate)} />
           )}
-          {!readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+          </React.Fragment>)}
+          {editorTab === 'details' && !readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
             <h3 className="text-base font-semibold text-gray-900">Product status</h3>
             <label className="flex items-start gap-3 text-sm text-gray-700">
               <input type="checkbox" aria-label="Discontinue item" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
@@ -2242,7 +2273,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         message="This item will show a placeholder in the catalog and documents. Add a photo now, or save without one if no useful photo exists."
         variant="warning" confirmLabel="Save without photo" cancelLabel="Add photo"
         onConfirm={() => { setShowMissingImagePrompt(false); void handleSave(); }}
-        onCancel={() => { setShowMissingImagePrompt(false); imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />
+        onCancel={() => { setShowMissingImagePrompt(false); selectEditorTab('overview'); setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }} />
     </div>
   );
 }

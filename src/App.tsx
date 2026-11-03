@@ -1,4 +1,5 @@
 import { notify } from './lib/feedback';
+import { recordPageVisit } from './lib/pageVisitTracking';
 import { EmployeeWelcomeOnboarding } from './components/Auth/EmployeeWelcomeOnboarding';
 import { PasswordSetup } from './components/Auth/PasswordSetup';
 import { canManageTimeOff } from './lib/timeOff';
@@ -114,7 +115,7 @@ const PortalDashboard = lazy(() => import('./components/Portal/PortalDashboard')
 const PortalContactUs = lazy(() => import('./components/Portal/PortalContactUs').then(m => ({ default: m.PortalContactUs })));
 const PortalProposals = lazy(() => import('./components/Portal/PortalProposals').then(m => ({ default: m.PortalProposals })));
 const FinanceTimeWorkspace = lazy(() => import('./components/Finance/FinanceTimeWorkspace').then(m => ({ default: m.FinanceTimeWorkspace })));
-const DailyClock = lazy(() => import('./components/Technician/DailyClock').then(m => ({ default: m.DailyClock })));
+const EmployeeTimeClock = lazy(() => import('./components/Technician/EmployeeTimeClock').then(m => ({ default: m.EmployeeTimeClock })));
 const TimeClockHistory = lazy(() => import('./components/Dispatch/TimeClockHistory').then(m => ({ default: m.TimeClockHistory })));
 const ContractManagement = lazy(() => import('./components/Finance/ContractOnboarding'));
 const SecurityOnboarding = lazy(() => import('./components/Finance/SecurityOnboarding'));
@@ -272,6 +273,17 @@ function AppContent() {
   };
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [_currentHash, setCurrentHash] = useState(window.location.hash);
+
+  // Record a visit only when the logical workspace page changes, not on each render.
+  const lastTrackedPage = useRef('');
+  useEffect(() => {
+    if (!user?.id || !profile?.organization_id || isPortalUser || loading) return;
+    const path = window.location.pathname;
+    const page = path === '/' || workspacePage(path) ? 'workspace/' + activeTab : path;
+    if (lastTrackedPage.current === page) return;
+    lastTrackedPage.current = page;
+    void recordPageVisit(user.id, profile.organization_id, page);
+  }, [user?.id, profile?.organization_id, isPortalUser, loading, activeTab, currentPath]);
 
   const notificationCount = useNotificationCount();
 
@@ -903,7 +915,7 @@ function AppContent() {
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>
-          {activeTab === 'time' && <DailyClock key={activeTab} />}
+          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
             <ContactsView
               key={activeTab}

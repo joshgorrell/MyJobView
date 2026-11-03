@@ -46,7 +46,7 @@ export function permissionLabel(key: string, fallback: string): string {
       {
         reviews: "Feedback",
         messages: "Flow: Customer Messages",
-        settings: "System Administration",
+        settings: "Dealer Admin",
       } as Record<string, string>
     )[key] || fallback
   );

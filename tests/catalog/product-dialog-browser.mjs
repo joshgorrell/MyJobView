@@ -30,7 +30,10 @@ for(const width of [320,390,768,1440]) {
  await productPage.goto('http://127.0.0.1:5173/tests/catalog/product-dialog.html?product');
  await productPage.getByRole('heading',{name:'QN85Q8F',exact:true}).waitFor();
  const description=productPage.getByText(productDescription,{exact:true});
- assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'3','Overview shows a concise preview');
+ assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Overview displays the full-width, unclamped description');
+ assert.ok((await description.innerText()).endsWith('DESCRIPTION END'),'Overview retains the entire description');
+ assert.ok(await productPage.getByRole('heading',{name:'Product information'}).isVisible(),'Product identity is displayed beside the photo');
+ assert.ok(await productPage.getByRole('heading',{name:'Pricing'}).isVisible(),'Pricing card is visible');
  await productPage.getByRole('button',{name:'Details',exact:true}).click();
  await productPage.getByRole('heading',{name:'Sales description',exact:true}).waitFor();
  assert.equal(await description.evaluate(el=>getComputedStyle(el).webkitLineClamp),'none','Details exposes the full description');
@@ -45,8 +48,9 @@ for(const width of [320,390,768,1440]) {
  await productPage.setViewportSize({width,height:844});
  await productPage.goto('http://127.0.0.1:5173/tests/catalog/product-dialog.html?add-product');
  await productPage.getByRole('heading',{name:'New Product',exact:true}).waitFor();
+ await productPage.getByRole('navigation',{name:'Product editor sections'}).getByRole('button',{name:'Details',exact:true}).click();
  const controls=productPage.locator('.product-form-controls input:not([type="hidden"]):not([type="file"]):not(:disabled), .product-form-controls select:not(:disabled), .product-form-controls textarea:not(:disabled)');
- assert.ok(await controls.count()>10);
+ assert.ok(await controls.count()>0,'Details tab exposes editable fields');
  // Product forms follow the workspace palette; security agreement fields above stay white.
  for(const [theme,background,text] of [
   ['light','rgb(255, 255, 255)','rgb(17, 24, 39)'],
@@ -60,6 +64,7 @@ for(const width of [320,390,768,1440]) {
  const description=productPage.getByPlaceholder('Description that customers will see on proposals');
  await description.fill('A full product description. '.repeat(20));
  assert.equal(await description.getAttribute('rows'),'5');
+ await productPage.getByRole('navigation',{name:'Product editor sections'}).getByRole('button',{name:'Overview',exact:true}).click();
  await productPage.getByRole('button',{name:'New',exact:true}).first().click();
  await productPage.getByPlaceholder('Enter manufacturer name').fill('New manufacturer');
  assert.ok(await productPage.getByRole('dialog',{name:'New Product',exact:true}).evaluate(el=>el.scrollWidth<=el.clientWidth),'Add product dialog fits '+width);

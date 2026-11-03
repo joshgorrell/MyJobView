@@ -1,5 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { Building2, Building, Globe, Phone, Plus, Trash2, Save, Upload, X, MapPin, Mail, CreditCard, Loader2, Clock, Image, RefreshCw, Check, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -11,6 +12,7 @@ import { BusinessCardIdentity, CardBranding } from '../BusinessCard/BusinessCard
 import { CompanyDirectorySetting } from '../CompanyDirectory/CompanyDirectorySetting';
 
 export function CompanySettings({ section = 'company' }: { section?: 'company' | 'billing' | 'automation' | 'email' }) {
+  const { profile } = useAuth();
   const [settings, setSettings] = useState<CompanySettingsType | null>(null);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,10 +92,12 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
   const cardBannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadSettings();
-    loadOffices();
-    loadOrganization();
-  }, []);
+    if (!profile?.organization_id) return;
+    setLoading(true);
+    void loadSettings();
+    void loadOffices();
+    void loadOrganization();
+  }, [profile?.organization_id]);
 
   async function loadSettings() {
     setSettingsLoadError(null);
@@ -101,12 +105,15 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
+        .eq('organization_id', profile?.organization_id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
       if (error) throw error;
 
-      if (!data) throw new Error('No company settings record is accessible for this account.');
-      if (data) {
+      const resolvedData = data;
+      if (!resolvedData) throw new Error(`Electronic Life company settings could not be loaded for your signed-in organization. Check that your user profile has the correct organization and that company_settings SELECT access is allowed.`);
+      if (resolvedData) {
+        const data = resolvedData;
         setSettings(data);
         setCompanyName(data.company_name);
         setWebsite(data.website || '');
@@ -157,7 +164,9 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
       }
     } catch (error) {
       console.error('Error loading settings:', error);
-      setSettingsLoadError(error instanceof Error ? error.message : String(error));
+      const details = error && typeof error === 'object' ? error as { message?: string; code?: string; details?: string; hint?: string } : null;
+      const diagnostic = [details?.message, details?.code && `Code: ${details.code}`, details?.details, details?.hint].filter(Boolean).join(' — ');
+      setSettingsLoadError(diagnostic || (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }

@@ -1,10 +1,10 @@
 import { gpsTrackingService } from '../../lib/gpsTracking';
-import { notify, requestConfirmation } from '../../lib/feedback';
+import { notify } from '../../lib/feedback';
 import { saveClockEventGps } from '../../lib/clockEventGps';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff, HeartPulse, X } from 'lucide-react';
+import { Clock, Play, Pause, StopCircle, Coffee, Award, AlertCircle, User, WifiOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ClockOutModal } from '../Shared/ClockOutModal';
 import { offlineSupabaseInsert, offlineSupabaseUpdate, offlineSupabaseQuery } from '../../lib/offlineSupport';
@@ -50,14 +50,6 @@ export function DailyClock() {
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago');
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [leaveBalances, setLeaveBalances] = useState<Array<{ id: string; policy: { id: string; policy_name: string; pto_type: string; is_paid: boolean }; current_balance_hours: number }>>([]);
-  const [selectedLeavePolicy, setSelectedLeavePolicy] = useState('');
-  const [leaveStartTime,setLeaveStartTime] = useState('08:00');
-  const [leaveEndTime,setLeaveEndTime] = useState('16:00');
-  const [leaveFullDay,setLeaveFullDay] = useState(true);
-  const [leaveReason, setLeaveReason] = useState('');
-  const [submittingLeave, setSubmittingLeave] = useState(false);
   const breakMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,9 +75,6 @@ export function DailyClock() {
       console.error('Geolocation requires HTTPS on iOS. Current protocol:', window.location.protocol);
     }
 
-    if (profile?.id) {
-      loadLeaveBalances();
-    }
 
     return () => {
       clearInterval(timer);
@@ -217,64 +206,6 @@ export function DailyClock() {
       setRewardEvent(data);
     } catch (error) {
       console.error('Error loading reward event:', error);
-    }
-  }
-
-  async function loadLeaveBalances() {
-    if (!profile?.id) return;
-    try {
-      const { data } = await supabase
-        .from('pto_balances')
-        .select(`
-          id,
-          current_balance_hours,
-          policy:pto_policies!policy_id(id, policy_name, pto_type, is_paid)
-        `)
-        .eq('employee_id', profile.id)
-        .gt('current_balance_hours', 0);
-      if (data) setLeaveBalances(data as any);
-    } catch (error) {
-      console.error('Error loading leave balances:', error);
-    }
-  }
-
-  async function submitLeaveRequest() {
-    if (!profile?.id || !selectedLeavePolicy) {
-      notify('Please select a leave type', { theme: 'blue', tone: 'warning' });
-      return;
-    }
-
-    const policy = leaveBalances.find(b => b.policy.id === selectedLeavePolicy);
-    if (!policy) return;
-
-    const today = formatDateInTimezone(new Date().toISOString(),orgTimezone);
-    const isSameDay = true;
-
-    if (isSameDay && !['bereavement', 'jury_duty', 'unpaid'].includes(policy.policy.pto_type)) {
-      const confirmed = (await requestConfirmation(`You are calling in for today. This will submit a ${policy.policy.pto_type} request for manager approval.\n\nIf submitted after the cutoff time, points may be deducted from your rewards balance.\n\nDo you want to proceed?`, { theme: 'blue' }));
-      if (!confirmed) return;
-    }
-
-    setSubmittingLeave(true);
-    try {
-      const { error } = await supabase.rpc('submit_time_off', {
-        p_policy:selectedLeavePolicy,p_start:today,p_end:today,p_type:leaveFullDay?'full_day':'hours',
-        p_start_time:leaveFullDay?null:leaveStartTime,p_end_time:leaveFullDay?null:leaveEndTime,
-        p_reason:leaveReason||`Same-day ${policy.policy.pto_type} call-in`
-      });
-
-      if (error) throw error;
-
-      notify('Leave request submitted. Your manager will review and approve it.', { theme: 'blue', tone: 'success' });
-      setShowLeaveModal(false);
-      setSelectedLeavePolicy('');
-      setLeaveReason('');
-      loadLeaveBalances();
-    } catch (error: any) {
-      console.error('Error submitting leave request:', error);
-      notify(error.message || 'Failed to submit leave request', { theme: 'blue', tone: 'error' });
-    } finally {
-      setSubmittingLeave(false);
     }
   }
 
@@ -575,15 +506,7 @@ export function DailyClock() {
               <Play className="w-8 h-8" />
               CLOCK IN
             </button>
-            {leaveBalances.length > 0 && (
-              <button
-                onClick={() => setShowLeaveModal(true)}
-                className="w-full mt-3 bg-blue-500/20 border border-blue-300/50 text-blue-100 rounded-xl py-4 text-lg font-semibold hover:bg-blue-500/30 transition-colors flex items-center justify-center gap-2"
-              >
-                <HeartPulse className="w-6 h-6" />
-                Request Leave (Sick / Vacation)
-              </button>
-            )}
+
           </>
         )}
 
@@ -701,67 +624,6 @@ export function DailyClock() {
           </div>
         )}
       </div>
-
-      {/* Leave Request Modal */}
-      {showLeaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <HeartPulse className="w-6 h-6 text-blue-600" />\n                Clock In as Leave
-              </h3>
-              <button onClick={() => setShowLeaveModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">
-                Submit a same-day leave request. Your manager must approve it before PTO hours are paid.
-                Same-day call-ins after the cutoff time may deduct rewards points.
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Leave Type *</label>
-                <select
-                  value={selectedLeavePolicy}
-                  onChange={(e) => setSelectedLeavePolicy(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select type...</option>
-                  {leaveBalances.map(b => (
-                    <option key={b.id} value={b.policy.id}>
-                      {b.policy.policy_name} ({b.current_balance_hours.toFixed(1)} hrs available)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className="block text-gray-900"><input type="checkbox" checked={leaveFullDay} onChange={e=>setLeaveFullDay(e.target.checked)}/> Full scheduled workday</label>
-              {!leaveFullDay && <div className="grid grid-cols-2 gap-3 text-gray-900"><label>Leave Starts<input type="time" value={leaveStartTime} onChange={e=>setLeaveStartTime(e.target.value)} className="min-h-11 w-full rounded border p-2"/></label><label>Leave Ends<input type="time" value={leaveEndTime} onChange={e=>setLeaveEndTime(e.target.value)} className="min-h-11 w-full rounded border p-2"/></label></div>}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reason (Optional)</label>
-                <textarea
-                  value={leaveReason}
-                  onChange={(e) => setLeaveReason(e.target.value)}
-                  rows={2}
-                  placeholder="Provide context for your call-in..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl">
-              <button onClick={() => setShowLeaveModal(false)} className="px-4 py-2 text-gray-700 hover:text-gray-900">
-                Cancel
-              </button>
-              <button
-                onClick={submitLeaveRequest}
-                disabled={submittingLeave || !selectedLeavePolicy}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {submittingLeave ? 'Submitting...' : 'Submit Leave Request'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Break History */}
       {breaks.length > 0 && (

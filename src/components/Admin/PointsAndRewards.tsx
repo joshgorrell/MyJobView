@@ -1,3 +1,4 @@
+import { ActionRewards } from '../Rewards/ActionRewards';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { Award, Plus, Edit2, Trash2, Save, X, DollarSign, Package } from 'lucide-react';
@@ -259,7 +260,7 @@ export function PointsAndRewards() {
         <h2 className="text-xl sm:text-2xl font-bold text-white">Points & Rewards System</h2>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-700">
+      <div className="flex flex-wrap gap-2 border-b border-gray-700">
         <button
           onClick={() => setActiveTab('points')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -297,7 +298,8 @@ export function PointsAndRewards() {
 
       {activeTab === 'points' && (
         <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
-          <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Points Values</h3>
+          <ActionRewards admin onTimePoints={pointsForm.attendance_on_time_points} />
+          <h3 className="text-lg sm:text-xl font-semibold text-white my-4">Other Activity Values</h3>
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Activity Points</h3>

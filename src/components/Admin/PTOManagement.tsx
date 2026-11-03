@@ -93,6 +93,7 @@ export function PTOManagement() {
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [savingBalance, setSavingBalance] = useState(false);
   const [busyRequest, setBusyRequest] = useState<string | null>(null);
+  const [coverageFollowUp, setCoverageFollowUp] = useState<string>("");
   const [coverage, setCoverage] = useState<
     Record<
       string,
@@ -280,9 +281,12 @@ export function PTOManagement() {
       if (!user) throw new Error("Not authenticated");
 
       setBusyRequest(requestId);
+      setCoverageFollowUp("");
+      let conflictingBookings = 0;
       if (action === 'approve') {
         const { data: conflicts, error: coverageError } = await supabase.rpc('time_off_coverage', { p_request: requestId });
         if (coverageError) throw coverageError;
+        conflictingBookings = conflicts?.length ?? 0;
         if (conflicts?.length && !(await requestConfirmation(`${conflicts.length} existing job(s) or appointment(s) overlap this leave. Approve and then reassign those bookings?`, { theme: 'amber' }))) return;
         if (conflicts?.length) setCoverage(v => ({ ...v, [requestId]: conflicts }));
       }
@@ -298,6 +302,9 @@ export function PTOManagement() {
       toast.success(
         `Request ${action === "approve" ? "approved" : "denied"} successfully`,
       );
+      if (action === "approve" && conflictingBookings > 0) {
+        setCoverageFollowUp(`${conflictingBookings} existing booking(s) overlap the approved absence. Approval did not reassign or cancel them. Dispatch must review and reassign those bookings.`);
+      }
       loadRequests();
     } catch (error: any) {
       console.error("Error updating request:", error);
@@ -366,6 +373,7 @@ export function PTOManagement() {
         </p>
       </div>
 
+      {coverageFollowUp && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">{coverageFollowUp}</p>}
       <PTORoutingSettings />
       <TeamTimeOffPanel />
       <button

@@ -54,7 +54,8 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   }, [preview]);
   useEffect(() => () => cancelPreviewClose(), []);
 
-  const [draft, setDraft] = useState({ project: '', title: '', description: '', visible: true });
+  const [draft, setDraft] = useState({ customer: '', project: '', title: '', description: '', visible: true });
+  const [showNewTask, setShowNewTask] = useState(false);
   const submission = useRef<{ key: string; id: string } | null>(null);
   const saving = useRef(false);
   const generation = useRef(0);
@@ -110,7 +111,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     try {
       const { error: failure } = await supabase.rpc('add_test_tune_adjustment', { p_project_id: draft.project, p_title: draft.title, p_customer_description: draft.visible ? draft.description : null });
       if (failure) throw failure;
-      setDraft({ project: '', title: '', description: '', visible: true }); await load();
+      setDraft({ customer: '', project: '', title: '', description: '', visible: true }); setShowNewTask(false); await load();
     } catch (failure) { setError((failure as Error).message); }
     finally { saving.current = false; setBusy(false); }
   }
@@ -122,14 +123,14 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const rows = visible.flatMap(p => p.tasks.filter(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(t => ({ p, t }))).sort((a, b) => (Date.parse(b.t.updated_at || b.t.created_at || '') || 0) - (Date.parse(a.t.updated_at || a.t.created_at || '') || 0));
   const summary = scoped.flatMap(p => p.tasks).filter(t => (sourceFilter === 'all' || t.source === sourceFilter) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (!dateCutoff || (Date.parse(t.updated_at || t.created_at || '') || 0) >= dateCutoff) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && [search.toLowerCase()].every(q => !q || [t.title, t.customer_description, ...scoped.filter(p => p.tasks.some(item => item.id === t.id)).flatMap(p => [p.customer, p.name, p.number])].some(v => v?.toLowerCase().includes(q))));
   const summaryCounts = { all: summary.length, unsubmitted: summary.filter(t => !t.request_id && t.status === 'open').length, requested: summary.filter(t => Boolean(t.request_id)).length, completed: summary.filter(t => t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || ''))).length };
-  return <section className="min-w-0 space-y-3" aria-label="Test and Tune punchlist feed">
+  return <section className="min-w-0 space-y-2" aria-label="Test and Tune punchlist feed">
     <div data-testid="punchlist-toolbar" className="flex min-w-0 items-center gap-2">
       <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers, projects or tasks" className="min-h-11 min-w-0 flex-1 rounded-xl border border-subtle bg-surface px-3 text-primary" />
       <button type="button" aria-label="Filter Test and Tune tasks" aria-haspopup="dialog" aria-expanded={showAdvancedFilters} onClick={() => setShowAdvancedFilters(true)} className="relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-subtle bg-surface px-3 text-sm font-medium text-primary">
         <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Filters</span>
         {[statusFilter, visibilityFilter, customerFilter, projectFilter, sourceFilter, dateFilter].filter(value => value !== 'all').length > 0 && <span className="rounded-full bg-blue-600 px-1.5 text-xs text-white">{[statusFilter, visibilityFilter, customerFilter, projectFilter, sourceFilter, dateFilter].filter(value => value !== 'all').length}</span>}
       </button>
-      <button disabled={busy} onClick={() => void load()} className="min-h-11 shrink-0 rounded-xl px-2 text-sm text-info">Refresh</button>
+      <button type="button" onClick={() => { setDraft({ customer: contactId || '', project: projectId || '', title: '', description: '', visible: true }); setShowNewTask(true); }} className="min-h-11 shrink-0 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white">+ New</button>
     </div>
     {showAdvancedFilters && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-6" onMouseDown={event => { if (event.target === event.currentTarget) setShowAdvancedFilters(false); }}>
       <section role="dialog" aria-modal="true" aria-label="Test and Tune filters" className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-subtle bg-surface text-primary shadow-2xl">
@@ -139,7 +140,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </header>
         <div className="grid min-w-0 grid-cols-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
           <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-secondary">Status
-            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All statuses</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
+            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All items</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
           </label>
           <select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
       <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
@@ -154,7 +155,10 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         </footer>
       </section>
     </div>}
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" aria-label="Punchlist summary filters">{([{ key: 'all', label: 'All items' }, { key: 'unsubmitted', label: 'Not submitted' }, { key: 'requested', label: 'Service requested' }, { key: 'completed', label: 'Completed' }] as const).map(item => <button key={item.key} type="button" aria-pressed={statusFilter === item.key} onClick={() => setStatusFilter(item.key)} className={`min-h-14 min-w-0 rounded-xl border px-3 py-2 text-left text-sm ${statusFilter === item.key ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary'}`}><strong>{summaryCounts[item.key]}</strong> {item.label}</button>)}</div>
+    <div className="flex items-center justify-between gap-2 text-xs text-secondary" aria-live="polite">
+      <span>{rows.length} {rows.length === 1 ? 'item' : 'items'} shown</span>
+      <span>{summaryCounts[statusFilter as keyof typeof summaryCounts] ?? rows.length} in selected category</span>
+    </div>
     {loading && <p role="status">Loading punchlist…</p>}
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
     {notice && <p role="status" className="break-words text-sm text-secondary">{notice}</p>}
@@ -162,7 +166,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {(taskId || requestId) && !loading && !error && !visible.some(p => p.tasks.length) && <p role="alert">This punchlist item or request is unavailable in the selected project.</p>}
     {lastRequestId && canViewServiceRequests && <a href={`/service-requests?serviceRequestId=${encodeURIComponent(lastRequestId)}`} className="inline-flex min-h-11 items-center text-sm text-info">View service request →</a>}
     {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected · {selectedProject?.customer}</span><button disabled={busy || !selectedProject?.can_submit} onClick={() => void submit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Request service'}</button><button disabled={busy} onClick={() => setSelected([])} className="min-h-11 px-3 text-info">Clear selection</button></div>}
-    {!loading && !error && !visible.length && <div className="rounded-xl border border-subtle bg-surface px-5 py-10 text-center"><h2 className="text-base font-semibold text-primary">No matching Test &amp; Tune projects</h2><p className="mt-2 text-sm text-secondary">Try adjusting your filters, or add an adjustment to an eligible project.</p></div>}
+    {!loading && !error && !visible.length && <div className="rounded-xl border border-subtle bg-surface px-5 py-10 text-center"><h2 className="text-base font-semibold text-primary">No matching Test &amp; Tune projects</h2><p className="mt-2 text-sm text-secondary">Try adjusting your filters, or create a Test & Tune task for an eligible project.</p></div>}
     <div className="space-y-2 md:hidden" aria-label="Mobile Test and Tune tasks">
       {rows.map(({ p, t }) => {
         const description = t.customer_description || t.title;
@@ -246,14 +250,35 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
         {requested && canViewServiceRequests && <a className="mt-2 block text-info underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id!)}`}>View service request →</a>}
       </div>;
     })()}
-    <details className="rounded-lg border border-subtle p-3"><summary className="min-h-11 cursor-pointer text-sm text-info">Add punchlist item</summary>
-      <div className="grid gap-2 pt-2">
-        <select aria-label="Punchlist project" value={draft.project} onChange={e => setDraft({ ...draft, project: e.target.value })} className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="">Choose customer and project</option>{scoped.filter(p => p.can_submit).map(p => <option key={p.id} value={p.id}>{p.customer} · {p.name}</option>)}</select>
-        <input aria-label="Punchlist item title" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder="Internal title" className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary" />
-        <label className="text-sm"><input type="checkbox" checked={draft.visible} onChange={e => setDraft({ ...draft, visible: e.target.checked })} /> Customer visible</label>
-        {draft.visible && <textarea aria-label="Customer-visible description" value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} placeholder="Description the customer can see" className="min-h-20 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary" />}
-        <button disabled={busy || !draft.project || !draft.title.trim() || (draft.visible && !draft.description.trim())} onClick={() => void add()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">Save punchlist item</button>
-      </div>
-    </details>
+    {showNewTask && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-6" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setShowNewTask(false); }}>
+      <section role="dialog" aria-modal="true" aria-label="New Test and Tune task" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-subtle bg-surface p-4 text-primary shadow-2xl sm:p-6">
+        <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">New Test &amp; Tune task</h2><button type="button" aria-label="Close new task" disabled={busy} onClick={() => setShowNewTask(false)} className="min-h-11 min-w-11 rounded-lg border border-subtle"><X className="mx-auto h-4 w-4" /></button></div>
+        <p className="mt-1 text-sm text-secondary">Select a customer and a substantially completed Test &amp; Tune project.</p>
+        <div className="mt-4 grid gap-3">
+          <label className="grid gap-1 text-sm">Customer
+            <select aria-label="Test and Tune customer" value={draft.customer} onChange={e => setDraft({ ...draft, customer: e.target.value, project: '' })} className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary">
+              <option value="">Select customer</option>
+              {Array.from(new Map(projects.filter(p => p.can_submit).map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">Project
+            <select aria-label="Test and Tune project" disabled={!draft.customer} value={draft.project} onChange={e => setDraft({ ...draft, project: e.target.value })} className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary">
+              <option value="">Select eligible project</option>
+              {projects.filter(p => p.can_submit && p.contact_id === draft.customer).map(p => <option key={p.id} value={p.id}>{p.name}{p.number ? ` (#${p.number})` : ''}</option>)}
+            </select>
+          </label>
+          {draft.customer && !projects.some(p => p.can_submit && p.contact_id === draft.customer) && <p className="text-sm text-secondary">No eligible Test &amp; Tune projects for this customer.</p>}
+          <label className="grid gap-1 text-sm">Task title
+            <input aria-label="Punchlist item title" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder="Describe the issue" className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary" />
+          </label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.visible} onChange={e => setDraft({ ...draft, visible: e.target.checked })} /> Customer visible</label>
+          {draft.visible && <label className="grid gap-1 text-sm">Customer-visible description
+            <textarea aria-label="Customer-visible description" value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} placeholder="Description the customer can see" className="min-h-20 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary" />
+          </label>}
+          <div className="flex justify-end gap-2"><button type="button" disabled={busy} onClick={() => setShowNewTask(false)} className="min-h-11 rounded-lg border border-subtle px-4">Cancel</button>
+          <button type="button" disabled={busy || !projects.some(p => p.id === draft.project && p.contact_id === draft.customer && p.can_submit) || !draft.title.trim() || (draft.visible && !draft.description.trim())} onClick={() => void add()} className="min-h-11 rounded-lg bg-blue-600 px-4 text-white disabled:opacity-50">Save task</button></div>
+        </div>
+      </section>
+    </div>}
   </section>;
 }
