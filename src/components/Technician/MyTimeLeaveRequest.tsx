@@ -9,6 +9,7 @@ type Balance = { id: string; current_balance_hours: number; policy: { id: string
 export function MyTimeLeaveRequest() {
   const { profile } = useAuth();
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [loadingBalances, setLoadingBalances] = useState(true);
   const [policyId, setPolicyId] = useState('');
   const [reason, setReason] = useState('');
   const [fullDay, setFullDay] = useState(true);
@@ -19,8 +20,9 @@ export function MyTimeLeaveRequest() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!profile?.id) { setLoadingBalances(false); return; }
     let cancelled = false;
+    setLoadingBalances(true);
     supabase.from('pto_balances')
       .select('id,current_balance_hours,policy:pto_policies!policy_id(id,policy_name,pto_type,is_paid)')
       .eq('employee_id', profile.id)
@@ -28,6 +30,7 @@ export function MyTimeLeaveRequest() {
         if (cancelled) return;
         if (error) setError('Leave balances could not be loaded.');
         else setBalances((data ?? []) as unknown as Balance[]);
+        setLoadingBalances(false);
       });
     return () => { cancelled = true; };
   }, [profile?.id]);
@@ -58,8 +61,9 @@ export function MyTimeLeaveRequest() {
   return <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
     <h3 className="font-semibold text-gray-900">Request Same-Day Leave</h3>
     <p className="text-sm text-gray-600">Submit a sick or vacation call-in for manager approval. This does not clock you in.</p>
-    {balances.length === 0 && !error && <p className="text-sm text-gray-600">No leave policies are assigned to your account. Contact your manager to request time off.</p>}
-    {balances.length > 0 && <>
+    {loadingBalances && <p className="text-sm text-gray-600">Loading available leave types…</p>}
+    {!loadingBalances && balances.length === 0 && !error && <p className="text-sm text-gray-600">No leave policies are assigned to your account. Contact your manager to request time off.</p>}
+    {!loadingBalances && balances.length > 0 && <>
       <label className="block text-sm text-gray-800">Leave type
         <select className="mt-1 w-full rounded border p-2" value={policyId} onChange={e => setPolicyId(e.target.value)}>
           <option value="">Select leave type</option>
