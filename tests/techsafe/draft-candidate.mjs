@@ -4,6 +4,7 @@ import {prepareTechsafeDraftCandidate as prepare} from '../../supabase/functions
 import {copy,digest,binding,history} from './fixtures/equipment-history.mjs';
 import {prepareTechsafeCandidateFromBundle} from '../../supabase/functions/_shared/techsafe-bundle-composition.mjs';
 import {compareTechsafeSourceReread} from '../../supabase/functions/_shared/techsafe-source-reread.mjs';
+import {assessOriginalHistoryAnchor} from '../../supabase/functions/_shared/techsafe-original-history-anchor.mjs';
 function fixture(direct=false){
  const input=history(),m=input.currentModel;
  input.basis={basisVersion:1,sourceKind:'customer_portal_approval',binding:copy(binding),approvalRef:'approval',portalVersion:1,
@@ -56,6 +57,22 @@ const unknownPrice=fixture();delete unknownPrice.currentModel.lines[0].salePrice
 const percentages=fixture();for(const key of ['pricingFacts','discount_percent','misc_parts_percent'])Object.defineProperty(percentages.currentModel,key,{get(){throw Error('Aggregate pricing must not be read');}});pass(percentages);
 const costs=fixture();for(const row of costs.currentModel.lines){Object.defineProperty(row,'cost',{get(){throw Error('Cost must not be read');}});Object.defineProperty(row.product,'retail_price',{get(){throw Error('Retail must not be read');}});}pass(costs);
 assert.equal(prepare(null,binding).valid,false);
+
+const anchorSource=fixture();
+const anchorOk=assessOriginalHistoryAnchor(anchorSource,binding);
+assert.equal(anchorOk.anchored,true,JSON.stringify(anchorOk));
+assert.equal(anchorOk.checkedApplications,8);
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(anchorOk[flag],false);
+const anchorChanged=fixture();
+anchorChanged.basis.lines[0].line.quantity='99.00';
+assert.equal(assessOriginalHistoryAnchor(anchorChanged,binding).anchored,false);
+const anchorMissing=fixture();
+anchorMissing.pairs.splice(2,1);
+assert.equal(assessOriginalHistoryAnchor(anchorMissing,binding).anchored,false);
+const anchorHash=fixture();
+anchorHash.basis.approvedRowsHash='b'.repeat(64);
+assert.equal(assessOriginalHistoryAnchor(anchorHash,binding).anchored,false);
+assert.equal(assessOriginalHistoryAnchor(null,binding).anchored,false);
 
 const bundleInput=fixture();
 const bundle={bundleVersion:1,currentModel:bundleInput.currentModel,basis:bundleInput.basis,
