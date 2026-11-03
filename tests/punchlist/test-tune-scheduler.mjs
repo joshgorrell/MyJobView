@@ -36,12 +36,22 @@ assert.equal((await db.query('SELECT count(*)::int n FROM punchlist_access_grant
 await db.query(`UPDATE projects SET test_tune_invite_sent_at=now() WHERE id='${id(20)}'`);
 assert.equal((await db.query('SELECT prepare_due_test_tune_invites() AS invites')).rows[0].invites.length,0);
 await db.close();
-let handler;const acknowledged=[];let preparedCalls=0;
+// The legacy Day-7 processor is retired by Issue #440. It must not
+// prepare invitations or send emails even if an old scheduler calls it.
+let handler;let preparedCalls=0;let outboundCalls=0;
 const edge=(await readFile('supabase/functions/process-test-tune-starts/index.ts','utf8')).replace(/^import .*;\n/gm,'');
 const env={SUPABASE_SERVICE_ROLE_KEY:'service',TEST_TUNE_SCHEDULER_SECRET:'scheduler',SUPABASE_URL:'https://test.invalid'};
-const client={rpc:async()=>{preparedCalls++;return{data:[{project_id:'a',organization_id:'org'},{project_id:'b',organization_id:'org'}],error:null}},from:()=>{let payload,project;const q={update(p){payload=p;return q},eq(k,v){if(k==='id')project=v;return q},is:async()=>{acknowledged.push({project,payload});return{error:null}}};return q}};
-vm.runInNewContext(ts.transpileModule(edge,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,{Request,Response,createClient:()=>client,Deno:{env:{get:key=>env[key]},serve:fn=>handler=fn},fetch:async(_,init)=>JSON.parse(init.body).project_id==='a'?Response.json({success:true}):Response.json({success:false,error:'Sender not configured'}),console});
+vm.runInNewContext(ts.transpileModule(edge,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,{
+  Request,Response,createClient:()=>({rpc:async()=>{preparedCalls++;return{data:[],error:null}}}),
+  Deno:{env:{get:key=>env[key]},serve:fn=>handler=fn},
+  fetch:async()=>{outboundCalls++;return Response.json({success:true})},console
+});
 const call=token=>handler(new Request('https://edge.invalid',{method:'POST',headers:{Authorization:'Bearer '+token}}));
-assert.equal((await call('ordinary-staff')).status,401);assert.equal(preparedCalls,0);
-const result=await (await call('scheduler')).json();assert.deepEqual(result.results.map(r=>r.status),['sent','retry_needed']);assert.deepEqual(acknowledged.map(row=>row.project),['a'],'A 200 response with success=false never marks an email sent');
-console.log('Day-7 eligibility, 90-day project expiry, credential gating, service-only SQL, repeat processing, and delivery retry/acknowledgment checks passed.');
+assert.equal((await call('ordinary-staff')).status,401);
+const result=await (await call('scheduler')).json();
+assert.equal(result.retired,true,'Legacy worker explicitly reports retirement');
+assert.equal(result.processed,0,'Legacy worker never processes invitations');
+assert.deepEqual(result.results,[]);
+assert.equal(preparedCalls,0,'Legacy worker never prepares Day-7 invitations');
+assert.equal(outboundCalls,0,'Legacy worker never sends emails');
+console.log('Legacy Day-7 SQL fixture checks and retired edge processor no-op checks passed.');
