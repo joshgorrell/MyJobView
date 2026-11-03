@@ -74,7 +74,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
     return () => { cancelled = true; };
   }, [section, profile?.id, historyRevision]);
   const sections: { id: TimeSection; label: string; icon: typeof Clock }[] = [
-    ...(policy.dailyClock ? [{ id: 'daily' as const, label: 'Daily Clock', icon: Clock }] : []),
+    { id: 'daily', label: 'Daily Clock', icon: Clock },
     { id: 'job', label: 'Job Clock', icon: Briefcase },
     { id: 'mine', label: 'My Time', icon: History },
   ];
@@ -93,7 +93,12 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
           </button>
         ))}
       </div>
-      {current === 'daily' && policy.dailyClock && <DailyClock />}
+      {current === 'daily' && (policy.dailyClock ? <DailyClock /> : (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-5" role="status">
+          <h2 className="font-semibold text-gray-700">Daily Clock not required</h2>
+          <p className="mt-2 text-sm text-gray-600">Your employee time settings do not require you to clock in and out for the day. Daily clocking is disabled for your account. You can still use Job Clock for assigned work and My Time to review your entries.</p>
+        </div>
+      ))}
       {current === 'job' && (
         <div className="space-y-3">
           <div className="rounded-xl border border-gray-200 bg-white p-4">
