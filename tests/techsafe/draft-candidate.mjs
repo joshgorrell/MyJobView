@@ -54,6 +54,37 @@ const unknownPrice=fixture();delete unknownPrice.currentModel.lines[0].salePrice
 const percentages=fixture();for(const key of ['pricingFacts','discount_percent','misc_parts_percent'])Object.defineProperty(percentages.currentModel,key,{get(){throw Error('Aggregate pricing must not be read');}});pass(percentages);
 const costs=fixture();for(const row of costs.currentModel.lines){Object.defineProperty(row,'cost',{get(){throw Error('Cost must not be read');}});Object.defineProperty(row.product,'retail_price',{get(){throw Error('Retail must not be read');}});}pass(costs);
 assert.equal(prepare(null,binding).valid,false);
+
+// Phase 2: malformed and partial source bundles must never authorize export.
+// Assert the security outcome rather than coupling these tests to diagnostic codes.
+const held=(input,actor=binding)=>{
+ const result=prepare(input,actor);
+ assert.equal(result.valid,false,JSON.stringify(result));
+ assert.equal(result.content,null);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(result[flag],false);
+};
+for(const mutate of [
+ input=>{delete input.basis;},
+ input=>{delete input.pairs;},
+ input=>{input.pairs=null;},
+ input=>{input.pairs=[...input.pairs,{...input.pairs[0],startedOrder:'not-an-order'}];},
+ input=>{input.currentModel.lines=null;},
+ input=>{input.currentModel.order.status='cancelled';},
+ input=>{input.currentModel.order.status='deleted';},
+ input=>{input.currentModel.customer=null;},
+ input=>{input.currentModel.sellingPriceContext=null;},
+ input=>{input.basis.lines=null;},
+]){
+ const input=fixture();mutate(input);held(input);
+}
+// A valid candidate is still never a source-authorized export envelope.
+const candidate=pass(fixture());
+assert.equal(candidate.scopeVerified,false);
+assert.equal(candidate.snapshotReady,false);
+assert.equal(candidate.quoteReady,false);
+assert.equal(Object.hasOwn(candidate,'revision'),false);
+assert.equal(Object.hasOwn(candidate,'eventId'),false);
+
 if(process.argv[2]){
  const {prepareImport}=await import(pathToFileURL(process.argv[2]).href);
  const receiverBinding={...binding,sourceInstanceId:'mjv',environment:'sandbox',generation:1,dealerId:'dealer',status:'active',reconciliationRequired:false};
