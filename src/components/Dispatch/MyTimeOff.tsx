@@ -49,6 +49,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("12:00");
   const [reason, setReason] = useState("");
+  const [calledManagerAcknowledged, setCalledManagerAcknowledged] = useState(false);
   const [preview, setPreview] = useState<LeaveDay[]>([]);
   const [previewError, setPreviewError] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -192,7 +193,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       86400000 <
       28;
   async function submit() {
-    if (!policy || !preview.length || previewError) return;
+    if (!policy || !preview.length || previewError || (start === today && !calledManagerAcknowledged)) return;
     setBusy(true);
     setError("");
     const { error } = await supabase.rpc("submit_time_off", {
@@ -202,10 +203,13 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       p_type: type,
       p_start_time: type === "full_day" ? null : startTime,
       p_end_time: type === "full_day" ? null : endTime,
-      p_reason: reason || null,
+      p_reason: start === today
+        ? [reason.trim() || "Same-day call-in", `Manager phone call self-attested by employee ${user?.id ?? "unknown"} at ${new Date().toISOString()} (UTC).`].join("\\n")
+        : reason || null,
     });
     if (error) setError(error.message);
     else {
+      setCalledManagerAcknowledged(false);
       setShowForm(false);
       setRefresh((v) => v + 1);
     }
