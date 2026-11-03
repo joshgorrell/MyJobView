@@ -133,18 +133,18 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
           if (grantLookupError || !grant) throw new Error('Customer access expiration could not be confirmed');
 
           if (sendEmail) {
-          const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
-            body: {
-              contact_email: emailAddress.trim(),
-              contact_name: customer.contact_name,
-              project_name: customer.project_name,
-              expiration_date: grant.expiration_date,
-              access_type: 'test_and_tune',
-            },
-          });
-          if (inviteError || inviteResult?.success !== true) {
-            throw new Error(inviteResult?.error || inviteError?.message || 'Invitation delivery was not confirmed');
-          }
+            const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
+              body: {
+                contact_email: emailAddress.trim(),
+                contact_name: customer.contact_name,
+                project_name: customer.project_name,
+                expiration_date: grant.expiration_date,
+                access_type: 'test_and_tune',
+              },
+            });
+            if (inviteError || inviteResult?.success !== true) {
+              throw new Error(inviteResult?.error || inviteError?.message || 'Invitation delivery was not confirmed');
+            }
           }
         } catch (inviteError) {
           console.error('Project completed; Test & Tune access or invitation requires attention:', inviteError);
