@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/organizationTimezone';
+import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
 type Balance = { id: string; current_balance_hours: number; policy: { id: string; policy_name: string; pto_type: string } };
 
