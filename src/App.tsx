@@ -115,7 +115,7 @@ const PortalDashboard = lazy(() => import('./components/Portal/PortalDashboard')
 const PortalContactUs = lazy(() => import('./components/Portal/PortalContactUs').then(m => ({ default: m.PortalContactUs })));
 const PortalProposals = lazy(() => import('./components/Portal/PortalProposals').then(m => ({ default: m.PortalProposals })));
 const FinanceTimeWorkspace = lazy(() => import('./components/Finance/FinanceTimeWorkspace').then(m => ({ default: m.FinanceTimeWorkspace })));
-const DailyClock = lazy(() => import('./components/Technician/DailyClock').then(m => ({ default: m.DailyClock })));
+const EmployeeTimeClock = lazy(() => import('./components/Technician/EmployeeTimeClock').then(m => ({ default: m.EmployeeTimeClock })));
 const TimeClockHistory = lazy(() => import('./components/Dispatch/TimeClockHistory').then(m => ({ default: m.TimeClockHistory })));
 const ContractManagement = lazy(() => import('./components/Finance/ContractOnboarding'));
 const SecurityOnboarding = lazy(() => import('./components/Finance/SecurityOnboarding'));
@@ -915,7 +915,7 @@ function AppContent() {
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>
-          {activeTab === 'time' && <DailyClock key={activeTab} />}
+          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
             <ContactsView
               key={activeTab}

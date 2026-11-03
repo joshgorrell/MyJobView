@@ -122,7 +122,7 @@ assert.ok(nativeClockUi.includes('Hours pending synchronization or review'),
 assert.ok(!nativeClockUi.includes('Offline clock-out and breaks are not yet available.'),
   'Offline clock-in instructions must reflect supported offline clock-out');
 assert.ok(nativeDashboardUi.includes("setUsesDailyClock(context.dailyClock)") &&
-  nativeDashboardUi.includes('No Active Job Timer'),
+  nativeDashboardUi.includes('No active job'),
   'Job Time employees must not be shown a false Daily Clock status');
 assert.ok(nativeDashboardUi.includes("setRecentDays([])"),
   'Job Time employees must not be shown irrelevant Daily Clock recent shifts');

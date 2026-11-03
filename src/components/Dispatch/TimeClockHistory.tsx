@@ -1054,7 +1054,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       {/* Page Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-white">Time Clock History</h2>
+          <h2 className="text-lg font-bold text-white">Time Clock</h2>
           {refreshing && activeTab === 'clock' && <span className="text-xs text-gray-400 animate-pulse">Updating...</span>}
         </div>
         <div className="flex items-center gap-2">
@@ -1119,46 +1119,52 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-700 w-fit">
+      <div role="tablist" aria-label="Time clock sections" className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-700 w-full sm:w-fit overflow-x-auto">
         <button
           onClick={() => setActiveTab('clock')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          role="tab"
+          aria-selected={activeTab === 'clock'}
+          className={`flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === 'clock'
               ? 'bg-gray-700 text-white shadow-sm'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
           }`}
         >
           <Clock className="w-4 h-4" />
-          Clock History
+          Daily Clock History
         </button>
         <button
           onClick={() => setActiveTab('job_time')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          role="tab"
+          aria-selected={activeTab === 'job_time'}
+          className={`flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === 'job_time'
               ? 'bg-gray-700 text-white shadow-sm'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
           }`}
         >
           <LayoutList className="w-4 h-4" />
-          Job Time History
+          Job Clock History
         </button>
         <button
           onClick={() => setActiveTab('sessions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+          role="tab"
+          aria-selected={activeTab === 'sessions'}
+          className={`flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all ${
             activeTab === 'sessions'
               ? 'bg-gray-700 text-white shadow-sm'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
           }`}
         >
           <Wrench className="w-4 h-4" />
-          Shop &amp; Training
+          My Time
         </button>
       </div>
 
       {/* Job Time History Tab */}
       {activeTab === 'job_time' && <JobTimeHistory />}
 
-      {/* Internal Sessions Management Tab */}
+      {/* My Time: internal shop and training sessions; additional employee records will be consolidated here. */}
       {activeTab === 'sessions' && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <InternalSessionsManagement />
