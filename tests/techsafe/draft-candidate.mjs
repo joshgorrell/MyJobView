@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {prepareTechsafeDraftCandidate as prepare} from '../../supabase/functions/_shared/techsafe-draft-candidate.mjs';
 import {copy,digest,binding,history} from './fixtures/equipment-history.mjs';
+import {prepareTechsafeCandidateFromBundle} from '../../supabase/functions/_shared/techsafe-bundle-composition.mjs';
 function fixture(direct=false){
  const input=history(),m=input.currentModel;
  input.basis={basisVersion:1,sourceKind:'customer_portal_approval',binding:copy(binding),approvalRef:'approval',portalVersion:1,
@@ -54,6 +55,27 @@ const unknownPrice=fixture();delete unknownPrice.currentModel.lines[0].salePrice
 const percentages=fixture();for(const key of ['pricingFacts','discount_percent','misc_parts_percent'])Object.defineProperty(percentages.currentModel,key,{get(){throw Error('Aggregate pricing must not be read');}});pass(percentages);
 const costs=fixture();for(const row of costs.currentModel.lines){Object.defineProperty(row,'cost',{get(){throw Error('Cost must not be read');}});Object.defineProperty(row.product,'retail_price',{get(){throw Error('Retail must not be read');}});}pass(costs);
 assert.equal(prepare(null,binding).valid,false);
+
+const bundleInput=fixture();
+const bundle={bundleVersion:1,currentModel:bundleInput.currentModel,basis:bundleInput.basis,
+ pairs:bundleInput.pairs,inputFingerprint:'a'.repeat(64),readAtEpoch:'1793448000.000000'};
+const composed=prepareTechsafeCandidateFromBundle(bundle,binding);
+assert.equal(composed.valid,true,JSON.stringify(composed));
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(composed[flag],false);
+const rejectBundle=b=>{const out=prepareTechsafeCandidateFromBundle(b,binding);
+ assert.equal(out.valid,false,JSON.stringify(out));assert.equal(out.content,null);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(out[flag],false);};
+rejectBundle(null);
+rejectBundle({...bundle,bundleVersion:2});
+rejectBundle({...bundle,inputFingerprint:'untrusted'});
+rejectBundle({...bundle,readAtEpoch:'invalid'});
+rejectBundle({...bundle,pairs:null});
+rejectBundle({...bundle,pairs:Array(1001).fill(null)});
+rejectBundle({...bundle,quoteReady:true});
+rejectBundle({...bundle,eventId:'fabricated'});
+rejectBundle({...bundle,revision:1});
+rejectBundle({...bundle,basis:null});
+
 
 // Phase 2: malformed and partial source bundles must never authorize export.
 // Assert the security outcome rather than coupling these tests to diagnostic codes.
