@@ -14,6 +14,7 @@ export function MyTimeLeaveRequest() {
   const [start, setStart] = useState('08:00');
   const [end, setEnd] = useState('16:00');
   const [busy, setBusy] = useState(false);
+  const [calledManagerAcknowledged, setCalledManagerAcknowledged] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -30,7 +31,7 @@ export function MyTimeLeaveRequest() {
     return () => { cancelled = true; };
   }, [profile?.id]);
   async function submit() {
-    if (!policyId || busy) return;
+    if (!policyId || busy || !calledManagerAcknowledged) return;
     if (!fullDay && end <= start) { setError('Leave end time must be after start time.'); return; }
     setBusy(true); setError(''); setMessage('');
     try {
@@ -38,7 +39,7 @@ export function MyTimeLeaveRequest() {
       const today = formatDateInTimezone(new Date().toISOString(), timezone);
       const policy = balances.find(item => item.policy.id === policyId);
       if (!policy) throw new Error('Select a valid leave type.');
-      if (!window.confirm('Submit a same-day leave request for manager approval? Same-day call-ins may affect rewards points.')) return;
+      if (!window.confirm('Confirm you have personally called your manager. This request is required for eligible PTO payment but does not replace your call. Submit for approval?')) return;
       const { error } = await supabase.rpc('submit_time_off', {
         p_policy: policyId, p_start: today, p_end: today,
         p_type: fullDay ? 'full_day' : 'hours',
@@ -47,7 +48,7 @@ export function MyTimeLeaveRequest() {
       });
       if (error) throw error;
       setMessage('Leave request submitted for manager approval.');
-      setPolicyId(''); setReason('');
+      setPolicyId(''); setReason(''); setCalledManagerAcknowledged(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Leave request could not be submitted.');
     } finally { setBusy(false); }
@@ -70,7 +71,12 @@ export function MyTimeLeaveRequest() {
         <label className="text-sm text-gray-800">End<input type="time" className="block w-full rounded border p-2" value={end} onChange={e => setEnd(e.target.value)} /></label>
       </div>}
       <label className="block text-sm text-gray-800">Reason (optional)<textarea className="mt-1 w-full rounded border p-2" value={reason} onChange={e => setReason(e.target.value)} /></label>
-      <button type="button" disabled={!policyId || busy} onClick={submit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Submit Leave Request'}</button>
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2" role="note">
+        <p className="font-semibold text-amber-950">IMPORTANT — You must call your manager</p>
+        <p className="text-sm text-amber-950">You must personally call your manager to report your absence. Submitting this request does not replace the required phone call. To receive paid time off, you must submit a request, have sufficient eligible PTO hours, and receive approval. Submission does not guarantee payment.</p>
+        <label className="flex items-start gap-2 text-sm text-amber-950"><input type="checkbox" className="mt-1" checked={calledManagerAcknowledged} onChange={e => setCalledManagerAcknowledged(e.target.checked)} />I confirm that I have personally called my manager to report this absence.</label>
+      </div>
+      <button type="button" disabled={!policyId || busy || !calledManagerAcknowledged} onClick={submit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Submit Leave Request'}</button>
     </>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     {message && <p role="status" className="text-sm text-green-700">{message}</p>}
