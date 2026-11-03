@@ -1,4 +1,3 @@
-import { notify } from '../../lib/feedback';
 import { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Heart, Trash2, ListTodo, HelpCircle, MessageCircle, Reply, TrendingUp, CheckCircle, Award, User, Lock, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -253,7 +252,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       loadPosts();
     } catch (error) {
       console.error('Error posting reply:', error);
-      notify('Failed to post reply. Please try again.', { theme: 'cyan', tone: 'error' });
+      alert('Failed to post reply. Please try again.');
     }
   }
 
@@ -262,26 +261,61 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
 
     try {
       if ((post as any).is_completed) {
-        notify('This has already been completed', { theme: 'cyan', tone: 'warning' });
+        alert('This has already been completed');
         return;
       }
 
       const assignedTo = (post as any).assigned_to;
       if (assignedTo && assignedTo !== profile.id) {
-        notify('Only the assigned person can mark this as complete', { theme: 'cyan', tone: 'info' });
+        alert('Only the assigned person can mark this as complete');
         return;
       }
 
-      const { error } = await supabase.rpc('set_discussion_task_completion', {
-        p_post_id: post.id,
-        p_complete: true,
-      });
-      if (error) throw error;
+      // Get points configuration
+      const { data: pointsConfig } = await supabase
+        .from('points_configuration')
+        .select('task_completion_points, question_answer_points')
+        .single();
+
+      const postPoints = post.post_type === 'task'
+        ? (pointsConfig?.task_completion_points || 10)
+        : (pointsConfig?.question_answer_points || 5);
+
+      await offlineSupabaseUpdate('discussion_posts', {
+        is_completed: true,
+        completed_by: profile.id,
+        completed_at: new Date().toISOString(),
+      }, post.id);
+
+      // Create points transaction
+      await supabase.from('points_transactions').insert([{
+        user_id: profile.id,
+        points_amount: postPoints,
+        transaction_type: post.post_type === 'task' ? 'task_completion' : 'question_answer',
+        reference_id: post.id,
+        description: `${post.post_type === 'task' ? 'Completed task' : 'Answered question'}: ${post.content.substring(0, 50)}...`,
+      }]);
+
+      await supabase.from('notifications').insert([{
+        user_id: profile.id,
+        type: 'points_earned',
+        title: `+${postPoints} Points!`,
+        body: `You earned ${postPoints} points for ${post.post_type === 'task' ? 'completing a task' : 'answering a question'}`,
+      }]);
+
+      if (post.user_id !== profile.id) {
+        await supabase.from('notifications').insert([{
+          user_id: post.user_id,
+          type: post.post_type === 'task' ? 'task_completed' : 'question_answered',
+          title: post.post_type === 'task' ? 'Task Completed' : 'Question Answered',
+          body: `${profile.full_name} ${post.post_type === 'task' ? 'completed' : 'answered'} your ${post.post_type}`,
+        }]);
+      }
 
       loadPosts();
     } catch (error) {
       console.error('Error completing post:', error);
-      notify('Failed to mark as complete', { theme: 'cyan', tone: 'error' });
+      alert('Failed to mark as complete');
     }
   }
 
@@ -293,12 +327,12 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       const hoursSinceCreation = postAge / (1000 * 60 * 60);
 
       if (hoursSinceCreation < 4) {
-        notify('Posts can only be bumped after 4 hours', { theme: 'cyan', tone: 'info' });
+        alert('Posts can only be bumped after 4 hours');
         return;
       }
 
       if (post.reply_count && post.reply_count > 0) {
-        notify('This post already has replies', { theme: 'cyan', tone: 'warning' });
+        alert('This post already has replies');
         return;
       }
 
@@ -308,7 +342,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
         const hoursSinceLastBump = timeSinceLastBump / (1000 * 60 * 60);
 
         if (hoursSinceLastBump < 24) {
-          notify('Posts can only be bumped once every 24 hours', { theme: 'cyan', tone: 'info' });
+          alert('Posts can only be bumped once every 24 hours');
           return;
         }
       }
@@ -348,7 +382,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
       loadPosts();
     } catch (error) {
       console.error('Error bumping post:', error);
-      notify('Failed to bump post', { theme: 'cyan', tone: 'error' });
+      alert('Failed to bump post');
     }
   }
 
@@ -676,7 +710,7 @@ export function DiscussionFeed({ onLeadClick, selectedHashtag, onHashtagClick, s
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
                       placeholder="Write a reply..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+                      className="mjv-writing-field w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
                       rows={3}
                     />
                     <div className="flex gap-2 mt-2">

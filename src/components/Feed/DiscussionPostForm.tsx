@@ -1,6 +1,5 @@
-import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { Send, ListTodo, HelpCircle, MessageCircle, Calendar, ChevronDown, ChevronUp, Users, Lock, CheckCircle2 } from 'lucide-react';
+import { Send, ListTodo, HelpCircle, MessageCircle, Calendar, ChevronDown, ChevronUp, Users, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { resolveMentions, parseHashtags } from '../../lib/username';
@@ -19,9 +18,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [reminderDate, setReminderDate] = useState('');
   const [showReminder, setShowReminder] = useState(false);
   const [assignedUsername, setAssignedUsername] = useState('');
-  const [audience, setAudience] = useState<'company' | 'direct' | 'department'>('company');
-  const [departmentId, setDepartmentId] = useState('');
-  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<Array<{ type: 'user' | 'lead'; username: string; name: string; id: string }>>([]);
@@ -29,15 +26,8 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
   const [route, setRoute] = useState<FlowTarget | null>(null);
   const [routeToken, setRouteToken] = useState('');
   const [highlight, setHighlight] = useState(0);
-  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id ?? undefined);
+  const { tag, choices } = useFlowTags(content, cursorPosition, profile?.organization_id);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (!profile?.organization_id) return;
-    void supabase.from('departments').select('id,display_name,name').eq('organization_id', profile.organization_id).eq('is_active', true).order('sort_order').then(({ data }) => {
-      setDepartments((data || []).map((d: any) => ({ id: d.id, name: d.display_name || d.name })));
-    });
-  }, [profile?.organization_id]);
 
   useEffect(() => {
     const text = content.slice(0, cursorPosition);
@@ -153,10 +143,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         hashtags: hashtags,
         reminder_date: reminderDate ? new Date(reminderDate).toISOString() : null,
         assigned_to: (postType === 'task' || postType === 'question') ? assignedToId : null,
-        is_private: audience !== 'company',
-        audience_type: audience,
-        audience_department_id: audience === 'department' ? departmentId : null,
-        audience_user_ids: audience === 'direct' ? userMentions : [],
+        is_private: isPrivate,
         contact_id: route?.kind === 'contact' ? route.id : null,
         project_id: route?.kind === 'project' ? route.id : null,
         work_order_id: route?.kind === 'work_order' ? route.id : null,
@@ -206,47 +193,64 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
       setReminderDate('');
       setShowReminder(false);
       setAssignedUsername('');
-      setAudience('company');
-      setDepartmentId('');
+      setIsPrivate(false);
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
-      notify('Failed to create post. Please try again.', { theme: 'cyan', tone: 'error' });
+      alert('Failed to create post. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="relative space-y-5 rounded-2xl bg-transparent p-2 text-slate-100 sm:p-4">
+    <form onSubmit={handleSubmit} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 relative">
       <div className="mb-3">
-        <label className="mb-3 block text-xs font-bold uppercase tracking-widest text-slate-300">Message type <span className="text-rose-400">*</span></label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <button type="button" aria-pressed={postType === 'task'} onClick={() => setPostType('task')}
-            className={`relative flex min-h-[76px] items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${postType === 'task' ? 'border-blue-400 bg-blue-600/20 text-white ring-1 ring-blue-500' : 'border-slate-600 bg-slate-800/50 text-slate-200 hover:border-slate-400'}`}>
-            <ListTodo className="h-6 w-6 shrink-0" />
-            <span className="min-w-0"><strong className="block text-sm">Task</strong><small className="block text-xs text-slate-400">Assign work or next steps</small></span>
-            {postType === 'task' && <CheckCircle2 className="absolute right-2 top-2 h-4 w-4 text-blue-300" />}
+        <label className="block text-sm font-medium text-gray-700 mb-2">Post Type *</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setPostType('task')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+              postType === 'task'
+                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                : 'border-gray-300 hover:border-gray-400 text-gray-700'
+            }`}
+          >
+            <ListTodo className="w-4 h-4" />
+            Task
           </button>
-          <button type="button" aria-pressed={postType === 'question'} onClick={() => setPostType('question')}
-            className={`relative flex min-h-[76px] items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${postType === 'question' ? 'border-blue-400 bg-blue-600/20 text-white ring-1 ring-blue-500' : 'border-slate-600 bg-slate-800/50 text-slate-200 hover:border-slate-400'}`}>
-            <HelpCircle className="h-6 w-6 shrink-0" />
-            <span className="min-w-0"><strong className="block text-sm">Question</strong><small className="block text-xs text-slate-400">Get input or clarification</small></span>
-            {postType === 'question' && <CheckCircle2 className="absolute right-2 top-2 h-4 w-4 text-blue-300" />}
+          <button
+            type="button"
+            onClick={() => setPostType('question')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+              postType === 'question'
+                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                : 'border-gray-300 hover:border-gray-400 text-gray-700'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4" />
+            Question
           </button>
-          <button type="button" aria-pressed={postType === 'general'} onClick={() => setPostType('general')}
-            className={`relative flex min-h-[76px] items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${postType === 'general' ? 'border-blue-400 bg-blue-600/20 text-white ring-1 ring-blue-500' : 'border-slate-600 bg-slate-800/50 text-slate-200 hover:border-slate-400'}`}>
-            <MessageCircle className="h-6 w-6 shrink-0" />
-            <span className="min-w-0"><strong className="block text-sm">General</strong><small className="block text-xs text-slate-400">Share information</small></span>
-            {postType === 'general' && <CheckCircle2 className="absolute right-2 top-2 h-4 w-4 text-blue-300" />}
+          <button
+            type="button"
+            onClick={() => setPostType('general')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+              postType === 'general'
+                ? 'border-blue-600 bg-blue-50 text-blue-700'
+                : 'border-gray-300 hover:border-gray-400 text-gray-700'
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            General
           </button>
         </div>
       </div>
 
       {(postType === 'task' || postType === 'question') && (
-        <div className="mb-3 p-3 bg-slate-800/70 border border-slate-600 rounded-lg space-y-3">
+        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-200 mb-1 flex items-center gap-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
               <Users className="w-4 h-4" />
               Assign To
             </label>
@@ -257,16 +261,14 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
               placeholder="Enter username or type 'anyone'"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             />
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-gray-600 mt-1">
               Type @username to assign to a specific user, or @anyone for open assignment. Points will be awarded based on admin settings.
             </p>
           </div>
         </div>
       )}
 
-      <label htmlFor="flow-message-content" className="block text-xs font-bold uppercase tracking-widest text-slate-300">Your message <span className="text-rose-400">*</span></label>
       <textarea
-        id="flow-message-content"
         ref={textareaRef}
         value={content}
         onChange={(e) => { setContent(e.target.value); setCursorPosition(e.target.selectionStart); if (routeToken && !e.target.value.includes(routeToken)) { setRoute(null); setRouteToken(''); } setHighlight(0); }}
@@ -274,32 +276,32 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         onSelect={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         onClick={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
         onKeyUp={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
-        placeholder="Write your message… Use @ to mention someone or # to link a job."
-        rows={5}
-        className="w-full min-h-40 resize-y rounded-xl border border-slate-600 bg-slate-900/70 px-4 py-4 text-slate-100 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        placeholder="Start a discussion... Use @ to mention users/leads, # for hashtags"
+        rows={3}
+        className="mjv-writing-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
       />
-
-      <div className="-mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400"><span>@ Mention a person &nbsp; · &nbsp; # Link a job</span><span>{content.length} characters</span></div>
 
       {tag?.symbol === '#' && <div className="flow flow-tag-results" role="listbox" aria-label="Matching customers and jobs">{choices.filter(c => c.kind !== 'person').map((choice, index) => <button type="button" role="option" aria-selected={index === highlight} key={`${choice.kind}:${choice.id}`} onClick={() => chooseRoute(choice as FlowTarget)}>{choice.label} · {choice.kind.replace('_', ' ')}</button>)}</div>}
       {route && <p className="text-sm text-blue-700 my-2">Posting to {route.label} <button type="button" onClick={() => { setRoute(null); setRouteToken(''); }}>Remove</button></p>}
       <div className="mt-3 space-y-2">
-        <div className="space-y-3 rounded-xl border border-slate-600 bg-slate-800/60 p-4">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-200"><Lock className="w-4 h-4" /> Recipients</label>
-          <div className="flex gap-2 flex-wrap">
-            <button type="button" onClick={() => setAudience('company')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'company' ? 'bg-blue-600 text-white' : 'bg-slate-900/60 border border-slate-600 text-slate-200 hover:border-slate-400'}`}>@everyone</button>
-            <button type="button" onClick={() => setAudience('direct')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'direct' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@user(s)</button>
-            <button type="button" onClick={() => setAudience('department')} className={`px-3 py-1.5 rounded-lg text-sm ${audience === 'department' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300'}`}>@department</button>
-          </div>
-          {audience === 'direct' && <p className="text-xs text-slate-400">Mention one or more teammates with @username. Only you and those users can see the message.</p>}
-          {audience === 'department' && <select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100"><option value="">Choose department…</option>{departments.map(d => <option key={d.id} value={d.id}>@{d.name}</option>)}</select>}
-          {audience === 'company' && <p className="text-xs text-slate-400">Visible to everyone in the company with Flow access.</p>}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="private-toggle"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          />
+          <label htmlFor="private-toggle" className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <Lock className="w-4 h-4" />
+            <span>Private discussion (only visible to mentioned users)</span>
+          </label>
         </div>
 
         <button
           type="button"
           onClick={() => setShowReminder(!showReminder)}
-          className="flex items-center gap-2 text-sm text-slate-400 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
         >
           <Calendar className="w-4 h-4" />
           <span>{showReminder ? 'Hide' : 'Add'} Reminder</span>
@@ -307,7 +309,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         </button>
 
         {showReminder && (
-          <div className="mt-2 rounded-xl border border-slate-600 bg-slate-800/60 p-3">
+          <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
             <input
               type="datetime-local"
               value={reminderDate}
@@ -331,7 +333,7 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
               className={`w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 transition-colors ${index === highlight ? 'bg-blue-50' : ''}`}
             >
               <span className="font-mono text-sm text-blue-600">@{suggestion.username}</span>
-              <span className="text-slate-200">{suggestion.name}</span>
+              <span className="text-gray-700">{suggestion.name}</span>
               <span className="ml-auto text-xs text-gray-500">
                 {suggestion.type === 'user' ? 'User' : 'Lead'}
               </span>
@@ -340,14 +342,14 @@ export function DiscussionPostForm({ onSuccess }: DiscussionPostFormProps) {
         </div>
       )}
 
-      <div className="flex justify-end border-t border-slate-700 pt-4">
+      <div className="flex justify-end mt-2">
         <button
           type="submit"
-          disabled={loading || !content.trim() || !postType || (audience === 'department' && !departmentId)}
-          className="flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={loading || !content.trim() || !postType}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           <Send className="w-4 h-4" />
-          {loading ? 'Sending…' : 'Send'}
+          {loading ? 'Posting...' : 'Post'}
         </button>
       </div>
     </form>

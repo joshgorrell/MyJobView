@@ -1,18 +1,18 @@
-import { notify } from '../../lib/feedback';
-import { NotificationPreferenceFields } from './NotificationPreferenceFields';
 import { useState, useEffect } from 'react';
-import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
+import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToPushNotifications, unsubscribeFromPushNotifications, checkPushSubscription } from '../../lib/pushNotifications';
 import { UserBusinessCardEditor } from '../BusinessCard/UserBusinessCardEditor';
 import { RewardsDashboard } from '../Rewards/RewardsDashboard';
 import ConfirmModal from '../ui/ConfirmModal';
-import { ThemeSelector } from './ThemeSelector';
+import { useTheme, type ThemePreference } from '../../contexts/ThemeContext';
 
-export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: { directoryEnabled?: boolean; onOpenDirectory?: () => void } = {}) {
+export function UserPreferences() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards'>(() => {
+  const { preference, setPreference } = useTheme();
+  const [themeError, setThemeError] = useState('');
+  const [activeTab, setActiveTab] = useState<'notifications' | 'business-card' | 'rewards' | 'proposals'>(() => {
     const target = sessionStorage.getItem('mjv-preferences-tab');
     sessionStorage.removeItem('mjv-preferences-tab');
     return target === 'business-card' ? 'business-card' : 'notifications';
@@ -37,6 +37,9 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
     notify_on_lead_status: true,
     notify_on_product_requests: true,
   });
+  const [proposalTemplates, setProposalTemplates] = useState<any[]>([]);
+  const [defaultTemplateId, setDefaultTemplateId] = useState<string>('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
     loadOffices();
     loadVisibilitySettings();
     checkPushStatus();
+    loadProposalTemplates();
   }, [profile?.id]);
 
   async function checkPushStatus() {
@@ -140,6 +144,49 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
     }
   }
 
+  async function loadProposalTemplates() {
+    if (!profile?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('proposal_report_templates')
+        .select('*')
+        .or(`is_personal.eq.false,created_by.eq.${profile.id}`)
+        .order('is_default', { ascending: false })
+        .order('name');
+
+      if (error) throw error;
+      setProposalTemplates(data || []);
+
+      // Load user's default template preference
+      if (profile.default_proposal_report_template_id) {
+        setDefaultTemplateId(profile.default_proposal_report_template_id);
+      }
+    } catch (error) {
+      console.error('Error loading proposal templates:', error);
+    }
+  }
+
+  async function saveDefaultTemplate() {
+    if (!profile?.id) return;
+
+    setSavingTemplate(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_proposal_report_template_id: defaultTemplateId || null })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+      alert('Default proposal template saved!');
+    } catch (error) {
+      console.error('Error saving template preference:', error);
+      alert('Failed to save template preference');
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
+
   async function handleSaveVisibility() {
     if (!profile?.id) return;
 
@@ -173,10 +220,10 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
         }
       }
 
-      notify('Office visibility settings saved!', { theme: 'blue', tone: 'success' });
+      alert('Office visibility settings saved!');
     } catch (error) {
       console.error('Error saving visibility settings:', error);
-      notify('Failed to save visibility settings', { theme: 'blue', tone: 'error' });
+      alert('Failed to save visibility settings');
     } finally {
       setSaving(false);
     }
@@ -200,10 +247,10 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
         .eq('id', profile.id);
 
       if (error) throw error;
-      notify('Preferences saved successfully!', { theme: 'blue', tone: 'success' });
+      alert('Preferences saved successfully!');
     } catch (error) {
       console.error('Error saving preferences:', error);
-      notify('Failed to save preferences', { theme: 'blue', tone: 'error' });
+      alert('Failed to save preferences');
     } finally {
       setSaving(false);
     }
@@ -241,10 +288,10 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
         if (event.data.type === 'google-auth-success') {
           window.removeEventListener('message', handleMessage);
           loadPreferences();
-          notify('Google Calendar connected successfully!', { theme: 'blue', tone: 'success' });
+          alert('Google Calendar connected successfully!');
         } else if (event.data.type === 'google-auth-error') {
           window.removeEventListener('message', handleMessage);
-          notify('Failed to connect Google Calendar', { theme: 'blue', tone: 'error' });
+          alert('Failed to connect Google Calendar');
         }
       };
 
@@ -258,13 +305,12 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
       }, 500);
     } catch (error) {
       console.error('Error connecting calendar:', error);
-      notify(`Failed to connect Google Calendar: ${error instanceof Error ? error.message : 'Unknown error'}`, { theme: 'blue', tone: 'error' });
+      alert(`Failed to connect Google Calendar: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setConnecting(false);
     }
   }
 
   async function handleDisconnectCalendar() {
-    if (!profile) return;
     setDisconnecting(true);
     try {
       const { error } = await supabase
@@ -282,10 +328,10 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
 
       setCalendarConnected(false);
       setCalendarEmail('');
-      notify('Google Calendar disconnected successfully!', { theme: 'blue', tone: 'success' });
+      alert('Google Calendar disconnected successfully!');
     } catch (error) {
       console.error('Error disconnecting calendar:', error);
-      notify('Failed to disconnect Google Calendar', { theme: 'blue', tone: 'error' });
+      alert('Failed to disconnect Google Calendar');
     } finally {
       setDisconnecting(false);
     }
@@ -299,13 +345,13 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
       const success = await subscribeToPushNotifications(profile.id);
       if (success) {
         setPushEnabled(true);
-        notify('Push notifications enabled successfully!', { theme: 'blue', tone: 'success' });
+        alert('Push notifications enabled successfully!');
       } else {
-        notify('Failed to enable push notifications. Please check your browser permissions.', { theme: 'blue', tone: 'error' });
+        alert('Failed to enable push notifications. Please check your browser permissions.');
       }
     } catch (error) {
       console.error('Error enabling push notifications:', error);
-      notify('Failed to enable push notifications', { theme: 'blue', tone: 'error' });
+      alert('Failed to enable push notifications');
     } finally {
       setEnablingPush(false);
     }
@@ -319,13 +365,13 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
       const success = await unsubscribeFromPushNotifications(profile.id);
       if (success) {
         setPushEnabled(false);
-        notify('Push notifications disabled successfully!', { theme: 'blue', tone: 'success' });
+        alert('Push notifications disabled successfully!');
       } else {
-        notify('Failed to disable push notifications', { theme: 'blue', tone: 'error' });
+        alert('Failed to disable push notifications');
       }
     } catch (error) {
       console.error('Error disabling push notifications:', error);
-      notify('Failed to disable push notifications', { theme: 'blue', tone: 'error' });
+      alert('Failed to disable push notifications');
     } finally {
       setEnablingPush(false);
     }
@@ -341,58 +387,167 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
 
   return (
     <div className="space-y-6">
-      <ThemeSelector />
+      <section className="rounded-lg border border-subtle bg-canvas p-4 text-primary">
+        <h2 className="font-semibold">Appearance</h2>
+        <p className="mt-1 text-sm text-muted">Choose how MyJobView appears. Your appearance preference is saved to your account.</p>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Color theme">
+          {(['classic', 'light', 'dark', 'system'] as ThemePreference[]).map(option => (
+            <button key={option} type="button" aria-pressed={preference === option}
+              onClick={async () => { setThemeError(''); try { await setPreference(option); } catch { setThemeError('Could not save your theme. Please try again.'); } }}
+              className={`rounded-lg border px-4 py-2 text-sm font-medium ${preference === option ? 'border-blue-500 bg-blue-600 text-white' : 'border-subtle bg-surface text-primary hover:bg-elevated'}`}>
+              {option === 'classic' ? 'Classic Gradient' : option[0].toUpperCase() + option.slice(1)}
+            </button>
+          ))}
+        </div>
+        {themeError && <p role="alert" className="mt-2 text-sm text-red-500">{themeError}</p>}
+      </section>
       <div className="border-b border-subtle">
-        <nav className="flex flex-wrap gap-1 sm:gap-4" aria-label="Preferences sections">
+        <nav className="flex gap-4 overflow-x-auto">
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'notifications'
                 ? 'border-blue-500 text-brand'
                 : 'border-transparent text-muted hover:text-primary'
             }`}
           >
-            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
-              <Bell className="w-5 h-5 shrink-0" />
-              <span className="sm:hidden">Settings</span><span className="hidden sm:inline">Notifications & Settings</span>
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5" />
+              Notifications & Settings
             </div>
           </button>
           <button
             onClick={() => setActiveTab('business-card')}
-            className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'business-card'
                 ? 'border-blue-500 text-brand'
                 : 'border-transparent text-muted hover:text-primary'
             }`}
           >
-            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
-              <CreditCard className="w-5 h-5 shrink-0" />
-              <span className="sm:hidden">Business Card</span><span className="hidden sm:inline">My Business Card</span>
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5" />
+              My Business Card
             </div>
           </button>
           <button
             onClick={() => setActiveTab('rewards')}
-            className={`min-w-0 shrink-0 whitespace-nowrap px-1 sm:px-4 py-3 text-xs sm:text-base font-medium transition-colors border-b-2 ${
+            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
               activeTab === 'rewards'
                 ? 'border-blue-500 text-brand'
                 : 'border-transparent text-muted hover:text-primary'
             }`}
           >
-            <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
-              <Award className="w-5 h-5 shrink-0" />
-              <span className="sm:hidden">Rewards</span><span className="hidden sm:inline">My Rewards</span>
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              My Rewards
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('proposals')}
+            className={`px-4 py-3 font-medium transition-colors border-b-2 ${
+              activeTab === 'proposals'
+                ? 'border-blue-500 text-brand'
+                : 'border-transparent text-muted hover:text-primary'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Proposals
             </div>
           </button>
         </nav>
       </div>
 
-      {directoryEnabled && onOpenDirectory && <button type="button" onClick={onOpenDirectory} className="mb-4 rounded-lg border border-subtle bg-elevated px-4 py-2 text-sm font-medium text-primary hover:bg-surface">View Company Directory →</button>}
       {activeTab === 'business-card' && (
         <UserBusinessCardEditor />
       )}
 
       {activeTab === 'rewards' && (
         <RewardsDashboard />
+      )}
+
+      {activeTab === 'proposals' && (
+        <div className="max-w-2xl space-y-8">
+          <div className="bg-canvas rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+              <FileText className="w-6 h-6 text-brand" />
+              Default Proposal Template
+            </h3>
+            <p className="text-secondary mb-6">
+              Choose your preferred template layout for new proposals. This will be automatically
+              selected when you review proposals before sending to customers.
+            </p>
+
+            {proposalTemplates.length === 0 ? (
+              <div className="bg-surface border border-subtle rounded-lg p-6 text-center">
+                <FileText className="w-12 h-12 mx-auto mb-3 text-muted" />
+                <p className="text-secondary">No proposal templates available</p>
+                <p className="text-sm text-muted mt-2">
+                  Contact your administrator to create proposal templates
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3 mb-6">
+                  {proposalTemplates.map((template) => (
+                    <label
+                      key={template.id}
+                      className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        defaultTemplateId === template.id
+                          ? 'border-blue-500 bg-infoSoft'
+                          : 'border-subtle hover:border-strong'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        value={template.id}
+                        checked={defaultTemplateId === template.id}
+                        onChange={(e) => setDefaultTemplateId(e.target.value)}
+                        className="mt-1 w-4 h-4 text-brand"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-primary">{template.name}</span>
+                          {template.is_personal && (
+                            <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">
+                              Personal
+                            </span>
+                          )}
+                          {template.is_default && !template.is_personal && (
+                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+                              Company Default
+                            </span>
+                          )}
+                        </div>
+                        {template.description && (
+                          <p className="text-sm text-secondary">{template.description}</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-subtle">
+                  <button
+                    onClick={() => setDefaultTemplateId('')}
+                    disabled={!defaultTemplateId}
+                    className="text-sm text-secondary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Clear Selection
+                  </button>
+                  <button
+                    onClick={saveDefaultTemplate}
+                    disabled={savingTemplate}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save className="w-4 h-4" />
+                    {savingTemplate ? 'Saving...' : 'Save Default Template'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {activeTab === 'notifications' && (
@@ -409,7 +564,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
         <div className="bg-canvas border border-subtle rounded-lg p-6">
           {pushEnabled ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-success">
+              <div className="flex items-center gap-3 text-green-600">
                 <CheckCircle className="w-6 h-6" />
                 <div>
                   <div className="font-semibold">Push Notifications Enabled</div>
@@ -422,7 +577,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
               <button
                 onClick={() => setConfirmModal({ title: 'Disable Push Notifications', message: 'Are you sure you want to disable push notifications?', onConfirm: handleDisablePushNotifications })}
                 disabled={enablingPush}
-                className="px-4 py-2 bg-red-600 text-primary rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <XCircle className="w-4 h-4" />
                 {enablingPush ? 'Disabling...' : 'Disable Push Notifications'}
@@ -440,7 +595,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
               <button
                 onClick={handleEnablePushNotifications}
                 disabled={enablingPush}
-                className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Smartphone className="w-4 h-4" />
                 {enablingPush ? 'Enabling...' : 'Enable Push Notifications'}
@@ -462,7 +617,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
 
           <div className="bg-canvas border border-subtle rounded-lg p-6 space-y-6">
             <div>
-              <label className="block text-sm font-medium text-secondary mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 What can you see?
               </label>
               <div className="space-y-3">
@@ -530,7 +685,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
 
             {(visibilityScope === 'office_only' || visibilityScope === 'selected_offices') && (
               <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Building2 className="w-4 h-4 inline mr-1" />
                   Primary Office
                 </label>
@@ -551,7 +706,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
 
             {visibilityScope === 'selected_offices' && (
               <div>
-                <label className="block text-sm font-medium text-secondary mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Additional Offices
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-subtle rounded-lg p-3">
@@ -579,7 +734,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
             <button
               onClick={handleSaveVisibility}
               disabled={saving}
-              className="w-full px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Visibility Settings'}
@@ -600,7 +755,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
         <div className="bg-canvas border border-subtle rounded-lg p-6">
           {calendarConnected ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-success">
+              <div className="flex items-center gap-3 text-green-600">
                 <CheckCircle className="w-6 h-6" />
                 <div>
                   <div className="font-semibold">Connected</div>
@@ -613,7 +768,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
               <button
                 onClick={() => setConfirmModal({ title: 'Disconnect Google Calendar', message: 'Are you sure you want to disconnect your Google Calendar? Future reminders will not be synced.', onConfirm: handleDisconnectCalendar })}
                 disabled={disconnecting}
-                className="px-4 py-2 bg-red-600 text-primary rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <XCircle className="w-4 h-4" />
                 {disconnecting ? 'Disconnecting...' : 'Disconnect Calendar'}
@@ -631,7 +786,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
               <button
                 onClick={handleConnectCalendar}
                 disabled={connecting}
-                className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Calendar className="w-4 h-4" />
                 {connecting ? 'Connecting...' : 'Connect Google Calendar'}
@@ -650,13 +805,115 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
           <p className="text-secondary">Choose which notifications you want to receive</p>
         </div>
 
-        <NotificationPreferenceFields value={preferences} onChange={setPreferences} disabled={saving} />
+        <div className="space-y-4">
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_mention}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_mention: e.target.checked })}
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-primary">Mention Notifications</div>
+              <div className="text-sm text-secondary mt-1">
+                Receive notifications when someone mentions you with @ in discussions
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_lead_assigned}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_lead_assigned: e.target.checked })}
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-primary">Lead Assignment Notifications</div>
+              <div className="text-sm text-secondary mt-1">
+                Receive notifications when leads are assigned to you
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_fishbowl}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_fishbowl: e.target.checked })}
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-primary">Fishbowl Lead Notifications</div>
+              <div className="text-sm text-secondary mt-1">
+                Receive notifications when new leads are added to the fishbowl
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_escalated}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_escalated: e.target.checked })}
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-primary">Lead Escalation Notifications</div>
+              <div className="text-sm text-secondary mt-1">
+                Receive notifications when leads are escalated
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_lead_status}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_lead_status: e.target.checked })}
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-primary">Priority Lead Status Updates</div>
+              <div className="text-sm text-secondary mt-1">
+                Receive notifications when your High or Urgent priority leads are claimed or status changes
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-canvas border border-subtle rounded-lg p-4 hover:border-blue-300 transition-colors">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preferences.notify_on_product_requests}
+              onChange={(e) => setPreferences({ ...preferences, notify_on_product_requests: e.target.checked })}
+              className="mt-1 w-5 h-5 text-brand rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-primary">Product Request Notifications</div>
+              <div className="text-sm text-secondary mt-1">
+                Receive email notifications when new product/parts requests are submitted for purchasing
+              </div>
+            </div>
+          </label>
+        </div>
+        </div>
 
         <div className="mt-6 flex justify-end">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-3 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Preferences'}
