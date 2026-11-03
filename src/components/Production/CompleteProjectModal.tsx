@@ -94,11 +94,10 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
       if (completionChoice === 'test_and_tune' && sendEmail) {
         const { error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
           body: {
-            project_id: customer.project_id,
-            contact_id: customer.contact_id,
-            email: emailAddress.trim(),
+            contact_email: emailAddress.trim(),
+            contact_name: customer.contact_name,
+            project_name: customer.project_name,
             access_type: 'test_and_tune',
-            delivery_key: `test-tune-${customer.project_id}`,
           },
         });
         if (inviteError) toast.error('Project completed, but invitation delivery failed. You can resend from Test & Tune.', 'Invitation not sent');
