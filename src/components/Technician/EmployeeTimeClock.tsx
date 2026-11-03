@@ -9,7 +9,7 @@ import { ProjectTimeClock } from './ProjectTimeClock';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 
 type TimeSection = 'daily' | 'job' | 'mine';
-type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job'; break_minutes?: number | null };
+type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
 
 export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) => void }) {
   const policy = useEmployeeTimePolicy();
@@ -46,13 +46,13 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
     setHistoryError(false);
     Promise.all([
       supabase.from('daily_clock_entries').select('id, entry_date, clock_in, clock_out, total_hours, break_minutes').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
-      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
+      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours, entry_type').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
     ]).then(([daily, job]) => {
       if (cancelled) return;
       if (daily.error || job.error) { setHistoryError(true); return; }
       const combined: PersonalEntry[] = [
         ...(daily.data ?? []).map(e => ({ ...e, kind: 'Daily' as const })),
-        ...(job.data ?? []).map(e => ({ ...e, kind: 'Job' as const })),
+        ...(job.data ?? []).map(e => ({ ...e, kind: (e.entry_type === 'shop_time' ? 'Shop' : e.entry_type === 'training' ? 'Training' : 'Job') as PersonalEntry['kind'] })),
       ];
       setEntries(combined.sort((a, b) => b.clock_in.localeCompare(a.clock_in)).slice(0, 30));
     }).catch(() => { if (!cancelled) setHistoryError(true); }).finally(() => { if (!cancelled) setHistoryLoading(false); });
@@ -111,7 +111,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
       {current === 'mine' && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
-          <p className="text-sm text-gray-600">Your recent daily and job time entries. Select Request Correction on a Daily Clock entry to request a time adjustment. Time-off requests remain available from Daily Clock when enabled.</p>
+          <p className="text-sm text-gray-600">Your recent daily, job, shop, and training time entries. Select Request Correction on a Daily Clock entry to request a time adjustment. Time-off requests remain available from Daily Clock when enabled.</p>
           {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
           {historyError && <p role="alert" className="text-sm text-red-700">Time history could not be loaded.</p>}
           {!historyLoading && !historyError && entries.length === 0 && <p className="text-sm text-gray-500">No recent time entries.</p>}
