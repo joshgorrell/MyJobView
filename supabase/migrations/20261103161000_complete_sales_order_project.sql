@@ -41,8 +41,7 @@ BEGIN
   IF v_rows <> 1 THEN RAISE EXCEPTION 'Project update failed'; END IF;
 
   UPDATE public.sales_orders SET
-    status = 'complete',
-    completed_at = COALESCE(completed_at, now())
+    status = 'complete'
   WHERE id = v_order_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 1 THEN RAISE EXCEPTION 'Sales Order update failed'; END IF;
