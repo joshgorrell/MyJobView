@@ -73,6 +73,16 @@ const anchorHash=fixture();
 anchorHash.basis.approvedRowsHash='b'.repeat(64);
 assert.equal(assessOriginalHistoryAnchor(anchorHash,binding).anchored,false);
 assert.equal(assessOriginalHistoryAnchor(null,binding).anchored,false);
+// Invalid ordering evidence must produce a held diagnostic, not a thrown error.
+for(const invalid of ['not-a-number','-1','0','1.5','']){
+ const broken=fixture();broken.pairs[0].startedOrder=invalid;
+ const assessed=assessOriginalHistoryAnchor(broken,binding);
+ assert.equal(assessed.anchored,false);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(assessed[flag],false);
+}
+const duplicateOrder=fixture();duplicateOrder.pairs[1].startedOrder=duplicateOrder.pairs[0].startedOrder;
+assert.equal(assessOriginalHistoryAnchor(duplicateOrder,binding).anchored,false);
+
 
 const bundleInput=fixture();
 const bundle={bundleVersion:1,currentModel:bundleInput.currentModel,basis:bundleInput.basis,
