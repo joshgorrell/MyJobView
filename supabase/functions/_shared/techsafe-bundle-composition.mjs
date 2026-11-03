@@ -14,6 +14,19 @@ export function prepareTechsafeCandidateFromBundle(bundle,binding){
  // Never accept readiness/authorization flags supplied in a bundle.
  if(['scopeVerified','snapshotReady','quoteReady','authorized','eventId','revision'].some(k=>Object.hasOwn(bundle,k)))
   return held('source_bundle_authority_unverified');
+ // Require a single trusted connection/order/proposal identity across all
+ // bundle layers before passing any data to the candidate composer.
+ const keys=['connectionId','organizationId','orderId','proposalId'];
+ const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
+ if(!object(binding)||!keys.every(k=>id(binding[k]))||
+  !object(bundle.basis.binding)||!keys.every(k=>bundle.basis.binding[k]===binding[k])||
+  bundle.currentModel.connectionId!==binding.connectionId||
+  bundle.currentModel.organizationId!==binding.organizationId||
+  !object(bundle.currentModel.order)||
+  bundle.currentModel.order.id!==binding.orderId||
+  bundle.currentModel.order.proposal_id!==binding.proposalId||
+  bundle.currentModel.order.organization_id!==binding.organizationId)
+  return held('source_bundle_binding_mismatch');
  const candidate=prepareTechsafeDraftCandidate({
   currentModel:bundle.currentModel,basis:bundle.basis,pairs:bundle.pairs
  },binding);
