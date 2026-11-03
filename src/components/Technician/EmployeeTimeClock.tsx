@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
 import { DailyClock } from './DailyClock';
+import { MyTimeLeaveRequest } from './MyTimeLeaveRequest';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { WorkOrderTimeControl } from '../Production/WorkOrderTimeControl';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
@@ -119,7 +120,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
       {current === 'mine' && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
-          <p className="text-sm text-gray-600">Your recent daily, job, shop, and training time entries. Select Request Correction on a Daily Clock entry to request a time adjustment. Time-off requests remain available from Daily Clock when enabled.</p>
+          <p className="text-sm text-gray-600">Your recent daily, job, shop, and training time entries. Select Request Correction on a Daily Clock entry to request a time adjustment. Same-day leave requests are available below.</p>
           {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
           {historyError && <p role="alert" className="text-sm text-red-700">Time history could not be loaded.</p>}
           {!historyLoading && !historyError && entries.length === 0 && <p className="text-sm text-gray-500">No recent time entries.</p>}
@@ -132,6 +133,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
               </div>
             </div>
           ))}
+          <MyTimeLeaveRequest />
           <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">Open Work Orders</button>
         </div>
       )}
