@@ -9,15 +9,23 @@ DECLARE
   v_project public.projects%ROWTYPE;
   v_order_id uuid;
   v_rows integer;
+  v_actor_org uuid;
+  v_actor_role text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
+  END IF;
+  SELECT organization_id, role INTO v_actor_org, v_actor_role
+  FROM public.profiles
+  WHERE id = auth.uid() AND is_active AND contact_id IS NULL;
+  IF v_actor_org IS NULL OR v_actor_role NOT IN ('admin', 'manager', 'service_manager') THEN
+    RAISE EXCEPTION 'Not authorized to complete projects';
   END IF;
   IF p_choice IS NULL OR p_choice NOT IN ('close', 'test_and_tune') THEN
     RAISE EXCEPTION 'Invalid completion choice';
   END IF;
 
-  SELECT * INTO v_project FROM public.projects WHERE id = p_project_id FOR UPDATE;
+  SELECT * INTO v_project FROM public.projects WHERE id = p_project_id AND organization_id = v_actor_org FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Project not found or not authorized';
   END IF;
@@ -26,7 +34,7 @@ BEGIN
   END IF;
 
   SELECT id INTO v_order_id FROM public.sales_orders
-  WHERE id = v_project.sales_order_id FOR UPDATE;
+  WHERE id = v_project.sales_order_id AND organization_id = v_actor_org FOR UPDATE;
   IF v_order_id IS NULL THEN
     RAISE EXCEPTION 'Linked Sales Order not found or not authorized';
   END IF;
@@ -41,8 +49,7 @@ BEGIN
   IF v_rows <> 1 THEN RAISE EXCEPTION 'Project update failed'; END IF;
 
   UPDATE public.sales_orders SET
-    status = 'complete',
-    completed_at = COALESCE(completed_at, now())
+    status = 'complete'
   WHERE id = v_order_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   IF v_rows <> 1 THEN RAISE EXCEPTION 'Sales Order update failed'; END IF;
