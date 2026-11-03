@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { requestConfirmation } from '../../lib/feedback';
 import { supabase } from '../../lib/supabase';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
@@ -39,7 +40,7 @@ export function MyTimeLeaveRequest() {
       const today = formatDateInTimezone(new Date().toISOString(), timezone);
       const policy = balances.find(item => item.policy.id === policyId);
       if (!policy) throw new Error('Select a valid leave type.');
-      if (!window.confirm('Confirm you have personally called your manager. This request is required for eligible PTO payment but does not replace your call. Submit for approval?')) return;
+      if (!(await requestConfirmation('Confirm you have personally called your manager. This request is required for eligible PTO payment but does not replace your call. Submit for approval?', { theme: 'blue' }))) return;
       const { error } = await supabase.rpc('submit_time_off', {
         p_policy: policyId, p_start: today, p_end: today,
         p_type: fullDay ? 'full_day' : 'hours',
