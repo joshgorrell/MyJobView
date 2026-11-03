@@ -26,17 +26,30 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
     if (section !== 'job' || !profile?.id) return;
     let cancelled = false;
     setJobsLoading(true); setJobsError(false);
-    supabase.from('work_orders').select('id, work_order_number, title, assigned_to')
-      .eq('assigned_to', profile.id).order('created_at', { ascending: false }).limit(50)
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) { setJobsError(true); return; }
-        setAssignedJobs(data ?? []);
-        setSelectedWorkOrderId(current => current && (data ?? []).some(job => job.id === current) ? current : '');
-      }).catch(() => { if (!cancelled) setJobsError(true); })
+    Promise.all([
+      supabase.from('work_orders').select('id, work_order_number, title, assigned_to')
+        .eq('assigned_to', profile.id).in('status', ['assigned', 'pending', 'in_progress'])
+        .order('created_at', { ascending: false }).limit(50),
+      supabase.from('time_entries').select('work_order_id')
+        .eq('technician_id', profile.id).is('clock_out', null)
+        .in('status', ['draft', 'submitted']).order('clock_in', { ascending: false }).limit(1).maybeSingle(),
+    ]).then(async ([jobsResult, activeResult]) => {
+      if (jobsResult.error || activeResult.error) throw jobsResult.error || activeResult.error;
+      const jobs = jobsResult.data ?? [];
+      const activeId = activeResult.data?.work_order_id;
+      if (activeId && !jobs.some(job => job.id === activeId)) {
+        const { data: activeJob, error } = await supabase.from('work_orders')
+          .select('id, work_order_number, title, assigned_to').eq('id', activeId).maybeSingle();
+        if (error) throw error;
+        if (activeJob) jobs.unshift(activeJob);
+      }
+      if (cancelled) return;
+      setAssignedJobs(jobs);
+      setSelectedWorkOrderId(current => current && jobs.some(job => job.id === current) ? current : activeId && jobs.some(job => job.id === activeId) ? activeId : '');
+    }).catch(() => { if (!cancelled) setJobsError(true); })
       .finally(() => { if (!cancelled) setJobsLoading(false); });
     return () => { cancelled = true; };
-  }, [section, profile?.id]);
+  }, [section, profile?.id, historyRevision]);
   const [entries, setEntries] = useState<PersonalEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState(false);
@@ -96,7 +109,7 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
             {jobsLoading && <p className="text-sm text-gray-500">Loading assigned work orders…</p>}
             {jobsError && <p role="alert" className="text-sm text-red-700">Unable to load assigned work orders.</p>}
             {!jobsLoading && !jobsError && assignedJobs.length === 0 && <p className="text-sm text-gray-500">No directly assigned work orders found. Check your work center for team assignments.</p>}
-            {selectedWorkOrderId && assignedJobs.some(job => job.id === selectedWorkOrderId) && <WorkOrderTimeControl key={selectedWorkOrderId} workOrderId={selectedWorkOrderId} assignedTo={profile?.id ?? null} onChanged={() => setHistoryRevision(v => v + 1)} />}
+            {selectedWorkOrderId && assignedJobs.some(job => job.id === selectedWorkOrderId) && <WorkOrderTimeControl key={selectedWorkOrderId} workOrderId={selectedWorkOrderId} assignedTo={assignedJobs.find(job => job.id === selectedWorkOrderId)?.assigned_to ?? null} onChanged={() => setHistoryRevision(v => v + 1)} />}
           </div>
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
