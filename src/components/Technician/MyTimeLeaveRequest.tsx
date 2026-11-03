@@ -44,11 +44,15 @@ export function MyTimeLeaveRequest() {
       const policy = balances.find(item => item.policy.id === policyId);
       if (!policy) throw new Error('Select a valid leave type.');
       if (!(await requestConfirmation('Confirm you have personally called your manager. This request is required for eligible PTO payment but does not replace your call. Submit for approval?', { theme: 'blue' }))) return;
+      // Persist the phone-call acknowledgment with the existing leave request record.
+      // This is a client-attested audit note, not independent verification of the call.
+      const callAcknowledgment = `Manager phone call self-attested by employee ${profile?.id ?? 'unknown'} at ${new Date().toISOString()} (UTC).`;
+      const leaveReason = [reason.trim() || `Same-day ${policy.policy.pto_type} call-in`, callAcknowledgment].join('\n');
       const { error } = await supabase.rpc('submit_time_off', {
         p_policy: policyId, p_start: today, p_end: today,
         p_type: fullDay ? 'full_day' : 'hours',
         p_start_time: fullDay ? null : start, p_end_time: fullDay ? null : end,
-        p_reason: reason || `Same-day ${policy.policy.pto_type} call-in`,
+        p_reason: leaveReason,
       });
       if (error) throw error;
       setMessage('Leave request submitted for manager approval.');
