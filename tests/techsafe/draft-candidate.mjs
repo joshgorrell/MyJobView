@@ -3,6 +3,7 @@ import {pathToFileURL} from 'node:url';
 import {prepareTechsafeDraftCandidate as prepare} from '../../supabase/functions/_shared/techsafe-draft-candidate.mjs';
 import {copy,digest,binding,history} from './fixtures/equipment-history.mjs';
 import {prepareTechsafeCandidateFromBundle} from '../../supabase/functions/_shared/techsafe-bundle-composition.mjs';
+import {compareTechsafeSourceReread} from '../../supabase/functions/_shared/techsafe-source-reread.mjs';
 function fixture(direct=false){
  const input=history(),m=input.currentModel;
  input.basis={basisVersion:1,sourceKind:'customer_portal_approval',binding:copy(binding),approvalRef:'approval',portalVersion:1,
@@ -75,6 +76,25 @@ rejectBundle({...bundle,quoteReady:true});
 rejectBundle({...bundle,eventId:'fabricated'});
 rejectBundle({...bundle,revision:1});
 rejectBundle({...bundle,basis:null});
+
+const sameReread=compareTechsafeSourceReread(bundle,copy(bundle),binding);
+assert.equal(sameReread.matches,true,JSON.stringify(sameReread));
+assert.equal(sameReread.content,null);
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(sameReread[flag],false);
+for(const latest of [
+ null,
+ {...bundle,inputFingerprint:'b'.repeat(64)},
+ {...bundle,currentModel:{...bundle.currentModel,organizationId:'other'}},
+ {...bundle,quoteReady:true},
+ {...bundle,currentModel:{...bundle.currentModel,lines:null}},
+]){
+ const result=compareTechsafeSourceReread(bundle,latest,binding);
+ assert.equal(result.matches,false,JSON.stringify(result));
+ assert.equal(result.content,null);
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(result[flag],false);
+}
+assert.equal(compareTechsafeSourceReread(null,bundle,binding).matches,false);
+
 
 for(const key of ['connectionId','organizationId','orderId','proposalId']){
  rejectBundle({...bundle,basis:{...bundle.basis,binding:{...bundle.basis.binding,[key]:'other'}}});
