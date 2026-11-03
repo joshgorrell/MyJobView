@@ -5,7 +5,6 @@ import { Clock, Briefcase, History } from 'lucide-react';
 import { DailyClock } from './DailyClock';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { WorkOrderTimeControl } from '../Production/WorkOrderTimeControl';
-import { ProjectTimeClock } from './ProjectTimeClock';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 
 const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
@@ -85,7 +84,19 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
         <div className="space-y-3">
           <div className="rounded-xl border border-gray-200 bg-white p-4">
             <h2 className="font-semibold text-gray-900">Job Clock</h2>
-            <p className="text-sm text-gray-600">Select an assigned work order below to access its existing job workflow. Job time is separate from your daily payroll clock.</p>
+            <p className="text-sm text-gray-600">Clock directly against an assigned work order using the existing start/stop workflow. Job time is separate from your daily payroll clock.</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+            <label className="block text-sm font-medium text-gray-700">Assigned work order
+              <select value={selectedWorkOrderId} onChange={event => setSelectedWorkOrderId(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 p-2">
+                <option value="">Select a work order</option>
+                {assignedJobs.map(job => <option key={job.id} value={job.id}>{job.work_order_number} · {job.title}</option>)}
+              </select>
+            </label>
+            {jobsLoading && <p className="text-sm text-gray-500">Loading assigned work orders…</p>}
+            {jobsError && <p role="alert" className="text-sm text-red-700">Unable to load assigned work orders.</p>}
+            {!jobsLoading && !jobsError && assignedJobs.length === 0 && <p className="text-sm text-gray-500">No directly assigned work orders found. Check your work center for team assignments.</p>}
+            {selectedWorkOrderId && assignedJobs.some(job => job.id === selectedWorkOrderId) && <WorkOrderTimeControl key={selectedWorkOrderId} workOrderId={selectedWorkOrderId} assignedTo={profile?.id ?? null} onChanged={() => setHistoryRevision(v => v + 1)} />}
           </div>
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
