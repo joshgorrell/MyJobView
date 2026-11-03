@@ -1,3 +1,14 @@
+## Live MJV Supabase inspection (2026-11-03, read-only)
+
+Connected project: MJV (Supabase project `bqtsuzvuvqvgidipbsis`). Catalog-only SQL confirmed:
+
+- `public.apply_change_order(uuid)` exists and is `SECURITY DEFINER`.
+- Its current function source does **not** contain `TECHSAFE_OBSERVER_BEGIN_START`.
+- `techsafe_source.application_observer_controls` and `techsafe_source.application_observations` do **not** exist.
+- No `techsafe_source` relations were found; no relevant October 30/31 or November 1 migration versions appeared in the migration-history query.
+
+Therefore the GitHub observer migration is **repository-only** in the inspected live MJV project. The current live system is not collecting Techsafe application evidence. Do not claim the observer is active, or attempt to enable a missing control. The deployment gap is an explicit blocker. Next: compare the live function definition and required schema against the guarded migrations in a disposable reviewed schema-only clone, then plan migration deployment with rollback and production change approval. No database changes were made during inspection.
+
 # Techsafe: transaction-attached evidence implementation gate
 
 ## Decision
