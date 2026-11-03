@@ -3,6 +3,14 @@
 ## Decision
 Do **not** attach the existing observer to the live change-order applier yet. The private begin/finish helpers are available, but the currently verified tests use a synthetic harness and a minimal schema. No public approval/apply/reject function should be replaced merely to record Techsafe evidence.
 
+## Repository finding: an opt-in attachment already exists
+
+Inspection of `supabase/migrations/20261030184035_techsafe_opt_in_application_observer.sql` confirms the original `public.apply_change_order(uuid)` function is already instrumented by a guarded migration. The migration adds begin/finish observation calls around the existing body, requires explicit `techsafe_source.application_observer_controls.enabled=true`, and seeds no enabled rows. This is **not** a second recorder to implement.
+
+`tests/techsafe/captured-sales-order-scenarios.mjs` already compares baseline and observed outcomes across source actions, financial columns, original error codes, retry/reject paths, and synthetic observer outages using a privately reviewed captured schema. This is meaningful coverage but does **not** certify production Supabase Auth/RLS, real multi-session concurrency, current deployed schema drift, or end-to-end authorization.
+
+**Revised next action:** inspect the currently deployed definition and controls read-only, verify that the migration's guarded instrumentation matches that deployment, and expand native-schema/concurrency tests. Do not add a duplicate hook or enable the existing observer until these gates pass.
+
 ## Required source attachment contract
 
 1. Identify the **actual** production function and all callers that mutate approved proposal equipment: approval, apply, retry, reject/unlock, direct proposal edits, sales-order conversion, restore/transfer, and any admin or service-role write. Record function signature, invoker/definer role, transaction scope, lock order, and current error behavior. Unsupported mutation paths must hold quote eligibility.
