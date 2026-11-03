@@ -92,15 +92,41 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
       if (!data) throw new Error('Project completion was not confirmed');
 
       if (completionChoice === 'test_and_tune' && sendEmail) {
-        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
-          body: {
-            contact_email: emailAddress.trim(),
-            contact_name: customer.contact_name,
-            project_name: customer.project_name,
-            access_type: 'test_and_tune',
-          },
-        });
-        if (inviteError || inviteResult?.success !== true) toast.error('Project completed, but invitation delivery failed. You can resend from Test & Tune.', 'Invitation not sent');
+        // Use the established customer-program grant before emailing a portal link.
+        // If access provisioning fails, do not send an unusable invitation.
+        try {
+          const { data: grantId, error: grantError } = await supabase.rpc('grant_customer_program', {
+            p_contact_id: customer.contact_id,
+            p_program: 'test_and_tune',
+            p_project_id: customer.project_id,
+            p_days: ttDays,
+          });
+          if (grantError) throw grantError;
+          if (!grantId) throw new Error('Customer access was not confirmed');
+
+          const { data: grant, error: grantLookupError } = await supabase
+            .from('punchlist_access_grants')
+            .select('expiration_date')
+            .eq('id', grantId)
+            .single();
+          if (grantLookupError || !grant) throw new Error('Customer access expiration could not be confirmed');
+
+          const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
+            body: {
+              contact_email: emailAddress.trim(),
+              contact_name: customer.contact_name,
+              project_name: customer.project_name,
+              expiration_date: grant.expiration_date,
+              access_type: 'test_and_tune',
+            },
+          });
+          if (inviteError || inviteResult?.success !== true) {
+            throw new Error(inviteResult?.error || inviteError?.message || 'Invitation delivery was not confirmed');
+          }
+        } catch (inviteError) {
+          console.error('Project completed; customer invitation requires attention:', inviteError);
+          toast.error('Project completed, but customer invitation needs attention. Review access and resend from Test & Tune.', 'Invitation not confirmed');
+        }
       }
       setDone(true);
       setTimeout(() => { onComplete(); onClose(); }, 1800);
