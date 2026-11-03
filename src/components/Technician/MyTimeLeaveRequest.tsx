@@ -21,7 +21,7 @@ export function MyTimeLeaveRequest() {
     let cancelled = false;
     supabase.from('pto_balances')
       .select('id,current_balance_hours,policy:pto_policies!policy_id(id,policy_name,pto_type,is_paid)')
-      .eq('employee_id', profile.id).gt('current_balance_hours', 0)
+      .eq('employee_id', profile.id)
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) setError('Leave balances could not be loaded.');
@@ -34,7 +34,7 @@ export function MyTimeLeaveRequest() {
     if (!fullDay && end <= start) { setError('Leave end time must be after start time.'); return; }
     setBusy(true); setError(''); setMessage('');
     try {
-      const timezone = await getOrganizationTimezone();
+      const timezone = await getOrganizationTimezone(profile?.organization_id || undefined);
       const today = formatDateInTimezone(new Date().toISOString(), timezone);
       const policy = balances.find(item => item.policy.id === policyId);
       if (!policy) throw new Error('Select a valid leave type.');
@@ -52,10 +52,11 @@ export function MyTimeLeaveRequest() {
       setError(err instanceof Error ? err.message : 'Leave request could not be submitted.');
     } finally { setBusy(false); }
   }
-  if (!balances.length && !error) return null;
+  
   return <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
     <h3 className="font-semibold text-gray-900">Request Same-Day Leave</h3>
     <p className="text-sm text-gray-600">Submit a sick or vacation call-in for manager approval. This does not clock you in.</p>
+    {balances.length === 0 && !error && <p className="text-sm text-gray-600">No leave policies are assigned to your account. Contact your manager to request time off.</p>}
     {balances.length > 0 && <>
       <label className="block text-sm text-gray-800">Leave type
         <select className="mt-1 w-full rounded border p-2" value={policyId} onChange={e => setPolicyId(e.target.value)}>
