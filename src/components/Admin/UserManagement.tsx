@@ -72,34 +72,25 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
 
       console.log('Users loaded:', data?.length || 0);
       setUsers(data || []);
-      const { data: statuses, error: statusError } = await supabase.from('user_account_email_status').select('*');
-      setAccountStatusError(!!statusError);
-      setAccountStatuses(new Map((statuses || []).map(s => [s.user_id, s])));
-      const {data:reviews,error:reviewError}=await supabase.from('user_setup_reviews').select('user_id,reviewed_sections');
-      setSetupReviewError(!!reviewError);
-      setSetupReviews(new Map((reviews||[]).map(r=>[r.user_id,r.reviewed_sections])));
-
-      // Load employee records
-      const { data: empData } = await supabase
-        .from('employees')
-        .select('user_id, id, employment_status, hire_date');
-      const empMap = new Map<string, EmployeeInfo>();
-      (empData || []).forEach(e => empMap.set(e.user_id, e));
-      setEmployeeMap(empMap);
-
-      // Load config review status
-      const empIds = (empData || []).map(e => e.id);
-      if (empIds.length > 0) {
-        const { data: configData } = await supabase
-          .from('employee_payroll_configs')
+      setLoading(false);
+      // Independent settings metadata must not serialize initial user rendering.
+      const [statusResult, reviewResult, employeeResult] = await Promise.all([
+        supabase.from('user_account_email_status').select('*'),
+        supabase.from('user_setup_reviews').select('user_id,reviewed_sections'),
+        supabase.from('employees').select('user_id, id, employment_status, hire_date'),
+      ]);
+      setAccountStatusError(!!statusResult.error);
+      setAccountStatuses(new Map((statusResult.data || []).map(item => [item.user_id, item])));
+      setSetupReviewError(!!reviewResult.error);
+      setSetupReviews(new Map((reviewResult.data || []).map(item => [item.user_id, item.reviewed_sections])));
+      const employees = employeeResult.data || [];
+      setEmployeeMap(new Map(employees.map(item => [item.user_id, item])));
+      const employeeIds = employees.map(item => item.id);
+      if (employeeIds.length) {
+        const { data: configData } = await supabase.from('employee_payroll_configs')
           .select('employee_id, effective_to, reviewed_at')
-          .in('employee_id', empIds)
-          .is('effective_to', null);
-        const reviewMap = new Map<string, boolean>();
-        (configData || []).forEach(c => {
-          reviewMap.set(c.employee_id, !!c.reviewed_at);
-        });
-        setConfigReviewMap(reviewMap);
+          .in('employee_id', employeeIds).is('effective_to', null);
+        setConfigReviewMap(new Map((configData || []).map(item => [item.employee_id, !!item.reviewed_at])));
       }
 
     } catch (error) {
