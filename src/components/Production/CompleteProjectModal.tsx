@@ -92,7 +92,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
       if (!data) throw new Error('Project completion was not confirmed');
 
       if (completionChoice === 'test_and_tune' && sendEmail) {
-        const { error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
+        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke('send-punchlist-invite', {
           body: {
             contact_email: emailAddress.trim(),
             contact_name: customer.contact_name,
@@ -100,7 +100,7 @@ export function CompleteProjectModal({ customer, onClose, onComplete, onOpenSale
             access_type: 'test_and_tune',
           },
         });
-        if (inviteError) toast.error('Project completed, but invitation delivery failed. You can resend from Test & Tune.', 'Invitation not sent');
+        if (inviteError || inviteResult?.success !== true) toast.error('Project completed, but invitation delivery failed. You can resend from Test & Tune.', 'Invitation not sent');
       }
       setDone(true);
       setTimeout(() => { onComplete(); onClose(); }, 1800);
