@@ -89,6 +89,17 @@ rejectBundle({...bundle,inputFingerprint:'untrusted'});
 rejectBundle({...bundle,readAtEpoch:'invalid'});
 rejectBundle({...bundle,pairs:null});
 rejectBundle({...bundle,pairs:Array(1001).fill(null)});
+// The SQL read_draft_candidate_inputs function explicitly emits false flags.
+// Those are safe diagnostic values, not authority, and must be composable.
+const sqlShapedBundle={...bundle,scopeVerified:false,snapshotReady:false,quoteReady:false};
+const sqlComposed=prepareTechsafeCandidateFromBundle(sqlShapedBundle,binding);
+assert.equal(sqlComposed.valid,true,JSON.stringify(sqlComposed));
+for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(sqlComposed[flag],false);
+assert.equal(compareTechsafeSourceReread(sqlShapedBundle,copy(sqlShapedBundle),binding).matches,true);
+for(const flag of ['scopeVerified','snapshotReady','quoteReady']){
+ rejectBundle({...sqlShapedBundle,[flag]:true});
+ rejectBundle({...sqlShapedBundle,[flag]:null});
+}
 rejectBundle({...bundle,quoteReady:true});
 rejectBundle({...bundle,eventId:'fabricated'});
 rejectBundle({...bundle,revision:1});
