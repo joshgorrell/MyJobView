@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   X,
-  CheckCircle2,
   CheckCircle,
   Mail,
   Building,
