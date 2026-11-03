@@ -1,3 +1,4 @@
+import { ActionRewards } from './ActionRewards';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { Award, Trophy, ShoppingCart, History, Check, ListChecks } from 'lucide-react';
@@ -304,6 +305,7 @@ export function RewardsDashboard() {
         <section className="bg-gray-800 rounded-lg border border-gray-700 p-5 space-y-4">
           <div>
             <h3 className="text-xl font-semibold text-white">How to Earn Points</h3>
+            <ActionRewards />
             <p className="text-sm text-gray-400 mt-1">
               Current activities and deductions for your company. Assignment rewards use the value shown on each assignment.
             </p>
