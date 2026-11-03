@@ -3,7 +3,7 @@
 import {prepareTechsafeDraftCandidate} from './techsafe-draft-candidate.mjs';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const digest=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
-const epoch=v=>typeof v==='string'&&/^\\d{1,12}(?:\\.\\d{1,6})?$/.test(v);
+const epoch=v=>typeof v==='string'&&/^\d{1,12}(?:\.\d{1,6})?$/.test(v);
 export function prepareTechsafeCandidateFromBundle(bundle,binding){
  const held=code=>({valid:false,content:null,excluded:[],issues:[{code}],
   equipmentMembershipResolved:false,scopeVerified:false,snapshotReady:false,quoteReady:false});
