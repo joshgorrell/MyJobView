@@ -79,7 +79,8 @@
     "test:proposal-templates:browser": "node tests/proposal-templates/browser.mjs",
     "test:customer-proposals": "node tests/customer-proposals/database.mjs && node tests/customer-proposals/shared-link.mjs",
     "test:customer-proposals:browser": "node tests/customer-proposals/browser.mjs",
-    "test:tech-stats:browser": "npm run build && node tests/labor-dashboard/production-browser.mjs"
+    "test:tech-stats:browser": "npm run build && node tests/labor-dashboard/production-browser.mjs",
+    "test:techsafe:preflight": "node tests/techsafe/observer-deployment-static-gate.mjs && node tests/techsafe/pending-migration-inventory.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
