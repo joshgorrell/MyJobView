@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
@@ -7,6 +7,8 @@ import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { WorkOrderTimeControl } from '../Production/WorkOrderTimeControl';
 import { ProjectTimeClock } from './ProjectTimeClock';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
+
+const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
 
 type TimeSection = 'daily' | 'job' | 'mine';
 type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
@@ -80,32 +82,14 @@ export function EmployeeTimeClock({ onNavigate }: { onNavigate: (page: string) =
       </div>
       {current === 'daily' && policy.dailyClock && <DailyClock />}
       {current === 'job' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
-          <h2 className="font-semibold text-gray-900">Job Clock</h2>
-          <ProjectTimeClock onChanged={() => setHistoryRevision(value => value + 1)} />
-          <p className="text-sm text-gray-600">Clock directly into any open project, even without an assigned work order. Daily payroll time remains separate.</p>
-          {jobsLoading && <p className="text-sm text-gray-500">Loading assigned work orders…</p>}
-          {jobsError && <p role="alert" className="text-sm text-red-700">Unable to load assigned work orders.</p>}
-          {!jobsLoading && !jobsError && (
-            <label className="block text-sm font-medium text-gray-700">
-              Assigned work order
-              <select value={selectedWorkOrderId} onChange={e => setSelectedWorkOrderId(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
-                <option value="">Select a work order</option>
-                {assignedJobs.map(job => <option key={job.id} value={job.id}>{job.work_order_number} — {job.title}</option>)}
-              </select>
-            </label>
-          )}
-          {!jobsLoading && !jobsError && assignedJobs.length === 0 && <p className="text-sm text-gray-500">No work orders are currently assigned to you. Ask your project manager to assign one, or open the Technician Work Center.</p>}
-          {selectedWorkOrderId && assignedJobs.some(job => job.id === selectedWorkOrderId) && (
-            <WorkOrderTimeControl key={selectedWorkOrderId} workOrderId={selectedWorkOrderId}
-              assignedTo={assignedJobs.find(job => job.id === selectedWorkOrderId)?.assigned_to ?? null}
-              onChanged={() => setHistoryRevision(value => value + 1)} />
-          )}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => onNavigate('tech_center')} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open Technician Work Center</button>
-            <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">Browse Work Orders</button>
+        <div className="space-y-3">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <h2 className="font-semibold text-gray-900">Job Clock</h2>
+            <p className="text-sm text-gray-600">Select an assigned work order below to access its existing job workflow. Job time is separate from your daily payroll clock.</p>
           </div>
+          <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
+            <TechnicianWorkCenter />
+          </Suspense>
         </div>
       )}
       {current === 'mine' && (
