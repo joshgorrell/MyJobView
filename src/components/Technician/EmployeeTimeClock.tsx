@@ -130,7 +130,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
                   {assignedJobs.filter(job => job.scheduled_date !== today).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
                 </>;
               })()}
-            </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
+            </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget key={timeType} sessionType={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
           </div>
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
