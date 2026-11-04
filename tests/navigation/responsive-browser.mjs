@@ -14,6 +14,8 @@ export const useDepartments=()=>({mainDepartments:[],footerDepartments:[],getUse
 export const useEmployeeTimePolicy=()=>({dailyClock:true});
 export const getOrganizationTimezone=async()=> 'America/Chicago';
 export const formatDateInTimezone=()=> '2026-10-09';
+export const formatTimeInTimezone=()=> '8:00 AM';
+export const createTimestampInTimezone=(date,time)=>date+'T'+time+':00Z';
 window.actions=[];
 const records=Array.from({length:10},(_,i)=>({id:'notice-'+i,type:i===0?'auto_clock_out':'work_order_assignment',related_id:'wo-'+i,title:i===0?'Auto Clock-Out: Needs Approval':'Work order assigned',body:'Technicians completed the installation. Follow up with the customer regarding remaining programming and additional equipment before returning to the project.',created_at:new Date(Date.now()-i*60000).toISOString(),is_read:i>1}));
 export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then'){let data=table==='notifications'?records:table==='organizations'?{header_logo_url:'/logo.svg'}:table==='company_settings'?{}:table==='business_cards'?{}:table==='daily_clock_entries'?null:[];return(a,b)=>Promise.resolve({data,error:null}).then(a,b);}return()=>q;}});return q;},channel(){const q={on(){return q;},subscribe(){return q;},unsubscribe(){}};return q;},removeChannel(){}};
