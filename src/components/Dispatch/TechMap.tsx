@@ -61,6 +61,11 @@ export function TechMap() {
         loadTechLocations();
       })
       .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'enhanced_gps_breadcrumbs'
+      }, () => {
+        loadTechLocations();
+      })
+      .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'daily_clock_entries'
@@ -320,7 +325,7 @@ export function TechMap() {
 
   async function loadTechLocations() {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
 
       // Get all clocked-in technicians with their clock-in location
       const { data: dailyClocks } = await supabase
@@ -350,15 +355,26 @@ export function TechMap() {
 
       if (error) throw error;
 
-      const latestLocations = new Map<string, TechLocation>();
+      // Native mobile writes enhanced breadcrumbs; legacy web tracking writes basic breadcrumbs.
+      // Select the newest point across both sources, scoped to the active daily clock entry.
+      const { data: nativeBreadcrumbs, error: nativeError } = await supabase
+        .from('enhanced_gps_breadcrumbs')
+        .select('id, technician_id, daily_clock_entry_id, latitude, longitude, accuracy, heading, speed, captured_at, battery_level')
+        .in('technician_id', clockedInTechIds.length ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000'])
+        .order('captured_at', { ascending: false }).limit(500);
+      if (nativeError) console.error('Unable to load native GPS breadcrumbs:', nativeError);
 
-      // Get the most recent breadcrumb for each technician
+      const latestLocations = new Map<string, TechLocation>();
       const latestBreadcrumbs = new Map<string, any>();
-      breadcrumbs?.forEach((b: any) => {
-        if (!latestBreadcrumbs.has(b.technician_id)) {
-          latestBreadcrumbs.set(b.technician_id, b);
-        }
-      });
+      const activeShiftIds = new Map((dailyClocks || []).map(clock => [clock.technician_id, clock.id]));
+      const consider = (point: any) => {
+        const shiftId = activeShiftIds.get(point.technician_id);
+        if (!shiftId || (point.daily_clock_entry_id && point.daily_clock_entry_id !== shiftId)) return;
+        const previous = latestBreadcrumbs.get(point.technician_id);
+        if (!previous || Date.parse(point.recorded_at) > Date.parse(previous.recorded_at)) latestBreadcrumbs.set(point.technician_id, point);
+      };
+      breadcrumbs?.forEach(consider);
+      nativeBreadcrumbs?.forEach(point => consider({ ...point, recorded_at: point.captured_at }));
 
       // Process all clocked-in technicians
       dailyClocks?.forEach((clock: any) => {
@@ -607,7 +623,10 @@ export function TechMap() {
                     )}
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Clock className="w-3 h-3" />
-                      {getTimeSince(tech.timestamp)}
+                      Last GPS: {getTimeSince(tech.timestamp)}
+                      {Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 && (
+                        <span className="ml-2 font-semibold text-amber-700">Stale location — not live</span>
+                      )}
                     </div>
                   </div>
 
