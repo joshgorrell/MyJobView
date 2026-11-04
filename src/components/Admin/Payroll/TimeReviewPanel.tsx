@@ -3,6 +3,7 @@ import {ManualJobTimeRequests} from './ManualJobTimeRequests';
 import {InternalSessionsManagement} from '../../Dispatch/InternalSessionsManagement';
 import {TravelBonusQueue} from '../../Dispatch/TravelBonusQueue';
 import {TravelBonusTracking} from '../../Dispatch/TravelBonusTracking';
+import {InternalTimeApprovalQueue} from '../../Technician/InternalTimeApprovalQueue';
 
 export function TimeReviewPanel({onPayroll}:{onPayroll?:()=>void}) {
   const [view,setView]=useState<'manual'|'internal'|'travel'|'travel_logs'>('manual');
@@ -16,7 +17,7 @@ export function TimeReviewPanel({onPayroll}:{onPayroll?:()=>void}) {
       {([['manual','Manual Job Time'],['internal','Shop / Training'],['travel','Travel Bonus Requests'],['travel_logs','Travel Logs']] as const).map(([key,label])=><button key={key} onClick={()=>setView(key)} aria-pressed={view===key} className={`rounded-lg px-3 py-2 text-sm ${view===key?'bg-blue-600 text-white':'border border-subtle bg-surface text-primary'}`}>{label}</button>)}
     </nav>
     {view==='manual' && <ManualJobTimeRequests/>}
-    {view==='internal' && <InternalSessionsManagement/>}
+    {view==='internal' && <div className="space-y-4"><InternalTimeApprovalQueue/><InternalSessionsManagement/></div>}
     {view==='travel' && <TravelBonusQueue/>}
     {view==='travel_logs' && <TravelBonusTracking/>}
   </section>;
