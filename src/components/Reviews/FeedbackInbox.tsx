@@ -46,9 +46,9 @@ export default function FeedbackInbox({ onNavigate, canJob, canProposal, canLost
       const requestNames = new Map((requests.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
       const baselineAt = baselines.data?.started_at ? Date.parse(baselines.data.started_at) : Number.POSITIVE_INFINITY;
       const all: Item[] = [
-        ...(jobs.data || []).map(row => ({ id: row.id, kind: 'job' as const, customer: row.customer_name || 'Customer', answer: row.rating != null ? String(row.rating) : 'Feedback submitted', note: row.comment || '', at: row.responded_at!, target: 'dashboard' })),
-        ...proposalEvents.map(row => ({ id: row.id, kind: 'proposal' as const, customer: emailNames.get(row.email_id) || 'Customer', answer: row.choice || 'Written response', note: row.message || '', at: row.created_at, target: 'proposal', emailId: row.email_id })),
-        ...(lost.data || []).filter(row => requestNames.has(row.request_id)).map(row => ({ id: row.request_id, kind: 'lost' as const, customer: requestNames.get(row.request_id) || 'Customer', answer: Array.isArray(row.reasons) ? row.reasons.join(', ') : 'Feedback submitted', note: row.message || '', at: row.created_at, target: 'lost' })),
+        ...(jobs.data || []).map(row => ({ id: row.id, kind: 'job' as const, customer: row.customer_name || 'Customer', answer: row.rating != null ? String(row.rating) : 'Feedback submitted', note: row.comment || '', at: row.responded_at!, target: 'dashboard' as const })),
+        ...proposalEvents.map(row => ({ id: row.id, kind: 'proposal' as const, customer: emailNames.get(row.email_id) || 'Customer', answer: row.choice || 'Written response', note: row.message || '', at: row.created_at, target: 'proposal' as const, emailId: row.email_id })),
+        ...(lost.data || []).filter(row => requestNames.has(row.request_id)).map(row => ({ id: row.request_id, kind: 'lost' as const, customer: requestNames.get(row.request_id) || 'Customer', answer: Array.isArray(row.reasons) ? row.reasons.join(', ') : 'Feedback submitted', note: row.message || '', at: row.created_at, target: 'lost' as const })),
       ];
       all.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
       setItems(all.filter(item => Number.isFinite(Date.parse(item.at))).slice(0, 100));
