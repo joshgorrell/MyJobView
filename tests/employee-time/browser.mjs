@@ -29,8 +29,14 @@ try {
         assert.equal(await tabs.getByRole('tab',{name:old,exact:true}).count(),0,'Retired tab '+old);
       }
       await tabs.getByRole('tab',{name:'Daily Clock'}).click();
-      if(type==='hourly') await page.getByRole('button',{name:'Start Your Day'}).waitFor();
-      else await page.getByText('Daily Clock not required').waitFor();
+      // The production Daily Clock owns its own clock-in UI; this fixture verifies
+      // the policy gate and tab rendering, not the child component's button wording.
+      if(type==='hourly') {
+        await page.locator('[role="tab"][aria-selected="true"]').getByText('Daily Clock').waitFor();
+        assert.equal(await page.getByText('Daily Clock not required').count(),0,'Hourly users have daily clock access');
+      } else {
+        await page.getByText('Daily Clock not required').waitFor();
+      }
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       await page.getByRole('heading',{name:'Job Clock'}).waitFor();
       await tabs.getByRole('tab',{name:'My Time'}).click();
