@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Battery from 'expo-battery';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import { supabase } from './supabase';
@@ -34,6 +34,35 @@ interface TrackingConfig {
 
 class LocationTrackingService {
   private isTracking = false;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private heartbeatListener = AppState.addEventListener('change', state => {
+    if (state === 'active' && this.isTracking) void this.sendHeartbeat();
+  });
+
+  private async sendHeartbeat(allowBackground = false) {
+    if (!allowBackground && AppState.currentState !== 'active') return;
+    const session = await this.getTrackingSession();
+    if (!session) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id !== session.technicianId) return;
+    const { error } = await supabase.from('technician_tracking_heartbeats').upsert({
+      technician_id: session.technicianId,
+      daily_clock_entry_id: session.clockEntryId
+    }, { onConflict: 'technician_id' });
+    if (error) console.warn('GPS connectivity heartbeat failed', error);
+  }
+
+  private startHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    void this.sendHeartbeat();
+    this.heartbeatTimer = setInterval(() => { void this.sendHeartbeat(); }, 60000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+  }
+
   private currentClockEntryId: string | null = null;
   private currentTechnicianId: string | null = null;
   private batteryLevel: number = 1.0;
@@ -73,6 +102,7 @@ class LocationTrackingService {
       this.isTracking = true;
       this.currentTechnicianId = technicianId;
       this.currentClockEntryId = clockEntryId;
+      this.startHeartbeat();
       return;
     }
 
@@ -101,6 +131,7 @@ class LocationTrackingService {
       this.isTracking = true;
       this.currentTechnicianId = technicianId;
       this.currentClockEntryId = clockEntryId;
+      this.startHeartbeat();
     } catch (error) {
       await SecureStore.deleteItemAsync(TRACKING_SESSION_KEY);
       throw error;
@@ -114,6 +145,7 @@ class LocationTrackingService {
     const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
     if (running) await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
     await SecureStore.deleteItemAsync(TRACKING_SESSION_KEY);
+    this.stopHeartbeat();
     this.isTracking = false;
     this.currentClockEntryId = null;
     this.currentTechnicianId = null;
@@ -183,6 +215,7 @@ class LocationTrackingService {
     // Verify that the persisted shift still belongs to the signed-in account.
     const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession || authSession.user.id !== session.technicianId) return;
+    await this.sendHeartbeat(true);
     for (const location of locations) {
       // Re-check for clock-out between queued points.
       const active = await this.getTrackingSession();

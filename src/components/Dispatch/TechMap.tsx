@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createTimestampInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { MapPin, Navigation, Battery, Clock, RefreshCw } from 'lucide-react';
 
 interface TechLocation {
@@ -12,6 +13,7 @@ interface TechLocation {
   speed: number | null;
   timestamp: string;
   battery_level: number | null;
+  heartbeat_at?: string | null;
   is_active: boolean;
   technician: {
     full_name: string;
@@ -42,10 +44,21 @@ export function TechMap() {
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const initRetryCount = useRef(0);
+  const [historyDate, setHistoryDate] = useState(() => formatDateInTimezone(new Date().toISOString(), 'America/Chicago'));
+  const [organizationTimezone, setOrganizationTimezone] = useState('America/Chicago');
+  const [historyMode, setHistoryMode] = useState(false);
+  const [historyPoints, setHistoryPoints] = useState<Array<{ latitude: number; longitude: number; recorded_at: string }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyTechnicians, setHistoryTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const historyLineRef = useRef<any>(null);
+  const historyEndpointsRef = useRef<any[]>([]);
 
   useEffect(() => {
     loadApiKey();
     loadTechLocations();
+    void loadHistoryTechnicians();
+
 
     const interval = setInterval(() => {
       loadTechLocations();
@@ -57,6 +70,11 @@ export function TechMap() {
         event: '*',
         schema: 'public',
         table: 'gps_breadcrumbs'
+      }, () => {
+        loadTechLocations();
+      })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'enhanced_gps_breadcrumbs'
       }, () => {
         loadTechLocations();
       })
@@ -76,6 +94,13 @@ export function TechMap() {
   }, []);
 
   useEffect(() => {
+    void getOrganizationTimezone().then(timezone => {
+      setOrganizationTimezone(timezone);
+      setHistoryDate(formatDateInTimezone(new Date().toISOString(), timezone));
+    });
+  }, []);
+
+  useEffect(() => {
     if (apiKey && !mapReady) {
       console.log('Initiating Google Maps load...');
       // Small delay to ensure DOM is ready
@@ -90,10 +115,10 @@ export function TechMap() {
     if (mapReady) {
       updateMarkers();
     }
-  }, [techLocations, mapReady]);
+  }, [techLocations, mapReady, historyMode]);
 
   useEffect(() => {
-    if (selectedTech && googleMapRef.current) {
+    if (!historyMode && selectedTech && googleMapRef.current) {
       const tech = techLocations.find(t => t.technician_id === selectedTech);
       if (tech) {
         googleMapRef.current.panTo({ lat: tech.latitude, lng: tech.longitude });
@@ -104,7 +129,67 @@ export function TechMap() {
         }
       }
     }
-  }, [selectedTech]);
+  }, [selectedTech, historyMode]);
+
+  useEffect(() => {
+    if (!historyMode || !selectedTech) { setHistoryPoints([]); return; }
+    let cancelled = false;
+    const start = new Date(createTimestampInTimezone(historyDate, '00:00', organizationTimezone));
+    const followingDay = new Date(historyDate + 'T12:00:00Z');
+    followingDay.setUTCDate(followingDay.getUTCDate() + 1);
+    const end = new Date(createTimestampInTimezone(followingDay.toISOString().slice(0, 10), '00:00', organizationTimezone));
+    setHistoryLoading(true);
+    setHistoryError(null);
+    Promise.all([
+      supabase.from('enhanced_gps_breadcrumbs').select('latitude,longitude,captured_at').eq('technician_id', selectedTech).gte('captured_at', start.toISOString()).lt('captured_at', end.toISOString()).order('captured_at').limit(5000),
+      supabase.from('gps_breadcrumbs').select('latitude,longitude,recorded_at').eq('technician_id', selectedTech).gte('recorded_at', start.toISOString()).lt('recorded_at', end.toISOString()).order('recorded_at').limit(5000)
+    ]).then(([native, legacy]) => {
+      if (cancelled) return;
+      if (native.error || legacy.error) { console.error('GPS history load failed', native.error, legacy.error); setHistoryError('Route unavailable — could not load all GPS sources'); setHistoryPoints([]); }
+      else {
+        if ((native.data?.length || 0) >= 5000 || (legacy.data?.length || 0) >= 5000) setHistoryError('Route may be incomplete: GPS point limit reached');
+        setHistoryPoints([
+        ...(native.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.captured_at })),
+        ...(legacy.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.recorded_at }))
+      ].filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)).sort((a,b) => Date.parse(a.recorded_at) - Date.parse(b.recorded_at)));
+      }
+      setHistoryLoading(false);
+    }).catch(error => {
+      if (cancelled) return;
+      console.error('GPS history request failed', error);
+      setHistoryError('Route unavailable — please try again');
+      setHistoryPoints([]);
+      setHistoryLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedTech, historyDate, historyMode, organizationTimezone]);
+
+  useEffect(() => {
+    historyLineRef.current?.setMap(null);
+    historyEndpointsRef.current.forEach(marker => marker.setMap(null));
+    historyEndpointsRef.current = [];
+    if (!historyMode || !mapReady || !historyPoints.length || !window.google?.maps || !googleMapRef.current) return;
+    const path = historyPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
+    historyLineRef.current = new window.google.maps.Polyline({ path, map: googleMapRef.current, strokeColor: '#2563eb', strokeWeight: 4 });
+    const bounds = new window.google.maps.LatLngBounds();
+    path.forEach(p => bounds.extend(p));
+    googleMapRef.current.fitBounds(bounds);
+    historyEndpointsRef.current = [
+      new window.google.maps.Marker({ map: googleMapRef.current, position: path[0], label: 'S', title: 'First recorded GPS point' }),
+      new window.google.maps.Marker({ map: googleMapRef.current, position: path[path.length - 1], label: 'E', title: 'Last recorded GPS point' })
+    ];
+    return () => {
+      historyLineRef.current?.setMap(null);
+      historyEndpointsRef.current.forEach(marker => marker.setMap(null));
+      historyEndpointsRef.current = [];
+    };
+  }, [historyPoints, mapReady, historyMode]);
+
+  async function loadHistoryTechnicians() {
+    const { data, error } = await supabase.from('profiles').select('id,full_name').order('full_name');
+    if (error) { console.error('Unable to load technician history selector', error); return; }
+    setHistoryTechnicians((data || []).filter(p => p.id && p.full_name));
+  }
 
   async function loadApiKey() {
     try {
@@ -203,6 +288,7 @@ export function TechMap() {
   }
 
   function getMarkerColor(status?: string): string {
+
     switch (status) {
       case 'available':
         return '#10b981'; // green
@@ -274,7 +360,7 @@ export function TechMap() {
                 </div>
               ` : ''}
               <div style="font-size: 14px; color: #666;">
-                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}
+                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}${Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 ? ' — last location, connectivity unknown' : ''}
               </div>
               ${tech.accuracy > 100 ? `
                 <div style="font-size: 12px; color: #f59e0b; margin-top: 4px;">
@@ -305,7 +391,7 @@ export function TechMap() {
       }
     });
 
-    if (techLocations.length > 0) {
+    if (!historyMode && techLocations.length > 0) {
       const bounds = new window.google.maps.LatLngBounds();
       techLocations.forEach(tech => {
         bounds.extend({ lat: tech.latitude, lng: tech.longitude });
@@ -320,7 +406,7 @@ export function TechMap() {
 
   async function loadTechLocations() {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = formatDateInTimezone(new Date().toISOString(), organizationTimezone);
 
       // Get all clocked-in technicians with their clock-in location
       const { data: dailyClocks } = await supabase
@@ -346,19 +432,34 @@ export function TechMap() {
         .from('gps_breadcrumbs')
         .select('*')
         .in('technician_id', clockedInTechIds.length > 0 ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000'])
-        .order('recorded_at', { ascending: false });
+        .order('recorded_at', { ascending: false }).limit(500);
 
       if (error) throw error;
 
-      const latestLocations = new Map<string, TechLocation>();
+      // Native mobile writes enhanced breadcrumbs; legacy web tracking writes basic breadcrumbs.
+      // Select the newest point across both sources, scoped to the active daily clock entry.
+      const { data: nativeBreadcrumbs, error: nativeError } = await supabase
+        .from('enhanced_gps_breadcrumbs')
+        .select('id, technician_id, daily_clock_entry_id, latitude, longitude, accuracy, heading, speed, captured_at, battery_level')
+        .in('technician_id', clockedInTechIds.length ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000'])
+        .order('captured_at', { ascending: false }).limit(500);
+      if (nativeError) console.error('Unable to load native GPS breadcrumbs:', nativeError);
 
-      // Get the most recent breadcrumb for each technician
+      const { data: heartbeats } = await supabase.from('technician_tracking_heartbeats').select('technician_id,daily_clock_entry_id,last_seen_at').in('technician_id', clockedInTechIds.length ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000']);
+      const heartbeatByTech = new Map((heartbeats || []).map(h => [h.technician_id, h]));
+      const latestLocations = new Map<string, TechLocation>();
       const latestBreadcrumbs = new Map<string, any>();
-      breadcrumbs?.forEach((b: any) => {
-        if (!latestBreadcrumbs.has(b.technician_id)) {
-          latestBreadcrumbs.set(b.technician_id, b);
-        }
-      });
+      const activeShiftIds = new Map((dailyClocks || []).map(clock => [clock.technician_id, clock.id]));
+      const consider = (point: any) => {
+        const shiftId = activeShiftIds.get(point.technician_id);
+        if (!shiftId || (point.daily_clock_entry_id && point.daily_clock_entry_id !== shiftId)) return;
+        const shift = (dailyClocks || []).find(clock => clock.id === shiftId);
+        if (!shift || !Number.isFinite(Date.parse(point.recorded_at)) || Date.parse(point.recorded_at) < Date.parse(shift.clock_in)) return;
+        const previous = latestBreadcrumbs.get(point.technician_id);
+        if (!previous || Date.parse(point.recorded_at) > Date.parse(previous.recorded_at)) latestBreadcrumbs.set(point.technician_id, point);
+      };
+      breadcrumbs?.forEach(consider);
+      nativeBreadcrumbs?.forEach(point => consider({ ...point, recorded_at: point.captured_at }));
 
       // Process all clocked-in technicians
       dailyClocks?.forEach((clock: any) => {
@@ -417,6 +518,7 @@ export function TechMap() {
             speed: locationData.speed,
             timestamp: locationData.timestamp,
             battery_level: null,
+            heartbeat_at: heartbeatByTech.get(techId)?.daily_clock_entry_id === clock.id ? heartbeatByTech.get(techId)?.last_seen_at : null,
             is_active: true,
             technician: clock.profiles,
             status: {
@@ -457,6 +559,8 @@ export function TechMap() {
     const then = new Date(timestamp);
     const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
 
+    if (!Number.isFinite(seconds)) return 'unknown';
+    if (seconds < 0) return 'just now';
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     return `${Math.floor(seconds / 3600)}h ago`;
@@ -490,6 +594,17 @@ export function TechMap() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4 text-gray-900">
+        <button type="button" className="rounded border px-3 py-2" onClick={() => setHistoryMode(v => !v)}>{historyMode ? 'Return to live map' : 'View route history'}</button>
+        {historyMode && <label>History technician
+          <select className="block rounded border p-2" value={selectedTech || ''} onChange={e => setSelectedTech(e.target.value || null)}>
+            <option value="">Select technician</option>
+            {historyTechnicians.map(tech => <option key={tech.id} value={tech.id}>{tech.full_name}</option>)}
+          </select>
+        </label>}
+        {historyMode && <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>}
+        {historyMode && <span className="text-sm">{historyLoading ? 'Loading route…' : historyError || (selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history')}</span>}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Area */}
         <div className="lg:col-span-2">
@@ -607,10 +722,14 @@ export function TechMap() {
                     )}
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Clock className="w-3 h-3" />
-                      {getTimeSince(tech.timestamp)}
+                      Last GPS: {getTimeSince(tech.timestamp)}
+                      {Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 && (
+                        <span className="ml-2 font-semibold text-amber-700">Last GPS is older than 5 minutes; connection status unknown</span>
+                      )}
                     </div>
                   </div>
 
+                  <div className="mt-1 text-xs text-gray-600">App connectivity: {tech.heartbeat_at ? (Date.now() - Date.parse(tech.heartbeat_at) <= 180000 ? 'Recently connected' : 'No recent foreground heartbeat; background unknown') : 'Not confirmed'}</div>
                   {tech.status?.notes && (
                     <div className="mt-2 text-xs text-gray-600 italic">
                       "{tech.status.notes}"
