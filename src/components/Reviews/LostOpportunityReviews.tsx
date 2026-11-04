@@ -310,7 +310,6 @@ export default function LostOpportunityReviews(
   const pendingCount = reviews.filter(v => !v.responded_at).length;
   const reviewedCount = reviews.filter(v => !!v.reviewed_at).length;
   const winnableCount = reviews.filter(v => ["yes", "maybe"].includes(v.response?.recoverable || "")).length;
-  const recoveredCount = reviews.filter(v => v.recovery_outcome === "recovered").length;
 
   const openedCount = reviews.filter(v => !!v.opened_at).length;
   const lostStats: StatItem[] = [
