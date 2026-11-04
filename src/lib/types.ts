@@ -43,7 +43,7 @@ export interface Profile {
   last_seen_fishbowl_at: string | null;
   last_seen_punchlist_at: string | null;
   default_calendar_view: string | null;
-  ui_theme?: 'light' | 'dark' | 'classic' | 'mjv' | 'system';
+  ui_theme?: 'light' | 'dark' | 'classic' | 'mjv' | 'newspaper' | 'system';
   created_at: string;
   updated_at: string;
 }

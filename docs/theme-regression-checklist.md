@@ -1,6 +1,6 @@
 # Workspace theme regression checklist
 
-Themes: Classic Gradient (`classic`), Light, Dark, MJV.
+Themes: Classic Gradient (`classic`), Light, Dark, MJV, Newspaper (black, white and neutral grays).
 
 ## Shared rules
 
@@ -17,7 +17,7 @@ Themes: Classic Gradient (`classic`), Light, Dark, MJV.
 
 Run `npm run test:themes`, `npm run test:themes:browser`, `npm run test:service-requests`, `npm run test:punchlist` and `npm run test:proposals:browser`.
 
-The theme browser harness uses actual components with mocked account/data APIs at 320, 375, 390, 430 and 1280px. It checks all four themes against Settings, populated Flow, populated Service Requests, populated Punchlist, Projects, Tasks and its creation form, Finance, Dispatch, confirmations, portal-rendered content and legacy surface/button fixtures. It measures text contrast across solid and gradient surfaces, heading uniformity, horizontal overflow and selector layout. Persistence scenarios cover reload, stale cache, legacy System normalization, fresh-device account loading, network/schema/constraint failures and zero-row saves.
+The theme browser harness uses actual components with mocked account/data APIs at 320, 375, 390, 430 and 1280px. It checks all five themes against Settings, populated Flow, populated Service Requests, populated Punchlist, Projects, Tasks and its creation form, Finance, Dispatch, confirmations, portal-rendered content and legacy surface/button fixtures. It measures text contrast across solid and gradient surfaces, heading uniformity, horizontal overflow and selector layout. Persistence scenarios cover reload, stale cache, legacy System normalization, fresh-device account loading, network/schema/constraint failures and zero-row saves.
 
 ## Release smoke test
 
@@ -30,3 +30,5 @@ On a connected staging account, repeat these checks with production-like data:
 - On iPhone, keep the theme selector on one row, ensure no horizontal page overflow, and verify proposal expansion and scheduling actions.
 
 The automated harness does not authenticate to a live account or verify live cross-device database synchronization. The existing theme migrations must be present before account saving can succeed.
+
+Newspaper additionally checks computed text, surfaces, borders, shadows and gradients for neutral RGB values. Photos and fixed customer artwork retain their source colors. Apply the newspaper migration before releasing the new choice.

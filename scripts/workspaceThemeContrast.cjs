@@ -26,8 +26,9 @@ module.exports = plugin(({ addBase, e }) => {
   rules[':root, [data-theme]'] = Object.fromEntries(foregroundVariables.map(x=>['--workspace-'+x, 'var(--'+x+')']));
   const resetForeground = Object.fromEntries(foregroundVariables.map(x=>['--'+x, 'var(--workspace-'+x+')']));
   const excluded = ':not(:where([data-theme-fixed], [data-theme-fixed] *))';
+  let themeScope = '';
   const selector = (name, state = '') =>
-    `:is(.theme-workspace, .theme-workspace *)${excluded}.${e(name)}${state}`;
+    `${themeScope}:is(.theme-workspace, .theme-workspace *)${excluded}.${e(name)}${state}`;
   // Uniform semantic heading sizes; figures and branded artwork retain their own scale.
   for (const [tag, role] of [['h1','page-title'],['h2','section-title'],['h3','card-title']]) {
     rules[`.theme-workspace ${tag}${excluded}:not(:where([data-type-scale="display"], [data-type-scale="display"] *))`] = {fontSize:`var(--font-${role})`,fontWeight:'600',lineHeight:'1.4'};
@@ -45,7 +46,7 @@ module.exports = plugin(({ addBase, e }) => {
         if (usedClasses.has(candidate)) (rules[`@media (min-width: ${width}px)`] ||= {})[selector(candidate,state)] = declarations;
       }
     }
-    if (usedClasses.has('group-hover:'+name)) rules[`.theme-workspace .group:hover .${e('group-hover:' + name)}${excluded}`] = declarations;
+    if (usedClasses.has('group-hover:'+name)) rules[`${themeScope}.theme-workspace .group:hover .${e('group-hover:' + name)}${excluded}`] = declarations;
   };
   const neutral = ['gray', 'slate', 'zinc', 'neutral', 'stone'];
   for (const family of neutral) {
@@ -98,7 +99,7 @@ module.exports = plugin(({ addBase, e }) => {
   }
   // Legacy separate opacity utilities expose the workspace through the tint;
   // they must use workspace text rather than opaque-button foregrounds.
-  const translucent = `:is(.theme-workspace, .theme-workspace *)${excluded}[class*="bg-opacity-"]`;
+  const translucent = `${themeScope}:is(.theme-workspace, .theme-workspace *)${excluded}[class*="bg-opacity-"]`;
   rules[translucent] = resetForeground;
   rules[`:where(${translucent})`] = {color:'rgb(var(--text-primary))'};
   const control = `.theme-workspace :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]),textarea,select)${excluded}`;
@@ -108,5 +109,26 @@ module.exports = plugin(({ addBase, e }) => {
   rules[control+' option'] = {backgroundColor:'rgb(var(--canvas))',color:'rgb(var(--text-primary))'};
   rules[control+':-webkit-autofill'] = {WebkitTextFillColor:'rgb(var(--text-primary))',WebkitBoxShadow:'0 0 0 1000px rgb(var(--canvas)) inset'};
   rules['@media (max-width: 639px)'] = {[control]: {fontSize:'16px'}};
+
+  // Neutralize legacy color utilities without filtering photos or fixed artwork.
+  themeScope = '[data-theme="newspaper"] ';
+  for (const [family, role] of Object.entries(roles)) {
+    for (const shade of [50,100,200,300,400,500,600,700,800,900,950]) {
+      const gray = colors.neutral[shade];
+      const l = luminance(gray);
+      const foreground = (l+.05)/.05 >= 1.05/(l+.05) ? '0 0 0' : '255 255 255';
+      const palette = Object.fromEntries(foregroundVariables.map(x=>['--'+x,foreground]));
+      add(`bg-${family}-${shade}`, {...palette, backgroundColor:gray, color:`rgb(${foreground})`});
+      if (usedClasses.has(`bg-${family}-${shade}`)) rules[selector(`bg-${family}-${shade}`)+'[class*="bg-opacity-"]'] = {...resetForeground,backgroundColor:`rgb(var(--${role}-surface))`};
+      add(`border-${family}-${shade}`, {borderColor:'rgb(var(--border-strong))'});
+      add(`ring-${family}-${shade}`, {'--tw-ring-color':'rgb(var(--brand-text))'});
+      add(`accent-${family}-${shade}`, {accentColor:'rgb(var(--brand-text))'});
+      for (const suffix of ['', ...[10,15,20,25,30,40,50,60,70,75,80,90,95].map(x=>'/'+x)]) {
+        add(`shadow-${family}-${shade}${suffix}`, {'--tw-shadow-color':'rgb(0 0 0 / .15)','--tw-shadow':'var(--tw-shadow-colored)'});
+        add(`border-${family}-${shade}${suffix}`, {borderColor:'rgb(var(--border-strong))'});
+        add(`ring-${family}-${shade}${suffix}`, {'--tw-ring-color':'rgb(var(--brand-text))'});
+      }
+    }
+  }
   addBase(rules);
 });

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 
-export type ThemePreference = 'light' | 'dark' | 'classic' | 'mjv';
+export type ThemePreference = 'light' | 'dark' | 'classic' | 'mjv' | 'newspaper';
 type ThemeContextValue = {
   preference: ThemePreference;
   resolvedTheme: ThemePreference;
@@ -10,7 +10,7 @@ type ThemeContextValue = {
 };
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 const validTheme = (value: unknown): value is ThemePreference =>
-  value === 'light' || value === 'dark' || value === 'classic' || value === 'mjv';
+  value === 'light' || value === 'dark' || value === 'classic' || value === 'mjv' || value === 'newspaper';
 const normalize = (value: unknown) => value === 'system' ? 'mjv' : value;
 function cacheTheme(userId: string, theme: ThemePreference) {
   // Storage may be unavailable in private browsing. Account saving still works.
@@ -39,7 +39,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = preference;
-    document.documentElement.style.colorScheme = preference === 'light' || preference === 'mjv' ? 'light' : 'dark';
+    document.documentElement.style.colorScheme = preference === 'light' || preference === 'mjv' || preference === 'newspaper' ? 'light' : 'dark';
   }, [preference]);
 
   const value = useMemo<ThemeContextValue>(() => ({

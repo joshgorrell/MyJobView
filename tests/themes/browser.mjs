@@ -29,14 +29,14 @@ try{
  const css=(await readdir('dist/assets')).find(x=>x.startsWith('index-')&&x.endsWith('.css'));await writeFile(join(dir,'style.css'),Buffer.concat([await readFile('dist/assets/'+css),await readFile(join(dir,'app.css'))]));await writeFile(join(dir,'index.html'),'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>');await new Promise(r=>server.listen(0,'127.0.0.1',r));
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,headless:true,args:['--no-sandbox']});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack)});
  for(const width of [320,375,390,430,1280]){await page.setViewportSize({width,height:900});await page.goto('http://127.0.0.1:'+server.address().port);await page.getByRole('heading',{name:'Appearance',exact:true}).waitFor();
- for(const theme of ['classic','light','dark','mjv']){await page.getByRole('button',{name:theme==='classic'?/Classic Gradient/:new RegExp('^'+theme,'i')}).click();await page.waitForFunction(()=>!document.querySelector('[aria-label="Color theme"]').getAttribute('aria-busy')||document.querySelector('[aria-label="Color theme"]').getAttribute('aria-busy')==='false');
+ for(const theme of ['classic','light','dark','mjv','newspaper']){await page.getByRole('button',{name:theme==='classic'?/Classic Gradient/:new RegExp('^'+theme,'i')}).click();await page.waitForFunction(()=>!document.querySelector('[aria-label="Color theme"]').getAttribute('aria-busy')||document.querySelector('[aria-label="Color theme"]').getAttribute('aria-busy')==='false');
  assert.equal(await page.locator('[aria-label="Color theme"] [aria-pressed="true"]').count(),1);
  const typography=await page.locator('h1,h2,h3').evaluateAll(els=>els.filter(el=>!el.closest('[data-theme-fixed]')).map(el=>({tag:el.tagName,size:getComputedStyle(el).fontSize,font:getComputedStyle(el).fontFamily,weight:getComputedStyle(el).fontWeight})));
  for(const tag of ['H1','H2','H3'])assert.ok(new Set(typography.filter(x=>x.tag===tag).map(x=>x.size+'|'+x.font+'|'+x.weight)).size<=1,JSON.stringify({width,theme,tag,typography}));
  assert.equal(await page.locator('.flow').first().evaluate(el=>getComputedStyle(el).backgroundColor),await page.locator('#portal-fixture').evaluate(el=>getComputedStyle(el).backgroundColor));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  if(width<640)assert.equal(await page.locator('[aria-label="Preferences sections"]').evaluate(el=>el.scrollWidth>el.clientWidth),false);
- const boxes=await page.locator('[aria-label="Color theme"] button').evaluateAll(bs=>bs.map(b=>{const r=b.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));assert.ok(boxes.every(b=>b.h>=44));assert.equal(boxes[0].y,boxes[1].y);assert.equal(boxes[2].y,boxes[3].y);assert.equal(boxes[0].w,boxes[1].w);assert.equal(boxes[0].y,boxes[2].y);
- await page.locator('#tasks-fixture').getByRole('button',{name:/^New(?: Task)?$/}).click();await page.getByRole('button',{name:'Create Task',exact:true}).waitFor();
+ const boxes=await page.locator('[aria-label="Color theme"] button').evaluateAll(bs=>bs.map(b=>{const r=b.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));assert.ok(boxes.every(b=>b.h>=44));assert.equal(boxes[0].y,boxes[1].y);assert.equal(boxes[2].y,boxes[3].y);assert.ok(Math.abs(boxes[0].w-boxes[1].w)<1);assert.equal(boxes[0].y,boxes[2].y);assert.equal(boxes[0].y,boxes[4].y);
+ await page.locator('#tasks-fixture').getByRole('button',{name:/^New(?: Task)?$/}).click();await page.getByRole('button',{name:'Create Assignment',exact:true}).waitFor();
  const contrastIssues=()=>page.evaluate(()=>{
    const rgb=value=>{const c=(value.match(/[\d.]+/g)||[]).map(Number);if(c.length===3)c.push(1);return c;};
    const blend=(front,back)=>back.map((v,i)=>front[i]*(front[3]??1)+v*(1-(front[3]??1)));
@@ -64,7 +64,22 @@ try{
  });const issues=await contrastIssues();assert.deepEqual(issues,[],JSON.stringify({width,theme,issues}));
  await page.getByRole('button',{name:'Close dialog',exact:true}).click();await page.getByRole('button',{name:'Secondary action',exact:true}).hover();assert.deepEqual(await contrastIssues(),[],JSON.stringify({width,theme,hover:true}));assert.deepEqual(await page.locator('[data-theme-fixed]').last().evaluate(el=>[getComputedStyle(el).color,getComputedStyle(el).backgroundColor]),['rgb(0, 0, 0)','rgb(255, 255, 255)']);await page.getByRole('button',{name:'Open confirmation',exact:true}).click();assert.deepEqual(await contrastIssues(),[],JSON.stringify({width,theme,dialog:true}));await page.getByRole('button',{name:'Cancel',exact:true}).click();
  if(process.env.THEME_SCREENSHOT_DIR&&width===390){await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:join(process.env.THEME_SCREENSHOT_DIR,theme+'.png')});await page.locator('#tasks-fixture').screenshot({path:join(process.env.THEME_SCREENSHOT_DIR,theme+'-tasks.png')});}
- }console.log(width+'px: four theme choices, layout and text contrast pass');}
+
+ if(theme==='newspaper'){
+   assert.equal(await page.evaluate(()=>document.documentElement.style.colorScheme),'light');
+   const colored=await page.locator('.theme-workspace, .theme-workspace *, #portal-fixture').evaluateAll(els=>els.filter(el=>!el.closest('[data-theme-fixed]')&&el.getBoundingClientRect().height).flatMap(el=>{
+     const s=getComputedStyle(el);
+     return ['color','backgroundColor','borderTopColor','outlineColor','boxShadow','backgroundImage'].flatMap(prop=>{
+       if(prop==='borderTopColor'&&parseFloat(s.borderTopWidth)===0)return [];
+       if(prop==='outlineColor'&&s.outlineStyle==='none')return [];
+       const colors=s[prop].match(/rgba?\([^)]+\)/g)||[];
+       return colors.filter(c=>{const v=c.match(/[\d.]+/g).map(Number);return(v.length<4||v[3]>0)&&!(v[0]===v[1]&&v[1]===v[2]);}).map(c=>({prop,color:c,classes:String(el.className).slice(0,150)}));
+     });
+   }));
+   assert.deepEqual(colored,[],JSON.stringify({width,theme,colored}));
+   await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.theme==='newspaper');
+ }
+ }console.log(width+'px: five theme choices, layout and text contrast pass');}
  await page.getByRole('button',{name:/^MJV/}).click();await page.waitForFunction(()=>document.documentElement.dataset.theme==='mjv');await page.emulateMedia({colorScheme:'dark'});assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),'mjv');assert.equal(await page.evaluate(()=>document.documentElement.style.colorScheme),'light');assert.equal(await page.getByRole('button',{name:/^System/}).count(),0);
  await page.evaluate(()=>{localStorage.setItem('server-theme','system');localStorage.setItem('mjv-theme-test','dark')});await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.theme==='mjv');assert.equal(await page.evaluate(()=>localStorage.getItem('mjv-theme-test')),'mjv');
  await page.getByRole('button',{name:/^Light/}).click();await page.waitForFunction(()=>document.querySelector('[aria-busy]').getAttribute('aria-busy')==='false');await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.theme==='light');
