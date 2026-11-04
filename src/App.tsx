@@ -972,9 +972,11 @@ function AppContent() {
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
           {activeTab === 'labor_dashboard' && profile.role==='admin' && <TechStats key={activeTab}/>}
-          {['payroll', 'time_approval'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
-            ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Review', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
+          {['payroll', 'time_approval', 'time_records', 'time_settings'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+            ...(checkModuleAccess('daily_clock') ? [{ key: 'time_records', label: 'Time Records', content: <TimeClockHistory onNavigate={setActiveTab} /> }] : []),
+            ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Approvals', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
             ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
+            ...(profile.role === 'admin' ? [{ key: 'time_settings', label: 'Settings', content: <TimeClockManagement onLaborDashboard={() => setActiveTab('tech_stats')} /> }] : []),
           ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
