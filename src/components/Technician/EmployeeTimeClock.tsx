@@ -6,7 +6,7 @@ import { DailyClock } from './DailyClock';
 import { MyTimeLeaveRequest } from './MyTimeLeaveRequest';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
-import { AssignedSessionsWidget } from '../Production/AssignedSessionsWidget';
+import { DirectInternalTimeClock } from './DirectInternalTimeClock';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
 const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
@@ -150,7 +150,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
                   {assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
                 </>;
               })()}
-            </> : <div className="space-y-2"><div role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><strong>Manager approval required.</strong> {timeType === 'shop_time' ? 'Shop Time' : 'Training Time'} is only valid with manager approval. Completed time must be approved before it is included in payroll.</div><AssignedSessionsWidget key={timeType} sessionType={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
+            </> : <DirectInternalTimeClock key={timeType} type={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefresh={() => setHistoryRevision(value => value + 1)} />}
           </div>
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
