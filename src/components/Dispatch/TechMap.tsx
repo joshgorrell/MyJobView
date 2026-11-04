@@ -12,6 +12,7 @@ interface TechLocation {
   speed: number | null;
   timestamp: string;
   battery_level: number | null;
+  heartbeat_at?: string | null;
   is_active: boolean;
   technician: {
     full_name: string;
@@ -402,6 +403,8 @@ export function TechMap() {
         .order('captured_at', { ascending: false }).limit(500);
       if (nativeError) console.error('Unable to load native GPS breadcrumbs:', nativeError);
 
+      const { data: heartbeats } = await supabase.from('technician_tracking_heartbeats').select('technician_id,daily_clock_entry_id,last_seen_at').in('technician_id', clockedInTechIds.length ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000']);
+      const heartbeatByTech = new Map((heartbeats || []).map(h => [h.technician_id, h]));
       const latestLocations = new Map<string, TechLocation>();
       const latestBreadcrumbs = new Map<string, any>();
       const activeShiftIds = new Map((dailyClocks || []).map(clock => [clock.technician_id, clock.id]));
@@ -473,6 +476,7 @@ export function TechMap() {
             speed: locationData.speed,
             timestamp: locationData.timestamp,
             battery_level: null,
+            heartbeat_at: heartbeatByTech.get(techId)?.daily_clock_entry_id === clock.id ? heartbeatByTech.get(techId)?.last_seen_at : null,
             is_active: true,
             technician: clock.profiles,
             status: {
