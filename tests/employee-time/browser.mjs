@@ -34,7 +34,7 @@ try {
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       await page.getByRole('heading',{name:'Job Clock'}).waitFor();
       await tabs.getByRole('tab',{name:'My Time'}).click();
-      await page.getByText('Request time off').waitFor();
+      await page.getByText('Your recent daily, job, shop, and training time entries.',{exact:false}).waitFor();
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow '+size.width+' '+type);
       const box=await page.getByRole('dialog').boundingBox();
