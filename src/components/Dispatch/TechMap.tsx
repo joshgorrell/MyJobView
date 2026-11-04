@@ -52,6 +52,7 @@ export function TechMap() {
   const [historyTechnicians, setHistoryTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const historyLineRef = useRef<any>(null);
+  const historyEndpointsRef = useRef<any[]>([]);
 
   useEffect(() => {
     loadApiKey();
@@ -156,13 +157,23 @@ export function TechMap() {
 
   useEffect(() => {
     historyLineRef.current?.setMap(null);
+    historyEndpointsRef.current.forEach(marker => marker.setMap(null));
+    historyEndpointsRef.current = [];
     if (!historyMode || !mapReady || !historyPoints.length || !window.google?.maps || !googleMapRef.current) return;
     const path = historyPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
     historyLineRef.current = new window.google.maps.Polyline({ path, map: googleMapRef.current, strokeColor: '#2563eb', strokeWeight: 4 });
     const bounds = new window.google.maps.LatLngBounds();
     path.forEach(p => bounds.extend(p));
     googleMapRef.current.fitBounds(bounds);
-    return () => historyLineRef.current?.setMap(null);
+    historyEndpointsRef.current = [
+      new window.google.maps.Marker({ map: googleMapRef.current, position: path[0], label: 'S', title: 'First recorded GPS point' }),
+      new window.google.maps.Marker({ map: googleMapRef.current, position: path[path.length - 1], label: 'E', title: 'Last recorded GPS point' })
+    ];
+    return () => {
+      historyLineRef.current?.setMap(null);
+      historyEndpointsRef.current.forEach(marker => marker.setMap(null));
+      historyEndpointsRef.current = [];
+    };
   }, [historyPoints, mapReady, historyMode]);
 
   async function loadHistoryTechnicians() {
