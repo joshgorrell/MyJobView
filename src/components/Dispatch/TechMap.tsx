@@ -154,6 +154,12 @@ export function TechMap() {
       ].filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)).sort((a,b) => Date.parse(a.recorded_at) - Date.parse(b.recorded_at)));
       }
       setHistoryLoading(false);
+    }).catch(error => {
+      if (cancelled) return;
+      console.error('GPS history request failed', error);
+      setHistoryError('Route unavailable — please try again');
+      setHistoryPoints([]);
+      setHistoryLoading(false);
     });
     return () => { cancelled = true; };
   }, [selectedTech, historyDate, historyMode, organizationTimezone]);
@@ -553,6 +559,8 @@ export function TechMap() {
     const then = new Date(timestamp);
     const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
 
+    if (!Number.isFinite(seconds)) return 'unknown';
+    if (seconds < 0) return 'just now';
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     return `${Math.floor(seconds / 3600)}h ago`;
