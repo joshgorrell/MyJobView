@@ -62,9 +62,10 @@ function getElapsed(clockIn: string): string {
 
 interface AssignedSessionsWidgetProps {
   onRefreshParent?: () => void;
+  sessionType?: 'shop_time' | 'training';
 }
 
-export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidgetProps) {
+export function AssignedSessionsWidget({ onRefreshParent, sessionType }: AssignedSessionsWidgetProps) {
   const { profile } = useAuth();
   const [sessions, setSessions] = useState<InternalSession[]>([]);
   const [activeEntries, setActiveEntries] = useState<ActiveEntry[]>([]);
@@ -249,11 +250,12 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
     companySettings?.shop_time_request_enabled ||
     companySettings?.training_time_request_enabled;
 
-  const pendingSessions = sessions.filter(s => s.status === 'pending_approval');
-  const deniedSessions = sessions.filter(s => s.status === 'denied');
-  const activeSessions = sessions.filter(s => s.status !== 'pending_approval' && s.status !== 'denied');
+  const visibleSessions = sessionType ? sessions.filter(session => session.session_type === sessionType) : sessions;
+  const pendingSessions = visibleSessions.filter(s => s.status === 'pending_approval');
+  const deniedSessions = visibleSessions.filter(s => s.status === 'denied');
+  const activeSessions = visibleSessions.filter(s => s.status !== 'pending_approval' && s.status !== 'denied');
 
-  const showWidget = !loading && (sessions.length > 0 || deniedSessions.length > 0 || requestEnabled);
+  const showWidget = !loading && (visibleSessions.length > 0 || deniedSessions.length > 0 || requestEnabled);
   if (!showWidget) return null;
 
   return (
@@ -263,9 +265,9 @@ export function AssignedSessionsWidget({ onRefreshParent }: AssignedSessionsWidg
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-gray-600" />
             <h2 className="text-base sm:text-lg font-bold text-gray-900">Assigned Sessions</h2>
-            {sessions.length > 0 && (
+            {visibleSessions.length > 0 && (
               <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-xs font-medium">
-                {sessions.length}
+                {visibleSessions.length}
               </span>
             )}
           </div>
