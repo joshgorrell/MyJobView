@@ -47,9 +47,7 @@ class LocationTrackingService {
     if (user?.id !== session.technicianId) return;
     const { error } = await supabase.from('technician_tracking_heartbeats').upsert({
       technician_id: session.technicianId,
-      daily_clock_entry_id: session.clockEntryId,
-      last_seen_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      daily_clock_entry_id: session.clockEntryId
     }, { onConflict: 'technician_id' });
     if (error) console.warn('GPS connectivity heartbeat failed', error);
   }
