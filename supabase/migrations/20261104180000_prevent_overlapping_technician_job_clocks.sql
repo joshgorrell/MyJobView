@@ -8,7 +8,7 @@ BEGIN
     WHERE clock_out IS NULL
       AND technician_id IS NOT NULL
       AND entry_type IN ('work_order', 'project', 'customer_activity', 'shop_time', 'training')
-    GROUP BY organization_id, technician_id
+    GROUP BY technician_id
     HAVING COUNT(*) > 1
   ) THEN
     RAISE EXCEPTION 'Overlapping active job clocks exist. Resolve them before applying the one-active-job constraint.';
@@ -16,7 +16,7 @@ BEGIN
 END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS time_entries_one_open_job_per_technician
-  ON public.time_entries (organization_id, technician_id)
+  ON public.time_entries (technician_id)
   WHERE clock_out IS NULL
     AND technician_id IS NOT NULL
     AND entry_type IN ('work_order', 'project', 'customer_activity', 'shop_time', 'training');
