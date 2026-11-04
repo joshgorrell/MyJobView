@@ -39,8 +39,8 @@ class LocationTrackingService {
     if (state === 'active' && this.isTracking) void this.sendHeartbeat();
   });
 
-  private async sendHeartbeat() {
-    if (AppState.currentState !== 'active') return;
+  private async sendHeartbeat(allowBackground = false) {
+    if (!allowBackground && AppState.currentState !== 'active') return;
     const session = await this.getTrackingSession();
     if (!session) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -215,6 +215,7 @@ class LocationTrackingService {
     // Verify that the persisted shift still belongs to the signed-in account.
     const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession || authSession.user.id !== session.technicianId) return;
+    await this.sendHeartbeat(true);
     for (const location of locations) {
       // Re-check for clock-out between queued points.
       const active = await this.getTrackingSession();
