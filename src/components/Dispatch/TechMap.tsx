@@ -684,6 +684,7 @@ export function TechMap() {
                     </div>
                   </div>
 
+                  <div className="mt-1 text-xs text-gray-600">App connectivity: {tech.heartbeat_at ? (Date.now() - Date.parse(tech.heartbeat_at) <= 180000 ? 'Recently connected' : 'No recent foreground heartbeat; background unknown') : 'Not confirmed'}</div>
                   {tech.status?.notes && (
                     <div className="mt-2 text-xs text-gray-600 italic">
                       "{tech.status.notes}"
