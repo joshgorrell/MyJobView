@@ -44,7 +44,7 @@ export function TechMap() {
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const initRetryCount = useRef(0);
-  const [historyDate, setHistoryDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [historyDate, setHistoryDate] = useState(() => formatDateInTimezone(new Date().toISOString(), 'America/Chicago'));
   const [organizationTimezone, setOrganizationTimezone] = useState('America/Chicago');
   const [historyMode, setHistoryMode] = useState(false);
   const [historyPoints, setHistoryPoints] = useState<Array<{ latitude: number; longitude: number; recorded_at: string }>>([]);
@@ -57,7 +57,7 @@ export function TechMap() {
     loadApiKey();
     loadTechLocations();
     void loadHistoryTechnicians();
-    void getOrganizationTimezone().then(setOrganizationTimezone);
+
 
     const interval = setInterval(() => {
       loadTechLocations();
@@ -90,7 +90,14 @@ export function TechMap() {
       clearInterval(interval);
       locationsChannel.unsubscribe();
     };
-  }, [organizationTimezone]);
+  }, []);
+
+  useEffect(() => {
+    void getOrganizationTimezone().then(timezone => {
+      setOrganizationTimezone(timezone);
+      setHistoryDate(formatDateInTimezone(new Date().toISOString(), timezone));
+    });
+  }, []);
 
   useEffect(() => {
     if (apiKey && !mapReady) {
@@ -107,7 +114,7 @@ export function TechMap() {
     if (mapReady) {
       updateMarkers();
     }
-  }, [techLocations, mapReady]);
+  }, [techLocations, mapReady, historyMode]);
 
   useEffect(() => {
     if (!historyMode && selectedTech && googleMapRef.current) {
