@@ -36,7 +36,7 @@ try{
  assert.equal(await page.locator('.flow').first().evaluate(el=>getComputedStyle(el).backgroundColor),await page.locator('#portal-fixture').evaluate(el=>getComputedStyle(el).backgroundColor));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  if(width<640)assert.equal(await page.locator('[aria-label="Preferences sections"]').evaluate(el=>el.scrollWidth>el.clientWidth),false);
  const boxes=await page.locator('[aria-label="Color theme"] button').evaluateAll(bs=>bs.map(b=>{const r=b.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}}));assert.ok(boxes.every(b=>b.h>=44));assert.equal(boxes[0].y,boxes[1].y);assert.equal(boxes[2].y,boxes[3].y);assert.ok(Math.abs(boxes[0].w-boxes[1].w)<1);assert.equal(boxes[0].y,boxes[2].y);assert.equal(boxes[0].y,boxes[4].y);
- await page.locator('#tasks-fixture').getByRole('button',{name:/^New(?: Task)?$/}).click();await page.getByRole('button',{name:'Create Assignment',exact:true}).waitFor();
+ await page.locator('#tasks-fixture').getByRole('button',{name:/^New(?: Task| Assignment)?$/}).click();await page.getByRole('button',{name:'Create Assignment',exact:true}).waitFor();
  const contrastIssues=()=>page.evaluate(()=>{
    const rgb=value=>{const c=(value.match(/[\d.]+/g)||[]).map(Number);if(c.length===3)c.push(1);return c;};
    const blend=(front,back)=>back.map((v,i)=>front[i]*(front[3]??1)+v*(1-(front[3]??1)));
