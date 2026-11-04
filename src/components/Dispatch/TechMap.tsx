@@ -207,7 +207,9 @@ export function TechMap() {
     }
   }
 
-  function getMarkerColor(status?: string): string {
+  function getMarkerColor(status?: string, timestamp?: string): string {
+    if (timestamp && (Number.isNaN(Date.parse(timestamp)) || Date.now() - Date.parse(timestamp) > 5 * 60 * 1000)) return '#6b7280';
+
     switch (status) {
       case 'available':
         return '#10b981'; // green
@@ -243,7 +245,7 @@ export function TechMap() {
         marker.setIcon({
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 10,
-          fillColor: getMarkerColor(tech.status?.status),
+          fillColor: getMarkerColor(tech.status?.status, tech.timestamp),
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
@@ -255,7 +257,7 @@ export function TechMap() {
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             scale: 10,
-            fillColor: getMarkerColor(tech.status?.status),
+            fillColor: getMarkerColor(tech.status?.status, tech.timestamp),
             fillOpacity: 1,
             strokeColor: '#ffffff',
             strokeWeight: 2,
@@ -279,7 +281,7 @@ export function TechMap() {
                 </div>
               ` : ''}
               <div style="font-size: 14px; color: #666;">
-                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}
+                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}${Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 ? ' — STALE, NOT LIVE' : ''}
               </div>
               ${tech.accuracy > 100 ? `
                 <div style="font-size: 12px; color: #f59e0b; margin-top: 4px;">
@@ -351,7 +353,7 @@ export function TechMap() {
         .from('gps_breadcrumbs')
         .select('*')
         .in('technician_id', clockedInTechIds.length > 0 ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000'])
-        .order('recorded_at', { ascending: false });
+        .order('recorded_at', { ascending: false }).limit(500);
 
       if (error) throw error;
 
@@ -370,6 +372,8 @@ export function TechMap() {
       const consider = (point: any) => {
         const shiftId = activeShiftIds.get(point.technician_id);
         if (!shiftId || (point.daily_clock_entry_id && point.daily_clock_entry_id !== shiftId)) return;
+        const shift = (dailyClocks || []).find(clock => clock.id === shiftId);
+        if (!shift || !Number.isFinite(Date.parse(point.recorded_at)) || Date.parse(point.recorded_at) < Date.parse(shift.clock_in)) return;
         const previous = latestBreadcrumbs.get(point.technician_id);
         if (!previous || Date.parse(point.recorded_at) > Date.parse(previous.recorded_at)) latestBreadcrumbs.set(point.technician_id, point);
       };
