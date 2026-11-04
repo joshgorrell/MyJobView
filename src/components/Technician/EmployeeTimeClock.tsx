@@ -12,7 +12,7 @@ import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezon
 const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
 
 type TimeSection = 'daily' | 'job' | 'mine';
-type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
+type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; status?: string | null; break_minutes?: number | null };
 
 export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
   const policy = useEmployeeTimePolicy();
@@ -84,7 +84,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
     setHistoryError(false);
     Promise.all([
       supabase.from('daily_clock_entries').select('id, entry_date, clock_in, clock_out, total_hours, break_minutes').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
-      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours, entry_type').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
+      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours, entry_type, status').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
     ]).then(([daily, job]) => {
       if (cancelled) return;
       if (daily.error || job.error) { setHistoryError(true); return; }
@@ -169,6 +169,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               <div><span className="font-medium text-gray-900">{entry.kind} time</span><div className="text-gray-500">{entry.entry_date}</div></div>
               <div className="flex flex-col items-end gap-1">
                 <span className="font-semibold tabular-nums text-gray-900">{entry.total_hours == null ? 'In progress' : `${Number(entry.total_hours).toFixed(2)} hrs`}</span>
+                {(entry.kind === 'Shop' || entry.kind === 'Training') && entry.clock_out && <span className={`text-xs font-medium ${entry.status === 'approved' ? 'text-green-700' : entry.status === 'rejected' ? 'text-red-700' : 'text-amber-700'}`}>{entry.status === 'approved' ? 'Manager approved' : entry.status === 'rejected' ? 'Manager denied' : 'Pending manager approval'}</span>}
                 {entry.kind === 'Daily' && <button type="button" onClick={() => setCorrectionEntry(entry)} className="text-xs font-medium text-blue-700 hover:underline">Request Correction</button>}
               </div>
             </div>
