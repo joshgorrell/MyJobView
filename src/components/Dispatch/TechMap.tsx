@@ -146,10 +146,13 @@ export function TechMap() {
     ]).then(([native, legacy]) => {
       if (cancelled) return;
       if (native.error || legacy.error) { console.error('GPS history load failed', native.error, legacy.error); setHistoryError('Route unavailable — could not load all GPS sources'); setHistoryPoints([]); }
-      else setHistoryPoints([
+      else {
+        if ((native.data?.length || 0) >= 5000 || (legacy.data?.length || 0) >= 5000) setHistoryError('Route may be incomplete: GPS point limit reached');
+        setHistoryPoints([
         ...(native.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.captured_at })),
         ...(legacy.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.recorded_at }))
       ].filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)).sort((a,b) => Date.parse(a.recorded_at) - Date.parse(b.recorded_at)));
+      }
       setHistoryLoading(false);
     });
     return () => { cancelled = true; };
