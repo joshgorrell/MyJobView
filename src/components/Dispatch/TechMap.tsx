@@ -42,6 +42,10 @@ export function TechMap() {
   const googleMapRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const initRetryCount = useRef(0);
+  const [historyDate, setHistoryDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [historyPoints, setHistoryPoints] = useState<Array<{ latitude: number; longitude: number; recorded_at: string }>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyLineRef = useRef<any>(null);
 
   useEffect(() => {
     loadApiKey();
