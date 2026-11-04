@@ -206,7 +206,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const validTabs = ['overview','vip','notes','tasks','materials','time','parts','photos','completion','history','flow'] as const;
   type WorkOrderTab = typeof validTabs[number];
   const requestedTab = new URLSearchParams(window.location.search).get('subtab') as WorkOrderTab | null;
-  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'tasks');
+  const [activeTab, setActiveTab] = useState<WorkOrderTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'overview');
   const [editedWorkOrder, setEditedWorkOrder] = useState<Partial<WorkOrder>>({});
   const [notesDraft, setNotesDraft] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
@@ -917,6 +917,17 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       </div>
 
+      {/* Technician-first arrival information: customer and destination before work instructions. */}
+      <section className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2" aria-label="Customer and job location">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900"><MapPin className="h-4 w-4" /> Where am I going?</h2>
+        <p className="font-semibold text-gray-900">{workOrder.contact?.company_name || workOrder.contact?.full_name || 'Customer not specified'}</p>
+        {(() => {
+          const address = workOrder.service_location_address || workOrder.address || [workOrder.contact?.street_address, workOrder.contact?.city, workOrder.contact?.state, workOrder.contact?.zip_code].filter(Boolean).join(', ');
+          return address ? <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-gray-700">{address}</p><a className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4" /> Directions</a></div> : <p className="text-sm text-amber-700">No service address on this work order. Confirm the destination with dispatch.</p>;
+        })()}
+        {workOrder.scheduled_date && <p className="text-xs text-gray-600">Scheduled: {workOrder.scheduled_date}{workOrder.scheduled_start_time ? ` · ${workOrder.scheduled_start_time.slice(0,5)}` : ''}</p>}
+      </section>
+
       {/* Recurring Series Banner */}
       {(workOrder.is_recurring_parent || workOrder.recurrence_parent_id) && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -948,7 +959,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
       {/* Work instructions and the actual visit checklist are the primary work-order content. */}
       <section className="bg-white rounded-t-xl border border-gray-200 p-3 sm:p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-gray-900">Work Requested</h2>
+        <h2 className="text-sm font-semibold text-gray-900">What am I doing? · Work Requested</h2>
         {editing ? (
           <textarea
             value={editedWorkOrder.description || ''}
