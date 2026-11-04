@@ -929,6 +929,15 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         {workOrder.scheduled_date && <p className="text-xs text-gray-600">Scheduled: {workOrder.scheduled_date}{workOrder.scheduled_start_time ? ` · ${workOrder.scheduled_start_time.slice(0,5)}` : ''}</p>}
       </section>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setActiveTab('time')} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+          <Clock className="h-4 w-4" /> Job Clock In / Out
+        </button>
+        <button type="button" onClick={() => setActiveTab('tasks')} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">
+          <CheckSquare className="h-4 w-4" /> View Tasks
+        </button>
+      </div>
+
       {/* Recurring Series Banner */}
       {(workOrder.is_recurring_parent || workOrder.recurrence_parent_id) && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
