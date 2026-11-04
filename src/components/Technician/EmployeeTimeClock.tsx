@@ -7,6 +7,7 @@ import { MyTimeLeaveRequest } from './MyTimeLeaveRequest';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { DirectInternalTimeClock } from './DirectInternalTimeClock';
+import { InternalTimeApprovalQueue } from './InternalTimeApprovalQueue';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
 const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
@@ -152,6 +153,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               })()}
             </> : <DirectInternalTimeClock key={timeType} type={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefresh={() => setHistoryRevision(value => value + 1)} />}
           </div>
+          {profile?.is_global_admin && <InternalTimeApprovalQueue />}
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
           </Suspense>
