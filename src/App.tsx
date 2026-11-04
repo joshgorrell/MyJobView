@@ -976,7 +976,7 @@ function AppContent() {
             ...(checkModuleAccess('daily_clock') ? [{ key: 'time_records', label: 'Time Records', content: <TimeClockHistory onNavigate={setActiveTab} /> }] : []),
             ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Approvals', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
             ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
-            ...(profile.role === 'admin' ? [{ key: 'time_settings', label: 'Settings', content: <TimeClockManagement onLaborDashboard={() => setActiveTab('tech_stats')} /> }] : []),
+            ...(profile.role === 'admin' ? [{ key: 'time_settings', label: 'Settings', content: <TimeClockManagement settingsOnly onLaborDashboard={() => setActiveTab('tech_stats')} /> }] : []),
           ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
           {activeTab === 'invoices' && checkModuleAccess('invoices') && (
