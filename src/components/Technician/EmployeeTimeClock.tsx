@@ -30,17 +30,24 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
     if (section !== 'job' || !profile?.id) return;
     let cancelled = false;
     setJobsLoading(true); setJobsError(false);
-    void getOrganizationTimezone().then(zone => { if (!cancelled) setToday(formatDateInTimezone(new Date().toISOString(), zone)); }).catch(() => { if (!cancelled) setJobsError(true); });
+    const localDatePromise = getOrganizationTimezone().then(zone => formatDateInTimezone(new Date().toISOString(), zone));
     Promise.all([
+      localDatePromise,
       supabase.from('work_orders').select('id, work_order_number, title, assigned_to, scheduled_date, scheduled_start_time, status')
         .eq('assigned_to', profile.id).in('status', ['assigned', 'pending', 'in_progress', 'completed'])
         .order('created_at', { ascending: false }).limit(50),
       supabase.from('time_entries').select('work_order_id')
         .eq('technician_id', profile.id).is('clock_out', null)
         .in('status', ['draft', 'submitted']).order('clock_in', { ascending: false }).limit(1).maybeSingle(),
-    ]).then(async ([jobsResult, activeResult]) => {
+    ]).then(async ([localToday, jobsResult, activeResult]) => {
+      if (!cancelled) setToday(localToday);
       if (jobsResult.error || activeResult.error) throw jobsResult.error || activeResult.error;
-      const jobs = jobsResult.data ?? [];
+      const { data: scheduledToday, error: scheduledError } = await supabase.from('work_orders')
+        .select('id, work_order_number, title, assigned_to, scheduled_date, scheduled_start_time, status')
+        .eq('assigned_to', profile.id).eq('scheduled_date', localToday)
+        .order('scheduled_start_time', { ascending: true });
+      if (scheduledError) throw scheduledError;
+      const jobs = [...(scheduledToday ?? []), ...(jobsResult.data ?? []).filter(job => !(scheduledToday ?? []).some(todayJob => todayJob.id === job.id))];
       const activeId = activeResult.data?.work_order_id;
       if (activeId && !jobs.some(job => job.id === activeId)) {
         const { data: activeJob, error } = await supabase.from('work_orders')
