@@ -44,7 +44,7 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
       if (companyError || !company?.id) throw companyError || new Error('Company settings unavailable.');
       const now = new Date().toISOString();
       const { error } = await supabase.from('time_entries').insert({
-        company_id: company.id, technician_id: profile.id,
+        company_id: company.id, organization_id: profile.organization_id, technician_id: profile.id,
         entry_date: formatDateInTimezone(now, await getOrganizationTimezone()),
         clock_in: now, clock_out: null, total_hours: 0, break_minutes: 0,
         entry_type: type, status: 'draft', notes: null,
