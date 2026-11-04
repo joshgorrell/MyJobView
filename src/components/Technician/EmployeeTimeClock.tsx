@@ -6,6 +6,7 @@ import { DailyClock } from './DailyClock';
 import { MyTimeLeaveRequest } from './MyTimeLeaveRequest';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
+import { AssignedSessionsWidget } from '../Production/AssignedSessionsWidget';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
 const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
@@ -129,7 +130,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
                   {assignedJobs.filter(job => job.scheduled_date !== today).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
                 </>;
               })()}
-            </> : <p className="text-sm text-amber-800">Shop and training time tracking is not yet connected here. Use the existing internal time workflow until it is integrated; selecting a type does not start payable time.</p>}
+            </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
           </div>
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
