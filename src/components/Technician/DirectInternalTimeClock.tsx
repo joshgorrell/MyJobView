@@ -12,6 +12,7 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
   const [running, setRunning] = useState<Running | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [clockError, setClockError] = useState(false);
   const [notes, setNotes] = useState('');
   const label = type === 'shop_time' ? 'Shop Time' : 'Training Time';
 
@@ -22,6 +23,7 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
       .select('id, entry_type, clock_in, work_order_id')
       .eq('technician_id', profile.id).is('clock_out', null)
       .order('clock_in', { ascending: false }).limit(1);
+    setClockError(Boolean(error));
     if (error) notify('Unable to verify your active time clock.', { theme: 'blue', tone: 'error' });
     else setRunning(data?.[0] ?? null);
     setLoading(false);
@@ -30,7 +32,7 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
   useEffect(() => { void refresh(); }, [refresh, type]);
 
   async function start() {
-    if (!profile?.id || running || loading || saving) return;
+    if (!profile?.id || running || loading || saving || clockError) return;
     setSaving(true);
     try {
       // Recheck before writing; the database unique index is the authoritative guard.
@@ -103,6 +105,7 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
       <strong>Manager approval required.</strong> {label} is only valid with manager approval. Completed entries must be approved before they are included in payroll.
     </div>
     {loading ? <p className="text-sm text-gray-500">Checking active time…</p> : <>
+      {clockError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Unable to verify your active clock. Refresh the page before starting another activity.</p>}
       {running && !ownClock && <p role="status" className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
         Another activity is already running. Stop that time entry before starting {label.toLowerCase()}.
       </p>}
@@ -113,7 +116,7 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
             className="mt-1 w-full rounded-lg border border-gray-300 p-2" placeholder="Add a brief description" />
         </label>
       </>}
-      <button type="button" disabled={saving || Boolean(running && !ownClock)}
+      <button type="button" disabled={saving || clockError || Boolean(running && !ownClock)}
         onClick={() => void (ownClock ? stop() : start())}
         className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
         {saving ? 'Saving…' : ownClock ? `Stop ${label}` : `Start ${label}`}
