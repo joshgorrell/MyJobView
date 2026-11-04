@@ -115,6 +115,39 @@ export function TechMap() {
     }
   }, [selectedTech]);
 
+  useEffect(() => {
+    if (!selectedTech) { setHistoryPoints([]); return; }
+    let cancelled = false;
+    const start = new Date(historyDate + 'T00:00:00');
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    setHistoryLoading(true);
+    Promise.all([
+      supabase.from('enhanced_gps_breadcrumbs').select('latitude,longitude,captured_at').eq('technician_id', selectedTech).gte('captured_at', start.toISOString()).lt('captured_at', end.toISOString()).order('captured_at').limit(5000),
+      supabase.from('gps_breadcrumbs').select('latitude,longitude,recorded_at').eq('technician_id', selectedTech).gte('recorded_at', start.toISOString()).lt('recorded_at', end.toISOString()).order('recorded_at').limit(5000)
+    ]).then(([native, legacy]) => {
+      if (cancelled) return;
+      if (native.error || legacy.error) { console.error('GPS history load failed', native.error, legacy.error); setHistoryPoints([]); }
+      else setHistoryPoints([
+        ...(native.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.captured_at })),
+        ...(legacy.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.recorded_at }))
+      ].filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)).sort((a,b) => Date.parse(a.recorded_at) - Date.parse(b.recorded_at)));
+      setHistoryLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedTech, historyDate]);
+
+  useEffect(() => {
+    historyLineRef.current?.setMap(null);
+    if (!mapReady || !historyPoints.length || !window.google?.maps || !googleMapRef.current) return;
+    const path = historyPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
+    historyLineRef.current = new window.google.maps.Polyline({ path, map: googleMapRef.current, strokeColor: '#2563eb', strokeWeight: 4 });
+    const bounds = new window.google.maps.LatLngBounds();
+    path.forEach(p => bounds.extend(p));
+    googleMapRef.current.fitBounds(bounds);
+    return () => historyLineRef.current?.setMap(null);
+  }, [historyPoints, mapReady]);
+
   async function loadApiKey() {
     try {
       const { data, error } = await supabase
@@ -514,6 +547,16 @@ export function TechMap() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4 text-gray-900">
+        <label>History technician
+          <select className="block rounded border p-2" value={selectedTech || ''} onChange={e => setSelectedTech(e.target.value || null)}>
+            <option value="">Select technician</option>
+            {techLocations.map(tech => <option key={tech.technician_id} value={tech.technician_id}>{tech.technician.full_name}</option>)}
+          </select>
+        </label>
+        <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>
+        <span className="text-sm">{historyLoading ? 'Loading route…' : selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history'}</span>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Area */}
         <div className="lg:col-span-2">
