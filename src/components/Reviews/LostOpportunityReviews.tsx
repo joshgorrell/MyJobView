@@ -314,11 +314,12 @@ export default function LostOpportunityReviews(
   const responseRate = totalSent > 0 ? Math.round((respondedCount / totalSent) * 100) : 0;
   const recoveryRate = respondedCount > 0 ? Math.round((recoveredCount / respondedCount) * 100) : 0;
 
+  const openedCount = reviews.filter(v => !!v.opened_at).length;
   const lostStats: StatItem[] = [
-    { label: 'Requests Sent', value: totalSent, sublabel: `${pendingCount} awaiting response`, icon: Send, iconColor: 'text-blue-400' },
-    { label: 'Response Rate', value: `${responseRate}%`, sublabel: `${respondedCount} of ${totalSent} responded`, icon: TrendingUp, iconColor: 'text-blue-400' },
-    { label: 'Recovery Rate', value: `${recoveryRate}%`, sublabel: `${recoveredCount} won back`, icon: RotateCcw, iconColor: 'text-green-400' },
-    { label: 'Winnable', value: winnableCount, sublabel: 'recoverable opportunities', icon: AlertCircle, iconColor: 'text-amber-400' },
+    { label: 'Sent', value: totalSent, sublabel: 'lost opportunity requests', icon: Send, iconColor: 'text-blue-400' },
+    { label: 'Opened', value: openedCount, sublabel: 'open detection is approximate', icon: TrendingUp, iconColor: 'text-blue-400' },
+    { label: 'Feedback Received', value: respondedCount, sublabel: 'customer responses', icon: RotateCcw, iconColor: 'text-green-400' },
+    { label: 'No Feedback Yet', value: pendingCount, sublabel: 'awaiting customer response', icon: AlertCircle, iconColor: 'text-amber-400' },
   ];
 
   const filterOptions: FilterOption[] = [
