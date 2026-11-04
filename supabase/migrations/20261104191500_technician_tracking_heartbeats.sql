@@ -8,13 +8,13 @@ CREATE TABLE IF NOT EXISTS public.technician_tracking_heartbeats (
 ALTER TABLE public.technician_tracking_heartbeats ENABLE ROW LEVEL SECURITY;
 -- Only the database clock may establish connectivity recency.
 CREATE OR REPLACE FUNCTION public.stamp_technician_tracking_heartbeat()
-RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $heartbeat$
 BEGIN
   NEW.last_seen_at := now();
   NEW.updated_at := now();
   RETURN NEW;
 END;
-$;
+$heartbeat$;
 CREATE TRIGGER stamp_technician_tracking_heartbeat_before_write
 BEFORE INSERT OR UPDATE ON public.technician_tracking_heartbeats
 FOR EACH ROW EXECUTE FUNCTION public.stamp_technician_tracking_heartbeat();
