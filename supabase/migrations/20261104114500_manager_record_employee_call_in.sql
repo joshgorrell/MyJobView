@@ -3,21 +3,6 @@ ALTER TABLE public.pto_requests
   ADD COLUMN IF NOT EXISTS recorded_by uuid REFERENCES public.profiles(id),
   ADD COLUMN IF NOT EXISTS call_received_by_manager boolean NOT NULL DEFAULT false;
 
--- The recording manager cannot approve their own recorded call-in.
-CREATE OR REPLACE FUNCTION pto_private.prevent_self_reviewed_call_in()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $
-BEGIN
- IF NEW.status IN ('approved','denied') AND OLD.status IS DISTINCT FROM NEW.status
-   AND OLD.recorded_by IS NOT NULL AND OLD.recorded_by = auth.uid() THEN
-  RAISE EXCEPTION 'A different manager must review this recorded call-in';
- END IF;
- RETURN NEW;
-END $;
-REVOKE ALL ON FUNCTION pto_private.prevent_self_reviewed_call_in() FROM PUBLIC,anon,authenticated;
-DROP TRIGGER IF EXISTS prevent_self_reviewed_call_in ON public.pto_requests;
-CREATE TRIGGER prevent_self_reviewed_call_in BEFORE UPDATE OF status ON public.pto_requests
-FOR EACH ROW EXECUTE FUNCTION pto_private.prevent_self_reviewed_call_in();
-
 CREATE OR REPLACE FUNCTION public.record_employee_call_in(
  p_employee uuid, p_policy uuid, p_type text,
  p_start_time time DEFAULT NULL, p_end_time time DEFAULT NULL,
