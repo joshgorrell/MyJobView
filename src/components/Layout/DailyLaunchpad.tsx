@@ -78,12 +78,12 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
   // Show one dialog at a time so request forms cannot sit behind the hub.
   if (request === 'manual') return createPortal(<ManualJobTimeRequestModal onClose={() => setRequest(null)} onSubmitted={() => void load()} />, document.body);
   if (request === 'internal' && settings) return createPortal(<RequestInternalTimeModal companySettings={settings} onClose={() => setRequest(null)} onSubmitted={() => void load()} />, document.body);
-  return <QuickActionModal stableHeight scrollBody={false} title="Time Clock" subtitle="Your day, your jobs, your time off" icon={<Timer className="h-5 w-5" />} accentColor="from-cyan-700 to-blue-800" onClose={onClose}>
-    <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
-      <nav aria-label="Time Clock views" className="grid shrink-0 grid-cols-5 gap-1 rounded-xl bg-elevated p-1">
-        {tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`min-h-14 min-w-0 rounded-lg flex flex-col items-center justify-center gap-1 text-[11px] sm:text-sm transition-colors ${tab === key ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:bg-surface'}`}><Icon className="h-4 w-4" />{label}</button>)}
+  return <QuickActionModal scrollBody={false} title="Time Clock" subtitle="Your day, your jobs, your time off" icon={<Timer className="h-5 w-5" />} accentColor="from-cyan-700 to-blue-800" onClose={onClose}>
+    <div className="flex min-h-0 flex-col gap-3 p-3 sm:p-4">
+      <nav aria-label="Time Clock views" className="grid shrink-0 grid-cols-5 gap-1 rounded-lg border border-subtle bg-elevated p-1">
+        {tabs.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => setTab(key)} aria-pressed={tab === key} className={`min-h-11 min-w-0 rounded-md flex items-center justify-center gap-1.5 px-1 text-[11px] sm:text-sm transition-colors ${tab === key ? 'bg-blue-600 text-white shadow-sm' : 'text-secondary hover:bg-surface'}`}><Icon className="hidden h-4 w-4 sm:block" />{label}</button>)}
       </nav>
-      <div className="min-h-0 flex-1 space-y-2 sm:space-y-3 overflow-y-auto overscroll-contain" aria-label={tab === 'work' ? 'Today’s time overview' : undefined} key={tab}>
+      <div className="min-h-0 space-y-2 sm:space-y-3 overflow-y-auto overscroll-contain" aria-label={tab === 'work' ? 'Today’s time overview' : undefined} key={tab}>
       {tab === 'work' && <>
         {activeJob && activeJobStarted && <section role="status" aria-label="Running Job Time" className="rounded-xl border-2 border-green-400 bg-green-50 p-3 space-y-2">
           <p className="font-semibold text-green-900">Job Time running · {activeJob.title}</p>
@@ -109,7 +109,7 @@ export function DailyLaunchpad({ onClose, onNavigate }: { onClose: () => void; o
       {tab === 'time' && <div className="space-y-5"><MyTimeView />{policy.basis === 'daily_clock' && <section><h3 className="font-semibold mb-3">Job Time & Requests</h3><MyJobTimeView /></section>}</div>}
       {tab === 'calendar' && <Suspense fallback={<p>Loading daily calendar…</p>}><Calendar personalOnly onWorkOrderSelect={openWorkOrder} /></Suspense>}
       </div>
-      {tab === 'work' && <div aria-label="Time Clock actions" className="grid grid-cols-2 shrink-0 gap-2 border-t border-subtle pt-3">
+      {tab === 'work' && <div aria-label="Time Clock actions" className="grid grid-cols-1 sm:grid-cols-2 shrink-0 gap-2 border-t border-subtle pt-3">
           {policy.ready && <button type="button" onClick={() => setRequest('manual')} className="min-h-11 rounded-xl bg-blue-600 text-white px-2 py-2 text-sm font-semibold flex items-center justify-center gap-2"><Plus className="h-4 w-4" />Record Job Time</button>}
           {settings && (settings.shop_time_request_enabled || settings.training_time_request_enabled) && <button type="button" onClick={() => setRequest('internal')} className="min-h-11 rounded-xl border border-subtle px-2 py-2 text-sm">Request Shop / Training Time</button>}
       </div>}
