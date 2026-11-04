@@ -327,3 +327,82 @@ html {
 .mobile-navigation-panel {
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
+
+/* Newspaper: neutral ink and paper, with no colored workspace accents. */
+[data-theme='newspaper'] {
+  --workspace: 242 242 242;
+  --canvas: 255 255 255;
+  --surface: 250 250 250;
+  --elevated: 229 229 229;
+  --text-primary: 0 0 0;
+  --text-secondary: 38 38 38;
+  --text-muted: 64 64 64;
+  --border-subtle: 190 190 190;
+  --border-strong: 115 115 115;
+  --brand-text: 23 23 23;
+  --warning-border: 115 115 115;
+  --warning-text: 23 23 23;
+  --warning-surface: 229 229 229;
+  --info-text: 23 23 23;
+  --info-surface: 240 240 240;
+  --success-text: 23 23 23;
+  --success-surface: 245 245 245;
+  --danger-text: 23 23 23;
+  --danger-surface: 220 220 220;
+  --attention-text: 23 23 23;
+  --attention-surface: 235 235 235;
+  --accent-text: 23 23 23;
+  --accent-surface: 238 238 238;
+}
+[data-theme='newspaper'] .theme-chrome {
+  --workspace: 242 242 242;
+  --canvas: 0 0 0;
+  --surface: 23 23 23;
+  --elevated: 38 38 38;
+  --text-primary: 255 255 255;
+  --text-secondary: 229 229 229;
+  --text-muted: 212 212 212;
+  --border-subtle: 82 82 82;
+  --border-strong: 140 140 140;
+  --brand-text: 255 255 255;
+  --warning-border: 115 115 115;
+  --warning-text: 240 240 240;
+  --warning-surface: 38 38 38;
+  --info-text: 240 240 240;
+  --info-surface: 38 38 38;
+  --success-text: 240 240 240;
+  --success-surface: 38 38 38;
+  --danger-text: 240 240 240;
+  --danger-surface: 38 38 38;
+  --attention-text: 240 240 240;
+  --attention-surface: 38 38 38;
+  --accent-text: 240 240 240;
+  --accent-surface: 38 38 38;
+  --workspace-text-primary: 255 255 255;
+  --workspace-text-secondary: 229 229 229;
+  --workspace-text-muted: 212 212 212;
+  --workspace-brand-text: 255 255 255;
+  --workspace-warning-text: 240 240 240;
+  --workspace-info-text: 240 240 240;
+  --workspace-success-text: 240 240 240;
+  --workspace-danger-text: 240 240 240;
+  --workspace-attention-text: 240 240 240;
+  --workspace-accent-text: 240 240 240;
+  color: rgb(var(--text-primary));
+  color-scheme: dark;
+}
+[data-theme='newspaper'] .theme-header { box-shadow: inset 0 -3px 0 #737373; }
+[data-theme='newspaper'] .theme-workspace :is(input, select, textarea) { accent-color: #525252; }
+
+[data-theme='newspaper'] .theme-workspace .flow .flow-primary {
+  background: #171717;
+  color: #fff;
+  border-color: #171717;
+}
+[data-theme='newspaper'] .theme-workspace .flow .flow-primary:hover { background: #404040; }
+[data-theme='newspaper'] .theme-workspace .flow [class*='flow-icon--'] { color: rgb(var(--brand-text)); }
+[data-theme='newspaper'] .theme-workspace .flow .flow-dot { background: rgb(var(--brand-text)); }
+[data-theme='newspaper'] .theme-workspace .flow .flow-mention {
+  background: rgb(var(--accent-surface));
+  color: rgb(var(--accent-text));
+}

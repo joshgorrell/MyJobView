@@ -13,5 +13,14 @@ try {
  await assert.rejects(()=>db.exec("update public.profiles set ui_theme='invalid' where id='new'"));
  await db.exec(sql);
  assert.equal((await db.query("select count(*)::int as count from public.profiles where ui_theme='mjv'")).rows[0].count,2);
+
+ const newspaperSql=await readFile('supabase/migrations/20261104114607_add_newspaper_workspace_theme.sql','utf8');
+ const before=(await db.query("select * from public.profiles order by id")).rows;
+ await db.exec(newspaperSql);
+ assert.deepEqual((await db.query("select * from public.profiles order by id")).rows,before);
+ await db.exec("insert into public.profiles(id,ui_theme) values ('paper','newspaper')");
+ await db.exec(newspaperSql);
+ assert.equal((await db.query("select ui_theme from public.profiles where id='paper'")).rows[0].ui_theme,'newspaper');
+ await assert.rejects(()=>db.exec("update public.profiles set ui_theme='invalid' where id='paper'"));
  console.log('MJV migration accepts new theme, converts legacy System and rejects invalid values; rerun passes');
 } finally {await db.close();}
