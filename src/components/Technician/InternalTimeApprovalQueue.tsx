@@ -14,6 +14,7 @@ export function InternalTimeApprovalQueue() {
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [denial, setDenial] = useState<Record<string, string>>({});
+  const [employeeNames, setEmployeeNames] = useState<Record<string, string>>({});
   const refresh = useCallback(async () => {
     if (profile?.role !== 'admin' || !profile.organization_id) return;
     setLoading(true);
@@ -24,9 +25,19 @@ export function InternalTimeApprovalQueue() {
       .eq('status', 'submitted').not('clock_out', 'is', null)
       .order('clock_out', { ascending: true }).limit(100);
     if (error) notify('Unable to load internal time approvals.', { theme: 'blue', tone: 'error' });
-    else setEntries((data || []) as Entry[]);
+    else {
+      const rows = (data || []) as Entry[];
+      setEntries(rows);
+      const ids = [...new Set(rows.map(row => row.technician_id))];
+      if (ids.length) {
+        const { data: employees, error: namesError } = await supabase.from('profiles')
+          .select('id, full_name').eq('organization_id', profile.organization_id).in('id', ids);
+        if (namesError) notify('Employee names could not be loaded.', { theme: 'blue', tone: 'error' });
+        else setEmployeeNames(Object.fromEntries((employees || []).map(employee => [employee.id, employee.full_name || 'Unnamed employee'])));
+      } else setEmployeeNames({});
+    }
     setLoading(false);
-  }, [profile?.role === 'admin', profile?.organization_id]);
+  }, [profile?.role, profile?.organization_id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -63,7 +74,7 @@ export function InternalTimeApprovalQueue() {
       entries.length === 0 ? <p className="text-sm text-gray-500">No time awaiting approval.</p> :
       entries.map(entry => <div key={entry.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
         <p className="text-sm font-medium">{entry.entry_type === 'shop_time' ? 'Shop Time' : 'Training Time'} · {entry.entry_date} · {Number(entry.total_hours).toFixed(2)} hrs</p>
-        <p className="text-xs text-gray-600">Employee ID: {entry.technician_id}</p>
+        <p className="text-xs text-gray-600">Employee: {employeeNames[entry.technician_id] || 'Unknown employee'}</p>
         {entry.notes && <p className="text-sm text-gray-700">{entry.notes}</p>}
         <label className="block text-xs text-gray-600">Reason for denial
           <input value={denial[entry.id] || ''} onChange={event => setDenial(prev => ({ ...prev, [entry.id]: event.target.value }))}
