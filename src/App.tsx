@@ -231,6 +231,7 @@ function AppContent() {
   const [invoiceContactFilter, setInvoiceContactFilter] = useState<string | null>(null);
   const [openChangeOrderId, setOpenChangeOrderId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('coId'));
   const [salesRepAIContext, setSalesRepAIContext] = useState<SalesRepAIContext | null>(null);
+  const [workOrderOpenedFromTime, setWorkOrderOpenedFromTime] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(() => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('workOrderId');
@@ -915,7 +916,7 @@ function AppContent() {
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>
-          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} onOpenWorkOrder={(id) => { setSelectedWorkOrderId(id); setActiveTab('work_orders'); }} />}
+          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} onOpenWorkOrder={(id) => { setWorkOrderOpenedFromTime(true); setSelectedWorkOrderId(id); setActiveTab('work_orders'); }} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
             <ContactsView
               key={activeTab}
@@ -1011,7 +1012,7 @@ function AppContent() {
 
           {activeTab === 'work_orders' && checkModuleAccess('work_orders') && (
             selectedWorkOrderId
-              ? <WorkOrderDetail key={selectedWorkOrderId} workOrderId={selectedWorkOrderId} onBack={() => setSelectedWorkOrderId(null)} />
+              ? <WorkOrderDetail key={selectedWorkOrderId} workOrderId={selectedWorkOrderId} onBack={() => { setSelectedWorkOrderId(null); if (workOrderOpenedFromTime) { setWorkOrderOpenedFromTime(false); setActiveTab('time'); } }} />
               : <WorkOrdersList key="work_orders_list" onSelectWorkOrder={setSelectedWorkOrderId} />
           )}
           {activeTab === 'change_orders' && checkModuleAccess('change_orders') && (
