@@ -33,12 +33,14 @@ try {
       else await page.getByText('Daily Clock not required').waitFor();
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       await page.getByRole('heading',{name:'Job Clock'}).waitFor();
+      await tabs.getByRole('tab',{name:'My Time'}).click();
+      await page.getByText('Request time off').waitFor();
+      await tabs.getByRole('tab',{name:'Job Clock'}).click();
       if(type!=='salary') {
         await page.getByRole('button',{name:/Install Speakers/}).click();
         assert.deepEqual(await page.evaluate(()=>window.__navigation),{tab:'work_orders',params:{workOrderId:'wo'}});
+        assert.equal(await page.getByRole('dialog').count(),0,'Work Order navigation closes the Time Clock');
       }
-      await tabs.getByRole('tab',{name:'My Time'}).click();
-      await page.getByText('Request time off').waitFor();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow '+size.width+' '+type);
       const box=await page.getByRole('dialog').boundingBox();
       assert.ok(box.width<=size.width && box.height<=size.height,'Dialog fits viewport '+size.width+' '+type);
