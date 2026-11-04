@@ -1,3 +1,4 @@
+import { markActivitySeen } from '../../hooks/useActivityCounts';
 import ConfirmModal from '../ui/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEffect, useState } from 'react';
@@ -12,7 +13,8 @@ const label=(v:string|null)=>isProposalChoice(v)?proposalChoices[v].label:'—';
 const readResponseTarget=()=>{const p=new URLSearchParams(window.location.search);return {emailId:p.get('proposalCheckEmailId'),eventId:p.get('proposalCheckEventId'),receivedAt:p.get('proposalCheckReceivedAt')}};
 const clearResponseTarget=()=>{const url=new URL(window.location.href);for(const key of ['proposalCheckEmailId','proposalCheckEventId','proposalCheckReceivedAt'])url.searchParams.delete(key);window.history.replaceState(window.history.state,'',url.pathname+url.search+url.hash)};
 export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
- const {profile}=useAuth();const canDelete=['admin','owner','super_admin'].includes(profile?.role||'');
+ const {profile}=useAuth();const org=profile?.organization_id;
+ const canDelete=['admin','owner','super_admin'].includes(profile?.role||'');
  const [responseTarget,setResponseTarget]=useState(readResponseTarget);const [response,setResponse]=useState<{row:EmailRecord;event:Activity}|null>(null);const [responseLoading,setResponseLoading]=useState(false);const [responseError,setResponseError]=useState('');
  const [deleteEmailTarget,setDeleteEmailTarget]=useState<EmailRecord|null>(null);
  const [deleteTarget,setDeleteTarget]=useState<Activity|null>(null);const [deleting,setDeleting]=useState(false);
@@ -33,7 +35,7 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
    else throw new Error('This notification does not identify a response.');
    const {data:event,error:eventError}=await request.maybeSingle();
    if(eventError||!event)throw new Error('This response is no longer available, or you do not have access to it.');
-   if(current){setPreview(null);setTimeline(null);setResponse({row,event});}
+   if(current){setPreview(null);setTimeline(null);setResponse({row,event});if(profile?.id&&org)void markActivitySeen(profile.id,org,'feedback',event.id).catch(console.error);}
   }catch(e){if(current)setResponseError(e instanceof Error?e.message:'Response could not load.');}finally{if(current)setResponseLoading(false);}})();
   return()=>{current=false};
  },[responseTarget]);
@@ -48,7 +50,7 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
  void Promise.all(counts).then(results=>{if(current){if(results.some(r=>r.error))setError('Some reporting totals could not load. Please refresh.');else setTotals({sent:results[0].count||0,opened:results[1].count||0,clicked:results[2].count||0,messages:results[3].count||0})}});return()=>{current=false};},[page,query,filter,refresh,refreshKey]);
  useEffect(()=>{if(!preview&&!timeline&&!response)return;const close=(e:KeyboardEvent)=>{if(e.key==='Escape'){closeDetails()}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[preview,timeline,response]);
  async function showEmail(row:EmailRecord){const {data,error}=await supabase.from('proposal_check_emails').select('email_html').eq('id',row.id).single();if(error)setError('Saved email could not load.');else setPreview({subject:row.subject,html:data.email_html})}
- async function showTimeline(row:EmailRecord,eventPage=0){const {data,error}=await supabase.from('proposal_check_events').select('id,kind,choice,step,message,suspected_automated,created_at').eq('email_id',row.id).order('created_at',{ascending:false}).order('id',{ascending:false}).range(eventPage*50,eventPage*50+49);if(error)setError('Activity could not load.');else setTimeline({row,events:(data||[]) as Activity[],page:eventPage,more:data?.length===50})}
+ async function showTimeline(row:EmailRecord,eventPage=0){const {data,error}=await supabase.from('proposal_check_events').select('id,kind,choice,step,message,suspected_automated,created_at').eq('email_id',row.id).order('created_at',{ascending:false}).order('id',{ascending:false}).range(eventPage*50,eventPage*50+49);if(error)setError('Activity could not load.');else {setTimeline({row,events:(data||[]) as Activity[],page:eventPage,more:data?.length===50});if(profile?.id&&org)void Promise.all((data||[]).filter(event=>event.kind==='message').map(event=>markActivitySeen(profile.id,org,'feedback',event.id))).catch(console.error)}}
  async function deleteEmailRecord(){if(!deleteEmailTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_email',email_id:deleteEmailTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Email record could not be deleted.');setDeleteEmailTarget(null);setTimeline(null);setRefresh(v=>v+1);}catch(e){setError(e instanceof Error?e.message:'Email record could not be deleted.');}finally{setDeleting(false);}}
  async function deleteSubmission(){if(!deleteTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_submission',event_id:deleteTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Submission could not be deleted.');setDeleteTarget(null);setRefresh(v=>v+1);if(response){setResponse(null);clearResponseTarget();}if(timeline)await showTimeline(timeline.row,0);}catch(e){setError(e instanceof Error?e.message:'Submission could not be deleted.');}finally{setDeleting(false);}}
  const proposalStats: StatItem[] = [
