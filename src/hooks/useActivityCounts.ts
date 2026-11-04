@@ -16,12 +16,13 @@ export function useActivityCounts() {
       return;
     }
     const org = profile.organization_id;
-    const [reads, baselines, leads, feedback, lostFeedback, service, tune] = await Promise.all([
+    const [reads, baselines, leads, feedback, lostFeedback, proposalFeedback, service, tune] = await Promise.all([
       supabase.from('activity_notification_reads').select('activity_type,activity_id').eq('user_id', profile.id),
       supabase.from('activity_notification_baselines').select('activity_type,started_at').eq('user_id', profile.id),
       supabase.from('leads').select('id,is_fishbowl,created_at').eq('organization_id', org).eq('assigned_to', profile.id),
       supabase.from('customer_satisfaction').select('id,responded_at').eq('organization_id', org).not('responded_at', 'is', null),
       supabase.from('lost_review_details').select('request_id,responded_at').eq('organization_id', org).not('responded_at', 'is', null),
+      supabase.from('proposal_check_events').select('id,created_at').eq('kind', 'message'),
       supabase.from('service_requests').select('id,created_at').eq('organization_id', org),
       supabase.rpc('get_test_tune_workspace'),
     ]);
@@ -30,6 +31,9 @@ export function useActivityCounts() {
       setCounts({ pipeline_lead: 0, test_tune: 0, feedback: 0, service_request: 0 });
       return;
     }
+    // Proposal Check uses event IDs, so each typed response is counted independently.
+    // Do not erase other Feedback badges if this optional reporting query is unavailable.
+    if (proposalFeedback.error) console.warn('Proposal Check activity count unavailable:', proposalFeedback.error);
     const seen = new Set((reads.data || []).map(row => `${row.activity_type}:${row.activity_id}`));
     const baseline = new Map((baselines.data || []).map(row => [row.activity_type, row.started_at]));
     const areas: ActivityArea[] = ['pipeline_lead', 'test_tune', 'feedback', 'service_request'];
@@ -58,6 +62,7 @@ export function useActivityCounts() {
       feedback: count('feedback', [
         ...(feedback.data || []).filter(row => isNew('feedback', row.responded_at)).map(row => row.id),
         ...(lostFeedback.data || []).filter(row => isNew('feedback', row.responded_at)).map(row => row.request_id),
+        ...(!proposalFeedback.error ? (proposalFeedback.data || []).filter(row => isNew('feedback', row.created_at)).map(row => row.id) : []),
       ]),
       service_request: count('service_request', (service.data || []).filter(row => isNew('service_request', row.created_at)).map(row => row.id)),
     });
@@ -66,7 +71,7 @@ export function useActivityCounts() {
   useEffect(() => {
     void refresh();
     const channel = supabase.channel(`favorite_activity:${profile?.id || 'none'}`);
-    for (const table of ['leads', 'customer_satisfaction', 'service_requests', 'project_tasks', 'activity_notification_reads']) {
+    for (const table of ['leads', 'customer_satisfaction', 'proposal_check_events', 'lost_review_details', 'service_requests', 'project_tasks', 'activity_notification_reads']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void refresh());
     }
     channel.subscribe();
