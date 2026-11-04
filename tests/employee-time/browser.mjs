@@ -36,15 +36,15 @@ try {
       await tabs.getByRole('tab',{name:'My Time'}).click();
       await page.getByText('Request time off').waitFor();
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow '+size.width+' '+type);
+      const box=await page.getByRole('dialog').boundingBox();
+      assert.ok(box.width<=size.width && box.height<=size.height,'Dialog fits viewport '+size.width+' '+type);
+      if(size.width===390) await page.screenshot({path:'test-artifacts/time-clock/'+type+'-mobile.png'});
       if(type!=='salary') {
         await page.getByRole('button',{name:/Install Speakers/}).click();
         assert.deepEqual(await page.evaluate(()=>window.__navigation),{tab:'work_orders',params:{workOrderId:'wo'}});
         assert.equal(await page.getByRole('dialog').count(),0,'Work Order navigation closes the Time Clock');
       }
-      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow '+size.width+' '+type);
-      const box=await page.getByRole('dialog').boundingBox();
-      assert.ok(box.width<=size.width && box.height<=size.height,'Dialog fits viewport '+size.width+' '+type);
-      if(size.width===390) await page.screenshot({path:'test-artifacts/time-clock/'+type+'-mobile.png'});
       assert.deepEqual(errors,[],'No browser errors '+type);
       await page.close();
     }
