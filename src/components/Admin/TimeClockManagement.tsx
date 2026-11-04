@@ -93,7 +93,7 @@ interface PendingTimeRequest {
   assigned_profile: { full_name: string | null } | null;
 }
 
-export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'timeoff';onLaborDashboard?:()=>void}) {
+export function TimeClockManagement({initialTab,onLaborDashboard,settingsOnly=false}:{initialTab?:'timeoff';onLaborDashboard?:()=>void;settingsOnly?:boolean}) {
   const { user, profile } = useAuth();
   const admin = profile?.role === 'admin';
   const [autoClockOutSettings, setAutoClockOutSettings] = useState<AutoClockOutSettings>({
@@ -533,7 +533,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
 
       {onLaborDashboard&&<button className="text-blue-600 border border-blue-200 rounded-lg px-4 py-2" onClick={onLaborDashboard}>Open Tech Stats</button>}
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-1 border-b border-gray-200">
+      {!settingsOnly && <div className="flex flex-wrap gap-1 border-b border-gray-200">
         {admin && <button
           onClick={() => setActiveTab('settings')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -559,7 +559,7 @@ export function TimeClockManagement({initialTab,onLaborDashboard}:{initialTab?:'
         </button>}
         {admin && <button onClick={()=>setActiveTab('imports')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='imports'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Historical Imports</button>}
         {canManageTimeOff(profile?.role) && <button onClick={()=>setActiveTab('timeoff')} className={`min-h-11 px-4 py-2 text-sm font-medium border-b-2 ${activeTab==='timeoff'?'border-blue-600 text-blue-600':'border-transparent text-gray-500'}`}>Time Off</button>}
-      </div>
+      </div>}
 
       {admin && activeTab==='imports' && <Suspense fallback={<p role="status">Loading import settings…</p>}><LaborImportControls controlsOnly/></Suspense>}
       {activeTab==='timeoff' && canManageTimeOff(profile?.role) && <PTOManagement/>}
