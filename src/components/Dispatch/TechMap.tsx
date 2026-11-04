@@ -46,11 +46,14 @@ export function TechMap() {
   const [historyDate, setHistoryDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [historyPoints, setHistoryPoints] = useState<Array<{ latitude: number; longitude: number; recorded_at: string }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyTechnicians, setHistoryTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const historyLineRef = useRef<any>(null);
 
   useEffect(() => {
     loadApiKey();
     loadTechLocations();
+    void loadHistoryTechnicians();
 
     const interval = setInterval(() => {
       loadTechLocations();
@@ -123,12 +126,13 @@ export function TechMap() {
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
     setHistoryLoading(true);
+    setHistoryError(null);
     Promise.all([
       supabase.from('enhanced_gps_breadcrumbs').select('latitude,longitude,captured_at').eq('technician_id', selectedTech).gte('captured_at', start.toISOString()).lt('captured_at', end.toISOString()).order('captured_at').limit(5000),
       supabase.from('gps_breadcrumbs').select('latitude,longitude,recorded_at').eq('technician_id', selectedTech).gte('recorded_at', start.toISOString()).lt('recorded_at', end.toISOString()).order('recorded_at').limit(5000)
     ]).then(([native, legacy]) => {
       if (cancelled) return;
-      if (native.error || legacy.error) { console.error('GPS history load failed', native.error, legacy.error); setHistoryPoints([]); }
+      if (native.error || legacy.error) { console.error('GPS history load failed', native.error, legacy.error); setHistoryError('Route unavailable — could not load all GPS sources'); setHistoryPoints([]); }
       else setHistoryPoints([
         ...(native.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.captured_at })),
         ...(legacy.data || []).map(p => ({ latitude: Number(p.latitude), longitude: Number(p.longitude), recorded_at: p.recorded_at }))
@@ -148,6 +152,12 @@ export function TechMap() {
     googleMapRef.current.fitBounds(bounds);
     return () => historyLineRef.current?.setMap(null);
   }, [historyPoints, mapReady]);
+
+  async function loadHistoryTechnicians() {
+    const { data, error } = await supabase.from('profiles').select('id,full_name').order('full_name');
+    if (error) { console.error('Unable to load technician history selector', error); return; }
+    setHistoryTechnicians((data || []).filter(p => p.id && p.full_name));
+  }
 
   async function loadApiKey() {
     try {
@@ -554,11 +564,11 @@ export function TechMap() {
         <label>History technician
           <select className="block rounded border p-2" value={selectedTech || ''} onChange={e => setSelectedTech(e.target.value || null)}>
             <option value="">Select technician</option>
-            {techLocations.map(tech => <option key={tech.technician_id} value={tech.technician_id}>{tech.technician.full_name}</option>)}
+            {historyTechnicians.map(tech => <option key={tech.id} value={tech.id}>{tech.full_name}</option>)}
           </select>
         </label>
         <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>
-        <span className="text-sm">{historyLoading ? 'Loading route…' : selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history'}</span>
+        <span className="text-sm">{historyLoading ? 'Loading route…' : historyError || (selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history')}</span>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Area */}
