@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../Shared/Toast';
 import { Star, Mail, Users, ExternalLink, Send, Check, FileText, Eye, X, Search, UserPlus, RefreshCw, MessageSquare, Trash2, Loader2, CheckCircle, Lock, TrendingUp } from 'lucide-react';
 import ProposalFollowUps from '../Reviews/ProposalFollowUps';
+import FeedbackInbox from '../Reviews/FeedbackInbox';
 import LostOpportunityReviews from '../Reviews/LostOpportunityReviews';
 import { CustomerSatisfactionDashboard } from './CustomerSatisfactionDashboard';
 import { ReviewStatsRow, type StatItem } from '../Reviews/ReviewStats';
@@ -170,10 +171,10 @@ export default function ReviewsView() {
   const canManageCustomerFeedback = isAdmin || ((profile as any)?.can_manage_customer_feedback ?? false);
   const canSendLostOpportunities = isAdmin || ((profile as any)?.can_send_lost_opportunity_reviews ?? false);
   const canViewLostOpportunities = isAdmin || ((profile as any)?.can_view_lost_opportunity_submissions ?? false);
-  type ReviewTab = 'dashboard' | 'send' | 'lost' | 'proposal';
+  type ReviewTab = 'dashboard' | 'send' | 'lost' | 'proposal' | 'inbox';
   const getReviewTabFromUrl = (): ReviewTab => {
     const tab = new URLSearchParams(window.location.search).get('reviewType');
-    return tab === 'proposal' || tab === 'send' || tab === 'lost' || tab === 'dashboard' ? tab : 'dashboard';
+    return tab === 'proposal' || tab === 'send' || tab === 'lost' || tab === 'dashboard' || tab === 'inbox' ? tab : 'dashboard';
   };
   const [activeTab, setActiveTabState] = useState<ReviewTab>(getReviewTabFromUrl);
   const setActiveTab = useCallback((tab: ReviewTab, options?: { replace?: boolean }) => {
@@ -936,6 +937,7 @@ export default function ReviewsView() {
       </header>
 
       <nav aria-label="Feedback sections" className="flex gap-1 overflow-x-auto border-b border-gray-700">
+        {(canViewCustomerFeedback || canManageCustomerFeedback || canViewLostOpportunities) && <button type="button" onClick={() => setActiveTab('inbox')} aria-current={activeTab === 'inbox' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-3 py-2 text-sm font-semibold ${activeTab === 'inbox' ? 'border-cyan-400 bg-cyan-950/30 text-white' : 'border-transparent text-gray-300 hover:bg-gray-800'}`}>Overview</button>}
         {(canViewCustomerFeedback || canManageCustomerFeedback) && <button type="button" onClick={() => {
           if (canViewCustomerFeedback) { setGoogleOnlyMode(false); setActiveTab('dashboard'); }
           else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }
@@ -949,6 +951,8 @@ export default function ReviewsView() {
           <MessageSquare className="mr-1 hidden h-4 w-4 text-violet-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Lost Opportunities</span>
         </button>}
       </nav>
+
+      {activeTab === 'inbox' && <FeedbackInbox onNavigate={tab => setActiveTab(tab)} canJob={canViewCustomerFeedback} canProposal={canManageCustomerFeedback} canLost={canViewLostOpportunities} />}
 
       {(activeTab === 'dashboard' || (activeTab === 'send' && !googleOnlyMode)) && canManageCustomerFeedback && (
         <section aria-label="Job review emails" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
