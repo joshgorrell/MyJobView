@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createTimestampInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { MapPin, Navigation, Battery, Clock, RefreshCw } from 'lucide-react';
 
 interface TechLocation {
@@ -44,6 +45,8 @@ export function TechMap() {
   const markersRef = useRef<Map<string, any>>(new Map());
   const initRetryCount = useRef(0);
   const [historyDate, setHistoryDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [organizationTimezone, setOrganizationTimezone] = useState('America/Chicago');
+  const [historyMode, setHistoryMode] = useState(false);
   const [historyPoints, setHistoryPoints] = useState<Array<{ latitude: number; longitude: number; recorded_at: string }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyTechnicians, setHistoryTechnicians] = useState<Array<{ id: string; full_name: string }>>([]);
@@ -54,6 +57,7 @@ export function TechMap() {
     loadApiKey();
     loadTechLocations();
     void loadHistoryTechnicians();
+    void getOrganizationTimezone().then(setOrganizationTimezone);
 
     const interval = setInterval(() => {
       loadTechLocations();
@@ -86,7 +90,7 @@ export function TechMap() {
       clearInterval(interval);
       locationsChannel.unsubscribe();
     };
-  }, []);
+  }, [organizationTimezone]);
 
   useEffect(() => {
     if (apiKey && !mapReady) {
@@ -106,7 +110,7 @@ export function TechMap() {
   }, [techLocations, mapReady]);
 
   useEffect(() => {
-    if (selectedTech && googleMapRef.current) {
+    if (!historyMode && selectedTech && googleMapRef.current) {
       const tech = techLocations.find(t => t.technician_id === selectedTech);
       if (tech) {
         googleMapRef.current.panTo({ lat: tech.latitude, lng: tech.longitude });
@@ -117,14 +121,15 @@ export function TechMap() {
         }
       }
     }
-  }, [selectedTech]);
+  }, [selectedTech, historyMode]);
 
   useEffect(() => {
-    if (!selectedTech) { setHistoryPoints([]); return; }
+    if (!historyMode || !selectedTech) { setHistoryPoints([]); return; }
     let cancelled = false;
-    const start = new Date(historyDate + 'T00:00:00');
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
+    const start = new Date(createTimestampInTimezone(historyDate, '00:00', organizationTimezone));
+    const followingDay = new Date(historyDate + 'T12:00:00Z');
+    followingDay.setUTCDate(followingDay.getUTCDate() + 1);
+    const end = new Date(createTimestampInTimezone(followingDay.toISOString().slice(0, 10), '00:00', organizationTimezone));
     setHistoryLoading(true);
     setHistoryError(null);
     Promise.all([
@@ -140,18 +145,18 @@ export function TechMap() {
       setHistoryLoading(false);
     });
     return () => { cancelled = true; };
-  }, [selectedTech, historyDate]);
+  }, [selectedTech, historyDate, historyMode, organizationTimezone]);
 
   useEffect(() => {
     historyLineRef.current?.setMap(null);
-    if (!mapReady || !historyPoints.length || !window.google?.maps || !googleMapRef.current) return;
+    if (!historyMode || !mapReady || !historyPoints.length || !window.google?.maps || !googleMapRef.current) return;
     const path = historyPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
     historyLineRef.current = new window.google.maps.Polyline({ path, map: googleMapRef.current, strokeColor: '#2563eb', strokeWeight: 4 });
     const bounds = new window.google.maps.LatLngBounds();
     path.forEach(p => bounds.extend(p));
     googleMapRef.current.fitBounds(bounds);
     return () => historyLineRef.current?.setMap(null);
-  }, [historyPoints, mapReady]);
+  }, [historyPoints, mapReady, historyMode]);
 
   async function loadHistoryTechnicians() {
     const { data, error } = await supabase.from('profiles').select('id,full_name').order('full_name');
@@ -359,7 +364,7 @@ export function TechMap() {
       }
     });
 
-    if (techLocations.length > 0) {
+    if (!historyMode && techLocations.length > 0) {
       const bounds = new window.google.maps.LatLngBounds();
       techLocations.forEach(tech => {
         bounds.extend({ lat: tech.latitude, lng: tech.longitude });
@@ -374,7 +379,7 @@ export function TechMap() {
 
   async function loadTechLocations() {
     try {
-      const today = new Date().toLocaleDateString('en-CA');
+      const today = formatDateInTimezone(new Date().toISOString(), organizationTimezone);
 
       // Get all clocked-in technicians with their clock-in location
       const { data: dailyClocks } = await supabase
@@ -561,14 +566,15 @@ export function TechMap() {
       </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4 text-gray-900">
-        <label>History technician
+        <button type="button" className="rounded border px-3 py-2" onClick={() => setHistoryMode(v => !v)}>{historyMode ? 'Return to live map' : 'View route history'}</button>
+        {historyMode && <label>History technician
           <select className="block rounded border p-2" value={selectedTech || ''} onChange={e => setSelectedTech(e.target.value || null)}>
             <option value="">Select technician</option>
             {historyTechnicians.map(tech => <option key={tech.id} value={tech.id}>{tech.full_name}</option>)}
           </select>
-        </label>
-        <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>
-        <span className="text-sm">{historyLoading ? 'Loading route…' : historyError || (selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history')}</span>
+        </label>}
+        {historyMode && <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>}
+        {historyMode && <span className="text-sm">{historyLoading ? 'Loading route…' : historyError || (selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history')}</span>}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Area */}
