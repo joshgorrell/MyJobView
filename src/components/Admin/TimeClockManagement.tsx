@@ -93,7 +93,7 @@ interface PendingTimeRequest {
   assigned_profile: { full_name: string | null } | null;
 }
 
-export function TimeClockManagement({initialTab,onLaborDashboard,settingsOnly=false}:{initialTab?:'timeoff';onLaborDashboard?:()=>void;settingsOnly?:boolean}) {
+export function TimeClockManagement({initialTab,onLaborDashboard,settingsOnly=false}:{initialTab?:'settings'|'timeoff'|'imports';onLaborDashboard?:()=>void;settingsOnly?:boolean}) {
   const { user, profile } = useAuth();
   const admin = profile?.role === 'admin';
   const [autoClockOutSettings, setAutoClockOutSettings] = useState<AutoClockOutSettings>({
