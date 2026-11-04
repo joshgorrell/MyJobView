@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { MessageSquare, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { markActivitySeen } from '../../hooks/useActivityCounts';
 
 type Kind = 'job' | 'proposal' | 'lost';
-type Item = { id: string; kind: Kind; customer: string; answer: string; note: string; at: string; target: string; };
+type Item = { id: string; kind: Kind; customer: string; answer: string; note: string; at: string; target: 'dashboard' | 'proposal' | 'lost'; emailId?: string; };
 type Props = { onNavigate: (tab: 'dashboard' | 'proposal' | 'lost') => void; canJob: boolean; canProposal: boolean; canLost: boolean };
 const kindName: Record<Kind, string> = { job: 'Job Review', proposal: 'Proposal Check', lost: 'Lost Opportunity' };
 const shortDate = (date: string) => new Date(date).toLocaleString();
@@ -42,8 +42,8 @@ export default function FeedbackInbox({ onNavigate, canJob, canProposal, canLost
       const emailNames = new Map((emailResult.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
       const requestNames = new Map((requests.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
       const all: Item[] = [
-        ...(jobs.data || []).map(row => ({ id: row.id, kind: 'job' as const, customer: row.customer_name || 'Customer', answer: row.rating || 'Feedback submitted', note: row.comment || '', at: row.responded_at!, target: 'dashboard' })),
-        ...proposalEvents.map(row => ({ id: row.id, kind: 'proposal' as const, customer: emailNames.get(row.email_id) || 'Customer', answer: row.choice || 'Written response', note: row.message || '', at: row.created_at, target: 'proposal' })),
+        ...(jobs.data || []).map(row => ({ id: row.id, kind: 'job' as const, customer: row.customer_name || 'Customer', answer: row.rating != null ? String(row.rating) : 'Feedback submitted', note: row.comment || '', at: row.responded_at!, target: 'dashboard' })),
+        ...proposalEvents.map(row => ({ id: row.id, kind: 'proposal' as const, customer: emailNames.get(row.email_id) || 'Customer', answer: row.choice || 'Written response', note: row.message || '', at: row.created_at, target: 'proposal', emailId: row.email_id })),
         ...(lost.data || []).filter(row => requestNames.has(row.request_id)).map(row => ({ id: row.request_id, kind: 'lost' as const, customer: requestNames.get(row.request_id) || 'Customer', answer: Array.isArray(row.reasons) ? row.reasons.join(', ') : 'Feedback submitted', note: row.message || '', at: row.created_at, target: 'lost' })),
       ];
       all.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -71,7 +71,13 @@ export default function FeedbackInbox({ onNavigate, canJob, canProposal, canLost
         setSeen(current => new Set([...current, item.id]));
       } catch (e) { console.error('Could not mark feedback as viewed', e); }
     }
-    onNavigate(item.target as 'dashboard' | 'proposal' | 'lost');
+    if (item.kind === 'proposal' && item.emailId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('proposalCheckEmailId', item.emailId);
+      url.searchParams.set('proposalCheckEventId', item.id);
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    }
+    onNavigate(item.target);
   };
   return <section aria-label="Customer feedback inbox" className="space-y-3 rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
