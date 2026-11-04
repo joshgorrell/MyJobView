@@ -972,10 +972,12 @@ function AppContent() {
           )}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
           {activeTab === 'labor_dashboard' && profile.role==='admin' && <TechStats key={activeTab}/>}
-          {['payroll', 'time_approval', 'time_records', 'time_settings'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
+          {['payroll', 'time_approval', 'time_records', 'time_off', 'time_imports', 'time_settings'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[
             ...(checkModuleAccess('daily_clock') ? [{ key: 'time_records', label: 'Time Records', content: <TimeClockHistory onNavigate={setActiveTab} /> }] : []),
             ...(checkModuleAccess('time_approval') ? [{ key: 'time_approval', label: 'Approvals', content: <FinanceTimeWorkspace review onPayroll={checkModuleAccess('payroll') ? () => setActiveTab('payroll') : undefined} /> }] : []),
             ...(checkModuleAccess('payroll') ? [{ key: 'payroll', label: 'Payroll', content: <FinanceTimeWorkspace /> }] : []),
+            ...(canManageTimeOff(profile.role) ? [{ key: 'time_off', label: 'Time Off', content: <TimeClockManagement settingsOnly initialTab="timeoff" /> }] : []),
+            ...(profile.role === 'admin' ? [{ key: 'time_imports', label: 'Imports', content: <TimeClockManagement settingsOnly initialTab="imports" /> }] : []),
             ...(profile.role === 'admin' ? [{ key: 'time_settings', label: 'Settings', content: <TimeClockManagement settingsOnly onLaborDashboard={() => setActiveTab('tech_stats')} /> }] : []),
           ]} />}
           {activeTab === 'finance_dashboard' && checkModuleAccess('finance_dashboard') && <FinanceDashboard key={activeTab} />}
