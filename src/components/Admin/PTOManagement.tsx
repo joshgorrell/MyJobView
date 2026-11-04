@@ -84,6 +84,15 @@ export function PTOManagement() {
   const [filterStatus, setFilterStatus] = useState<string>("pending");
   const [searchTerm, setSearchTerm] = useState("");
   const [setup, setSetup] = useState(false);
+  const [callInOpen, setCallInOpen] = useState(false);
+  const [callInEmployee, setCallInEmployee] = useState("");
+  const [callInPolicy, setCallInPolicy] = useState("");
+  const [callInReason, setCallInReason] = useState("");
+  const [callInConfirmed, setCallInConfirmed] = useState(false);
+  const [callInType, setCallInType] = useState("full_day");
+  const [callInStart, setCallInStart] = useState("08:00");
+  const [callInEnd, setCallInEnd] = useState("12:00");
+  const [callInBusy, setCallInBusy] = useState(false);
   const [employees, setEmployees] = useState<
     Array<{ id: string; full_name: string }>
   >([]);
@@ -107,7 +116,7 @@ export function PTOManagement() {
     >
   >({});
   useEffect(() => {
-    if (!setup) return;
+    if (!setup && !callInOpen) return;
     loadPolicies();
     supabase
       .from("profiles")
@@ -119,7 +128,7 @@ export function PTOManagement() {
         if (error) toast.error(error.message);
         else setEmployees(data || []);
       });
-  }, [setup]);
+  }, [setup, callInOpen]);
   async function saveBalance() {
     setSavingBalance(true);
     const { error } = await supabase.rpc("set_time_off_balance", {
@@ -375,6 +384,18 @@ export function PTOManagement() {
 
       {coverageFollowUp && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950">{coverageFollowUp}</p>}
       <PTORoutingSettings />
+      <button type="button" className="min-h-11 px-4 rounded-lg bg-blue-600 text-white" onClick={() => setCallInOpen(v => !v)}>Record Employee Call-In</button>
+      {callInOpen && <section className="rounded-xl border border-subtle bg-surface p-4 space-y-3 text-primary">
+        <h3 className="font-semibold">Record Employee Call-In</h3>
+        <p className="text-sm text-muted">For employees who personally called their manager. This creates a pending leave request, not approved or paid hours.</p>
+        <label className="block">Employee<select className="block w-full min-h-11 bg-canvas border rounded p-2" value={callInEmployee} onChange={e => {setCallInEmployee(e.target.value);setCallInPolicy("");}}><option value="">Select employee</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="block">Leave policy<select className="block w-full min-h-11 bg-canvas border rounded p-2" value={callInPolicy} onChange={e => setCallInPolicy(e.target.value)}><option value="">Select policy</option>{policies.filter(p => p.is_active).map(p => <option key={p.id} value={p.id}>{p.policy_name}</option>)}</select></label>
+        <label className="block">Duration<select className="block w-full min-h-11 bg-canvas border rounded p-2" value={callInType} onChange={e => setCallInType(e.target.value)}><option value="full_day">Full scheduled day</option><option value="hours">Specific hours</option></select></label>
+        {callInType === "hours" && <div className="grid grid-cols-2 gap-3"><label>Start<input className="block w-full bg-canvas border rounded p-2" type="time" value={callInStart} onChange={e => setCallInStart(e.target.value)} /></label><label>End<input className="block w-full bg-canvas border rounded p-2" type="time" value={callInEnd} onChange={e => setCallInEnd(e.target.value)} /></label></div>}
+        <label className="block">Reason (optional)<textarea className="block w-full bg-canvas border rounded p-2" maxLength={5000} value={callInReason} onChange={e => setCallInReason(e.target.value)} /></label>
+        <label className="flex gap-2"><input type="checkbox" checked={callInConfirmed} onChange={e => setCallInConfirmed(e.target.checked)} />I confirm this employee personally called their manager to report today’s absence.</label>
+        <button type="button" className="min-h-11 rounded-lg bg-blue-600 text-white px-4 disabled:opacity-50" disabled={callInBusy || !callInEmployee || !callInPolicy || !callInConfirmed || (callInType === "hours" && callInEnd <= callInStart)} onClick={async () => {setCallInBusy(true);try {const {error}=await supabase.rpc("record_employee_call_in",{p_employee:callInEmployee,p_policy:callInPolicy,p_type:callInType,p_start_time:callInType==="hours"?callInStart:null,p_end_time:callInType==="hours"?callInEnd:null,p_reason:callInReason.trim()||null,p_call_received:true});if(error) throw error;toast.success("Call-in recorded; awaiting separate approval");setCallInOpen(false);setCallInConfirmed(false);setCallInReason("");loadRequests();}catch(e){toast.error(e instanceof Error?e.message:"Unable to record call-in");}finally{setCallInBusy(false);}}}>{callInBusy?"Recording…":"Submit Pending Absence"}</button>
+      </section>}
       <TeamTimeOffPanel />
       <button
         type="button"
