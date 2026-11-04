@@ -42,11 +42,22 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
     ]).then(async ([localToday, jobsResult, activeResult]) => {
       if (!cancelled) setToday(localToday);
       if (jobsResult.error || activeResult.error) throw jobsResult.error || activeResult.error;
-      const { data: scheduledToday, error: scheduledError } = await supabase.from('work_orders')
-        .select('id, work_order_number, title, assigned_to, scheduled_date, scheduled_start_time, status')
-        .eq('assigned_to', profile.id).eq('scheduled_date', localToday)
-        .order('scheduled_start_time', { ascending: true });
-      if (scheduledError) throw scheduledError;
+      // Supabase responses are capped by the configured row limit. Page through
+      // today's assignments so older scheduled jobs cannot silently disappear.
+      const scheduledToday: NonNullable<typeof jobsResult.data> = [];
+      const pageSize = 500;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data: page, error: scheduledError } = await supabase.from('work_orders')
+          .select('id, work_order_number, title, assigned_to, scheduled_date, scheduled_start_time, status')
+          .eq('assigned_to', profile.id).eq('scheduled_date', localToday)
+          .in('status', ['assigned', 'pending', 'in_progress', 'completed'])
+          .order('scheduled_start_time', { ascending: true })
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (scheduledError) throw scheduledError;
+        scheduledToday.push(...(page ?? []));
+        if (!page || page.length < pageSize) break;
+      }
       const jobs = [...(scheduledToday ?? []), ...(jobsResult.data ?? []).filter(job => !(scheduledToday ?? []).some(todayJob => todayJob.id === job.id))];
       const activeId = activeResult.data?.work_order_id;
       if (activeId && !jobs.some(job => job.id === activeId)) {
