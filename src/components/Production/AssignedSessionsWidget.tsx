@@ -546,6 +546,7 @@ export function AssignedSessionsWidget({ onRefreshParent, sessionType }: Assigne
 
       {showRequestModal && companySettings && (
         <RequestInternalTimeModal
+          initialSessionType={sessionType}
           companySettings={companySettings}
           onClose={() => setShowRequestModal(false)}
           onSubmitted={() => {
