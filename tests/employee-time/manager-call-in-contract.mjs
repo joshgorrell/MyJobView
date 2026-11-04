@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 const sql=readFileSync('supabase/migrations/20261104114500_manager_record_employee_call_in.sql','utf8');
 const ui=readFileSync('src/components/Admin/PTOManagement.tsx','utf8');
 for (const check of [/public\.can_manage_pto\(\)/,/p\.organization_id=org/,/p\.is_active/,/employment_classification='employee'/,/p_employee=auth\.uid\(\)/,/pto_private\.request_days/,/current_balance_hours-bal\.pending_hours/,/pto_eligible/,/r\.status IN \('pending','approved'\)/,/status,recorded_by,call_received_by_manager/,/'pending',auth\.uid\(\),true/,/REVOKE ALL ON FUNCTION public\.record_employee_call_in/,/GRANT EXECUTE ON FUNCTION public\.record_employee_call_in/]) assert.match(sql,check);
+assert.match(sql,/prevent_self_reviewed_call_in/);
+assert.match(sql,/OLD\.recorded_by = auth\.uid\(\)/);
 assert.match(ui,/Record Employee Call-In/);
 assert.match(ui,/record_employee_call_in/);
 assert.match(ui,/callInConfirmed/);
