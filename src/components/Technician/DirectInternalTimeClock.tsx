@@ -66,6 +66,29 @@ export function DirectInternalTimeClock({ type, onRefresh }: { type: InternalTyp
       }).eq('id', running.id).eq('technician_id', profile.id).is('clock_out', null).select('id');
       if (error) throw error;
       if (!data?.length) throw new Error('This entry was already stopped or changed. Refresh and try again.');
+      // Emit a single notification after successful clock-out, never at clock-in.
+      // Use a stable related_id so downstream notification handling can deduplicate.
+      const { data: managers, error: managerError } = await supabase.from('profiles')
+        .select('id')
+        .eq('organization_id', profile.organization_id)
+        .eq('is_active', true)
+        .eq('is_global_admin', true);
+      if (managerError) {
+        console.error('Unable to resolve internal-time approvers:', managerError);
+      } else if (managers?.length) {
+        const label = type === 'shop_time' ? 'Shop Time' : 'Training Time';
+        const { error: notificationError } = await supabase.from('notifications').insert(
+          managers.map(manager => ({
+            user_id: manager.id,
+            organization_id: profile.organization_id,
+            type: 'system',
+            title: `${label} awaiting approval`,
+            body: `${profile.full_name || 'A technician'} submitted ${Number(hours.toFixed(2))} hours of ${label.toLowerCase()} for manager review.`,
+            related_id: data[0].id,
+          }))
+        );
+        if (notificationError) console.error('Time submitted but manager notification failed:', notificationError);
+      }
       setNotes('');
       notify('Time submitted. Manager approval is required before payroll.', { theme: 'blue', tone: 'success' });
       onRefresh?.();
