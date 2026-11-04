@@ -742,6 +742,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
 
   const tabs = [
+    { id: 'overview', label: 'Overview', icon: FileText },
     ...(isVipMaintenance ? [{ id: 'vip', label: 'VIP Maintenance', icon: CheckSquare }] : []),
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, count: tasks.length },
     { id: 'notes', label: 'Notes', icon: FileText },
