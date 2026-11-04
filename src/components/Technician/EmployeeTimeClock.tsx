@@ -23,6 +23,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
   const [timeType, setTimeType] = useState<'work_order' | 'shop_time' | 'training'>('work_order');
   const [assignedJobs, setAssignedJobs] = useState<{ id: string; work_order_number: string; title: string; assigned_to: string | null; scheduled_date: string | null; scheduled_start_time: string | null; status: string }[]>([]);
   const [today, setToday] = useState('');
+  const [activeWorkOrderId, setActiveWorkOrderId] = useState<string | null>(null);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState(false);
   useEffect(() => {
@@ -49,6 +50,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
       }
       if (cancelled) return;
       setAssignedJobs(jobs);
+      setActiveWorkOrderId(activeId || null);
 
     }).catch(() => { if (!cancelled) setJobsError(true); })
       .finally(() => { if (!cancelled) setJobsLoading(false); });
@@ -121,13 +123,13 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               {jobsLoading && <p className="text-sm text-gray-500">Loading work orders…</p>}
               {jobsError && <p role="alert" className="text-sm text-red-700">Unable to load work orders.</p>}
               {(() => {
-                const todayJobs = assignedJobs.filter(job => job.scheduled_date === today && job.status !== 'completed');
+                const todayJobs = assignedJobs.filter(job => (job.scheduled_date === today || job.id === activeWorkOrderId) && job.status !== 'completed');
                 const completedToday = assignedJobs.filter(job => job.scheduled_date === today && job.status === 'completed');
                 return <>
                   {!jobsLoading && !jobsError && todayJobs.length === 0 && <p className="text-sm text-gray-600">No directly assigned work orders scheduled for today. Team dispatch assignments may also appear in your work center below.</p>}
-                  {todayJobs.sort((a,b) => (a.scheduled_start_time || '').localeCompare(b.scheduled_start_time || '')).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-blue-400 hover:bg-blue-50"><span className="block font-semibold text-gray-900">{job.work_order_number} · {job.title}</span><span className="text-sm text-gray-600">{job.scheduled_start_time?.slice(0,5) || 'Time not specified'} · Open Work Order</span></button>)}
+                  {todayJobs.sort((a,b) => Number(b.id === activeWorkOrderId) - Number(a.id === activeWorkOrderId) || (a.scheduled_start_time || '').localeCompare(b.scheduled_start_time || '')).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className={`w-full rounded-lg border p-3 text-left hover:border-blue-400 hover:bg-blue-50 ${job.id === activeWorkOrderId ? "border-green-500 bg-green-50" : "border-gray-200"}`}><span className="block font-semibold text-gray-900">{job.id === activeWorkOrderId ? "● Clocked in · " : ""}{job.work_order_number} · {job.title}</span><span className="text-sm text-gray-600">{job.scheduled_start_time?.slice(0,5) || 'Time not specified'} · Open Work Order</span></button>)}
                   {completedToday.length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Completed today ({completedToday.length})</summary><div className="mt-2 space-y-2">{completedToday.map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
-                  {assignedJobs.filter(job => job.scheduled_date !== today).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
+                  {assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
                 </>;
               })()}
             </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget key={timeType} sessionType={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
