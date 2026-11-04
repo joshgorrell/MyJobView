@@ -24,31 +24,35 @@ export default function FeedbackInbox({ onNavigate, canJob, canProposal, canLost
     setLoading(true);
     setError('');
     try {
-      const [reads, jobs, proposals, lost, requests] = await Promise.all([
+      // Resolve organization-scoped parent records before loading private responses.
+      // RLS still applies, but explicit parent IDs prevent cross-tenant inbox aggregation.
+      const [reads, baselines, jobs, emails, requests] = await Promise.all([
         supabase.from('activity_notification_reads').select('activity_id').eq('user_id', userId).eq('activity_type', 'feedback'),
+        supabase.from('activity_notification_baselines').select('started_at').eq('user_id', userId).eq('activity_type', 'feedback').maybeSingle(),
         canJob ? supabase.from('customer_satisfaction').select('id,customer_name,rating,comment,responded_at').eq('organization_id', org).not('responded_at', 'is', null).order('responded_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
-        canProposal ? supabase.from('proposal_check_events').select('id,email_id,choice,message,created_at').eq('kind', 'message').order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
-        canLost ? supabase.from('lost_review_responses').select('request_id,reasons,message,created_at').order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
-        canLost ? supabase.from('review_requests').select('id,recipient_name,recipient_email').eq('organization_id', org).eq('request_type', 'lost_opportunity') : Promise.resolve({ data: [], error: null }),
+        canProposal ? supabase.from('proposal_check_reporting').select('id,recipient_name,recipient_email').limit(500) : Promise.resolve({ data: [], error: null }),
+        canLost ? supabase.from('review_requests').select('id,recipient_name,recipient_email').eq('organization_id', org).eq('request_type', 'lost_opportunity').limit(500) : Promise.resolve({ data: [], error: null }),
       ]);
-      const results = [reads, jobs, proposals, lost, requests];
-      if (results.some(result => result.error)) throw new Error('Unable to load some feedback responses.');
+      if ([reads, baselines, jobs, emails, requests].some(result => result.error)) throw new Error('Unable to load some feedback responses.');
+      const emailIds = (emails.data || []).map(row => row.id);
+      const requestIds = (requests.data || []).map(row => row.id);
+      const [proposals, lost] = await Promise.all([
+        canProposal && emailIds.length ? supabase.from('proposal_check_events').select('id,email_id,choice,message,created_at').eq('kind', 'message').in('email_id', emailIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
+        canLost && requestIds.length ? supabase.from('lost_review_responses').select('request_id,reasons,message,created_at').in('request_id', requestIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (proposals.error || lost.error) throw new Error('Unable to load submitted feedback.');
       const proposalEvents = proposals.data || [];
-      const proposalIds = [...new Set(proposalEvents.map(event => event.email_id))];
-      const emailResult = canProposal && proposalIds.length
-        ? await supabase.from('proposal_check_reporting').select('id,recipient_name,recipient_email').in('id', proposalIds)
-        : { data: [], error: null };
-      if (emailResult.error) throw emailResult.error;
-      const emailNames = new Map((emailResult.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
+      const emailNames = new Map((emails.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
       const requestNames = new Map((requests.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
+      const baselineAt = baselines.data?.started_at ? Date.parse(baselines.data.started_at) : Number.POSITIVE_INFINITY;
       const all: Item[] = [
         ...(jobs.data || []).map(row => ({ id: row.id, kind: 'job' as const, customer: row.customer_name || 'Customer', answer: row.rating != null ? String(row.rating) : 'Feedback submitted', note: row.comment || '', at: row.responded_at!, target: 'dashboard' })),
         ...proposalEvents.map(row => ({ id: row.id, kind: 'proposal' as const, customer: emailNames.get(row.email_id) || 'Customer', answer: row.choice || 'Written response', note: row.message || '', at: row.created_at, target: 'proposal', emailId: row.email_id })),
         ...(lost.data || []).filter(row => requestNames.has(row.request_id)).map(row => ({ id: row.request_id, kind: 'lost' as const, customer: requestNames.get(row.request_id) || 'Customer', answer: Array.isArray(row.reasons) ? row.reasons.join(', ') : 'Feedback submitted', note: row.message || '', at: row.created_at, target: 'lost' })),
       ];
       all.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-      setItems(all.slice(0, 100));
-      setSeen(new Set((reads.data || []).map(row => row.activity_id)));
+      setItems(all.filter(item => Number.isFinite(Date.parse(item.at))).slice(0, 100));
+      setSeen(new Set([...((reads.data || []).map(row => row.activity_id)), ...all.filter(item => Date.parse(item.at) <= baselineAt).map(item => item.id)]));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to load feedback.');
     } finally {
