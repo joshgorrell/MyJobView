@@ -1,0 +1,22 @@
+name: Techsafe dispatch safeguards
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/techsafe-*.mjs'
+      - 'tests/techsafe/**'
+      - 'package.json'
+      - '.github/workflows/techsafe-dispatch-safeguards.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify disabled-by-default integration and source comparison
+        run: npm run test:techsafe:dispatch
