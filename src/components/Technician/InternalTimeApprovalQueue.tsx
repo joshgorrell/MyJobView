@@ -15,7 +15,7 @@ export function InternalTimeApprovalQueue() {
   const [loading, setLoading] = useState(true);
   const [denial, setDenial] = useState<Record<string, string>>({});
   const refresh = useCallback(async () => {
-    if (!profile?.is_global_admin || !profile.organization_id) return;
+    if (profile?.role !== 'admin' || !profile.organization_id) return;
     setLoading(true);
     const { data, error } = await supabase.from('time_entries')
       .select('id, technician_id, entry_type, entry_date, clock_in, clock_out, total_hours, notes')
@@ -26,12 +26,12 @@ export function InternalTimeApprovalQueue() {
     if (error) notify('Unable to load internal time approvals.', { theme: 'blue', tone: 'error' });
     else setEntries((data || []) as Entry[]);
     setLoading(false);
-  }, [profile?.is_global_admin, profile?.organization_id]);
+  }, [profile?.role === 'admin', profile?.organization_id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
   async function decide(entry: Entry, approve: boolean) {
-    if (!profile?.is_global_admin || !profile.organization_id || busy) return;
+    if (profile?.role !== 'admin' || !profile.organization_id || busy) return;
     const reason = denial[entry.id]?.trim();
     if (!approve && !reason) {
       notify('A reason is required to deny time.', { theme: 'blue', tone: 'error' });
@@ -56,7 +56,7 @@ export function InternalTimeApprovalQueue() {
     } finally { setBusy(null); }
   }
 
-  if (!profile?.is_global_admin) return null;
+  if (profile?.role !== 'admin') return null;
   return <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
     <h3 className="font-semibold text-gray-900">Shop & Training approvals</h3>
     {loading ? <p className="text-sm text-gray-500">Loading approvals…</p> :
