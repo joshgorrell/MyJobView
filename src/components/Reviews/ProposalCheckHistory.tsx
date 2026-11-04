@@ -55,10 +55,10 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
  async function deleteSubmission(){if(!deleteTarget||deleting)return;setDeleting(true);setError('');try{const {data,error}=await supabase.functions.invoke('lost-opportunity-review',{body:{action:'delete_proposal_check_submission',event_id:deleteTarget.id}});if(error||data?.error||!data?.success)throw new Error(data?.error||'Submission could not be deleted.');setDeleteTarget(null);setRefresh(v=>v+1);if(response){setResponse(null);clearResponseTarget();}if(timeline)await showTimeline(timeline.row,0);}catch(e){setError(e instanceof Error?e.message:'Submission could not be deleted.');}finally{setDeleting(false);}}
  const feedbackReceived = records.filter(row => !!row.confirmed_choice || row.message_count > 0).length;
  const proposalStats: StatItem[] = [
-  { label: 'Sent', value: totals.sent, sublabel: 'proposal checks sent', icon: Send, iconColor: 'text-blue-400' },
-  { label: 'Opened', value: totals.opened, sublabel: 'open detection is approximate', icon: Mail, iconColor: 'text-blue-400' },
+  { label: 'Sent', value: records.length, sublabel: 'checks on this page', icon: Send, iconColor: 'text-blue-400' },
+  { label: 'Opened', value: records.filter(row => !!row.opened_at).length, sublabel: 'detected on this page', icon: Mail, iconColor: 'text-blue-400' },
   { label: 'Feedback Received', value: feedbackReceived, sublabel: 'confirmed selections or messages', icon: MessageSquare, iconColor: 'text-green-400' },
-  { label: 'No Feedback Yet', value: Math.max(0, totals.sent - feedbackReceived), sublabel: 'no confirmed customer response', icon: TrendingUp, iconColor: 'text-amber-400' },
+  { label: 'No Feedback Yet', value: Math.max(0, records.length - feedbackReceived), sublabel: 'no response on this page', icon: TrendingUp, iconColor: 'text-amber-400' },
  ];
   const proposalFilterOptions: FilterOption[] = [
     { value: 'all', label: 'All', count: totals.sent },
