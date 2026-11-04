@@ -915,7 +915,7 @@ function AppContent() {
           style={{ scrollbarGutter: 'stable' }}
         >
         <Suspense fallback={<LoadingFallback />}>
-          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} />}
+          {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} onOpenWorkOrder={(id) => { setSelectedWorkOrderId(id); setActiveTab('work_orders'); }} />}
           {activeTab === 'contacts' && checkModuleAccess('contacts') && (
             <ContactsView
               key={activeTab}
