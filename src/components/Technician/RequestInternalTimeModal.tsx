@@ -19,6 +19,7 @@ interface RequestInternalTimeModalProps {
   companySettings: CompanySettings;
   onClose: () => void;
   onSubmitted: () => void;
+  initialSessionType?: 'shop_time' | 'training';
 }
 
 const DURATION_OPTIONS = [
@@ -34,12 +35,13 @@ export function RequestInternalTimeModal({
   companySettings,
   onClose,
   onSubmitted,
+  initialSessionType,
 }: RequestInternalTimeModalProps) {
   const { profile } = useAuth();
-  const [step, setStep] = useState<Step>('type');
+  const [step, setStep] = useState<Step>(initialSessionType ? 'details' : 'type');
   const stepRef = useRef<HTMLDivElement>(null);
   useEffect(() => { stepRef.current?.focus({ preventScroll: true }); }, [step]);
-  const [sessionType, setSessionType] = useState<'shop_time' | 'training' | null>(null);
+  const [sessionType, setSessionType] = useState<'shop_time' | 'training' | null>(initialSessionType ?? null);
   const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -107,8 +109,8 @@ export function RequestInternalTimeModal({
 
   return (
     <QuickActionModal
-      title="Request Shop / Training Time"
-      subtitle={step === 'success' ? 'Request submitted' : 'Choose Shop Time or Training, then add the details'}
+      title={initialSessionType === 'shop_time' ? 'Request Shop Time' : initialSessionType === 'training' ? 'Request Training Time' : 'Request Shop / Training Time'}
+      subtitle={step === 'success' ? 'Request submitted' : initialSessionType ? 'Add the details for your time request' : 'Choose Shop Time or Training, then add the details'}
       icon={sessionType === 'training' ? <BookOpen className="w-5 h-5" /> : <Wrench className="w-5 h-5" />}
       accentColor={headerGradient}
       onClose={onClose}
