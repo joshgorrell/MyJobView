@@ -244,8 +244,7 @@ export function TechMap() {
     }
   }
 
-  function getMarkerColor(status?: string, timestamp?: string): string {
-    if (timestamp && (Number.isNaN(Date.parse(timestamp)) || Date.now() - Date.parse(timestamp) > 5 * 60 * 1000)) return '#6b7280';
+  function getMarkerColor(status?: string): string {
 
     switch (status) {
       case 'available':
@@ -282,7 +281,7 @@ export function TechMap() {
         marker.setIcon({
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 10,
-          fillColor: getMarkerColor(tech.status?.status, tech.timestamp),
+          fillColor: getMarkerColor(tech.status?.status),
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
@@ -294,7 +293,7 @@ export function TechMap() {
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             scale: 10,
-            fillColor: getMarkerColor(tech.status?.status, tech.timestamp),
+            fillColor: getMarkerColor(tech.status?.status),
             fillOpacity: 1,
             strokeColor: '#ffffff',
             strokeWeight: 2,
@@ -318,7 +317,7 @@ export function TechMap() {
                 </div>
               ` : ''}
               <div style="font-size: 14px; color: #666;">
-                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}${Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 ? ' — STALE, NOT LIVE' : ''}
+                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}${Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 ? ' — last location, connectivity unknown' : ''}
               </div>
               ${tech.accuracy > 100 ? `
                 <div style="font-size: 12px; color: #f59e0b; margin-top: 4px;">
@@ -676,7 +675,7 @@ export function TechMap() {
                       <Clock className="w-3 h-3" />
                       Last GPS: {getTimeSince(tech.timestamp)}
                       {Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 && (
-                        <span className="ml-2 font-semibold text-amber-700">Stale location — not live</span>
+                        <span className="ml-2 font-semibold text-amber-700">Last GPS is older than 5 minutes; connection status unknown</span>
                       )}
                     </div>
                   </div>
