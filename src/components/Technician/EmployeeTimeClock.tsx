@@ -6,13 +6,13 @@ import { DailyClock } from './DailyClock';
 import { MyTimeLeaveRequest } from './MyTimeLeaveRequest';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
-import { AssignedSessionsWidget } from '../Production/AssignedSessionsWidget';
+import { DirectInternalTimeClock } from './DirectInternalTimeClock';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
 const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
 
 type TimeSection = 'daily' | 'job' | 'mine';
-type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
+type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; status?: string | null; break_minutes?: number | null };
 
 export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
   const policy = useEmployeeTimePolicy();
@@ -42,11 +42,22 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
     ]).then(async ([localToday, jobsResult, activeResult]) => {
       if (!cancelled) setToday(localToday);
       if (jobsResult.error || activeResult.error) throw jobsResult.error || activeResult.error;
-      const { data: scheduledToday, error: scheduledError } = await supabase.from('work_orders')
-        .select('id, work_order_number, title, assigned_to, scheduled_date, scheduled_start_time, status')
-        .eq('assigned_to', profile.id).eq('scheduled_date', localToday)
-        .order('scheduled_start_time', { ascending: true });
-      if (scheduledError) throw scheduledError;
+      // Supabase responses are capped by the configured row limit. Page through
+      // today's assignments so older scheduled jobs cannot silently disappear.
+      const scheduledToday: NonNullable<typeof jobsResult.data> = [];
+      const pageSize = 500;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data: page, error: scheduledError } = await supabase.from('work_orders')
+          .select('id, work_order_number, title, assigned_to, scheduled_date, scheduled_start_time, status')
+          .eq('assigned_to', profile.id).eq('scheduled_date', localToday)
+          .in('status', ['assigned', 'pending', 'in_progress', 'completed'])
+          .order('scheduled_start_time', { ascending: true })
+          .order('id', { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (scheduledError) throw scheduledError;
+        scheduledToday.push(...(page ?? []));
+        if (!page || page.length < pageSize) break;
+      }
       const jobs = [...(scheduledToday ?? []), ...(jobsResult.data ?? []).filter(job => !(scheduledToday ?? []).some(todayJob => todayJob.id === job.id))];
       const activeId = activeResult.data?.work_order_id;
       if (activeId && !jobs.some(job => job.id === activeId)) {
@@ -73,7 +84,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
     setHistoryError(false);
     Promise.all([
       supabase.from('daily_clock_entries').select('id, entry_date, clock_in, clock_out, total_hours, break_minutes').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
-      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours, entry_type').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
+      supabase.from('time_entries').select('id, entry_date, clock_in, clock_out, total_hours, entry_type, status').eq('technician_id', profile.id).order('entry_date', { ascending: false }).limit(20),
     ]).then(([daily, job]) => {
       if (cancelled) return;
       if (daily.error || job.error) { setHistoryError(true); return; }
@@ -139,7 +150,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
                   {assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
                 </>;
               })()}
-            </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget key={timeType} sessionType={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
+            </> : <DirectInternalTimeClock key={timeType} type={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefresh={() => setHistoryRevision(value => value + 1)} />}
           </div>
           <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
             <TechnicianWorkCenter />
@@ -158,6 +169,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               <div><span className="font-medium text-gray-900">{entry.kind} time</span><div className="text-gray-500">{entry.entry_date}</div></div>
               <div className="flex flex-col items-end gap-1">
                 <span className="font-semibold tabular-nums text-gray-900">{entry.total_hours == null ? 'In progress' : `${Number(entry.total_hours).toFixed(2)} hrs`}</span>
+                {(entry.kind === 'Shop' || entry.kind === 'Training') && entry.clock_out && <span className={`text-xs font-medium ${entry.status === 'approved' ? 'text-green-700' : entry.status === 'rejected' ? 'text-red-700' : 'text-amber-700'}`}>{entry.status === 'approved' ? 'Manager approved' : entry.status === 'rejected' ? 'Manager denied' : 'Pending manager approval'}</span>}
                 {entry.kind === 'Daily' && <button type="button" onClick={() => setCorrectionEntry(entry)} className="text-xs font-medium text-blue-700 hover:underline">Request Correction</button>}
               </div>
             </div>

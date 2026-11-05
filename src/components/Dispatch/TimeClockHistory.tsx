@@ -168,9 +168,10 @@ interface PendingAutoClockOut {
 interface TimeClockHistoryProps {
   onNavigate?: (tab: string) => void;
   initialTab?: 'clock' | 'job_time' | 'sessions';
+  embeddedInPayroll?: boolean;
 }
 
-export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryProps = {}) {
+export function TimeClockHistory({ onNavigate, initialTab, embeddedInPayroll = false }: TimeClockHistoryProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [orgTimezone, setOrgTimezone] = useState<string>('America/Chicago');
   const [entries, setEntries] = useState<ClockEntry[]>([]);
@@ -1146,7 +1147,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           <LayoutList className="w-4 h-4" />
           Job Clock History
         </button>
-        <button
+        {!embeddedInPayroll && <button
           onClick={() => setActiveTab('sessions')}
           role="tab"
           aria-selected={activeTab === 'sessions'}
@@ -1157,8 +1158,8 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           }`}
         >
           <Wrench className="w-4 h-4" />
-          My Time
-        </button>
+          Shop / Training
+        </button>}
       </div>
 
       {/* Job Time History Tab */}

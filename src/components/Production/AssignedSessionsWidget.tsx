@@ -144,6 +144,19 @@ export function AssignedSessionsWidget({ onRefreshParent, sessionType }: Assigne
   async function clockInToSession(session: InternalSession) {
     setClockingIn(session.id);
     try {
+      // Guard against overlapping work order, shop and training clocks.
+      // A database-level constraint is still required to eliminate concurrent-device races.
+      const { data: runningEntries, error: runningError } = await supabase
+        .from('time_entries')
+        .select('id, entry_type')
+        .eq('technician_id', profile!.id)
+        .is('clock_out', null)
+        .limit(1);
+      if (runningError) throw runningError;
+      if (runningEntries?.length) {
+        notify('Stop your current job, shop or training clock before starting another.', { theme: 'blue', tone: 'error' });
+        return;
+      }
       const now = new Date();
       const { data: companyData } = await supabase
         .from('company_settings')
@@ -246,9 +259,11 @@ export function AssignedSessionsWidget({ onRefreshParent, sessionType }: Assigne
     }
   }
 
-  const requestEnabled =
-    companySettings?.shop_time_request_enabled ||
-    companySettings?.training_time_request_enabled;
+  const requestEnabled = sessionType === 'shop_time'
+    ? Boolean(companySettings?.shop_time_request_enabled)
+    : sessionType === 'training'
+      ? Boolean(companySettings?.training_time_request_enabled)
+      : Boolean(companySettings?.shop_time_request_enabled || companySettings?.training_time_request_enabled);
 
   const visibleSessions = sessionType ? sessions.filter(session => session.session_type === sessionType) : sessions;
   const pendingSessions = visibleSessions.filter(s => s.status === 'pending_approval');
@@ -544,6 +559,7 @@ export function AssignedSessionsWidget({ onRefreshParent, sessionType }: Assigne
 
       {showRequestModal && companySettings && (
         <RequestInternalTimeModal
+          initialSessionType={sessionType}
           companySettings={companySettings}
           onClose={() => setShowRequestModal(false)}
           onSubmitted={() => {
