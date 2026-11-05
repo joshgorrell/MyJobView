@@ -103,7 +103,7 @@ export function UserSetupTabs({
 }) {
   return (
     <div className="flex-shrink-0">
-      <nav aria-label="User settings" className="flex gap-1 overflow-x-auto border-b border-gray-700 px-3">
+      <nav aria-label="User settings" className="flex flex-wrap gap-1 border-b border-gray-700 px-3 py-2">
         {[...setupSections, { key: 'review' as const, label: 'Review / User Card' }].map((s) => (
           <button
             type="button"
@@ -111,7 +111,7 @@ export function UserSetupTabs({
             onClick={() => onSelect(s.key)}
             aria-current={active === s.key ? 'step' : undefined}
             title={issues[s.key] || undefined}
-            className={`min-h-11 shrink-0 px-3 py-2 text-xs sm:text-sm border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
+            className={`min-h-11 px-3 py-2 text-xs sm:text-sm border-b-2 ${active === s.key ? 'text-cyan-300 border-cyan-400 bg-gray-800' : 'text-gray-300 border-transparent'}`}
           >
             <span className="inline-flex items-center gap-2 whitespace-nowrap">
               {s.key !== 'review' && requiredSections.includes(s.key) && (
