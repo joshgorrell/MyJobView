@@ -44,13 +44,16 @@ export function InvoiceAssignmentEditor({ invoiceId, salesOrderId, status, canMa
       const [assignmentResult, linksResult] = await Promise.all([
         supabase.from('invoice_staff_assignments')
           .select('invoice_kind,sales_rep_id,service_manager_id').eq('invoice_id', invoiceId).maybeSingle(),
-        supabase.from('work_order_invoice_links').select('work_order_id').eq('invoice_id', invoiceId).limit(1),
+        supabase.from('invoice_line_items').select('id, invoice_line_item_sources(source_type)').eq('invoice_id', invoiceId),
       ]);
       if (!active) return;
       if (assignmentResult.error || linksResult.error) {
         setError(assignmentResult.error?.message || linksResult.error?.message || 'Unable to load assignments');
       } else {
-        const linked = (linksResult.data?.length || 0) > 0;
+        const linked = (linksResult.data || []).some(line => {
+          const sources = line.invoice_line_item_sources as unknown as Array<{ source_type: string }> | null;
+          return (sources || []).some(source => source.source_type === 'work_order' || source.source_type.startsWith('work_order_'));
+        });
         setHasWorkOrder(linked);
         const row = assignmentResult.data;
         setKind(linked ? 'service' : (row?.invoice_kind as InvoiceKind | undefined) || null);
