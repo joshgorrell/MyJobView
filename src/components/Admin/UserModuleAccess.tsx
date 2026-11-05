@@ -56,6 +56,7 @@ export function UserModuleAccess({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [reload, setReload] = useState(0);
+  const [bulkAction, setBulkAction] = useState<boolean | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadedFor, setLoadedFor] = useState("");
   const identity = `${userId}:${userRoleId || ""}`;
@@ -169,6 +170,9 @@ export function UserModuleAccess({
     }
   }
 
+  const eligibleKeys = pages.map((m) => m.module_key).filter((key) => !locked(key));
+  const bulkCount = eligibleKeys.filter((key) => access(key) !== bulkAction).length;
+
   const content = (
     <div className="space-y-3 min-w-0">
       {!inline && (
@@ -196,6 +200,37 @@ export function UserModuleAccess({
           Changes.
         </span>
       </p>
+      {role !== "admin" && !loading && loadedFor === identity && (
+        <div className="rounded-lg border border-subtle p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold text-primary">All Page Permissions</p>
+              <p className="text-xs text-secondary">Bulk changes override role defaults and save immediately. Employee details and separate action permissions are not changed.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => setBulkAction(true)}
+                className="min-h-11 px-3 rounded border border-subtle text-sm">Grant All</button>
+              <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => setBulkAction(false)}
+                className="min-h-11 px-3 rounded border border-red-500/50 text-red-500 text-sm">Revoke All</button>
+            </div>
+          </div>
+          {bulkAction !== null && (
+            <div role="group" aria-label="Confirm bulk page permission change" className="rounded border border-amber-500/40 p-3 space-y-2">
+              <p className="text-sm text-primary">
+                {bulkAction ? "Grant" : "Revoke"} access to {eligibleKeys.length} eligible pages for {userName}?
+                {bulkCount > 0 ? ` ${bulkCount} currently have a different effective access setting.` : " All already show the requested access."}
+                {" "}This overrides inherited role defaults. Administrator-only and universal pages are excluded.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={saving} onClick={() => { const value = bulkAction; setBulkAction(null); void change(eligibleKeys, value); }}
+                  className="min-h-11 px-3 rounded bg-primary text-white text-sm">Confirm {bulkAction ? "Grant All" : "Revoke All"}</button>
+                <button type="button" disabled={saving} onClick={() => setBulkAction(null)}
+                  className="min-h-11 px-3 rounded border border-subtle text-sm">Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {role === "admin" && (
         <p className="p-3 rounded bg-amber-500/10 text-sm">
           Administrators have full system access. Use a limited role to restrict
