@@ -186,10 +186,11 @@ const liveModal = fs.readFileSync('src/components/Layout/DailyLaunchpad.tsx', 'u
 const internalTimer = fs.readFileSync('src/components/Technician/InternalTimeTimer.tsx', 'utf8');
 const customerTimer = fs.readFileSync('src/components/Technician/CustomerTimeTimer.tsx', 'utf8');
 const verifiedStop = fs.readFileSync('src/components/Shared/ClockOutModal.tsx', 'utf8');
-assert.ok(liveModal.includes('activeJobStarted') && liveModal.includes('Job Time running') &&
-  liveModal.includes('InternalTimeTimer'), 'Time Clock must show running job and internal controls');
-assert.ok(liveModal.includes("setInterval(() => setNow(Date.now()), 1000)"),
-  'Active job elapsed time must update each second');
+const canonicalClock = fs.readFileSync('src/components/Technician/EmployeeTimeClock.tsx', 'utf8');
+assert.ok(liveModal.includes('EmployeeTimeClock') && canonicalClock.includes("label: 'Daily Clock'") &&
+  canonicalClock.includes("label: 'Job Clock'") && canonicalClock.includes("label: 'My Time'") &&
+  canonicalClock.includes('activeWorkOrderId') && canonicalClock.includes('AssignedSessionsWidget'),
+  'Canonical employee clock retains daily, shop/training and work-order flows');
 assert.ok(internalTimer.includes("start_internal_time") && internalTimer.includes("stop_internal_time") &&
   internalTimer.includes("Start {session.session_type === 'shop_time' ? 'Shop Time' : 'Training'}"),
   'Job Time employees must be able to start and stop internal time without Daily Clock');
