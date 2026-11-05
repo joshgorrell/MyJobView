@@ -28,27 +28,18 @@ const policy={useEmployeeTimePolicy:()=>effectivePolicy};
 const nav=[];const writes=[];
 function query(table){const q=new Proxy({}, {get(_,key){if(key==='then')return(resolve)=>resolve({error:null,data:table==='work_orders'?[{id:'wo-1',work_order_number:'WO-100',title:'Install Speakers',status:'assigned',scheduled_start_time:'08:00',project:{name:'Home'}}]:table==='company_settings'?{shop_time_request_enabled:true,training_time_request_enabled:true}:[]});return(...args)=>{if(['insert','update','delete','upsert'].includes(key))writes.push([table,key,args]);return q;};}});return q;}
 const launch=harness('src/components/Layout/DailyLaunchpad.tsx',{
-  '../../lib/supabase':{supabase:{from:query,channel:()=>({on(){return this;},subscribe(){return this;},unsubscribe(){}})}},'../../contexts/AuthContext':auth,'../../hooks/useEmployeeTimePolicy':policy,
-  '../../lib/timezoneUtils':{getOrganizationTimezone:async()=> 'America/Chicago',formatDateInTimezone:()=> '2026-10-02'},
-  '../Technician/ManualJobTimeRequestModal':{ManualJobTimeRequestModal:'ManualJobTimeRequestModal'},
-  '../Technician/RequestInternalTimeModal':{RequestInternalTimeModal:'RequestInternalTimeModal'},
-  '../Technician/MyJobTimeView':{MyJobTimeView:'MyJobTimeView'},'../Technician/CustomerTimeTimer':{CustomerTimeTimer:'CustomerTimeTimer'},
-  '../Technician/InternalTimeTimer':{InternalTimeTimer:'InternalTimeTimer'},
-  '../Technician/MyTimeView':{MyTimeView:'MyTimeView'},
-  '../Dispatch/MyTimeOff':{MyTimeOff:'MyTimeOff'},'../Shared/TeamTimeOffPanel':{TeamTimeOffPanel:'TeamTimeOffPanel'},
-  '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},'../Production/WorkOrderTimeControl':{WorkOrderTimeControl:'WorkOrderTimeControl'},'./TimeClockModal':{TimeClockModal:'TimeClockModal'},'./MobileClockRedirect':{MobileClockRedirect:'MobileClockRedirect'},
-},{window:{location:{search:''},addEventListener(){},removeEventListener(){}},document:{activeElement:null,body:{style:{overflow:""}}}});
+  '../Technician/EmployeeTimeClock':{EmployeeTimeClock:'EmployeeTimeClock'},
+  '../Shared/QuickActionModal':{QuickActionModal:'QuickActionModal'},
+});
 let closed=0;const props={onClose(){closed++;},onNavigate:(...args)=>nav.push(args)};
-launch.render('DailyLaunchpad',props);launch.effects.splice(0).forEach(fn=>fn());
-for(let i=0;i<20;i++)await Promise.resolve();
 let tree=launch.render('DailyLaunchpad',props);
-assert.ok(text(tree).includes('Install Speakers'));
-const card=nodes(tree).find(n=>n.type==='button'&&text(n).includes('Install Speakers'));
-card.props.onClick();assert.equal(nav[0][0],'work_orders');assert.equal(nav[0][1].workOrderId,'wo-1');assert.equal(closed,1);assert.equal(writes.length,0);
-assert.ok(nodes(tree).some(n=>n.type==='button'&&text(n)==='Record Job Time'));
-nodes(tree).find(n=>n.type==='button'&&text(n)==='Calendar').props.onClick();tree=launch.render('DailyLaunchpad',props);
-const calendar=nodes(tree).find(n=>n.type==='Calendar');assert.ok(calendar);assert.equal(calendar.props.personalOnly,true);
-calendar.props.onWorkOrderSelect('wo-2');assert.equal(nav[1][1].workOrderId,'wo-2');assert.equal(writes.length,0);
+assert.ok(nodes(tree).some(n=>n.type==='EmployeeTimeClock'),'Header modal reuses canonical employee Time Clock');
+assert.ok(!text(tree).includes('Calendar') && !text(tree).includes('Team'),'Header modal does not restore legacy tabs');
+const canonicalClock=nodes(tree).find(n=>n.type==='EmployeeTimeClock');
+canonicalClock.props.onOpenWorkOrder('wo-1');
+assert.equal(nav[0][0],'work_orders');assert.equal(nav[0][1].workOrderId,'wo-1');assert.equal(closed,1);
+canonicalClock.props.onNavigate('work_orders');assert.equal(nav[1][0],'work_orders');assert.equal(closed,2);
+assert.equal(writes.length,0);
 const dash=harness('src/components/Technician/TechDashboard.tsx',{'../../hooks/useEmployeeTimePolicy':policy,'./DailyClock':{DailyClock:'DailyClock'},'../Production/TechnicianWorkCenter':{TechnicianWorkCenter:'TechnicianWorkCenter'},'./MyTimeView':{MyTimeView:'MyTimeView'},'../../contexts/AuthContext':auth});
 tree=dash.render('TechDashboard');assert.ok(!text(tree).includes('Daily Clock'));assert.ok(nodes(tree).some(n=>n.type==='TechnicianWorkCenter'));
 const mytime=harness('src/components/Technician/MyTimeView.tsx',{
@@ -59,12 +50,8 @@ const mytime=harness('src/components/Technician/MyTimeView.tsx',{
 tree=mytime.render('MyTimeView');assert.equal(tree.type,'MyJobTimeView');assert.equal(tree.props.salary,false);
 effectivePolicy={...effectivePolicy,basis:'salary'};
 tree=mytime.render('MyTimeView');assert.equal(tree.type,'MyJobTimeView');assert.equal(tree.props.salary,true);
-nodes(launch.render('DailyLaunchpad',props)).find(n=>n.type==='button'&&text(n)==='Today').props.onClick();
 tree=launch.render('DailyLaunchpad',props);
-assert.ok(!nodes(tree).some(n=>n.type==='TimeClockModal'),'Salary without attendance has no daily punch');
-assert.ok(nodes(tree).some(n=>n.type==='WorkOrderTimeControl'&&n.props.workOrderId==='wo-1'),'Assigned job timer remains available');
-nodes(tree).find(n=>n.type==='button'&&text(n)==='Record Job Time').props.onClick();
-tree=launch.render('DailyLaunchpad',props);assert.ok(nodes(tree).some(n=>n.type==='ManualJobTimeRequestModal'));
+assert.ok(nodes(tree).some(n=>n.type==='EmployeeTimeClock'),'Salary and job-time users share the policy-aware clock');
 // Exercise the actual header component with salary/no attendance, overnight job time,
 // and the existing hourly attendance states. Opening the tools must never write time.
 const headerReads=[],headerCallbacks=[];
@@ -186,10 +173,11 @@ const liveModal = fs.readFileSync('src/components/Layout/DailyLaunchpad.tsx', 'u
 const internalTimer = fs.readFileSync('src/components/Technician/InternalTimeTimer.tsx', 'utf8');
 const customerTimer = fs.readFileSync('src/components/Technician/CustomerTimeTimer.tsx', 'utf8');
 const verifiedStop = fs.readFileSync('src/components/Shared/ClockOutModal.tsx', 'utf8');
-assert.ok(liveModal.includes('activeJobStarted') && liveModal.includes('Job Time running') &&
-  liveModal.includes('InternalTimeTimer'), 'Time Clock must show running job and internal controls');
-assert.ok(liveModal.includes("setInterval(() => setNow(Date.now()), 1000)"),
-  'Active job elapsed time must update each second');
+const canonicalModal = fs.readFileSync('src/components/Technician/EmployeeTimeClock.tsx', 'utf8');
+assert.ok(liveModal.includes('EmployeeTimeClock') && !liveModal.includes('TeamTimeOffPanel') && !liveModal.includes('AppointmentsCalendar'),
+  'Header Time Clock delegates to the canonical employee clock without Team or Calendar');
+assert.ok(canonicalModal.includes('DailyClock') && canonicalModal.includes('AssignedSessionsWidget') && canonicalModal.includes('TechnicianWorkCenter'),
+  'Canonical employee clock retains daily, shop/training and work-order flows');
 assert.ok(internalTimer.includes("start_internal_time") && internalTimer.includes("stop_internal_time") &&
   internalTimer.includes("Start {session.session_type === 'shop_time' ? 'Shop Time' : 'Training'}"),
   'Job Time employees must be able to start and stop internal time without Daily Clock');
