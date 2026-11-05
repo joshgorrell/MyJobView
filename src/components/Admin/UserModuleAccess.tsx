@@ -285,6 +285,7 @@ export function UserModuleAccess({
             {toGrant.length > 0 && <div><p className="font-semibold text-sm text-green-600">Grant access</p><p className="text-sm text-secondary">{toGrant.map((key) => permissionLabel(key, pages.find((p) => p.module_key === key)?.display_name || key)).join(", ")}</p></div>}
             {toRevoke.length > 0 && <div><p className="font-semibold text-sm text-red-500">Revoke access</p><p className="text-sm text-secondary">{toRevoke.map((key) => permissionLabel(key, pages.find((p) => p.module_key === key)?.display_name || key)).join(", ")}</p></div>}
             {!toGrant.length && !toRevoke.length && <p className="text-sm text-secondary">No effective page access changes. Existing exceptions may still be updated.</p>}
+            {error && <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" disabled={saving} onClick={() => setDialog(null)} className="min-h-11 px-4 rounded border border-subtle">{dialog === "bulk" ? "Back to Editing" : "Cancel"}</button>
               <button type="button" disabled={saving} onClick={() => void applyReviewed()} className="min-h-11 px-4 rounded bg-primary text-white disabled:opacity-50">{saving ? "Saving…" : dialog === "revoke" ? "Confirm Revoke All" : dialog === "role" ? "Apply Role Permissions" : "Confirm & Apply"}</button>
