@@ -127,6 +127,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const contentRef = useRef<HTMLFormElement>(null);
+  const editorScrollRef = useRef<HTMLDivElement>(null);
   const moduleRequest = useRef(0);
   const departmentRequest = useRef(0);
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
@@ -796,7 +797,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       setError(profileSaved
         ? `The profile saved, but the remaining setup did not finish: ${detail}`
         : `Changes were not saved: ${detail}`);
-      contentRef.current?.scrollTo({ top: 0 });
+      editorScrollRef.current?.scrollTo({ top: 0 });
     } finally {
       setLoading(false);
     }
@@ -844,7 +845,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     'mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
+    <div ref={editorScrollRef} className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
       <div className="mx-auto min-h-screen w-full max-w-6xl bg-gray-900 shadow-2xl sm:min-h-screen sm:border-x sm:border-gray-700">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-700 flex-shrink-0">
@@ -877,7 +878,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); contentRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} requiredSections={isEmployee ? ['profile', 'access', 'pay'] : ['profile', 'access']} issues={requiredSetupIssues} />
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} requiredSections={isEmployee ? ['profile', 'access', 'pay'] : ['profile', 'access']} issues={requiredSetupIssues} />
         {/* Messages */}
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
