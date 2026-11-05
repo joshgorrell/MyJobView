@@ -80,23 +80,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [reviewed, setReviewed] = useState<string[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState(() => notificationDefaults());
-  function reviewAndContinue() {
-    const problem = validateSetup(
-      activeTab,
-      formData,
-      classification,
-      employeeForm,
-      departments.some((d) => getEffectiveDeptAccess(d.id)),
-    );
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    setError(null);
-    setReviewed((prev) => [...new Set([...prev, activeTab])]);
-    const index = setupSections.findIndex((s) => s.key === activeTab);
-    setActiveTab(index === setupSections.length - 1 ? 'review' : setupSections[index + 1].key);
-  }
   const [roles, setRoles] = useState<Role[]>([]);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
