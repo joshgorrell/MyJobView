@@ -66,7 +66,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     setEmployeeRewardsVisible(false);
-    if (!profile?.id || profile.role === 'admin') return;
+    if (!profile?.id || ['admin', 'owner', 'super_admin'].includes(profile.role)) return;
     void supabase.rpc('get_employee_rewards_visibility').then(({ data, error }) => {
       if (!cancelled) setEmployeeRewardsVisible(!error && data === true);
     });
@@ -299,7 +299,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   function hasModuleAccess(moduleKey: string | DepartmentModule): boolean {
     if (!profile || profile.is_active === false) return false;
     const key = typeof moduleKey === 'string' ? moduleKey : moduleKey.module_key;
-    if (key === 'rewards_dashboard' && profile.role !== 'admin' && !employeeRewardsVisible) return false;
+    if (key === 'rewards_dashboard' && !['admin', 'owner', 'super_admin'].includes(profile.role) && !employeeRewardsVisible) return false;
     if (key === 'my_time_off' && (profile as any).employment_classification !== 'employee') return false;
     return effectiveModuleAccess(key, modules, moduleRoleAccess, moduleUserOverrides, profile.role);
   }
