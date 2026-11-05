@@ -80,7 +80,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [newOnly, setNewOnly] = useState(true);
-  const [createdRequestId, setCreatedRequestId] = useState<string | null>(() => !scoped ? window.sessionStorage.getItem('mjv-new-service-request') : null);
+  const [createdRequestId, setCreatedRequestId] = useState<string | null>(() => !scoped && typeof window !== 'undefined' ? window.sessionStorage?.getItem('mjv-new-service-request') ?? null : null);
   useEffect(() => {
     if (scoped) return;
     const handleCreated = (event: Event) => {
@@ -128,7 +128,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const flow = useFlow(filters);
   useEffect(() => {
     if (!createdRequestId) return;
-    window.sessionStorage.removeItem('mjv-new-service-request');
+    if (typeof window !== 'undefined') window.sessionStorage?.removeItem('mjv-new-service-request');
     setView('all');
     setNewOnly(true);
     setSearch('');
