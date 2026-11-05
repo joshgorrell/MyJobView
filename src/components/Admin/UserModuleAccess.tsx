@@ -42,7 +42,6 @@ export function UserModuleAccess({
   userRoleId,
   onClose,
   inline = false,
-  previewRole,
   onChanged,
 }: Props) {
   const [modules, setModules] = useState<Module[]>([]);
@@ -107,7 +106,7 @@ export function UserModuleAccess({
           ),
         );
         setOverrides(exceptions.data || []);
-        setRole(previewRole || profile.data?.role || "");
+        setRole(profile.data?.role || "");
         setClassification(profile.data?.employment_classification || "");
         setLoadedFor(identity);
       })
@@ -120,7 +119,7 @@ export function UserModuleAccess({
     return () => {
       cancelled = true;
     };
-  }, [userId, userRoleId, previewRole, reload]);
+  }, [userId, userRoleId, reload]);
 
   const overrideMap = permissionOverridesMap(overrides);
   const pages = uniquePermissionModules(modules);
@@ -232,10 +231,9 @@ export function UserModuleAccess({
       <p className="text-sm text-secondary flex gap-2">
         <Shield className="w-5 h-5 shrink-0" />
         <span>
-          Pages inherit the selected role. Individual exceptions survive role
-          changes. Department buttons apply to the pages listed inside them.
-          Changes save immediately; action permissions elsewhere use Save
-          Changes.
+          Pages inherit the saved user role. Individual exceptions survive role
+          changes. Individual page changes save immediately; bulk changes
+          require confirmation. Other action permissions use Save Changes.
         </span>
       </p>
       {role !== "admin" && !loading && loadedFor === identity && (
