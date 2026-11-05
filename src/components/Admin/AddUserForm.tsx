@@ -5,7 +5,6 @@ import {
   UserDataCard,
   setupSections,
   notificationDefaults,
-  saveSetupReview,
   validateSetup,
 } from './UserSetup';
 import { useState, useEffect, useRef } from 'react';
@@ -78,7 +77,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     setDraftMessage('Draft saved for this browser session. Password must be re-entered.');
   }
   const [activeTab, setActiveTab] = useState<(typeof setupSections)[number]['key'] | 'review'>('profile');
-  const [reviewed, setReviewed] = useState<string[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState(() => notificationDefaults());
   const [roles, setRoles] = useState<Role[]>([]);
@@ -471,8 +469,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
 
       const grantedDeptNames = departments.filter((d) => getEffectiveDeptAccess(d.id)).map((d) => d.display_name);
 
-      // Section acknowledgments are no longer required; persist only actual reviewed sections.
-      await saveSetupReview(newUserId, reviewed);
       sessionStorage.removeItem(draftKey);
       onSuccess({
         userId: newUserId,
@@ -507,7 +503,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
           ...(!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !formData.username.trim() ? { profile: 'Enter a name, username and valid email.' } : {}),
           ...(!formData.role_id || !classification || formData.password.length < 6 ? { access: 'Choose a role, classification and password of at least six characters.' } : {}),
           ...(!departments.some(d => getEffectiveDeptAccess(d.id)) ? { permissions: 'Enable at least one department.' } : {}),
@@ -622,7 +618,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                 <select
                   value={formData.role_id}
                   onChange={(e) => {
-                    setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'permissions'));
                     const selectedRole = roles.find((r) => r.id === e.target.value);
                     const roleKey = (selectedRole?.role_key as any) || 'sales';
                     // Auto-set can_view_prospects for sales, admin, and manager roles
@@ -712,7 +707,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   type="button"
                   onClick={() => {
                     setClassification('employee');
-                    setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                   }}
                   className={`px-4 py-3 rounded-lg border-2 transition-all text-left ${
                     classification === 'employee'
@@ -734,7 +728,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   type="button"
                   onClick={() => {
                     setClassification('non_employee');
-                    setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                   }}
                   className={`px-4 py-3 rounded-lg border-2 transition-all text-left ${
                     classification === 'non_employee'
