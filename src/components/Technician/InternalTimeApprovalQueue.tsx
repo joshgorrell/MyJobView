@@ -16,7 +16,7 @@ export function InternalTimeApprovalQueue() {
   const [denial, setDenial] = useState<Record<string, string>>({});
   const [employeeNames, setEmployeeNames] = useState<Record<string, string>>({});
   const refresh = useCallback(async () => {
-    if (!profile?.is_global_admin || !profile.organization_id) return;
+    if (!profile?.is_global_admin || !profile.organization_id) { setEntries([]); setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase.from('time_entries')
       .select('id, technician_id, entry_type, entry_date, clock_in, clock_out, total_hours, notes')
@@ -24,7 +24,7 @@ export function InternalTimeApprovalQueue() {
       .in('entry_type', ['shop_time', 'training'])
       .eq('status', 'submitted').not('clock_out', 'is', null)
       .order('clock_out', { ascending: true }).limit(100);
-    if (error) notify('Unable to load internal time approvals.', { theme: 'blue', tone: 'error' });
+    if (error) { setEntries([]); notify('Unable to load internal time approvals.', { theme: 'blue', tone: 'error' }); }
     else {
       const rows = (data || []) as Entry[];
       setEntries(rows);
@@ -37,7 +37,7 @@ export function InternalTimeApprovalQueue() {
       } else setEmployeeNames({});
     }
     setLoading(false);
-  }, [profile?.role, profile?.organization_id]);
+  }, [profile?.is_global_admin, profile?.organization_id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
