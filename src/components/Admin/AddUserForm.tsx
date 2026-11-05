@@ -56,6 +56,7 @@ interface Role {
 export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   const [draftKey, setDraftKey] = useState('');
   const roleAccessRequest = useRef(0);
+  const editorScrollRef = useRef<HTMLDivElement>(null);
   const [dataLoadFailed, setDataLoadFailed] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const [draftMessage, setDraftMessage] = useState('');
@@ -494,7 +495,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
+    <div ref={editorScrollRef} className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
       <div className="mx-auto min-h-screen w-full max-w-6xl bg-gray-900 shadow-2xl sm:min-h-screen sm:border-x sm:border-gray-700">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-purple-500/30 flex-shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-white">Add New User</h2>
@@ -506,7 +507,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
           ...(!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !formData.username.trim() ? { profile: 'Enter a name, username and valid email.' } : {}),
           ...(!formData.role_id || !classification || formData.password.length < 6 ? { access: 'Choose a role, classification and password of at least six characters.' } : {}),
           ...(!departments.some(d => getEffectiveDeptAccess(d.id)) ? { permissions: 'Enable at least one department.' } : {}),
