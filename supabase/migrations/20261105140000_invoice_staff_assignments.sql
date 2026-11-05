@@ -33,7 +33,7 @@ BEGIN
   SELECT EXISTS (
     SELECT 1 FROM public.invoice_line_item_sources s
     JOIN public.invoice_line_items li ON li.id = s.invoice_line_item_id
-    WHERE li.invoice_id = NEW.invoice_id AND (s.source_type = 'work_order' OR s.source_type LIKE 'work\\_order\\_%' ESCAPE '\\')
+    WHERE li.invoice_id = NEW.invoice_id AND (s.source_type = 'work_order' OR left(s.source_type, 11) = 'work_order_')
   ) INTO v_has_work_order;
   IF v_has_work_order AND NEW.invoice_kind <> 'service' THEN
     RAISE EXCEPTION 'Work-order invoices must be classified as service';
