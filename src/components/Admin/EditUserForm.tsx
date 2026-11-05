@@ -844,8 +844,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     'mt-1 w-4 h-4 text-cyan-500 bg-gray-700 border-gray-600 rounded focus:ring-2 focus:ring-cyan-500';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-0 z-50 overflow-hidden">
-      <div className="bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full h-full sm:h-auto sm:max-h-[90vh] sm:my-4 border-0 sm:border border-gray-700 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
+      <div className="mx-auto min-h-screen w-full max-w-6xl bg-gray-900 shadow-2xl sm:min-h-screen sm:border-x sm:border-gray-700">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-700 flex-shrink-0">
           <div>
@@ -909,8 +909,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           noValidate
           ref={contentRef}
           onSubmit={handleSubmit}
-          onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="w-full"
         >
           <div className="p-4 sm:p-6 space-y-5">
             {reviewError && <p className="text-red-300">{reviewError}</p>}
@@ -958,20 +957,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                 }))}
               />
             )}
-            {activeTab !== 'review' && (
-              <label className="flex items-center gap-2 text-cyan-300 text-sm">
-                <input
-                  type="checkbox"
-                  checked={reviewed.includes(activeTab)}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    setReviewed(e.target.checked ? [...reviewed, activeTab] : reviewed.filter((k) => k !== activeTab));
-                  }}
-                />
-                I have reviewed this section
-              </label>
-            )}
-
             {/* ===== USER DETAILS TAB ===== */}
             {activeTab === 'profile' && (
               <div className="space-y-5">
