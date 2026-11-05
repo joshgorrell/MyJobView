@@ -850,6 +850,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
               <InvoiceAssignmentEditor
                 invoiceId={invoice.id}
                 salesOrderId={invoice.sales_order_id}
+                projectId={invoice.project_id}
                 status={invoice.status}
                 canManage={canManageBilling}
               />
