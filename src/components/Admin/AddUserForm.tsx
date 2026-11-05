@@ -514,8 +514,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-0 z-50 overflow-hidden">
-      <div className="bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full h-full sm:h-auto sm:max-h-[90vh] sm:my-4 border-0 sm:border border-purple-500/30 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
+      <div className="mx-auto min-h-screen w-full max-w-6xl bg-gray-900 shadow-2xl sm:min-h-screen sm:border-x sm:border-gray-700">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-purple-500/30 flex-shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-white">Add New User</h2>
           <button
@@ -536,7 +536,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           noValidate
           onSubmit={handleSubmit}
           onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
-          className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1"
+          className="p-4 sm:p-6 space-y-4"
         >
           {error && (
             <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">{error}</div>
