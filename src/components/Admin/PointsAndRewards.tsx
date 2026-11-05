@@ -332,13 +332,13 @@ export function PointsAndRewards() {
       {activeTab === 'points' && (
         <div className="bg-gray-800 rounded-lg p-4 sm:p-6">
           <ActionRewards admin onTimePoints={pointsForm.attendance_on_time_points} />
-          <h3 className="text-lg sm:text-xl font-semibold text-white my-4">Other Activity Values</h3>
-          <div className="space-y-6">
+          <h3 className="text-lg sm:text-xl font-semibold text-white my-4">Additional Point Rules</h3>
+          <div className="space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Activity Points</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <h3 className="text-sm font-semibold text-gray-200 mb-3 border-b border-gray-700 pb-2">Activity Points</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Contact Created
                   </label>
                   <input
@@ -348,12 +348,12 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, contact_created_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when a rep creates a new contact</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when a rep creates a new contact</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Connection Logged
                   </label>
                   <input
@@ -363,12 +363,12 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, connection_logged_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when a rep logs a connection</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when a rep logs a connection</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Lead Created
                   </label>
                   <input
@@ -378,12 +378,12 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, lead_created_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when a rep creates a lead</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when a rep creates a lead</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Lead Claimed
                   </label>
                   <input
@@ -393,12 +393,12 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, lead_claimed_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when a rep claims a lead from fishbowl</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when a rep claims a lead from fishbowl</p>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                <div className="">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Lead Converted
                   </label>
                   <input
@@ -408,18 +408,18 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, lead_converted_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when a rep converts a lead to won/closed</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when a rep converts a lead to won/closed</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Production & Documentation Points</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <h3 className="text-sm font-semibold text-gray-200 mb-3 border-b border-gray-700 pb-2">Production & Documentation Points</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Photo Upload
                   </label>
                   <input
@@ -427,12 +427,12 @@ export function PointsAndRewards() {
                     min="0"
                     value={photoUploadPoints}
                     onChange={(e) => setPhotoUploadPoints(parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded for each job photo uploaded</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded for each job photo uploaded</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Task Completion
                   </label>
                   <input
@@ -442,18 +442,18 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, task_completion_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when a task is completed</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when a task is completed</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-red-400 mb-4 border-b border-gray-700 pb-2">Points Deductions</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <h3 className="text-sm font-semibold text-gray-200 mb-3 border-b border-gray-700 pb-2">Points Deductions</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Manual Time Entry
                   </label>
                   <input
@@ -463,18 +463,18 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, manual_entry_points_loss: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-red-700 text-white rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points deducted when admin creates manual time entry for employee who forgot to clock in/out</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points deducted when admin creates manual time entry for employee who forgot to clock in/out</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Discussion Points</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <h3 className="text-sm font-semibold text-gray-200 mb-3 border-b border-gray-700 pb-2">Discussion Points</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
                     Question Answer
                   </label>
                   <input
@@ -484,17 +484,17 @@ export function PointsAndRewards() {
                     onChange={(e) =>
                       setPointsForm({ ...pointsForm, question_answer_points: parseInt(e.target.value) || 0 })
                     }
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points awarded when answering a question</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points awarded when answering a question</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-700 pb-2">Attendance & Punctuality</h3>
-              <p className="text-sm text-gray-400 mb-4">Configure daily arrival rewards and deductions. Positive values award points; negative values deduct points.</p>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-200 mb-3 border-b border-gray-700 pb-2">Attendance & Punctuality</h3>
+              <p className="text-xs text-gray-400 mb-3">Configure daily arrival rewards and deductions. Positive values award points; negative values deduct points.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3 mb-3">
                 {([
                   ['attendance_early_points', '15+ Minutes Early', 'Default: +10'],
                   ['attendance_on_time_points', 'Early / On Time', 'Default: +5'],
@@ -502,17 +502,17 @@ export function PointsAndRewards() {
                   ['attendance_very_late_points', 'More Than 15 Minutes Late', 'Default: -10'],
                 ] as const).map(([key, label, description]) => (
                   <div key={key}>
-                    <label htmlFor={key} className="block text-sm font-medium text-gray-300 mb-2">{label}</label>
+                    <label htmlFor={key} className="block text-xs font-medium text-gray-300 mb-1">{label}</label>
                     <input id={key} type="number" step="1" value={pointsForm[key]}
                       onChange={e => setPointsForm(previous => ({ ...previous, [key]: Number.parseInt(e.target.value, 10) || 0 }))}
-                      className="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:ring-2 focus:ring-cyan-500" />
-                    <p className="text-xs text-gray-500 mt-1">{description}</p>
+                      className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500" />
+                    <p className="text-xs text-gray-400 mt-1 leading-snug">{description}</p>
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-3">
                 <div>
-                  <label htmlFor="forgot-clock-out-penalty" className="block text-sm font-medium text-gray-300 mb-2">Forgotten Clock-Out Penalty</label>
+                  <label htmlFor="forgot-clock-out-penalty" className="block text-xs font-medium text-gray-300 mb-1">Forgotten Clock-Out Penalty</label>
                   <input
                     id="forgot-clock-out-penalty"
                     type="number"
@@ -520,9 +520,9 @@ export function PointsAndRewards() {
                     step="1"
                     value={forgotClockOutPenalty}
                     onChange={e => setForgotClockOutPenalty(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    className="w-full px-4 py-2 bg-gray-900 border border-red-700 text-white rounded-lg focus:ring-2 focus:ring-red-500"
+                    className="w-full max-w-32 px-3 py-1.5 bg-gray-900 border border-gray-600 text-white rounded-md focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Points deducted when an employee forgets to clock out. Uses the existing company setting.</p>
+                  <p className="text-xs text-gray-400 mt-1 leading-snug">Points deducted when an employee forgets to clock out. Uses the existing company setting.</p>
                 </div>
               </div>
             </div>
