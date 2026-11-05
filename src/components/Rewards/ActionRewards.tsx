@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 type Settings = { enabled: boolean; invoice_points_per_dollar: number; job_clock_points: number; review_points: number; value_points: number; value_dollars: number };
 type Data = { settings: Settings; attendance: { early: number; on_time: number; late: number; very_late: number } | null; photo_points: number };
-type Queue = { employees: { id: string; full_name: string }[]; reviews: { id: string; contact_name: string; sent_at: string }[] };
+
 const number = (n: number, decimals = 2) => Number(n).toLocaleString('en-US', { maximumFractionDigits: decimals });
 const money = (n: number) => Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const inputClass = 'mt-1 w-full min-w-0 rounded-lg border border-gray-600 bg-gray-900 p-2 text-white';
@@ -13,13 +13,9 @@ export function ActionRewards({ admin = false, onTimePoints }: { admin?: boolean
   const { profile } = useAuth();
   const [data, setData] = useState<Data | null>(null);
   const [form, setForm] = useState<Settings | null>(null);
-  const [queue, setQueue] = useState<Queue>({ employees: [], reviews: [] });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [employee, setEmployee] = useState('');
-  const [review, setReview] = useState('');
-  const [evidence, setEvidence] = useState('');
   const version = useRef(0);
   const pending = useRef(false);
   const load = useCallback(async () => {
@@ -27,20 +23,16 @@ export function ActionRewards({ admin = false, onTimePoints }: { admin?: boolean
     const request = ++version.current;
     setError('');
     try {
-      const [rules, reviews] = await Promise.all([
-        supabase.rpc('get_employee_action_rewards'),
-        admin ? supabase.rpc('get_employee_review_reward_queue') : Promise.resolve({ data: { employees: [], reviews: [] }, error: null }),
-      ]);
+      const rules = await supabase.rpc('get_employee_action_rewards');
       if (rules.error) throw rules.error;
-      if (reviews.error) throw reviews.error;
       const result = rules.data as Data;
-      if (!result?.settings || !Number.isFinite(Number(result.settings.invoice_points_per_dollar)) || !Array.isArray(reviews.data?.employees) || !Array.isArray(reviews.data?.reviews)) throw new Error('Action rules returned an invalid response.');
+      if (!result?.settings || !Number.isFinite(Number(result.settings.invoice_points_per_dollar))) throw new Error('Action rules returned an invalid response.');
       if (request !== version.current) return;
-      setData(result);setForm(result.settings);setQueue(reviews.data);
+      setData(result);setForm(result.settings);
     } catch (e) { if (request === version.current) setError(e instanceof Error ? e.message : 'Action rewards could not be loaded. Please retry.'); }
-  }, [admin, profile?.id, profile?.organization_id]);
+  }, [profile?.id, profile?.organization_id]);
   useEffect(() => {
-    setData(null);setForm(null);setQueue({ employees: [], reviews: [] });setEmployee('');setReview('');setEvidence('');setMessage('');void load();
+    setData(null);setForm(null);setMessage('');void load();
     const generation = version;
     return () => { generation.current++; };
   }, [load]);
@@ -69,19 +61,19 @@ export function ActionRewards({ admin = false, onTimePoints }: { admin?: boolean
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-300">
         <p>Invoice payment: <strong className="text-cyan-300">{number(shown.invoice_points_per_dollar, 8)} points / $1 collected before tax</strong></p>
         <p>Job clock-in: <strong className="text-cyan-300">{number(shown.job_clock_points)} points</strong> per distinct job per day</p>
-        <p>Verified customer review: <strong className="text-cyan-300">{number(shown.review_points)} points</strong> after administrator verification</p>
+        <p>Excellent Job Review: <strong className="text-cyan-300">{number(shown.review_points)} points</strong> on customer submission</p>
         <p>Job photo/video: <strong className="text-cyan-300">{number(data?.photo_points ?? 0)} points</strong> per upload, using the existing rule</p>
       </div>
       {!shown.enabled && <p className="text-amber-300 text-sm">New invoice, job clock and review awards are paused. Existing activity rules continue.</p>}
       <p className="text-xs text-gray-400">{number(shown.value_points)} points = {money(shown.value_dollars)} reference reward value. Catalog items retain their configured point prices. No individual points goals or quarterly qualification apply.</p>
       {admin && form && <>
         <form className="space-y-3" onSubmit={e => { e.preventDefault();void mutate('save_employee_action_rewards', { p_enabled: form.enabled, p_invoice_rate: form.invoice_points_per_dollar, p_job_points: form.job_clock_points, p_review_points: form.review_points, p_value_points: form.value_points, p_value_dollars: form.value_dollars }, 'Action points saved. New payments and job awards use the new values.'); }}>
-          <label className="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={form.enabled} disabled={busy} onChange={e => setForm({ ...form, enabled: e.target.checked })} />Enable invoice, job clock and verified review points</label>
+          <label className="flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={form.enabled} disabled={busy} onChange={e => setForm({ ...form, enabled: e.target.checked })} />Enable invoice, job clock and review points</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {([
               ['invoice_points_per_dollar', 'Invoice points per $1 before tax', 0, 1000, 0.00000001],
               ['job_clock_points', 'Job clock-in points', 0, 100000, 1],
-              ['review_points', 'Verified review points', 0, 100000, 1],
+              ['review_points', 'Excellent Job Review points', 0, 100000, 1],
               ['value_points', 'Reference points', 1, 1000000, 1],
               ['value_dollars', 'Reference reward value ($)', 0.01, 999999.99, 0.01],
             ] as const).map(([key, label, min, max, step]) => <label key={key} className="text-sm text-gray-300">{label}<input required type="number" min={min} max={max} step={step} disabled={busy} value={form[key]} onChange={e => setForm({ ...form, [key]: Number(e.target.value) })} className={inputClass} /></label>)}
@@ -95,16 +87,6 @@ export function ActionRewards({ admin = false, onTimePoints }: { admin?: boolean
           <p className="text-sm text-gray-300">65 on-time days + 130 job clock-ins: {number(hourlyExample)} points ≈ {money(equivalent(hourlyExample))}</p>
           <p className="text-sm text-gray-300">$224,482.04 in pre-tax invoice payments: {number(224482.04 * form.invoice_points_per_dollar)} points ≈ {money(equivalent(224482.04 * form.invoice_points_per_dollar))}</p>
         </div>
-        <form className="space-y-3 border-t border-gray-700 pt-4" onSubmit={e => { e.preventDefault();void mutate('award_employee_review_points', { p_review: review, p_user: employee, p_evidence: evidence }, 'Verified customer review points awarded.'); }}>
-          <h4 className="font-semibold text-white">Recognize a customer review</h4>
-          <p className="text-xs text-gray-400">Verify the actual review and select the employee who earned it. A sent request or clicked link does not earn review points. Each review request and evidence reference receives one award.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="text-sm text-gray-300">Employee<select required value={employee} onChange={e => setEmployee(e.target.value)} className={inputClass}><option value="">Select employee</option>{queue.employees.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select></label>
-            <label className="text-sm text-gray-300">Completed review request<select required value={review} onChange={e => setReview(e.target.value)} className={inputClass}><option value="">Select completed review</option>{queue.reviews.map(r => <option key={r.id} value={r.id}>{r.contact_name} · {r.sent_at.slice(0, 10)}</option>)}</select></label>
-          </div>
-          <label className="block text-sm text-gray-300">Individual review URL or verification evidence<input required minLength={10} maxLength={2000} value={evidence} onChange={e => setEvidence(e.target.value)} className={inputClass} /></label>
-          <button disabled={busy || !employee || !review || !form.enabled || form.review_points === 0} className="rounded-lg bg-cyan-700 px-4 py-2 text-white disabled:opacity-50">Award verified review points</button>
-        </form>
       </>}
     </>}
   </section>;
