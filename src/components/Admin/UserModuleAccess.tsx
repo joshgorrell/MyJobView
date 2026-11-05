@@ -288,7 +288,7 @@ export function UserModuleAccess({
             {error && <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-600">{error}</p>}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" disabled={saving} onClick={() => setDialog(null)} className="min-h-11 px-4 rounded border border-subtle">{dialog === "bulk" ? "Back to Editing" : "Cancel"}</button>
-              <button type="button" disabled={saving} onClick={() => void applyReviewed()} className="min-h-11 px-4 rounded bg-primary text-white disabled:opacity-50">{saving ? "Saving…" : dialog === "revoke" ? "Confirm Revoke All" : dialog === "role" ? "Apply Role Permissions" : "Confirm & Apply"}</button>
+              <button type="button" disabled={saving} onClick={() => void applyReviewed()} className="min-h-11 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50">{saving ? "Saving…" : dialog === "revoke" ? "Confirm Revoke All" : dialog === "role" ? "Apply Role Permissions" : "Confirm & Apply"}</button>
             </div>
           </div>
         </div>
