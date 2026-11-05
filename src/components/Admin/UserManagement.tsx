@@ -1,6 +1,6 @@
 import { setupSections } from './UserSetup';
 import { useEffect, useState } from 'react';
-import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, AlertCircle, UserCircle, Clock } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, UserCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
@@ -203,93 +203,28 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         </button>
       </div>
 
-      {/* Needs Classification Section */}
+      {/* Setup issues are summarized rather than duplicating the user directory. */}
       {(() => {
-        const unclassified = users.filter(u => (u as any).employment_classification === 'unreviewed' || !(u as any).employment_classification);
-        if (unclassified.length === 0) return null;
-        return (
-          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-amber-800">
-              <AlertCircle className="w-5 h-5" />
-              <h3 className="text-sm font-semibold">Needs Classification</h3>
-            </div>
-            <p className="text-xs text-amber-700">
-              These users were created before classification was required. Designate each as an Employee or Non-Employee.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-amber-100 border-b border-amber-300">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">User</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Role</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-amber-800 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-amber-200">
-                  {unclassified.map(u => (
-                    <tr key={u.id} className="bg-canvas/50">
-                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-amber-600 text-primary rounded text-xs font-medium hover:bg-amber-700 transition-colors"
-                        >
-                          Review
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Payroll Config Needs Review Section */}
-      {(() => {
-        const unreviewed = users.filter(u => {
+        const classificationCount = users.filter(u =>
+          (u as any).employment_classification === 'unreviewed' || !(u as any).employment_classification
+        ).length;
+        const payrollCount = users.filter(u => {
           const emp = employeeMap.get(u.id);
-          return (u as any).employment_classification === 'employee' && emp && !configReviewMap.get(emp.id);
-        });
-        if (unreviewed.length === 0) return null;
+          return (u as any).employment_classification === 'employee' && !!emp && !configReviewMap.get(emp.id);
+        }).length;
+        if (!classificationCount && !payrollCount) return null;
         return (
-          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-blue-800">
-              <Clock className="w-5 h-5" />
-              <h3 className="text-sm font-semibold">Payroll Config Needs Review</h3>
-            </div>
-            <p className="text-xs text-blue-700">
-              These employees have payroll configurations that need to be reviewed before payroll can be processed.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-blue-100 border-b border-blue-300">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">User</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Role</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-blue-800 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-blue-200">
-                  {unreviewed.map(u => (
-                    <tr key={u.id} className="bg-canvas/50">
-                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-blue-600 text-primary rounded text-xs font-medium hover:bg-blue-700 transition-colors"
-                        >
-                          Review
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="flex flex-wrap gap-2" role="status" aria-label="User setup attention needed">
+            {classificationCount > 0 && (
+              <span className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {classificationCount} {classificationCount === 1 ? 'user needs' : 'users need'} classification
+              </span>
+            )}
+            {payrollCount > 0 && (
+              <span className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                {payrollCount} payroll {payrollCount === 1 ? 'configuration needs' : 'configurations need'} review
+              </span>
+            )}
           </div>
         );
       })()}
