@@ -88,7 +88,7 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
       {row.opened_at && <span className="rounded-full border border-blue-500/40 bg-blue-950 px-3 py-1 text-xs text-blue-300">Opened</span>}
       {!row.confirmed_choice && row.click_count > 0 && <span className="rounded-full border border-amber-500/40 bg-amber-950 px-3 py-1 text-xs text-amber-300">Link visited (unconfirmed)</span>}
     </div>
-    {row.confirmed_choice && <p className="mt-2 text-sm text-green-300">Customer selected: {label(row.confirmed_choice)}</p>}
+    {row.confirmed_choice && <p className="mt-2 text-sm text-green-300">Customer selected: <span>{label(row.confirmed_choice)}</span></p>}
     {row.message_count > 0 && <p className="mt-1 text-sm text-green-300">{row.message_count} customer {row.message_count === 1 ? 'message' : 'messages'} received — open Activity & messages to read</p>}
     <p className="mt-1 text-xs text-gray-400">{row.sender_name} · {date(row.sent_at||row.created_at)}</p>
     <div className="mt-1 flex flex-wrap gap-x-4"><button onClick={()=>void showTimeline(row)} className="min-h-11 text-sm text-blue-300">Activity & messages</button><button onClick={()=>void showEmail(row)} className="flex min-h-11 items-center gap-2 text-sm text-blue-300"><Eye size={16}/>Sent email</button>{row.proposal_id&&<a className="flex min-h-11 items-center text-sm text-blue-300" href={`/?tab=proposals&proposalId=${row.proposal_id}`}>Proposal</a>}</div>
