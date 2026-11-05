@@ -524,26 +524,13 @@ export default function LostOpportunityReviews(
             className="flex h-[92dvh] max-h-[92dvh] w-full max-w-3xl flex-col rounded-xl bg-gray-800 border border-gray-600 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 flex shrink-0 justify-between gap-4">
-              <div>
-                <h3
-                  id="lost-email-preview-title"
-                  className="text-lg font-bold text-white"
-                >
-                  Email Preview
-                </h3>
-                <p className="text-gray-300 text-sm">To: {preview.recipient}</p>
-                <p className="text-gray-300 text-sm">
-                  Subject: {preview.subject}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreview(null)}
-                className="min-h-11 shrink-0 px-3 text-gray-200 self-start"
-              >
-                Close
-              </button>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-700 bg-gray-900 px-4 py-3">
+              <h3 id="lost-email-preview-title" className="truncate text-sm font-semibold text-white sm:text-base">Email Preview</h3>
+              <button type="button" disabled={busy} onClick={() => setPreview(null)} aria-label="Close email preview" className="min-h-11 shrink-0 rounded-lg px-3 text-gray-300 hover:bg-gray-700 hover:text-white disabled:opacity-50">Close</button>
+            </div>
+            <div className="shrink-0 space-y-2 border-b border-gray-700 bg-gray-800 p-4 text-sm">
+              <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3"><strong className="shrink-0 text-gray-300">To:</strong><span className="break-all text-gray-400">{preview.recipient}</span></div>
+              <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3"><strong className="shrink-0 text-gray-300">Subject:</strong><span className="break-words text-gray-400">{preview.subject}</span></div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto bg-white" role="region" aria-label="Full email preview" tabIndex={0}>
               <FullEmailPreview title="Lost Opportunity email preview" html={preview.html} />
