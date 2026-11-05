@@ -19,6 +19,7 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
  const [deleteEmailTarget,setDeleteEmailTarget]=useState<EmailRecord|null>(null);
  const [deleteTarget,setDeleteTarget]=useState<Activity|null>(null);const [deleting,setDeleting]=useState(false);
  const [records,setRecords]=useState<EmailRecord[]>([]);const [page,setPage]=useState(0);const [search,setSearch]=useState('');const [query,setQuery]=useState('');const [filter,setFilter]=useState('all');const [refresh,setRefresh]=useState(0);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
+ const [inlineComments,setInlineComments]=useState<Record<string,string[]>>({});
  const [totals,setTotals]=useState({sent:0,opened:0,clicked:0,messages:0,feedback:0});const [preview,setPreview]=useState<{subject:string;html:string}|null>(null);const [timeline,setTimeline]=useState<{row:EmailRecord;events:Activity[];page:number;more:boolean}|null>(null);
  useEffect(()=>{const changed=()=>setResponseTarget(readResponseTarget());window.addEventListener('popstate',changed);return()=>window.removeEventListener('popstate',changed)},[]);
  useEffect(()=>{let current=true;setResponse(null);setResponseError('');
@@ -48,6 +49,12 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
  void request.then(({data,error})=>{if(!current)return;if(error){setError('History could not load. Please refresh.');setRecords([])}else setRecords((data||[]) as EmailRecord[]);setLoading(false)});
  const counts=[supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).eq('status','sent'),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).not('opened_at','is',null),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).gt('click_count',0),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).gt('message_count',0),supabase.from('proposal_check_reporting').select('id',{count:'exact',head:true}).or('confirmed_choice.not.is.null,message_count.gt.0')];
  void Promise.all(counts).then(results=>{if(current){if(results.some(r=>r.error))setError('Some reporting totals could not load. Please refresh.');else setTotals({sent:results[0].count||0,opened:results[1].count||0,clicked:results[2].count||0,messages:results[3].count||0,feedback:results[4].count||0})}});return()=>{current=false};},[page,query,filter,refresh,refreshKey]);
+ useEffect(()=>{let current=true;const ids=records.filter(row=>row.message_count>0).map(row=>row.id);
+  if(!ids.length){setInlineComments({});return()=>{current=false};}
+  void supabase.from('proposal_check_events').select('email_id,message,created_at').eq('kind','message').in('email_id',ids).order('created_at',{ascending:false}).limit(200)
+    .then(({data,error})=>{if(!current)return;if(error){setInlineComments({});return;}const comments:Record<string,string[]>={};for(const event of data||[]){if(typeof event.message!=='string'||!event.message.trim())continue;(comments[event.email_id]??=[]).push(event.message.trim());}setInlineComments(comments)});
+  return()=>{current=false};
+ },[records]);
  useEffect(()=>{if(!preview&&!timeline&&!response)return;const close=(e:KeyboardEvent)=>{if(e.key==='Escape'){closeDetails()}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[preview,timeline,response]);
  async function showEmail(row:EmailRecord){const {data,error}=await supabase.from('proposal_check_emails').select('email_html').eq('id',row.id).single();if(error)setError('Saved email could not load.');else setPreview({subject:row.subject,html:data.email_html})}
  async function showTimeline(row:EmailRecord,eventPage=0){const {data,error}=await supabase.from('proposal_check_events').select('id,kind,choice,step,message,suspected_automated,created_at').eq('email_id',row.id).order('created_at',{ascending:false}).order('id',{ascending:false}).range(eventPage*50,eventPage*50+49);if(error)setError('Activity could not load.');else {setTimeline({row,events:(data||[]) as Activity[],page:eventPage,more:data?.length===50});if(profile?.id&&org)void Promise.all((data||[]).filter(event=>event.kind==='message').map(event=>markActivitySeen(profile.id,org,'feedback',event.id))).catch(console.error)}}
@@ -89,7 +96,11 @@ export default function ProposalCheckHistory({refreshKey}:{refreshKey:number}) {
       {!row.confirmed_choice && row.click_count > 0 && <span className="rounded-full border border-amber-500/40 bg-amber-950 px-3 py-1 text-xs text-amber-300">Link visited (unconfirmed)</span>}
     </div>
     {row.confirmed_choice && <p className="mt-2 text-sm text-green-300">Customer selected: <span>{label(row.confirmed_choice)}</span></p>}
-    {row.message_count > 0 && <p className="mt-1 text-sm text-green-300">{row.message_count} customer {row.message_count === 1 ? 'message' : 'messages'} received — open Activity & messages to read</p>}
+    {row.message_count > 0 && <div className="mt-2 space-y-2">
+      <p className="text-sm font-medium text-green-300">{row.message_count} customer {row.message_count === 1 ? 'message' : 'messages'} received</p>
+      {(inlineComments[row.id]||[]).slice(0,2).map((message,index)=><p key={index} className="whitespace-pre-wrap break-words rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-gray-200">{message}</p>)}
+      {row.message_count > 2 && <p className="text-xs text-gray-400">Open Activity & messages to see all responses.</p>}
+    </div>}
     <p className="mt-1 text-xs text-gray-400">{row.sender_name} · {date(row.sent_at||row.created_at)}</p>
     <div className="mt-1 flex flex-wrap gap-x-4"><button onClick={()=>void showTimeline(row)} className="min-h-11 text-sm text-blue-300">Activity & messages</button><button onClick={()=>void showEmail(row)} className="flex min-h-11 items-center gap-2 text-sm text-blue-300"><Eye size={16}/>Sent email</button>{row.proposal_id&&<a className="flex min-h-11 items-center text-sm text-blue-300" href={`/?tab=proposals&proposalId=${row.proposal_id}`}>Proposal</a>}</div>
     <details className="text-xs text-gray-400"><summary className="cursor-pointer py-2">Email & tracking details</summary><dl className="grid gap-2 pt-1 sm:grid-cols-2"><div className="sm:col-span-2">Subject: {row.subject}</div><div>Version: {row.variant==='owner'?'Owner':'Salesperson'}</div><div className="break-all">Replies to: {row.reply_to}</div><div>First open detected: {date(row.opened_at)}</div><div>Latest open detected: {date(row.last_opened_at||row.opened_at)}</div><div>Latest link visit: {date(row.last_clicked_at)}</div><div>{row.click_count} link visits · {row.interaction_count} page interactions</div></dl></details>
