@@ -82,7 +82,6 @@ const pages = [
   "tech_stats",
   "tech_status",
   "test_tune",
-  "test_tune_settings",
   "time",
   "time_approval",
   "time_clock_management",
