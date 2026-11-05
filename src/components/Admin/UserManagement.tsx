@@ -1,4 +1,3 @@
-import { setupSections } from './UserSetup';
 import { useEffect, useState } from 'react';
 import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, UserCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -28,8 +27,7 @@ interface EmployeeInfo {
 
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
-  const [setupReviews,setSetupReviews] = useState<Map<string,string[]>>(new Map());
-  const [setupReviewError,setSetupReviewError] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [accountStatuses, setAccountStatuses] = useState<Map<string, AccountEmailStatus>>(new Map());
   const [accountStatusError, setAccountStatusError] = useState(false);
   const [sendingAccountEmail, setSendingAccountEmail] = useState<string | null>(null);
@@ -74,15 +72,12 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       setUsers(data || []);
       setLoading(false);
       // Independent settings metadata must not serialize initial user rendering.
-      const [statusResult, reviewResult, employeeResult] = await Promise.all([
+      const [statusResult, employeeResult] = await Promise.all([
         supabase.from('user_account_email_status').select('*'),
-        supabase.from('user_setup_reviews').select('user_id,reviewed_sections'),
         supabase.from('employees').select('user_id, id, employment_status, hire_date'),
       ]);
       setAccountStatusError(!!statusResult.error);
       setAccountStatuses(new Map((statusResult.data || []).map(item => [item.user_id, item])));
-      setSetupReviewError(!!reviewResult.error);
-      setSetupReviews(new Map((reviewResult.data || []).map(item => [item.user_id, item.reviewed_sections])));
       const employees = employeeResult.data || [];
       setEmployeeMap(new Map(employees.map(item => [item.user_id, item])));
       const employeeIds = employees.map(item => item.id);
@@ -203,6 +198,10 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         </button>
       </div>
 
+      <label className="block rounded-lg border border-subtle bg-canvas p-3 text-sm text-primary">
+        <span className="sr-only">Search users</span>
+        <input type="search" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search users by name, email or username" className="w-full bg-transparent outline-none" />
+      </label>
       {/* Setup issues are summarized rather than duplicating the user directory. */}
       {(() => {
         const classificationCount = users.filter(u =>
@@ -242,7 +241,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.map((user) => (
+              {users.filter(user => [user.full_name, user.email, user.username].some(value => String(value || '').toLowerCase().includes(searchTerm.trim().toLowerCase()))).map((user) => (
                 <tr key={user.id} className="hover:bg-surface">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -297,7 +296,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       }`}>
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
-                      <button type="button" onClick={()=>setEditingUser(user)} className="text-xs text-cyan-700 underline" title={setupSections.filter(s=>!(setupReviews.get(user.id)||[]).includes(s.key)).map(s=>s.label).join(', ')}>{setupReviewError?'Setup status unavailable':setupSections.every(s=>(setupReviews.get(user.id)||[]).includes(s.key))?'Setup complete':'Needs setup review'}</button>
+                      {((user as any).employment_classification === 'unreviewed' || !(user as any).employment_classification) && <button type="button" onClick={() => setEditingUser(user)} className="text-xs text-amber-700 underline">Needs classification</button>}
                       {(user as any).employment_classification === 'employee' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <UserCircle className="w-3 h-3" />
