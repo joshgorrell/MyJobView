@@ -9,6 +9,7 @@ const empty: InvoiceAssignments = { salesRep: null, designer: null, manager: nul
 interface Props {
   invoiceId: string;
   salesOrderId: string | null;
+  projectId: string | null;
   status: string;
   canManage: boolean;
 }
@@ -17,7 +18,7 @@ interface Props {
  * Staff attribution editor for standalone invoices. Project attribution remains
  * on the sales order; this never writes project assignment or commission records.
  */
-export function InvoiceAssignmentEditor({ invoiceId, salesOrderId, status, canManage }: Props) {
+export function InvoiceAssignmentEditor({ invoiceId, salesOrderId, projectId, status, canManage }: Props) {
   const [kind, setKind] = useState<InvoiceKind | null>(null);
   const [assignments, setAssignments] = useState<InvoiceAssignments>(empty);
   const [loading, setLoading] = useState(true);
@@ -36,7 +37,7 @@ export function InvoiceAssignmentEditor({ invoiceId, salesOrderId, status, canMa
     setNotice(null);
     setKind(null);
     setAssignments(empty);
-    if (salesOrderId) {
+    if (salesOrderId || projectId) {
       setLoading(false);
       return () => { active = false; };
     }
@@ -67,9 +68,9 @@ export function InvoiceAssignmentEditor({ invoiceId, salesOrderId, status, canMa
     }
     void load();
     return () => { active = false; };
-  }, [invoiceId, salesOrderId]);
+  }, [invoiceId, salesOrderId, projectId]);
 
-  if (salesOrderId) return null; // No misleading project data: must come from sales order.
+  if (salesOrderId || projectId) return null; // No misleading project data: must come from sales order.
   if (!canManage) return null;
   if (loading) return <p className="text-sm text-gray-500">Loading invoice assignments…</p>;
 
