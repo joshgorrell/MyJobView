@@ -3,89 +3,78 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { notify } from '../../lib/feedback';
 
-type Entry = {
-  id: string; technician_id: string; entry_type: string; entry_date: string;
-  clock_in: string; clock_out: string; total_hours: number; notes: string | null;
+type Session = {
+  id: string;
+  session_type: 'shop_time' | 'training';
+  session_date: string;
+  assigned_profile: { full_name: string } | null;
+  time_entries: Array<{ id: string; status: string; total_hours: number; clock_out: string | null }>;
 };
 
 export function InternalTimeApprovalQueue() {
   const { profile } = useAuth();
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const canReview = profile?.role === 'admin';
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [denial, setDenial] = useState<Record<string, string>>({});
-  const [employeeNames, setEmployeeNames] = useState<Record<string, string>>({});
   const refresh = useCallback(async () => {
-    if (!profile?.is_global_admin || !profile.organization_id) { setEntries([]); setLoading(false); return; }
+    if (!canReview || !profile?.organization_id) {
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const { data, error } = await supabase.from('time_entries')
-      .select('id, technician_id, entry_type, entry_date, clock_in, clock_out, total_hours, notes')
+    const { data, error } = await supabase.from('internal_time_sessions')
+      .select('id, session_type, session_date, assigned_profile:profiles!assigned_to(full_name), time_entries(id, status, total_hours, clock_out)')
       .eq('organization_id', profile.organization_id)
-      .in('entry_type', ['shop_time', 'training'])
-      .eq('status', 'submitted').not('clock_out', 'is', null)
-      .order('clock_out', { ascending: true }).limit(100);
-    if (error) { setEntries([]); notify('Unable to load internal time approvals.', { theme: 'blue', tone: 'error' }); }
-    else {
-      const rows = (data || []) as Entry[];
-      setEntries(rows);
-      const ids = [...new Set(rows.map(row => row.technician_id))];
-      if (ids.length) {
-        const { data: employees, error: namesError } = await supabase.from('profiles')
-          .select('id, full_name').eq('organization_id', profile.organization_id).in('id', ids);
-        if (namesError) notify('Employee names could not be loaded.', { theme: 'blue', tone: 'error' });
-        else setEmployeeNames(Object.fromEntries((employees || []).map(employee => [employee.id, employee.full_name || 'Unnamed employee'])));
-      } else setEmployeeNames({});
+      .order('session_date', { ascending: false })
+      .limit(200);
+    if (error) {
+      setSessions([]);
+      notify('Unable to load internal time approvals.', { theme: 'blue', tone: 'error' });
+    } else {
+      setSessions(((data || []) as unknown as Session[]).filter(session =>
+        session.time_entries?.some(entry => entry.status === 'submitted' && entry.clock_out !== null)));
     }
     setLoading(false);
-  }, [profile?.is_global_admin, profile?.organization_id]);
+  }, [canReview, profile?.organization_id]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  async function decide(entry: Entry, approve: boolean) {
-    if (!profile?.is_global_admin || !profile.organization_id || busy) return;
-    const reason = denial[entry.id]?.trim();
-    if (!approve && !reason) {
-      notify('A reason is required to deny time.', { theme: 'blue', tone: 'error' });
-      return;
-    }
-    setBusy(entry.id);
+  async function approve(session: Session) {
+    if (!canReview || busy) return;
+    setBusy(session.id);
     try {
-      const { data, error } = await supabase.from('time_entries').update({
-        status: approve ? 'approved' : 'rejected',
-        approved_by: approve ? profile.id : null,
-        approved_at: approve ? new Date().toISOString() : null,
-        ...(approve ? {} : { notes: [entry.notes, `Denial reason: ${reason}`].filter(Boolean).join('\n') }),
-      }).eq('id', entry.id).eq('organization_id', profile.organization_id)
-        .eq('status', 'submitted').in('entry_type', ['shop_time', 'training'])
-        .not('clock_out', 'is', null).select('id');
+      // Use the existing server-side review operation, not a direct time_entries update.
+      // It owns authorization and the session/time-entry state transition.
+      const { error } = await supabase.rpc('review_internal_time', {
+        p_session_id: session.id,
+        p_action: 'approve_time',
+        p_notes: null,
+      });
       if (error) throw error;
-      if (!data?.length) throw new Error('Entry was already reviewed or you do not have permission.');
-      notify(approve ? 'Time approved.' : 'Time denied.', { theme: 'blue', tone: 'success' });
+      notify('Time approved.', { theme: 'blue', tone: 'success' });
       await refresh();
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Approval failed.', { theme: 'blue', tone: 'error' });
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   }
 
-  if (!profile?.is_global_admin) return null;
-  return <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-    <h3 className="font-semibold text-gray-900">Shop & Training approvals</h3>
-    {loading ? <p className="text-sm text-gray-500">Loading approvals…</p> :
-      entries.length === 0 ? <p className="text-sm text-gray-500">No time awaiting approval.</p> :
-      entries.map(entry => <div key={entry.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
-        <p className="text-sm font-medium">{entry.entry_type === 'shop_time' ? 'Shop Time' : 'Training Time'} · {entry.entry_date} · {Number(entry.total_hours).toFixed(2)} hrs</p>
-        <p className="text-xs text-gray-600">Employee: {employeeNames[entry.technician_id] || 'Unknown employee'}</p>
-        {entry.notes && <p className="text-sm text-gray-700">{entry.notes}</p>}
-        <label className="block text-xs text-gray-600">Reason for denial
-          <input value={denial[entry.id] || ''} onChange={event => setDenial(prev => ({ ...prev, [entry.id]: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-gray-300 p-2 text-sm" placeholder="Required if denying" />
-        </label>
-        <div className="flex gap-2">
-          <button type="button" disabled={busy !== null} onClick={() => void decide(entry, true)}
-            className="rounded-lg bg-green-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Approve</button>
-          <button type="button" disabled={busy !== null} onClick={() => void decide(entry, false)}
-            className="rounded-lg bg-red-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Deny</button>
-        </div>
+  if (!canReview) return null;
+  return <section className="rounded-xl border border-subtle bg-surface p-4 space-y-3">
+    <h3 className="font-semibold text-primary">Completed Shop & Training time</h3>
+    <p className="text-sm text-secondary">Approve submitted completed time using the existing manager review process. Denial or correction of completed time requires a separate audited server-side operation and is not enabled here.</p>
+    {loading ? <p className="text-sm text-secondary">Loading approvals…</p> :
+      sessions.length === 0 ? <p className="text-sm text-secondary">No completed time awaiting approval.</p> :
+      sessions.map(session => <div key={session.id} className="rounded-lg border border-subtle p-3 space-y-2">
+        <p className="text-sm font-medium text-primary">{session.session_type === 'shop_time' ? 'Shop Time' : 'Training Time'} · {session.session_date}</p>
+        <p className="text-sm text-secondary">Employee: {session.assigned_profile?.full_name || 'Unknown employee'}</p>
+        {session.time_entries.filter(entry => entry.status === 'submitted' && entry.clock_out !== null).map(entry =>
+          <p key={entry.id} className="text-sm text-secondary">{Number(entry.total_hours).toFixed(2)} hours submitted</p>)}
+        <button type="button" disabled={busy !== null} onClick={() => void approve(session)}
+          className="rounded-lg bg-green-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Approve completed time</button>
       </div>)}
   </section>;
 }
