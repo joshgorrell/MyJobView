@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, UserCircle } from 'lucide-react';
+import { Users, Plus, AlertCircle, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, UserCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
@@ -225,7 +225,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       </div>
       {showFilters && <div className="grid gap-3 rounded-lg border border-subtle bg-canvas p-3 sm:grid-cols-2">
         <label className="text-sm text-primary">Status<select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="classification">Needs classification</option><option value="payroll">Payroll review required</option></select></label>
-        <label className="text-sm text-primary">Role<select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All roles</option>{[...new Set(users.map(user => String(user.role)))].sort().map(role => <option key={role} value={role}>{role.replaceAll('_', ' ')}</option>)}</select></label>
+        <label className="text-sm text-primary">Role<select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All roles</option>{[...new Set(users.map(user => String(user.role)))].sort().map(role => <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>)}</select></label>
         <button type="button" onClick={() => {setStatusFilter('all');setRoleFilter('all');setSearchTerm('');}} className="text-left text-sm text-blue-600 underline">Clear filters</button>
       </div>}
       {/* Setup issues are summarized rather than duplicating the user directory. */}
