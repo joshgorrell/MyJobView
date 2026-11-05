@@ -178,7 +178,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           setClassification(d.classification || '');
           setSelectedOffices(d.offices || []);
           setNotifications(notificationDefaults(d.notifications));
-          setDraftMessage('Saved draft restored. Review every section and re-enter the password.');
+          setDraftMessage('Saved draft restored. Complete required fields and re-enter the password.');
         } catch {
           sessionStorage.removeItem(key);
         }
@@ -297,10 +297,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       setError('Setup data did not load. Close and reopen this form before creating a user.');
       return;
     }
-    if (activeTab !== 'review') {
-      reviewAndContinue();
-      return;
-    }
     for (const section of setupSections) {
       const problem = validateSetup(
         section.key,
@@ -318,7 +314,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     const salesIssue = validateSalesCompensation(salesCompensation);
     if (salesIssue) { setError(salesIssue); setActiveTab('pay'); return; }
     if (classification !== 'employee' && salesCompensation.arrangement !== 'none') { setError('Sales compensation requires an employee.'); setActiveTab('access'); return; }
-    if (reviewed.length !== setupSections.length || createdId) return;
+    if (createdId) return;
     setLoading(true);
     setError(null);
 
@@ -491,6 +487,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
 
       const grantedDeptNames = departments.filter((d) => getEffectiveDeptAccess(d.id)).map((d) => d.display_name);
 
+      // Section acknowledgments are no longer required; persist only actual reviewed sections.
       await saveSetupReview(newUserId, reviewed);
       sessionStorage.removeItem(draftKey);
       onSuccess({
@@ -526,7 +523,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} guided requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
+        <UserSetupTabs active={activeTab} onSelect={setActiveTab} reviewed={reviewed} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
           ...(!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !formData.username.trim() ? { profile: 'Enter a name, username and valid email.' } : {}),
           ...(!formData.role_id || !classification || formData.password.length < 6 ? { access: 'Choose a role, classification and password of at least six characters.' } : {}),
           ...(!departments.some(d => getEffectiveDeptAccess(d.id)) ? { permissions: 'Enable at least one department.' } : {}),
@@ -535,7 +532,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         <form
           noValidate
           onSubmit={handleSubmit}
-          onChange={() => setReviewed((prev) => prev.filter((k) => k !== activeTab))}
           className="p-4 sm:p-6 space-y-4"
         >
           {error && (
@@ -1503,30 +1499,14 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                 Back
               </button>
             )}
-            {activeTab !== 'review' ? (
-              <button
-                key="continue-setup"
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  reviewAndContinue();
-                }}
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg"
-              >
-                Review & Continue
-              </button>
-            ) : (
-              <button
-                key="create-user"
-                type="submit"
-                disabled={
-                  loading || dataLoading || dataLoadFailed || reviewed.length !== setupSections.length || !!createdId
-                }
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg disabled:opacity-50"
-              >
-                {loading ? 'Creating…' : 'Create User'}
-              </button>
-            )}
+            <button
+              key="create-user"
+              type="submit"
+              disabled={loading || dataLoading || dataLoadFailed || !!createdId}
+              className="px-4 py-2 bg-cyan-600 text-white rounded-lg disabled:opacity-50"
+            >
+              {loading ? 'Creating…' : 'Create User'}
+            </button>
           </div>
         </form>
       </div>
