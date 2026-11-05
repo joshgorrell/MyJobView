@@ -1,6 +1,5 @@
-import { setupSections } from './UserSetup';
 import { useEffect, useState } from 'react';
-import { Users, Plus, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, AlertCircle, UserCircle, Clock } from 'lucide-react';
+import { Users, Plus, AlertCircle, CreditCard as Edit2, UserX, UserCheck, Shield, User, Trash2, Mail, UserCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Profile } from '../../lib/types';
 import { formatDistanceToNow, formatRoleName } from '../../lib/utils';
@@ -28,8 +27,10 @@ interface EmployeeInfo {
 
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
-  const [setupReviews,setSetupReviews] = useState<Map<string,string[]>>(new Map());
-  const [setupReviewError,setSetupReviewError] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [accountStatuses, setAccountStatuses] = useState<Map<string, AccountEmailStatus>>(new Map());
   const [accountStatusError, setAccountStatusError] = useState(false);
   const [sendingAccountEmail, setSendingAccountEmail] = useState<string | null>(null);
@@ -74,15 +75,12 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       setUsers(data || []);
       setLoading(false);
       // Independent settings metadata must not serialize initial user rendering.
-      const [statusResult, reviewResult, employeeResult] = await Promise.all([
+      const [statusResult, employeeResult] = await Promise.all([
         supabase.from('user_account_email_status').select('*'),
-        supabase.from('user_setup_reviews').select('user_id,reviewed_sections'),
         supabase.from('employees').select('user_id, id, employment_status, hire_date'),
       ]);
       setAccountStatusError(!!statusResult.error);
       setAccountStatuses(new Map((statusResult.data || []).map(item => [item.user_id, item])));
-      setSetupReviewError(!!reviewResult.error);
-      setSetupReviews(new Map((reviewResult.data || []).map(item => [item.user_id, item.reviewed_sections])));
       const employees = employeeResult.data || [];
       setEmployeeMap(new Map(employees.map(item => [item.user_id, item])));
       const employeeIds = employees.map(item => item.id);
@@ -99,6 +97,20 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
       setLoading(false);
     }
   }
+
+  const visibleUsers = users.filter(user => {
+    const query = searchTerm.trim().toLowerCase();
+    if (query && ![user.full_name, user.email, user.username].some(value => String(value || '').toLowerCase().includes(query))) return false;
+    if (roleFilter !== 'all' && user.role !== roleFilter) return false;
+    if (statusFilter === 'active') return !!user.is_active;
+    if (statusFilter === 'inactive') return !user.is_active;
+    if (statusFilter === 'classification') return !(user as any).employment_classification || (user as any).employment_classification === 'unreviewed';
+    if (statusFilter === 'payroll') {
+      const employee = employeeMap.get(user.id);
+      return (user as any).employment_classification === 'employee' && !!employee && !configReviewMap.get(employee.id);
+    }
+    return true;
+  });
 
   async function toggleUserStatus(userId: string, currentStatus: boolean) {
     try {
@@ -203,93 +215,41 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         </button>
       </div>
 
-      {/* Needs Classification Section */}
+      <label className="block rounded-lg border border-subtle bg-canvas p-3 text-sm text-primary">
+        <span className="sr-only">Search users</span>
+        <input type="search" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search users by name, email or username" className="w-full bg-transparent outline-none" />
+      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className="rounded-lg border border-subtle bg-canvas px-3 py-2 text-sm text-primary">Filters {statusFilter !== 'all' || roleFilter !== 'all' ? '•' : ''}</button>
+        <span className="text-xs text-muted">{visibleUsers.length} of {users.length} users</span>
+      </div>
+      {showFilters && <div className="grid gap-3 rounded-lg border border-subtle bg-canvas p-3 sm:grid-cols-2">
+        <label className="text-sm text-primary">Status<select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="classification">Needs classification</option><option value="payroll">Payroll review required</option></select></label>
+        <label className="text-sm text-primary">Role<select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All roles</option>{[...new Set(users.map(user => String(user.role)))].sort().map(role => <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>)}</select></label>
+        <button type="button" onClick={() => {setStatusFilter('all');setRoleFilter('all');setSearchTerm('');}} className="text-left text-sm text-blue-600 underline">Clear filters</button>
+      </div>}
+      {/* Setup issues are summarized rather than duplicating the user directory. */}
       {(() => {
-        const unclassified = users.filter(u => (u as any).employment_classification === 'unreviewed' || !(u as any).employment_classification);
-        if (unclassified.length === 0) return null;
-        return (
-          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-amber-800">
-              <AlertCircle className="w-5 h-5" />
-              <h3 className="text-sm font-semibold">Needs Classification</h3>
-            </div>
-            <p className="text-xs text-amber-700">
-              These users were created before classification was required. Designate each as an Employee or Non-Employee.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-amber-100 border-b border-amber-300">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">User</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-amber-800 uppercase">Role</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-amber-800 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-amber-200">
-                  {unclassified.map(u => (
-                    <tr key={u.id} className="bg-canvas/50">
-                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-amber-600 text-primary rounded text-xs font-medium hover:bg-amber-700 transition-colors"
-                        >
-                          Review
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Payroll Config Needs Review Section */}
-      {(() => {
-        const unreviewed = users.filter(u => {
+        const classificationCount = users.filter(u =>
+          (u as any).employment_classification === 'unreviewed' || !(u as any).employment_classification
+        ).length;
+        const payrollCount = users.filter(u => {
           const emp = employeeMap.get(u.id);
-          return (u as any).employment_classification === 'employee' && emp && !configReviewMap.get(emp.id);
-        });
-        if (unreviewed.length === 0) return null;
+          return (u as any).employment_classification === 'employee' && !!emp && !configReviewMap.get(emp.id);
+        }).length;
+        if (!classificationCount && !payrollCount) return null;
         return (
-          <div className="bg-blue-50 border border-blue-300 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-blue-800">
-              <Clock className="w-5 h-5" />
-              <h3 className="text-sm font-semibold">Payroll Config Needs Review</h3>
-            </div>
-            <p className="text-xs text-blue-700">
-              These employees have payroll configurations that need to be reviewed before payroll can be processed.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-blue-100 border-b border-blue-300">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">User</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Role</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-blue-800 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-blue-200">
-                  {unreviewed.map(u => (
-                    <tr key={u.id} className="bg-canvas/50">
-                      <td className="px-3 py-2 text-primary font-medium">{u.full_name}</td>
-                      <td className="px-3 py-2 text-secondary">{formatRoleName(u.role)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          onClick={() => setEditingUser(u)}
-                          className="px-3 py-1 bg-blue-600 text-primary rounded text-xs font-medium hover:bg-blue-700 transition-colors"
-                        >
-                          Review
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="flex flex-wrap gap-2" role="status" aria-label="User setup attention needed">
+            {classificationCount > 0 && (
+              <span className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {classificationCount} {classificationCount === 1 ? 'user needs' : 'users need'} classification
+              </span>
+            )}
+            {payrollCount > 0 && (
+              <span className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                {payrollCount} payroll {payrollCount === 1 ? 'configuration needs' : 'configurations need'} review
+              </span>
+            )}
           </div>
         );
       })()}
@@ -307,7 +267,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.map((user) => (
+              {visibleUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-surface">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -362,7 +322,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
                       }`}>
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
-                      <button type="button" onClick={()=>setEditingUser(user)} className="text-xs text-cyan-700 underline" title={setupSections.filter(s=>!(setupReviews.get(user.id)||[]).includes(s.key)).map(s=>s.label).join(', ')}>{setupReviewError?'Setup status unavailable':setupSections.every(s=>(setupReviews.get(user.id)||[]).includes(s.key))?'Setup complete':'Needs setup review'}</button>
+                      {((user as any).employment_classification === 'unreviewed' || !(user as any).employment_classification) && <button type="button" onClick={() => setEditingUser(user)} className="text-xs text-amber-700 underline">Needs classification</button>}
                       {(user as any).employment_classification === 'employee' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                           <UserCircle className="w-3 h-3" />
