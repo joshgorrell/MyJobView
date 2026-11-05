@@ -184,15 +184,18 @@ export function UserModuleAccess({
     setError("");
     setMessage("");
     try {
-      const groups: Array<[string[], boolean | null]> = mode === "role"
-        ? [[eligibleKeys, null]]
-        : mode === "revoke"
-          ? [[eligibleKeys, false]]
-          : [[selectedKeys, true], [eligibleKeys.filter((key) => !selection.has(key)), false]];
-      for (const [keys, allowed] of groups) {
-        if (!keys.length) continue;
+      if (mode === "bulk") {
+        const { error: failure } = await supabase.rpc("set_user_page_permissions_bulk", {
+          p_user_id: userId,
+          p_grant_keys: selectedKeys,
+          p_revoke_keys: eligibleKeys.filter((key) => !selection.has(key)),
+        });
+        if (failure) throw failure;
+      } else {
         const { error: failure } = await supabase.rpc("set_user_page_permissions", {
-          p_user_id: userId, p_module_keys: keys, p_has_access: allowed,
+          p_user_id: userId,
+          p_module_keys: eligibleKeys,
+          p_has_access: mode === "role" ? null : false,
         });
         if (failure) throw failure;
       }
