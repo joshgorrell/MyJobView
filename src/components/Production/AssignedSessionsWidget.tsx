@@ -246,9 +246,11 @@ export function AssignedSessionsWidget({ onRefreshParent, sessionType }: Assigne
     }
   }
 
-  const requestEnabled =
-    companySettings?.shop_time_request_enabled ||
-    companySettings?.training_time_request_enabled;
+  const requestEnabled = sessionType === 'shop_time'
+    ? Boolean(companySettings?.shop_time_request_enabled)
+    : sessionType === 'training'
+      ? Boolean(companySettings?.training_time_request_enabled)
+      : Boolean(companySettings?.shop_time_request_enabled || companySettings?.training_time_request_enabled);
 
   const visibleSessions = sessionType ? sessions.filter(session => session.session_type === sessionType) : sessions;
   const pendingSessions = visibleSessions.filter(s => s.status === 'pending_approval');
@@ -544,6 +546,7 @@ export function AssignedSessionsWidget({ onRefreshParent, sessionType }: Assigne
 
       {showRequestModal && companySettings && (
         <RequestInternalTimeModal
+          initialSessionType={sessionType}
           companySettings={companySettings}
           onClose={() => setShowRequestModal(false)}
           onSubmitted={() => {
