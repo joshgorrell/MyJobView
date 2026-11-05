@@ -7,8 +7,6 @@ import {
   UserDataCard,
   setupSections,
   notificationDefaults,
-  saveSetupReview,
-  useSetupReview,
 } from './UserSetup';
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -132,7 +130,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const departmentRequest = useRef(0);
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
 
-  const { reviewed, setReviewed, reviewError } = useSetupReview(user.id);
   const [notifications, setNotifications] = useState(() =>
     notificationDefaults(user as unknown as Record<string, unknown>),
   );
@@ -782,12 +779,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         if (saveError) throw saveError;
       }
 
-      await saveSetupReview(
-        user.id,
-        !isEmployee && !showNonEmployeeConfirm && classification === 'unreviewed'
-          ? reviewed.filter((k) => k !== 'access' && k !== 'pay')
-          : reviewed,
-      );
       setSuccessMessage('User updated successfully! Closing...');
       onSuccess();
       onClose();
@@ -878,7 +869,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} reviewed={reviewed} requiredSections={isEmployee ? ['profile', 'access', 'pay'] : ['profile', 'access']} issues={requiredSetupIssues} />
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} reviewed={[]} requiredSections={isEmployee ? ['profile', 'access', 'pay'] : ['profile', 'access']} issues={requiredSetupIssues} />
         {/* Messages */}
         {(error || successMessage || accessMessage) && (
           <div className="px-4 sm:px-6 pt-4 flex-shrink-0 space-y-2">
@@ -913,7 +904,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
           className="w-full"
         >
           <div className="p-4 sm:p-6 space-y-5">
-            {reviewError && <p className="text-red-300">{reviewError}</p>}
             {activeTab === 'notifications' && (
               <UserNotifications
                 value={{
@@ -1063,7 +1053,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                   <select
                     value={formData.role_id}
                     onChange={(e) => {
-                      setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'permissions'));
                       const selectedRole = roles.find((r) => r.id === e.target.value);
                       setFormData({
                         ...formData,
@@ -1474,9 +1463,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
             {activeTab === 'permissions' && (
               <UserModuleAccess inline userId={user.id} userName={user.full_name} userRoleId={formData.role_id || null} previewRole={formData.role} onClose={() => {}} onChanged={() => {
                 void loadModules();
-                const remaining = reviewed.filter(k => k !== 'permissions');
-                void saveSetupReview(user.id, remaining);
-                setReviewed(remaining);
               }} />
             )}
 
@@ -1511,7 +1497,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       <button
                         type="button"
                         onClick={() => {
-                          setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                           setIsEmployee(true);
                           setShowEmployeeSetup(true);
                           setShowNonEmployeeConfirm(false);
@@ -1524,7 +1509,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <button
                           type="button"
                           onClick={() => {
-                            setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                             setShowNonEmployeeConfirm(true);
                             setShowEmployeeSetup(false);
                           }}
@@ -1548,7 +1532,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         <button
                           type="button"
                           onClick={() => {
-                            setReviewed((prev) => prev.filter((k) => k !== 'access' && k !== 'pay'));
                             setIsEmployee(false);
                             setShowEmployeeSetup(false);
                             setShowNonEmployeeConfirm(true);
