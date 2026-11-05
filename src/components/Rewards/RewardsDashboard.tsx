@@ -73,7 +73,7 @@ export function RewardsDashboard() {
     void supabase.rpc('get_employee_rewards_visibility').then(({ data, error }) => {
       if (cancelled) return;
       if (error) { setVisibilityError(true); return; }
-      const allowed = profile.role === 'admin' || data === true;
+      const allowed = ['admin', 'owner', 'super_admin'].includes(profile.role) || data === true;
       setVisibility(allowed);
       if (allowed) void loadData();
     });
