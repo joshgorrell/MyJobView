@@ -1642,49 +1642,31 @@ export default function ReviewsView() {
             className="bg-gray-900 rounded-xl border border-gray-700 shadow-2xl flex flex-col w-full transition-all duration-300"
             style={{ height: '92dvh', maxHeight: '92dvh', maxWidth: editMode ? '1100px' : '680px' }}
           >
-            {/* Modal Header */}
-            <div className="flex flex-wrap items-center justify-between px-3 sm:px-6 py-3 border-b border-gray-700 shrink-0 gap-2">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center shrink-0">
-                  <Mail className="w-4 h-4 text-cyan-400" />
-                </div>
-                <div className="min-w-0">
-                  {editMode ? (
-                    <input
-                      value={editedSubject}
-                      onChange={e => setEditedSubject(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-base sm:text-sm font-medium w-full min-w-0 focus:outline-none focus:border-cyan-500 transition-colors"
-                      placeholder="Email subject..."
-                    />
-                  ) : (
-                    <p className="text-white font-semibold text-sm truncate">{editedSubject || previewData.subject}</p>
-                  )}
-                  <p className="text-gray-400 text-xs mt-0.5">
-                    To: <span className="text-gray-300">{previewData.recipientEmail || previewData.recipientName}</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
+            {/* Consistent Feedback preview header and metadata; editing stays available. */}
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-700 bg-gray-900 px-4 py-3">
+              <h3 className="text-sm font-semibold text-white sm:text-base">Email Preview</h3>
+              <div className="flex items-center gap-2">
                 {!examplePreview && (
-                <button
-                  onClick={() => setEditMode(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-                    editMode
-                      ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25'
-                      : 'bg-gray-800 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700'
-                  }`}
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  {editMode ? 'Hide Editor' : 'Edit / Add Note'}
-                </button>
+                  <button type="button" onClick={() => setEditMode(v => !v)}
+                    className="min-h-11 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white">
+                    {editMode ? 'Hide Editor' : 'Edit / Add Note'}
+                  </button>
                 )}
-                <button
+                <button type="button" aria-label="Close email preview"
                   onClick={() => { setShowPreview(false); setPreviewData(null); setEditMode(false); setPersonalNote(''); }}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-                >
-                  <X className="w-5 h-5" />
+                  className="min-h-11 rounded-lg px-3 text-gray-300 hover:bg-gray-800 hover:text-white">
+                  Close
                 </button>
+              </div>
+            </div>
+            <div className="shrink-0 space-y-2 border-b border-gray-700 bg-gray-800 p-4 text-sm">
+              <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3">
+                <strong className="shrink-0 text-gray-300">To:</strong>
+                <span className="break-all text-gray-400">{previewData.recipientEmail || previewData.recipientName}</span>
+              </div>
+              <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-3">
+                <strong className="shrink-0 text-gray-300">Subject:</strong>
+                <span className="break-words text-gray-400">{editedSubject || previewData.subject}</span>
               </div>
             </div>
 
