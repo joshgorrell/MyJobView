@@ -106,7 +106,6 @@ const PunchlistAdminDashboard = lazy(() => import('./components/Production/Punch
 const TestTunePerformanceDashboard = lazy(() => import('./components/Production/TestTunePerformanceDashboard').then(m => ({ default: m.TestTunePerformanceDashboard })));
 const VIPPlanManagement = lazy(() => import('./components/Finance/VIPPlanManagement').then(m => ({ default: m.VIPPlanManagement })));
 
-const TestTuneSettings = lazy(() => import('./components/Admin/TestTuneSettings').then(m => ({ default: m.TestTuneSettings })));
 const PortalPunchlist = lazy(() => import('./components/Portal/PortalPunchlist').then(m => ({ default: m.PortalPunchlist })));
 const PortalVIPMembership = lazy(() => import('./components/Portal/PortalVIPMembership').then(m => ({ default: m.PortalVIPMembership })));
 const PublicVIPMembership = lazy(() => import('./components/Portal/PublicVIPMembership').then(m => ({ default: m.PublicVIPMembership })));
@@ -1133,8 +1132,6 @@ function AppContent() {
               onNavigate={setActiveTab}
             />
           )}
-
-          {activeTab === 'test_tune_settings' && checkModuleAccess('test_tune_settings') && <TestTuneSettings key={activeTab} />}
 
           {activeTab === 'department_access' && profile.role === 'admin' && <DepartmentManager key={activeTab} />}
 
