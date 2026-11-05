@@ -19,6 +19,7 @@ interface RequestInternalTimeModalProps {
   companySettings: CompanySettings;
   onClose: () => void;
   onSubmitted: () => void;
+  initialSessionType?: 'shop_time' | 'training';
 }
 
 const DURATION_OPTIONS = [
@@ -34,12 +35,13 @@ export function RequestInternalTimeModal({
   companySettings,
   onClose,
   onSubmitted,
+  initialSessionType,
 }: RequestInternalTimeModalProps) {
   const { profile } = useAuth();
-  const [step, setStep] = useState<Step>('type');
+  const [step, setStep] = useState<Step>(initialSessionType ? 'details' : 'type');
   const stepRef = useRef<HTMLDivElement>(null);
   useEffect(() => { stepRef.current?.focus({ preventScroll: true }); }, [step]);
-  const [sessionType, setSessionType] = useState<'shop_time' | 'training' | null>(null);
+  const [sessionType, setSessionType] = useState<'shop_time' | 'training' | null>(initialSessionType ?? null);
   const [selectedDuration, setSelectedDuration] = useState<number>(1);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
