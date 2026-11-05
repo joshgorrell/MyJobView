@@ -49,6 +49,10 @@ export function PointsAndRewards() {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<RewardRedemption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [employeeVisible, setEmployeeVisible] = useState(false);
+  const [visibilityLoading, setVisibilityLoading] = useState(true);
+  const [visibilitySaving, setVisibilitySaving] = useState(false);
+  const [visibilityError, setVisibilityError] = useState('');
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
   const [showRewardForm, setShowRewardForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'points' | 'rewards' | 'redemptions'>('points');
@@ -83,7 +87,25 @@ export function PointsAndRewards() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    void loadVisibility();
+  }, [profile?.organization_id]);
+
+  async function loadVisibility() {
+    setVisibilityLoading(true);
+    const { data, error } = await supabase.rpc('get_employee_rewards_visibility');
+    if (error) setVisibilityError('Could not load employee visibility. Employees remain hidden by default until verified.');
+    else { setEmployeeVisible(data === true); setVisibilityError(''); }
+    setVisibilityLoading(false);
+  }
+
+  async function changeVisibility(visible: boolean) {
+    setVisibilitySaving(true);
+    setVisibilityError('');
+    const { data, error } = await supabase.rpc('set_employee_rewards_visibility', { p_visible: visible });
+    if (error) { setVisibilityError('Could not save employee visibility. Please retry.'); }
+    else { setEmployeeVisible(data === true); notify(visible ? 'Employee rewards are now visible.' : 'Employee rewards are hidden; points continue accumulating.', { theme: 'blue', tone: 'success' }); }
+    setVisibilitySaving(false);
+  }
 
   async function loadData() {
     try {
@@ -259,6 +281,17 @@ export function PointsAndRewards() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl sm:text-2xl font-bold text-white">Points & Rewards System</h2>
       </div>
+
+      <section className="rounded-xl border border-gray-700 bg-gray-800 p-4 sm:p-5 space-y-3" aria-label="Employee rewards visibility">
+        <h3 className="font-semibold text-white">Employee visibility</h3>
+        <p className="text-sm text-gray-300">Points continue accumulating while employee access is hidden. Admin configuration and reports remain available.</p>
+        <label className="flex items-center gap-3 text-sm text-white">
+          <input type="checkbox" checked={employeeVisible} disabled={visibilityLoading || visibilitySaving || !!visibilityError} onChange={e => void changeVisibility(e.target.checked)} />
+          Show Points & Rewards to employees
+        </label>
+        {visibilityLoading && <p className="text-sm text-gray-400">Checking employee visibility…</p>}
+        {visibilityError && <div role="alert" className="text-sm text-red-300">{visibilityError} <button type="button" className="underline" onClick={() => void loadVisibility()}>Retry</button></div>}
+      </section>
 
       <div className="flex flex-wrap gap-2 border-b border-gray-700">
         <button
