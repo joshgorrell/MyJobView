@@ -56,7 +56,9 @@ export function UserModuleAccess({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [reload, setReload] = useState(0);
-  const [bulkAction, setBulkAction] = useState<boolean | null>(null);
+  const [dialog, setDialog] = useState<"revoke" | "role" | "bulk" | null>(null);
+  const [bulkEditing, setBulkEditing] = useState(false);
+  const [selection, setSelection] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadedFor, setLoadedFor] = useState("");
   const identity = `${userId}:${userRoleId || ""}`;
@@ -171,7 +173,43 @@ export function UserModuleAccess({
   }
 
   const eligibleKeys = pages.map((m) => m.module_key).filter((key) => !locked(key));
-  const bulkCount = eligibleKeys.filter((key) => access(key) !== bulkAction).length;
+  const selectedKeys = eligibleKeys.filter((key) => selection.has(key));
+  const desired = (key: string) => dialog === "revoke" ? false : dialog === "role" ? access(key, true) : selection.has(key);
+  const toGrant = eligibleKeys.filter((key) => desired(key) && !access(key));
+  const toRevoke = eligibleKeys.filter((key) => !desired(key) && access(key));
+
+  async function applyReviewed() {
+    if (!dialog || saving || loading || loadedFor !== identity) return;
+    const mode = dialog;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const groups: Array<[string[], boolean | null]> = mode === "role"
+        ? [[eligibleKeys, null]]
+        : mode === "revoke"
+          ? [[eligibleKeys, false]]
+          : [[selectedKeys, true], [eligibleKeys.filter((key) => !selection.has(key)), false]];
+      for (const [keys, allowed] of groups) {
+        if (!keys.length) continue;
+        const { error: failure } = await supabase.rpc("set_user_page_permissions", {
+          p_user_id: userId, p_module_keys: keys, p_has_access: allowed,
+        });
+        if (failure) throw failure;
+      }
+      setDialog(null);
+      setBulkEditing(false);
+      setMessage(mode === "role" ? "Role page defaults restored." : "Page permissions updated.");
+      setReload((v) => v + 1);
+      notifyPermissionsChanged();
+      onChanged?.();
+    } catch (e: any) {
+      setError((e.message || "Unable to apply page permissions.") + " Reload to verify saved access.");
+      setReload((v) => v + 1);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const content = (
     <div className="space-y-3 min-w-0">
@@ -201,34 +239,56 @@ export function UserModuleAccess({
         </span>
       </p>
       {role !== "admin" && !loading && loadedFor === identity && (
-        <div className="rounded-lg border border-subtle p-3 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="font-semibold text-primary">All Page Permissions</p>
-              <p className="text-xs text-secondary">Bulk changes override role defaults and save immediately. Employee details and separate action permissions are not changed.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => setBulkAction(true)}
-                className="min-h-11 px-3 rounded border border-subtle text-sm">Grant All</button>
-              <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => setBulkAction(false)}
-                className="min-h-11 px-3 rounded border border-red-500/50 text-red-500 text-sm">Revoke All</button>
-            </div>
+        <div className="rounded-lg border border-subtle p-3 space-y-3">
+          <div>
+            <p className="font-semibold text-primary">Page Permissions</p>
+            <p className="text-xs text-secondary">Individual pages save immediately. Bulk actions require confirmation. Separate action permissions are unaffected.</p>
           </div>
-          {bulkAction !== null && (
-            <div role="group" aria-label="Confirm bulk page permission change" className="rounded border border-amber-500/40 p-3 space-y-2">
-              <p className="text-sm text-primary">
-                {bulkAction ? "Grant" : "Revoke"} access to {eligibleKeys.length} eligible pages for {userName}?
-                {bulkCount > 0 ? ` ${bulkCount} currently have a different effective access setting.` : " All already show the requested access."}
-                {" "}This overrides inherited role defaults. Administrator-only and universal pages are excluded.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={saving} onClick={() => { const value = bulkAction; setBulkAction(null); void change(eligibleKeys, value); }}
-                  className="min-h-11 px-3 rounded bg-primary text-white text-sm">Confirm {bulkAction ? "Grant All" : "Revoke All"}</button>
-                <button type="button" disabled={saving} onClick={() => setBulkAction(null)}
-                  className="min-h-11 px-3 rounded border border-subtle text-sm">Cancel</button>
-              </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => setDialog("revoke")}
+              className="min-h-11 px-3 rounded border border-red-500/50 text-red-500 text-sm">Revoke All</button>
+            <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => setDialog("role")}
+              className="min-h-11 px-3 rounded border border-subtle text-sm">Grant Role</button>
+            <button type="button" disabled={saving || !eligibleKeys.length} onClick={() => {
+              if (bulkEditing) { setBulkEditing(false); return; }
+              setSelection(new Set(eligibleKeys.filter((key) => access(key))));
+              setBulkEditing(true);
+              setExpanded(new Set(departments.map((d) => d.id)));
+            }} className="min-h-11 px-3 rounded border border-subtle text-sm">{bulkEditing ? "Cancel Bulk" : "Bulk Grant"}</button>
+          </div>
+          {bulkEditing && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-secondary">{selectedKeys.length} pages selected. Check or uncheck pages below, then review.</span>
+              <button type="button" onClick={() => setSelection(new Set(eligibleKeys))} className="min-h-11 px-3 rounded border border-subtle text-sm">Select All</button>
+              <button type="button" onClick={() => setSelection(new Set())} className="min-h-11 px-3 rounded border border-subtle text-sm">Clear</button>
+              <button type="button" onClick={() => setDialog("bulk")} className="min-h-11 px-3 rounded bg-primary text-white text-sm">Review Changes</button>
             </div>
           )}
+        </div>
+      )}
+      {dialog && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-3 sm:p-6" onMouseDown={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-label="Review page permission changes"
+            className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-xl bg-canvas text-primary border border-subtle p-4 sm:p-6 space-y-4">
+            <h3 className="text-lg font-semibold">Review Page Permission Changes</h3>
+            <p className="text-sm text-secondary">
+              {dialog === "revoke" ? `Revoke all ${eligibleKeys.length} eligible pages for ${userName}, overriding role defaults.`
+                : dialog === "role" ? `Replace ${userName}'s page exceptions with the saved defaults for their assigned role.`
+                : `Apply the selected page permissions for ${userName}. Unchecked eligible pages will be revoked.`}
+              {" "}Administrator-only and universal pages are unchanged. Separate action permissions are unaffected.
+            </p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-subtle p-3"><strong>{toGrant.length}</strong> pages to grant</div>
+              <div className="rounded-lg border border-subtle p-3"><strong>{toRevoke.length}</strong> pages to revoke</div>
+            </div>
+            {toGrant.length > 0 && <div><p className="font-semibold text-sm text-green-600">Grant access</p><p className="text-sm text-secondary">{toGrant.map((key) => permissionLabel(key, pages.find((p) => p.module_key === key)?.display_name || key)).join(", ")}</p></div>}
+            {toRevoke.length > 0 && <div><p className="font-semibold text-sm text-red-500">Revoke access</p><p className="text-sm text-secondary">{toRevoke.map((key) => permissionLabel(key, pages.find((p) => p.module_key === key)?.display_name || key)).join(", ")}</p></div>}
+            {!toGrant.length && !toRevoke.length && <p className="text-sm text-secondary">No effective page access changes. Existing exceptions may still be updated.</p>}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" disabled={saving} onClick={() => setDialog(null)} className="min-h-11 px-4 rounded border border-subtle">{dialog === "bulk" ? "Back to Editing" : "Cancel"}</button>
+              <button type="button" disabled={saving} onClick={() => void applyReviewed()} className="min-h-11 px-4 rounded bg-primary text-white disabled:opacity-50">{saving ? "Saving…" : dialog === "revoke" ? "Confirm Revoke All" : dialog === "role" ? "Apply Role Permissions" : "Confirm & Apply"}</button>
+            </div>
+          </div>
         </div>
       )}
       {role === "admin" && (
@@ -255,7 +315,6 @@ export function UserModuleAccess({
         {departments.map((d) => {
           const list = pages.filter((m) => m.department_id === d.id);
           if (!list.length) return null;
-          const keys = list.map((m) => m.module_key).filter((k) => !locked(k));
           return (
             <section
               key={d.id}
@@ -278,24 +337,7 @@ export function UserModuleAccess({
                   {list.filter((m) => access(m.module_key)).length}/
                   {list.length} pages
                 </button>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={!keys.length}
-                    onClick={() => change(keys, true)}
-                    className="min-h-11 text-sm px-3 border border-subtle rounded"
-                  >
-                    Grant All
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!keys.length}
-                    onClick={() => change(keys, false)}
-                    className="min-h-11 text-sm px-3 border border-subtle rounded"
-                  >
-                    Revoke All
-                  </button>
-                </div>
+
               </div>
               {expanded.has(d.id) && (
                 <div className="divide-y divide-subtle">
@@ -323,7 +365,7 @@ export function UserModuleAccess({
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {hasOverride(m.module_key) && !locked(m.module_key) && (
+                        {!bulkEditing && hasOverride(m.module_key) && !locked(m.module_key) && (
                           <button
                             type="button"
                             onClick={() => change([m.module_key], null)}
@@ -332,7 +374,14 @@ export function UserModuleAccess({
                             Use Role Default
                           </button>
                         )}
-                        <button
+                        {bulkEditing && !locked(m.module_key) ? (
+                          <input type="checkbox" aria-label={`Select ${permissionLabel(m.module_key, m.display_name)}`}
+                            checked={selection.has(m.module_key)} onChange={(e) => setSelection((current) => {
+                              const next = new Set(current);
+                              if (e.target.checked) next.add(m.module_key); else next.delete(m.module_key);
+                              return next;
+                            })} className="h-5 w-5" />
+                        ) : <button
                           type="button"
                           aria-label={`Access ${permissionLabel(m.module_key, m.display_name)}`}
                           aria-pressed={access(m.module_key)}
@@ -343,7 +392,7 @@ export function UserModuleAccess({
                           className={`min-h-11 px-3 text-sm rounded ${access(m.module_key) ? "bg-green-600 text-white" : "bg-elevated border border-subtle"}`}
                         >
                           {access(m.module_key) ? "Allowed" : "Not Allowed"}
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   ))}
