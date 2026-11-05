@@ -30,8 +30,7 @@ type TabType =
   | 'approval'
   | 'payments'
   | 'adjustments'
-  | 'employee-config'
-  | 'company-settings'
+  | 'settings'
   | 'pay-period-report'
   | 'contract-report';
 
@@ -258,8 +257,7 @@ export function CommissionsPage() {
     { id: 'adjustments', label: 'Adjustments', icon: Calendar },
     { id: 'pay-period-report', label: 'Pay Period Report', icon: FileText },
     { id: 'contract-report', label: 'Contract Report', icon: Shield },
-    { id: 'employee-config', label: 'Employee Setup', icon: Users },
-    { id: 'company-settings', label: 'Commission Settings', icon: Settings }
+    { id: 'settings', label: 'Commission Settings', icon: Settings }
   ];
 
   const visibleTabs = tabs;
@@ -739,11 +737,8 @@ export function CommissionsPage() {
           </div>
         )}
 
-        {/* Employee Setup */}
-        {activeTab === 'employee-config' && <EmployeeCommissionConfig />}
-
-        {/* Company Settings */}
-        {activeTab === 'company-settings' && <CompanyCommissionSettings />}
+        {/* One settings destination, preserving the existing underlying editors and data contracts. */}
+        {activeTab === 'settings' && <CommissionSettingsHub />}
 
         {/* Pay Period Report */}
         {activeTab === 'pay-period-report' && <CommissionReportPage />}
@@ -755,6 +750,40 @@ export function CommissionsPage() {
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} title="Commission System Guide">
         <CommissionHelpContent />
       </HelpModal>
+    </div>
+  );
+}
+
+function CommissionSettingsHub() {
+  const [section, setSection] = useState<'defaults' | 'employees'>('defaults');
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-gray-700 bg-gray-900/50 p-4 sm:p-5">
+        <h2 className="text-lg font-semibold text-white">Commission Settings</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Manage company defaults, eligible roles, and individual employee overrides in one place.
+          Employee overrides take precedence over company defaults.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Commission settings sections">
+          <button type="button" onClick={() => setSection('defaults')}
+            aria-pressed={section === 'defaults'}
+            className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${section === 'defaults' ? 'border-blue-500 bg-blue-600 text-white' : 'border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700'}`}>
+            Company Defaults & Roles
+          </button>
+          <button type="button" onClick={() => setSection('employees')}
+            aria-pressed={section === 'employees'}
+            className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${section === 'employees' ? 'border-blue-500 bg-blue-600 text-white' : 'border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700'}`}>
+            Employee Overrides
+          </button>
+        </div>
+      </div>
+      {section === 'defaults' ? <CompanyCommissionSettings /> : <EmployeeCommissionConfig />}
+      <p className="text-xs text-gray-500">
+        Service Department allocation and invoice-specific overrides require a separate
+        calculation and database review before they can be enabled. Existing service PM
+        fields have not been repurposed.
+      </p>
     </div>
   );
 }
