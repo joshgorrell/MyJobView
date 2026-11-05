@@ -28,6 +28,9 @@ interface EmployeeInfo {
 export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [accountStatuses, setAccountStatuses] = useState<Map<string, AccountEmailStatus>>(new Map());
   const [accountStatusError, setAccountStatusError] = useState(false);
   const [sendingAccountEmail, setSendingAccountEmail] = useState<string | null>(null);
@@ -202,6 +205,15 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
         <span className="sr-only">Search users</span>
         <input type="search" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search users by name, email or username" className="w-full bg-transparent outline-none" />
       </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className="rounded-lg border border-subtle bg-canvas px-3 py-2 text-sm text-primary">Filters {statusFilter !== 'all' || roleFilter !== 'all' ? '•' : ''}</button>
+        <span className="text-xs text-muted">{users.filter(user => [user.full_name, user.email, user.username].some(value => String(value || '').toLowerCase().includes(searchTerm.trim().toLowerCase())) && (roleFilter === 'all' || user.role === roleFilter) && (statusFilter === 'all' || (statusFilter === 'active' && user.is_active) || (statusFilter === 'inactive' && !user.is_active) || (statusFilter === 'classification' && (!(user as any).employment_classification || (user as any).employment_classification === 'unreviewed')) || (statusFilter === 'payroll' && (user as any).employment_classification === 'employee' && !!employeeMap.get(user.id) && !configReviewMap.get(employeeMap.get(user.id)!.id))).length} of {users.length} users</span>
+      </div>
+      {showFilters && <div className="grid gap-3 rounded-lg border border-subtle bg-canvas p-3 sm:grid-cols-2">
+        <label className="text-sm text-primary">Status<select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="classification">Needs classification</option><option value="payroll">Payroll review required</option></select></label>
+        <label className="text-sm text-primary">Role<select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} className="mt-1 block w-full rounded-lg border border-subtle bg-surface p-2 text-primary"><option value="all">All roles</option>{[...new Set(users.map(user => String(user.role)))].sort().map(role => <option key={role} value={role}>{role.replaceAll('_', ' ')}</option>)}</select></label>
+        <button type="button" onClick={() => {setStatusFilter('all');setRoleFilter('all');setSearchTerm('');}} className="text-left text-sm text-blue-600 underline">Clear filters</button>
+      </div>}
       {/* Setup issues are summarized rather than duplicating the user directory. */}
       {(() => {
         const classificationCount = users.filter(u =>
@@ -241,7 +253,7 @@ export function UserManagement({ onNavigate }: { onNavigate?: (tab: string) => v
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.filter(user => [user.full_name, user.email, user.username].some(value => String(value || '').toLowerCase().includes(searchTerm.trim().toLowerCase()))).map((user) => (
+              {users.filter(user => [user.full_name, user.email, user.username].some(value => String(value || '').toLowerCase().includes(searchTerm.trim().toLowerCase())) && (roleFilter === 'all' || user.role === roleFilter) && (statusFilter === 'all' || (statusFilter === 'active' && user.is_active) || (statusFilter === 'inactive' && !user.is_active) || (statusFilter === 'classification' && (!(user as any).employment_classification || (user as any).employment_classification === 'unreviewed')) || (statusFilter === 'payroll' && (user as any).employment_classification === 'employee' && !!employeeMap.get(user.id) && !configReviewMap.get(employeeMap.get(user.id)!.id))).map((user) => (
                 <tr key={user.id} className="hover:bg-surface">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
