@@ -31,7 +31,9 @@ BEGIN
     RAISE EXCEPTION 'Invoice assignments are locked after draft submission';
   END IF;
   SELECT EXISTS (
-    SELECT 1 FROM public.work_order_invoice_links l WHERE l.invoice_id = NEW.invoice_id
+    SELECT 1 FROM public.invoice_line_item_sources s
+    JOIN public.invoice_line_items li ON li.id = s.invoice_line_item_id
+    WHERE li.invoice_id = NEW.invoice_id AND s.source_type IN ('work_order', 'work_order_material', 'work_order_labor')
   ) INTO v_has_work_order;
   IF v_has_work_order AND NEW.invoice_kind <> 'service' THEN
     RAISE EXCEPTION 'Work-order invoices must be classified as service';
