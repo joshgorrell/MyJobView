@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
@@ -8,8 +8,6 @@ import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { AssignedSessionsWidget } from '../Production/AssignedSessionsWidget';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
-
-const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
 
 type TimeSection = 'daily' | 'job' | 'mine';
 type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
@@ -95,8 +93,8 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
   if (!policy.ready) return <div className="p-4 text-gray-500">Loading time configuration…</div>;
 
   return (
-    <div className="space-y-4">
-      <div role="tablist" aria-label="Time Clock" className="flex gap-1 overflow-x-auto rounded-xl bg-gray-900 p-1">
+    <div className="min-w-0 space-y-3">
+      <div role="tablist" aria-label="Time Clock" className="flex flex-wrap gap-1 rounded-xl bg-gray-900 p-1">
         {sections.map(({ id, label, icon: Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={current === id}
             onClick={() => setSection(id)}
@@ -113,11 +111,11 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
       ))}
       {current === 'job' && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3">
             <h2 className="font-semibold text-gray-900">Job Clock</h2>
-            <p className="text-sm text-gray-600">Clock directly against an assigned work order using the existing start/stop workflow. Job time is separate from your daily payroll clock.</p>
+            <p className="text-sm text-gray-600">Select an assigned work order or an internal session to track job time.</p>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+          <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 space-y-3">
             <label className="block text-sm font-medium text-gray-700">Time Type
               <select value={timeType} onChange={event => setTimeType(event.target.value as typeof timeType)} className="mt-1 w-full rounded-lg border border-gray-300 p-2">
                 <option value="work_order">Work Order</option>
@@ -141,9 +139,6 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               })()}
             </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget key={timeType} sessionType={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
           </div>
-          <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
-            <TechnicianWorkCenter />
-          </Suspense>
         </div>
       )}
       {current === 'mine' && (
