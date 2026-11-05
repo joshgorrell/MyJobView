@@ -62,6 +62,7 @@ interface InvoiceDetail {
   payment_terms: string | null;
   contact_id: string | null;
   sales_order_id: string | null;
+  project_id: string | null;
   source_type: string | null;
   billing_name: string | null;
   billing_address_line1: string | null;
@@ -850,6 +851,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
               <InvoiceAssignmentEditor
                 invoiceId={invoice.id}
                 salesOrderId={invoice.sales_order_id}
+                projectId={invoice.project_id}
                 status={invoice.status}
                 canManage={canManageBilling}
               />
