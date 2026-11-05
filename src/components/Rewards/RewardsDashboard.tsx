@@ -58,15 +58,27 @@ export function RewardsDashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibility, setVisibility] = useState<boolean | null>(null);
+  const [visibilityError, setVisibilityError] = useState(false);
   const [activeTab, setActiveTab] = useState<'rewards' | 'earn' | 'history'>('rewards');
   const [userPoints, setUserPoints] = useState(0);
   const [topPerformers, setTopPerformers] = useState<TopPerformer[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
-    loadData();
-    return () => { loadVersion.current++; };
-  }, [profile?.id, profile?.organization_id]);
+    let cancelled = false;
+    setVisibility(null);
+    setVisibilityError(false);
+    if (!profile?.id) return;
+    void supabase.rpc('get_employee_rewards_visibility').then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) { setVisibilityError(true); return; }
+      const allowed = profile.role === 'admin' || data === true;
+      setVisibility(allowed);
+      if (allowed) void loadData();
+    });
+    return () => { cancelled = true; loadVersion.current++; };
+  }, [profile?.id, profile?.organization_id, profile?.role]);
 
   async function loadData() {
     if (!profile) { setLoading(false); return; }
@@ -152,6 +164,9 @@ export function RewardsDashboard() {
     }
   }
 
+  if (visibilityError) return <div role="alert" className="p-4 text-red-300">Unable to verify rewards access. Please refresh.</div>;
+  if (visibility === false) return null;
+  if (visibility === null) return <div className="text-center py-8 text-gray-400">Checking rewards access…</div>;
   if (loading) {
     return <div className="text-center py-8 text-gray-400">Loading...</div>;
   }
