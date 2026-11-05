@@ -61,7 +61,7 @@ export function ActionRewards({ admin = false, onTimePoints }: { admin?: boolean
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-300">
         <p>Invoice payment: <strong className="text-cyan-300">{number(shown.invoice_points_per_dollar, 8)} points / $1 collected before tax</strong></p>
         <p>Job clock-in: <strong className="text-cyan-300">{number(shown.job_clock_points)} points</strong> per distinct job per day</p>
-        <p>Excellent Job Review: <strong className="text-cyan-300">{number(shown.review_points)} points</strong> on customer submission</p>
+        <p>Excellent Job Review: <strong className="text-cyan-300">{number(shown.review_points)} points</strong> intended for automatic awards on customer submission</p>
         <p>Job photo/video: <strong className="text-cyan-300">{number(data?.photo_points ?? 0)} points</strong> per upload, using the existing rule</p>
       </div>
       {!shown.enabled && <p className="text-amber-300 text-sm">New invoice, job clock and review awards are paused. Existing activity rules continue.</p>}
