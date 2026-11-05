@@ -1,6 +1,7 @@
 import { notify, requestText } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import {CreateInvoiceFromWorkOrderModal} from './CreateInvoiceFromWorkOrderModal';
+import { InvoiceAssignmentEditor } from './InvoiceAssignmentEditor';
 import {customerSecurityInvoiceLines} from '../../../supabase/functions/_shared/security-customer-invoice';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -843,6 +844,15 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                   <p className="text-xs text-gray-500 mt-0.5">All linked change order billing has been reversed.</p>
                 </div>
               </div>
+            )}
+
+            {!customerView && !readonly && canManageBilling && (
+              <InvoiceAssignmentEditor
+                invoiceId={invoice.id}
+                salesOrderId={invoice.sales_order_id}
+                status={invoice.status}
+                canManage={canManageBilling}
+              />
             )}
 
             {/* Two-column header info */}
