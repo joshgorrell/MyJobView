@@ -503,7 +503,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
           </button>
         </div>
 
-        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
+        <UserSetupTabs active={activeTab} onSelect={(tab) => { setActiveTab(tab); editorScrollRef.current?.scrollTo({ top: 0 }); }} reviewed={[]} requiredSections={classification === 'employee' ? ['profile', 'access', 'permissions', 'pay'] : ['profile', 'access', 'permissions']} issues={{
           ...(!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !formData.username.trim() ? { profile: 'Enter a name, username and valid email.' } : {}),
           ...(!formData.role_id || !classification || formData.password.length < 6 ? { access: 'Choose a role, classification and password of at least six characters.' } : {}),
           ...(!departments.some(d => getEffectiveDeptAccess(d.id)) ? { permissions: 'Enable at least one department.' } : {}),
