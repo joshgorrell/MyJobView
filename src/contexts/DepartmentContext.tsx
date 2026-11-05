@@ -201,7 +201,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       // Unified access check: a module is accessible if ANY copy sharing the
       // same module_key has an override or role grant that says "yes".
       const checkModuleAccess = (mod: DepartmentModule): boolean => {
-        if (mod.module_key === 'my_time_off' && (profile as any).employment_classification !== 'employee') return false;
+        if (mod.module_key === 'my_time_off') return (profile as any).employment_classification === 'employee';
         return effectiveModuleAccess(mod.module_key, mods, roleModAccessMap, userModAccessMap, profile.role);
       };
 
@@ -300,7 +300,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
     if (!profile || profile.is_active === false) return false;
     const key = typeof moduleKey === 'string' ? moduleKey : moduleKey.module_key;
     if (key === 'rewards_dashboard' && !['admin', 'owner', 'super_admin'].includes(profile.role) && !employeeRewardsVisible) return false;
-    if (key === 'my_time_off' && (profile as any).employment_classification !== 'employee') return false;
+    if (key === 'my_time_off') return (profile as any).employment_classification === 'employee';
     return effectiveModuleAccess(key, modules, moduleRoleAccess, moduleUserOverrides, profile.role);
   }
 

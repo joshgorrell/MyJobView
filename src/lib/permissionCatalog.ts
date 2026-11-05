@@ -2,6 +2,7 @@
 // Legacy database rows retain their IDs for historical references and bookmarks.
 const retiredKeys = new Set([
   "pto_management",
+  "my_time_off",
   "test_tune_settings",
   "connections",
   "sales_activity",
