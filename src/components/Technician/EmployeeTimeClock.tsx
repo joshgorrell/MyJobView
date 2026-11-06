@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
@@ -9,7 +9,6 @@ import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { AssignedSessionsWidget } from '../Production/AssignedSessionsWidget';
 import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 
-const TechnicianWorkCenter = lazy(() => import('../Production/TechnicianWorkCenter').then(m => ({ default: m.TechnicianWorkCenter })));
 
 type TimeSection = 'daily' | 'job' | 'mine';
 type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
@@ -141,10 +140,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               })()}
             </> : <div className="space-y-2"><p className="text-sm text-gray-600">Use your existing assigned internal sessions to clock in and out. Shop and training sessions follow company approval settings.</p><AssignedSessionsWidget key={timeType} sessionType={timeType === 'shop_time' ? 'shop_time' : 'training'} onRefreshParent={() => setHistoryRevision(value => value + 1)} /></div>}
           </div>
-          <Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading work orders…</div>}>
-            <TechnicianWorkCenter />
-          </Suspense>
-        </div>
+</div>
       )}
       {current === 'mine' && (
         <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 space-y-3">
