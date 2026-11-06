@@ -22,6 +22,8 @@ import {
   Radio,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { convertEmployee } from './convertEmployee';
+import { requestConfirmation } from '../../lib/feedback';
 import { Profile, CompanyOffice } from '../../lib/types';
 import { TimeClockAccess, defaultClockAccessForRole } from '../../lib/employeeTimePolicy';
 
@@ -200,6 +202,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [showEmployeeSetup, setShowEmployeeSetup] = useState(false);
   const [classification, setClassification] = useState<string>('unreviewed');
   const [showNonEmployeeConfirm, setShowNonEmployeeConfirm] = useState(false);
+  const [conversionDate, setConversionDate] = useState('');
+  const [conversionBusy, setConversionBusy] = useState(false);
+  const [conversionError, setConversionError] = useState('');
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [showEffectiveDatePrompt, setShowEffectiveDatePrompt] = useState(false);
   const [employeeForm, setEmployeeForm] = useState({
@@ -358,9 +363,13 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (empError) throw empError;
 
       if (empData) {
-        setIsEmployee(true);
+        const { data: classificationData, error: classificationError } = await supabase
+          .from('profiles').select('employment_classification').eq('id', user.id).single();
+        if (classificationError) throw classificationError;
+        const converted = classificationData?.employment_classification === 'non_employee';
+        setIsEmployee(!converted);
         setEmployeeRecord(empData);
-        setClassification('employee');
+        setClassification(converted ? 'non_employee' : 'employee');
         setEmployeeForm((prev) => ({
           ...prev,
           hire_date: empData.hire_date,
@@ -378,8 +387,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
         if (configError) throw configError;
 
+        setCurrentConfig(configData || null);
         if (configData) {
-          setCurrentConfig(configData);
           setEmployeeForm((prev) => ({
             ...prev,
             compensation_type: configData.compensation_type,
@@ -1490,11 +1499,13 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         </div>
                       )}
                       <p className="text-xs text-gray-400">
-                        {classification === 'non_employee'
+                        {employeeRecord && classification === 'non_employee'
+                          ? 'Former employee. Historical payroll records are preserved. Technician permissions are managed separately.'
+                          : classification === 'non_employee'
                           ? 'Change classification to enable payroll and timekeeping.'
                           : 'Designate this person as an Employee to enable payroll and timekeeping, or confirm them as a Non-Employee.'}
                       </p>
-                      <button
+                      {!employeeRecord && <button
                         type="button"
                         onClick={() => {
                           setIsEmployee(true);
@@ -1504,8 +1515,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                       >
                         {classification === 'non_employee' ? 'Change to Employee' : 'Make this person an Employee'}
-                      </button>
-                      {classification !== 'non_employee' && (
+                      </button>}
+                      {!employeeRecord && classification !== 'non_employee' && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1528,6 +1539,24 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {employeeRecord && (
+                        <div className="space-y-2 rounded-lg border border-amber-600/50 p-3">
+                          <p className="text-sm text-amber-200">Convert this employee to a subcontractor. Historical employee records will be retained.</p>
+                          <label className="block text-xs text-gray-300">Last day as employee</label>
+                          <input type="date" value={conversionDate} onChange={e => setConversionDate(e.target.value)} className={inputClass} />
+                          {conversionError && <p role="alert" className="text-xs text-red-400">{conversionError}</p>}
+                          <button type="button" disabled={!conversionDate || conversionBusy} className="px-3 py-2 rounded bg-amber-700 text-white disabled:opacity-50" onClick={async () => {
+                            if (!(await requestConfirmation('End employee payroll eligibility after ' + conversionDate + ' and retain historical records?', { theme: 'amber' }))) return;
+                            setConversionBusy(true);
+                            setConversionError('');
+                            try {
+                              await convertEmployee(user.id, conversionDate);
+                              await loadEmployeeData();
+                            } catch (err) { setConversionError(err instanceof Error ? err.message : 'Conversion failed'); }
+                            finally { setConversionBusy(false); }
+                          }}> {conversionBusy ? 'Converting...' : 'Convert to Subcontractor'} </button>
+                        </div>
+                      )}
                       {!employeeRecord && (
                         <button
                           type="button"
