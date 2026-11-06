@@ -386,8 +386,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
         if (configError) throw configError;
 
+        setCurrentConfig(configData || null);
         if (configData) {
-          setCurrentConfig(configData);
           setEmployeeForm((prev) => ({
             ...prev,
             compensation_type: configData.compensation_type,
@@ -1498,7 +1498,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                         </div>
                       )}
                       <p className="text-xs text-gray-400">
-                        {classification === 'non_employee'
+                        {employeeRecord && classification === 'non_employee'
+                          ? 'Former employee. Historical payroll records are preserved. Technician permissions are managed separately.'
+                          : classification === 'non_employee'
                           ? 'Change classification to enable payroll and timekeeping.'
                           : 'Designate this person as an Employee to enable payroll and timekeeping, or confirm them as a Non-Employee.'}
                       </p>
@@ -1513,7 +1515,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       >
                         {classification === 'non_employee' ? 'Change to Employee' : 'Make this person an Employee'}
                       </button>}
-                      {classification !== 'non_employee' && (
+                      {!employeeRecord && classification !== 'non_employee' && (
                         <button
                           type="button"
                           onClick={() => {
