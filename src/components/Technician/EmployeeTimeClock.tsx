@@ -131,7 +131,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
                 const todayJobs = assignedJobs.filter(job => (job.scheduled_date === today || job.id === activeWorkOrderId) && job.status !== 'completed');
                 const completedToday = assignedJobs.filter(job => job.scheduled_date === today && job.status === 'completed');
                 return <>
-                  {!jobsLoading && !jobsError && todayJobs.length === 0 && <p className="text-sm text-gray-600">No directly assigned work orders scheduled for today. Team dispatch assignments may also appear in your work center below.</p>}
+                  {!jobsLoading && !jobsError && todayJobs.length === 0 && <p className="text-sm text-gray-600">No assigned work orders scheduled for today. Open Production to view team assignments.</p>}
                   {todayJobs.sort((a,b) => Number(b.id === activeWorkOrderId) - Number(a.id === activeWorkOrderId) || (a.scheduled_start_time || '').localeCompare(b.scheduled_start_time || '')).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className={`w-full rounded-lg border p-3 text-left hover:border-blue-400 hover:bg-blue-50 ${job.id === activeWorkOrderId ? "border-green-500 bg-green-50" : "border-gray-200"}`}><span className="block font-semibold text-gray-900">{job.id === activeWorkOrderId ? "● Clocked in · " : ""}{job.work_order_number} · {job.title}</span><span className="text-sm text-gray-600">{job.scheduled_start_time?.slice(0,5) || 'Time not specified'} · Open Work Order</span></button>)}
                   {completedToday.length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Completed today ({completedToday.length})</summary><div className="mt-2 space-y-2">{completedToday.map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
                   {assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium text-gray-700">Other assigned work orders</summary><div className="mt-2 space-y-2">{assignedJobs.filter(job => job.scheduled_date !== today && job.id !== activeWorkOrderId).map(job => <button type="button" key={job.id} onClick={() => onOpenWorkOrder(job.id)} className="block w-full rounded-lg border p-2 text-left hover:bg-gray-50">{job.work_order_number} · {job.title}</button>)}</div></details>}
@@ -142,7 +142,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
         </div>
       )}
       {current === 'mine' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
+        <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
           <p className="text-sm text-gray-600">Your recent daily, job, shop, and training time entries. Select Request Correction on a Daily Clock entry to request a time adjustment. Same-day leave requests are available below.</p>
           {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
