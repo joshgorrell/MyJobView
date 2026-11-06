@@ -36,6 +36,14 @@ BEGIN
     WHERE employee_id = v_employee_id AND effective_from > p_last_employee_date
   ) THEN RAISE EXCEPTION 'Future payroll configuration requires review'; END IF;
 
+  -- Do not silently strand payroll time already generated after the requested end date.
+  IF EXISTS (
+    SELECT 1 FROM public.payroll_time_segments
+    WHERE employee_id = p_user_id AND segment_date > p_last_employee_date
+  ) THEN
+    RAISE EXCEPTION 'Payroll time exists after last employee date; reconcile it before conversion';
+  END IF;
+
   UPDATE public.employee_payroll_configs
   SET effective_to = p_last_employee_date, updated_at = now()
   WHERE employee_id = v_employee_id
