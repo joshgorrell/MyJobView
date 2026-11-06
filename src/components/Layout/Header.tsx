@@ -45,11 +45,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
 
   const loading = deptLoading;
   const initials = profile?.full_name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
-  const timeOffShortcut = profile?.is_active !== false && (profile as any)?.employment_classification === 'employee' ? (
-    <button type="button" onClick={() => { onTabChange('my_time_off'); setMobileMenuOpen(false); }}
-      className="px-2 py-2 text-xs font-medium text-secondary hover:text-primary hover:bg-surface rounded-lg"
-      title="View and request your time off" aria-label="My Time Off">Time Off</button>
-  ) : null;
   const avatar = (
     <button
       type="button"
@@ -322,7 +317,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
               onProposalClick={onProposalClick}
               onTabChange={onTabChange}
             />
-            {timeOffShortcut}
             {avatar}
           </div>
 
@@ -348,7 +342,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                 setMobileMenuOpen(false);
               }}
             />
-            {timeOffShortcut}
             {avatar}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
