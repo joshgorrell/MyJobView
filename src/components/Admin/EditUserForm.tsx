@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { convertEmployee } from './convertEmployee';
+import { requestConfirmation } from '../../lib/feedback';
 import { Profile, CompanyOffice } from '../../lib/types';
 import { TimeClockAccess, defaultClockAccessForRole } from '../../lib/employeeTimePolicy';
 
@@ -1545,7 +1546,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                           <input type="date" value={conversionDate} onChange={e => setConversionDate(e.target.value)} className={inputClass} />
                           {conversionError && <p role="alert" className="text-xs text-red-400">{conversionError}</p>}
                           <button type="button" disabled={!conversionDate || conversionBusy} className="px-3 py-2 rounded bg-amber-700 text-white disabled:opacity-50" onClick={async () => {
-                            if (!window.confirm('End employee payroll eligibility after ' + conversionDate + ' and retain historical records?')) return;
+                            if (!(await requestConfirmation('End employee payroll eligibility after ' + conversionDate + ' and retain historical records?', { theme: 'amber' }))) return;
                             setConversionBusy(true);
                             setConversionError('');
                             try {
