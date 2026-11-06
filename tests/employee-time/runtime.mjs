@@ -176,8 +176,8 @@ const verifiedStop = fs.readFileSync('src/components/Shared/ClockOutModal.tsx', 
 const canonicalModal = fs.readFileSync('src/components/Technician/EmployeeTimeClock.tsx', 'utf8');
 assert.ok(liveModal.includes('EmployeeTimeClock') && !liveModal.includes('TeamTimeOffPanel') && !liveModal.includes('AppointmentsCalendar'),
   'Header Time Clock delegates to the canonical employee clock without Team or Calendar');
-assert.ok(canonicalModal.includes('DailyClock') && canonicalModal.includes('AssignedSessionsWidget') && canonicalModal.includes('TechnicianWorkCenter'),
-  'Canonical employee clock retains daily, shop/training and work-order flows');
+assert.ok(canonicalModal.includes('DailyClock') && canonicalModal.includes('AssignedSessionsWidget') && canonicalModal.includes('onOpenWorkOrder(job.id)') && !canonicalModal.includes('TechnicianWorkCenter'),
+  'Canonical employee clock retains daily, shop/training and work-order navigation without embedding Work Center');
 assert.ok(internalTimer.includes("start_internal_time") && internalTimer.includes("stop_internal_time") &&
   internalTimer.includes("Start {session.session_type === 'shop_time' ? 'Shop Time' : 'Training'}"),
   'Job Time employees must be able to start and stop internal time without Daily Clock');
