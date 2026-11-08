@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {dispatchTechsafeDraft} from '../../supabase/functions/_shared/techsafe-draft-dispatch.mjs';
+import {dispatchTechsafeDraft,connectionValid} from '../../supabase/functions/_shared/techsafe-draft-dispatch.mjs';
 const binding={connectionId:'connection',organizationId:'org',orderId:'order',proposalId:'proposal'};
 let called=0;
 const deps={binding,loadConnection:async()=>{called++;return {enabled:true,status:'active',connectionId:'connection',organizationId:'org',orderId:'order',proposalId:'proposal'};},readBundle:async()=>{called++;return null;},deliverDraft:async()=>{called++;throw Error('Never deliver without authority');}};
@@ -14,3 +14,11 @@ assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,loadConnection:a
 assert.equal(called,2,'Wrong approved proposal must not read any source bundle');
 assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,binding:{...binding,organizationId:'another'}})).reason,'connection_inactive_or_unverified');
 console.log('Techsafe dispatch boundary holds disabled, inactive, invalid and unavailable integrations; never delivers');
+
+const validConnection={enabled:true,status:'active',connectionId:'connection',organizationId:'org',orderId:'order',proposalId:'proposal'};
+assert.equal(connectionValid(validConnection,binding),true);
+for(const invalid of [
+ {...validConnection,enabled:false}, {...validConnection,status:'paused'},
+ {...validConnection,orderId:'another-order'}, {...validConnection,proposalId:'another-proposal'},
+ {...validConnection,organizationId:'another-org'}, {...validConnection,connectionId:'another-connection'},null
+])assert.equal(connectionValid(invalid,binding),false,'Connection pause/revoke/rebind must fail closed');
