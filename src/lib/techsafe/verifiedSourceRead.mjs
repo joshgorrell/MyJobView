@@ -14,7 +14,9 @@ export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,r
     evidence=await readConsistentSource({connectionId,orderId});
   } catch { return held('authoritative_read_failed'); }
   if (!evidence || evidence.connectionId!==connectionId || evidence.orderId!==orderId ||
-    evidence.transactionConsistent!==true || evidence.ledgerHeld!==true ||
+    // A row lock and a ledger in the 'held' state are different concepts.
+    // The reader must prove it owns the row lock while ledgerState is candidate.
+    evidence.transactionConsistent!==true || evidence.ledgerRowLocked!==true ||
     evidence.connectionActive!==true || evidence.sourceRevisionVerified!==true ||
     !positiveInt(evidence.connectionGeneration) ||
     !positiveInt(evidence.revision) || evidence.ledgerRevision!==evidence.revision ||
