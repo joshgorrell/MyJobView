@@ -55,6 +55,12 @@ denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manife
 denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
 denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
 
+// Two edits to one base line inside the same approved change order are
+// ambiguous without a source-defined intra-order sequence; reject rather
+// than guessing whether a price or quantity change should win.
+denied({changeOrders:[{...change,lines:[change.lines[0],{...change.lines[0],id:'duplicate-target',newQuantity:4}]}]},'ambiguous_change_order_line_actions');
+denied({changeOrders:[{...change,lines:[change.lines[0],{...change.lines[0],id:'duplicate-target-price',actionType:'modify_price'}]}]},'ambiguous_change_order_line_actions');
+// A later approved change order may legitimately update that same base line.
 // A price-only customer-approved change must not alter the covered quantity.
 const priceOnly={...change,id:'co-price',revision:6,lines:[{...change.lines[0],id:'price-line',changeOrderId:'co-price',actionType:'modify_price',newQuantity:2}]};
 assert.deepEqual(run({changeOrders:[priceOnly]}).items.map(x=>x.quantity),[2]);
