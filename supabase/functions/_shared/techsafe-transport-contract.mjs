@@ -40,7 +40,7 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
   !nonnegative(snapshot.minimumUnitValueCents)||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
   typeof snapshot.customerName!=='string'||!snapshot.customerName.trim()||snapshot.customerName.length>256||
-  /[\\u0000-\\u001f\\u007f]/.test(snapshot.customerName)||snapshot.lines.length>10000||
+  [...snapshot.customerName].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)||snapshot.lines.length>10000||
   (['cancelled','deleted'].includes(snapshot.orderStatus)&&snapshot.lines.length>0))
   return held('receiver_v2_envelope_invalid');
  const seen=new Set();let total=0;
