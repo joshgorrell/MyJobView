@@ -36,4 +36,9 @@ denied({sourceManifest:{...manifest,organizationId:'other-tenant'}},'source_mani
 denied({sourceManifest:{}},'source_not_authoritatively_verified');
 denied({sourceManifest:{...manifest,complete:false}},'source_not_authoritatively_verified');
 denied({sourceManifest:{...manifest,approvalEvidenceVerified:false}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,changeLineCount:-1}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,baseLineCount:-1}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeOrderCount:-1}},'source_manifest_incomplete');
+denied({baseLines:Array.from({length:10001},()=>base[0])},'source_too_large');
+denied({changeOrders:Array.from({length:10001},()=>change)},'source_too_large');
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
