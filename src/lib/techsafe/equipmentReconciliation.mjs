@@ -30,7 +30,6 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       !Number.isSafeInteger(sourceManifest.changeOrderCount) || sourceManifest.changeOrderCount < 0 ||
       !Number.isSafeInteger(sourceManifest.changeLineCount) || sourceManifest.changeLineCount < 0 ||
       sourceManifest.changeLineCount > MAX_LINES ||
-      !Number.isSafeInteger(sourceManifest.baseLineCount) ||
       !Number.isSafeInteger(sourceManifest.changeOrderCount) ||
       !Number.isSafeInteger(sourceManifest.changeLineCount) ||
       sourceManifest.baseLineCount !== baseLines.length ||
