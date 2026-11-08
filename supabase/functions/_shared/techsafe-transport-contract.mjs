@@ -3,6 +3,8 @@
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=128&&/^[A-Za-z0-9_-]+$/.test(v);
 const integer=v=>Number.isSafeInteger(v)&&v>=1;
+const nonnegative=v=>Number.isSafeInteger(v)&&v>=0;
+const kinds=new Set(['equipment','miscellaneous','labor','fee','tax','consumable','subscription','unclassified']);
 const held=reason=>({ready:false,reason,snapshot:null});
 const lineKeys=new Set(['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','manufacturer','model','sku','description','room','serialNumber','productCategory','originalPurchaseDate']);
 const allowed=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','customerRef','customerName','siteRef','lines']);
@@ -32,8 +34,28 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   snapshot.eventId!==eventId||snapshot.complete!==true||
   snapshot.scopeState!=='committed'||!Array.isArray(snapshot.lines)||
   snapshot.lines.some(l=>!object(l)||Object.keys(l).some(k=>!lineKeys.has(k))||
-   !id(l.sourceLineId)||!['included','excluded'].includes(l.scope)))
+   !id(l.sourceLineId)||!['included','removed'].includes(l.scope)))
   return held('snapshot_contract_unverified');
+ if(!['production','sandbox'].includes(snapshot.environment)||!id(snapshot.sourceInstanceId)||
+  !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
+  !nonnegative(snapshot.minimumUnitValueCents)||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
+  typeof snapshot.customerName!=='string'||!snapshot.customerName.trim()||snapshot.customerName.length>256||
+  [...snapshot.customerName].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)||snapshot.lines.length>10000||
+  (['cancelled','deleted'].includes(snapshot.orderStatus)&&snapshot.lines.length>0))
+  return held('receiver_v2_envelope_invalid');
+ const seen=new Set();let total=0;
+ for(const l of snapshot.lines){
+  if(seen.has(l.sourceLineId)||!kinds.has(l.productKind)||
+   (l.productRef!==null&&!id(l.productRef))||
+   (l.productKind==='equipment'&&!id(l.productRef))||
+   typeof l.techsafeExcluded!=='boolean'||typeof l.customerSupplied!=='boolean'||
+   !nonnegative(l.quantity)||l.quantity>10000||!nonnegative(l.unitEquipmentValueCents))
+   return held('receiver_v2_line_invalid');
+  seen.add(l.sourceLineId);
+  const value=l.quantity*l.unitEquipmentValueCents;total+=value;
+  if(!Number.isSafeInteger(value)||!Number.isSafeInteger(total))return held('receiver_v2_value_overflow');
+ }
+
  // Do not infer equipment membership from the raw SQL rows: the independent
  // approved-basis and applied-change history gate must prove it first.
  const result={};
