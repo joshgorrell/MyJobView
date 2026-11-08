@@ -2,7 +2,7 @@
 // No database access, credentials, dispatch, or network side effects.
 const MAX_QUANTITY = 10000;
 const MAX_LINES = 10000;
-function fail(reason) { return {ok:false,reason,items:[]}; }
+function fail(reason) { return {ok:false,authorized:false,snapshotReady:false,reason,items:[]}; }
 function quantity(value) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > MAX_QUANTITY) throw Error('invalid_quantity');
   return value;
