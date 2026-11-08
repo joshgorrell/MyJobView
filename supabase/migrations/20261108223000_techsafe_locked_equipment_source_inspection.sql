@@ -1,6 +1,10 @@
 -- Private, non-authorizing source-freshness inspection under row locks.
 -- Requires explicit human migration review and real PostgreSQL concurrency tests.
 -- Does not certify the equipment snapshot or enable Techsafe delivery.
+-- READ COMMITTED statement snapshots and these two row locks do NOT establish
+-- transaction-wide consistency for proposal lines or change-order rows.
+-- Even successful diagnostics must report valid=false until a transaction-
+-- consistent source reader and persisted snapshot certificate exist.
 CREATE OR REPLACE FUNCTION techsafe_source.inspect_locked_equipment_source(
  p_connection uuid, p_order uuid, p_generation bigint, p_revision bigint
 ) RETURNS jsonb
@@ -45,8 +49,8 @@ BEGIN
    'reason','equipment_scope_incomplete'); END IF;
  -- Even a clean read under locks is not an export certificate: the existing
  -- scope inspector deliberately does not certify complete equipment snapshots.
- RETURN jsonb_build_object('valid',true,'authorized',false,'snapshotReady',false,
-   'reason','locked_scope_inspected_not_certified',
+ RETURN jsonb_build_object('valid',false,'inspected',true,'authorized',false,'snapshotReady',false,
+   'reason','locked_scope_inspected_not_transaction_certified',
    'connection_id',c.connection_id,'sales_order_id',c.sales_order_id,
    'organization_id',c.organization_id,'approved_proposal_id',c.proposal_id,
    'connection_generation',c.connection_generation,'revision',l.revision,
