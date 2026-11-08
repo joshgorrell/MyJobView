@@ -9,6 +9,7 @@ DECLARE evidence jsonb; c techsafe_source.integration_connections%ROWTYPE;
         base_count bigint; base_unmapped bigint;
         changes_count bigint; pending_count bigint; unsupported_count bigint;
         approved_count bigint; approved_line_count bigint;
+        mismatched_line_count bigint;
 BEGIN
  evidence:=techsafe_source.inspect_sales_order_source(p_connection,p_order);
  IF evidence->>'valid' IS DISTINCT FROM 'true'
@@ -48,6 +49,14 @@ BEGIN
    AND co.status='approved'
    AND co.customer_approved=true
    AND li.organization_id=c.organization_id;
+ -- Do not silently ignore change-order lines whose tenant differs from
+ -- the parent approved change order. Missing lines would understate scope.
+ SELECT count(*) INTO mismatched_line_count
+ FROM public.change_order_line_items li
+ JOIN public.change_orders co ON co.id=li.change_order_id
+ WHERE co.sales_order_id=c.sales_order_id AND co.organization_id=c.organization_id
+   AND co.status='approved' AND co.customer_approved=true
+   AND li.organization_id IS DISTINCT FROM c.organization_id;
  RETURN jsonb_build_object(
   'valid',true,'connection_id',c.connection_id,'organization_id',c.organization_id,
   'sales_order_id',c.sales_order_id,'approved_proposal_id',c.proposal_id,
@@ -56,11 +65,12 @@ BEGIN
   'change_order_count',changes_count,'unapproved_change_order_count',pending_count,
   'approved_change_order_count',approved_count,'approved_change_line_count',approved_line_count,
   'unsupported_change_line_count',unsupported_count,
+  'cross_tenant_change_line_count',mismatched_line_count,
   'requires_change_reconciliation',changes_count>0,
   'scopeVerified',false,'snapshotReady',false,
   'reason',CASE WHEN pending_count>0 THEN 'unapproved_changes_present'
     WHEN base_unmapped>0 THEN 'base_product_mapping_incomplete'
-    WHEN unsupported_count>0 THEN 'change_line_mapping_incomplete'
+    WHEN unsupported_count>0 OR mismatched_line_count>0 THEN 'change_line_mapping_incomplete'
     ELSE 'approved_scope_reconciliation_not_certified' END);
 END $$;
 REVOKE ALL ON FUNCTION techsafe_source.inspect_sales_order_equipment_scope(uuid,uuid)
