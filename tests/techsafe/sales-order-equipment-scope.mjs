@@ -18,3 +18,12 @@ assert.ok(!sql.includes("'modify'"),'nonexistent generic modify action');
 assert.match(sql,/OR \(li\.new_quantity IS NULL OR li\.new_quantity<0[\s\S]*?li\.new_quantity>10000\)\)/);
 assert.ok(!sql.includes("li.action_type='add' AND (li.new_quantity"),'quantity checks cannot be add-only');
 console.log('Sales Order equipment scope diagnostic remains private and non-authorizing');
+
+// An internally approved change order is not proof of customer approval.
+// Even when requires_customer_approval=false, the Techsafe diagnostic must
+// hold scope until customer_approved=true is explicitly recorded.
+assert.match(sql,/status IS DISTINCT FROM 'approved'\s+OR customer_approved IS DISTINCT FROM true/);
+assert.match(sql,/status='approved' AND customer_approved=true/);
+assert.match(sql,/AND co.customer_approved=true/);
+assert.ok(!sql.includes('requires_customer_approval IS DISTINCT FROM true OR co.customer_approved=true'));
+assert.ok(!sql.includes('requires_customer_approval=true AND customer_approved IS DISTINCT FROM true'));
