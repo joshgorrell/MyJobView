@@ -41,4 +41,7 @@ denied({sourceManifest:{...manifest,baseLineCount:-1}},'source_manifest_incomple
 denied({sourceManifest:{...manifest,changeOrderCount:-1}},'source_manifest_incomplete');
 denied({baseLines:Array.from({length:10001},()=>base[0])},'source_too_large');
 denied({changeOrders:Array.from({length:10001},()=>change)},'source_too_large');
+denied({baseLines:[{...base[0],quantity:10000}],changeOrders:[{...change,lines:[{...change.lines[1],newQuantity:1}]}]},'equipment_quantity_limit_exceeded');
+const manyLines=Array.from({length:10001},(_,i)=>({...change.lines[1],id:'added-'+i,newQuantity:1}));
+denied({changeOrders:[{...change,lines:manyLines}]},'source_too_large');
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
