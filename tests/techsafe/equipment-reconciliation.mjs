@@ -6,7 +6,7 @@ const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',status:'ap
  lines:[{id:'line-1',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'modify_quantity',proposalLineItemId:'base-1',productId:'tv',newQuantity:3},
  {id:'line-2',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'add',productId:'speaker',newQuantity:2}]};
 const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch};
- const sourceManifest=patch.sourceManifest??{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
+ const sourceManifest=Object.hasOwn(patch,'sourceManifest')?patch.sourceManifest:{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
  return reconcile({...args,sourceManifest}); };
 assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]]);
 assert.equal(run().reason,'reconciled_not_certified');
