@@ -1,6 +1,7 @@
 // Pure, non-authorizing equipment reconciliation for an approved MJV Sales Order.
 // No database access, credentials, dispatch, or network side effects.
 const MAX_QUANTITY = 10000;
+const MAX_LINES = 10000;
 function fail(reason) { return {ok:false,reason,items:[]}; }
 function quantity(value) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > MAX_QUANTITY) throw Error('invalid_quantity');
@@ -14,6 +15,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
+    if (baseLines.length > MAX_LINES || changeOrders.length > MAX_LINES) return fail('source_too_large');
     // Never accept a manifest merely because counts match a caller-filtered list.
     // The trusted DB reader must explicitly assert an exhaustive source scan.
     if (sourceManifest?.complete !== true || sourceManifest?.approvalEvidenceVerified !== true)
@@ -24,6 +26,10 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       sourceManifest.organizationId !== salesOrder.organizationId ||
       sourceManifest.proposalId !== salesOrder.proposalId ||
       sourceManifest.revision !== expectedRevision ||
+      !Number.isSafeInteger(sourceManifest.baseLineCount) || sourceManifest.baseLineCount < 0 ||
+      !Number.isSafeInteger(sourceManifest.changeOrderCount) || sourceManifest.changeOrderCount < 0 ||
+      !Number.isSafeInteger(sourceManifest.changeLineCount) || sourceManifest.changeLineCount < 0 ||
+      sourceManifest.changeLineCount > MAX_LINES ||
       !Number.isSafeInteger(sourceManifest.baseLineCount) ||
       !Number.isSafeInteger(sourceManifest.changeOrderCount) ||
       !Number.isSafeInteger(sourceManifest.changeLineCount) ||
@@ -53,6 +59,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
         return fail('ambiguous_change_order_sequence');
       lastRevision=order.revision;
       if (!Array.isArray(order.lines) || order.lines.length === 0) return fail('missing_change_order_lines');
+      if (order.lines.length > MAX_LINES) return fail('source_too_large');
       for (const line of order.lines) {
         if (line.organizationId !== salesOrder.organizationId || line.changeOrderId !== orderId)
           return fail('change_line_scope_mismatch');
