@@ -47,3 +47,8 @@ assert.match(sql,/unsupported_count>0 OR mismatched_line_count>0/);
 const invalidation=readFileSync('supabase/migrations/20261108211000_techsafe_change_order_revision_invalidation.sql','utf8');
 for(const name of ['public.change_orders','public.change_order_line_items','AFTER INSERT OR UPDATE OR DELETE','techsafe_source.order_revision_ledger','c.sales_order_id=affected_order','c.organization_id=affected_org','c.sales_order_id=prior_order','source_fingerprint=repeat(\'0\',64)','revision_exhausted','state=\'held\'']) assert.ok(invalidation.includes(name),name);
 assert.ok(!invalidation.includes('CREATE POLICY'));
+
+// Lock the change-order parent during line mutation to serialize with
+// concurrent parent reassignment/deletion and avoid stale source bindings.
+assert.match(invalidation,/WHERE co\.id = CASE WHEN TG_OP='DELETE' THEN OLD\.change_order_id ELSE NEW\.change_order_id END\s+FOR SHARE/);
+assert.match(invalidation,/WHERE co\.id=OLD\.change_order_id\s+FOR SHARE/);
