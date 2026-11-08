@@ -19,4 +19,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify disabled-by-default integration and source comparison
-        run: npm run test:techsafe:dispatch
+        run: npm run test:techsafe:dispatch && node tests/techsafe/order-revision.mjs

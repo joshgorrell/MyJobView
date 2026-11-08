@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {advanceTechsafeOrderRevision as advance,isTechsafeRevisionCurrent as current} from '../../supabase/functions/_shared/techsafe-order-revision.mjs';
+const binding={connectionId:'connection',organizationId:'org',orderId:'order',proposalId:'approved-proposal'};
+const a='a'.repeat(64),b='b'.repeat(64);
+const transition=(state,action,fingerprint,generation)=>advance({current:state,binding,action,nextFingerprint:fingerprint,connectionGeneration:generation});
+const first=transition(null,'source_changed',a,1);
+assert.equal(first.accepted,true);
+assert.equal(first.next.revision,'1');
+assert.equal(first.next.status,'candidate');
+assert.equal(current(first.next,first.next,binding),true);
+assert.equal(transition(first.next,'source_changed',a,1).accepted,false);
+const changed=transition(first.next,'source_changed',b,1);
+assert.equal(changed.next.revision,'2');
+assert.equal(current(changed.next,first.next,binding),false,'Old receiver draft must be stale');
+const paused=transition(changed.next,'connection_changed',b,2);
+assert.equal(paused.next.revision,'3');
+assert.equal(paused.next.status,'held');
+assert.equal(current(paused.next,paused.next,binding),false,'Held revisions cannot authorize draft');
+assert.equal(transition(paused.next,'connection_changed',b,2).accepted,false);
+assert.equal(transition(paused.next,'source_changed',a,1).accepted,false);
+const resumed=transition(paused.next,'source_changed',b,3);
+assert.equal(resumed.next.revision,'4');
+assert.equal(current(resumed.next,changed.next,binding),false,'ABA pause and resume must not revive old revision');
+const outage=transition(resumed.next,'source_unavailable',b,3);
+assert.equal(outage.next.status,'held');
+assert.equal(outage.next.revision,'5');
+assert.equal(current(outage.next,resumed.next,binding),false);
+assert.equal(advance({current:resumed.next,binding:{...binding,proposalId:'other'},action:'source_changed',nextFingerprint:a,connectionGeneration:3}).accepted,false);
+assert.equal(advance({current:{...resumed.next,revision:'9223372036854775807'},binding,action:'source_changed',nextFingerprint:a,connectionGeneration:3}).reason,'revision_exhausted');
+assert.equal(advance({current:null,binding,action:'source_changed',nextFingerprint:'not-a-hash',connectionGeneration:1}).accepted,false);
+for(const result of [first,changed,paused,resumed,outage]){
+ for(const flag of ['scopeVerified','snapshotReady','quoteReady'])assert.equal(result[flag],false);
+}
+console.log('Techsafe per-order revision and invalidation protocol checks passed');
