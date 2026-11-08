@@ -31,8 +31,8 @@ BEGIN
  FROM public.change_orders
  WHERE sales_order_id=c.sales_order_id AND organization_id=c.organization_id;
  SELECT count(*),count(*) FILTER (WHERE
-   li.action_type NOT IN ('add','remove','modify') OR li.action_type IS NULL
-   OR (li.action_type IN ('remove','modify') AND li.proposal_line_item_id IS NULL)
+   li.action_type NOT IN ('add','remove','modify_quantity','modify_price') OR li.action_type IS NULL
+   OR (li.action_type IN ('remove','modify_quantity','modify_price') AND li.proposal_line_item_id IS NULL)
    OR (li.action_type='add' AND li.product_id IS NULL)
    OR (li.action_type='add' AND (li.new_quantity IS NULL OR li.new_quantity<0
      OR li.new_quantity<>trunc(li.new_quantity) OR li.new_quantity>10000)))
