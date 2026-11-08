@@ -24,9 +24,8 @@ BEGIN
  INTO base_count,base_unmapped FROM public.proposal_line_items
  WHERE proposal_id=c.proposal_id AND organization_id=c.organization_id;
  SELECT count(*),count(*) FILTER (WHERE status IS DISTINCT FROM 'approved'
-   OR (requires_customer_approval=true AND customer_approved IS DISTINCT FROM true)),
-   count(*) FILTER (WHERE status='approved' AND
-     (requires_customer_approval IS DISTINCT FROM true OR customer_approved=true))
+   OR customer_approved IS DISTINCT FROM true),
+   count(*) FILTER (WHERE status='approved' AND customer_approved=true)
  INTO changes_count,pending_count,approved_count
  FROM public.change_orders
  WHERE sales_order_id=c.sales_order_id AND organization_id=c.organization_id;
@@ -41,7 +40,7 @@ BEGIN
  JOIN public.change_orders co ON co.id=li.change_order_id
  WHERE co.sales_order_id=c.sales_order_id AND co.organization_id=c.organization_id
    AND co.status='approved'
-   AND (co.requires_customer_approval IS DISTINCT FROM true OR co.customer_approved=true)
+   AND co.customer_approved=true
    AND li.organization_id=c.organization_id;
  RETURN jsonb_build_object(
   'valid',true,'connection_id',c.connection_id,'organization_id',c.organization_id,
