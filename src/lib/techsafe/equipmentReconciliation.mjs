@@ -7,13 +7,26 @@ function quantity(value) {
   return value;
 }
 function id(value) { if (typeof value !== 'string' || !value.trim()) throw Error('missing_identifier'); return value; }
-export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,changeOrders,expectedRevision}) {
+export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,changeOrders,expectedRevision,sourceManifest}) {
   try {
     if (!salesOrder || salesOrder.approved !== true || !salesOrder.id || !salesOrder.organizationId || !salesOrder.proposalId)
       return fail('approved_sales_order_unverified');
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
+    // A complete, trusted DB read must supply counts from the same transaction.
+    // Without it, filtering out pending orders or missing lines looks valid.
+    if (!sourceManifest || sourceManifest.salesOrderId !== salesOrder.id ||
+      sourceManifest.organizationId !== salesOrder.organizationId ||
+      sourceManifest.proposalId !== salesOrder.proposalId ||
+      sourceManifest.revision !== expectedRevision ||
+      !Number.isSafeInteger(sourceManifest.baseLineCount) ||
+      !Number.isSafeInteger(sourceManifest.changeOrderCount) ||
+      !Number.isSafeInteger(sourceManifest.changeLineCount) ||
+      sourceManifest.baseLineCount !== baseLines.length ||
+      sourceManifest.changeOrderCount !== changeOrders.length ||
+      sourceManifest.changeLineCount !== changeOrders.reduce((n,co)=>n+(Array.isArray(co.lines)?co.lines.length:0),0))
+      return fail('source_manifest_incomplete');
     const items = new Map();
     for (const line of baseLines) {
       if (line.organizationId !== salesOrder.organizationId || line.proposalId !== salesOrder.proposalId) return fail('source_scope_mismatch');
