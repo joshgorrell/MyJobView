@@ -16,6 +16,14 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
     if (baseLines.length > MAX_LINES || changeOrders.length > MAX_LINES) return fail('source_too_large');
+    // Bound aggregate change lines before manifest validation so oversized input
+    // cannot be misclassified as merely a mismatched source manifest.
+    let inputChangeLines=0;
+    for (const change of changeOrders) {
+      if (!Array.isArray(change?.lines)) continue;
+      inputChangeLines += change.lines.length;
+      if (inputChangeLines > MAX_LINES) return fail('source_too_large');
+    }
     // Never accept a manifest merely because counts match a caller-filtered list.
     // The trusted DB reader must explicitly assert an exhaustive source scan.
     if (sourceManifest?.complete !== true || sourceManifest?.approvalEvidenceVerified !== true)
