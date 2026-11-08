@@ -1,3 +1,26 @@
+-- Private integration source boundary. No connections are provisioned or activated
+-- by this migration. MJV sales_orders remains the only equipment authority.
+CREATE SCHEMA IF NOT EXISTS techsafe_source;
+REVOKE ALL ON SCHEMA techsafe_source FROM PUBLIC, anon, authenticated, service_role;
+
+CREATE TABLE IF NOT EXISTS techsafe_source.integration_connections (
+  connection_id uuid PRIMARY KEY,
+  organization_id uuid NOT NULL,
+  sales_order_id uuid NOT NULL,
+  proposal_id uuid NOT NULL,
+  connection_generation bigint NOT NULL DEFAULT 1 CHECK (connection_generation >= 1),
+  status text NOT NULL DEFAULT 'held' CHECK (status IN ('held','active','paused','revoked')),
+  enabled boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT techsafe_connection_not_auto_active CHECK (NOT enabled OR status = 'active'),
+  CONSTRAINT techsafe_connection_order_fk FOREIGN KEY (sales_order_id)
+    REFERENCES public.sales_orders(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS techsafe_connection_order_scope_idx
+ ON techsafe_source.integration_connections(connection_id,organization_id,sales_order_id,proposal_id);
+REVOKE ALL ON techsafe_source.integration_connections FROM PUBLIC, anon, authenticated, service_role;
+
 -- Integration-private revision ledger. This is storage only: no export authority,
 -- automatic mutation observer, delivery, checkout, or production activation.
 -- A trusted backend must verify source evidence and perform atomic transitions
