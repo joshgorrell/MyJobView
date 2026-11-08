@@ -27,3 +27,11 @@ assert.match(sql,/status='approved' AND customer_approved=true/);
 assert.match(sql,/AND co.customer_approved=true/);
 assert.ok(!sql.includes('requires_customer_approval IS DISTINCT FROM true OR co.customer_approved=true'));
 assert.ok(!sql.includes('requires_customer_approval=true AND customer_approved IS DISTINCT FROM true'));
+
+// Existing-item changes must reference an item belonging to the approved
+// Sales Order's own source proposal and tenant, not merely a non-null UUID.
+assert.match(sql,/LEFT JOIN public\.proposal_line_items base/);
+assert.match(sql,/base\.id=li\.proposal_line_item_id/);
+assert.match(sql,/base\.proposal_id=c\.proposal_id/);
+assert.match(sql,/base\.organization_id=c\.organization_id/);
+assert.match(sql,/li\.action_type IN \('remove','modify_quantity','modify_price'\)\s+AND base\.id IS NULL/);
