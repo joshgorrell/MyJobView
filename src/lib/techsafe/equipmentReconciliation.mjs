@@ -14,6 +14,10 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
+    // Never accept a manifest merely because counts match a caller-filtered list.
+    // The trusted DB reader must explicitly assert an exhaustive source scan.
+    if (sourceManifest?.complete !== true || sourceManifest?.approvalEvidenceVerified !== true)
+      return fail('source_not_authoritatively_verified');
     // A complete, trusted DB read must supply counts from the same transaction.
     // Without it, filtering out pending orders or missing lines looks valid.
     if (!sourceManifest || sourceManifest.salesOrderId !== salesOrder.id ||
