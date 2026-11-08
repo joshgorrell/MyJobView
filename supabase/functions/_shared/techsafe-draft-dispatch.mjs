@@ -5,7 +5,7 @@ import {prepareTechsafeCandidateFromBundle} from './techsafe-bundle-composition.
 import {compareTechsafeSourceReread} from './techsafe-source-reread.mjs';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
-const connectionValid=(connection,binding)=>object(connection)&&connection.enabled===true&&connection.status==='active'&&
+export const connectionValid=(connection,binding)=>object(connection)&&connection.enabled===true&&connection.status==='active'&&
  connection.connectionId===binding.connectionId&&connection.organizationId===binding.organizationId&&
  connection.proposalId===binding.proposalId&&connection.orderId===binding.orderId;
 const held=reason=>({status:'held',reason,delivered:false,quoteReady:false});
