@@ -44,6 +44,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       items.set(key,{sourceLineId:key,productId,quantity:qty});
     }
     const seenOrders=new Set(), seenChanges=new Set();
+    let processedChangeLines=0;
     // Caller must supply authoritative, complete change-order history in
     // immutable revision order; a missing/ambiguous sequence fails closed.
     let lastRevision=0;
@@ -58,7 +59,8 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
         return fail('ambiguous_change_order_sequence');
       lastRevision=order.revision;
       if (!Array.isArray(order.lines) || order.lines.length === 0) return fail('missing_change_order_lines');
-      if (order.lines.length > MAX_LINES) return fail('source_too_large');
+      processedChangeLines+=order.lines.length;
+      if (processedChangeLines > MAX_LINES) return fail('source_too_large');
       for (const line of order.lines) {
         if (line.organizationId !== salesOrder.organizationId || line.changeOrderId !== orderId)
           return fail('change_line_scope_mismatch');
@@ -82,6 +84,10 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
         } else return fail('unsupported_change_action');
       }
     }
+    // Never emit an equipment set whose aggregate quantity exceeds the
+    // bounded source contract, even when each individual line is valid.
+    const totalQuantity=[...items.values()].reduce((sum,item)=>sum+item.quantity,0);
+    if (totalQuantity > MAX_LINES) return fail('equipment_quantity_limit_exceeded');
     return {ok:true,reason:'reconciled_not_certified',revision:expectedRevision,
       items:[...items.values()].filter(x=>x.quantity>0).sort((a,b)=>a.sourceLineId.localeCompare(b.sourceLineId))};
   } catch (error) { return fail(error instanceof Error ? error.message : 'invalid_source'); }
