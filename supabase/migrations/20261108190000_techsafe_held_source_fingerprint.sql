@@ -26,7 +26,7 @@ BEGIN
                       'equipment',evidence->'equipment'))::text,'UTF8')),'hex');
  RETURN techsafe_source.cas_order_revision(
   c.connection_id,c.sales_order_id,c.organization_id,c.proposal_id,
-  p_expected_revision,p_expected_generation,c.connection_generation,
+  p_expected_revision,CASE WHEN p_expected_revision IS NULL THEN NULL ELSE p_expected_generation END,c.connection_generation,
   fingerprint,'held','awaiting_independent_source_authority');
 END $$;
 REVOKE ALL ON FUNCTION techsafe_source.refresh_held_source_fingerprint(uuid,uuid,bigint,bigint)
