@@ -13,5 +13,7 @@ for(const required of [
  'REVOKE ALL ON FUNCTION techsafe_source.inspect_locked_equipment_source'
 ]) assert.ok(sql.includes(required),`Missing source inspection safeguard: ${required}`);
 assert.ok(!/GRANT EXECUTE/i.test(sql),'Private inspection must not expose RPC access');
+assert.ok(!/['\"]valid['\"],true/i.test(sql),'Diagnostic cannot claim verified source validity');
+assert.ok(sql.includes("'inspected',true"),'Diagnostic should distinguish inspected from certified');
 assert.ok(!/authorized',true/i.test(sql),'Inspection must never authorize delivery');
 console.log('Locked equipment source SQL static contract: PASS (not PostgreSQL runtime verified)');
