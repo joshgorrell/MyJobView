@@ -10,6 +10,8 @@ const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders
  return reconcile({...args,sourceManifest}); };
 assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]]);
 assert.equal(run().reason,'reconciled_not_certified');
+assert.equal(run().authorized,false);
+assert.equal(run().snapshotReady,false);
 const denied=(patch,reason)=>assert.equal(run(patch).reason,reason);
 denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified');
 denied({salesOrder:{...order,revision:8}},'stale_source_revision');
