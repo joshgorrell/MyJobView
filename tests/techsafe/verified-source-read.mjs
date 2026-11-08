@@ -10,5 +10,20 @@ for(const patch of [{connectionId:'other'},{orderId:'other'},{transactionConsist
 }
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1'})).reason,'authoritative_reader_unavailable');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',readConsistentSource:async()=>{throw Error('db down')}})).reason,'authoritative_read_failed');
+// A valid-looking manifest cannot override ledger holds, revision reuse,
+// or connection generation rotation. No inspection result authorizes export.
+for (const patch of [
+ {ledgerState:'held',sourceManifest:{...evidence.sourceManifest,complete:true}},
+ {ledgerRevision:5,revision:4},
+ {connectionGeneration:3,ledgerGeneration:2},
+ {salesOrder:{...order,organizationId:'other-tenant'}},
+ {salesOrder:{...order,proposalId:'unapproved-proposal'}}
+]) {
+ const result=await run(patch);
+ assert.equal(result.ok,false);
+ assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
+ assert.deepEqual(result.items,[]);
+}
 assert.equal((await run({salesOrder:{...order,approved:false}})).reason,'approved_sales_order_unverified');
 console.log('Transaction source inspection orchestration contract: PASS');
