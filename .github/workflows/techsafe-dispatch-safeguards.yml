@@ -6,6 +6,7 @@ on:
       - 'tests/techsafe/**'
       - 'src/lib/techsafe/**'
       - 'supabase/migrations/*techsafe*revision*.sql'
+      - 'supabase/migrations/*techsafe*equipment*.sql'
       - 'package.json'
       - '.github/workflows/techsafe-dispatch-safeguards.yml'
   workflow_dispatch:
@@ -21,4 +22,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify disabled-by-default integration and source comparison
-        run: npm run test:techsafe:dispatch && node tests/techsafe/order-revision.mjs && node tests/techsafe/private-revision-ledger.mjs && node tests/techsafe/transport-contract.mjs && node tests/techsafe/v2-snapshot-http.mjs && node tests/techsafe/private-delivery-authority.mjs && node tests/techsafe/sales-order-equipment-scope.mjs && node tests/techsafe/equipment-reconciliation.mjs && node tests/techsafe/verified-source-read.mjs
+        run: npm run test:techsafe:dispatch && node tests/techsafe/order-revision.mjs && node tests/techsafe/private-revision-ledger.mjs && node tests/techsafe/transport-contract.mjs && node tests/techsafe/v2-snapshot-http.mjs && node tests/techsafe/private-delivery-authority.mjs && node tests/techsafe/sales-order-equipment-scope.mjs && node tests/techsafe/equipment-reconciliation.mjs && node tests/techsafe/verified-source-read.mjs && node tests/techsafe/locked-equipment-source.mjs
