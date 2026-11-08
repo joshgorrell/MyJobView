@@ -5,6 +5,9 @@ import {prepareTechsafeCandidateFromBundle} from './techsafe-bundle-composition.
 import {compareTechsafeSourceReread} from './techsafe-source-reread.mjs';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
+const connectionValid=(connection,binding)=>object(connection)&&connection.enabled===true&&connection.status==='active'&&
+ connection.connectionId===binding.connectionId&&connection.organizationId===binding.organizationId&&
+ connection.proposalId===binding.proposalId&&connection.orderId===binding.orderId;
 const held=reason=>({status:'held',reason,delivered:false,quoteReady:false});
 export async function dispatchTechsafeDraft({binding,enabled=false,loadConnection,readBundle,deliverDraft}={}){
  // Opt-in must be explicit. Do not touch source, credentials or network when off.
@@ -14,9 +17,7 @@ export async function dispatchTechsafeDraft({binding,enabled=false,loadConnectio
  try{
   // Server-only gate. The returned connection must be live, scoped and enabled.
   const connection=await loadConnection(binding);
-  if(!object(connection)||connection.enabled!==true||connection.status!=='active'||
-   connection.connectionId!==binding.connectionId||connection.organizationId!==binding.organizationId||
-   connection.proposalId!==binding.proposalId||connection.orderId!==binding.orderId)
+  if(!connectionValid(connection,binding))
    return held('connection_inactive_or_unverified');
   const bundle=await readBundle(binding);
   const candidate=prepareTechsafeCandidateFromBundle(bundle,binding);
@@ -26,6 +27,10 @@ export async function dispatchTechsafeDraft({binding,enabled=false,loadConnectio
   const latest=await readBundle(binding);
   const reread=compareTechsafeSourceReread(bundle,latest,binding);
   if(!reread.matches)return held(reread.reason);
+  // Pause, revoke, or rebind may occur during two independent source reads.
+  // A final connection check is required even for diagnostic readiness.
+  const currentConnection=await loadConnection(binding);
+  if(!connectionValid(currentConnection,binding))return held('connection_changed_during_source_read');
   // A business candidate is not yet source-authorized: no transport until
   // independent authenticated revision, history, provenance and freshness
   // authority exists. Never infer readiness from bundle/client fields.
