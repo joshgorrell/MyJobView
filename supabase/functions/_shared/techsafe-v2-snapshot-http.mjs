@@ -4,7 +4,7 @@
 import {prepareTechsafeTransportSnapshot} from './techsafe-transport-contract.mjs';
 const held=reason=>({accepted:false,reason});
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
-export async function sendTechsafeV2Snapshot({endpoint,token,binding,source,authority,revision,eventId,enabled=false,fetchImpl=globalThis.fetch}={}){
+export async function sendTechsafeV2Snapshot({endpoint,token,binding,source,authority,revision,eventId,enabled=false,allowedOrigin,fetchImpl=globalThis.fetch}={}){
  if(enabled!==true)return held('integration_disabled');
  const prepared=prepareTechsafeTransportSnapshot({source,authority,binding,revision,eventId});
  if(!prepared.ready)return held(prepared.reason);
@@ -13,7 +13,12 @@ export async function sendTechsafeV2Snapshot({endpoint,token,binding,source,auth
   return held('invalid_snapshot_identity');
  let url;
  try{url=new URL(endpoint);}catch{return held('invalid_endpoint');}
- if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash)return held('invalid_endpoint');
+ if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.port&&url.port!=='443')return held('invalid_endpoint');
+ // Endpoint must be pinned by trusted server configuration, not merely HTTPS:
+ // otherwise a caller could exfiltrate an authorized customer snapshot to any host.
+ // Compare exact origin, not suffixes (techsafe.example.evil is not Techsafe).
+ if(typeof allowedOrigin!=='string'||!/^https:\/\/[^/?#]+$/.test(allowedOrigin)||
+  url.origin!==allowedOrigin)return held('endpoint_not_allowlisted');
  if(typeof token!=='string'||token.length<32||token.length>4096||/[\r\n]/.test(token))
   return held('credentials_unavailable');
  if(typeof fetchImpl!=='function')return held('transport_unavailable');
