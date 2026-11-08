@@ -13,4 +13,8 @@ for(const action of ['add','remove','modify_quantity','modify_price']){
  assert.ok(sql.includes("'"+action+"'"),'inspection action '+action);
 }
 assert.ok(!sql.includes("'modify'"),'nonexistent generic modify action');
+// Every approved action has a resulting quantity; modifications must not bypass
+// bounds/integer validation merely because they are not additions.
+assert.match(sql,/OR \(li\.new_quantity IS NULL OR li\.new_quantity<0[\s\S]*?li\.new_quantity>10000\)\)/);
+assert.ok(!sql.includes("li.action_type='add' AND (li.new_quantity"),'quantity checks cannot be add-only');
 console.log('Sales Order equipment scope diagnostic remains private and non-authorizing');
