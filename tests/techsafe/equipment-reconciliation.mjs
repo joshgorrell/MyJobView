@@ -55,4 +55,17 @@ denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manife
 denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
 denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
 
+// A price-only customer-approved change must not alter the covered quantity.
+const priceOnly={...change,id:'co-price',revision:6,lines:[{...change.lines[0],id:'price-line',changeOrderId:'co-price',actionType:'modify_price',newQuantity:2}]};
+assert.deepEqual(run({changeOrders:[priceOnly]}).items.map(x=>x.quantity),[2]);
+// Multiple approved changes must apply in ascending source revision order.
+const first={...change,id:'co-first',revision:5,lines:[{...change.lines[0],id:'first-line',changeOrderId:'co-first',newQuantity:4}]};
+const second={...change,id:'co-second',revision:6,lines:[{...change.lines[0],id:'second-line',changeOrderId:'co-second',newQuantity:5}]};
+assert.deepEqual(run({changeOrders:[first,second]}).items.map(x=>x.quantity),[5]);
+denied({changeOrders:[second,first]},'ambiguous_change_order_sequence');
+// Repeated invocation must be deterministic and must not mutate source data.
+const originalBase=structuredClone(base), originalChange=structuredClone(change);
+assert.deepEqual(run(),run());
+assert.deepEqual(base,originalBase);
+assert.deepEqual(change,originalChange);
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
