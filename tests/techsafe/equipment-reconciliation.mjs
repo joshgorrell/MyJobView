@@ -5,7 +5,9 @@ const base=[{id:'base-1',organizationId:'tenant-1',proposalId:'approved-source-1
 const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',status:'approved',customerApproved:true,revision:6,
  lines:[{id:'line-1',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'modify_quantity',proposalLineItemId:'base-1',productId:'tv',newQuantity:3},
  {id:'line-2',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'add',productId:'speaker',newQuantity:2}]};
-const run=(patch={})=>reconcile({salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch});
+const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch};
+ const sourceManifest=patch.sourceManifest??{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
+ return reconcile({...args,sourceManifest}); };
 assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]]);
 assert.equal(run().reason,'reconciled_not_certified');
 const denied=(patch,reason)=>assert.equal(run(patch).reason,reason);
@@ -26,4 +28,29 @@ denied({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'remove',
 denied({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'replace'}]}]},'unsupported_change_action');
 assert.deepEqual(run({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'remove',newQuantity:0}]}]}).items,[]);
 assert.deepEqual(run({changeOrders:[]}).items.map(x=>x.quantity),[2]);
+const manifest={salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:1,changeOrderCount:1,changeLineCount:2};
+denied({sourceManifest:{...manifest,changeOrderCount:2}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeLineCount:3}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,revision:6}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,organizationId:'other-tenant'}},'source_manifest_incomplete');
+denied({sourceManifest:{}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,complete:false}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,approvalEvidenceVerified:false}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,changeLineCount:-1}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,baseLineCount:-1}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeOrderCount:-1}},'source_manifest_incomplete');
+denied({baseLines:Array.from({length:10001},()=>base[0])},'source_too_large');
+denied({changeOrders:Array.from({length:10001},()=>change)},'source_too_large');
+denied({baseLines:[{...base[0],quantity:10000}],changeOrders:[{...change,lines:[{...change.lines[1],newQuantity:1}]}]},'equipment_quantity_limit_exceeded');
+const manyLines=Array.from({length:10001},(_,i)=>({...change.lines[1],id:'added-'+i,newQuantity:1}));
+denied({changeOrders:[{...change,lines:manyLines}]},'source_too_large');
+
+// An independently obtained manifest must not silently adapt to caller-filtered arrays.
+// Dropping a base item or approved change order is an incomplete source read.
+denied({baseLines:[],sourceManifest:manifest},'source_manifest_incomplete');
+denied({changeOrders:[],sourceManifest:manifest},'source_manifest_incomplete');
+denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manifest},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
+denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
+
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
