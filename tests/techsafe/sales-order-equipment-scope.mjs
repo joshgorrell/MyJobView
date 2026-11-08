@@ -41,3 +41,9 @@ assert.match(sql,/li\.action_type IN \('remove','modify_quantity','modify_price'
 assert.match(sql,/li.organization_id IS DISTINCT FROM c.organization_id/);
 assert.match(sql,/'cross_tenant_change_line_count',mismatched_line_count/);
 assert.match(sql,/unsupported_count>0 OR mismatched_line_count>0/);
+
+// Source freshness: approved change-order status and line edits must hold the
+// exact Sales Order revision ledger, including deletes and parent reassignment.
+const invalidation=readFileSync('supabase/migrations/20261108211000_techsafe_change_order_revision_invalidation.sql','utf8');
+for(const name of ['public.change_orders','public.change_order_line_items','AFTER INSERT OR UPDATE OR DELETE','techsafe_source.order_revision_ledger','c.sales_order_id=affected_order','c.organization_id=affected_org','c.sales_order_id=prior_order','source_fingerprint=repeat(\'0\',64)','revision_exhausted','state=\'held\'']) assert.ok(invalidation.includes(name),name);
+assert.ok(!invalidation.includes('CREATE POLICY'));
