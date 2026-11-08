@@ -35,3 +35,9 @@ assert.match(sql,/base\.id=li\.proposal_line_item_id/);
 assert.match(sql,/base\.proposal_id=c\.proposal_id/);
 assert.match(sql,/base\.organization_id=c\.organization_id/);
 assert.match(sql,/li\.action_type IN \('remove','modify_quantity','modify_price'\)\s+AND base\.id IS NULL/);
+
+// A cross-tenant change line must be counted as an integrity blocker rather
+// than disappearing from the approved-line query's tenant filter.
+assert.match(sql,/li.organization_id IS DISTINCT FROM c.organization_id/);
+assert.match(sql,/'cross_tenant_change_line_count',mismatched_line_count/);
+assert.match(sql,/unsupported_count>0 OR mismatched_line_count>0/);
