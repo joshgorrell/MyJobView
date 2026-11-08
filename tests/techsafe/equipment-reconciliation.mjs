@@ -44,4 +44,13 @@ denied({changeOrders:Array.from({length:10001},()=>change)},'source_too_large');
 denied({baseLines:[{...base[0],quantity:10000}],changeOrders:[{...change,lines:[{...change.lines[1],newQuantity:1}]}]},'equipment_quantity_limit_exceeded');
 const manyLines=Array.from({length:10001},(_,i)=>({...change.lines[1],id:'added-'+i,newQuantity:1}));
 denied({changeOrders:[{...change,lines:manyLines}]},'source_too_large');
+
+// An independently obtained manifest must not silently adapt to caller-filtered arrays.
+// Dropping a base item or approved change order is an incomplete source read.
+denied({baseLines:[],sourceManifest:manifest},'source_manifest_incomplete');
+denied({changeOrders:[],sourceManifest:manifest},'source_manifest_incomplete');
+denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manifest},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
+denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
+
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
