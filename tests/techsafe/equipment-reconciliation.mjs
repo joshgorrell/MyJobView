@@ -12,7 +12,7 @@ assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speake
 assert.equal(run().reason,'reconciled_not_certified');
 assert.equal(run().authorized,false);
 assert.equal(run().snapshotReady,false);
-const denied=(patch,reason)=>assert.equal(run(patch).reason,reason);
+const denied=(patch,reason)=>{ const result=run(patch); assert.equal(result.reason,reason); assert.equal(result.ok,false); assert.equal(result.authorized,false); assert.equal(result.snapshotReady,false); assert.deepEqual(result.items,[]); };
 denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified');
 denied({salesOrder:{...order,revision:8}},'stale_source_revision');
 denied({baseLines:[{...base[0],organizationId:'tenant-2'}]},'source_scope_mismatch');
