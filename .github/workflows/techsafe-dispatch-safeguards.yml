@@ -4,6 +4,7 @@ on:
     paths:
       - 'supabase/functions/_shared/techsafe-*.mjs'
       - 'tests/techsafe/**'
+      - 'supabase/migrations/*techsafe*revision*.sql'
       - 'package.json'
       - '.github/workflows/techsafe-dispatch-safeguards.yml'
   workflow_dispatch:
@@ -19,4 +20,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify disabled-by-default integration and source comparison
-        run: npm run test:techsafe:dispatch && node tests/techsafe/order-revision.mjs
+        run: npm run test:techsafe:dispatch && node tests/techsafe/order-revision.mjs && node tests/techsafe/private-revision-ledger.mjs
