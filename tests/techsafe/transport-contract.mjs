@@ -6,8 +6,8 @@ const snapshot={schemaVersion:2,connectionId:'c',organizationId:'o',orderId:'s',
 const authority={verified:true,sourceAuthorized:true,scopeVerified:true,snapshotReady:true,connectionId:'c',organizationId:'o',orderId:'s',proposalId:'p',generation:1,revision:1,snapshot};
 const run=(changes={})=>prepareTechsafeTransportSnapshot({source,authority,binding,revision:1,eventId:'e',...changes});
 assert.equal(run().ready,true);
-assert.equal(run({authority:{...authority,snapshot:{...snapshot,lines:[{...snapshot.lines[0],scope:'removed'}]}}).ready,true);
-assert.equal(run({authority:{...authority,snapshot:{...snapshot,lines:[{...snapshot.lines[0],scope:'excluded'}]}}).ready,false);
+assert.equal(run({authority:{...authority,snapshot:{...snapshot,lines:[{...snapshot.lines[0],scope:'removed'}]}}}).ready,true);
+assert.equal(run({authority:{...authority,snapshot:{...snapshot,lines:[{...snapshot.lines[0],scope:'excluded'}]}}}).ready,false);
 assert.equal(JSON.stringify(run().snapshot).includes('private'),false);
 assert.equal(JSON.stringify(run().snapshot).includes('cost'),false);
 for(const changes of [{authority:{...authority,sourceAuthorized:false}},{authority:{...authority,revision:2}},{source:{...source,approved_proposal_id:'other'}},{authority:{...authority,snapshot:{...snapshot,lines:[{...snapshot.lines[0],cost:999}]}}},{authority:{...authority,snapshot:{...snapshot,scopeState:'pending'}}}])
