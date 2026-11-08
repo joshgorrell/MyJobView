@@ -6,7 +6,7 @@ const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',status:'ap
  lines:[{id:'line-1',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'modify_quantity',proposalLineItemId:'base-1',productId:'tv',newQuantity:3},
  {id:'line-2',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'add',productId:'speaker',newQuantity:2}]};
 const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch};
- const sourceManifest=patch.sourceManifest??{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
+ const sourceManifest=Object.hasOwn(patch,'sourceManifest')?patch.sourceManifest:{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
  return reconcile({...args,sourceManifest}); };
 assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]]);
 assert.equal(run().reason,'reconciled_not_certified');
@@ -52,5 +52,22 @@ denied({changeOrders:[],sourceManifest:manifest},'source_manifest_incomplete');
 denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manifest},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
 denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
+
+
+// Approved Sales Order source authority must remain independent of a caller's
+// filtered equipment arrays; malformed or absent manifests always fail closed.
+denied({sourceManifest:null},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,complete:'true'}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,approvalEvidenceVerified:'true'}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,baseLineCount:0}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeOrderCount:0}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeLineCount:1}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,salesOrderId:'other-order'}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,proposalId:'other-proposal'}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,revision:8}},'source_manifest_incomplete');
+// Approval and scope checks cannot be bypassed even with a matching manifest.
+denied({salesOrder:{...order,approved:'true'}},'approved_sales_order_unverified');
+denied({salesOrder:{...order,organizationId:'other-tenant'}},'source_manifest_incomplete');
+denied({salesOrder:{...order,proposalId:'other-proposal'}},'source_manifest_incomplete');
 
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
