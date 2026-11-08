@@ -69,6 +69,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       if (!Array.isArray(order.lines) || order.lines.length === 0) return fail('missing_change_order_lines');
       processedChangeLines+=order.lines.length;
       if (processedChangeLines > MAX_LINES) return fail('source_too_large');
+      const touchedBaseLines=new Set();
       for (const line of order.lines) {
         if (line.organizationId !== salesOrder.organizationId || line.changeOrderId !== orderId)
           return fail('change_line_scope_mismatch');
@@ -81,6 +82,8 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
           items.set(key,{sourceLineId:key,productId,quantity:qty});
         } else if (line.actionType === 'remove' || line.actionType === 'modify_quantity' || line.actionType === 'modify_price') {
           const key=id(line.proposalLineItemId), previous=items.get(key);
+          if (touchedBaseLines.has(key)) return fail('ambiguous_change_order_line_actions');
+          touchedBaseLines.add(key);
           if (!previous || !baseIds.has(key)) return fail('changed_item_not_in_sales_order');
           if (line.productId && line.productId !== previous.productId) return fail('changed_product_mismatch');
           if (line.actionType === 'remove') {
