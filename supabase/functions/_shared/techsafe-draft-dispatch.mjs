@@ -8,7 +8,7 @@ const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
 export const connectionValid=(connection,binding)=>object(connection)&&connection.enabled===true&&connection.status==='active'&&
  connection.connectionId===binding.connectionId&&connection.organizationId===binding.organizationId&&
  connection.proposalId===binding.proposalId&&connection.orderId===binding.orderId;
-const epochSeconds=value=>typeof value==='string'&&/^\\d{1,12}(?:\\.\\d{1,6})?$/.test(value)?Number(value):NaN;
+const epochSeconds=value=>typeof value==='string'&&/^\d{1,12}(?:\.\d{1,6})?$/.test(value)?Number(value):NaN;
 export const freshSourceRead=(bundle,nowSeconds,maxAgeSeconds=30)=>{
  const at=epochSeconds(bundle?.readAtEpoch);
  return Number.isFinite(at)&&Number.isFinite(nowSeconds)&&Number.isFinite(maxAgeSeconds)&&
