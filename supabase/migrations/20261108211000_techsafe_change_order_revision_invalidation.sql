@@ -13,10 +13,12 @@ BEGIN
  ELSE
   SELECT co.sales_order_id, co.organization_id INTO affected_order, affected_org
   FROM public.change_orders co
-  WHERE co.id = CASE WHEN TG_OP='DELETE' THEN OLD.change_order_id ELSE NEW.change_order_id END;
+  WHERE co.id = CASE WHEN TG_OP='DELETE' THEN OLD.change_order_id ELSE NEW.change_order_id END
+  FOR SHARE;
   IF TG_OP='UPDATE' AND OLD.change_order_id IS DISTINCT FROM NEW.change_order_id THEN
    SELECT co.sales_order_id, co.organization_id INTO prior_order, prior_org
-   FROM public.change_orders co WHERE co.id=OLD.change_order_id;
+   FROM public.change_orders co WHERE co.id=OLD.change_order_id
+   FOR SHARE;
   END IF;
  END IF;
  -- A mutation affecting either the previous or new parent must invalidate
