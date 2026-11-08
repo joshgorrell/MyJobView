@@ -38,17 +38,17 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       !Number.isSafeInteger(sourceManifest.changeOrderCount) || sourceManifest.changeOrderCount < 0 ||
       !Number.isSafeInteger(sourceManifest.changeLineCount) || sourceManifest.changeLineCount < 0 ||
       sourceManifest.changeLineCount > MAX_LINES ||
-      !Number.isSafeInteger(sourceManifest.changeOrderCount) ||
-      !Number.isSafeInteger(sourceManifest.changeLineCount) ||
       sourceManifest.baseLineCount !== baseLines.length ||
       sourceManifest.changeOrderCount !== changeOrders.length ||
       sourceManifest.changeLineCount !== changeOrders.reduce((n,co)=>n+(Array.isArray(co.lines)?co.lines.length:0),0))
       return fail('source_manifest_incomplete');
     const items = new Map();
+    const baseIds = new Set();
     for (const line of baseLines) {
       if (line.organizationId !== salesOrder.organizationId || line.proposalId !== salesOrder.proposalId) return fail('source_scope_mismatch');
       const key=id(line.id), productId=id(line.productId), qty=quantity(line.quantity);
       if (items.has(key)) return fail('duplicate_base_line');
+      baseIds.add(key);
       items.set(key,{sourceLineId:key,productId,quantity:qty});
     }
     const seenOrders=new Set(), seenChanges=new Set();
@@ -81,7 +81,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
           items.set(key,{sourceLineId:key,productId,quantity:qty});
         } else if (line.actionType === 'remove' || line.actionType === 'modify_quantity' || line.actionType === 'modify_price') {
           const key=id(line.proposalLineItemId), previous=items.get(key);
-          if (!previous || !baseLines.some(base=>base.id===key)) return fail('changed_item_not_in_sales_order');
+          if (!previous || !baseIds.has(key)) return fail('changed_item_not_in_sales_order');
           if (line.productId && line.productId !== previous.productId) return fail('changed_product_mismatch');
           if (line.actionType === 'remove') {
             if (qty !== 0) return fail('remove_must_zero_quantity');
@@ -96,7 +96,10 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     // bounded source contract, even when each individual line is valid.
     const totalQuantity=[...items.values()].reduce((sum,item)=>sum+item.quantity,0);
     if (totalQuantity > MAX_LINES) return fail('equipment_quantity_limit_exceeded');
-    return {ok:true,reason:'reconciled_not_certified',revision:expectedRevision,
-      items:[...items.values()].filter(x=>x.quantity>0).sort((a,b)=>a.sourceLineId.localeCompare(b.sourceLineId))};
+    const output=[...items.values()].filter(x=>x.quantity>0).sort((a,b)=>a.sourceLineId.localeCompare(b.sourceLineId));
+    // The pure result is diagnostic evidence only; downstream consumers must
+    // not confuse a successfully computed list with a certified export.
+    return {ok:true,authorized:false,snapshotReady:false,reason:'reconciled_not_certified',revision:expectedRevision,
+      items:output};
   } catch (error) { return fail(error instanceof Error ? error.message : 'invalid_source'); }
 }
