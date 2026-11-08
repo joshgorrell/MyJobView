@@ -5,7 +5,8 @@ CREATE FUNCTION techsafe_source.invalidate_order_source()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE source_proposal uuid; source_order uuid; source_org uuid; old_proposal uuid; old_org uuid;
 BEGIN
- IF TG_OP='UPDATE' AND TG_TABLE_NAME='proposal_line_items' AND (OLD.proposal_id IS DISTINCT FROM NEW.proposal_id OR OLD.organization_id IS DISTINCT FROM NEW.organization_id) THEN
+ IF TG_OP='UPDATE' AND TG_TABLE_NAME='proposal_line_items' THEN
+  IF OLD.proposal_id IS DISTINCT FROM NEW.proposal_id OR OLD.organization_id IS DISTINCT FROM NEW.organization_id THEN
    old_proposal:=OLD.proposal_id; old_org:=OLD.organization_id;
    UPDATE techsafe_source.order_revision_ledger l
    SET revision=LEAST(l.revision+CASE WHEN l.revision<9223372036854775807 THEN 1 ELSE 0 END,9223372036854775807),
@@ -13,6 +14,7 @@ BEGIN
        source_fingerprint=repeat('0',64),updated_at=clock_timestamp()
    FROM techsafe_source.integration_connections c
    WHERE c.connection_id=l.connection_id AND c.organization_id=old_org AND c.proposal_id=old_proposal;
+  END IF;
  END IF;
  IF TG_TABLE_NAME = 'proposal_line_items' THEN
    source_proposal := CASE WHEN TG_OP='DELETE' THEN OLD.proposal_id ELSE NEW.proposal_id END;
