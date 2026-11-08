@@ -21,6 +21,11 @@ export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,r
     evidence.ledgerGeneration!==evidence.connectionGeneration ||
     evidence.ledgerOrganizationId!==evidence.salesOrder?.organizationId ||
     evidence.ledgerProposalId!==evidence.salesOrder?.proposalId ||
+    evidence.ledgerState!=='candidate' ||
+    typeof evidence.ledgerFingerprint!=='string' ||
+    !/^[0-9a-f]{64}$/.test(evidence.ledgerFingerprint) ||
+    evidence.ledgerFingerprint==='0'.repeat(64) ||
+    evidence.sourceFingerprint!==evidence.ledgerFingerprint ||
     evidence.salesOrder?.id!==orderId ||
     evidence.sourceManifest?.complete!==true || evidence.sourceManifest?.approvalEvidenceVerified!==true)
     return held('authoritative_evidence_unverified');
