@@ -53,4 +53,21 @@ denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manife
 denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
 denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
 
+
+// Approved Sales Order source authority must remain independent of a caller's
+// filtered equipment arrays; malformed or absent manifests always fail closed.
+denied({sourceManifest:null},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,complete:'true'}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,approvalEvidenceVerified:'true'}},'source_not_authoritatively_verified');
+denied({sourceManifest:{...manifest,baseLineCount:0}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeOrderCount:0}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,changeLineCount:1}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,salesOrderId:'other-order'}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,proposalId:'other-proposal'}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,revision:8}},'source_manifest_incomplete');
+// Approval and scope checks cannot be bypassed even with a matching manifest.
+denied({salesOrder:{...order,approved:'true'}},'approved_sales_order_unverified');
+denied({salesOrder:{...order,organizationId:'other-tenant'}},'source_manifest_incomplete');
+denied({salesOrder:{...order,proposalId:'other-proposal'}},'source_manifest_incomplete');
+
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
