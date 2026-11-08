@@ -32,12 +32,18 @@ BEGIN
  SELECT count(*),count(*) FILTER (WHERE
    li.action_type NOT IN ('add','remove','modify_quantity','modify_price') OR li.action_type IS NULL
    OR (li.action_type IN ('remove','modify_quantity','modify_price') AND li.proposal_line_item_id IS NULL)
+   OR (li.action_type IN ('remove','modify_quantity','modify_price')
+     AND base.id IS NULL)
    OR (li.action_type='add' AND li.product_id IS NULL)
    OR (li.new_quantity IS NULL OR li.new_quantity<0
      OR li.new_quantity<>trunc(li.new_quantity) OR li.new_quantity>10000))
  INTO approved_line_count,unsupported_count
  FROM public.change_order_line_items li
  JOIN public.change_orders co ON co.id=li.change_order_id
+ LEFT JOIN public.proposal_line_items base
+   ON base.id=li.proposal_line_item_id
+   AND base.proposal_id=c.proposal_id
+   AND base.organization_id=c.organization_id
  WHERE co.sales_order_id=c.sales_order_id AND co.organization_id=c.organization_id
    AND co.status='approved'
    AND co.customer_approved=true
