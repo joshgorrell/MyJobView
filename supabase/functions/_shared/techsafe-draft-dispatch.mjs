@@ -29,9 +29,9 @@ export async function dispatchTechsafeDraft({binding,enabled=false,loadConnectio
   if(!connectionValid(connection,binding))
    return held('connection_inactive_or_unverified');
   const bundle=await readBundle(binding);
-  if(!freshSourceRead(bundle,nowSeconds()))return held('source_read_stale');
   const candidate=prepareTechsafeCandidateFromBundle(bundle,binding);
   if(!candidate.valid)return held(candidate.issues[0]?.code??'source_candidate_unverified');
+  if(!freshSourceRead(bundle,nowSeconds()))return held('source_read_stale');
   // A second independent statement read can detect intervening edits before
   // transport authority is built. It is diagnostic, never authorization.
   const latest=await readBundle(binding);
