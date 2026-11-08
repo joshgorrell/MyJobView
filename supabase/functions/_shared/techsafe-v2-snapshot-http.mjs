@@ -4,7 +4,7 @@
 import {prepareTechsafeTransportSnapshot} from './techsafe-transport-contract.mjs';
 const held=reason=>({accepted:false,reason});
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
-export async function sendTechsafeV2Snapshot({endpoint,token,binding,source,authority,revision,eventId,enabled=false,allowedOrigin,fetchImpl=globalThis.fetch}={}){
+export async function sendTechsafeV2Snapshot({endpoint,token,binding,source,authority,revision,eventId,enabled=false,allowedOrigin,authorizeForDelivery,fetchImpl=globalThis.fetch}={}){
  if(enabled!==true)return held('integration_disabled');
  const prepared=prepareTechsafeTransportSnapshot({source,authority,binding,revision,eventId});
  if(!prepared.ready)return held(prepared.reason);
@@ -22,6 +22,20 @@ export async function sendTechsafeV2Snapshot({endpoint,token,binding,source,auth
  if(typeof token!=='string'||token.length<32||token.length>4096||/[\r\n]/.test(token))
   return held('credentials_unavailable');
  if(typeof fetchImpl!=='function')return held('transport_unavailable');
+ // The authority object is just data. A separate server-only transactional gate
+ // must validate the persisted active binding, generation, held/candidate ledger,
+ // approved Sales Order scope, revision and fingerprint immediately before delivery.
+ if(typeof authorizeForDelivery!=='function')return held('transactional_authority_unavailable');
+ let permitted;
+ try{
+  permitted=await authorizeForDelivery({binding:{...binding},revision,eventId,
+   generation:prepared.snapshot.generation,snapshot:structuredClone(prepared.snapshot)});
+ }catch{return held('transactional_authority_failed');}
+ if(!permitted||permitted.authorized!==true||
+  permitted.connectionId!==binding.connectionId||permitted.orderId!==binding.orderId||
+  permitted.organizationId!==binding.organizationId||permitted.proposalId!==binding.proposalId||
+  permitted.generation!==prepared.snapshot.generation||permitted.revision!==revision||
+  permitted.eventId!==eventId)return held('transactional_authority_denied');
  // Never send the raw SQL evidence or the authority object, which may contain private data.
  const body=JSON.stringify(prepared.snapshot);
  if(body.length>1048576)return held('payload_too_large');
