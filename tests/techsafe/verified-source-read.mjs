@@ -44,4 +44,31 @@ for (const patch of [
 }
 assert.equal((await run({salesOrder:{...order,approved:false}})).reason,'approved_sales_order_unverified');
 assert.equal((await run({sourceManifest:{...evidence.sourceManifest,totalChangeOrderCount:1,unapprovedChangeOrderCount:1}})).reason,'unapproved_changes_present');
+
+// Contract regression: a caller-supplied proposal alone is never a Sales Order.
+// A mismatched sales_orders.proposal_id must hold even if approval flags are true.
+for (const patch of [
+ {salesOrder:{...order,id:'proposal-only'}},
+ {salesOrder:{...order,proposalId:'different-approved-proposal'},connectionProposalId:'different-approved-proposal'},
+ {salesOrder:{...order,approved:false}},
+ {sourceManifest:{...evidence.sourceManifest,approvalEvidenceVerified:false}},
+ {sourceManifest:{...evidence.sourceManifest,proposalId:'unapproved-proposal'}},
+ {baseLines:[{...base[0],proposalId:'unapproved-proposal'}]},
+ {changeOrders:[{id:'co-1',salesOrderId:'sales-1',organizationId:'tenant-1',status:'pending',customerApproved:false,revision:1,lines:[]}],
+  sourceManifest:{...evidence.sourceManifest,changeOrderCount:1,totalChangeOrderCount:1}}
+]) {
+ const result=await run(patch);
+ assert.equal(result.ok,false,JSON.stringify(patch));
+ assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
+ assert.deepEqual(result.items,[]);
+}
+// Failure and replay-like repeated inspection never create an export grant.
+for (let i=0;i<3;i++) {
+ const result=await run();
+ assert.equal(result.ok,true);
+ assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
+}
+
 console.log('Transaction source inspection orchestration contract: PASS');
