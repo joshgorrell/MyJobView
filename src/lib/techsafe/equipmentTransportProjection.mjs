@@ -20,11 +20,12 @@ export function projectTechsafeEquipment({inspection,details,minimumUnitValueCen
    return fail('invalid_equipment_detail');
   byId.set(detail.sourceLineId,detail);
  }
- const lines=[];let total=0;
+ const lines=[];let total=0;const seenSourceLines=new Set();
  for(const item of inspection.items){
-  if(!item||!id(item.productId)||!sourceLineId(item.sourceLineId)||
+  if(!item||!id(item.productId)||!sourceLineId(item.sourceLineId)||seenSourceLines.has(item.sourceLineId)||
    !Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>10000)
    return fail('invalid_reconciled_equipment');
+  seenSourceLines.add(item.sourceLineId);
   const detail=byId.get(item.sourceLineId);
   if(!detail||detail.productRef!==item.productId)return fail('equipment_identity_mismatch');
   // Techsafe draft receiver accepts eligible equipment only. Keep the
@@ -33,10 +34,12 @@ export function projectTechsafeEquipment({inspection,details,minimumUnitValueCen
   const line={sourceLineId:item.sourceLineId,productRef:detail.productRef,productKind:'equipment',
    scope:'included',customerSupplied:detail.customerSupplied,techsafeExcluded:detail.techsafeExcluded,
    quantity:item.quantity,unitEquipmentValueCents:detail.unitEquipmentValueCents,description:detail.description};
-  total+=line.quantity*line.unitEquipmentValueCents;
-  if(!Number.isSafeInteger(total))return fail('equipment_value_overflow');
-  if(!line.customerSupplied&&!line.techsafeExcluded&&line.unitEquipmentValueCents>=minimumUnitValueCents)
+  if(!line.customerSupplied&&!line.techsafeExcluded&&line.unitEquipmentValueCents>=minimumUnitValueCents){
+   const lineValue=line.quantity*line.unitEquipmentValueCents;
+   if(!Number.isSafeInteger(lineValue)||!Number.isSafeInteger(total+lineValue))return fail('equipment_value_overflow');
+   total+=lineValue;
    lines.push(line);
+  }
  }
  return {ok:true,authorized:false,snapshotReady:false,reason:'projection_not_certified',revision:inspection.revision,lines};
 }
