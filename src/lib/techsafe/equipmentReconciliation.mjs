@@ -7,12 +7,12 @@ function quantity(value) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > MAX_QUANTITY) throw Error('invalid_quantity');
   return value;
 }
-function id(value) { if (typeof value !== 'string' || !value.trim()) throw Error('missing_identifier'); return value; }
+function id(value) { if (typeof value !== 'string' || !value.trim() || value !== value.trim() || value.length > 256) throw Error('invalid_identifier'); return value; }
 export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,changeOrders,expectedRevision,sourceManifest}) {
   try {
     if (!salesOrder || salesOrder.approved !== true || !salesOrder.id || !salesOrder.organizationId || !salesOrder.proposalId)
       return fail('approved_sales_order_unverified');
-    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || salesOrder.revision !== expectedRevision)
+    // Validate identity before comparing scoped rows; malformed IDs must not alias.\n    const salesOrderId=id(salesOrder.id), organizationId=id(salesOrder.organizationId), proposalId=id(salesOrder.proposalId);\n    if (salesOrderId.startsWith('change:') || organizationId.startsWith('change:') || proposalId.startsWith('change:')) return fail('reserved_source_identifier');\n    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
     if (baseLines.length > MAX_LINES || changeOrders.length > MAX_LINES) return fail('source_too_large');
@@ -56,7 +56,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     const items = new Map();
     const baseIds = new Set();
     for (const line of baseLines) {
-      if (line.organizationId !== salesOrder.organizationId || line.proposalId !== salesOrder.proposalId) return fail('source_scope_mismatch');
+      if (line.organizationId !== organizationId || line.proposalId !== proposalId) return fail('source_scope_mismatch');
       const key=id(line.id), productId=id(line.productId), qty=quantity(line.quantity);
       if (key.startsWith('change:')) return fail('reserved_source_line_identifier');
       if (items.has(key)) return fail('duplicate_base_line');
@@ -69,7 +69,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     // immutable revision order; a missing/ambiguous sequence fails closed.
     let lastRevision=0;
     for (const order of changeOrders) {
-      if (order.salesOrderId !== salesOrder.id || order.organizationId !== salesOrder.organizationId)
+      if (order.salesOrderId !== salesOrderId || order.organizationId !== organizationId)
         return fail('change_order_scope_mismatch');
       if (order.status !== 'approved' || order.customerApproved !== true) return fail('change_order_not_customer_approved');
       const orderId=id(order.id);
@@ -83,7 +83,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       if (processedChangeLines > MAX_LINES) return fail('source_too_large');
       const touchedBaseLines=new Set();
       for (const line of order.lines) {
-        if (line.organizationId !== salesOrder.organizationId || line.changeOrderId !== orderId)
+        if (line.organizationId !== organizationId || line.changeOrderId !== orderId)
           return fail('change_line_scope_mismatch');
         const lineId=id(line.id);
         if (seenChanges.has(lineId)) return fail('duplicate_change_line');
