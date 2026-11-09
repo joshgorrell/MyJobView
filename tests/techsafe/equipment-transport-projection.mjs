@@ -16,6 +16,8 @@ assert.equal(good.snapshotReady,false);
 assert.equal(good.lines.length,1);
 assert.equal(good.lines[0].sourceLineId,'base');
 assert.equal(good.lines[0].unitEquipmentValueCents,75000);
+assert.equal(project({details:[details[0],{...details[1],techsafeExcluded:false,unitEquipmentValueCents:30000}]}).lines[1].sourceLineId,'change:added');
+assert.equal(project({details:[details[0],{...details[1],sourceLineId:'change:bad!'}]}).reason,'invalid_equipment_detail');
 assert.equal(project({inspection:{...inspection,ok:false}}).ok,false);
 assert.equal(project({inspection:{...inspection,authorized:true}}).ok,false);
 assert.equal(project({details:details.slice(0,1)}).reason,'equipment_details_incomplete');
