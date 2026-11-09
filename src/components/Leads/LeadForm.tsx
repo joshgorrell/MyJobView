@@ -128,7 +128,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
         .from('contacts')
         .select('id, full_name, company_name, email, phone, street_address, city, state, zip_code, assigned_to')
         .or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
-        .order('contact_name')
+        .order('full_name')
         .limit(10);
 
       if (error) throw error;
@@ -152,7 +152,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
     setFormData({
       ...formData,
-      contact_name: contact.full_name || '',
+      contact_name: contact.full_name || contact.company_name || '',
       company_name: contact.company_name || '',
       email: contact.email || '',
       phone: contact.phone || '',
@@ -209,6 +209,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       const assignedTo = isFishbowl ? null : formData.assignment;
 
       if (contactMode === 'existing' && !selectedContact) throw new Error('Select a customer first.');
+      const username = await generateUniqueUsername(formData.contact_name, supabase);
       let contactId = selectedContact?.id || null;
       if (!contactId) {
         if (!formData.contact_name.trim()) throw new Error('Contact name is required.');
@@ -222,8 +223,6 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
         if (contactError || !createdContact?.id) throw contactError || new Error('Unable to create contact');
         contactId = createdContact.id;
       }
-      const username = await generateUniqueUsername(formData.contact_name, supabase);
-
       const leadData = {
         company_name: (formData.is_business ? formData.company_name : null) || null,
         contact_name: formData.contact_name,
