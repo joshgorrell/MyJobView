@@ -9,6 +9,11 @@ PSQL=(psql "$DB" -X -v ON_ERROR_STOP=1 -qAt)
 existing="$("${PSQL[@]}" -c "SELECT count(*) FROM pg_class WHERE relnamespace IN ('public'::regnamespace) AND relkind IN ('r','p')")"
 if [[ "$existing" != "0" ]]; then echo 'Refusing nonempty public schema' >&2; exit 2; fi
 "${PSQL[@]}" <<'SQL'
+-- Supabase migrations revoke privileges from these predefined API roles.
+-- Disposable vanilla PostgreSQL does not provide them by default.
+CREATE ROLE anon NOLOGIN;
+CREATE ROLE authenticated NOLOGIN;
+CREATE ROLE service_role NOLOGIN;
 CREATE SCHEMA techsafe_source;
 CREATE TABLE public.proposal_line_items (
  id uuid PRIMARY KEY, organization_id uuid NOT NULL, proposal_id uuid NOT NULL,
