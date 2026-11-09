@@ -228,7 +228,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   return (
     <div className="space-y-4 text-primary">
       <div className="flex flex-wrap justify-between items-center gap-3">
-        <h2 className="text-2xl font-bold">My Time Off</h2>
+        <h2 className={compact ? "text-base font-semibold" : "text-2xl font-bold"}>{compact ? "PTO & Leave" : "My Time Off"}</h2>
         <button
           type="button"
           onClick={() => {
@@ -240,7 +240,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
           Request Time Off
         </button>
       </div>
-      <div className="flex flex-wrap gap-2">
+      {!compact && <div className="flex flex-wrap gap-2">
         <button
           type="button"
           aria-pressed={tab === "mine"}
@@ -266,7 +266,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
             Manage Time Off
           </button>
         )}
-      </div>
+      </div>}
       {error && (
         <p
           role="alert"
