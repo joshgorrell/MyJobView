@@ -65,8 +65,13 @@ try {
  // The unlinked row must not affect either connected Sales Order.
  assert.deepEqual(await read(),beforeRollback);
  await db.query('UPDATE public.proposal_line_items SET organization_id=$1 WHERE id=$2',[otherOrg,b]);
- // Still unlinked: source identity requires BOTH proposal and organization.
- assert.deepEqual(await read(),beforeRollback);
+ // This reparent now matches the connected destination scope and MUST
+ // invalidate its ledger inside the transaction, then roll back atomically.
+ const linkedInside=await read();
+ assert.equal(linkedInside[0].revision,beforeRollback[0].revision);
+ assert.equal(linkedInside[1].revision,beforeRollback[1].revision+1);
+ assert.equal(linkedInside[1].state,'held');
+ assert.equal(linkedInside[1].source_fingerprint,'0'.repeat(64));
  await db.exec('ROLLBACK');
  assert.deepEqual(await read(),beforeRollback);
  // Verify transactional rollback of an actual connected source mutation.
