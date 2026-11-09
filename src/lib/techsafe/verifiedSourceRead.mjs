@@ -35,11 +35,18 @@ export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,r
     evidence.salesOrder?.id!==orderId ||
     evidence.sourceManifest?.complete!==true || evidence.sourceManifest?.approvalEvidenceVerified!==true)
     return held('authoritative_evidence_unverified');
-  const result=reconcileApprovedSalesOrderEquipment({
-    salesOrder:evidence.salesOrder,baseLines:evidence.baseLines,
-    changeOrders:evidence.changeOrders,expectedRevision:evidence.revision,
-    sourceManifest:evidence.sourceManifest
-  });
+  let result;
+  try {
+    result=reconcileApprovedSalesOrderEquipment({
+      salesOrder:evidence.salesOrder,baseLines:evidence.baseLines,
+      changeOrders:evidence.changeOrders,expectedRevision:evidence.revision,
+      sourceManifest:evidence.sourceManifest
+    });
+  } catch {
+    // A malformed authoritative row must hold, not crash the inspection caller.
+    // Inspection is never a dispatch or coverage authorization.
+    return held('authoritative_reconciliation_failed');
+  }
   // No matter what a caller or adapter returns, this operation is inspection
   // only. Certification requires a separate persisted, authenticated snapshot.
   return {...result,authorized:false,snapshotReady:false};
