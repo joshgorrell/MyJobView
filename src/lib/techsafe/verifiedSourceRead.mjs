@@ -2,7 +2,7 @@
 // MJV source read. Does not create trust from caller-supplied flags or send data.
 import {reconcileApprovedSalesOrderEquipment} from './equipmentReconciliation.mjs';
 const held=reason=>({ok:false,authorized:false,snapshotReady:false,reason,items:[]});
-const isId=x=>typeof x==='string'&&x.length>0&&x.length<=256&&x===x.trim();
+const isId=x=>typeof x==='string'&&x.length>0&&x.length<=256&&x===x.trim()&&!/[\u0000-\u001f\u007f]/.test(x)&&!x.startsWith('change:');
 const positiveInt=x=>Number.isSafeInteger(x)&&x>0;
 export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,readConsistentSource}={}) {
   if (!isId(connectionId)||!isId(orderId)) return held('invalid_source_identity');
