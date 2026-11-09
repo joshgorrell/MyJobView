@@ -38,6 +38,22 @@ const render=()=>tree=h.render({},'TestTuneProjectAdjustments');
 const find=label=>nodes(tree).find(n=>n.props?.['aria-label']===label);
 const button=label=>nodes(tree).find(n=>n.type==='button'&&text(n)===label);
 render();for(const effect of h.effects.splice(0))effect();await new Promise(r=>setTimeout(r,0));render();
+// A sales order is context; every task remains an individually actionable row.
+assert.equal(nodes(tree).filter(n=>n.type==='tbody').flatMap(n=>nodes(n).filter(x=>x.type==='tr')).length,7);
+window.location.search='?orderTab=project&projectScope=all&projectStatus=open&projectSort=goal';
+listeners.popstate();render();
+assert.equal(nodes(tree).filter(n=>n.type==='tbody').flatMap(n=>nodes(n).filter(x=>x.type==='tr')).length,7,'Legacy project filters do not hide tasks');
+find('Search Test and Tune punchlist').props.onChange({target:{value:'no-such-task'}});render();
+assert.ok(text(tree).includes('No matching Test & Tune tasks'));
+assert.ok(!text(tree).includes('No matching Test & Tune projects'));
+find('Search Test and Tune punchlist').props.onChange({target:{value:''}});render();
+find('Filter Test and Tune tasks').props.onClick();render();
+find('Filter punchlist status').props.onChange({target:{value:'completed'}});render();
+assert.equal(nodes(tree).filter(n=>n.type==='tbody').length,0,'Open tasks are excluded from completed filter');
+find('Filter punchlist status').props.onChange({target:{value:'open'}});render();
+assert.ok(find('Select a'),'Open task remains actionable');
+find('Filter punchlist status').props.onChange({target:{value:'all'}});render();
+find('Close filters').props.onClick();render();
 const previewTarget={getBoundingClientRect:()=>({left:120,bottom:130})};
 find('Preview a').props.onClick({currentTarget:previewTarget});
 render();
@@ -57,3 +73,16 @@ const originalRoute= listeners.popstate;const fresh=make();fresh.render({},'Test
 window.location.search='?projectId=missing&contactId=c1';originalRoute();render();assert.ok(text(tree).includes('unavailable or you no longer have access'));
 window.location.search='?contactId=c1&history=1&tuneStatus=requested';originalRoute();render();assert.equal(nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox'&&n.props['aria-label']).length,0,'Requested history cannot select already submitted items');assert.ok(text(tree).includes('Service requested'));assert.ok(!nodes(tree).filter(n=>n.type==='article').some(n=>text(n).includes('Other project')));
 console.log('PASS: exactly three of five, project lock, expired block, stable retry key, persisted reload and unavailable route context.');
+
+window.location.search='';
+// Canonical task completion wins over an outstanding service-request status.
+projects[0].tasks[0].status='completed';
+projects[0].tasks[0].service_status='scheduled';
+listeners.popstate();
+const completed=make();completed.render({},'TestTuneProjectAdjustments');
+for(const effect of completed.effects.splice(0))effect();
+await new Promise(r=>setTimeout(r,0));
+let completedTree=completed.render({},'TestTuneProjectAdjustments');
+assert.ok(nodes(completedTree).some(n=>n.props?.['aria-label']==='Completed'));
+assert.ok(!nodes(completedTree).some(n=>n.props?.['aria-label']==='Select a'));
+console.log('PASS: individual task rows, legacy URLs, task empty state, status filters, completion precedence.');
