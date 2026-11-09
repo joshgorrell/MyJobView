@@ -42,7 +42,6 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const [policy, setPolicy] = useState("");
   const [type, setType] = useState("full_day");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -183,7 +182,9 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       clearTimeout(timer);
     };
   }, [showForm, start, end, type, startTime, endTime]);
-  const selected = balances.find((b) => b.policy.id === policy);
+  // A single assigned balance is required until legacy multi-policy data is reconciled.
+  const activePolicy = balances.length === 1 ? balances[0].policy.id : "";
+  const selected = balances.length === 1 ? balances[0] : undefined;
   const total = preview.reduce((sum, d) => sum + Number(d.hours), 0);
   const shortNotice =
     start &&
@@ -193,11 +194,11 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       86400000 <
       28;
   async function submit() {
-    if (!policy || !preview.length || previewError || (start === today && !calledManagerAcknowledged)) return;
+    if (!activePolicy || !preview.length || previewError || (start === today && !calledManagerAcknowledged)) return;
     setBusy(true);
     setError("");
     const { error } = await supabase.rpc("submit_time_off", {
-      p_policy: policy,
+      p_policy: activePolicy,
       p_start: start,
       p_end: end,
       p_type: type,
@@ -378,21 +379,13 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                 {error}
               </p>
             )}
-            <label className="block">
-              Leave Policy
-              <select
-                className={field}
-                value={policy}
-                onChange={(e) => setPolicy(e.target.value)}
-              >
-                <option value="">Select policy…</option>
-                {balances.map((b) => (
-                  <option key={b.id} value={b.policy.id}>
-                    {b.policy.policy_name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {balances.length !== 1 && (
+              <p role="alert" className="text-sm text-red-600">
+                {balances.length === 0
+                  ? "Your PTO balance has not been set up. Contact your manager."
+                  : "Your PTO setup needs administrator review before requesting time off."}
+              </p>
+            )}
             <label className="block">
               Request Type
               <select
@@ -403,8 +396,8 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                   if (e.target.value === "hours") setEnd(start);
                 }}
               >
-                <option value="full_day">Full workday(s)</option>
-                <option value="half_day">Half workday(s)</option>
+                <option value="full_day">Full day (8 hours)</option>
+                <option value="half_day">Half day (4 hours)</option>
                 <option value="hours">Specific hours (one day)</option>
               </select>
             </label>
@@ -458,8 +451,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
               </div>
             )}
             <p className="text-sm text-muted">
-              Only your configured workdays are charged; company holidays are excluded. Half days must match
-              half your configured daily hours.
+              Only scheduled workdays are charged; company holidays are excluded.
             </p>
             {previewLoading ? (
               <p role="status">Calculating hours…</p>
@@ -511,7 +503,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                 busy ||
                 (start === today && !calledManagerAcknowledged) ||
                 previewLoading ||
-                !policy ||
+                !activePolicy ||
                 !preview.length ||
                 !!previewError
               }
