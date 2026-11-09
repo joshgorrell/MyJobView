@@ -2,7 +2,6 @@
 // No caller-supplied JSON is authority: both rows MUST be fetched independently
 // by the server with connection/ledger/certificate locks in one DB transaction.
 // Even a passing result cannot authorize dispatch until that adapter exists.
-import {compareSalesOrderEquipmentEvidence} from './canonicalEquipmentEvidence.mjs';
 const held=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 const id=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const positive=x=>Number.isSafeInteger(x)&&x>0;
