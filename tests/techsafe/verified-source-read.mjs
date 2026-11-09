@@ -122,4 +122,20 @@ for(const patch of [
  assert.deepEqual(result.items,[]);
 }
 
+
+// The Techsafe receiver rejects these source IDs. Hold before the DB adapter
+// rather than reporting a successful inspection that cannot be transported.
+for (const invalid of ['space in id','bad.dot','bad:colon','nonascii-ñ','a'.repeat(129),'trailing/']) {
+ for (const field of ['connectionId','orderId']) {
+  let reads=0;
+  const input={connectionId:'conn-1',orderId:'sales-1',readConsistentSource:async()=>{reads++;return evidence;}};
+  input[field]=invalid;
+  const result=await inspect(input);
+  assert.equal(result.reason,'invalid_source_identity',field+': '+invalid);
+  assert.equal(result.authorized,false);
+  assert.equal(result.snapshotReady,false);
+  assert.equal(reads,0,'invalid transport identity reached database adapter');
+ }
+}
+
 console.log('Transaction source inspection orchestration contract: PASS');
