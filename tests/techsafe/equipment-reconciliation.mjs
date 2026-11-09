@@ -19,7 +19,7 @@ const denied=(patch,reason)=>{ const result=run(patch); assert.equal(result.reas
 denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified');
 denied({salesOrder:{...order,id:' so-1'}},'invalid_identifier');
 denied({salesOrder:{...order,organizationId:'tenant-1 '}},'invalid_identifier');
-denied({salesOrder:{...order,proposalId:'change:other'}},'reserved_source_identifier');
+denied({salesOrder:{...order,proposalId:'change:other'}},'invalid_identifier');
 // IDs must not contain control characters that could break canonical source
 // identity, logs, signatures, or downstream transport encodings.
 denied({salesOrder:{...order,id:'so-1\nother'}},'invalid_identifier');
@@ -44,7 +44,7 @@ denied({changeOrders:[{...change,lines:[{...change.lines[0],id:' '.repeat(257)}]
 
 denied({salesOrder:{...order,revision:8}},'stale_source_revision');
 denied({salesOrder:{...order,revision:0},expectedRevision:0},'stale_source_revision');
-denied({baseLines:[{...base[0],id:'change:line-1'}]},'reserved_source_line_identifier');
+denied({baseLines:[{...base[0],id:'change:line-1'}]},'invalid_identifier');
 denied({baseLines:[{...base[0],organizationId:'tenant-2'}]},'source_scope_mismatch');
 denied({baseLines:[{...base[0],quantity:10001}]},'invalid_quantity');
 denied({baseLines:[base[0],base[0]]},'duplicate_base_line');
