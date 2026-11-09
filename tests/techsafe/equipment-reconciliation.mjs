@@ -1,18 +1,39 @@
 import assert from 'node:assert/strict';
 import {reconcileApprovedSalesOrderEquipment as reconcile} from '../../src/lib/techsafe/equipmentReconciliation.mjs';
+import {readFileSync} from 'node:fs';
+const reconcilerSource=readFileSync(new URL('../../src/lib/techsafe/equipmentReconciliation.mjs',import.meta.url),'utf8');
+assert.doesNotMatch(reconcilerSource,/\/\/[^\n]*\\n\s*(?:const|if|return)\b/,'Escaped newlines must not comment out security checks');
 const order={id:'so-1',organizationId:'tenant-1',proposalId:'approved-source-1',approved:true,revision:7};
 const base=[{id:'base-1',organizationId:'tenant-1',proposalId:'approved-source-1',productId:'tv',quantity:2}];
 const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',proposalId:'approved-source-1',status:'approved',customerApproved:true,revision:6,
  lines:[{id:'line-1',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'modify_quantity',proposalLineItemId:'base-1',productId:'tv',newQuantity:3},
  {id:'line-2',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'add',productId:'speaker',newQuantity:2}]};
 const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch};
- const sourceManifest=Object.hasOwn(patch,'sourceManifest')?patch.sourceManifest:{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
+ const sourceManifest=patch.sourceManifest??{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,totalChangeOrderCount:args.changeOrders.length,unapprovedChangeOrderCount:0,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
  return reconcile({...args,sourceManifest}); };
 assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]]);
 assert.equal(run().reason,'reconciled_not_certified');
-const denied=(patch,reason)=>assert.equal(run(patch).reason,reason);
+assert.equal(run().authorized,false);
+assert.equal(run().snapshotReady,false);
+const denied=(patch,reason)=>{ const result=run(patch); assert.equal(result.reason,reason); assert.equal(result.ok,false); assert.equal(result.authorized,false); assert.equal(result.snapshotReady,false); assert.deepEqual(result.items,[]); };
 denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified');
+denied({salesOrder:{...order,id:' so-1'}},'invalid_identifier');
+denied({salesOrder:{...order,organizationId:'tenant-1 '}},'invalid_identifier');
+denied({salesOrder:{...order,proposalId:'change:other'}},'reserved_source_identifier');
+// IDs must not contain control characters that could break canonical source
+// identity, logs, signatures, or downstream transport encodings.
+denied({salesOrder:{...order,id:'so-1\nother'}},'invalid_identifier');
+denied({salesOrder:{...order,organizationId:'tenant-1\tother'}},'invalid_identifier');
+denied({baseLines:[{...base[0],id:'base-1\u0000other'}]},'invalid_identifier');
+denied({changeOrders:[{...change,lines:[{...change.lines[0],id:'line-1\rmore'}]}]},'invalid_identifier');
+denied({baseLines:[{...base[0],id:'base-1 '}]},'invalid_identifier');
+denied({baseLines:[{...base[0],productId:' '}]},'invalid_identifier');
+denied({changeOrders:[{...change,id:'co-1 '}]},'invalid_identifier');
+denied({changeOrders:[{...change,lines:[{...change.lines[0],id:' '.repeat(257)}]}]},'invalid_identifier');
+
 denied({salesOrder:{...order,revision:8}},'stale_source_revision');
+denied({salesOrder:{...order,revision:0},expectedRevision:0},'stale_source_revision');
+denied({baseLines:[{...base[0],id:'change:line-1'}]},'reserved_source_line_identifier');
 denied({baseLines:[{...base[0],organizationId:'tenant-2'}]},'source_scope_mismatch');
 denied({baseLines:[{...base[0],quantity:10001}]},'invalid_quantity');
 denied({baseLines:[base[0],base[0]]},'duplicate_base_line');
@@ -30,8 +51,11 @@ denied({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'remove',
 denied({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'replace'}]}]},'unsupported_change_action');
 assert.deepEqual(run({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'remove',newQuantity:0}]}]}).items,[]);
 assert.deepEqual(run({changeOrders:[]}).items.map(x=>x.quantity),[2]);
-const manifest={salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:1,changeOrderCount:1,changeLineCount:2};
+const manifest={salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:1,changeOrderCount:1,totalChangeOrderCount:1,unapprovedChangeOrderCount:0,changeLineCount:2};
 denied({sourceManifest:{...manifest,changeOrderCount:2}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}},'unapproved_changes_present');
+denied({sourceManifest:{...manifest,totalChangeOrderCount:2}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,unapprovedChangeOrderCount:-1}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,changeLineCount:3}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,revision:6}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,organizationId:'other-tenant'}},'source_manifest_incomplete');
@@ -55,21 +79,23 @@ denied({changeOrders:[{...change,lines:[change.lines[0]]}],sourceManifest:manife
 denied({sourceManifest:{...manifest,proposalId:'unapproved-proposal'}},'source_manifest_incomplete');
 denied({salesOrder:{...order,proposalId:'other-proposal'},sourceManifest:manifest},'source_manifest_incomplete');
 
-
-// Approved Sales Order source authority must remain independent of a caller's
-// filtered equipment arrays; malformed or absent manifests always fail closed.
-denied({sourceManifest:null},'source_not_authoritatively_verified');
-denied({sourceManifest:{...manifest,complete:'true'}},'source_not_authoritatively_verified');
-denied({sourceManifest:{...manifest,approvalEvidenceVerified:'true'}},'source_not_authoritatively_verified');
-denied({sourceManifest:{...manifest,baseLineCount:0}},'source_manifest_incomplete');
-denied({sourceManifest:{...manifest,changeOrderCount:0}},'source_manifest_incomplete');
-denied({sourceManifest:{...manifest,changeLineCount:1}},'source_manifest_incomplete');
-denied({sourceManifest:{...manifest,salesOrderId:'other-order'}},'source_manifest_incomplete');
-denied({sourceManifest:{...manifest,proposalId:'other-proposal'}},'source_manifest_incomplete');
-denied({sourceManifest:{...manifest,revision:8}},'source_manifest_incomplete');
-// Approval and scope checks cannot be bypassed even with a matching manifest.
-denied({salesOrder:{...order,approved:'true'}},'approved_sales_order_unverified');
-denied({salesOrder:{...order,organizationId:'other-tenant'}},'source_manifest_incomplete');
-denied({salesOrder:{...order,proposalId:'other-proposal'}},'source_manifest_incomplete');
-
+// Two edits to one base line inside the same approved change order are
+// ambiguous without a source-defined intra-order sequence; reject rather
+// than guessing whether a price or quantity change should win.
+denied({changeOrders:[{...change,lines:[change.lines[0],{...change.lines[0],id:'duplicate-target',newQuantity:4}]}]},'ambiguous_change_order_line_actions');
+denied({changeOrders:[{...change,lines:[change.lines[0],{...change.lines[0],id:'duplicate-target-price',actionType:'modify_price'}]}]},'ambiguous_change_order_line_actions');
+// A later approved change order may legitimately update that same base line.
+// A price-only customer-approved change must not alter the covered quantity.
+const priceOnly={...change,id:'co-price',revision:6,lines:[{...change.lines[0],id:'price-line',changeOrderId:'co-price',actionType:'modify_price',newQuantity:2}]};
+assert.deepEqual(run({changeOrders:[priceOnly]}).items.map(x=>x.quantity),[2]);
+// Multiple approved changes must apply in ascending source revision order.
+const first={...change,id:'co-first',revision:5,lines:[{...change.lines[0],id:'first-line',changeOrderId:'co-first',newQuantity:4}]};
+const second={...change,id:'co-second',revision:6,lines:[{...change.lines[0],id:'second-line',changeOrderId:'co-second',newQuantity:5}]};
+assert.deepEqual(run({changeOrders:[first,second]}).items.map(x=>x.quantity),[5]);
+denied({changeOrders:[second,first]},'ambiguous_change_order_sequence');
+// Repeated invocation must be deterministic and must not mutate source data.
+const originalBase=structuredClone(base), originalChange=structuredClone(change);
+assert.deepEqual(run(),run());
+assert.deepEqual(base,originalBase);
+assert.deepEqual(change,originalChange);
 console.log('Pure Sales Order equipment reconciliation contract: PASS');

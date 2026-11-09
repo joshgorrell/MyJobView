@@ -2,17 +2,20 @@
 // No database access, credentials, dispatch, or network side effects.
 const MAX_QUANTITY = 10000;
 const MAX_LINES = 10000;
-function fail(reason) { return {ok:false,reason,items:[]}; }
+function fail(reason) { return {ok:false,authorized:false,snapshotReady:false,reason,items:[]}; }
 function quantity(value) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > MAX_QUANTITY) throw Error('invalid_quantity');
   return value;
 }
-function id(value) { if (typeof value !== 'string' || !value.trim()) throw Error('missing_identifier'); return value; }
+function id(value) { if (typeof value !== 'string' || !value.trim() || value !== value.trim() || value.length > 256 || /[\u0000-\u001f\u007f]/.test(value)) throw Error('invalid_identifier'); return value; }
 export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,changeOrders,expectedRevision,sourceManifest}) {
   try {
     if (!salesOrder || salesOrder.approved !== true || !salesOrder.id || !salesOrder.organizationId || !salesOrder.proposalId)
       return fail('approved_sales_order_unverified');
-    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || salesOrder.revision !== expectedRevision)
+    // Validate identity before comparing scoped rows; malformed IDs must not alias.
+    const salesOrderId=id(salesOrder.id), organizationId=id(salesOrder.organizationId), proposalId=id(salesOrder.proposalId);
+    if (salesOrderId.startsWith('change:') || organizationId.startsWith('change:') || proposalId.startsWith('change:')) return fail('reserved_source_identifier');
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
     if (baseLines.length > MAX_LINES || changeOrders.length > MAX_LINES) return fail('source_too_large');
@@ -38,17 +41,29 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       !Number.isSafeInteger(sourceManifest.changeOrderCount) || sourceManifest.changeOrderCount < 0 ||
       !Number.isSafeInteger(sourceManifest.changeLineCount) || sourceManifest.changeLineCount < 0 ||
       sourceManifest.changeLineCount > MAX_LINES ||
-      !Number.isSafeInteger(sourceManifest.changeOrderCount) ||
-      !Number.isSafeInteger(sourceManifest.changeLineCount) ||
       sourceManifest.baseLineCount !== baseLines.length ||
       sourceManifest.changeOrderCount !== changeOrders.length ||
       sourceManifest.changeLineCount !== changeOrders.reduce((n,co)=>n+(Array.isArray(co.lines)?co.lines.length:0),0))
       return fail('source_manifest_incomplete');
+    // A filtered list of approved changes is insufficient: the independent
+    // source scan must also account for every unapproved/pending change.
+    // A pending change blocks snapshot certification rather than disappearing.
+    if (!Number.isSafeInteger(sourceManifest.totalChangeOrderCount) ||
+        sourceManifest.totalChangeOrderCount < 0 ||
+        !Number.isSafeInteger(sourceManifest.unapprovedChangeOrderCount) ||
+        sourceManifest.unapprovedChangeOrderCount < 0 ||
+        sourceManifest.totalChangeOrderCount !== sourceManifest.changeOrderCount + sourceManifest.unapprovedChangeOrderCount)
+      return fail('source_manifest_incomplete');
+    if (sourceManifest.unapprovedChangeOrderCount !== 0)
+      return fail('unapproved_changes_present');
     const items = new Map();
+    const baseIds = new Set();
     for (const line of baseLines) {
-      if (line.organizationId !== salesOrder.organizationId || line.proposalId !== salesOrder.proposalId) return fail('source_scope_mismatch');
+      if (line.organizationId !== organizationId || line.proposalId !== proposalId) return fail('source_scope_mismatch');
       const key=id(line.id), productId=id(line.productId), qty=quantity(line.quantity);
+      if (key.startsWith('change:')) return fail('reserved_source_line_identifier');
       if (items.has(key)) return fail('duplicate_base_line');
+      baseIds.add(key);
       items.set(key,{sourceLineId:key,productId,quantity:qty});
     }
     const seenOrders=new Set(), seenChanges=new Set();
@@ -57,8 +72,8 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     // immutable revision order; a missing/ambiguous sequence fails closed.
     let lastRevision=0;
     for (const order of changeOrders) {
-      if (order.salesOrderId !== salesOrder.id || order.organizationId !== salesOrder.organizationId ||
-          order.proposalId !== salesOrder.proposalId)
+      if (order.salesOrderId !== salesOrderId || order.organizationId !== organizationId ||
+          order.proposalId !== proposalId)
         return fail('change_order_scope_mismatch');
       if (order.status !== 'approved' || order.customerApproved !== true) return fail('change_order_not_customer_approved');
       const orderId=id(order.id);
@@ -70,8 +85,9 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       if (!Array.isArray(order.lines) || order.lines.length === 0) return fail('missing_change_order_lines');
       processedChangeLines+=order.lines.length;
       if (processedChangeLines > MAX_LINES) return fail('source_too_large');
+      const touchedBaseLines=new Set();
       for (const line of order.lines) {
-        if (line.organizationId !== salesOrder.organizationId || line.changeOrderId !== orderId)
+        if (line.organizationId !== organizationId || line.changeOrderId !== orderId)
           return fail('change_line_scope_mismatch');
         const lineId=id(line.id);
         if (seenChanges.has(lineId)) return fail('duplicate_change_line');
@@ -79,10 +95,13 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
         const qty=quantity(line.newQuantity);
         if (line.actionType === 'add') {
           const productId=id(line.productId), key='change:'+lineId;
+          if (baseIds.has(key) || items.has(key)) return fail('source_line_identifier_collision');
           items.set(key,{sourceLineId:key,productId,quantity:qty});
         } else if (line.actionType === 'remove' || line.actionType === 'modify_quantity' || line.actionType === 'modify_price') {
           const key=id(line.proposalLineItemId), previous=items.get(key);
-          if (!previous || !baseLines.some(base=>base.id===key)) return fail('changed_item_not_in_sales_order');
+          if (touchedBaseLines.has(key)) return fail('ambiguous_change_order_line_actions');
+          touchedBaseLines.add(key);
+          if (!previous || !baseIds.has(key)) return fail('changed_item_not_in_sales_order');
           if (line.productId && line.productId !== previous.productId) return fail('changed_product_mismatch');
           if (line.actionType === 'remove') {
             if (qty !== 0) return fail('remove_must_zero_quantity');
@@ -97,7 +116,10 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     // bounded source contract, even when each individual line is valid.
     const totalQuantity=[...items.values()].reduce((sum,item)=>sum+item.quantity,0);
     if (totalQuantity > MAX_LINES) return fail('equipment_quantity_limit_exceeded');
-    return {ok:true,reason:'reconciled_not_certified',revision:expectedRevision,
-      items:[...items.values()].filter(x=>x.quantity>0).sort((a,b)=>a.sourceLineId.localeCompare(b.sourceLineId))};
+    const output=[...items.values()].filter(x=>x.quantity>0).sort((a,b)=>a.sourceLineId.localeCompare(b.sourceLineId));
+    // The pure result is diagnostic evidence only; downstream consumers must
+    // not confuse a successfully computed list with a certified export.
+    return {ok:true,authorized:false,snapshotReady:false,reason:'reconciled_not_certified',revision:expectedRevision,
+      items:output};
   } catch (error) { return fail(error instanceof Error ? error.message : 'invalid_source'); }
 }
