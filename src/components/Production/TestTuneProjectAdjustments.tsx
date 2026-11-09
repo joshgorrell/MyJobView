@@ -7,6 +7,27 @@ import { SupportPhotos } from '../Shared/SupportPhotos';
 
 type PunchlistTask = { id: string; title: string; customer_description: string | null; visibility: string; status: string; request_id: string | null; source?: string; created_at?: string; updated_at?: string; service_status?: string | null; photos?: string[] };
 type Project = { id: string; contact_id: string; name: string; number: string | null; customer: string; can_submit: boolean; end_date: string; tasks: PunchlistTask[] };
+// Task completion takes precedence over a linked request's scheduling state.
+function taskStage(task: PunchlistTask) {
+  if (task.status === 'completed' || ['closed', 'completed'].includes(task.service_status || '')) return 'completed';
+  if (task.status === 'cancelled' || task.service_status === 'cancelled') return 'cancelled';
+  if (task.request_id || ['in_progress', 'scheduled', 'in_work_order'].includes(task.status)) return 'in_progress';
+  return 'open';
+}
+function matchesStatus(task: PunchlistTask, filter: string) {
+  if (!filter || filter === 'all') return true;
+  if (filter === 'requested') return Boolean(task.request_id);
+  if (filter === 'unsubmitted') return !task.request_id && task.status === 'open' && taskStage(task) === 'open';
+  return taskStage(task) === filter;
+}
+function taskStatusLabel(task: PunchlistTask) {
+  const stage = taskStage(task);
+  if (stage === 'completed') return 'Completed';
+  if (stage === 'cancelled') return 'Cancelled';
+  if (task.service_status === 'scheduled' || task.status === 'scheduled') return 'Scheduled';
+  if (task.request_id) return 'Service requested';
+  return stage === 'in_progress' ? 'In progress' : 'Open';
+}
 export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: { canViewServiceRequests?: boolean }) {
   const { profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -118,14 +139,19 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
   const projectId = context.get('projectId'), contactId = context.get('contactId'), taskId = context.get('taskId'), requestId = context.get('serviceRequestId'), taskStatus = context.get('tuneStatus');
   const scoped = projects.filter(p => (!projectId || p.id === projectId) && (!contactId || p.contact_id === contactId) && (customerFilter === 'all' || p.contact_id === customerFilter) && (projectFilter === 'all' || p.id === projectFilter));
   const dateCutoff = dateFilter === 'all' ? 0 : Date.now() - Number(dateFilter) * 86400000;
-  const visible = scoped.map(p => ({ ...p, tasks: p.tasks.filter(t => (sourceFilter === 'all' || t.source === sourceFilter) && (!dateCutoff || (Date.parse(t.updated_at || t.created_at || '') || 0) >= dateCutoff) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (statusFilter === 'all' || (statusFilter === 'requested' ? Boolean(t.request_id) : statusFilter === 'unsubmitted' ? !t.request_id && t.status === 'open' : statusFilter === 'completed' ? t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || '')) : t.status === statusFilter)) && (!taskStatus || taskStatus === 'all' || (taskStatus === 'requested' ? Boolean(t.request_id) : t.status === taskStatus))) }))
-    .filter(p => p.tasks.length > 0 && p.tasks.some(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))));
-  const rows = visible.flatMap(p => p.tasks.filter(t => [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.toLowerCase()))).map(t => ({ p, t }))).sort((a, b) => (Date.parse(b.t.updated_at || b.t.created_at || '') || 0) - (Date.parse(a.t.updated_at || a.t.created_at || '') || 0));
-  const summary = scoped.flatMap(p => p.tasks).filter(t => (sourceFilter === 'all' || t.source === sourceFilter) && (visibilityFilter === 'all' || t.visibility === visibilityFilter) && (!dateCutoff || (Date.parse(t.updated_at || t.created_at || '') || 0) >= dateCutoff) && (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) && [search.toLowerCase()].every(q => !q || [t.title, t.customer_description, ...scoped.filter(p => p.tasks.some(item => item.id === t.id)).flatMap(p => [p.customer, p.name, p.number])].some(v => v?.toLowerCase().includes(q))));
-  const summaryCounts = { all: summary.length, unsubmitted: summary.filter(t => !t.request_id && t.status === 'open').length, requested: summary.filter(t => Boolean(t.request_id)).length, completed: summary.filter(t => t.status === 'completed' || (Boolean(t.request_id) && ['closed', 'completed'].includes(t.service_status || ''))).length };
+  const summaryRows = scoped.flatMap(p => p.tasks.map(t => ({ p, t }))).filter(({ p, t }) =>
+    (sourceFilter === 'all' || t.source === sourceFilter) &&
+    (!dateCutoff || (Date.parse(t.updated_at || t.created_at || '') || 0) >= dateCutoff) &&
+    (!taskId || t.id === taskId) && (!requestId || t.request_id === requestId) &&
+    (visibilityFilter === 'all' || t.visibility === visibilityFilter) &&
+    matchesStatus(t, taskStatus || 'all') &&
+    [p.customer, p.name, p.number, t.customer_description, t.title].some(v => v?.toLowerCase().includes(search.trim().toLowerCase())));
+  const rows = summaryRows.filter(({ t }) => matchesStatus(t, statusFilter))
+    .sort((a, b) => (Date.parse(b.t.updated_at || b.t.created_at || '') || 0) - (Date.parse(a.t.updated_at || a.t.created_at || '') || 0));
+  const hasTasks = projects.some(p => p.tasks.length > 0);
   return <section className="min-w-0 space-y-2" aria-label="Test and Tune punchlist feed">
     <div data-testid="punchlist-toolbar" className="flex min-w-0 items-center gap-2">
-      <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search customers, projects or tasks" className="min-h-11 min-w-0 flex-1 rounded-xl border border-subtle bg-surface px-3 text-primary" />
+      <input aria-label="Search Test and Tune punchlist" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks, customers or sales orders" className="min-h-11 min-w-0 flex-1 rounded-xl border border-subtle bg-surface px-3 text-primary" />
       <button type="button" aria-label="Filter Test and Tune tasks" aria-haspopup="dialog" aria-expanded={showAdvancedFilters} onClick={() => setShowAdvancedFilters(true)} className="relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-subtle bg-surface px-3 text-sm font-medium text-primary">
         <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Filters</span>
         {[statusFilter, visibilityFilter, customerFilter, projectFilter, sourceFilter, dateFilter].filter(value => value !== 'all').length > 0 && <span className="rounded-full bg-blue-600 px-1.5 text-xs text-white">{[statusFilter, visibilityFilter, customerFilter, projectFilter, sourceFilter, dateFilter].filter(value => value !== 'all').length}</span>}
@@ -135,16 +161,16 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {showAdvancedFilters && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-6" onMouseDown={event => { if (event.target === event.currentTarget) setShowAdvancedFilters(false); }}>
       <section role="dialog" aria-modal="true" aria-label="Test and Tune filters" className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-subtle bg-surface text-primary shadow-2xl">
         <header className="flex items-center justify-between border-b border-subtle px-5 py-4">
-          <div><h2 className="text-lg font-semibold">Filter Test &amp; Tune</h2><p className="text-xs text-secondary">Narrow tasks by project, customer, status and more.</p></div>
+          <div><h2 className="text-lg font-semibold">Filter Test &amp; Tune</h2><p className="text-xs text-secondary">Narrow tasks by customer, sales order, status and source.</p></div>
           <button type="button" aria-label="Close filters" onClick={() => setShowAdvancedFilters(false)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-surface-hover"><X className="h-5 w-5" /></button>
         </header>
         <div className="grid min-w-0 grid-cols-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
           <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-secondary">Status
-            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All items</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
+            <select aria-label="Filter punchlist status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[165px]"><option value="all">All tasks</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="cancelled">Cancelled</option><option value="unsubmitted">Not submitted</option><option value="requested">Service requested</option><option value="completed">Completed</option></select>
           </label>
           <select aria-label="Filter punchlist visibility" value={visibilityFilter} onChange={e => setVisibilityFilter(e.target.value)} className="min-h-11 rounded-lg border border-subtle bg-surface px-2 text-primary"><option value="all">All visibility</option><option value="customer_visible">Public</option><option value="internal">Private</option></select>
       <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist customer" value={customerFilter} onChange={e => { setCustomerFilter(e.target.value); setProjectFilter('all'); }}><option value="all">All customers</option>{Array.from(new Map(projects.map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
-      <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All projects</option>{projects.filter(p => customerFilter === 'all' || p.contact_id === customerFilter).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+      <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[160px]" aria-label="Filter punchlist project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All sales orders</option>{projects.filter(p => customerFilter === 'all' || p.contact_id === customerFilter).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
       <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[130px]" aria-label="Filter punchlist source" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="all">All sources</option><option value="customer">Customer</option><option value="manual">Employee</option><option value="proposal">Project</option></select>
       <select className="min-h-11 min-w-0 flex-1 rounded-lg border border-subtle bg-surface px-2 text-primary xl:max-w-[150px]" aria-label="Filter punchlist date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}><option value="all">Any update date</option><option value="1">Past 24 hours</option><option value="7">Past 7 days</option><option value="30">Past 30 days</option><option value="90">Past 90 days</option></select>
 
@@ -156,22 +182,22 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
       </section>
     </div>}
     <div className="flex items-center justify-between gap-2 text-xs text-secondary" aria-live="polite">
-      <span>{rows.length} {rows.length === 1 ? 'item' : 'items'} shown</span>
-      <span>{summaryCounts[statusFilter as keyof typeof summaryCounts] ?? rows.length} in selected category</span>
+      <span>{rows.length} {rows.length === 1 ? 'task' : 'tasks'} shown</span>
+
     </div>
     {loading && <p role="status">Loading punchlist…</p>}
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
     {notice && <p role="status" className="break-words text-sm text-secondary">{notice}</p>}
     {(projectId || contactId) && !loading && !error && scoped.length === 0 && <p role="alert">This customer or project is unavailable or you no longer have access.</p>}
-    {(taskId || requestId) && !loading && !error && !visible.some(p => p.tasks.length) && <p role="alert">This punchlist item or request is unavailable in the selected project.</p>}
+    {(taskId || requestId) && !loading && !error && !rows.length && <p role="alert">This punchlist item or request is unavailable in the selected project.</p>}
     {lastRequestId && canViewServiceRequests && <a href={`/service-requests?serviceRequestId=${encodeURIComponent(lastRequestId)}`} className="inline-flex min-h-11 items-center text-sm text-info">View service request →</a>}
     {selected.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm"><span>{selected.length} selected · {selectedProject?.customer}</span><button disabled={busy || !selectedProject?.can_submit} onClick={() => void submit()} className="min-h-11 rounded-lg bg-blue-600 px-3 text-white disabled:opacity-50">{busy ? 'Submitting…' : 'Request service'}</button><button disabled={busy} onClick={() => setSelected([])} className="min-h-11 px-3 text-info">Clear selection</button></div>}
-    {!loading && !error && !visible.length && <div className="rounded-xl border border-subtle bg-surface px-5 py-10 text-center"><h2 className="text-base font-semibold text-primary">No matching Test &amp; Tune projects</h2><p className="mt-2 text-sm text-secondary">Try adjusting your filters, or create a Test & Tune task for an eligible project.</p></div>}
+    {!loading && !error && !rows.length && <div className="rounded-xl border border-subtle bg-surface px-5 py-10 text-center"><h2 className="text-base font-semibold text-primary">{hasTasks ? 'No matching Test & Tune tasks' : 'No Test & Tune tasks yet'}</h2><p className="mt-2 text-sm text-secondary">{hasTasks ? 'Try adjusting your search or filters.' : 'Tasks created by customers or your team during Test & Tune will appear here.'}</p></div>}
     <div className="space-y-2 md:hidden" aria-label="Mobile Test and Tune tasks">
       {rows.map(({ p, t }) => {
         const description = t.customer_description || t.title;
         const requested = Boolean(t.request_id);
-        const status = requested ? (['closed', 'completed'].includes(t.service_status || '') ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : t.service_status === 'cancelled' ? 'Cancelled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
+        const status = taskStatusLabel(t);
         return <article key={t.id} className="min-w-0 rounded-xl border border-subtle bg-surface p-4 shadow-sm">
           <div className="flex items-start gap-3">
             {!requested && t.status === 'open' && <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}
@@ -188,12 +214,12 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     </div>
     {rows.length > 0 && <div className="hidden max-w-full overflow-x-auto rounded-xl border border-subtle bg-surface md:block">
       <table className="w-full min-w-[680px] text-left text-sm">
-        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Project</th><th className="p-3">Punchlist item</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th></tr></thead>
+        <thead className="bg-surface text-xs text-muted"><tr><th className="p-3">Select</th><th className="p-3">Updated</th><th className="p-3">Customer / Sales order</th><th className="p-3">Task</th><th className="p-3" title="Source">Source</th><th className="p-3" title="Visibility">👁</th><th className="p-3" title="Service status">Status</th></tr></thead>
         <tbody className="divide-y divide-subtle">
           {rows.map(({ p, t }) => {
             const description = t.customer_description || t.title;
             const requested = Boolean(t.request_id);
-            const status = requested ? (t.service_status === 'closed' || t.service_status === 'completed' ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : t.service_status === 'cancelled' ? 'Cancelled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
+            const status = taskStatusLabel(t);
             return <tr key={t.id} onClick={() => openPunchlistTask(t.id)} className="group relative cursor-pointer hover:bg-surface/70 focus-within:bg-surface/70">
               <td className="p-3 align-top">{!requested && t.status === 'open' && <input className="h-5 w-5" type="checkbox" aria-label={`Select ${description}`} checked={selected.includes(t.id)} disabled={busy || !p.can_submit || Boolean(selectedProject && selectedProject.id !== p.id)} onClick={e => e.stopPropagation()} onChange={e => setSelected(prev => e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id))} />}</td>
               <td className="whitespace-nowrap p-3 align-top text-xs text-muted">{t.updated_at || t.created_at ? new Date(t.updated_at || t.created_at!).toLocaleString() : "—"}</td><td className="p-3 align-top"><span className="font-medium text-primary">{p.customer}</span><div className="text-xs text-muted">{p.name}</div></td>
@@ -209,7 +235,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
                 </div>
               </td>
               <td className="p-3 align-top"><span role="img" aria-label={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'} title={t.source === 'customer' ? 'Customer' : t.source === 'manual' ? 'Employee' : 'Project'}>{t.source === 'customer' ? '👤' : t.source === 'manual' ? '🛠️' : '📋'}</span></td><td className="p-3 align-top"><span role="img" aria-label={t.visibility === 'internal' ? 'Private' : 'Public'} title={t.visibility === 'internal' ? 'Private' : 'Public'}>{t.visibility === 'internal' ? '🔒' : '👁️'}</span></td>
-              <td className="p-3 align-top"><span title={status} aria-label={status} className="whitespace-nowrap">{status === 'Completed' ? '✅' : status === 'Scheduled' ? '📅' : status === 'Cancelled' ? '🚫' : requested ? '📤' : '🕒'} <span className="sr-only">{status}</span></span></td>
+              <td className="p-3 align-top"><span title={status} aria-label={status} className="whitespace-nowrap">{status === 'Completed' ? '✅' : status === 'Scheduled' ? '📅' : status === 'Cancelled' ? '🚫' : requested ? '📤' : '🕒'} <span>{status}</span></span></td>
               
             </tr>;
           })}
@@ -226,7 +252,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
           <p className="mt-2 text-sm text-muted">{p.customer} · {p.name}</p>
           <p className="mt-4 whitespace-pre-wrap break-words">{t.customer_description || t.title}</p>
           {Boolean(t.photos?.length) && <div className="mt-4"><SupportPhotos paths={t.photos || []} /></div>}
-          <p className="mt-4 text-sm text-secondary">{t.visibility === 'internal' ? 'Private' : 'Public'} · {t.service_status || t.status}</p>
+          <p className="mt-4 text-sm text-secondary">{t.visibility === 'internal' ? 'Private' : 'Public'} · {taskStatusLabel(t)}</p>
           <div className="mt-5 flex flex-wrap gap-3"><a className="inline-flex min-h-11 items-center text-info underline" href={`/projects?projectId=${encodeURIComponent(p.id)}`}>Open project →</a>{t.request_id && canViewServiceRequests && <a className="inline-flex min-h-11 items-center text-info underline" href={`/service-requests?serviceRequestId=${encodeURIComponent(t.request_id)}`}>Open service request →</a>}</div>
         </section>
       </div>;
@@ -236,7 +262,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
       if (!match) return null;
       const { p, t } = match;
       const requested = Boolean(t.request_id);
-      const status = requested ? (['closed', 'completed'].includes(t.service_status || '') ? 'Completed' : t.service_status === 'scheduled' ? 'Scheduled' : 'Service requested') : t.status === 'open' ? 'Not submitted' : t.status;
+      const status = taskStatusLabel(t);
       return <div role="dialog" aria-label={`Punchlist preview: ${t.title}`}
         style={{ top: preview.top, left: preview.left }}
         onMouseEnter={cancelPreviewClose} onMouseLeave={closePreviewSoon}
@@ -253,7 +279,7 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
     {showNewTask && <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-6" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setShowNewTask(false); }}>
       <section role="dialog" aria-modal="true" aria-label="New Test and Tune task" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-subtle bg-surface p-4 text-primary shadow-2xl sm:p-6">
         <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">New Test &amp; Tune task</h2><button type="button" aria-label="Close new task" disabled={busy} onClick={() => setShowNewTask(false)} className="min-h-11 min-w-11 rounded-lg border border-subtle"><X className="mx-auto h-4 w-4" /></button></div>
-        <p className="mt-1 text-sm text-secondary">Select a customer and a substantially completed Test &amp; Tune project.</p>
+        <p className="mt-1 text-sm text-secondary">Select a customer and an eligible sales order for this task.</p>
         <div className="mt-4 grid gap-3">
           <label className="grid gap-1 text-sm">Customer
             <select aria-label="Test and Tune customer" value={draft.customer} onChange={e => setDraft({ ...draft, customer: e.target.value, project: '' })} className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary">
@@ -261,13 +287,13 @@ export function TestTuneProjectAdjustments({ canViewServiceRequests = false }: {
               {Array.from(new Map(projects.filter(p => p.can_submit).map(p => [p.contact_id, p.customer])).entries()).sort((a,b) => a[1].localeCompare(b[1])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-sm">Project
+          <label className="grid gap-1 text-sm">Sales order
             <select aria-label="Test and Tune project" disabled={!draft.customer} value={draft.project} onChange={e => setDraft({ ...draft, project: e.target.value })} className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary">
-              <option value="">Select eligible project</option>
+              <option value="">Select eligible sales order</option>
               {projects.filter(p => p.can_submit && p.contact_id === draft.customer).map(p => <option key={p.id} value={p.id}>{p.name}{p.number ? ` (#${p.number})` : ''}</option>)}
             </select>
           </label>
-          {draft.customer && !projects.some(p => p.can_submit && p.contact_id === draft.customer) && <p className="text-sm text-secondary">No eligible Test &amp; Tune projects for this customer.</p>}
+          {draft.customer && !projects.some(p => p.can_submit && p.contact_id === draft.customer) && <p className="text-sm text-secondary">No eligible Test &amp; Tune sales orders for this customer.</p>}
           <label className="grid gap-1 text-sm">Task title
             <input aria-label="Punchlist item title" value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder="Describe the issue" className="min-h-11 min-w-0 rounded-lg border border-subtle bg-surface p-2 text-primary" />
           </label>

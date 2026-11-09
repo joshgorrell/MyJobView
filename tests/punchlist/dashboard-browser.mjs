@@ -30,9 +30,9 @@ for(const width of [375,390,1280]){
  await page.getByRole('button',{name:'Filter Test and Tune tasks'}).click();
  await page.getByRole('dialog',{name:'Test and Tune filters'}).waitFor();
  await page.getByRole('combobox',{name:'Filter punchlist customer'}).selectOption('c1');
- await page.getByText('6 items shown').waitFor();
+ await page.getByText('6 tasks shown').waitFor();
  await page.getByRole('combobox',{name:'Filter punchlist project'}).selectOption('p1');
- await page.getByText('5 items shown').waitFor();
+ await page.getByText('5 tasks shown').waitFor();
  await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('customer');
  assert.equal(await page.getByRole('checkbox',{name:'Select Adjustment a'}).count(),0);
  await page.getByRole('combobox',{name:'Filter punchlist source'}).selectOption('all');
