@@ -49,23 +49,7 @@ BEGIN
     scope->'approved_change_order_count',scope->'approved_change_line_count',
     scope->'unsupported_change_line_count',scope->'cross_tenant_change_line_count'
    )) AS count_value(v)
-   WHERE v IS NULL OR v !~ '^[0-9]{1,18}
- THEN RETURN jsonb_build_object('valid',false,'authorized',false,'snapshotReady',false,
-   'reason','equipment_scope_incomplete'); END IF;
- -- Even a clean read under locks is not an export certificate: the existing
- -- scope inspector deliberately does not certify complete equipment snapshots.
- RETURN jsonb_build_object('valid',false,'inspected',true,'authorized',false,'snapshotReady',false,
-   'reason','locked_scope_inspected_not_transaction_certified',
-   'connection_id',c.connection_id,'sales_order_id',c.sales_order_id,
-   'organization_id',c.organization_id,'approved_proposal_id',c.proposal_id,
-   'connection_generation',c.connection_generation,'revision',l.revision,
-   'base_line_count',scope->'base_line_count',
-   'change_order_count',scope->'change_order_count',
-   'approved_change_line_count',scope->'approved_change_line_count');
-END $$;
-REVOKE ALL ON FUNCTION techsafe_source.inspect_locked_equipment_source(uuid,uuid,bigint,bigint)
- FROM PUBLIC,anon,authenticated,service_role;
-)
+   WHERE v IS NULL OR v !~ '^[0-9]{1,18}$')
  THEN RETURN jsonb_build_object('valid',false,'authorized',false,'snapshotReady',false,
    'reason','scope_counts_missing_or_invalid'); END IF;
  IF (scope->>'unapproved_change_order_count')::bigint>0
