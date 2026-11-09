@@ -2,7 +2,7 @@
 // MJV source read. Does not create trust from caller-supplied flags or send data.
 import {reconcileApprovedSalesOrderEquipment} from './equipmentReconciliation.mjs';
 const held=reason=>({ok:false,authorized:false,snapshotReady:false,reason,items:[]});
-const isId=x=>typeof x==='string'&&x.length>0;
+const isId=x=>typeof x==='string'&&x.length>0&&x.length<=256&&x===x.trim();
 const positiveInt=x=>Number.isSafeInteger(x)&&x>0;
 export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,readConsistentSource}={}) {
   if (!isId(connectionId)||!isId(orderId)) return held('invalid_source_identity');
@@ -21,6 +21,10 @@ export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,r
     !positiveInt(evidence.connectionGeneration) ||
     !positiveInt(evidence.revision) || evidence.ledgerRevision!==evidence.revision ||
     evidence.ledgerGeneration!==evidence.connectionGeneration ||
+    evidence.ledgerConnectionId!==connectionId ||
+    evidence.ledgerSalesOrderId!==orderId ||
+    evidence.connectionOrganizationId!==evidence.salesOrder?.organizationId ||
+    evidence.connectionProposalId!==evidence.salesOrder?.proposalId ||
     evidence.ledgerOrganizationId!==evidence.salesOrder?.organizationId ||
     evidence.ledgerProposalId!==evidence.salesOrder?.proposalId ||
     evidence.ledgerState!=='candidate' ||
