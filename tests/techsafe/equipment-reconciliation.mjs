@@ -23,6 +23,17 @@ denied({salesOrder:{...order,proposalId:'change:other'}},'reserved_source_identi
 // IDs must not contain control characters that could break canonical source
 // identity, logs, signatures, or downstream transport encodings.
 denied({salesOrder:{...order,id:'so-1\nother'}},'invalid_identifier');
+// The Techsafe receiver uses the same strict identifier alphabet and length.
+// Fail during MJV reconciliation instead of exporting an unusable snapshot.
+for (const invalid of ['has space','has:colon','has/slash','has.dot','x'.repeat(129)]) {
+ denied({salesOrder:{...order,id:invalid}},'invalid_identifier');
+ denied({baseLines:[{...base[0],id:invalid}]},'invalid_identifier');
+ denied({baseLines:[{...base[0],productId:invalid}]},'invalid_identifier');
+ denied({changeOrders:[{...change,id:invalid}]},'invalid_identifier');
+ denied({changeOrders:[{...change,lines:[{...change.lines[1],id:invalid}]}]},'invalid_identifier');
+}
+// A nested namespace must never be generated for an added change-order line.
+denied({changeOrders:[{...change,lines:[{...change.lines[1],id:'change:nested'}]}]},'invalid_identifier');
 denied({salesOrder:{...order,organizationId:'tenant-1\tother'}},'invalid_identifier');
 denied({baseLines:[{...base[0],id:'base-1\u0000other'}]},'invalid_identifier');
 denied({changeOrders:[{...change,lines:[{...change.lines[0],id:'line-1\rmore'}]}]},'invalid_identifier');
