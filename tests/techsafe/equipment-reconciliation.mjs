@@ -6,7 +6,7 @@ const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',status:'ap
  lines:[{id:'line-1',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'modify_quantity',proposalLineItemId:'base-1',productId:'tv',newQuantity:3},
  {id:'line-2',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'add',productId:'speaker',newQuantity:2}]};
 const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch};
- const sourceManifest=patch.sourceManifest??{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
+ const sourceManifest=patch.sourceManifest??{salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:args.baseLines.length,changeOrderCount:args.changeOrders.length,totalChangeOrderCount:args.changeOrders.length,unapprovedChangeOrderCount:0,changeLineCount:args.changeOrders.reduce((n,c)=>n+(c.lines?.length??0),0)};
  return reconcile({...args,sourceManifest}); };
 assert.deepEqual(run().items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]]);
 assert.equal(run().reason,'reconciled_not_certified');
@@ -30,8 +30,11 @@ denied({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'remove',
 denied({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'replace'}]}]},'unsupported_change_action');
 assert.deepEqual(run({changeOrders:[{...change,lines:[{...change.lines[0],actionType:'remove',newQuantity:0}]}]}).items,[]);
 assert.deepEqual(run({changeOrders:[]}).items.map(x=>x.quantity),[2]);
-const manifest={salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:1,changeOrderCount:1,changeLineCount:2};
+const manifest={salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:1,changeOrderCount:1,totalChangeOrderCount:1,unapprovedChangeOrderCount:0,changeLineCount:2};
 denied({sourceManifest:{...manifest,changeOrderCount:2}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}},'unapproved_changes_present');
+denied({sourceManifest:{...manifest,totalChangeOrderCount:2}},'source_manifest_incomplete');
+denied({sourceManifest:{...manifest,unapprovedChangeOrderCount:-1}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,changeLineCount:3}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,revision:6}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,organizationId:'other-tenant'}},'source_manifest_incomplete');
