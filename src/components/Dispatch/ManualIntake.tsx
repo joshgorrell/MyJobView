@@ -1,3 +1,4 @@
+import { missingContactFields } from '../../lib/contactCompleteness';
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
@@ -8,7 +9,7 @@ import { toTaskDraft } from '../../lib/smart-intake/task-payload';
 const TaskForm = lazy(() => import('../Tasks/TaskForm').then(m => ({ default: m.TaskForm })));
 
 type IntakeType = 'service' | 'support' | 'task';
-type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null; office_id: string | null };
+type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null; phone?: string | null; street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null; office_id: string | null };
 
 export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onClose: () => void; onCreated?: () => void; serviceOnly?: boolean }) {
   const { tenant } = useTenant();
@@ -51,7 +52,7 @@ export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onCl
       const safe = query.replace(/[%_,()\\]/g, '').slice(0, 80);
       if (!safe) { if (active) setCustomerLoading(false); return; }
       const { data, error: lookupError } = await supabase.from('contacts')
-        .select('id,company_name,contact_name,email,office_id')
+        .select('id,company_name,contact_name,email,phone,street_address,city,state,zip_code,office_id')
         .eq('organization_id', organizationId)
         .or(['company_name.ilike.%' + safe + '%', 'contact_name.ilike.%' + safe + '%', 'email.ilike.%' + safe + '%'].join(','))
         .order('company_name').limit(25);
@@ -174,6 +175,7 @@ export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onCl
         </select>
       </label>
       {contactId && <p className="text-xs text-gray-400">Selected customer: {selectedCustomer?.company_name || selectedCustomer?.contact_name || selectedCustomer?.email || 'Previously selected contact'}</p>}
+      {selectedCustomer && missingContactFields({ ...selectedCustomer, full_name: selectedCustomer.contact_name }).length > 0 && <p className="text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedCustomer).join(', ')}</p>}
       <label className="block space-y-1 text-sm text-gray-300">Subject
         <input value={subject} onChange={e => setSubject(e.target.value)} maxLength={200} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>

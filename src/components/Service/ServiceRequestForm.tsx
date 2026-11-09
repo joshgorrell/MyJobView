@@ -1,3 +1,4 @@
+import { missingContactFields } from '../../lib/contactCompleteness';
 import { sendServiceApproval } from '../../lib/serviceApproval';
 import { notify } from '../../lib/feedback';
 import React, { useState, useEffect, useRef } from 'react';
@@ -924,6 +925,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                         setFormData(prev => ({ ...prev, contact_id: null, customer_location_id: null, customer_name: '', customer_phone: '', customer_email: '', job_location_address: '', job_location_city: '', job_location_state: '', job_location_zip: '' }));
                       }}>Change</button>}
                     </div>
+                    {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).length > 0 && <p className="mt-1 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).join(', ')}</p>}
                     <div className="flex flex-wrap items-center gap-x-4">
                     <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 text-sm text-blue-500">
                       {showCustomerDetails ? 'Hide request contact details' : 'Edit request contact details'}

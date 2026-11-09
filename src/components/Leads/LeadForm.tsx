@@ -1,12 +1,13 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { Users, Search, UserCheck } from 'lucide-react';
+import { Users, Search, UserCheck, Plus } from 'lucide-react';
 import { AIFormFill } from '../Shared/AIFormFill';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { missingContactFields } from '../../lib/contactCompleteness';
 import { generateUniqueUsername } from '../../lib/username';
 import { offlineSupabaseInsert } from '../../lib/offlineSupport';
 
@@ -18,11 +19,11 @@ interface LeadFormProps {
 
 interface ContactSearchResult {
   id: string;
-  contact_name: string;
+  contact_name: string | null;
   company_name: string | null;
   email: string | null;
   phone: string | null;
-  contact_type: string;
+  contact_type?: string | null;
   street_address: string | null;
   city: string | null;
   state: string | null;
@@ -53,7 +54,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const [contactMode, setContactMode] = useState<'new' | 'existing'>('new');
+  const [contactMode, setContactMode] = useState<'new' | 'existing'>('existing');
   const [contactSearch, setContactSearch] = useState('');
   const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -125,7 +126,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, contact_name, company_name, email, phone, contact_type, street_address, city, state, zip_code, assigned_to')
+        .select('id, contact_name, company_name, email, phone, street_address, city, state, zip_code, assigned_to')
         .or(`contact_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
         .order('contact_name')
         .limit(10);
@@ -151,11 +152,11 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
     setFormData({
       ...formData,
-      contact_name: contact.contact_name || '',
+      contact_name: contact.contact_name || contact.company_name || '',
       company_name: contact.company_name || '',
       email: contact.email || '',
       phone: contact.phone || '',
-      is_business: contact.contact_type === 'business',
+      is_business: Boolean(contact.company_name),
       office_id: '',
       assignment: repIsAssignable ? repId! : 'fishbowl',
     });
@@ -167,6 +168,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     ++searchVersion.current;
     setCustomerExpanded(false);
     setSelectedContact(null);
+    setContactMode('existing');
     setFormData({
       ...formData,
       contact_name: '',
@@ -208,7 +210,20 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
       if (contactMode === 'existing' && !selectedContact) throw new Error('Select a customer first.');
       const username = await generateUniqueUsername(formData.contact_name, supabase);
-
+      let contactId = selectedContact?.id || null;
+      if (!contactId) {
+        if (!formData.contact_name.trim()) throw new Error('Contact name is required.');
+        const { data: createdContact, error: contactError } = await supabase.from('contacts').insert({
+          contact_name: formData.contact_name.trim(),
+          username,
+          company_name: formData.is_business ? formData.company_name.trim() || null : null,
+          phone: formData.phone.trim() || null,
+          email: formData.email.trim() || null,
+          created_by: profile?.id,
+        }).select('id').single();
+        if (contactError || !createdContact?.id) throw contactError || new Error('Unable to create contact');
+        contactId = createdContact.id;
+      }
       const leadData = {
         company_name: (formData.is_business ? formData.company_name : null) || null,
         contact_name: formData.contact_name,
@@ -223,7 +238,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
         created_by: profile?.id,
         is_fishbowl: isFishbowl,
         claimed_at: isFishbowl ? null : new Date().toISOString(),
-        converted_from_contact_id: selectedContact?.id || null,
+        converted_from_contact_id: contactId,
       };
 
       const leadResult = await offlineSupabaseInsert('leads', leadData);
@@ -255,7 +270,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             company_name: formData.company_name,
             contact_name: formData.contact_name,
             is_fishbowl: isFishbowl,
-            linked_contact_id: selectedContact?.id || null,
+            linked_contact_id: contactId,
           },
         });
       }
@@ -422,37 +437,11 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     >
         <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-3 min-w-0">
           {contactMode === 'new' && <AIFormFill kind="lead" onFill={prefill => setFormData(previous => ({ ...previous, contact_name: prefill.contactName ?? previous.contact_name, company_name: prefill.company ?? previous.company_name, is_business: prefill.company ? true : previous.is_business, email: prefill.email ?? previous.email, phone: prefill.phone ?? previous.phone, opportunity_description: prefill.description ?? previous.opportunity_description, priority: ['low', 'medium', 'high', 'urgent'].includes(prefill.priority ?? '') ? prefill.priority! : previous.priority }))} />}
-          {/* Contact Mode Toggle */}
-          <div>
-            <label className="block text-sm font-medium text-secondary mb-2">
-              Customer <span className="text-red-400">*</span>
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setContactMode('new'); clearSelectedContact(); }}
-                className={`flex-1 px-3 py-2.5 text-sm rounded-lg border transition-all font-medium ${
-                  contactMode === 'new'
-                    ? 'border-emerald-500 bg-emerald-600/15 text-emerald-300'
-                    : 'border-subtle bg-surface text-secondary hover:border-emerald-500/40'
-                }`}
-              >
-                New Contact
-              </button>
-              <button
-                type="button"
-                onClick={() => { setContactMode('existing'); clearSelectedContact(); }}
-                className={`flex-1 px-3 py-2.5 text-sm rounded-lg border transition-all font-medium ${
-                  contactMode === 'existing'
-                    ? 'border-emerald-500 bg-emerald-600/15 text-emerald-300'
-                    : 'border-subtle bg-surface text-secondary hover:border-emerald-500/40'
-                }`}
-              >
-                Existing Customer
-              </button>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-sm font-medium text-secondary">Customer <span className="text-red-400">*</span></label>
+            {contactMode === 'existing' && !selectedContact && <button type="button" onClick={() => { setContactMode('new'); setShowResults(false); setContactSearch(''); }} className="inline-flex items-center gap-1 text-sm text-emerald-400 hover:underline"><Plus className="w-4 h-4" /> Add Contact</button>}
+            {contactMode === 'new' && <button type="button" onClick={() => { setContactMode('existing'); setShowResults(false); }} className="text-sm text-emerald-400 hover:underline">Search existing customers</button>}
           </div>
-
           {/* Existing Customer Search */}
           {contactMode === 'existing' && !selectedContact && (
             <div className="relative" ref={resultsRef}>
@@ -480,7 +469,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
               {showResults && contactSearch.trim().length >= 2 && (
                 <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg">
                   {searchError ? <p role="alert" className="p-3 text-sm text-red-500">{searchError}</p> : contactResults.length === 0 && !searching ? (
-                    <div className="px-4 py-3 text-sm text-muted">No customers found. Try a different search, or use "New Contact".</div>
+                    <div className="px-4 py-3 text-sm text-muted">No customers found. Use + Add Contact to create one.</div>
                   ) : (
                     contactResults.map((contact) => (
                       <button
@@ -495,7 +484,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-primary truncate">{contact.contact_name || 'Unnamed'}</p>
                             <p className="text-xs text-muted break-words">
-                              {contact.contact_type === 'business' && contact.company_name ? `${contact.company_name} · ` : ''}
+                              {Boolean(contact.company_name) && contact.company_name ? `${contact.company_name} · ` : ''}
                               {[contact.email, contact.phone, contact.street_address, contact.city, contact.state, contact.zip_code].filter(Boolean).join(' · ') || 'No contact info'}
                             </p>
                           </div>
@@ -518,7 +507,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-primary truncate">{selectedContact.contact_name || 'Unnamed'}</p>
                     <p className="text-xs text-muted break-words">
-                      {selectedContact.contact_type === 'business' && selectedContact.company_name ? `${selectedContact.company_name} · ` : ''}
+                      {Boolean(selectedContact.company_name) && selectedContact.company_name ? `${selectedContact.company_name} · ` : ''}
                       {customerExpanded ? 'Hide details ▴' : 'Show contact details ▾'}
                     </p>
                   </div>
@@ -531,6 +520,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                   Change
                 </button>
               </div>
+              {missingContactFields({ ...selectedContact, full_name: selectedContact.contact_name }).length > 0 && <p className="mt-2 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedContact).join(', ')}</p>}
               {customerExpanded && <dl id="lead-customer-details" className="mt-3 grid gap-1 text-sm break-words">
                 <div><dt className="inline text-muted">Phone: </dt><dd className="inline">{selectedContact.phone || 'Not provided'}</dd></div>
                 <div><dt className="inline text-muted">Email: </dt><dd className="inline">{selectedContact.email || 'Not provided'}</dd></div>
@@ -541,6 +531,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
           )}
 
           {contactMode === 'new' && <>
+          <p className="text-xs text-amber-400">{missingContactFields({ full_name: formData.contact_name, phone: formData.phone, email: formData.email }).length > 0 ? 'Incomplete contact — missing: ' + missingContactFields({ full_name: formData.contact_name, phone: formData.phone, email: formData.email }).join(', ') : 'Additional address details can be completed later in the customer record.'}</p>
           <label className="flex items-center gap-2 text-sm text-secondary"><input type="checkbox" checked={formData.is_business} onChange={e => setFormData({ ...formData, is_business: e.target.checked, company_name: '' })} />Business customer</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
