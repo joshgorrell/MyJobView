@@ -249,14 +249,14 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
         >
           My Requests & Balances
         </button>
-        <button
+        {!compact && <button
           type="button"
           aria-pressed={tab === "team"}
           onClick={() => setTab("team")}
           className={`min-h-11 px-4 rounded-lg ${tab === "team" ? "bg-blue-600 text-white" : "bg-surface"}`}
         >
           Team Time Off
-        </button>
+        </button>}
         {!compact && canManageTimeOff(profile?.role) && (
           <button
             type="button"
@@ -310,8 +310,8 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
             </p>
           )}
           <section className="rounded-xl border border-subtle bg-surface p-4 space-y-3">
-            <h3 className="font-semibold">Request History</h3>
-            {requests.map((r) => (
+            <h3 className="font-semibold">{compact ? "My PTO Requests" : "Request History"}</h3>
+            {requests.slice().sort((a, b) => (["pending", "approved"].includes(a.status) ? 0 : 1) - (["pending", "approved"].includes(b.status) ? 0 : 1)).map((r) => (
               <article key={r.id} className="border-b border-subtle pb-3">
                 <div className="flex flex-wrap justify-between gap-2">
                   <strong>{r.policy?.policy_name || "Time off"}</strong>

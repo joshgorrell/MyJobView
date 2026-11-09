@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { Clock, Briefcase, History } from 'lucide-react';
 import { DailyClock } from './DailyClock';
-import { MyTimeLeaveRequest } from './MyTimeLeaveRequest';
+import { MyTimeOff } from '../Dispatch/MyTimeOff';
 import { TimeAdjustmentRequestModal } from './TimeAdjustmentRequestModal';
 import { useEmployeeTimePolicy } from '../../hooks/useEmployeeTimePolicy';
 import { AssignedSessionsWidget } from '../Production/AssignedSessionsWidget';
@@ -13,7 +13,7 @@ import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezon
 type TimeSection = 'daily' | 'job' | 'mine';
 type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
 
-export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
+export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
   const policy = useEmployeeTimePolicy();
   const { profile } = useAuth();
   const [section, setSection] = useState<TimeSection>('job');
@@ -145,7 +145,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
       {current === 'mine' && (
         <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
-          <p className="text-sm text-gray-600">Your recent daily, job, shop, and training time entries. Select Request Correction on a Daily Clock entry to request a time adjustment. Same-day leave requests are available below.</p>
+          <p className="text-sm text-gray-600">Review PTO balances, pending and approved requests, and recent time entries. You can also request time off or correct a Daily Clock entry.</p>
           {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
           {historyError && <p role="alert" className="text-sm text-red-700">Time history could not be loaded.</p>}
           {!historyLoading && !historyError && entries.length === 0 && <p className="text-sm text-gray-500">No recent time entries.</p>}
@@ -158,8 +158,7 @@ export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate:
               </div>
             </div>
           ))}
-          <MyTimeLeaveRequest />
-          <button type="button" onClick={() => onNavigate('work_orders')} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50">Open Work Orders</button>
+          <MyTimeOff compact />
         </div>
       )}
       {correctionEntry && <TimeAdjustmentRequestModal entry={{ id: correctionEntry.id, entry_date: correctionEntry.entry_date, clock_in: correctionEntry.clock_in, clock_out: correctionEntry.clock_out, total_hours: correctionEntry.total_hours ?? 0, break_minutes: correctionEntry.break_minutes ?? 0 }} onClose={() => setCorrectionEntry(null)} onSubmit={() => { setCorrectionEntry(null); setHistoryRevision(v => v + 1); }} />}
