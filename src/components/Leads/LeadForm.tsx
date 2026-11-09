@@ -97,17 +97,17 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
   useEffect(() => {
     ++searchVersion.current;
-    if (contactMode !== 'existing') return;
+    if (contactMode !== 'existing' && contactMode !== 'new') return;
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (contactSearch.trim().length < 2) {
+    if ((contactMode === 'new' ? formData.contact_name : contactSearch).trim().length < 2) {
       setContactResults([]);
       setSearching(false);
       return;
     }
     setSearching(true);
-    searchTimeoutRef.current = setTimeout(() => searchContacts(contactSearch.trim()), 300);
+    searchTimeoutRef.current = setTimeout(() => searchContacts((contactMode === 'new' ? formData.contact_name : contactSearch).trim()), 300);
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
-  }, [contactSearch, contactMode]);
+  }, [contactSearch, contactMode, formData.contact_name]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -161,6 +161,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     });
     setShowResults(false);
     setContactSearch('');
+    setContactMode('existing');
   }
 
   function clearSelectedContact() {
@@ -430,7 +431,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => { setContactMode('new'); clearSelectedContact(); }}
+                onClick={() => { setContactMode('new'); clearSelectedContact(); setShowResults(false); }}
                 className={`flex-1 px-3 py-2.5 text-sm rounded-lg border transition-all font-medium ${
                   contactMode === 'new'
                     ? 'border-emerald-500 bg-emerald-600/15 text-emerald-300'
@@ -441,7 +442,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
               </button>
               <button
                 type="button"
-                onClick={() => { setContactMode('existing'); clearSelectedContact(); }}
+                onClick={() => { setContactMode('existing'); clearSelectedContact(); setShowResults(false); }}
                 className={`flex-1 px-3 py-2.5 text-sm rounded-lg border transition-all font-medium ${
                   contactMode === 'existing'
                     ? 'border-emerald-500 bg-emerald-600/15 text-emerald-300'
@@ -551,10 +552,24 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                 type="text"
                 required
                 value={formData.contact_name}
-                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                onChange={(e) => { setFormData({ ...formData, contact_name: e.target.value }); setShowResults(true); }}
+                onFocus={() => setShowResults(true)}
                 className={inputClass}
                 placeholder="John Doe"
               />
+              {showResults && formData.contact_name.trim().length >= 2 && (
+                <div className="relative" ref={resultsRef}>
+                  <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg" role="group" aria-label="Matching existing customers">
+                    {searching ? <p className="p-3 text-xs text-muted">Searching customers…</p> : searchError ? <p role="alert" className="p-3 text-xs text-red-500">{searchError}</p> : contactResults.length ? <>
+                      <p className="px-3 pt-2 text-xs text-muted">Existing customers — select to populate this lead</p>
+                      {contactResults.map(contact => <button key={contact.id} type="button" disabled={!repsLoaded} onClick={() => selectContact(contact)} className="w-full px-3 py-2 text-left hover:bg-emerald-600/10 border-b border-subtle/50 last:border-0">
+                        <span className="block text-sm font-medium text-primary">{contact.contact_name || 'Unnamed'}{contact.company_name ? ` · ${contact.company_name}` : ''}</span>
+                        <span className="block text-xs text-muted break-words">{[contact.email, contact.phone, contact.street_address, contact.city, contact.state].filter(Boolean).join(' · ') || 'No identifying details'}</span>
+                      </button>)}
+                    </> : <p className="p-3 text-xs text-muted">No existing customer matches. Continue entering a new contact.</p>}
+                  </div>
+                </div>
+              )}
             </div>
             {formData.is_business && <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
