@@ -182,6 +182,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       clearTimeout(timer);
     };
   }, [showForm, start, end, type, startTime, endTime]);
+  // A single assigned balance is required until legacy multi-policy data is reconciled.
   const activePolicy = balances.length === 1 ? balances[0].policy.id : "";
   const selected = balances.length === 1 ? balances[0] : undefined;
   const total = preview.reduce((sum, d) => sum + Number(d.hours), 0);
