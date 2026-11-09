@@ -33,7 +33,11 @@ const rejects=[
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:6,fingerprint}},
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:3,revision:1,fingerprint}},
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint:'b'.repeat(64)}},
- {lastDelivered:{connectionId:'conn-2',orderId:'order-1',generation:2,revision:5,fingerprint}}
+ {lastDelivered:{connectionId:'conn-2',orderId:'order-1',generation:2,revision:5,fingerprint}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',organizationId:'org-2',proposalId:'proposal-1',generation:2,revision:4,fingerprint}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',organizationId:'org-1',proposalId:'proposal-2',generation:2,revision:4,fingerprint}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',organizationId:null,generation:2,revision:4,fingerprint}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',proposalId:'',generation:2,revision:4,fingerprint}}
 ];
 for(const mutation of rejects) {
  const result=check({...args,...mutation});
@@ -43,5 +47,6 @@ for(const mutation of rejects) {
 }
 assert.equal(check({...args,lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:4,fingerprint:'b'.repeat(64)}}).ok,true);
 assert.equal(check({...args,lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint}}).ok,true);
+assert.equal(check({...args,lastDelivered:{connectionId:'conn-1',orderId:'order-1',organizationId:'org-1',proposalId:'proposal-1',generation:2,revision:4,fingerprint}}).ok,true);
 assert.equal(check({...args,certificate:null}).ok,false);
 console.log('Techsafe persisted certificate comparison: PASS (not dispatch authorization)');
