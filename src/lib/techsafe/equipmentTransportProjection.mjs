@@ -27,14 +27,16 @@ export function projectTechsafeEquipment({inspection,details,minimumUnitValueCen
    return fail('invalid_reconciled_equipment');
   const detail=byId.get(item.sourceLineId);
   if(!detail||detail.productRef!==item.productId)return fail('equipment_identity_mismatch');
-  // Never silently drop excluded/low-value items from source evidence:
-  // transport filtering belongs to Techsafe's eligibility policy.
+  // Techsafe draft receiver accepts eligible equipment only. Keep the
+  // complete reconciled source separately for audit/certification; do not
+  // represent this filtered draft payload as an exhaustive source snapshot.
   const line={sourceLineId:item.sourceLineId,productRef:detail.productRef,productKind:'equipment',
    scope:'included',customerSupplied:detail.customerSupplied,techsafeExcluded:detail.techsafeExcluded,
    quantity:item.quantity,unitEquipmentValueCents:detail.unitEquipmentValueCents,description:detail.description};
   total+=line.quantity*line.unitEquipmentValueCents;
   if(!Number.isSafeInteger(total))return fail('equipment_value_overflow');
-  lines.push(line);
+  if(!line.customerSupplied&&!line.techsafeExcluded&&line.unitEquipmentValueCents>=minimumUnitValueCents)
+   lines.push(line);
  }
  return {ok:true,authorized:false,snapshotReady:false,reason:'projection_not_certified',revision:inspection.revision,lines};
 }
