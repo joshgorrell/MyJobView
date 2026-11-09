@@ -82,7 +82,7 @@
     "test:customer-proposals": "node tests/customer-proposals/database.mjs && node tests/customer-proposals/shared-link.mjs",
     "test:customer-proposals:browser": "node tests/customer-proposals/browser.mjs",
     "test:tech-stats:browser": "npm run build && node tests/labor-dashboard/production-browser.mjs",
-    "test:techsafe:dispatch": "node tests/techsafe/draft-dispatch.mjs && node tests/techsafe/source-reread-canonical.mjs && node tests/techsafe/draft-http-transport.mjs"
+    "test:techsafe:dispatch": "node tests/techsafe/draft-dispatch.mjs && node tests/techsafe/source-reread-canonical.mjs && node tests/techsafe/draft-http-transport.mjs && node tests/techsafe/base-equipment-postgres.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
