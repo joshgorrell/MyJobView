@@ -31,7 +31,7 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments: _mainDepartments, footerDepartments: _footerDepartments, getUserModules: _getUserModules, starredModules, loading: deptLoading } = useDepartments();
@@ -222,14 +222,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                       <div className="text-xs text-muted">Create sales opportunity</div>
                     </div>
                   </button>
-
-                  {onCreateInternalChat && <button
-                    onClick={() => { onCreateInternalChat(); setShowCreateMenu(false); setMobileMenuOpen(false); }}
-                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
-                  >
-                    <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="font-medium">Flow</div><div className="text-xs text-muted">Messages, activities and updates</div></div>
-                  </button>}
 
                   <button
                     onClick={() => {
@@ -435,14 +427,6 @@ export function Header({ onCreateContact, onCreateLead, onCreateInternalChat, on
                       <div className="text-xs text-muted">Create sales opportunity</div>
                     </div>
                   </button>
-
-                  {onCreateInternalChat && <button
-                    onClick={() => { onCreateInternalChat(); setShowCreateMenu(false); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
-                  >
-                    <FlowWaveIcon className="w-4 h-4 text-lg" />
-                    <div><div className="text-sm font-medium">Flow</div><div className="text-xs text-muted">Messages, activities and updates</div></div>
-                  </button>}
 
                   <button
                     onClick={() => { onCreateServiceRequest(); setMobileMenuOpen(false); }}
