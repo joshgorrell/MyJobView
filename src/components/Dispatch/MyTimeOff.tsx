@@ -42,7 +42,6 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const [policy, setPolicy] = useState("");
   const [type, setType] = useState("full_day");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
