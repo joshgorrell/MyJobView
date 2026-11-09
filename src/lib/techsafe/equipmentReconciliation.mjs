@@ -45,17 +45,15 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
       sourceManifest.changeOrderCount !== changeOrders.length ||
       sourceManifest.changeLineCount !== changeOrders.reduce((n,co)=>n+(Array.isArray(co.lines)?co.lines.length:0),0))
       return fail('source_manifest_incomplete');
-    // A filtered list of approved changes is insufficient: the independent
-    // source scan must also account for every unapproved/pending change.
-    // A pending change blocks snapshot certification rather than disappearing.
+    // The trusted source scan must account for pending changes, but pending
+    // changes do not alter the current approved Sales Order view. Only the
+    // complete set of customer-approved changes is reconciled below.
     if (!Number.isSafeInteger(sourceManifest.totalChangeOrderCount) ||
         sourceManifest.totalChangeOrderCount < 0 ||
         !Number.isSafeInteger(sourceManifest.unapprovedChangeOrderCount) ||
         sourceManifest.unapprovedChangeOrderCount < 0 ||
         sourceManifest.totalChangeOrderCount !== sourceManifest.changeOrderCount + sourceManifest.unapprovedChangeOrderCount)
       return fail('source_manifest_incomplete');
-    if (sourceManifest.unapprovedChangeOrderCount !== 0)
-      return fail('unapproved_changes_present');
     const items = new Map();
     const baseIds = new Set();
     for (const line of baseLines) {
