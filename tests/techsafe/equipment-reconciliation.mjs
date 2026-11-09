@@ -14,6 +14,14 @@ assert.equal(run().authorized,false);
 assert.equal(run().snapshotReady,false);
 const denied=(patch,reason)=>{ const result=run(patch); assert.equal(result.reason,reason); assert.equal(result.ok,false); assert.equal(result.authorized,false); assert.equal(result.snapshotReady,false); assert.deepEqual(result.items,[]); };
 denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified');
+denied({salesOrder:{...order,id:' so-1'}},'invalid_identifier');
+denied({salesOrder:{...order,organizationId:'tenant-1 '}},'invalid_identifier');
+denied({salesOrder:{...order,proposalId:'change:other'}},'reserved_source_identifier');
+denied({baseLines:[{...base[0],id:'base-1 '}]},'invalid_identifier');
+denied({baseLines:[{...base[0],productId:' '}]},'invalid_identifier');
+denied({changeOrders:[{...change,id:'co-1 '}]},'invalid_identifier');
+denied({changeOrders:[{...change,lines:[{...change.lines[0],id:' '.repeat(257)}]}]},'invalid_identifier');
+
 denied({salesOrder:{...order,revision:8}},'stale_source_revision');
 denied({salesOrder:{...order,revision:0},expectedRevision:0},'stale_source_revision');
 denied({baseLines:[{...base[0],id:'change:line-1'}]},'reserved_source_line_identifier');
