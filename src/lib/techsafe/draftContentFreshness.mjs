@@ -37,7 +37,9 @@ export async function preflightTechsafeDraftContent({connectionId,orderId,readCo
  // description or quantity is a content change even when source revision isn't.
  const canonical=lines=>JSON.stringify([...lines].sort((a,b)=>
   a.sourceLineId<b.sourceLineId?-1:a.sourceLineId>b.sourceLineId?1:0));
- if(canonical(first.lines)!==canonical(second.lines))return held('draft_content_changed_during_preflight');
+ if(canonical(first.lines)!==canonical(second.lines)||
+    canonical(firstSource.equipmentDetails)!==canonical(secondSource.equipmentDetails))
+  return held('draft_content_changed_during_preflight');
  return {ok:true,authorized:false,snapshotReady:false,reason:'draft_freshness_not_certified',
   revision:second.revision,lines:second.lines};
 }
