@@ -72,5 +72,23 @@ wait "$second"
 assert_revision "$b" 4
 "${PSQL[@]}" -c "DELETE FROM public.proposal_line_items WHERE id='00000000-0000-0000-0000-000000000022'"
 assert_revision "$b" 5
-echo 'PASS: linked base equipment insert/update/reparent/rollback/concurrent writers/delete'
+# An unrelated proposal must not touch either connected Sales Order ledger.
+"${PSQL[@]}" -c "INSERT INTO public.proposal_line_items VALUES ('00000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000099',1)"
+assert_revision "$a" 4
+assert_revision "$b" 5
+# Reparent from an unlinked proposal to a connected Sales Order: only destination invalidates.
+"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET proposal_id='00000000-0000-0000-0000-000000000004' WHERE id='00000000-0000-0000-0000-000000000023'"
+assert_revision "$a" 5
+assert_revision "$b" 5
+# Reparent to an unrelated proposal: only the previously linked source invalidates.
+"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET proposal_id='00000000-0000-0000-0000-000000000099' WHERE id='00000000-0000-0000-0000-000000000023'"
+assert_revision "$a" 6
+assert_revision "$b" 5
+# At bigint exhaustion the trigger must hold and invalidate, never wrap to a negative revision.
+"${PSQL[@]}" -c "UPDATE techsafe_source.order_revision_ledger SET revision=9223372036854775807,state='candidate',hold_reason=NULL,source_fingerprint=repeat('a',64) WHERE connection_id='$a'"
+"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET proposal_id='00000000-0000-0000-0000-000000000004' WHERE id='00000000-0000-0000-0000-000000000023'" >/dev/null
+assert_revision "$a" 9223372036854775807
+reason="$("${PSQL[@]}" -c "SELECT hold_reason FROM techsafe_source.order_revision_ledger WHERE connection_id='$a'")"
+[[ "$reason" == "revision_exhausted" ]] || { echo "Expected revision_exhausted, got $reason" >&2; exit 1; }
+echo 'PASS: linked base equipment insert/update/reparent/rollback/concurrent writers/delete/unlinked scope/bigint exhaustion'
 echo 'NOTE: Fixture verifies trigger behavior only; not the full application migration chain, customer approval or snapshot certification.'
