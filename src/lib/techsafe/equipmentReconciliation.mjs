@@ -72,7 +72,8 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     // immutable revision order; a missing/ambiguous sequence fails closed.
     let lastRevision=0;
     for (const order of changeOrders) {
-      if (order.salesOrderId !== salesOrderId || order.organizationId !== organizationId)
+      if (order.salesOrderId !== salesOrderId || order.organizationId !== organizationId ||
+          order.proposalId !== proposalId)
         return fail('change_order_scope_mismatch');
       if (order.status !== 'approved' || order.customerApproved !== true) return fail('change_order_not_customer_approved');
       const orderId=id(order.id);
