@@ -71,4 +71,34 @@ for (let i=0;i<3;i++) {
  assert.equal(result.snapshotReady,false);
 }
 
+
+// Adversarial source manifests: matching row counts do not establish a valid
+// Sales Order, approval chain, or complete customer-approved equipment scope.
+for (const patch of [
+ {sourceManifest:{...evidence.sourceManifest,salesOrderId:'standalone-proposal'}},
+ {sourceManifest:{...evidence.sourceManifest,organizationId:'other-tenant'}},
+ {sourceManifest:{...evidence.sourceManifest,proposalId:'other-proposal'}},
+ {sourceManifest:{...evidence.sourceManifest,revision:3}},
+ {sourceManifest:{...evidence.sourceManifest,baseLineCount:0}},
+ {sourceManifest:{...evidence.sourceManifest,changeOrderCount:1}},
+ {sourceManifest:{...evidence.sourceManifest,totalChangeOrderCount:1,unapprovedChangeOrderCount:0}},
+ {sourceManifest:{...evidence.sourceManifest,approvalEvidenceVerified:'true'}},
+ {salesOrder:{...order,revision:5}},
+ {baseLines:[{...base[0],organizationId:'other-tenant'}]},
+ {baseLines:[{...base[0],proposalId:'standalone-proposal'}]}
+]) {
+ const result=await run(patch);
+ assert.equal(result.ok,false,JSON.stringify(patch));
+ assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
+ assert.deepEqual(result.items,[]);
+}
+// The inspection adapter may fail, replay, or return plausible diagnostics;
+// none of those results may become permission to dispatch or activate coverage.
+for(const response of [null,{}, {authorized:true,snapshotReady:true}, {...evidence,ledgerState:'held'}]){
+ const result=await inspect({connectionId:'conn-1',orderId:'sales-1',readConsistentSource:async()=>response});
+ assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
+}
+
 console.log('Transaction source inspection orchestration contract: PASS');
