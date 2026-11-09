@@ -58,5 +58,37 @@ try {
  // An unlinked proposal has no Techsafe ledger to invalidate.
  await db.query('INSERT INTO public.proposal_line_items VALUES($1,$2,$3,1)',[b,otherProposal,org]);
  rows=await read(); assert.equal(rows[0].revision,7);assert.equal(rows[1].revision,11);
+ // A failed source transaction must roll back its ledger invalidation too.
+ const beforeRollback=await read();
+ await db.exec('BEGIN');
+ await db.query('UPDATE public.proposal_line_items SET quantity=3 WHERE id=$1',[b]);
+ // The unlinked row must not affect either connected Sales Order.
+ assert.deepEqual(await read(),beforeRollback);
+ await db.query('UPDATE public.proposal_line_items SET organization_id=$1 WHERE id=$2',[otherOrg,b]);
+ // Still unlinked: source identity requires BOTH proposal and organization.
+ assert.deepEqual(await read(),beforeRollback);
+ await db.exec('ROLLBACK');
+ assert.deepEqual(await read(),beforeRollback);
+ // Verify transactional rollback of an actual connected source mutation.
+ await db.query('INSERT INTO public.proposal_line_items VALUES($1,$2,$3,1)',[a,proposal,org]);
+ const committed=await read();
+ await db.exec('BEGIN');
+ await db.query('UPDATE public.proposal_line_items SET quantity=4 WHERE id=$1',[a]);
+ let inside=await read();
+ assert.equal(inside[0].revision,committed[0].revision+1);
+ assert.equal(inside[0].state,'held');
+ await db.exec('ROLLBACK');
+ assert.deepEqual(await read(),committed,'rollback must restore revision and fingerprint');
+ const qty=(await db.query('SELECT quantity FROM public.proposal_line_items WHERE id=$1',[a])).rows[0].quantity;
+ assert.equal(qty,1,'rollback must restore source equipment');
+ // Reaching bigint revision limit must never wrap to a reusable revision.
+ await db.query("UPDATE techsafe_source.order_revision_ledger SET revision=9223372036854775807,state='candidate',source_fingerprint=repeat('c',64) WHERE connection_id=$1",[a]);
+ await db.query('UPDATE public.proposal_line_items SET quantity=5 WHERE id=$1',[a]);
+ inside=await read();
+ assert.equal(String(inside[0].revision),'9223372036854775807');
+ assert.equal(inside[0].state,'held');
+ assert.equal(inside[0].hold_reason,'revision_exhausted');
+ assert.equal(inside[0].source_fingerprint,'0'.repeat(64));
+ assert.equal(inside[1].revision,11,'unrelated tenant remains untouched');
  console.log('Techsafe base-equipment PostgreSQL trigger runtime: PASS');
 } finally {await db.close();}
