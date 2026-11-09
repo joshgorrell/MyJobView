@@ -35,10 +35,16 @@ export async function preflightTechsafeDraftContent({connectionId,orderId,readCo
   return held('source_fingerprint_changed');
  // Canonicalize projection ordering; a change in price, exclusion, product,
  // description or quantity is a content change even when source revision isn't.
- const canonical=lines=>JSON.stringify([...lines].sort((a,b)=>
-  a.sourceLineId<b.sourceLineId?-1:a.sourceLineId>b.sourceLineId?1:0));
+ const canonical=lines=>JSON.stringify([...lines].map(x=>[
+  x.sourceLineId,x.productRef,x.productKind,x.description,x.quantity,
+  x.unitEquipmentValueCents,x.customerSupplied,x.techsafeExcluded
+ ]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0));
+ const canonicalDetails=lines=>JSON.stringify([...lines].map(x=>[
+  x.sourceLineId,x.productRef,x.productKind,x.description,
+  x.unitEquipmentValueCents,x.customerSupplied,x.techsafeExcluded
+ ]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0));
  if(canonical(first.lines)!==canonical(second.lines)||
-    canonical(firstSource.equipmentDetails)!==canonical(secondSource.equipmentDetails))
+    canonicalDetails(firstSource.equipmentDetails)!==canonicalDetails(secondSource.equipmentDetails))
   return held('draft_content_changed_during_preflight');
  return {ok:true,authorized:false,snapshotReady:false,reason:'draft_freshness_not_certified',
   revision:second.revision,lines:second.lines};
