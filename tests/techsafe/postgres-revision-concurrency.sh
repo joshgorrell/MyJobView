@@ -84,11 +84,33 @@ assert_revision "$b" 5
 "${PSQL[@]}" -c "UPDATE public.proposal_line_items SET proposal_id='00000000-0000-0000-0000-000000000099' WHERE id='00000000-0000-0000-0000-000000000023'"
 assert_revision "$a" 6
 assert_revision "$b" 5
+# Tenant isolation: matching proposal UUID in a different organization is NOT linked.
+"${PSQL[@]}" -c "INSERT INTO public.proposal_line_items VALUES ('00000000-0000-0000-0000-000000000024','00000000-0000-0000-0000-000000000099','00000000-0000-0000-0000-000000000004',1)"
+assert_revision "$a" 6
+assert_revision "$b" 5
+# Moving that line into the connected organization invalidates only the destination.
+"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET organization_id='00000000-0000-0000-0000-000000000003' WHERE id='00000000-0000-0000-0000-000000000024'"
+assert_revision "$a" 7
+assert_revision "$b" 5
+# Moving it back out invalidates only the former tenant.
+"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET organization_id='00000000-0000-0000-0000-000000000099' WHERE id='00000000-0000-0000-0000-000000000024'"
+assert_revision "$a" 8
+assert_revision "$b" 5
+# A rolled-back cross-tenant move must leave all revisions untouched.
+"${PSQL[@]}" <<'SQL'
+BEGIN;
+UPDATE public.proposal_line_items
+ SET organization_id='00000000-0000-0000-0000-000000000003'
+ WHERE id='00000000-0000-0000-0000-000000000024';
+ROLLBACK;
+SQL
+assert_revision "$a" 8
+assert_revision "$b" 5
 # At bigint exhaustion the trigger must hold and invalidate, never wrap to a negative revision.
 "${PSQL[@]}" -c "UPDATE techsafe_source.order_revision_ledger SET revision=9223372036854775807,state='candidate',hold_reason=NULL,source_fingerprint=repeat('a',64) WHERE connection_id='$a'"
 "${PSQL[@]}" -c "UPDATE public.proposal_line_items SET proposal_id='00000000-0000-0000-0000-000000000004' WHERE id='00000000-0000-0000-0000-000000000023'" >/dev/null
 assert_revision "$a" 9223372036854775807
 reason="$("${PSQL[@]}" -c "SELECT hold_reason FROM techsafe_source.order_revision_ledger WHERE connection_id='$a'")"
 [[ "$reason" == "revision_exhausted" ]] || { echo "Expected revision_exhausted, got $reason" >&2; exit 1; }
-echo 'PASS: linked base equipment insert/update/reparent/rollback/concurrent writers/delete/unlinked scope/bigint exhaustion'
+echo 'PASS: linked base equipment insert/update/reparent/rollback/concurrent writers/delete/unlinked scope/cross-tenant isolation/bigint exhaustion'
 echo 'NOTE: Fixture verifies trigger behavior only; not the full application migration chain, customer approval or snapshot certification.'
