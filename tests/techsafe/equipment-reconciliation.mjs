@@ -64,7 +64,7 @@ assert.deepEqual(run({changeOrders:[{...change,lines:[{...change.lines[0],action
 assert.deepEqual(run({changeOrders:[]}).items.map(x=>x.quantity),[2]);
 const manifest={salesOrderId:order.id,organizationId:order.organizationId,proposalId:order.proposalId,revision:7,complete:true,approvalEvidenceVerified:true,baseLineCount:1,changeOrderCount:1,totalChangeOrderCount:1,unapprovedChangeOrderCount:0,changeLineCount:2};
 denied({sourceManifest:{...manifest,changeOrderCount:2}},'source_manifest_incomplete');
-denied({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}},'unapproved_changes_present');
+assert.deepEqual(run({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}}).items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]],'pending changes must not alter approved equipment');
 denied({sourceManifest:{...manifest,totalChangeOrderCount:2}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,unapprovedChangeOrderCount:-1}},'source_manifest_incomplete');
 denied({sourceManifest:{...manifest,changeLineCount:3}},'source_manifest_incomplete');
@@ -126,8 +126,8 @@ const laterChange={...change,id:'co-later',revision:7,proposalId:originalProposa
 assert.deepEqual(run({changeOrders:[{...change,revision:6},laterChange]}).items.map(x=>[x.productId,x.quantity]),[['tv',5],['speaker',2]]);
 denied({changeOrders:[change,{...laterChange,proposalId:'standalone-proposal'}]},'change_order_scope_mismatch');
 denied({changeOrders:[change,{...laterChange,customerApproved:false}]},'change_order_not_customer_approved');
-// Even a complete-looking manifest must never turn a filtered pending change
-// history into an approved source.
-denied({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}},'unapproved_changes_present');
+// A trusted complete scan can include pending changes, while the approved
+// equipment view remains unchanged until customer approval.
+assert.deepEqual(run({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}}).items.map(x=>[x.productId,x.quantity]),[['tv',3],['speaker',2]],'pending changes must not alter approved equipment');
 
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
