@@ -2,6 +2,7 @@
 // approved Sales Order. This is NOT source certification or dispatch authority.
 const id=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const money=x=>Number.isSafeInteger(x)&&x>=0;
+const sourceLineId=x=>id(x)||(typeof x==='string'&&x.startsWith('change:')&&id(x.slice(7)));
 const fail=reason=>({ok:false,authorized:false,snapshotReady:false,reason,lines:[]});
 export function projectTechsafeEquipment({inspection,details,minimumUnitValueCents=0}={}){
  if(inspection?.ok!==true||inspection.authorized!==false||inspection.snapshotReady!==false||
@@ -12,7 +13,7 @@ export function projectTechsafeEquipment({inspection,details,minimumUnitValueCen
   return fail('equipment_details_incomplete');
  const byId=new Map();
  for(const detail of details){
-  if(!detail||!id(detail.sourceLineId)||byId.has(detail.sourceLineId)||
+  if(!detail||!sourceLineId(detail.sourceLineId)||byId.has(detail.sourceLineId)||
    !id(detail.productRef)||typeof detail.description!=='string'||detail.description.length>4000||
    !money(detail.unitEquipmentValueCents)||typeof detail.customerSupplied!=='boolean'||
    typeof detail.techsafeExcluded!=='boolean'||detail.productKind!=='equipment')
@@ -21,8 +22,7 @@ export function projectTechsafeEquipment({inspection,details,minimumUnitValueCen
  }
  const lines=[];let total=0;
  for(const item of inspection.items){
-  if(!item||!id(item.productId)||!id(item.sourceLineId)&&
-   !(typeof item.sourceLineId==='string'&&item.sourceLineId.startsWith('change:')&&id(item.sourceLineId.slice(7)))||
+  if(!item||!id(item.productId)||!sourceLineId(item.sourceLineId)||
    !Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>10000)
    return fail('invalid_reconciled_equipment');
   const detail=byId.get(item.sourceLineId);
