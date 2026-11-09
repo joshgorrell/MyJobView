@@ -7,9 +7,12 @@ PSQL=(psql "$TECHSAFE_TEST_DATABASE_URL" -X -qAt -v ON_ERROR_STOP=1)
 existing="$("${PSQL[@]}" -c "SELECT count(*) FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind IN ('r','p')")"
 [[ "$existing" == "0" ]] || { echo "Refusing nonempty public schema" >&2; exit 2; }
 "${PSQL[@]}" <<'SQL'
-CREATE ROLE anon NOLOGIN;
-CREATE ROLE authenticated NOLOGIN;
-CREATE ROLE service_role NOLOGIN;
+-- Roles are cluster-wide; the revision test already creates them in another DB.
+DO $ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+ IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+ IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+END $;
 CREATE SCHEMA techsafe_source;
 SQL
 "${PSQL[@]}" -f supabase/migrations/20261109183000_techsafe_equipment_certificate_storage.sql
