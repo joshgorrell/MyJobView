@@ -15,6 +15,8 @@ assert.equal(run().snapshotReady,false);
 const denied=(patch,reason)=>{ const result=run(patch); assert.equal(result.reason,reason); assert.equal(result.ok,false); assert.equal(result.authorized,false); assert.equal(result.snapshotReady,false); assert.deepEqual(result.items,[]); };
 denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified');
 denied({salesOrder:{...order,revision:8}},'stale_source_revision');
+denied({salesOrder:{...order,revision:0},expectedRevision:0},'stale_source_revision');
+denied({baseLines:[{...base[0],id:'change:line-1'}]},'reserved_source_line_identifier');
 denied({baseLines:[{...base[0],organizationId:'tenant-2'}]},'source_scope_mismatch');
 denied({baseLines:[{...base[0],quantity:10001}]},'invalid_quantity');
 denied({baseLines:[base[0],base[0]]},'duplicate_base_line');
