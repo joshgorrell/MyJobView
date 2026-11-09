@@ -10,15 +10,21 @@ for(const patch of [{connectionId:'other'},{orderId:'other'},{transactionConsist
 }
 assert.equal((await inspect({connectionId:' conn-1',orderId:'sales-1'})).reason,'invalid_source_identity');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1 '})).reason,'invalid_source_identity');
-for (const invalid of ['change:reserved','conn-1\\nother','conn-1\\tother','conn-1\\u0000other','x'.repeat(257)]) {
- const result=await inspect({connectionId:invalid,orderId:'sales-1',readConsistentSource:async()=>{throw Error('must not read')}});
+// Exercise actual control characters, not escaped backslash sequences.
+let rejectedReads=0;
+const forbiddenRead=async()=>{rejectedReads++;throw Error('invalid identity reached reader')};
+for (const invalid of ['change:reserved',...([0,9,10,13,31,127].map(code=>'conn-1'+String.fromCharCode(code)+'other')),'x'.repeat(257)]) {
+ const result=await inspect({connectionId:invalid,orderId:'sales-1',readConsistentSource:forbiddenRead});
  assert.equal(result.reason,'invalid_source_identity');
  assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
 }
-for (const invalid of ['change:reserved','sales-1\\rother','sales-1\\u007fother']) {
- const result=await inspect({connectionId:'conn-1',orderId:invalid,readConsistentSource:async()=>{throw Error('must not read')}});
+for (const invalid of ['change:reserved',...([0,9,10,13,31,127].map(code=>'sales-1'+String.fromCharCode(code)+'other'))]) {
+ const result=await inspect({connectionId:'conn-1',orderId:invalid,readConsistentSource:forbiddenRead});
  assert.equal(result.reason,'invalid_source_identity');
+ assert.equal(result.snapshotReady,false);
 }
+assert.equal(rejectedReads,0,'Malformed identifiers must be rejected before any database read');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1'})).reason,'authoritative_reader_unavailable');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',readConsistentSource:async()=>{throw Error('db down')}})).reason,'authoritative_read_failed');
 // A valid-looking manifest cannot override ledger holds, revision reuse,
