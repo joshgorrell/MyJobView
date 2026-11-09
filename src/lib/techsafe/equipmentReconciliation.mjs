@@ -7,7 +7,9 @@ function quantity(value) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > MAX_QUANTITY) throw Error('invalid_quantity');
   return value;
 }
-function id(value) { if (typeof value !== 'string' || !value.trim() || value !== value.trim() || value.length > 256 || /[\u0000-\u001f\u007f]/.test(value)) throw Error('invalid_identifier'); return value; }
+// Techsafe receiver accepts only these transport-safe source identities.
+// A change-order addition is namespaced exactly once after validation.
+function id(value) { if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) throw Error('invalid_identifier'); return value; }
 export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,changeOrders,expectedRevision,sourceManifest}) {
   try {
     if (!salesOrder || salesOrder.approved !== true || !salesOrder.id || !salesOrder.organizationId || !salesOrder.proposalId)
