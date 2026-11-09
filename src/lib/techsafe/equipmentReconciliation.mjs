@@ -12,7 +12,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
   try {
     if (!salesOrder || salesOrder.approved !== true || !salesOrder.id || !salesOrder.organizationId || !salesOrder.proposalId)
       return fail('approved_sales_order_unverified');
-    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || salesOrder.revision !== expectedRevision)
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
     if (baseLines.length > MAX_LINES || changeOrders.length > MAX_LINES) return fail('source_too_large');
@@ -58,6 +58,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
     for (const line of baseLines) {
       if (line.organizationId !== salesOrder.organizationId || line.proposalId !== salesOrder.proposalId) return fail('source_scope_mismatch');
       const key=id(line.id), productId=id(line.productId), qty=quantity(line.quantity);
+      if (key.startsWith('change:')) return fail('reserved_source_line_identifier');
       if (items.has(key)) return fail('duplicate_base_line');
       baseIds.add(key);
       items.set(key,{sourceLineId:key,productId,quantity:qty});
@@ -90,6 +91,7 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
         const qty=quantity(line.newQuantity);
         if (line.actionType === 'add') {
           const productId=id(line.productId), key='change:'+lineId;
+          if (baseIds.has(key) || items.has(key)) return fail('source_line_identifier_collision');
           items.set(key,{sourceLineId:key,productId,quantity:qty});
         } else if (line.actionType === 'remove' || line.actionType === 'modify_quantity' || line.actionType === 'modify_price') {
           const key=id(line.proposalLineItemId), previous=items.get(key);
