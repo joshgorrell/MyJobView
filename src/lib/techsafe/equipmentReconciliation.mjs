@@ -12,7 +12,10 @@ export function reconcileApprovedSalesOrderEquipment({salesOrder,baseLines,chang
   try {
     if (!salesOrder || salesOrder.approved !== true || !salesOrder.id || !salesOrder.organizationId || !salesOrder.proposalId)
       return fail('approved_sales_order_unverified');
-    // Validate identity before comparing scoped rows; malformed IDs must not alias.\n    const salesOrderId=id(salesOrder.id), organizationId=id(salesOrder.organizationId), proposalId=id(salesOrder.proposalId);\n    if (salesOrderId.startsWith('change:') || organizationId.startsWith('change:') || proposalId.startsWith('change:')) return fail('reserved_source_identifier');\n    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || salesOrder.revision !== expectedRevision)
+    // Validate identity before comparing scoped rows; malformed IDs must not alias.
+    const salesOrderId=id(salesOrder.id), organizationId=id(salesOrder.organizationId), proposalId=id(salesOrder.proposalId);
+    if (salesOrderId.startsWith('change:') || organizationId.startsWith('change:') || proposalId.startsWith('change:')) return fail('reserved_source_identifier');
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1 || salesOrder.revision !== expectedRevision)
       return fail('stale_source_revision');
     if (!Array.isArray(baseLines) || !Array.isArray(changeOrders)) return fail('source_incomplete');
     if (baseLines.length > MAX_LINES || changeOrders.length > MAX_LINES) return fail('source_too_large');
