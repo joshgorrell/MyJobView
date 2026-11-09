@@ -75,6 +75,7 @@ jobs:
       - run: node tests/techsafe/equipment-effects-source.mjs
       - run: node tests/techsafe/equipment-continuity.mjs
       - run: node tests/techsafe/approved-rows-connection.mjs
+      - run: node tests/techsafe/base-equipment-postgres.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tests/techsafe/product-exclusions-browser.mjs
 
