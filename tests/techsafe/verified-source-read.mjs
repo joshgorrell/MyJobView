@@ -101,4 +101,21 @@ for(const response of [null,{}, {authorized:true,snapshotReady:true}, {...eviden
  assert.equal(result.snapshotReady,false);
 }
 
+
+// Malformed authoritative evidence must never escape as an unhandled exception
+// or accidentally yield an export grant.
+for(const patch of [
+ {baseLines:null},
+ {baseLines:[null]},
+ {changeOrders:null},
+ {changeOrders:[null]},
+ {sourceManifest:{...evidence.sourceManifest,baseLineCount:1},baseLines:undefined}
+]){
+ const result=await run(patch);
+ assert.equal(result.ok,false);
+ assert.equal(result.authorized,false);
+ assert.equal(result.snapshotReady,false);
+ assert.deepEqual(result.items,[]);
+}
+
 console.log('Transaction source inspection orchestration contract: PASS');
