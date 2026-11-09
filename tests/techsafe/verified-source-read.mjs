@@ -10,6 +10,15 @@ for(const patch of [{connectionId:'other'},{orderId:'other'},{transactionConsist
 }
 assert.equal((await inspect({connectionId:' conn-1',orderId:'sales-1'})).reason,'invalid_source_identity');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1 '})).reason,'invalid_source_identity');
+for (const invalid of ['change:reserved','conn-1\\nother','conn-1\\tother','conn-1\\u0000other','x'.repeat(257)]) {
+ const result=await inspect({connectionId:invalid,orderId:'sales-1',readConsistentSource:async()=>{throw Error('must not read')}});
+ assert.equal(result.reason,'invalid_source_identity');
+ assert.equal(result.authorized,false);
+}
+for (const invalid of ['change:reserved','sales-1\\rother','sales-1\\u007fother']) {
+ const result=await inspect({connectionId:'conn-1',orderId:invalid,readConsistentSource:async()=>{throw Error('must not read')}});
+ assert.equal(result.reason,'invalid_source_identity');
+}
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1'})).reason,'authoritative_reader_unavailable');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',readConsistentSource:async()=>{throw Error('db down')}})).reason,'authoritative_read_failed');
 // A valid-looking manifest cannot override ledger holds, revision reuse,
