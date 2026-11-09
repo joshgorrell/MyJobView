@@ -9,7 +9,7 @@ import { toTaskDraft } from '../../lib/smart-intake/task-payload';
 const TaskForm = lazy(() => import('../Tasks/TaskForm').then(m => ({ default: m.TaskForm })));
 
 type IntakeType = 'service' | 'support' | 'task';
-type Customer = { id: string; company_name: string | null; contact_name: string | null; full_name?: string | null; email: string | null; phone?: string | null; street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null; office_id: string | null };
+type Customer = { id: string; company_name: string | null; contact_name: string | null; email: string | null; phone?: string | null; street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null; office_id: string | null };
 
 export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onClose: () => void; onCreated?: () => void; serviceOnly?: boolean }) {
   const { tenant } = useTenant();
@@ -52,9 +52,9 @@ export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onCl
       const safe = query.replace(/[%_,()\\]/g, '').slice(0, 80);
       if (!safe) { if (active) setCustomerLoading(false); return; }
       const { data, error: lookupError } = await supabase.from('contacts')
-        .select('id,company_name,contact_name,full_name,email,phone,street_address,city,state,zip_code,office_id')
+        .select('id,company_name,contact_name,email,phone,street_address,city,state,zip_code,office_id')
         .eq('organization_id', organizationId)
-        .or(['company_name.ilike.%' + safe + '%', 'full_name.ilike.%' + safe + '%', 'email.ilike.%' + safe + '%'].join(','))
+        .or(['company_name.ilike.%' + safe + '%', 'contact_name.ilike.%' + safe + '%', 'email.ilike.%' + safe + '%'].join(','))
         .order('company_name').limit(25);
       if (!active) return;
       setCustomerLoading(false);
@@ -92,7 +92,7 @@ export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onCl
     return () => { active = false; };
   }, [organizationId]);
 
-  const filtered = [ ...(selectedCustomer && !customers.some(customer => customer.id === selectedCustomer.id) ? [selectedCustomer] : []), ...customers ].filter(customer => customer.id === contactId || [customer.company_name, customer.full_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
+  const filtered = [ ...(selectedCustomer && !customers.some(customer => customer.id === selectedCustomer.id) ? [selectedCustomer] : []), ...customers ].filter(customer => customer.id === contactId || [customer.company_name, customer.contact_name, customer.email].some(value => value?.toLowerCase().includes(customerSearch.trim().toLowerCase())));
   const purposeGuidance: Record<IntakeType, string> = {
     service: 'Equipment, installation, repair, or on-site service. Creates a service request for the dispatch queue.',
     support: 'A customer question or issue that may be resolved without dispatching a technician.',
@@ -171,11 +171,11 @@ export function ManualIntake({ onClose, onCreated, serviceOnly = false }: { onCl
       <label className="block space-y-1 text-sm text-gray-300">Customer
         <select value={contactId} onChange={e => { const id = e.target.value; setContactId(id); const customer = filtered.find(customer => customer.id === id) ?? null; setSelectedCustomer(customer); if (customer?.office_id) setOfficeId(customer.office_id); }} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white">
           <option value="">Select an existing customer</option>
-          {filtered.map(customer => <option key={customer.id} value={customer.id}>{customer.company_name || customer.full_name || customer.contact_name || customer.email || 'Unnamed contact'}</option>)}
+          {filtered.map(customer => <option key={customer.id} value={customer.id}>{customer.company_name || customer.contact_name || customer.email || 'Unnamed contact'}</option>)}
         </select>
       </label>
-      {contactId && <p className="text-xs text-gray-400">Selected customer: {selectedCustomer?.company_name || selectedCustomer?.full_name || selectedCustomer?.contact_name || selectedCustomer?.email || 'Previously selected contact'}</p>}
-      {selectedCustomer && missingContactFields(selectedCustomer).length > 0 && <p className="text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedCustomer).join(', ')}</p>}
+      {contactId && <p className="text-xs text-gray-400">Selected customer: {selectedCustomer?.company_name || selectedCustomer?.contact_name || selectedCustomer?.email || 'Previously selected contact'}</p>}
+      {selectedCustomer && missingContactFields({ ...selectedCustomer, full_name: selectedCustomer.contact_name }).length > 0 && <p className="text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedCustomer).join(', ')}</p>}
       <label className="block space-y-1 text-sm text-gray-300">Subject
         <input value={subject} onChange={e => setSubject(e.target.value)} maxLength={200} className="w-full min-h-11 rounded-lg border border-gray-700 bg-gray-800 px-3 text-white" />
       </label>
