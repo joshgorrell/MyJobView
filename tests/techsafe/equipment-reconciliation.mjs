@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import {reconcileApprovedSalesOrderEquipment as reconcile} from '../../src/lib/techsafe/equipmentReconciliation.mjs';
+import {readFileSync} from 'node:fs';
+const reconcilerSource=readFileSync(new URL('../../src/lib/techsafe/equipmentReconciliation.mjs',import.meta.url),'utf8');
+assert.doesNotMatch(reconcilerSource,/\/\/[^\n]*\\n\s*(?:const|if|return)\b/,'Escaped newlines must not comment out security checks');
 const order={id:'so-1',organizationId:'tenant-1',proposalId:'approved-source-1',approved:true,revision:7};
 const base=[{id:'base-1',organizationId:'tenant-1',proposalId:'approved-source-1',productId:'tv',quantity:2}];
 const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',status:'approved',customerApproved:true,revision:6,
