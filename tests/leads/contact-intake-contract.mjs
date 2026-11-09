@@ -5,8 +5,8 @@ const service=readFileSync('src/components/Service/ServiceRequestForm.tsx','utf8
 const completeness=readFileSync('src/lib/contactCompleteness.ts','utf8');
 assert.match(lead,/useState<'new' \| 'existing'>\('existing'\)/,'Existing customer is the default');
 assert.match(lead,/Add Contact/,'New contact entry is explicitly available');
-assert.match(lead,/full_name\.ilike/,'Search uses canonical contacts.full_name');
-assert.match(lead,/\.order\('full_name'\)/,'Search ordering uses an existing column');
+assert.match(lead,/contact_name\.ilike/,'Search uses canonical contacts.full_name');
+assert.match(lead,/\.order\('contact_name'\)/,'Search ordering uses an existing column');
 assert.match(lead,/\.from\('contacts'\)\.insert/,'New lead contacts are persisted');
 assert.match(lead,/converted_from_contact_id: contactId/,'Lead references shared customer');
 assert.match(lead,/missingContactFields\(/,'Lead uses shared completeness');
