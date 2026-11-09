@@ -5,7 +5,7 @@ const reconcilerSource=readFileSync(new URL('../../src/lib/techsafe/equipmentRec
 assert.doesNotMatch(reconcilerSource,/\/\/[^\n]*\\n\s*(?:const|if|return)\b/,'Escaped newlines must not comment out security checks');
 const order={id:'so-1',organizationId:'tenant-1',proposalId:'approved-source-1',approved:true,revision:7};
 const base=[{id:'base-1',organizationId:'tenant-1',proposalId:'approved-source-1',productId:'tv',quantity:2}];
-const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',status:'approved',customerApproved:true,revision:6,
+const change={id:'co-1',salesOrderId:'so-1',organizationId:'tenant-1',proposalId:'approved-source-1',status:'approved',customerApproved:true,revision:6,
  lines:[{id:'line-1',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'modify_quantity',proposalLineItemId:'base-1',productId:'tv',newQuantity:3},
  {id:'line-2',changeOrderId:'co-1',organizationId:'tenant-1',actionType:'add',productId:'speaker',newQuantity:2}]};
 const run=(patch={})=>{ const args={salesOrder:order,baseLines:base,changeOrders:[change],expectedRevision:7,...patch};
@@ -40,6 +40,8 @@ denied({baseLines:[base[0],base[0]]},'duplicate_base_line');
 denied({changeOrders:[{...change,customerApproved:false}]},'change_order_not_customer_approved');
 denied({changeOrders:[{...change,status:'pending'}]},'change_order_not_customer_approved');
 denied({changeOrders:[{...change,salesOrderId:'so-2'}]},'change_order_scope_mismatch');
+denied({changeOrders:[{...change,proposalId:'another-source-proposal'}]},'change_order_scope_mismatch');
+denied({changeOrders:[{...change,proposalId:null}]},'change_order_scope_mismatch');
 denied({changeOrders:[{...change,revision:8}]},'ambiguous_change_order_sequence');
 denied({changeOrders:[change,change]},'duplicate_change_order');
 denied({changeOrders:[{...change,lines:[{...change.lines[0],proposalLineItemId:'another-order'}]}]},'changed_item_not_in_sales_order');
