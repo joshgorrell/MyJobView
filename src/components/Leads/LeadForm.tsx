@@ -1,13 +1,13 @@
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
-import { AtSign, Users, Search, UserCheck } from 'lucide-react';
+import { Users, Search, UserCheck } from 'lucide-react';
 import { AIFormFill } from '../Shared/AIFormFill';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { generateUsername, generateUniqueUsername } from '../../lib/username';
+import { generateUniqueUsername } from '../../lib/username';
 import { offlineSupabaseInsert } from '../../lib/offlineSupport';
 
 interface LeadFormProps {
@@ -22,18 +22,23 @@ interface ContactSearchResult {
   company_name: string | null;
   email: string | null;
   phone: string | null;
-  username: string | null;
+  contact_type: string;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
   assigned_to: string | null;
 }
 
 export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   const { profile } = useAuth();
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
+  const [repsLoaded, setRepsLoaded] = useState(false);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [formData, setFormData] = useState({
     company_name: '',
     contact_name: '',
-    username: '',
+    is_business: false,
     email: '',
     phone: '',
     opportunity_description: '',
@@ -42,6 +47,9 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     office_id: '',
     assignment: 'fishbowl' as 'fishbowl' | string,
   });
+  const [customerExpanded, setCustomerExpanded] = useState(false);
+  const searchVersion = useRef(0);
+  const [searchError, setSearchError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -69,7 +77,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     // Auto-restore saved data on mount
     const savedData = restoreSavedData();
     if (savedData) {
-      setFormData(savedData);
+      setFormData(previous => ({ ...previous, ...savedData, is_business: Boolean(savedData.company_name) }));
     }
   }, []);
 
@@ -79,6 +87,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       ...previous,
       contact_name: aiPrefill.contactName ?? previous.contact_name,
       company_name: aiPrefill.company ?? previous.company_name,
+      is_business: aiPrefill.company ? true : previous.is_business,
       email: aiPrefill.email ?? previous.email,
       phone: aiPrefill.phone ?? previous.phone,
       opportunity_description: aiPrefill.description ?? previous.opportunity_description,
@@ -87,6 +96,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   }, [aiPrefill]);
 
   useEffect(() => {
+    ++searchVersion.current;
     if (contactMode !== 'existing') return;
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     if (contactSearch.trim().length < 2) {
@@ -110,24 +120,28 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   }, []);
 
   async function searchContacts(query: string) {
+    const version = searchVersion.current;
+    setSearchError('');
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, contact_name, company_name, email, phone, username, assigned_to')
+        .select('id, contact_name, company_name, email, phone, contact_type, street_address, city, state, zip_code, assigned_to')
         .or(`contact_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
         .order('contact_name')
         .limit(10);
 
       if (error) throw error;
-      setContactResults(data || []);
+      if (version === searchVersion.current) setContactResults(data || []);
     } catch {
-      setContactResults([]);
+      if (version === searchVersion.current) { setContactResults([]); setSearchError("Could not load customers. Please try again."); }
     } finally {
-      setSearching(false);
+      if (version === searchVersion.current) setSearching(false);
     }
   }
 
   function selectContact(contact: ContactSearchResult) {
+    ++searchVersion.current;
+    setCustomerExpanded(false);
     setSelectedContact(contact);
 
     const repId = contact.assigned_to;
@@ -141,7 +155,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       company_name: contact.company_name || '',
       email: contact.email || '',
       phone: contact.phone || '',
-      username: contact.username || '',
+      is_business: contact.contact_type === 'business',
       office_id: '',
       assignment: repIsAssignable ? repId! : 'fishbowl',
     });
@@ -150,6 +164,8 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   }
 
   function clearSelectedContact() {
+    ++searchVersion.current;
+    setCustomerExpanded(false);
     setSelectedContact(null);
     setFormData({
       ...formData,
@@ -157,7 +173,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       company_name: '',
       email: '',
       phone: '',
-      username: '',
+      is_business: false,
       assignment: 'fishbowl',
     });
   }
@@ -170,7 +186,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       .eq('is_active', true)
       .order('full_name');
 
-    if (data) setSalesReps(data);
+    if (data) { setSalesReps(data); setRepsLoaded(true); }
   }
 
   async function loadOffices() {
@@ -190,25 +206,11 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       const isFishbowl = formData.assignment === 'fishbowl';
       const assignedTo = isFishbowl ? null : formData.assignment;
 
-      let username = formData.username;
-      if (username) {
-        const { data: existingLead } = await supabase
-          .from('leads')
-          .select('username')
-          .eq('username', username)
-          .maybeSingle();
-
-        if (existingLead) {
-          notify(`Username "@${username}" is already taken. Please choose a different username or leave it blank to auto-generate.`, { theme: 'blue', tone: 'warning' });
-          setLoading(false);
-          return;
-        }
-      } else {
-        username = await generateUniqueUsername(formData.contact_name, supabase);
-      }
+      if (contactMode === 'existing' && !selectedContact) throw new Error('Select a customer first.');
+      const username = await generateUniqueUsername(formData.contact_name, supabase);
 
       const leadData = {
-        company_name: formData.company_name || null,
+        company_name: (formData.is_business ? formData.company_name : null) || null,
         contact_name: formData.contact_name,
         username: username,
         email: formData.email || null,
@@ -406,7 +408,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     onClose();
   }
 
-  const inputClass = "w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent";
+  const inputClass = "w-full px-3 py-2 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent";
 
   return (
     <QuickActionModal
@@ -418,8 +420,8 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       showSuccess={showSuccess}
       successMessage="Lead Created!"
     >
-        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-4 min-w-0">
-          <AIFormFill kind="lead" onFill={prefill => setFormData(previous => ({ ...previous, contact_name: prefill.contactName ?? previous.contact_name, company_name: prefill.company ?? previous.company_name, email: prefill.email ?? previous.email, phone: prefill.phone ?? previous.phone, opportunity_description: prefill.description ?? previous.opportunity_description, priority: ['low', 'medium', 'high', 'urgent'].includes(prefill.priority ?? '') ? prefill.priority! : previous.priority }))} />
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-4 space-y-3 min-w-0">
+          {contactMode === 'new' && <AIFormFill kind="lead" onFill={prefill => setFormData(previous => ({ ...previous, contact_name: prefill.contactName ?? previous.contact_name, company_name: prefill.company ?? previous.company_name, is_business: prefill.company ? true : previous.is_business, email: prefill.email ?? previous.email, phone: prefill.phone ?? previous.phone, opportunity_description: prefill.description ?? previous.opportunity_description, priority: ['low', 'medium', 'high', 'urgent'].includes(prefill.priority ?? '') ? prefill.priority! : previous.priority }))} />}
           {/* Contact Mode Toggle */}
           <div>
             <label className="block text-sm font-medium text-secondary mb-2">
@@ -477,13 +479,14 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
               {showResults && contactSearch.trim().length >= 2 && (
                 <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg">
-                  {contactResults.length === 0 && !searching ? (
+                  {searchError ? <p role="alert" className="p-3 text-sm text-red-500">{searchError}</p> : contactResults.length === 0 && !searching ? (
                     <div className="px-4 py-3 text-sm text-muted">No customers found. Try a different search, or use "New Contact".</div>
                   ) : (
                     contactResults.map((contact) => (
                       <button
                         type="button"
                         key={contact.id}
+                        disabled={!repsLoaded}
                         onClick={() => selectContact(contact)}
                         className="w-full text-left px-4 py-2.5 hover:bg-emerald-600/10 border-b border-subtle/50 last:border-0 transition-colors"
                       >
@@ -491,9 +494,9 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                           <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-primary truncate">{contact.contact_name || 'Unnamed'}</p>
-                            <p className="text-xs text-muted truncate">
-                              {contact.company_name ? `${contact.company_name} · ` : ''}
-                              {contact.email || contact.phone || 'No contact info'}
+                            <p className="text-xs text-muted break-words">
+                              {contact.contact_type === 'business' && contact.company_name ? `${contact.company_name} · ` : ''}
+                              {[contact.email, contact.phone, contact.street_address, contact.city, contact.state, contact.zip_code].filter(Boolean).join(' · ') || 'No contact info'}
                             </p>
                           </div>
                         </div>
@@ -510,16 +513,16 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
           {contactMode === 'existing' && selectedContact && (
             <div className="rounded-lg border border-emerald-600/40 bg-emerald-600/10 p-3">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+                <button type="button" aria-expanded={customerExpanded} aria-controls="lead-customer-details" onClick={() => setCustomerExpanded(value => !value)} className="flex items-center gap-2 min-w-0 text-left flex-1">
                   <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-primary truncate">{selectedContact.contact_name || 'Unnamed'}</p>
-                    <p className="text-xs text-muted truncate">
-                      {selectedContact.company_name ? `${selectedContact.company_name} · ` : ''}
-                      {selectedContact.email || selectedContact.phone || 'No contact info'}
+                    <p className="text-xs text-muted break-words">
+                      {selectedContact.contact_type === 'business' && selectedContact.company_name ? `${selectedContact.company_name} · ` : ''}
+                      {customerExpanded ? 'Hide details ▴' : 'Show contact details ▾'}
                     </p>
                   </div>
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={clearSelectedContact}
@@ -528,10 +531,17 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                   Change
                 </button>
               </div>
+              {customerExpanded && <dl id="lead-customer-details" className="mt-3 grid gap-1 text-sm break-words">
+                <div><dt className="inline text-muted">Phone: </dt><dd className="inline">{selectedContact.phone || 'Not provided'}</dd></div>
+                <div><dt className="inline text-muted">Email: </dt><dd className="inline">{selectedContact.email || 'Not provided'}</dd></div>
+                <div><dt className="inline text-muted">Current rep: </dt><dd className="inline">{salesReps.find(rep => rep.id === selectedContact.assigned_to)?.full_name || 'No active sales rep'}</dd></div>
+                <div><dt className="inline text-muted">Address: </dt><dd className="inline">{[selectedContact.street_address, selectedContact.city, selectedContact.state, selectedContact.zip_code].filter(Boolean).join(', ') || 'Not provided'}</dd></div>
+              </dl>}
             </div>
           )}
 
-          {/* Contact Fields - shown for both modes, but auto-filled when existing contact selected */}
+          {contactMode === 'new' && <>
+          <label className="flex items-center gap-2 text-sm text-secondary"><input type="checkbox" checked={formData.is_business} onChange={e => setFormData({ ...formData, is_business: e.target.checked, company_name: '' })} />Business customer</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
@@ -546,7 +556,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                 placeholder="John Doe"
               />
             </div>
-            <div>
+            {formData.is_business && <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
                 Company Name
               </label>
@@ -557,26 +567,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                 className={inputClass}
                 placeholder="Acme Corp"
               />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-secondary mb-1.5">
-              Username <span className="text-muted font-normal">(@ mention name)</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <AtSign className="w-4 h-4 text-muted" />
-              </div>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
-                className={`${inputClass} pl-10 pr-4`}
-                placeholder={formData.contact_name ? generateUsername(formData.contact_name) : 'johndoe'}
-              />
-            </div>
-            <p className="text-xs text-muted mt-1">Leave blank to auto-generate. Used for @mentions.</p>
+            </div>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -602,6 +593,8 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             </div>
           </div>
 
+          </>}
+
           <div>
             <label className="block text-sm font-medium text-secondary mb-1.5">Opportunity / Description</label>
             <textarea
@@ -613,6 +606,21 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-secondary mb-1.5">Assignment</label>
+            <select
+              value={formData.assignment}
+              onChange={(e) => setFormData({ ...formData, assignment: e.target.value })}
+              className={inputClass}
+            >
+              <option value="fishbowl">Sales Department (shared queue)</option>
+              {salesReps.map((rep) => (
+                <option key={rep.id} value={rep.id}>Assign to {rep.full_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <details className="text-sm"><summary className="cursor-pointer text-secondary">Additional details (optional)</summary><div className="mt-3 space-y-3">
           <div>
             <label className="block text-sm font-medium text-secondary mb-1.5">Tags</label>
             <input
@@ -657,31 +665,18 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-secondary mb-1.5">Assignment</label>
-            <select
-              value={formData.assignment}
-              onChange={(e) => setFormData({ ...formData, assignment: e.target.value })}
-              className={inputClass}
-            >
-              <option value="fishbowl">Send to Fishbowl (All reps notified)</option>
-              {salesReps.map((rep) => (
-                <option key={rep.id} value={rep.id}>Assign to {rep.full_name}</option>
-              ))}
-            </select>
-          </div>
-
+          </div></details>
           <div className="flex gap-3 pt-2 pb-2 border-t border-subtle/60">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-3 border border-subtle text-secondary rounded-xl hover:bg-surface transition-colors font-medium text-sm"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (contactMode === 'existing' && !selectedContact)}
               className="flex-1 min-h-11 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? 'Creating...' : 'Create Lead'}
