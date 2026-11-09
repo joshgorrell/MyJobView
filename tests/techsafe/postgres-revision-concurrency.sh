@@ -86,7 +86,7 @@ assert_revision "$a" 6
 assert_revision "$b" 5
 # At bigint exhaustion the trigger must hold and invalidate, never wrap to a negative revision.
 "${PSQL[@]}" -c "UPDATE techsafe_source.order_revision_ledger SET revision=9223372036854775807,state='candidate',hold_reason=NULL,source_fingerprint=repeat('a',64) WHERE connection_id='$a'"
-"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET quantity=5 WHERE id='00000000-0000-0000-0000-000000000021'" >/dev/null
+"${PSQL[@]}" -c "UPDATE public.proposal_line_items SET proposal_id='00000000-0000-0000-0000-000000000004' WHERE id='00000000-0000-0000-0000-000000000023'" >/dev/null
 assert_revision "$a" 9223372036854775807
 reason="$("${PSQL[@]}" -c "SELECT hold_reason FROM techsafe_source.order_revision_ledger WHERE connection_id='$a'")"
 [[ "$reason" == "revision_exhausted" ]] || { echo "Expected revision_exhausted, got $reason" >&2; exit 1; }
