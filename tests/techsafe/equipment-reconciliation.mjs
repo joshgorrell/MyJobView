@@ -98,4 +98,20 @@ const originalBase=structuredClone(base), originalChange=structuredClone(change)
 assert.deepEqual(run(),run());
 assert.deepEqual(base,originalBase);
 assert.deepEqual(change,originalChange);
+
+// Customer-approved Sales Order identity must remain bound to the original
+// approved proposal through every change-order revision, including later edits.
+const originalProposal='approved-source-1';
+for(const changedProposal of [null,'', 'standalone-proposal','approved-source-1 ']) {
+ denied({changeOrders:[{...change,proposalId:changedProposal}]},'change_order_scope_mismatch');
+}
+const laterChange={...change,id:'co-later',revision:7,proposalId:originalProposal,
+ lines:[{...change.lines[0],id:'later-line',changeOrderId:'co-later',newQuantity:5}]};
+assert.deepEqual(run({changeOrders:[{...change,revision:6},laterChange]}).items.map(x=>[x.productId,x.quantity]),[['tv',5],['speaker',2]]);
+denied({changeOrders:[change,{...laterChange,proposalId:'standalone-proposal'}]},'change_order_scope_mismatch');
+denied({changeOrders:[change,{...laterChange,customerApproved:false}]},'change_order_not_customer_approved');
+// Even a complete-looking manifest must never turn a filtered pending change
+// history into an approved source.
+denied({sourceManifest:{...manifest,totalChangeOrderCount:2,unapprovedChangeOrderCount:1}},'unapproved_changes_present');
+
 console.log('Pure Sales Order equipment reconciliation contract: PASS');
