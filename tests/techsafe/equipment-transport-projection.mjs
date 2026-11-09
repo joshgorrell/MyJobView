@@ -27,4 +27,11 @@ assert.equal(project({details:[{...details[0],unitEquipmentValueCents:-1},detail
 assert.equal(project({details:[{...details[0],productKind:'labor'},details[1]]}).reason,'invalid_equipment_detail');
 assert.equal(project({inspection:{...inspection,items:[]},details:[]}).ok,true);
 assert.equal(project({inspection:{...inspection,items:[{...inspection.items[0],quantity:10001}]},details:[details[0]]}).reason,'invalid_reconciled_equipment');
+// Repeating an authoritative source identity must not create duplicate Techsafe lines.
+assert.equal(project({inspection:{...inspection,items:[inspection.items[0],inspection.items[0]]},details:[details[0],details[1]]}).reason,'invalid_reconciled_equipment');
+// A filtered-out source line must not consume the covered-value budget.
+assert.equal(project({details:[details[0],{...details[1],unitEquipmentValueCents:Number.MAX_SAFE_INTEGER}]}).ok,true);
+// Multiplication and aggregation overflow are both rejected before returning a draft.
+assert.equal(project({details:[{...details[0],unitEquipmentValueCents:Number.MAX_SAFE_INTEGER},details[1]]}).reason,'equipment_value_overflow');
+assert.equal(project({details:[{...details[0],unitEquipmentValueCents:4000000000000000}, {...details[1],techsafeExcluded:false,unitEquipmentValueCents:2000000000000000}],minimumUnitValueCents:0}).reason,'equipment_value_overflow');
 console.log('PASS: fail-closed MJV approved Sales Order equipment projection and change-order identities');
