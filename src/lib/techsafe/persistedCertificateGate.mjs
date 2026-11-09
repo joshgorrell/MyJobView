@@ -51,6 +51,11 @@ export function checkPersistedEquipmentCertificate({connection,ledger,certificat
        lastDelivered.orderId!==connection.salesOrderId||
        !positive(lastDelivered.generation)||!positive(lastDelivered.revision)||
        !hash(lastDelivered.fingerprint)) return held('invalid_delivery_history');
+    // Historical rows may predate these scope fields. When present, never
+    // compare a delivery from a different tenant or approved proposal.
+    if((lastDelivered.organizationId!==undefined&&lastDelivered.organizationId!==connection.organizationId)||
+       (lastDelivered.proposalId!==undefined&&lastDelivered.proposalId!==connection.proposalId))
+      return held('delivery_history_scope_mismatch');
     if(ledger.generation<lastDelivered.generation||
        (ledger.generation===lastDelivered.generation&&ledger.revision<lastDelivered.revision))
       return held('delivery_revision_rollback');
