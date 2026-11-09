@@ -14,7 +14,8 @@ export function buildSalesOrderEquipmentEvidence(input={}) {
   if (!reconciled.ok) return fail(reconciled.reason);
   // Canonical, explicitly ordered fields. Never hash arbitrary caller JSON or
   // optional metadata: its key order and provenance are not source authority.
-  const lines=reconciled.items.map(x=>[x.sourceLineId,x.productId,x.quantity]);
+  const lines=reconciled.items.map(x=>[x.sourceLineId,x.productId,x.quantity])
+    .sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
   for(let i=0;i<lines.length;i++) {
     if (!id(lines[i][0]) && !(typeof lines[i][0]==='string'&&lines[i][0].startsWith('change:')&&id(lines[i][0].slice(7))))
       return fail('invalid_line_identity');
