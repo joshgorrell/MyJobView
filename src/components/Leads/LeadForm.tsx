@@ -19,7 +19,7 @@ interface LeadFormProps {
 
 interface ContactSearchResult {
   id: string;
-  full_name: string | null;
+  contact_name: string | null;
   company_name: string | null;
   email: string | null;
   phone: string | null;
@@ -126,9 +126,9 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, full_name, company_name, email, phone, street_address, city, state, zip_code, assigned_to')
-        .or(`full_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
-        .order('full_name')
+        .select('id, contact_name, company_name, email, phone, street_address, city, state, zip_code, assigned_to')
+        .or(`contact_name.ilike.%${query}%,company_name.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%`)
+        .order('contact_name')
         .limit(10);
 
       if (error) throw error;
@@ -152,7 +152,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
     setFormData({
       ...formData,
-      contact_name: contact.full_name || contact.company_name || '',
+      contact_name: contact.contact_name || contact.company_name || '',
       company_name: contact.company_name || '',
       email: contact.email || '',
       phone: contact.phone || '',
@@ -214,7 +214,8 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       if (!contactId) {
         if (!formData.contact_name.trim()) throw new Error('Contact name is required.');
         const { data: createdContact, error: contactError } = await supabase.from('contacts').insert({
-          full_name: formData.contact_name.trim(),
+          contact_name: formData.contact_name.trim(),
+          username,
           company_name: formData.is_business ? formData.company_name.trim() || null : null,
           phone: formData.phone.trim() || null,
           email: formData.email.trim() || null,
@@ -481,7 +482,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                         <div className="flex items-center gap-2">
                           <UserCheck className="w-4 h-4 text-emerald-500 shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-primary truncate">{contact.full_name || 'Unnamed'}</p>
+                            <p className="text-sm font-medium text-primary truncate">{contact.contact_name || 'Unnamed'}</p>
                             <p className="text-xs text-muted break-words">
                               {Boolean(contact.company_name) && contact.company_name ? `${contact.company_name} · ` : ''}
                               {[contact.email, contact.phone, contact.street_address, contact.city, contact.state, contact.zip_code].filter(Boolean).join(' · ') || 'No contact info'}
@@ -504,7 +505,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                 <button type="button" aria-expanded={customerExpanded} aria-controls="lead-customer-details" onClick={() => setCustomerExpanded(value => !value)} className="flex items-center gap-2 min-w-0 text-left flex-1">
                   <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-primary truncate">{selectedContact.full_name || 'Unnamed'}</p>
+                    <p className="text-sm font-medium text-primary truncate">{selectedContact.contact_name || 'Unnamed'}</p>
                     <p className="text-xs text-muted break-words">
                       {Boolean(selectedContact.company_name) && selectedContact.company_name ? `${selectedContact.company_name} · ` : ''}
                       {customerExpanded ? 'Hide details ▴' : 'Show contact details ▾'}
@@ -519,7 +520,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                   Change
                 </button>
               </div>
-              {missingContactFields(selectedContact).length > 0 && <p className="mt-2 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedContact).join(', ')}</p>}
+              {missingContactFields({ ...selectedContact, full_name: selectedContact.contact_name }).length > 0 && <p className="mt-2 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedContact).join(', ')}</p>}
               {customerExpanded && <dl id="lead-customer-details" className="mt-3 grid gap-1 text-sm break-words">
                 <div><dt className="inline text-muted">Phone: </dt><dd className="inline">{selectedContact.phone || 'Not provided'}</dd></div>
                 <div><dt className="inline text-muted">Email: </dt><dd className="inline">{selectedContact.email || 'Not provided'}</dd></div>
