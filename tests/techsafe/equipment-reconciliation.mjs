@@ -20,6 +20,12 @@ denied({salesOrder:{...order,approved:false}},'approved_sales_order_unverified')
 denied({salesOrder:{...order,id:' so-1'}},'invalid_identifier');
 denied({salesOrder:{...order,organizationId:'tenant-1 '}},'invalid_identifier');
 denied({salesOrder:{...order,proposalId:'change:other'}},'reserved_source_identifier');
+// IDs must not contain control characters that could break canonical source
+// identity, logs, signatures, or downstream transport encodings.
+denied({salesOrder:{...order,id:'so-1\nother'}},'invalid_identifier');
+denied({salesOrder:{...order,organizationId:'tenant-1\tother'}},'invalid_identifier');
+denied({baseLines:[{...base[0],id:'base-1\u0000other'}]},'invalid_identifier');
+denied({changeOrders:[{...change,lines:[{...change.lines[0],id:'line-1\rmore'}]}]},'invalid_identifier');
 denied({baseLines:[{...base[0],id:'base-1 '}]},'invalid_identifier');
 denied({baseLines:[{...base[0],productId:' '}]},'invalid_identifier');
 denied({changeOrders:[{...change,id:'co-1 '}]},'invalid_identifier');
