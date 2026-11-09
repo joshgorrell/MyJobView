@@ -43,7 +43,11 @@ for (const patch of [
  assert.deepEqual(result.items,[]);
 }
 assert.equal((await run({salesOrder:{...order,approved:false}})).reason,'approved_sales_order_unverified');
-assert.equal((await run({sourceManifest:{...evidence.sourceManifest,totalChangeOrderCount:1,unapprovedChangeOrderCount:1}})).reason,'unapproved_changes_present');
+const pending=await run({sourceManifest:{...evidence.sourceManifest,totalChangeOrderCount:1,unapprovedChangeOrderCount:1}});
+assert.equal(pending.ok,true,'pending changes do not invalidate previously approved equipment');
+assert.deepEqual(pending.items,[{sourceLineId:'base-1',productId:'product-1',quantity:2}]);
+assert.equal(pending.authorized,false);
+assert.equal(pending.snapshotReady,false);
 
 // Contract regression: a caller-supplied proposal alone is never a Sales Order.
 // A mismatched sales_orders.proposal_id must hold even if approval flags are true.
