@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { Profile, CompanyOffice } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { missingContactFields } from '../../lib/contactCompleteness';
 import { generateUniqueUsername } from '../../lib/username';
 import { offlineSupabaseInsert } from '../../lib/offlineSupport';
 
@@ -519,6 +520,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                   Change
                 </button>
               </div>
+              {missingContactFields(selectedContact).length > 0 && <p className="mt-2 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields(selectedContact).join(', ')}</p>}
               {customerExpanded && <dl id="lead-customer-details" className="mt-3 grid gap-1 text-sm break-words">
                 <div><dt className="inline text-muted">Phone: </dt><dd className="inline">{selectedContact.phone || 'Not provided'}</dd></div>
                 <div><dt className="inline text-muted">Email: </dt><dd className="inline">{selectedContact.email || 'Not provided'}</dd></div>
@@ -529,7 +531,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
           )}
 
           {contactMode === 'new' && <>
-          <p className="text-xs text-amber-400">Missing contact details can be completed later in the customer record.</p>
+          <p className="text-xs text-amber-400">{missingContactFields({ full_name: formData.contact_name, phone: formData.phone, email: formData.email }).length > 0 ? 'Incomplete contact — missing: ' + missingContactFields({ full_name: formData.contact_name, phone: formData.phone, email: formData.email }).join(', ') : 'Additional address details can be completed later in the customer record.'}</p>
           <label className="flex items-center gap-2 text-sm text-secondary"><input type="checkbox" checked={formData.is_business} onChange={e => setFormData({ ...formData, is_business: e.target.checked, company_name: '' })} />Business customer</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
