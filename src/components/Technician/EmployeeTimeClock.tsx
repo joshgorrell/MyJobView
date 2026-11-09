@@ -13,7 +13,7 @@ import { formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezon
 type TimeSection = 'daily' | 'job' | 'mine';
 type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_out: string | null; total_hours: number | null; kind: 'Daily' | 'Job' | 'Shop' | 'Training'; break_minutes?: number | null };
 
-export function EmployeeTimeClock({ onNavigate, onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
+export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
   const policy = useEmployeeTimePolicy();
   const { profile } = useAuth();
   const [section, setSection] = useState<TimeSection>('job');
