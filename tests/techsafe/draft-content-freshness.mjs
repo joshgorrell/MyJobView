@@ -18,6 +18,14 @@ assert.equal((await run(source,newer)).result.reason,'source_revision_rollback')
 assert.equal((await run({...source,sourceFingerprint:'b'.repeat(64),ledgerFingerprint:'b'.repeat(64)})).result.reason,'source_fingerprint_changed');
 assert.equal((await run({...source,ledgerState:'held'})).result.ok,false);
 assert.equal((await run(changedDetails({productRef:'wrong'}))).result.ok,false);
+// Source readers may return the same complete line set in a different order.
+// Non-contract diagnostic metadata must not cause a false content change.
+const secondBase={...base[0],id:'base-2',productId:'product-2',quantity:1};
+const secondDetail={...details[0],sourceLineId:'base-2',productRef:'product-2',description:'Camera',unitEquipmentValueCents:25000};
+const multi={...source,baseLines:[...base,secondBase],equipmentDetails:[...details,secondDetail],sourceManifest:{...manifest,baseLineCount:2}};
+const reordered={...multi,baseLines:[secondBase,...base],equipmentDetails:[{...secondDetail,diagnosticNote:'ignored'}, {...details[0],diagnosticNote:'ignored'}]};
+assert.equal((await run(reordered,multi)).result.ok,true,'source row order and unrelated metadata are not equipment changes');
+assert.equal((await run({...reordered,equipmentDetails:[{...secondDetail,unitEquipmentValueCents:26000},details[0]]},multi)).result.reason,'draft_content_changed_during_preflight');
 const rejected=await preflight({connectionId:'bad id',orderId:'sales-1',readConsistentSource:async()=>{throw Error('must not read')}});
 assert.equal(rejected.reason,'invalid_source_identity');
 assert.equal((await preflight({connectionId:'conn-1',orderId:'sales-1'})).reason,'authoritative_reader_unavailable');
