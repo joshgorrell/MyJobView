@@ -145,7 +145,11 @@ export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: stri
       {current === 'mine' && (
         <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
-          <p className="text-sm text-gray-600">Review PTO balances, pending and approved requests, and recent time entries. You can also request time off or correct a Daily Clock entry.</p>
+          <p className="text-sm text-gray-600">View your PTO balances and requests below. Expand Recent Time Entries to review hours and request corrections.</p>
+          <MyTimeOff compact />
+          <details className="rounded-xl border border-gray-200 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-900">Recent Time Entries & Corrections</summary>
+            <div className="mt-3 space-y-2">
           {historyLoading && <p className="text-sm text-gray-500">Loading your time…</p>}
           {historyError && <p role="alert" className="text-sm text-red-700">Time history could not be loaded.</p>}
           {!historyLoading && !historyError && entries.length === 0 && <p className="text-sm text-gray-500">No recent time entries.</p>}
@@ -158,7 +162,8 @@ export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: stri
               </div>
             </div>
           ))}
-          <MyTimeOff compact />
+            </div>
+          </details>
         </div>
       )}
       {correctionEntry && <TimeAdjustmentRequestModal entry={{ id: correctionEntry.id, entry_date: correctionEntry.entry_date, clock_in: correctionEntry.clock_in, clock_out: correctionEntry.clock_out, total_hours: correctionEntry.total_hours ?? 0, break_minutes: correctionEntry.break_minutes ?? 0 }} onClose={() => setCorrectionEntry(null)} onSubmit={() => { setCorrectionEntry(null); setHistoryRevision(v => v + 1); }} />}

@@ -40,7 +40,7 @@ try {
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       await page.getByRole('heading',{name:'Job Clock'}).waitFor();
       await tabs.getByRole('tab',{name:'My Time'}).click();
-      await page.getByText('Review PTO balances, pending and approved requests, and recent time entries.',{exact:false}).waitFor();
+      await page.getByText('View your PTO balances and requests below.',{exact:false}).waitFor();
        assert.equal(await page.getByRole('button',{name:'Open Work Orders',exact:true}).count(),0,'My Time does not link to Work Orders');
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow '+size.width+' '+type);
