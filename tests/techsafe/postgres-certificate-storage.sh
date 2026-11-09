@@ -32,7 +32,7 @@ BEGIN
   (connection_id,sales_order_id,organization_id,proposal_id,connection_generation,source_revision,
    source_fingerprint,equipment_fingerprint,canonical_version,equipment_count,state)
   VALUES (a,b,c,d,1,1,repeat('a',64),repeat('b',64),'mjv-techsafe-equipment-evidence-v1',2,'held');
-  RAISE EXCEPTION 'Duplicate revision was accepted';
+  RAISE EXCEPTION 'Duplicate revision was accepted' USING ERRCODE='P0001';
  EXCEPTION WHEN unique_violation THEN NULL;
  END;
  BEGIN
@@ -40,7 +40,7 @@ BEGIN
   (connection_id,sales_order_id,organization_id,proposal_id,connection_generation,source_revision,
    source_fingerprint,equipment_fingerprint,canonical_version,equipment_count,state)
   VALUES (a,b,c,d,1,2,repeat('0',64),repeat('b',64),'mjv-techsafe-equipment-evidence-v1',2,'held');
-  RAISE EXCEPTION 'Invalid zero fingerprint was accepted';
+  RAISE EXCEPTION 'Invalid zero fingerprint was accepted' USING ERRCODE='P0001';
  EXCEPTION WHEN check_violation THEN NULL;
  END;
  BEGIN
@@ -48,7 +48,7 @@ BEGIN
   (connection_id,sales_order_id,organization_id,proposal_id,connection_generation,source_revision,
    source_fingerprint,equipment_fingerprint,canonical_version,equipment_count,state)
   VALUES (a,b,c,d,1,2,repeat('a',64),repeat('b',64),'mjv-techsafe-equipment-evidence-v1',2,'certified');
-  RAISE EXCEPTION 'Certification without timestamp was accepted';
+  RAISE EXCEPTION 'Certification without timestamp was accepted' USING ERRCODE='P0001';
  EXCEPTION WHEN check_violation THEN NULL;
  END;
  IF (SELECT count(*) FROM techsafe_source.equipment_snapshot_certificates)<>1 THEN
