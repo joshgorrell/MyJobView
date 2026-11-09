@@ -6,6 +6,23 @@ for(const required of [
  'FROM techsafe_source.integration_connections',
  'FROM techsafe_source.order_revision_ledger',
  'FOR UPDATE',
+ 'jsonb_array_elements_text',
+ "'scope_counts_missing_or_invalid'",
+ "'approved_change_order_count'",
+ "'change_order_count'",
+ "'^[0-9]{1,18}
+ "l.state IS DISTINCT FROM 'candidate'",
+ "'unapproved_change_order_count'",
+ "'cross_tenant_change_line_count'",
+ "'authorized',false,'snapshotReady',false",
+ 'REVOKE ALL ON FUNCTION techsafe_source.inspect_locked_equipment_source'
+]) assert.ok(sql.includes(required),`Missing source inspection safeguard: ${required}`);
+assert.ok(!/GRANT EXECUTE/i.test(sql),'Private inspection must not expose RPC access');
+assert.ok(!/['\"]valid['\"],true/i.test(sql),'Diagnostic cannot claim verified source validity');
+assert.ok(sql.includes("'inspected',true"),'Diagnostic should distinguish inspected from certified');
+assert.ok(!/authorized',true/i.test(sql),'Inspection must never authorize delivery');
+console.log('Locked equipment source SQL static contract: PASS (not PostgreSQL runtime verified)');
+",
  "l.state IS DISTINCT FROM 'candidate'",
  "'unapproved_change_order_count'",
  "'cross_tenant_change_line_count'",
