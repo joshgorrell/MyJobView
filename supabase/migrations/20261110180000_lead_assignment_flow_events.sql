@@ -62,3 +62,24 @@ drop trigger if exists trg_lead_assignment_flow on public.leads;
 create trigger trg_lead_assignment_flow
 after insert or update of assigned_to, is_fishbowl, office_id on public.leads
 for each row execute function private.emit_lead_assignment_flow();
+
+-- Restrict Lead events to the intended recipient even in the unfiltered Flow.
+-- A department item stops appearing after another rep claims the Lead.
+drop policy if exists flow_lead_recipient_scope on public.flow_events;
+create policy flow_lead_recipient_scope on public.flow_events
+as restrictive for select to authenticated
+using (
+  source_table <> 'leads'
+  or (
+    activity_recipient_user_id = (select auth.uid())
+    and exists (
+      select 1 from public.leads l
+      where l.id = flow_events.source_id
+        and l.organization_id = flow_events.organization_id
+        and (
+          event_type <> 'leads.fishbowl'
+          or (l.assigned_to is null and l.is_fishbowl = true)
+        )
+    )
+  )
+);
