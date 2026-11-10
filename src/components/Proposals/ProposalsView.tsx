@@ -43,7 +43,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     return () => window.removeEventListener('popstate', readActivityLink);
   }, []);
 
-  const [createSource] = useState(() => {
+  const [createSource, setCreateSource] = useState<{ contactId?: string; leadId?: string }>(() => {
     const query = new URLSearchParams(window.location.search);
     return { contactId: query.get('createContactId') || undefined, leadId: query.get('createLeadId') || undefined };
   });
@@ -102,6 +102,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
   }
 
   function clearCreateSource() {
+    setCreateSource({});
     const url = new URL(window.location.href);
     url.searchParams.delete('createContactId');
     url.searchParams.delete('createLeadId');
