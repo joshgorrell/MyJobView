@@ -811,7 +811,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           {!isEditing && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-subtle px-3 py-2 text-sm">
               <span className="text-secondary">Lead status</span>
-              <span className="font-medium text-primary">{lead.status === 'closed_won' || lead.status === 'closed_lost' ? 'Closed' : Date.now() - new Date(lead.created_at).getTime() >= 90 * 86400000 ? 'Stale' : 'Active'}</span>
+              <span className="font-medium text-primary">{lead.converted_at ? 'Converted' : lead.status === 'closed_won' || lead.status === 'closed_lost' ? 'Closed' : Date.now() - new Date(lead.last_contact_date || lead.created_at).getTime() >= 90 * 86400000 ? 'Stale' : 'Active'}</span>
               <label className="ml-auto flex flex-wrap items-center gap-2 text-secondary">
                 <Calendar className="w-4 h-4" /> Reminder
                 <input type="datetime-local" aria-label="Follow-up reminder" value={reminderDate}
