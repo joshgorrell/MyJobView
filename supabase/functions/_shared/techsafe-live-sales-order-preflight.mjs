@@ -45,8 +45,13 @@ export function createLiveSalesOrderPreflight(client){
    return hold('source_incomplete');
   if(!b.approved_at&&!b.approval_completed_at)return hold('approval_evidence_unavailable');
   if(!String(b.full_name||b.contact_name||'').trim())return hold('customer_name_unavailable');
-  if(changes.some(c=>c.status!=='approved'||c.is_active!==false||
-      (c.requires_customer_approval===true&&c.customer_approved!==true)))
+  const allowedChanges=new Set(['draft','pending_approval','approved','completed']);
+  if(changes.some(c=>!allowedChanges.has(c.status)))return hold('change_order_state_unknown');
+  // MJV applies approved changes into existing proposal_line_items. Drafts
+  // are not sold equipment and must not block the approved current order.
+  if(changes.some(c=>['approved','completed'].includes(c.status)&&
+      (c.is_active!==false||!c.approval_date||
+       (c.requires_customer_approval===true&&c.customer_approved!==true))))
    return hold('change_order_application_unverified');
   if(lines.some(l=>l.product_id&&l.product_organization_id!==b.organization_id))
    return hold('cross_tenant_product');
