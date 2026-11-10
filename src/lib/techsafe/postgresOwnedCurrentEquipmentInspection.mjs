@@ -2,6 +2,7 @@
 // current Sales Order inspection; never let a request supply a transaction.
 import {createSerializableSourceTransaction} from './postgresSerializableTransaction.mjs';
 import {createTransactionalCurrentEquipmentInspection} from './postgresCurrentEquipmentInspection.mjs';
+import {createPrivateSqlCurrentContentReader} from './postgresPrivateSqlCurrentContentReader.mjs';
 export function createOwnedCurrentEquipmentInspection(pool,makePrivateContentReader){
  if(!pool||typeof pool.connect!=='function'||typeof makePrivateContentReader!=='function')
   throw new TypeError('trusted_pool_and_private_reader_factory_required');
@@ -23,4 +24,10 @@ export function createOwnedCurrentEquipmentInspection(pool,makePrivateContentRea
   // current-inspection capability in postgresSerializableTransaction.
   return tx.inspectCurrentEquipment({connectionId,orderId});
  });
+}
+
+// Real existing SQL source bridge, deliberately held until MJV has verified
+// original approval membership and actual per-unit selling price provenance.
+export function createOwnedPrivateSqlEquipmentInspection(pool){
+ return createOwnedCurrentEquipmentInspection(pool,createPrivateSqlCurrentContentReader);
 }
