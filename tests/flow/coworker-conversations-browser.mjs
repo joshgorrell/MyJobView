@@ -66,6 +66,7 @@ try {
   await page.setViewportSize({width,height:800});await page.goto(url);await messages();
   await page.getByRole('button',{name:'New message',exact:true}).click();
   const dialog=page.getByRole('dialog');
+  await dialog.getByRole('searchbox',{name:'Search people'}).fill('Julie');
   await dialog.getByRole('button',{name:'Julie',exact:true}).click();
   await dialog.getByRole('textbox',{name:'Message',exact:true}).fill('Hello Julie '+width);
   await dialog.getByRole('button',{name:'Send',exact:true}).click();
@@ -74,6 +75,7 @@ try {
   assert.equal(await page.evaluate(()=>window.inserts[0].audience_type),'direct');
   assert.equal(await page.evaluate(()=>window.inserts[0].is_private),true);
   await page.getByRole('button',{name:'New message',exact:true}).click();
+  await dialog.getByRole('searchbox',{name:'Search people'}).fill('Julie');
   await dialog.getByRole('button',{name:'Julie',exact:true}).click();
   await dialog.getByRole('textbox',{name:'Message',exact:true}).fill('Continue Julie');
   await dialog.getByRole('button',{name:'Send',exact:true}).click();
