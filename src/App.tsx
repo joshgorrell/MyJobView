@@ -91,7 +91,6 @@ const AppointmentsCalendar = lazy(() => import('./components/Appointments/Appoin
 const CalendarPopout = lazy(() => import('./components/Appointments/CalendarPopout').then(m => ({ default: m.CalendarPopout })));
 const SalesDashboard = lazy(() => import('./components/SalesDashboard/SalesDashboardPage').then(m => ({ default: m.SalesDashboardPage })));
 const PipelineBoard = lazy(() => import('./components/Sales/PipelineBoard').then(m => ({ default: m.PipelineBoard })));
-const ProspectsPage = lazy(() => import('./components/Sales/ProspectsPage').then(m => ({ default: m.ProspectsPage })));
 
 const SalesOrdersView = lazy(() => import('./components/Sales/SalesOrdersView').then(m => ({ default: m.SalesOrdersView })));
 const SalesOrderDetail = lazy(() => import('./components/Sales/SalesOrderDetail').then(m => ({ default: m.SalesOrderDetail })));
@@ -237,10 +236,12 @@ function AppContent() {
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<string>(() => {
-    return pageFromLocation(window.location, 'feed');
+    const page = pageFromLocation(window.location, 'feed');
+    return page === 'prospects' ? 'leads' : page;
   });
   const setActiveTab = React.useCallback((tab: string) => {
-    const page = resolveLegacyPage(tab);
+    const resolvedPage = resolveLegacyPage(tab);
+    const page = resolvedPage === 'prospects' ? 'leads' : resolvedPage;
     const current = new URL(window.location.href);
     if (profile && !isPortalUser && (current.pathname === '/' || workspacePage(current.pathname))) {
       const next = workspaceUrl(current, page);
@@ -1055,9 +1056,8 @@ function AppContent() {
             />
           )}
           {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onOpenRecord={openSalesDashboardRecord} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={navigateSalesDashboard} />}
-          {['pipeline_board', 'prospects', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
+          {['pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
             ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
-            ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
             ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
             ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
           ]} />}
