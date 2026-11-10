@@ -52,3 +52,7 @@ jobs:
         run: |
           PGPASSWORD=test_only_password createdb -h localhost -U techsafe_test techsafe_certificate_test
           TECHSAFE_TEST_DATABASE_URL=postgres://techsafe_test:test_only_password@localhost:5432/techsafe_certificate_test bash tests/techsafe/postgres-certificate-storage.sh
+      - name: Verify serializable source mutation race in separate disposable PostgreSQL database
+        run: |
+          PGPASSWORD=test_only_password createdb -h localhost -U techsafe_test techsafe_serializable_test
+          TECHSAFE_TEST_DATABASE_URL=postgres://techsafe_test:test_only_password@localhost:5432/techsafe_serializable_test bash tests/techsafe/postgres-serializable-source-race.sh
