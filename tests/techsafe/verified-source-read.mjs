@@ -43,6 +43,18 @@ for (const patch of [
  assert.deepEqual(result.items,[]);
 }
 assert.equal((await run({salesOrder:{...order,approved:false}})).reason,'approved_sales_order_unverified');
+// MJV already applies approved changes to current proposal_line_items.
+// Treating these rows as the original base would apply the changes twice.
+for(const patch of [
+ {baseLinesAreCurrent:true},
+ {sourceManifest:{...evidence.sourceManifest,baseLineSource:'current_proposal_line_items'}},
+ {sourceManifest:{...evidence.sourceManifest,baseLineSource:'post_application_current'}}
+]){
+ const result=await run(patch);
+ assert.equal(result.reason,'current_equipment_must_not_replay_change_orders');
+ assert.equal(result.authorized,false);assert.equal(result.snapshotReady,false);
+ assert.deepEqual(result.items,[]);
+}
 const pending=await run({sourceManifest:{...evidence.sourceManifest,totalChangeOrderCount:1,unapprovedChangeOrderCount:1}});
 assert.equal(pending.ok,true,'pending changes do not invalidate previously approved equipment');
 assert.deepEqual(pending.items,[{sourceLineId:'base-1',productId:'product-1',quantity:2}]);
