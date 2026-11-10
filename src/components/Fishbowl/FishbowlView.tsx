@@ -145,7 +145,7 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
     return `${minutes}m`;
   }
 
-  async function handleClaimLead(leadId: string, leadName: string, e: React.MouseEvent) {
+  async function handleClaimLead(leadId: string, e: React.MouseEvent) {
     e.stopPropagation();
     if (!profile) return;
 
@@ -340,7 +340,7 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
                 </div>
 
                 <button
-                  onClick={(e) => handleClaimLead(lead.id, lead.contact_name, e)}
+                  onClick={(e) => handleClaimLead(lead.id, e)}
                   disabled={claiming === lead.id}
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
