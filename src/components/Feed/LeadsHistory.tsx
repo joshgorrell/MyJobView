@@ -17,7 +17,7 @@ type ViewTab = 'all' | 'shared' | 'recently_claimed' | 'stale';
 
 export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryProps) {
   const { profile, loading: authLoading } = useAuth();
-  const [leads, setLeads] = useState<LeadWithDetails[]>([]);
+  const [leads, setLeads] = useState<(LeadWithDetails & { last_contact_date?: string | null })[]>([]);
   const [recentlyClaimed, setRecentlyClaimed] = useState<LeadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [recentlyClaimedLoading, setRecentlyClaimedLoading] = useState(true);
