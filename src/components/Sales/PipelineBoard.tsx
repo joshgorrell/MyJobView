@@ -711,18 +711,12 @@ export function PipelineBoard() {
 
                     // Render different card types based on stage
                     if (stage.id === 'contacts') {
-                      const isProspect = item.contact_type === 'prospect';
-                      const currentCompetitors = item.prospect_competitor_relationships?.filter(
-                        (rel: any) => rel.relationship_type === 'current_supplier'
-                      );
 
                       return (
                         <div
                           key={item.id}
                           onClick={() => handleContactClick(item.id)}
-                          className={`bg-white rounded-lg border-2 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation ${
-                            isProspect ? 'border-purple-300 bg-purple-50/30' : 'border-gray-200'
-                          }`}
+                          className={`bg-white rounded-lg border-2 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation border-gray-200`}
                         >
                           <div className="mb-2">
                             <div className="flex items-center justify-between gap-2 mb-1">
@@ -735,11 +729,6 @@ export function PipelineBoard() {
                                 {isNew && (
                                   <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
                                     NEW
-                                  </span>
-                                )}
-                                {isProspect && (
-                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-bold rounded-full">
-                                    PROSPECT
                                   </span>
                                 )}
                               </div>
@@ -758,70 +747,6 @@ export function PipelineBoard() {
                               )
                             )}
                           </div>
-
-                          {/* Competitor Information - Prominent for Prospects */}
-                          {isProspect && currentCompetitors && currentCompetitors.length > 0 && (
-                            <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                              <div className="flex items-start gap-1.5">
-                                <Building2 className="w-3.5 h-3.5 text-orange-600 mt-0.5 flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-semibold text-orange-900 mb-0.5">
-                                    Current Supplier:
-                                  </p>
-                                  {currentCompetitors.map((rel: any) => (
-                                    <p key={rel.id} className="text-xs text-orange-800 truncate">
-                                      {rel.competitors?.name}
-                                      {rel.relationship_strength && (
-                                        <span className="ml-1 text-orange-600">
-                                          ({rel.relationship_strength})
-                                        </span>
-                                      )}
-                                    </p>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Last Connection - Prominent for Prospects */}
-                          {isProspect && item.last_connection && (
-                            <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                              <div className="flex items-start gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-semibold text-blue-900 mb-0.5">
-                                    Last Contact:
-                                  </p>
-                                  <p className="text-xs text-blue-800">
-                                    {formatDistanceToNow(item.last_connection.connection_date)} ago
-                                    <span className="text-blue-600 ml-1">
-                                      ({item.last_connection.connection_type.replace('_', ' ')})
-                                    </span>
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Next Scheduled Connection - Prominent for Prospects */}
-                          {isProspect && item.next_scheduled_connection && (
-                            <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded">
-                              <div className="flex items-start gap-1.5">
-                                <CalendarClock className="w-3.5 h-3.5 text-green-600 mt-0.5 flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-semibold text-green-900 mb-0.5">
-                                    Next Scheduled:
-                                  </p>
-                                  <p className="text-xs text-green-800">
-                                    {new Date(item.next_scheduled_connection.scheduled_date).toLocaleDateString()}
-                                    <span className="text-green-600 ml-1">
-                                      ({item.next_scheduled_connection.connection_type.replace('_', ' ')})
-                                    </span>
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
 
                           {item.email && (
                             <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
