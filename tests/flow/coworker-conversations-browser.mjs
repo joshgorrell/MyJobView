@@ -83,6 +83,7 @@ try {
   assert.equal(await page.evaluate(()=>window.inserts[1].parent_id),'new-0','Same recipients resume the existing conversation');
   await page.getByRole('button',{name:'New message',exact:true}).click();
   await dialog.getByRole('button',{name:'Departments',exact:true}).click();
+  await dialog.getByRole('searchbox',{name:'Search departments'}).fill('Install');
   await dialog.getByRole('button',{name:'Install',exact:true}).click();
   await dialog.getByRole('textbox',{name:'Message',exact:true}).fill('Install team update');
   await dialog.getByRole('button',{name:'Send',exact:true}).click();
