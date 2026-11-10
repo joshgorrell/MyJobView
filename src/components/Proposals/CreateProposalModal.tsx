@@ -413,47 +413,68 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
         const lead = selectedResult.raw as Lead;
         resolvedLeadId = lead.id;
 
-        // Never match a blank email, and never silently choose between duplicates.
-        // A duplicate match must be resolved by selecting the existing Contact.
-        const normalizedEmail = lead.email?.trim().toLowerCase() || '';
-        let existingContact: { id: string } | null = null;
-        if (normalizedEmail) {
-          const { data: matches, error: matchError } = await supabase
+        // Leads created through MJV already have an explicit Contact relationship.
+        // Never replace it with an email guess (shared addresses are common).
+        const { data: linkedLead, error: linkedLeadError } = await supabase
+          .from('leads')
+          .select('contact_id, converted_from_contact_id')
+          .eq('id', lead.id)
+          .single();
+        if (linkedLeadError) throw linkedLeadError;
+        const linkedContactId = linkedLead?.contact_id || linkedLead?.converted_from_contact_id;
+        if (linkedContactId) {
+          const { data: linkedContact, error: linkedContactError } = await supabase
             .from('contacts')
             .select('id')
-            .ilike('email', normalizedEmail)
-            .limit(2);
-          if (matchError) throw matchError;
-          if ((matches || []).length > 1) {
-            throw new Error('Multiple contacts share this email. Select the correct existing Contact before creating a proposal.');
-          }
-          existingContact = matches?.[0] || null;
-        }
-
-        if (existingContact) {
-          resolvedContactId = existingContact.id;
-          if (zipCode.trim()) {
-            await supabase.from('contacts').update({ zip_code: zipCode.trim() }).eq('id', existingContact.id);
-          }
+            .eq('id', linkedContactId)
+            .maybeSingle();
+          if (linkedContactError) throw linkedContactError;
+          if (!linkedContact) throw new Error('The Contact linked to this Lead could not be found. Resolve the Lead Contact before creating a proposal.');
+          resolvedContactId = linkedContact.id;
         } else {
-          const { data: newContact, error: contactError } = await supabase
-            .from('contacts')
-            .insert({
-              contact_name: lead.contact_name,
-              company_name: lead.company_name || null,
-              email: lead.email || null,
-              phone: lead.phone || null,
-              contact_type: 'lead',
-              zip_code: zipCode.trim() || null,
-              office_id: (lead as any).office_id || userOffices?.office_id || null,
-              assigned_to: lead.assigned_to || profile?.id || null,
-              created_by: profile?.id,
-            })
-            .select('id')
-            .single();
-
-          if (contactError) throw contactError;
-          resolvedContactId = newContact.id;
+          // Legacy Leads without an explicit link: only use a uniquely matching
+          // nonblank email. Never silently choose between multiple Contacts.
+          const normalizedEmail = lead.email?.trim().toLowerCase() || '';
+          let existingContact: { id: string } | null = null;
+          if (normalizedEmail) {
+            const { data: matches, error: matchError } = await supabase
+              .from('contacts')
+              .select('id, email')
+              .ilike('email', normalizedEmail)
+              .limit(20);
+            if (matchError) throw matchError;
+            const exactMatches = (matches || []).filter(contact => contact.email?.trim().toLowerCase() === normalizedEmail);
+            if (exactMatches.length > 1) {
+              throw new Error('Multiple Contacts share this email. Link the correct Contact to this Lead before creating a proposal.');
+            }
+            existingContact = exactMatches[0] || null;
+          }
+          if (existingContact) {
+            resolvedContactId = existingContact.id;
+          } else {
+            const { data: newContact, error: contactError } = await supabase
+              .from('contacts')
+              .insert({
+                contact_name: lead.contact_name,
+                company_name: lead.company_name || null,
+                email: lead.email || null,
+                phone: lead.phone || null,
+                contact_type: 'lead',
+                zip_code: zipCode.trim() || null,
+                office_id: (lead as any).office_id || userOffices?.office_id || null,
+                assigned_to: lead.assigned_to || profile?.id || null,
+                created_by: profile?.id,
+              })
+              .select('id')
+              .single();
+            if (contactError) throw contactError;
+            resolvedContactId = newContact.id;
+          }
+          const { error: linkError } = await supabase
+            .from('leads')
+            .update({ contact_id: resolvedContactId, converted_from_contact_id: resolvedContactId })
+            .eq('id', lead.id);
+          if (linkError) throw linkError;
         }
       }
 
