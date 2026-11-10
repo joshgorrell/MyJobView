@@ -39,6 +39,7 @@ INSERT INTO techsafe_source.order_revision_ledger VALUES
   1,'candidate',NULL,repeat('a',64),now());
 SQL
 "${PSQL[@]}" -f supabase/migrations/20261108233000_techsafe_base_equipment_revision_invalidation.sql
+"${PSQL[@]}" -f supabase/migrations/20261109183000_techsafe_equipment_certificate_storage.sql
 "${PSQL[@]}" -c "INSERT INTO public.proposal_line_items VALUES ('00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000004',2)"
 # Re-arm a candidate solely in this isolated test fixture.
 "${PSQL[@]}" -c "UPDATE techsafe_source.order_revision_ledger SET state='candidate',revision=2,source_fingerprint=repeat('a',64)"
@@ -52,6 +53,16 @@ trap 'rm -rf "$tmp"' EXIT
 BEGIN ISOLATION LEVEL SERIALIZABLE;
 SELECT quantity FROM public.proposal_line_items WHERE id='00000000-0000-0000-0000-000000000005';
 SELECT revision FROM techsafe_source.order_revision_ledger WHERE connection_id='00000000-0000-0000-0000-000000000001';
+-- A certificate insert inside the same transaction must roll back on conflict.
+INSERT INTO techsafe_source.equipment_snapshot_certificates
+ (connection_id,sales_order_id,organization_id,proposal_id,connection_generation,
+  source_revision,source_fingerprint,equipment_fingerprint,canonical_version,
+  equipment_count,state,certified_at)
+ VALUES ('00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000002',
+  '00000000-0000-0000-0000-000000000003',
+  '00000000-0000-0000-0000-000000000004',1,2,repeat('a',64),repeat('b',64),
+  'mjv-techsafe-complete-equipment-v1',1,'certified',now());
 SELECT pg_sleep(2);
 UPDATE techsafe_source.order_revision_ledger SET updated_at=clock_timestamp()
  WHERE connection_id='00000000-0000-0000-0000-000000000001';
@@ -71,8 +82,12 @@ state="$("${PSQL[@]}" -c "SELECT revision || ':' || state || ':' || source_finge
 [[ "$state" == "3:held:$(printf '0%.0s' {1..64})" ]] || {
  echo "ERROR: concurrent mutation did not invalidate ledger: $state" >&2; exit 1;
 }
+certificate_count="$("${PSQL[@]}" -c "SELECT count(*) FROM techsafe_source.equipment_snapshot_certificates")"
+[[ "$certificate_count" == "0" ]] || {
+ echo "ERROR: certificate survived a failed SERIALIZABLE transaction" >&2; exit 1;
+}
 # A fresh transaction must see the new equipment and the held revision.
 fresh="$("${PSQL[@]}" -c "BEGIN ISOLATION LEVEL SERIALIZABLE; SELECT quantity FROM public.proposal_line_items WHERE id='00000000-0000-0000-0000-000000000005'; SELECT revision || ':' || state FROM techsafe_source.order_revision_ledger; COMMIT;")"
 [[ "$fresh" == *"3:held"* ]] || { echo "ERROR: fresh transaction missed hold: $fresh" >&2; exit 1; }
-echo 'PASS: concurrent approved equipment mutation aborts stale SERIALIZABLE transaction, invalidates ledger and is visible on fresh read'
+echo 'PASS: concurrent equipment mutation aborts stale SERIALIZABLE transaction; certificate rolls back atomically; ledger is held and fresh read sees mutation'
 echo 'NOTE: This test does not create or authorize certificates; real source reader and writer still require review.'
