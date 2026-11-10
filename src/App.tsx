@@ -236,12 +236,10 @@ function AppContent() {
   });
   const [showDesignBriefModal, setShowDesignBriefModal] = useState(false);
   const [activeTab, setActiveTabState] = useState<string>(() => {
-    const page = pageFromLocation(window.location, 'feed');
-    return page === 'prospects' ? 'leads' : page;
+    return pageFromLocation(window.location, 'feed');
   });
   const setActiveTab = React.useCallback((tab: string) => {
-    const resolvedPage = resolveLegacyPage(tab);
-    const page = resolvedPage === 'prospects' ? 'leads' : resolvedPage;
+    const page = resolveLegacyPage(tab);
     const current = new URL(window.location.href);
     if (profile && !isPortalUser && (current.pathname === '/' || workspacePage(current.pathname))) {
       const next = workspaceUrl(current, page);
