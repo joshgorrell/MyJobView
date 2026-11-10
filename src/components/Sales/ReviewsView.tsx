@@ -627,7 +627,7 @@ export default function ReviewsView() {
       const requestBody: any = {
         reviewUrl: REVIEW_URL,
         personalNote: personalNote.trim() || undefined,
-        customSubject: editedSubject && editedSubject !== previewData?.subject ? editedSubject : undefined,
+        customSubject: editedSubject.trim() || previewData?.subject || undefined,
       };
 
       if (useManualEntry) {
