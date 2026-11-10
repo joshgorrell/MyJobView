@@ -452,7 +452,10 @@ Deno.serve(async (req) => {
       const editedSubject = typeof b.edited_subject === "string" ? b.edited_subject.trim().slice(0, 300) : "";
       const editedContent = typeof b.edited_content === "string" ? b.edited_content.slice(0, 200000) : "";
       const subject = editedSubject || defaultSubject;
-      const html = editedContent ? wrapProposalContent(extendedSettings, editedContent, sender) : proposalFollowUpEmail(extendedSettings, contact, sender);
+      // Unchanged preview content must use the exact same HTML layout at send time.
+      const html = editedContent && editedContent !== defaultContent
+        ? wrapProposalContent(extendedSettings, editedContent, sender)
+        : proposalFollowUpEmail(extendedSettings, contact, sender);
       const from = settings.from_email || settings.company_email;
       if (!from || !Deno.env.get("RESEND_API_KEY")) return json({ error: "Configure email delivery before sending." }, 503);
       return json(await sendTrackedProposalCheck(admin, sendSystemEmail, {
