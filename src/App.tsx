@@ -1030,18 +1030,6 @@ function AppContent() {
           {activeTab === 'tech_center' && checkModuleAccess('tech_center') && <TechnicianWorkCenter key={activeTab} />}
           {activeTab === 'tech_stats' && checkModuleAccess('dispatch_dashboard') && <DispatchConsole key={activeTab} initialTab="tech_stats" />}
 
-          {activeTab === 'sales_dashboard' && checkModuleAccess('sales_dashboard') && (
-            <SalesDashboard
-              key={activeTab}
-              onProposalClick={(proposalId) => {
-                setOpenProposalId(proposalId);
-                setActiveTab('proposals');
-              }}
-              onOpenRecord={openSalesDashboardRecord}
-              onRepContextChange={setSalesRepAIContext}
-              onNavigateToTab={navigateSalesDashboard}
-            />
-          )}
           {activeTab === 'sales_orders' && checkModuleAccess('sales_orders') && (
             <SalesOrdersView
               key={activeTab}
@@ -1053,12 +1041,22 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onOpenRecord={openSalesDashboardRecord} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={navigateSalesDashboard} />}
-          {['pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
-            ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard onNavigate={setActiveTab} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
-            ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
-            ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
-          ]} />}
+          {['sales_dashboard', 'sales_performance', 'pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && (
+            <WorkspaceTabs key={activeTab} title="Sales" initial={['sales_dashboard', 'sales_performance'].includes(activeTab) ? 'performance' : 'pipeline'} tabs={[
+              ...(['pipeline_board', 'leads', 'fishbowl'].some(key => checkModuleAccess(key)) ? [{
+                key: 'pipeline', label: 'Pipeline',
+                content: <WorkspaceTabs title="" initial={['leads', 'fishbowl'].includes(activeTab) ? activeTab : 'pipeline_board'} onSelect={setActiveTab} tabs={[
+                  ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard onNavigate={setActiveTab} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
+                  ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
+                  ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
+                ]} />
+              }] : []),
+              ...(checkModuleAccess('sales_dashboard') ? [{
+                key: 'performance', label: 'Performance',
+                content: <SalesDashboard onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onOpenRecord={openSalesDashboardRecord} onRepContextChange={setSalesRepAIContext} onNavigateToTab={navigateSalesDashboard} />
+              }] : []),
+            ]} />
+          )}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
           {activeTab === 'sticky-notes' && checkModuleAccess('sticky-notes') && <StickyNotes key={activeTab} />}
