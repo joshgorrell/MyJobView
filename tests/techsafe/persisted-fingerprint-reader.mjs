@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createPersistedTechsafeFingerprintReader} from '../../supabase/functions/_shared/techsafe-persisted-fingerprint-reader.mjs';
+const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333','44444444-4444-4444-8444-444444444444'];
+const input={connectionId:ids[0],organizationId:ids[1],orderId:ids[2],proposalId:ids[3],generation:1};
+const fingerprint='a'.repeat(64);let params,sql;
+const reader=rows=>createPersistedTechsafeFingerprintReader({query:async(q,p)=>{sql=q;params=p;return {rows};}});
+const good={source_fingerprint:fingerprint,state:'candidate',hold_reason:null,revision:'1'};
+assert.equal(await reader([good])(input),fingerprint);
+assert.deepEqual(params,[...ids,1]);assert.match(sql,/c\\.connection_generation=l\\.connection_generation/);
+assert.match(sql,/c\\.enabled=true/);assert.equal(await reader([])(input),null);
+for(const bad of [{...good,state:'held'},{...good,state:'committed'},{...good,hold_reason:'manual_hold'},{...good,source_fingerprint:'bad'},{...good,revision:'0'}])await assert.rejects(reader([bad])(input));
+await assert.rejects(reader([good,good])(input));await assert.rejects(reader([good])({...input,generation:0}));
+console.log('Candidate ledger diagnostic reader fails closed');
