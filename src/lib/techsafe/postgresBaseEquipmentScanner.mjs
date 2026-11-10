@@ -1,5 +1,6 @@
-// Private, read-only PostgreSQL source scanner for approved Sales Order base
-// equipment. This does not attest approval or completeness of change orders.
+// Private, read-only PostgreSQL scanner for CURRENT Sales Order equipment.
+// public.apply_change_order mutates proposal_line_items: these are NOT an
+// original pre-change baseline. Does not attest approval or history.
 // Its output must NEVER be passed as a certified sourceManifest.
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
 const safeCount=x=>Number.isSafeInteger(x)&&x>=0&&x<=10000;
@@ -18,7 +19,7 @@ export function createPostgresBaseEquipmentScanner(client){
      order.rows[0]?.proposal_id!==proposalId)
    return hold('sales_order_scope_unverified');
   // The approved Sales Order references proposal_line_items through proposal_id.
-  // Read all base lines; no product filtering that could conceal incomplete data.
+  // Read all CURRENT lines; no product filtering that could conceal data.
   const lines=await client.query(
    `SELECT * FROM public.proposal_line_items
      WHERE organization_id=$1 AND proposal_id=$2 ORDER BY id FOR SHARE`,
@@ -39,7 +40,8 @@ export function createPostgresBaseEquipmentScanner(client){
   // must independently prove approval, exhaustive change orders, revisions,
   // full equipment details and a transaction-consistent source manifest.
   return Object.freeze({ok:true,authorized:false,snapshotReady:false,
-   reason:'base_lines_read_approval_and_change_orders_unverified',
+   reason:'current_lines_read_approval_and_change_orders_unverified',
+   baseLinesAreCurrent:true,baseLineSource:'current_proposal_line_items',
    orderId,organizationId,proposalId,baseLines:Object.freeze(baseLines),
    baseLineCount:baseLines.length,approvalVerified:false,sourceManifestComplete:false});
  };
