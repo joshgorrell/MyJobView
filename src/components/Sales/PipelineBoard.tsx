@@ -461,24 +461,18 @@ export function PipelineBoard() {
     if (!leadToClaim) return;
 
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({
-          assigned_to: profile?.id,
-          status: 'claimed',
-          is_fishbowl: false,
-          claimed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', leadToClaim.id);
-
-      if (error) throw error;
-
-      await supabase.from('activity_feed').insert({
-        type: 'lead_claimed',
-        user_id: profile?.id,
-        metadata: { lead_id: leadToClaim.id }
+      // All claim entry points must use the same first-wins, tenant-scoped transaction.
+      const { data: claimed, error } = await supabase.rpc('claim_shared_lead', {
+        p_lead_id: leadToClaim.id
       });
+      if (error) throw error;
+      if (!claimed) {
+        notify('This lead has already been claimed by another salesperson.', { theme: 'violet', tone: 'error' });
+        setShowClaimConfirm(false);
+        setLeadToClaim(null);
+        await loadPipelineData();
+        return;
+      }
 
       setShowClaimConfirm(false);
       setLeadToClaim(null);
