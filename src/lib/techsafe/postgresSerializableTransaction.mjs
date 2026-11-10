@@ -1,7 +1,9 @@
 // Trusted server-only PostgreSQL transaction executor. Never import into browser
 // code or expose a public RPC. Does not authorize delivery or create certificates.
 // pool is a server-owned pg-compatible Pool; never accept a user-supplied pool.
-export function createSerializableSourceTransaction(pool, makeReader) {
+export function createSerializableSourceTransaction(pool, makeReader, persistCertificate) {
+ if(persistCertificate!==undefined&&typeof persistCertificate!=='function')
+  throw new TypeError('trusted_certificate_writer_required');
  if(!pool||typeof pool.connect!=='function'||typeof makeReader!=='function')
   throw new TypeError('trusted_pool_and_reader_required');
  return async callback=>{
@@ -27,6 +29,7 @@ export function createSerializableSourceTransaction(pool, makeReader) {
       typeof reader.readCurrentRevision!=='function')
     throw new Error('trusted_source_reader_missing');
    const result=await callback(Object.freeze({
+    ...(persistCertificate?{persistCertificate:evidence=>persistCertificate({client,evidence})}:{}),
     isolationLevel:'serializable',serverOwned:true,
     readConsistentSource:reader.readConsistentSource.bind(reader),
     readCompleteEquipmentDetails:reader.readCompleteEquipmentDetails.bind(reader),
