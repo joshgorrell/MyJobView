@@ -17,7 +17,7 @@ type ViewTab = 'all' | 'shared' | 'recently_claimed' | 'stale';
 
 export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryProps) {
   const { profile, loading: authLoading } = useAuth();
-  const [leads, setLeads] = useState<LeadWithDetails[]>([]);
+  const [leads, setLeads] = useState<(LeadWithDetails & { last_contact_date?: string | null })[]>([]);
   const [recentlyClaimed, setRecentlyClaimed] = useState<LeadWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [recentlyClaimedLoading, setRecentlyClaimedLoading] = useState(true);
@@ -31,7 +31,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'priority'>('newest');
   const [activeTab, setActiveTab] = useState<ViewTab>(initialTab);
   const [staleDays, setStaleDays] = useState(90);
-  const [staleCandidates, setStaleCandidates] = useState<LeadWithDetails[]>([]);
+  const [staleCandidates, setStaleCandidates] = useState<(LeadWithDetails & { last_contact_date?: string | null })[]>([]);
   const [staleLoading, setStaleLoading] = useState(false);
   const [staleHasMore, setStaleHasMore] = useState(false);
   const [stalePage, setStalePage] = useState(0);
