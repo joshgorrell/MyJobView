@@ -535,73 +535,29 @@ export default function ReviewsView() {
   async function fetchEmailPreview() {
     setLoadingPreview(true);
     try {
-      const templateType = 'review_request';
       const { email: recipientEmail, name: recipientName } = getRecipientInfo();
-
-      const [_templateRes, settingsRes] = await Promise.all([
-        supabase
-          .from('email_templates')
-          .select('subject, body')
-          .eq('template_type', templateType)
-          .eq('is_active', true)
-          .maybeSingle(),
-        supabase
-          .from('company_settings')
-          .select('company_name, company_email, company_logo_url, company_website')
-          .maybeSingle(),
-      ]);
-
-      const settings = settingsRes.data || {
-        company_name: 'Electronic Life',
-        company_email: '',
-        company_logo_url: '',
-        company_website: '',
-      };
-
-
-      let subject: string;
-      let html: string;
-      {
-        subject = `How did we do, ${recipientName}?`;
-        html = buildJobSurveyEmailPreview({
-          customerName: recipientName,
-          companyName: settings.company_name,
-          companyEmail: settings.company_email || '',
-          companyLogoUrl: settings.company_logo_url || '',
-          reviewUrl: REVIEW_URL,
-          companyWebsite: (settings as any).company_website || '',
-        });
-      }
-
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-review-request`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ previewOnly: true, reviewUrl: REVIEW_URL,
+          ...(useManualEntry ? { email: recipientEmail, name: recipientName } : { contactId: selectedContact?.id }) }),
+      });
+      if (!response.ok) throw new Error('Unable to load review email preview');
+      const data = await response.json();
       setExamplePreview(false);
-      setPreviewData({ subject, html, recipientEmail, recipientName });
-      setEditedSubject(subject);
+      setPreviewData({ subject: data.subject, html: data.html, recipientEmail, recipientName });
+      setEditedSubject(data.subject);
       setPersonalNote('');
       setEditMode(false);
       setShowPreview(true);
     } catch (err) {
-      console.error('Error building preview:', err);
+      console.error('Error building review preview:', err);
+      toast.error('Could not load the email preview.');
     } finally {
       setLoadingPreview(false);
     }
-  }
-
-  function injectNoteIntoHtml(html: string, note: string): string {
-    if (!note.trim()) return html;
-    const noteBlock = `
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-        <tr>
-          <td style="background:#f8fafc;border-left:4px solid #06b6d4;border-radius:0 8px 8px 0;padding:16px 20px;">
-            <p style="color:#0c4a6e;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px 0;">Personal Note</p>
-            <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;white-space:pre-wrap;">${note.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-          </td>
-        </tr>
-      </table>`;
-    const insertBefore = '<p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">';
-    if (html.includes(insertBefore)) {
-      return html.replace(insertBefore, noteBlock + insertBefore);
-    }
-    return html.replace('</body>', noteBlock + '</body>');
   }
 
   async function sendReviewRequest() {
@@ -627,7 +583,7 @@ export default function ReviewsView() {
       const requestBody: any = {
         reviewUrl: REVIEW_URL,
         personalNote: personalNote.trim() || undefined,
-        customSubject: editedSubject && editedSubject !== previewData?.subject ? editedSubject : undefined,
+        customSubject: editedSubject.trim() || previewData?.subject || undefined,
       };
 
       if (useManualEntry) {
