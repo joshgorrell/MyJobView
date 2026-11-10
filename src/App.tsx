@@ -1055,7 +1055,7 @@ function AppContent() {
           )}
           {activeTab === 'sales_performance' && checkModuleAccess('sales_dashboard') && <SalesDashboard key={activeTab} onOpenRecord={openSalesDashboardRecord} onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onNavigateToTab={navigateSalesDashboard} />}
           {['pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Pipeline" onSelect={setActiveTab} initial={activeTab} tabs={[
-            ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard onNavigate={setActiveTab} /> }] : []),
+            ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard onNavigate={setActiveTab} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
             ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
             ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
           ]} />}
