@@ -44,7 +44,8 @@ export function createTransactionalBaseEquipmentAudit(client){
    reason:'base_equipment_audited_change_orders_and_approval_unverified',
    connectionId,orderId,organizationId:first.organizationId,proposalId:first.proposalId,
    connectionGeneration:first.connectionGeneration,revision:first.revision,
-   sourceFingerprint:first.sourceFingerprint,baseLines:base.baseLines,
+   sourceFingerprint:first.sourceFingerprint,baseLinesAreCurrent:true,
+   baseLineSource:'current_proposal_line_items',baseLines:base.baseLines,
    baseLineCount:base.baseLineCount,approvalVerified:false,
    sourceManifestComplete:false});
  };
