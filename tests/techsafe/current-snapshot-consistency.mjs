@@ -12,3 +12,9 @@ assert.equal(check({...source,lines:[{...line,is_hidden:true}]},{lines:[{...equi
 assert.equal(check({...source,lines:[{...line,unit_price:'19.999'}]},{lines:[equipment]}).valid,false);
 assert.equal(check({...source,lines:[{...line,product_organization_id:'other'}]},{lines:[equipment]}).valid,false);
 console.log('Current equipment snapshot consistency checks passed');
+
+assert.equal(check(source,{lines:[{...equipment,sourceLineId:'fabricated',productKind:'labor'}]}).reason,'snapshot_line_not_in_source');
+assert.equal(check(source,{lines:[{...equipment,productKind:'miscellaneous'}]}).reason,'eligible_equipment_reclassified');
+assert.equal(check(source,{lines:[{...equipment,customerSupplied:true}]}).reason,'equipment_exclusion_flag_mismatch');
+assert.equal(check(source,{lines:[{...equipment,techsafeExcluded:true}]}).reason,'equipment_exclusion_flag_mismatch');
+assert.equal(check(source,{lines:[{...equipment,productKind:'labor',productRef:'other'}]}).reason,'non_equipment_product_mismatch');
