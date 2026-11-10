@@ -723,6 +723,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
   return (
     <>
     <QuickActionModal
+      pageScroll
       title="New Contact"
       subtitle={isOffline ? 'Offline — will sync when reconnected' : 'Add a person or business to your contacts'}
       icon={<UserCircle2 className="w-5 h-5 text-primary" />}
