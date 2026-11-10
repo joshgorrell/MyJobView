@@ -61,7 +61,6 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   const [searching, setSearching] = useState(false);
   const [selectedContact, setSelectedContact] = useState<ContactSearchResult | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const hideOffice = contactMode === 'existing' && selectedContact !== null;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
@@ -75,7 +74,6 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   useEffect(() => {
     loadSalesReps();
     loadOffices();
-    loadDefaultOffice();
 
     // Auto-restore saved data on mount
     const savedData = restoreSavedData();
@@ -83,6 +81,10 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       setFormData(previous => ({ ...previous, ...savedData, is_business: Boolean(savedData.company_name) }));
     }
   }, []);
+
+  useEffect(() => {
+    if (profile?.id && !officeChangedByUser) void loadDefaultOffice();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!aiPrefill) return;
