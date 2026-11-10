@@ -15,7 +15,7 @@ function fixture({isolation='serializable',failOn=null,reader=true}={}) {
   readCompleteEquipmentDetails:async()=>[],
   readCurrentRevision:async()=>({})
  }:null;
- return {queries,released,withTx:createSerializableSourceTransaction(pool,makeReader)};
+ return {client,queries,released,withTx:createSerializableSourceTransaction(pool,makeReader)};
 }
 const good=fixture();
 assert.strictEqual(await good.withTx(async tx=>{
@@ -48,4 +48,33 @@ const beginFail=fixture({failOn:'BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE'}
 await assert.rejects(()=>beginFail.withTx(async()=>inert));
 assert.deepEqual(beginFail.queries,['BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE']);
 assert.equal(beginFail.released.length,1);
+// Writer receives the exact transaction client and is never called outside it.
+const writerFixture=fixture();
+let receivedEvidence, receivedClient;
+const writer=async ({client,evidence})=>{
+ receivedClient=client;receivedEvidence=evidence;
+ return {ok:true,authorized:false,snapshotReady:false};
+};
+const wrapped=createSerializableSourceTransaction(
+ {connect:async()=>writerFixture.client},
+ ()=>({readConsistentSource:async()=>({}),readCompleteEquipmentDetails:async()=>[],readCurrentRevision:async()=>({})}),
+ writer);
+await wrapped(async tx=>{
+ assert.equal(typeof tx.persistCertificate,'function');
+ await tx.persistCertificate({test:'same-transaction'});
+ return inert;
+});
+assert.deepEqual(receivedEvidence,{test:'same-transaction'});
+assert.strictEqual(receivedClient,writerFixture.client);
+assert.equal(writerFixture.queries.at(-1),'COMMIT');
+const failureFixture=fixture();
+const failWrapped=createSerializableSourceTransaction(
+ {connect:async()=>failureFixture.client},
+ ()=>({readConsistentSource:async()=>({}),readCompleteEquipmentDetails:async()=>[],readCurrentRevision:async()=>({})}),
+ async()=>{throw Error('certificate insert failed')});
+await assert.rejects(()=>failWrapped(async tx=>{
+ await tx.persistCertificate({test:'rollback'});
+ return inert;
+}));
+assert.equal(failureFixture.queries.at(-1),'ROLLBACK');
 console.log('PASS: server-owned PostgreSQL SERIALIZABLE transaction commit/rollback/isolation and connection disposal');
