@@ -18,13 +18,25 @@ export function validateTechsafeCurrentEquipmentSnapshot(source,snapshot){
  for(const l of snapshot.lines){
   if(!l||typeof l.sourceLineId!=='string'||seen.has(l.sourceLineId))return held('duplicate_snapshot_line');
   seen.add(l.sourceLineId);
-  if(l.productKind!=='equipment')continue;
+  // Every line, including non-equipment, must correspond to a canonical
+  // source line. A fabricated labor/misc row is not a harmless extra.
   const row=rows.get(l.sourceLineId);
-  if(!row||row.product_id!==l.productRef||row.is_customer_supplied===true||
+  if(!row)return held('snapshot_line_not_in_source');
+  if(l.productKind!=='equipment'){
+   if(l.productKind==='unclassified'||l.productKind==='miscellaneous'&&
+      ['material','both'].includes(row.item_type)&&row.catalog_item_type==='material')
+    return held('eligible_equipment_reclassified');
+   if(l.productRef!==null&&l.productRef!==row.product_id)
+    return held('non_equipment_product_mismatch');
+   continue;
+  }
+  if(row.product_id!==l.productRef||row.is_customer_supplied===true||
      row.product_organization_id!==source.binding.organization_id)
    return held('equipment_source_binding_mismatch');
   if(!['material','both'].includes(row.item_type)||row.catalog_item_type!=='material')
    return held('equipment_classification_unverified');
+  if(l.customerSupplied!==false||l.techsafeExcluded!==false)
+   return held('equipment_exclusion_flag_mismatch');
   if(l.scope!==(row.is_hidden===true?'removed':'included'))
    return held('equipment_scope_mismatch');
   const count=Number(row.quantity),price=cents(row.unit_price);
