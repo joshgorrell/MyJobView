@@ -70,6 +70,9 @@ export interface Lead {
   time_to_claim_seconds: number | null;
   unclaimed_duration_seconds: number | null;
   is_incomplete?: boolean;
+  last_contact_date?: string | null;
+  reminder_date?: string | null;
+  converted_at?: string | null;
   raw_email_content?: string | null;
   raw_email_subject?: string | null;
   created_at: string;
