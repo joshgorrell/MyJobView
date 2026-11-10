@@ -577,17 +577,15 @@ export function TechMap() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white">Technician Map</h2>
-          <p className="text-gray-300">
-            Real-time location tracking for field technicians
-          </p>
+          <h2 className="text-xl sm:text-2xl font-bold text-white">Live Map</h2>
+          <p className="hidden sm:block text-gray-300">Clocked-in employee locations</p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="text-sm text-gray-600">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="text-xs sm:text-sm text-gray-300">
             <span className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
               {loading ? 'Loading...' : `Updated ${getTimeSince(lastUpdate.toISOString())}`}
@@ -596,7 +594,7 @@ export function TechMap() {
           <button
             onClick={() => loadTechLocations()}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="hidden sm:flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -604,14 +602,14 @@ export function TechMap() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4 text-gray-900">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 sm:p-4 text-gray-900">
         {!historyMode && <label className="text-sm">Employee role
-          <select aria-label="Filter employees by role" className="block rounded border p-2" value={roleFilter} onChange={e => { setRoleFilter(e.target.value); hasFittedMap.current = false; }}>
+          <select aria-label="Filter employees by role" className="block max-w-[180px] rounded border px-2 py-1.5 text-sm" value={roleFilter} onChange={e => { setRoleFilter(e.target.value); hasFittedMap.current = false; }}>
             <option value="all">All employees</option>
             {[...new Set(techLocations.map(t => t.technician?.role?.toLowerCase()).filter(Boolean))].sort().map(role => <option key={role} value={role}>{role}</option>)}
           </select>
         </label>}
-        <button type="button" className="rounded border px-3 py-2" onClick={() => setHistoryMode(v => !v)}>{historyMode ? 'Return to live map' : 'View route history'}</button>
+        <button type="button" className="rounded border px-2.5 py-1.5 text-sm" onClick={() => setHistoryMode(v => !v)}>{historyMode ? 'Return to live map' : 'View route history'}</button>
         {historyMode && <label>History technician
           <select className="block rounded border p-2" value={selectedTech || ''} onChange={e => setSelectedTech(e.target.value || null)}>
             <option value="">Select technician</option>
@@ -621,10 +619,10 @@ export function TechMap() {
         {historyMode && <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>}
         {historyMode && <span className="text-sm">{historyLoading ? 'Loading route…' : historyError || (selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history')}</span>}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
         {/* Map Area */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 sm:p-6">
             {mapError ? <div role="alert" className="rounded-lg bg-red-50 p-5 text-red-800">{mapError}</div> : !apiKey ? (
               <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
                 <div className="text-center">
@@ -642,7 +640,7 @@ export function TechMap() {
                 <div
                   ref={mapRef}
                   className="rounded-lg overflow-hidden"
-                  style={{ width: '100%', height: '500px', backgroundColor: '#e5e7eb' }}
+                  style={{ width: '100%', height: 'min(65dvh, 500px)', minHeight: '320px', backgroundColor: '#e5e7eb' }}
                 />
                 {!mapReady && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
@@ -656,28 +654,28 @@ export function TechMap() {
             )}
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 mt-3 sm:mt-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-lg sm:text-2xl font-bold text-green-600">
                   {visibleLocations.filter(t => t.status?.status === 'available').length}
                 </div>
                 <div className="text-xs text-gray-600">Available</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {techLocations.filter(t => t.status?.status === 'on_job').length}
+                  {visibleLocations.filter(t => t.status?.status === 'on_job').length}
                 </div>
                 <div className="text-xs text-gray-600">On Job</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-yellow-600">
-                  {techLocations.filter(t => t.status?.status === 'break').length}
+                  {visibleLocations.filter(t => t.status?.status === 'break').length}
                 </div>
                 <div className="text-xs text-gray-600">On Break</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-600">
-                  {techLocations.filter(t => t.status?.status === 'off_duty').length}
+                  {visibleLocations.filter(t => t.status?.status === 'off_duty').length}
                 </div>
                 <div className="text-xs text-gray-600">Off Duty</div>
               </div>
