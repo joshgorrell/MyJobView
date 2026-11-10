@@ -36,6 +36,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
   const [repsLoaded, setRepsLoaded] = useState(false);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
+  const [officeChangedByUser, setOfficeChangedByUser] = useState(false);
   const [formData, setFormData] = useState({
     company_name: '',
     contact_name: '',
@@ -74,6 +75,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   useEffect(() => {
     loadSalesReps();
     loadOffices();
+    loadDefaultOffice();
 
     // Auto-restore saved data on mount
     const savedData = restoreSavedData();
@@ -157,7 +159,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       email: contact.email || '',
       phone: contact.phone || '',
       is_business: Boolean(contact.company_name),
-      office_id: '',
+      office_id: formData.office_id,
       assignment: repIsAssignable ? repId! : 'fishbowl',
     });
     setShowResults(false);
@@ -178,6 +180,14 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
       is_business: false,
       assignment: 'fishbowl',
     });
+  }
+
+  async function loadDefaultOffice() {
+    if (!profile?.id) return;
+    const { data, error } = await supabase.from('user_offices').select('office_id').eq('user_id', profile.id).limit(2);
+    if (error) { console.error('Unable to load lead creator office:', error); return; }
+    // One assigned office is unambiguous. Multi-office users default to All Offices.
+    if (data?.length === 1) setFormData(previous => officeChangedByUser ? previous : { ...previous, office_id: previous.office_id || data[0].office_id });
   }
 
   async function loadSalesReps() {
@@ -302,16 +312,6 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             allSalesReps = data || [];
           }
 
-          const { data: unassignedReps } = await supabase
-            .from('profiles')
-            .select('id, email, email_leads, notify_on_fishbowl')
-            .eq('is_sales_rep', true)
-            .eq('is_active', true)
-            .not('id', 'in', `(SELECT user_id FROM user_offices)`);
-
-          if (unassignedReps) {
-            allSalesReps = [...allSalesReps, ...unassignedReps];
-          }
         } else {
           const { data } = await supabase
             .from('profiles')
@@ -610,6 +610,21 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             />
           </div>
 
+            {offices.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-1.5">Sales Office</label>
+                <select
+                  value={formData.office_id}
+                  onChange={(e) => { setOfficeChangedByUser(true); setFormData(previous => ({ ...previous, office_id: e.target.value })); }}
+                  className={inputClass}
+                >
+                  <option value="">All Offices</option>
+                  {offices.map((office) => (
+                    <option key={office.id} value={office.id}>{office.office_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           <div>
             <label className="block text-sm font-medium text-secondary mb-1.5">Assignment</label>
             <select
@@ -637,7 +652,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
             <p className="text-xs text-muted mt-1">Separate tags with spaces. Use # prefix.</p>
           </div>
 
-          <div className={`grid gap-3 ${hideOffice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+          <div className="grid gap-3 grid-cols-1">
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">Follow-up Priority</label>
               <select
@@ -652,21 +667,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
               </select>
             </div>
 
-            {offices.length > 0 && !hideOffice && (
-              <div>
-                <label className="block text-sm font-medium text-secondary mb-1.5">Sales Office</label>
-                <select
-                  value={formData.office_id}
-                  onChange={(e) => setFormData({ ...formData, office_id: e.target.value })}
-                  className={inputClass}
-                >
-                  <option value="">No specific office</option>
-                  {offices.map((office) => (
-                    <option key={office.id} value={office.id}>{office.office_name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+
           </div>
 
           </div></details>
