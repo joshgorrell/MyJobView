@@ -22,23 +22,25 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
   const [sort, setSort] = useState('overrun');
   const [pmFilter, setPmFilter] = useState('all');
   const openOrders = useMemo(() => orders.filter(o => OPEN.has(o.status)), [orders]);
-  const ids = openOrders.map(o => o.id).join(',');
+  const ids = openOrders.map(o => [o.id, o.project_id, o.proposal_id, o.contract_total, o.original_contract_total].join(':')).join(',');
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!ids || !profile?.organization_id) { setMetrics({}); return; }
+      if (!ids || !profile?.organization_id) { setMetrics({}); setError(''); setLoading(false); return; }
       setLoading(true); setError('');
       try {
         const next: Record<string, Metrics> = {};
         for (const order of openOrders) next[order.id] = { estimated: 0, actual: 0, invoiced: 0, due: 0, contract: number(order.contract_total), pm: '' };
-        const projectIds = [...new Set(openOrders.map(o => o.project_id).filter((id): id is string => !!id))];
-        const [invoicesResult, projectSummaries, proposalsResult, changesResult] = await Promise.all([
+        // Projects own the sales_order_id link; a sales order need not have a project_id column.
+        const orderIds = openOrders.map(o => o.id);
+        const [invoicesResult, projectsResult, proposalsResult, changesResult] = await Promise.all([
           supabase.from('invoices').select('sales_order_id,total,amount_due,status').in('sales_order_id', openOrders.map(o => o.id)),
-          projectIds.length ? loadProjectSummaries(profile.organization_id, projectIds) : Promise.resolve([]),
+          supabase.from('projects').select('id,sales_order_id').in('sales_order_id', orderIds),
           supabase.from('proposals').select('id,total').in('id', openOrders.map(o => o.proposal_id).filter((id): id is string => !!id).length ? openOrders.map(o => o.proposal_id).filter((id): id is string => !!id) : ['00000000-0000-0000-0000-000000000000']),
           supabase.from('change_orders').select('sales_order_id,status,is_billable,change_amount,tax_amount').in('sales_order_id', openOrders.map(o => o.id))
         ]);
         if (invoicesResult.error) throw invoicesResult.error;
+        if (projectsResult.error) throw projectsResult.error;
         if (proposalsResult.error) throw proposalsResult.error;
         if (changesResult.error) throw changesResult.error;
         const proposalTotals = new Map((proposalsResult.data || []).map(p => [p.id, number(p.total)]));
@@ -54,9 +56,13 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
           item.invoiced += number(invoice.total);
           item.due += number(invoice.amount_due);
         }
+        const projectLinks = projectsResult.data || [];
+        const projectIds = [...new Set(projectLinks.map(p => p.id))];
+        const projectSummaries = projectIds.length ? await loadProjectSummaries(profile.organization_id, projectIds) : [];
         const byProject = new Map(projectSummaries.map(summary => [summary.project.id, summary]));
         for (const order of openOrders) {
-          const project = order.project_id ? byProject.get(order.project_id) : null;
+          const link = projectLinks.find(p => p.sales_order_id === order.id);
+          const project = link ? byProject.get(link.id) : null;
           if (project) {
             next[order.id].estimated = project.goalHours ?? 0;
             next[order.id].actual = project.fieldHours;
