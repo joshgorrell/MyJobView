@@ -44,6 +44,15 @@ for(const bad of [
  assert.equal(f.released.length,1);
  assert.ok(f.released[0] instanceof Error);
 }
+// A reader can perform incidental writes before returning a held result.
+// Such a transaction must roll back rather than commit those writes.
+const heldSource=fixture();
+await assert.rejects(()=>heldSource.withTx(async()=>({
+ ok:false,authorized:false,snapshotReady:false,reason:'source_changed'
+})),/transaction_source_held/);
+assert.equal(heldSource.queries.at(-1),'ROLLBACK');
+assert.ok(!heldSource.queries.includes('COMMIT'));
+assert.ok(heldSource.released[0] instanceof Error);
 const beginFail=fixture({failOn:'BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE'});
 await assert.rejects(()=>beginFail.withTx(async()=>inert));
 assert.deepEqual(beginFail.queries,['BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE']);
