@@ -36,8 +36,18 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  if (dest && /^https:\/\/(www\.)?google\.com\//.test(dest)) {
-    return Response.redirect(dest, 302);
+  // Google Business Profile review links use g.page, not google.com.
+  // Validate the parsed hostname rather than accepting arbitrary redirect destinations.
+  if (dest) {
+    try {
+      const destination = new URL(dest);
+      const allowedHosts = new Set(['google.com', 'www.google.com', 'g.page', 'www.g.page']);
+      if (destination.protocol === 'https:' && allowedHosts.has(destination.hostname.toLowerCase())) {
+        return Response.redirect(destination.toString(), 302);
+      }
+    } catch {
+      // Reject malformed destinations below.
+    }
   }
 
   return new Response(
