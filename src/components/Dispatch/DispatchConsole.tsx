@@ -74,7 +74,7 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
   return (
     <div className="space-y-4">
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+      <div className="flex items-center gap-1 overflow-x-auto pb-1" aria-label="Dispatch sections">
         {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -82,7 +82,7 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'bg-surface text-muted hover:bg-elevated hover:text-primary'
