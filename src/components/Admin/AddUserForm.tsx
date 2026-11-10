@@ -1,3 +1,4 @@
+import { formatBirthDate, parseBirthDate } from '../../utils/birthDate';
 import { SalesCompensationFields, defaultSalesCompensation, validateSalesCompensation, type SalesCompensationValues } from './SalesCompensationFields';
 import {
   UserSetupTabs,
@@ -88,7 +89,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     full_name: '',
     first_name: '',
     last_name: '',
-    birthday_mmdd: '',
+    birth_date: '',
     birthday_visible: true,
     username: '',
     role: 'sales' as 'admin' | 'finance' | 'manager' | 'sales' | 'tech' | 'service_manager',
@@ -315,18 +316,16 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       return;
     }
 
-    if (formData.birthday_mmdd && !/^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(formData.birthday_mmdd)) {
-      setError('Birthday must be MM-DD (for example 04-23).');
+    const parsedBirthDate = parseBirthDate(formData.birth_date);
+    if (classification === 'employee' && !parsedBirthDate) {
+      setError('Employees must have a valid date of birth (MM/DD/YYYY).');
       setLoading(false);
       return;
     }
-    if (formData.birthday_mmdd) {
-      const [month, day] = formData.birthday_mmdd.split('-').map(Number);
-      if (new Date(Date.UTC(2000, month - 1, day)).getUTCMonth() !== month - 1) {
-        setError('Enter a valid birthday month and day.');
-        setLoading(false);
-        return;
-      }
+    if (formData.birth_date && !parsedBirthDate) {
+      setError('Enter a valid date of birth (MM/DD/YYYY).');
+      setLoading(false);
+      return;
     }
     try {
       // Check if username is already taken
@@ -420,7 +419,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         .from('profiles')
         .update({
           ...notifications,
-          birthday_mmdd: formData.birthday_mmdd || null,
           birthday_visible: formData.birthday_visible,
           email_leads: formData.email_leads,
           notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
@@ -430,6 +428,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         })
         .eq('id', newUserId);
       if (notificationError) throw notificationError;
+      const { error: birthDateError } = await supabase.rpc('set_employee_birth_date', { p_user_id: newUserId, p_birth_date: parsedBirthDate });
+      if (birthDateError) throw new Error(`Birthday could not be saved: ${birthDateError.message}`);
       const {
         data: { user: currentUser },
       } = await supabase.auth.getUser();
@@ -573,17 +573,17 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Birthday (MM-DD, optional)</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Date of birth (MM/DD/YYYY)</label>
                   <input
                     type="text"
                     inputMode="numeric"
-                    maxLength={5}
-                    placeholder="MM-DD"
-                    value={formData.birthday_mmdd}
-                    onChange={(e) => setFormData({ ...formData, birthday_mmdd: e.target.value })}
+                    maxLength={10}
+                    placeholder="MM/DD/YYYY"
+                    value={formData.birth_date}
+                    onChange={(e) => setFormData({ ...formData, birth_date: formatBirthDate(e.target.value) })}
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Month and day only; no birth year stored.</p>
+                  <p className="text-xs text-gray-500 mt-1">Required for employees. Birth year is never shown in greetings.</p>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input type="checkbox" checked={formData.birthday_visible}

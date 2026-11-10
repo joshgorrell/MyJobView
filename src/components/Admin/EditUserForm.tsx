@@ -1,3 +1,4 @@
+import { formatBirthDate, parseBirthDate, displayBirthDate } from '../../utils/birthDate';
 import { SalesCompensationFields, defaultSalesCompensation, validateSalesCompensation, type SalesCompensationValues } from './SalesCompensationFields';
 import { UserModuleAccess } from './UserModuleAccess';
 import { effectiveModuleAccess, isPermissionModule, permissionLabel, permissionOverridesMap } from '../../lib/permissionCatalog';
@@ -145,7 +146,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     full_name: user.full_name,
     first_name: (user as any).first_name || '',
     last_name: (user as any).last_name || '',
-    birthday_mmdd: (user as any).birthday_mmdd || '',
+    birth_date: '',
     birthday_visible: (user as any).birthday_visible ?? true,
     username: user.username,
     email: user.email,
@@ -203,6 +204,17 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [isEmployee, setIsEmployee] = useState(false);
   const [showEmployeeSetup, setShowEmployeeSetup] = useState(false);
   const [classification, setClassification] = useState<string>('unreviewed');
+  useEffect(() => {
+    let active = true;
+    supabase.rpc('get_employee_birth_date', { p_user_id: user.id })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) console.error('Unable to load date of birth:', error);
+        else setFormData((prev) => ({ ...prev, birth_date: displayBirthDate(data as string | null) }));
+      });
+    return () => { active = false; };
+  }, [user.id]);
+
   const [showNonEmployeeConfirm, setShowNonEmployeeConfirm] = useState(false);
   const [conversionDate, setConversionDate] = useState('');
   const [conversionBusy, setConversionBusy] = useState(false);
@@ -651,19 +663,15 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         if (!response.ok) throw new Error(result.error || 'Failed to update email');
       }
 
-      if (formData.birthday_mmdd) {
-        const validFormat = /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(formData.birthday_mmdd);
-        const [month, day] = formData.birthday_mmdd.split('-').map(Number);
-        if (!validFormat || new Date(Date.UTC(2000, month - 1, day)).getUTCMonth() !== month - 1) {
-          throw new Error('Birthday must be a valid MM-DD date (for example 04-23).');
-        }
+      const parsedBirthDate = parseBirthDate(formData.birth_date);
+      if ((classification === 'employee' || formData.birth_date) && !parsedBirthDate) {
+        throw new Error('Employees must have a valid date of birth (MM/DD/YYYY).');
       }
       const updateData = {
         ...notifications,
         full_name: formData.full_name,
         first_name: formData.first_name || null,
         last_name: formData.last_name || null,
-        birthday_mmdd: formData.birthday_mmdd || null,
         birthday_visible: formData.birthday_visible,
         username: formData.username,
         role: formData.role,
@@ -707,6 +715,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (updateError) throw new Error(`Database error: ${updateError.message} (${updateError.code})`);
       if (!updatedProfile) throw new Error('Update succeeded but no data returned.');
       profileSaved = true;
+      const { error: birthDateError } = await supabase.rpc('set_employee_birth_date', { p_user_id: user.id, p_birth_date: parsedBirthDate });
+      if (birthDateError) throw new Error(`Birthday could not be saved: ${birthDateError.message}`);
 
       if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
         await supabase.rpc('recalculate_sales_quota_for_user', {
@@ -1027,17 +1037,17 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Birthday (MM-DD, optional)</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Date of birth (MM/DD/YYYY)</label>
                   <input
                     type="text"
                     inputMode="numeric"
-                    maxLength={5}
-                    placeholder="MM-DD"
-                    value={formData.birthday_mmdd}
-                    onChange={(e) => setFormData({ ...formData, birthday_mmdd: e.target.value })}
+                    maxLength={10}
+                    placeholder="MM/DD/YYYY"
+                    value={formData.birth_date}
+                    onChange={(e) => setFormData({ ...formData, birth_date: formatBirthDate(e.target.value) })}
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Month and day only; no birth year stored.</p>
+                  <p className="text-xs text-gray-500 mt-1">Required for employees. Birth year is never shown in greetings.</p>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-gray-300">
                   <input type="checkbox" checked={formData.birthday_visible}
