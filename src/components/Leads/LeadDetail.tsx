@@ -7,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
 import { TaskList } from '../Tasks/TaskList';
 import { ConvertLeadToProspectModal } from './ConvertLeadToProspectModal';
-import CreateProposalModal from '../Proposals/CreateProposalModal';
 
 interface LeadDetailProps {
   leadId: string;
@@ -30,7 +29,6 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
   const [showClaimConfirm, setShowClaimConfirm] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
-  const [showCreateProposalModal, setShowCreateProposalModal] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [salesReps, setSalesReps] = useState<Profile[]>([]);
   const [reminderDate, setReminderDate] = useState('');
@@ -1091,7 +1089,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                 <p className="text-green-700 text-xs sm:text-sm mt-1">Create a proposal directly from this lead — no conversion needed</p>
               </div>
               <button
-                onClick={() => setShowCreateProposalModal(true)}
+                onClick={() => window.location.assign(`/proposals?createLeadId=${encodeURIComponent(lead.id)}`)}
                 className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl"
               >
                 Create Proposal
@@ -1299,17 +1297,6 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
         />
       )}
 
-      {showCreateProposalModal && (
-        <CreateProposalModal
-          leadId={lead.id}
-          onClose={() => setShowCreateProposalModal(false)}
-          onCreated={(proposalId) => {
-            setShowCreateProposalModal(false);
-            onClose();
-            window.location.href = `/proposals?open=${proposalId}`;
-          }}
-        />
-      )}
-    </div>
+</div>
   );
 }
