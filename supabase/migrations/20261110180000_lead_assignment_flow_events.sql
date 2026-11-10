@@ -1,0 +1,45 @@
+-- Emit canonical Flow activity when a Lead is assigned, including self-assignment.
+-- Fishbowl (department) Leads produce a shared sales activity item; office scope
+-- is preserved for existing Flow filters. Notifications remain managed separately.
+create or replace function private.emit_lead_assignment_flow()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_name text;
+begin
+  if tg_op = 'UPDATE'
+     and old.assigned_to is not distinct from new.assigned_to
+     and old.is_fishbowl is not distinct from new.is_fishbowl
+     and old.office_id is not distinct from new.office_id then
+    return new;
+  end if;
+
+  select coalesce(p.full_name, 'MJV') into v_actor_name
+    from public.profiles p where p.id = new.created_by;
+
+  insert into public.flow_events (
+    organization_id, contact_id, office_id, actor_id, actor_name,
+    customer_name, category, event_type, summary, details,
+    source_table, source_id, required_module, activity_recipient_user_id
+  ) values (
+    new.organization_id, coalesce(new.contact_id, new.converted_from_contact_id),
+    new.office_id, coalesce(auth.uid(), new.created_by),
+    coalesce(v_actor_name, 'MJV'), coalesce(new.contact_name, new.company_name, 'New lead'),
+    'sales', case when new.assigned_to is not null then 'leads.assigned' else 'leads.fishbowl' end,
+    case when new.assigned_to is not null
+      then 'Lead assigned · ' || coalesce(new.contact_name, new.company_name, 'New lead')
+      else 'New unclaimed lead · ' || coalesce(new.contact_name, new.company_name, 'New lead') end,
+    coalesce(new.opportunity_description, ''),
+    'leads', new.id, 'feed', new.assigned_to
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_lead_assignment_flow on public.leads;
+create trigger trg_lead_assignment_flow
+after insert or update of assigned_to, is_fishbowl, office_id on public.leads
+for each row execute function private.emit_lead_assignment_flow();
