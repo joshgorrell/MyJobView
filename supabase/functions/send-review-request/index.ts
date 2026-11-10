@@ -180,35 +180,25 @@ Deno.serve(async (req: Request) => {
     let subject: string;
     let emailHtml: string;
 
-    if (template) {
-      const placeholders = {
-        customer_name: customerName,
-        company_name: settings.company_name,
-        review_url: reviewUrl,
-      };
-
-      subject = replacePlaceholders(template.subject, placeholders);
-      const bodyText = replacePlaceholders(template.body, { ...placeholders, review_url: trackedClickUrl });
-      const emailBody = convertTextToHtml(bodyText);
-      emailHtml = wrapInEmailLayout(
-        emailBody,
-        settings.company_name,
-        settings.company_email,
-        '#06b6d4',
-        settings.company_logo_url || '',
-        settings.offices || []
-      );
-    } else {
-      subject = customSubject || (subjectName ? `We'd love your feedback, ${subjectName}!` : `We'd love your feedback!`);
-      emailHtml = buildReviewRequestEmail({
-        customerName,
-        companyName: settings.company_name,
-        companyEmail: settings.company_email,
-        offices: settings.offices || [],
-        companyLogoUrl: settings.company_logo_url || '',
-        reviewUrl: trackedClickUrl,
-      });
-    }
+    // Always deliver the branded HTML layout. A saved text template must never
+    // replace the CTA with a raw tracking URL (the preview uses branded HTML).
+    // Preserve customized subject lines while keeping click tracking inside the button.
+    const placeholders = {
+      customer_name: customerName,
+      company_name: settings.company_name,
+      review_url: reviewUrl,
+    };
+    subject = template
+      ? replacePlaceholders(template.subject, placeholders)
+      : (subjectName ? `We'd love your feedback, ${subjectName}!` : "We'd love your feedback!");
+    emailHtml = buildReviewRequestEmail({
+      customerName,
+      companyName: settings.company_name,
+      companyEmail: settings.company_email,
+      offices: settings.offices || [],
+      companyLogoUrl: settings.company_logo_url || '',
+      reviewUrl: trackedClickUrl,
+    });
 
     if (personalNote) {
       emailHtml = injectPersonalNote(emailHtml, personalNote);
