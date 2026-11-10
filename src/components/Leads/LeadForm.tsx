@@ -239,6 +239,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
         is_fishbowl: isFishbowl,
         claimed_at: isFishbowl ? null : new Date().toISOString(),
         converted_from_contact_id: contactId,
+        contact_id: contactId,
       };
 
       const leadResult = await offlineSupabaseInsert('leads', leadData);
