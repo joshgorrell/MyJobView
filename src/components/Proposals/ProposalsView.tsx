@@ -22,6 +22,7 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     const linked = linkedProposalActivity(window.location.search);
     if (linked) return linked;
     if (isStandalone) return query.get('id');
+    if (query.has('createContactId') || query.has('createLeadId')) return null;
     if (query.get('proposalId')) return query.get('proposalId');
     return localStorage.getItem('openProposalId');
   });
@@ -42,7 +43,11 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     return () => window.removeEventListener('popstate', readActivityLink);
   }, []);
 
-  const [showCreateModal, setShowCreateModal] = useState(() => sessionStorage.getItem(CREATE_PROPOSAL_DRAFT_KEY) === 'open');
+  const [createSource] = useState(() => {
+    const query = new URLSearchParams(window.location.search);
+    return { contactId: query.get('createContactId') || undefined, leadId: query.get('createLeadId') || undefined };
+  });
+  const [showCreateModal, setShowCreateModal] = useState(() => sessionStorage.getItem(CREATE_PROPOSAL_DRAFT_KEY) === 'open' || !!new URLSearchParams(window.location.search).get('createContactId') || !!new URLSearchParams(window.location.search).get('createLeadId'));
   const [showVideoLibrary, setShowVideoLibrary] = useState(false);
   const [targetRoomIds, setTargetRoomIds] = useState<Set<string>>(new Set());
   const [pendingPrefillRooms, setPendingPrefillRooms] = useState<ProposalPrefill['rooms'] | undefined>(undefined);
@@ -96,13 +101,22 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
     setShowCreateModal(true);
   }
 
+  function clearCreateSource() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('createContactId');
+    url.searchParams.delete('createLeadId');
+    window.history.replaceState({}, '', url);
+  }
+
   function closeCreateModal() {
+    clearCreateSource();
     sessionStorage.removeItem(CREATE_PROPOSAL_DRAFT_KEY);
     setShowCreateModal(false);
     onAiPrefillConsumed?.();
   }
 
   function handleProposalCreated(proposalId: string, prefillRooms?: ProposalPrefill['rooms']) {
+    clearCreateSource();
     sessionStorage.removeItem(CREATE_PROPOSAL_DRAFT_KEY);
     setShowCreateModal(false); setPendingPrefillRooms(prefillRooms); onAiPrefillConsumed?.(); navigateToProposal(proposalId);
   }
@@ -134,6 +148,6 @@ export default function ProposalsView({ isStandalone = false, openProposalId, on
 
   return <div className="w-full space-y-2">
     <ProposalsList onSelectProposal={navigateToProposal} onCreateNew={openCreateModal} onSelectSalesOrder={onSelectSalesOrder} onNavigateToSalesOrders={onNavigateToSalesOrders} onNavigateToSalesStats={onNavigateToSalesStats} onOpenVideoLibrary={() => setShowVideoLibrary(true)} />
-    {showCreateModal && <CreateProposalModal onClose={closeCreateModal} onCreated={handleProposalCreated} prefill={aiPrefill ?? undefined} contactId={aiPrefill?.contactId} leadId={aiPrefill?.leadId} />}
+    {showCreateModal && <CreateProposalModal onClose={closeCreateModal} onCreated={handleProposalCreated} prefill={aiPrefill ?? undefined} contactId={createSource.contactId || aiPrefill?.contactId} leadId={createSource.leadId || aiPrefill?.leadId} />}
   </div>;
 }
