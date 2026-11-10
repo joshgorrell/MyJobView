@@ -110,6 +110,7 @@ try {
  for (const width of [375,768,1280]) {
   await page.setViewportSize({width,height:800});await page.goto(url+'?emptyInbox');await messages();
   await page.getByRole('heading',{name:'Start a conversation',exact:true}).first().waitFor();
+  await page.getByRole('searchbox',{name:'Search people'}).fill('Julie');
   await page.getByRole('button',{name:'Julie',exact:true}).click();
   await page.screenshot({path:'/tmp/mjv-start-conversation-'+width+'.png'});
   assert.equal(await page.locator('.conversation-list').count(),0);
