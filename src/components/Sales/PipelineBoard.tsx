@@ -10,7 +10,7 @@ import { LeadForm } from '../Leads/LeadForm';
 import ConnectionForm from '../Connections/ConnectionForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
 
 
 interface PipelineStage {
