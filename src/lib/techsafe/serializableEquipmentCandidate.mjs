@@ -13,7 +13,12 @@ export async function inspectSerializableEquipmentCandidate({
  if(!id(connectionId)||!id(orderId))return hold('invalid_source_identity');
  if(typeof withSerializableSourceTransaction!=='function')return hold('serializable_transaction_unavailable');
  try {
+  let callbackInvocations=0;
+  let callbackResult;
   const result=await withSerializableSourceTransaction(async tx=>{
+   callbackInvocations++;
+   if(callbackInvocations!==1)return hold('transaction_callback_replayed');
+   callbackResult=await (async()=>{
    // A server adapter must attest the actual isolation level, row locks and
    // immutable transaction context; these flags alone are not DB proof.
    if(!tx||tx.isolationLevel!=='serializable'||tx.serverOwned!==true||
@@ -57,10 +62,13 @@ export async function inspectSerializableEquipmentCandidate({
     return hold('source_changed_during_transaction');
    return {...evidence,authorized:false,snapshotReady:false,
     reason:'serializable_candidate_not_certified'};
+   })();
+   return callbackResult;
   });
-  // Do not trust an adapter to return an authorization grant or fabricated
-  // candidate. The transaction callback's result is not a certificate.
-  if(!result||result.authorized!==false||result.snapshotReady!==false)
+  // The adapter must invoke the callback exactly once and return its exact
+  // result. It must not substitute a fabricated candidate or bypass inspection.
+  if(callbackInvocations!==1||!callbackResult||result!==callbackResult||
+     !result||result.authorized!==false||result.snapshotReady!==false)
    return hold('invalid_transaction_result');
   return result;
  } catch {
