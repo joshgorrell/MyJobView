@@ -3,7 +3,7 @@ import { WeeklyProposalActivity } from './WeeklyProposalActivity';
 import { ServiceRequestFlowDetail } from './ServiceRequestFlowDetail';
 import { proposalActivityPath } from '../../lib/proposalActivityLinks';
 import { Fragment, ReactNode, useEffect, useId, useMemo, useRef, useState, useLayoutEffect } from 'react';
-import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, MessageSquare, Package, Plus, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
+import { Activity, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, Filter, MessageSquare, Package, Plus, RefreshCw, Search, User, Wrench, X, DollarSign, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useDepartments } from '../../contexts/DepartmentContext';
