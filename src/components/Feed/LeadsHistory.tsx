@@ -6,14 +6,16 @@ import { formatDistanceToNow } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { LeadForm } from '../Leads/LeadForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
+import { FishbowlView } from '../Fishbowl/FishbowlView';
 
 interface LeadsHistoryProps {
   onLeadClick: (leadId: string) => void;
+  initialTab?: 'all' | 'shared';
 }
 
-type ViewTab = 'all' | 'recently_claimed';
+type ViewTab = 'all' | 'shared' | 'recently_claimed';
 
-export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
+export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryProps) {
   const { profile, loading: authLoading } = useAuth();
   const [leads, setLeads] = useState<LeadWithDetails[]>([]);
   const [recentlyClaimed, setRecentlyClaimed] = useState<LeadWithDetails[]>([]);
@@ -27,7 +29,7 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
   const [showPrint, setShowPrint] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'priority'>('newest');
-  const [activeTab, setActiveTab] = useState<ViewTab>('all');
+  const [activeTab, setActiveTab] = useState<ViewTab>(initialTab);
   const [recentlyClaimedDays, setRecentlyClaimedDays] = useState<7 | 14 | 30>(7);
 
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
@@ -286,6 +288,13 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
             All Leads
           </button>
           <button
+            onClick={() => setActiveTab('shared')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'shared' ? 'border-slate-700 text-slate-800' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          >
+            <Users className="w-4 h-4" />
+            Sales Department
+          </button>
+          <button
             onClick={() => setActiveTab('recently_claimed')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'recently_claimed'
@@ -302,6 +311,8 @@ export function LeadsHistory({ onLeadClick }: LeadsHistoryProps) {
             )}
           </button>
         </div>
+
+        {activeTab === 'shared' && <FishbowlView onLeadClick={onLeadClick} />}
 
         {/* Toolbar — All Leads tab */}
         {activeTab === 'all' && (
