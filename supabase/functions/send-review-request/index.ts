@@ -1,6 +1,6 @@
 import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { getEmailTemplate, getCompanySettings, replacePlaceholders, convertTextToHtml, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
+import { getCompanySettings } from '../_shared/emailTemplates.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,58 +16,85 @@ function injectPersonalNote(html: string, note: string): string {
   return html.replace('</body>', noteBlock + '</body>');
 }
 
-function buildReviewRequestEmail(params: {
-  customerName: string;
-  companyName: string;
-  companyEmail: string;
-  offices?: { office_name: string; phone: string }[];
-  companyLogoUrl?: string;
-  reviewUrl: string;
-}): string {
-  const logoBlock = params.companyLogoUrl
-    ? `<img src="${params.companyLogoUrl}" alt="${params.companyName}" style="max-height:60px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`
-    : `<span style="color:#ffffff;font-size:24px;font-weight:800;letter-spacing:-0.5px;">${params.companyName}</span>`;
+const EL_LOGO_URL = 'https://bqtsuzvuvqvgidipbsis.supabase.co/storage/v1/object/public/company_logo/logo-1770649712721.png';
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>We'd love your feedback!</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+
+function buildEmailShell(params: { companyName: string; companyEmail: string; companyLogoUrl?: string }, headerContent: string, bodyContent: string): string {
+  const logoUrl = params.companyLogoUrl || EL_LOGO_URL;
+  const logoBlock = `<img src="${logoUrl}" alt="${params.companyName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;margin:0 auto;" />`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+      <!-- Header: dark slate with logo -->
       <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #06b6d4;">
         <div style="margin-bottom:20px;">${logoBlock}</div>
-        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">Your Opinion Matters</h1>
-        <p style="color:#94a3b8;margin:0;font-size:15px;">to us and to your community</p>
-        <div style="margin-top:20px;"><span style="font-size:24px;letter-spacing:3px;color:#f59e0b;">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>
+        ${headerContent}
       </td></tr>
-      <tr><td style="background:#ffffff;padding:44px 44px 36px;">
-        <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName || 'there'},</p>
-        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>. We take pride in every project we complete and we genuinely hope your experience exceeded your expectations.</p>
-        <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">If you have a moment, we'd be grateful if you could share your experience with others on Google. Reviews like yours help homeowners and businesses in the community find reliable, quality service.</p>
-        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 32px 0;">
-          <a href="${params.reviewUrl}" style="display:inline-block;background:#0e7490;color:#ffffff;text-decoration:none;padding:16px 48px;border-radius:10px;font-size:17px;font-weight:700;letter-spacing:0.01em;">Leave Us a Google Review</a>
-        </td></tr></table>
-        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;"><tr><td style="padding:18px 22px;">
-          <p style="color:#0f172a;font-size:13px;margin:0 0 5px 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Takes less than 2 minutes</p>
-          <p style="color:#475569;font-size:14px;margin:0;line-height:1.6;">Just a sentence or two is enough. Your words directly help our team grow.</p>
-        </td></tr></table>
-      </td></tr>
+      <!-- Body: clean white -->
+      <tr><td style="background:#ffffff;padding:44px 44px 36px;">${bodyContent}</td></tr>
+      <!-- Footer -->
       <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:28px 44px;text-align:center;border-top:1px solid #334155;">
+        <img src="${logoUrl}" alt="${params.companyName}" style="max-height:36px;max-width:140px;object-fit:contain;display:block;margin:0 auto 12px auto;opacity:0.85;" />
         <p style="color:#06b6d4;font-size:14px;font-weight:700;margin:0 0 4px 0;letter-spacing:0.3px;">${params.companyName}</p>
-        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 2px 0;">${params.companyEmail}</p>` : ''}
-        ${params.offices && params.offices.length > 0 ? `<p style="color:#94a3b8;font-size:12px;margin:6px 0 0 0;line-height:1.8;">${params.offices.map(o => `${o.office_name}: ${o.phone}`).join('&nbsp;&nbsp;|&nbsp;&nbsp;')}</p>` : ''}
+        ${params.companyEmail ? `<p style="color:#94a3b8;font-size:13px;margin:0 0 12px 0;">${params.companyEmail}</p>` : ''}
         <p style="color:#475569;font-size:12px;margin:12px 0 0 0;line-height:1.6;">You received this email because you recently worked with us.<br>Thank you for your business.</p>
       </td></tr>
     </table>
   </td></tr>
 </table>
-</body>
-</html>`;
+</body></html>`;
+}
+
+
+function buildJobSurveyEmailPreview(params: { customerName: string; companyName: string; companyEmail: string; companyLogoUrl?: string; reviewUrl: string; companyWebsite?: string }): string {
+  const websiteLink = params.companyWebsite
+    ? `<a href="${params.companyWebsite}" style="color:#06b6d4;text-decoration:none;font-weight:600;font-size:13px;">${params.companyWebsite}</a>`
+    : '';
+  const header = `
+    <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How did we do?</h1>
+    <p style="color:#94a3b8;margin:0;font-size:15px;">Your experience means everything to us</p>
+    <div style="margin-top:20px;"><span style="font-size:24px;letter-spacing:3px;color:#f59e0b;">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>`;
+  const body = `
+    <p style="color:#111827;font-size:19px;font-weight:600;margin:0 0 20px 0;">Hi ${params.customerName},</p>
+    <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 18px 0;">Thank you for choosing <strong style="color:#0e7490;">${params.companyName}</strong>! We truly appreciate you trusting us with your project and we hope your experience exceeded your expectations.</p>
+    <p style="color:#374151;font-size:16px;line-height:1.75;margin:0 0 32px 0;">We'd love to hear how we did. Your feedback not only helps us grow — it helps other homeowners and businesses in the community find reliable, quality service they can count on.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;margin-bottom:24px;">
+      <tr><td style="padding:24px 28px;">
+        <table cellpadding="0" cellspacing="0" style="margin-bottom:12px;"><tr>
+          <td style="background:#16a34a;border-radius:6px;width:28px;height:28px;text-align:center;vertical-align:middle;font-size:15px;font-weight:900;color:#ffffff;line-height:28px;">&#9733;</td>
+          <td style="padding-left:10px;color:#15803d;font-size:16px;font-weight:700;vertical-align:middle;">If we earned 5 stars...</td>
+        </tr></table>
+        <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 20px 0;">We'd be so grateful if you'd take 2 minutes to share your experience on Google. A quick review helps our team grow and lets your neighbors know they can count on us.</p>
+        <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+          <a href="${params.reviewUrl}" style="display:inline-block;background:#ffffff;border:2px solid #dadce0;border-radius:8px;text-decoration:none;padding:12px 24px;font-family:Arial,sans-serif;">
+            <table cellpadding="0" cellspacing="0"><tr>
+              <td style="vertical-align:middle;padding-right:10px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-3.58-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+              </td>
+              <td style="vertical-align:middle;">
+                <span style="color:#3c4043;font-size:15px;font-weight:600;font-family:Arial,sans-serif;letter-spacing:0.01em;">Write a Google Review</span>
+              </td>
+            </tr></table>
+          </a>
+        </td></tr></table>
+      </td></tr>
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-radius:12px;border:1px solid #fecaca;margin-bottom:32px;">
+      <tr><td style="padding:24px 28px;">
+        <table cellpadding="0" cellspacing="0" style="margin-bottom:12px;"><tr>
+          <td style="background:#dc2626;border-radius:6px;width:28px;height:28px;text-align:center;vertical-align:middle;font-size:15px;font-weight:900;color:#ffffff;line-height:28px;">!</td>
+          <td style="padding-left:10px;color:#b91c1c;font-size:16px;font-weight:700;vertical-align:middle;">If we fell short of 5 stars...</td>
+        </tr></table>
+        <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 4px 0;">Please reach out to us directly before posting a review. We'd love the opportunity to make it right.</p>
+        <p style="color:#374151;font-size:15px;line-height:1.7;margin:0;">Simply reply to this email or give us a call — we're here to help.</p>
+      </td></tr>
+    </table>
+    <p style="color:#374151;font-size:15px;line-height:1.75;margin:0 0 28px 0;">And if you ever need additional service, training, or just have questions about your system, don't hesitate to reach out. We're always happy to help.</p>
+    <p style="color:#374151;font-size:15px;line-height:1.75;margin:0 0 4px 0;">Thank you again for being an <strong style="color:#0e7490;">${params.companyName}</strong> customer.</p>
+    <p style="color:#374151;font-size:15px;line-height:1.75;margin:0 0 4px 0;font-style:italic;font-weight:600;">Innovate. Integrate. Inspire.</p>
+    <p style="color:#6b7280;font-size:14px;line-height:1.75;margin:0;">The ${params.companyName} Team${websiteLink ? ` &nbsp;&bull;&nbsp; ${websiteLink}` : ''}</p>`;
+  return buildEmailShell(params, header, body);
 }
 
 Deno.serve(async (req: Request) => {
@@ -107,7 +134,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { contactId, email, name, reviewUrl, personalNote, customSubject } = await req.json();
+    const { contactId, email, name, reviewUrl, personalNote, customSubject, previewOnly = false } = await req.json();
 
     if (!reviewUrl) {
       return new Response(JSON.stringify({ error: 'Review URL required' }), {
@@ -171,33 +198,14 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const template = await getEmailTemplate(
-      'review_request',
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    let subject: string;
-    let emailHtml: string;
-
-    // Always deliver the branded HTML layout. A saved text template must never
-    // replace the CTA with a raw tracking URL (the preview uses branded HTML).
-    // Preserve customized subject lines while keeping click tracking inside the button.
-    const placeholders = {
-      customer_name: customerName,
-      company_name: settings.company_name,
-      review_url: reviewUrl,
-    };
-    subject = template
-      ? replacePlaceholders(template.subject, placeholders)
-      : (subjectName ? `We'd love your feedback, ${subjectName}!` : "We'd love your feedback!");
-    emailHtml = buildReviewRequestEmail({
-      customerName,
+    let subject = `How did we do, ${subjectName || customerName || 'Valued Customer'}?`;
+    let emailHtml = buildJobSurveyEmailPreview({
+      customerName: customerName || 'Valued Customer',
       companyName: settings.company_name,
-      companyEmail: settings.company_email,
-      offices: settings.offices || [],
+      companyEmail: settings.company_email || '',
       companyLogoUrl: settings.company_logo_url || '',
-      reviewUrl: trackedClickUrl,
+      reviewUrl: previewOnly ? reviewUrl : trackedClickUrl,
+      companyWebsite: settings.company_website || '',
     });
 
     if (personalNote) {
@@ -205,6 +213,12 @@ Deno.serve(async (req: Request) => {
     }
     if (customSubject) {
       subject = customSubject;
+    }
+
+    if (previewOnly) {
+      return new Response(JSON.stringify({ success: true, preview: true, subject, html: emailHtml }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="width:1px;height:1px;border:0" />`;
