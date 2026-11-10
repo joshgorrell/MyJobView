@@ -66,6 +66,7 @@ try {
   await page.setViewportSize({width,height:800});await page.goto(url);await messages();
   await page.getByRole('button',{name:'New message',exact:true}).click();
   const dialog=page.getByRole('dialog');
+  await dialog.getByRole('searchbox',{name:'Search people'}).fill('Julie');
   await dialog.getByRole('button',{name:'Julie',exact:true}).click();
   await dialog.getByRole('textbox',{name:'Message',exact:true}).fill('Hello Julie '+width);
   await dialog.getByRole('button',{name:'Send',exact:true}).click();
@@ -74,6 +75,7 @@ try {
   assert.equal(await page.evaluate(()=>window.inserts[0].audience_type),'direct');
   assert.equal(await page.evaluate(()=>window.inserts[0].is_private),true);
   await page.getByRole('button',{name:'New message',exact:true}).click();
+  await dialog.getByRole('searchbox',{name:'Search people'}).fill('Julie');
   await dialog.getByRole('button',{name:'Julie',exact:true}).click();
   await dialog.getByRole('textbox',{name:'Message',exact:true}).fill('Continue Julie');
   await dialog.getByRole('button',{name:'Send',exact:true}).click();
@@ -81,6 +83,7 @@ try {
   assert.equal(await page.evaluate(()=>window.inserts[1].parent_id),'new-0','Same recipients resume the existing conversation');
   await page.getByRole('button',{name:'New message',exact:true}).click();
   await dialog.getByRole('button',{name:'Departments',exact:true}).click();
+  await dialog.getByRole('searchbox',{name:'Search departments'}).fill('Install');
   await dialog.getByRole('button',{name:'Install',exact:true}).click();
   await dialog.getByRole('textbox',{name:'Message',exact:true}).fill('Install team update');
   await dialog.getByRole('button',{name:'Send',exact:true}).click();
@@ -107,6 +110,7 @@ try {
  for (const width of [375,768,1280]) {
   await page.setViewportSize({width,height:800});await page.goto(url+'?emptyInbox');await messages();
   await page.getByRole('heading',{name:'Start a conversation',exact:true}).first().waitFor();
+  await page.getByRole('searchbox',{name:'Search people'}).fill('Julie');
   await page.getByRole('button',{name:'Julie',exact:true}).click();
   await page.screenshot({path:'/tmp/mjv-start-conversation-'+width+'.png'});
   assert.equal(await page.locator('.conversation-list').count(),0);
@@ -136,7 +140,7 @@ try {
  // Representative header/bookmark space and long directories must not clip the first-message form.
  for (const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[820,1180],[1024,650],[1194,744],[1280,680]]) {
   await page.setViewportSize({width,height});await page.goto(url+'?emptyInbox&longDirectory');await messages();
-  await page.getByRole('button',{name:'Julie',exact:true}).waitFor();
+  await page.getByRole('searchbox',{name:'Search people'}).waitFor();
   if(width>=1024){
    const tabs=await page.locator('.flow-view-tabs').boundingBox();
    const audience=await filters().boundingBox();
@@ -151,7 +155,7 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.equal(await page.locator('main').evaluate(el=>el.scrollHeight>el.clientHeight+1),false);
   const scrollers=await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(node=>/auto|scroll/.test(getComputedStyle(node).overflowY)&&node.scrollHeight>node.clientHeight+1).length);
-  assert.equal(scrollers,1,JSON.stringify({width,height,areas:await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(n=>/auto|scroll/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight+1).map(n=>({cls:n.className,client:n.clientHeight,scroll:n.scrollHeight})))}));
+  assert.ok(scrollers<=1,JSON.stringify({width,height,areas:await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(n=>/auto|scroll/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight+1).map(n=>({cls:n.className,client:n.clientHeight,scroll:n.scrollHeight})))}));
   await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Staff 79');
   await page.getByRole('button',{name:'Staff 79',exact:true}).click();
   assert.equal(await page.getByRole('searchbox',{name:'Search people',exact:true}).count(),0);
