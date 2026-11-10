@@ -87,18 +87,24 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
       const ids = pageLeads.map(lead => lead.id);
       // A recent message or logged activity means a lead is not abandoned.
       // Fail closed if the activity checks cannot be completed.
-      const [messagesResult, eventsResult] = ids.length ? await Promise.all([
+      const [messagesResult, eventsResult, proposalsResult] = ids.length ? await Promise.all([
         supabase.from('lead_messages').select('lead_id').in('lead_id', ids).gte('created_at', cutoff),
-        supabase.from('feed_events').select('lead_id').in('lead_id', ids).gte('created_at', cutoff)
-      ]) : [{ data: [], error: null }, { data: [], error: null }];
+        supabase.from('feed_events').select('lead_id').in('lead_id', ids).gte('created_at', cutoff),
+        supabase.from('proposals').select('lead_id').in('lead_id', ids)
+      ]) : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
       if (messagesResult.error) throw messagesResult.error;
       if (eventsResult.error) throw eventsResult.error;
+      if (proposalsResult.error) throw proposalsResult.error;
       const recentlyActiveIds = new Set([
         ...(messagesResult.data || []).map(event => event.lead_id),
         ...(eventsResult.data || []).map(event => event.lead_id)
       ]);
+      // Any proposal (draft or approved Sales Order) means the lead has already
+      // progressed beyond intake and must never be offered for stale cleanup.
+      const convertedIds = new Set((proposalsResult.data || []).map(proposal => proposal.lead_id));
       const now = Date.now();
       const pageCandidates = pageLeads.filter(lead => {
+        if (convertedIds.has(lead.id)) return false;
         if (recentlyActiveIds.has(lead.id)) return false;
         if (lead.reminder_date && new Date(lead.reminder_date).getTime() > now) return false;
         const lastContact = lead.last_contact_date ? new Date(lead.last_contact_date).getTime() : 0;
@@ -372,7 +378,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
         {isAdminOrManager && activeTab === 'stale' && (
           <section className="p-4 sm:p-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h3 className="font-semibold text-gray-800">Stale Lead Review</h3><p className="text-xs text-gray-500">Review only. Recent messages and activity are excluded. Linked proposals, Sales Orders and other records still require verification before cleanup.</p></div>
+              <div><h3 className="font-semibold text-gray-800">Stale Lead Review</h3><p className="text-xs text-gray-500">Review only. Recent activity and proposal-linked leads (including Sales Orders) are excluded. Other customer links still require review before cleanup.</p></div>
               <label className="text-sm text-gray-600">Inactivity threshold <select className="ml-2 rounded border p-1" value={staleDays} onChange={e => { setStaleCandidates([]); setStalePage(0); setStaleDays(Number(e.target.value)); }}><option value={60}>60 days</option><option value={90}>90 days</option><option value={120}>120 days</option><option value={180}>180 days</option></select></label>
             </div>
             {staleLoading ? <p className="text-sm text-gray-500">Loading candidates…</p> : staleCandidates.length === 0 ? <p className="text-sm text-gray-500">No candidates found on this page. More older records may remain.</p> : (
