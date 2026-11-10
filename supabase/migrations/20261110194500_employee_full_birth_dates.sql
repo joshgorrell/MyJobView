@@ -3,7 +3,7 @@ create table if not exists public.employee_birth_dates (
   user_id uuid primary key references public.profiles(id) on delete cascade,
   birth_date date not null,
   updated_at timestamptz not null default now(),
-  constraint employee_birth_dates_reasonable check (birth_date >= date '1900-01-01' and birth_date <= current_date)
+  constraint employee_birth_dates_reasonable check (birth_date >= date '1900-01-01')
 );
 alter table public.employee_birth_dates enable row level security;
 revoke all on public.employee_birth_dates from anon, authenticated;
