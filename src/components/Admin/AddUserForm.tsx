@@ -419,7 +419,6 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         .from('profiles')
         .update({
           ...notifications,
-          birth_date: parsedBirthDate,
           birthday_visible: formData.birthday_visible,
           email_leads: formData.email_leads,
           notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
@@ -429,6 +428,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         })
         .eq('id', newUserId);
       if (notificationError) throw notificationError;
+      const { error: birthDateError } = await supabase.rpc('set_employee_birth_date', { p_user_id: newUserId, p_birth_date: parsedBirthDate });
+      if (birthDateError) throw new Error(`Birthday could not be saved: ${birthDateError.message}`);
       const {
         data: { user: currentUser },
       } = await supabase.auth.getUser();
