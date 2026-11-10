@@ -71,5 +71,31 @@ count="$("${PSQL[@]}" -c "SELECT count(*) FROM public.proposal_line_items WHERE 
 "${PSQL[@]}" -c "UPDATE techsafe_source.order_revision_ledger SET state='held',source_fingerprint=repeat('0',64)"
 held="$("${PSQL[@]}" -c "SELECT count(*) FROM techsafe_source.order_revision_ledger WHERE state='candidate' AND source_fingerprint<>repeat('0',64)")"
 [[ "$held" == 0 ]] || { echo 'Held revision appeared eligible' >&2; exit 1; }
+# Exercise the actual catalog discovery SQL used by postgresSourceSchemaPreflight.
+# Missing certificate storage must be reported, not assumed to exist.
+catalog="$("${PSQL[@]}" <<'SQL'
+SELECT n.nspname AS schema_name,c.relname AS table_name,
+ a.attname AS column_name,format_type(a.atttypid,a.atttypmod) AS data_type
+ FROM pg_catalog.pg_class c
+ JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+ JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid
+ WHERE c.relkind IN ('r','p') AND a.attnum>0 AND NOT a.attisdropped
+  AND n.nspname IN ('public','techsafe_source')
+ ORDER BY n.nspname,c.relname,a.attnum;
+SQL
+)"
+[[ "$catalog" == *"public|sales_orders|proposal_id|uuid"* ]] || {
+ echo 'Actual Sales Order schema missing from catalog' >&2; exit 1;
+}
+[[ "$catalog" == *"public|proposal_line_items|product_id|uuid"* ]] || {
+ echo 'Actual equipment product column missing from catalog' >&2; exit 1;
+}
+if [[ "$catalog" == *"equipment_snapshot_certificates"* ]]; then
+ echo 'Unexpected certificate storage in minimal fixture' >&2; exit 1
+fi
+# An approval/change-order reader cannot be built from a missing table:
+# fail closed rather than guessing that proposal lines imply approval.
+approval_count="$("${PSQL[@]}" -c "SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('change_orders','change_order_items')")"
+[[ "$approval_count" == 0 ]] || { echo 'Unexpected approval fixture tables' >&2; exit 1; }
 echo 'PASS: real PostgreSQL SERIALIZABLE Sales Order scope, tenant isolation and held revision'
 echo 'NOTE: no approval/change-order authority or live sync is established'
