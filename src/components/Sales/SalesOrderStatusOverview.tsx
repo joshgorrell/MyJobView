@@ -5,11 +5,11 @@ import { loadProjectSummaries } from '../../lib/projectOverview';
 
 type Order = {
   id: string; order_number: string; status: string; contract_total: number;
-  created_at: string; project_id?: string | null;
+  created_at: string; project_id?: string | null; proposal_id?: string | null; original_contract_total?: number | null;
   contact?: { full_name?: string } | null;
   sales_rep?: { full_name?: string } | null;
 };
-type Metrics = { estimated: number; actual: number; invoiced: number; due: number };
+type Metrics = { estimated: number; actual: number; invoiced: number; due: number; contract: number };
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 const number = (value: unknown) => Number(value) || 0;
 const OPEN = new Set(['pending_deposit', 'pending_po', 'planning', 'active']);
@@ -29,13 +29,23 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
       setLoading(true); setError('');
       try {
         const next: Record<string, Metrics> = {};
-        for (const order of openOrders) next[order.id] = { estimated: 0, actual: 0, invoiced: 0, due: 0 };
+        for (const order of openOrders) next[order.id] = { estimated: 0, actual: 0, invoiced: 0, due: 0, contract: number(order.contract_total) };
         const projectIds = [...new Set(openOrders.map(o => o.project_id).filter((id): id is string => !!id))];
-        const [invoicesResult, projectSummaries] = await Promise.all([
+        const [invoicesResult, projectSummaries, proposalsResult, changesResult] = await Promise.all([
           supabase.from('invoices').select('sales_order_id,total,amount_due,status').in('sales_order_id', openOrders.map(o => o.id)),
-          projectIds.length ? loadProjectSummaries(profile.organization_id, projectIds) : Promise.resolve([])
+          projectIds.length ? loadProjectSummaries(profile.organization_id, projectIds) : Promise.resolve([]),
+          supabase.from('proposals').select('id,total').in('id', openOrders.map(o => o.proposal_id).filter((id): id is string => !!id).length ? openOrders.map(o => o.proposal_id).filter((id): id is string => !!id) : ['00000000-0000-0000-0000-000000000000']),
+          supabase.from('change_orders').select('sales_order_id,status,is_billable,change_amount,tax_amount').in('sales_order_id', openOrders.map(o => o.id))
         ]);
         if (invoicesResult.error) throw invoicesResult.error;
+        if (proposalsResult.error) throw proposalsResult.error;
+        if (changesResult.error) throw changesResult.error;
+        const proposalTotals = new Map((proposalsResult.data || []).map(p => [p.id, number(p.total)]));
+        for (const order of openOrders) {
+          const base = order.proposal_id && proposalTotals.has(order.proposal_id) ? proposalTotals.get(order.proposal_id)! : number(order.original_contract_total ?? order.contract_total);
+          const changes = (changesResult.data || []).filter(co => co.sales_order_id === order.id && co.status === 'approved' && co.is_billable !== false);
+          next[order.id].contract = base + changes.reduce((sum, co) => sum + (number(co.change_amount) < 0 ? number(co.change_amount) - Math.abs(number(co.tax_amount)) : Math.abs(number(co.change_amount)) + number(co.tax_amount)), 0);
+        }
 
         for (const invoice of invoicesResult.data || []) {
           const item = next[invoice.sales_order_id];
@@ -62,7 +72,7 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
   const rows = openOrders.map(order => {
     const m = metrics[order.id];
     const pct = m?.estimated ? m.actual / m.estimated * 100 : null;
-    return { order, m, pct, unbilled: m ? Math.max(0, number(order.contract_total) - m.invoiced) : 0 };
+    return { order, m, pct, unbilled: m ? Math.max(0, m.contract - m.invoiced) : 0 };
   }).sort((a,b) => {
     if (sort === 'unbilled') return b.unbilled - a.unbilled;
     if (sort === 'due') return (b.m?.due || 0) - (a.m?.due || 0);
@@ -70,7 +80,7 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
     return (b.pct ?? -1) - (a.pct ?? -1);
   });
   const totals = rows.reduce((a,r) => ({
-    value: a.value + number(r.order.contract_total),
+    value: a.value + (r.m?.contract ?? 0),
     unbilled: a.unbilled + r.unbilled,
     due: a.due + (r.m?.due || 0)
   }), { value: 0, unbilled: 0, due: 0 });
@@ -108,7 +118,7 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
               <div className={`text-xs font-semibold mb-1 ${pct > 100 ? 'text-danger' : pct >= 90 ? 'text-warning' : 'text-primary'}`}>{pct.toFixed(0)}% <span className="font-normal text-muted">({m.actual.toFixed(1)} / {m.estimated.toFixed(1)}h)</span></div>
               <div className="h-2.5 rounded-full bg-elevated overflow-hidden"><div className={`h-full rounded-full ${pct > 100 ? 'bg-red-500' : pct >= 90 ? 'bg-amber-500' : 'bg-blue-500'}`} style={{width:`${Math.min(100,pct)}%`}} /></div>
             </> : <span className="text-muted text-xs">No labor estimate</span>}</td>
-            <td className="p-3 text-right text-primary">{money(number(order.contract_total))}</td>
+            <td className="p-3 text-right text-primary">{m ? money(m.contract) : '—'}</td>
             <td className="p-3 text-right font-medium text-primary">{m ? money(unbilled) : '—'}</td>
             <td className="p-3 text-right text-warning">{m ? money(m.due) : '—'}</td>
             <td className="p-3 text-muted whitespace-nowrap">{new Date(order.created_at).toLocaleDateString()}</td>
