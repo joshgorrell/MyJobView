@@ -59,6 +59,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   const savedDraft = prefill ? null : readProposalDraft();
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchError, setSearchError] = useState('');
+  const [contactCandidates, setContactCandidates] = useState<Array<{ id: string; contact_name: string; company_name: string | null; email: string | null; phone: string | null; zip_code: string | null }>>([]);
+  const [matchedContactId, setMatchedContactId] = useState<string | null>(null);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(savedDraft?.selectedResult || null);
   const [selectedLocation, setSelectedLocation] = useState<CustomerLocation | null>(savedDraft?.selectedLocation || null);
   const [searchQuery, setSearchQuery] = useState(prefill?.contactSearchName || savedDraft?.searchQuery || '');
@@ -416,18 +418,32 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
         // Never match a blank email, and never silently choose between duplicates.
         // A duplicate match must be resolved by selecting the existing Contact.
         const normalizedEmail = lead.email?.trim().toLowerCase() || '';
+        const normalizedPhone = lead.phone?.replace(/\D/g, '') || '';
         let existingContact: { id: string } | null = null;
-        if (normalizedEmail) {
-          const { data: matches, error: matchError } = await supabase
-            .from('contacts')
-            .select('id')
-            .ilike('email', normalizedEmail)
-            .limit(2);
-          if (matchError) throw matchError;
-          if ((matches || []).length > 1) {
-            throw new Error('Multiple contacts share this email. Select the correct existing Contact before creating a proposal.');
+        if (matchedContactId) {
+          const { data: selectedContact, error: selectedContactError } = await supabase
+            .from('contacts').select('id').eq('id', matchedContactId).maybeSingle();
+          if (selectedContactError) throw selectedContactError;
+          if (!selectedContact) throw new Error('The selected Contact is no longer available. Please select again.');
+          existingContact = selectedContact;
+        } else if (normalizedEmail || normalizedPhone) {
+          const queries = [];
+          if (normalizedEmail) queries.push(supabase.from('contacts')
+            .select('id, contact_name, company_name, email, phone, zip_code')
+            .ilike('email', normalizedEmail).limit(10));
+          if (normalizedPhone) queries.push(supabase.from('contacts')
+            .select('id, contact_name, company_name, email, phone, zip_code')
+            .ilike('phone', '%' + normalizedPhone.slice(-7)).limit(10));
+          const results = await Promise.all(queries);
+          const candidates = new Map<string, { id: string; contact_name: string; company_name: string | null; email: string | null; phone: string | null; zip_code: string | null }>();
+          for (const result of results) {
+            if (result.error) throw result.error;
+            for (const match of result.data || []) candidates.set(match.id, match);
           }
-          existingContact = matches?.[0] || null;
+          if (candidates.size > 0) {
+            setContactCandidates(Array.from(candidates.values()));
+            throw new Error('Possible existing Contacts found. Select the correct Contact below before creating this proposal.');
+          }
         }
 
         if (existingContact) {
@@ -760,6 +776,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                         key={`${result.source}-${result.id}`}
                         onClick={() => {
                           setSelectedResult(result);
+                          setMatchedContactId(null);
+                          setContactCandidates([]);
                           setSelectedLocation(null);
                           if (!title) setTitle(`Proposal for ${result.contact_name}`);
                           setZipCode(result.zip_code || '');
@@ -794,6 +812,19 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
             )}
           </div>
         </div>
+
+        {selectedResult?.source === 'lead' && contactCandidates.length > 0 && (
+          <div className="px-4 pb-3 space-y-2" role="group" aria-label="Choose matching Contact">
+            <p className="text-sm text-amber-300">Possible existing Contacts — choose the correct record, or confirm none match.</p>
+            {contactCandidates.map(candidate => (
+              <button key={candidate.id} type="button" onClick={() => setMatchedContactId(candidate.id)}
+                className={`block w-full rounded border p-2 text-left text-sm ${matchedContactId === candidate.id ? 'border-blue-400 bg-blue-900/30' : 'border-gray-600'}`}>
+                <span className="font-semibold">{candidate.contact_name}</span> {candidate.company_name || ''}
+                <span className="block text-gray-400">{candidate.email || 'No email'} · {candidate.phone || 'No phone'} · {candidate.zip_code || 'No ZIP'}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="p-3 sm:p-4 border-t border-gray-700 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 flex-shrink-0">
           <button
