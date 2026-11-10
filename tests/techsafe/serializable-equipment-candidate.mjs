@@ -24,4 +24,14 @@ assert.equal((await run({...tx(),readCurrentRevision:async()=>{throw Object.assi
 assert.equal((await inspect({connectionId:'bad space',orderId:'sales-1',withSerializableSourceTransaction:async()=>{throw Error('should not run')}})).reason,'invalid_source_identity');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1'})).reason,'serializable_transaction_unavailable');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',withSerializableSourceTransaction:async()=>({ok:true,authorized:true,snapshotReady:true})})).reason,'invalid_transaction_result');
+
+// A compromised or buggy adapter cannot skip, replay, or substitute callback
+// output, even if the substituted result has plausible digest and safe flags.
+assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',
+ withSerializableSourceTransaction:async()=>({...good})})).reason,'invalid_transaction_result');
+assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',
+ withSerializableSourceTransaction:async callback=>{await callback(tx());return {...good}}})).reason,'invalid_transaction_result');
+assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',
+ withSerializableSourceTransaction:async callback=>{const first=await callback(tx());await callback(tx());return first}})).reason,'invalid_transaction_result');
+
 console.log('PASS: serializable approved Sales Order candidate stays inert and rejects stale or incomplete source');
