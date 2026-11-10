@@ -5,7 +5,7 @@ import {createTransactionalBaseEquipmentAudit} from './postgresTransactionalBase
 import {createLockedRevisionReader} from './postgresLockedRevisionReader.mjs';
 import {inspectMjvCurrentSalesOrderEquipment} from './mjvCurrentEquipmentAdapter.mjs';
 const hold=reason=>Object.freeze({ok:false,authorized:false,snapshotReady:false,quoteReady:false,reason});
-const exactQuantity=v=>{const s=String(v);if(!/^(?:0|[1-9]\\d*)(?:\\.0+)?$/.test(s))return null;const n=Number(s);return Number.isSafeInteger(n)?n:null;};
+const exactQuantity=v=>{const s=String(v);if(!/^(?:0|[1-9]\d*)(?:\.0+)?$/.test(s))return null;const n=Number(s);return Number.isSafeInteger(n)?n:null;};
 const sameRevision=(a,b)=>a.connectionGeneration===b.connectionGeneration&&a.revision===b.revision&&
  a.sourceFingerprint===b.sourceFingerprint&&a.organizationId===b.organizationId&&a.proposalId===b.proposalId&&b.state==='candidate';
 export function createTransactionalCurrentEquipmentInspection(client,readPrivateCurrentContent){
