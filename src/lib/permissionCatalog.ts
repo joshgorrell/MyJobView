@@ -24,6 +24,7 @@ const retiredKeys = new Set([
   "reports",
   "quickbooks",
   "feature_suggestions",
+  "prospects",
 ]);
 
 export interface PermissionModule {
@@ -96,6 +97,7 @@ export function resolveLegacyPage(key: string): string {
   return (
     (
       {
+        prospects: "leads",
         connections: "feed",
         sales_activity: "feed",
         messages: "feed",
