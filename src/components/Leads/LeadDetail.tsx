@@ -674,9 +674,9 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
   const canClaim = lead.is_fishbowl && lead.status === 'unclaimed' && profile?.role === 'sales';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-0 z-50 overflow-hidden">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full h-full sm:h-auto sm:max-h-[90vh] sm:my-4 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full mx-auto my-0 sm:my-4 flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <div className="min-w-0 flex-1 pr-2">
             <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{lead.contact_name}</h2>
             {lead.company_name && <p className="text-sm sm:text-base text-gray-600 truncate">{lead.company_name}</p>}
@@ -709,8 +709,8 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4">
+        <div className="p-4 space-y-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
               {creatorProfile && (
                 <div className="flex items-center gap-2 text-blue-900">
@@ -865,31 +865,31 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
               </div>
             </div>
           ) : (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-blue-200 shadow-sm">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
                 <User className="w-5 h-5 text-blue-600" />
                 Customer Information
               </h3>
 
-              <div className="space-y-3">
-                <div className="bg-white rounded-lg p-4">
+              <div className="space-y-2">
+                <div className="bg-white rounded-lg px-3 py-2">
                   <div className="text-sm font-medium text-gray-500 mb-1">Contact Name</div>
-                  <div className="text-lg font-semibold text-gray-900">{lead.contact_name}</div>
+                  <div className="text-sm font-semibold text-gray-900">{lead.contact_name}</div>
                 </div>
 
                 {lead.company_name && (
-                  <div className="bg-white rounded-lg p-4">
+                  <div className="bg-white rounded-lg px-3 py-2">
                     <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                       <Building2 className="w-4 h-4" />
                       Company
                     </div>
-                    <div className="text-lg font-semibold text-gray-900">{lead.company_name}</div>
+                    <div className="text-sm font-semibold text-gray-900">{lead.company_name}</div>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {lead.email && (
-                    <div className="bg-white rounded-lg p-4">
+                    <div className="bg-white rounded-lg px-3 py-2">
                       <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                         <Mail className="w-4 h-4" />
                         Email
@@ -901,7 +901,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                   )}
 
                   {lead.phone && (
-                    <div className="bg-white rounded-lg p-4">
+                    <div className="bg-white rounded-lg px-3 py-2">
                       <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
                         <Phone className="w-4 h-4" />
                         Phone
@@ -914,13 +914,20 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                 </div>
 
                 {assignedProfile && (
-                  <div className="bg-white rounded-lg p-4">
+                  <div className="bg-white rounded-lg px-3 py-2">
                     <div className="text-sm font-medium text-gray-500 mb-1">Assigned To</div>
                     <div className="text-base font-medium text-gray-900">{assignedProfile.full_name}</div>
                   </div>
                 )}
               </div>
             </div>
+          )}
+
+          {!isEditing && (
+            <section className="rounded-lg border border-gray-200 bg-white px-3 py-3" aria-label="Lead Description">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Description</h3>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{lead.opportunity_description?.trim() || 'No description provided.'}</p>
+            </section>
           )}
 
           {tags.length > 0 && (
@@ -1015,12 +1022,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             </div>
           )}
 
-          {!isEditing && lead.opportunity_description && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Opportunity</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">{lead.opportunity_description}</p>
-            </div>
-          )}
+
 
           {vipOrigin && (
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
