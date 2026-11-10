@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight, Building2, X } from 'lucide-react';
+import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight, Building2, X, SlidersHorizontal } from 'lucide-react';
 import { SalesOrderDetail } from './SalesOrderDetail';
 import { SalesOrderStatusOverview } from './SalesOrderStatusOverview';
 import { ErrorBoundary } from '../Shared/ErrorBoundary';
@@ -71,6 +71,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [selectedRepId, setSelectedRepId] = useState<string | null>(null);
   const [quickViewContactId, setQuickViewContactId] = useState<string | null>(null);
@@ -217,9 +218,9 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
         <button role="tab" aria-selected={listTab === 'status'} onClick={() => setListTab('status')} className={`px-4 py-2 text-sm font-medium ${listTab === 'status' ? 'border-b-2 border-blue-500 text-primary' : 'text-muted'}`}>Status</button>
       </div>
 
-      {/* Search + Status filter */}
+      {/* Search and compact filters */}
       <div className="flex items-center gap-2">
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
           <input
             type="text"
@@ -229,6 +230,11 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
             className="w-full pl-9 pr-4 py-2.5 bg-surface border border-subtle rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px]"
           />
         </div>
+        <button type="button" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters} className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-subtle text-sm ${showFilters || statusFilter !== 'all' || selectedRepId ? 'bg-infoSoft text-info' : 'bg-surface text-secondary'}`}>
+          <SlidersHorizontal className="w-4 h-4" /> Filters{statusFilter !== 'all' || selectedRepId ? ' •' : ''}
+        </button>
+      </div>
+      {showFilters && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-subtle bg-surface/50 p-3">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -242,10 +248,10 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           <option value="complete">Complete</option>
           <option value="closed">Closed</option>
         </select>
-      </div>
+      </div>}
 
       {/* Rep selector — admin / manager / sales_manager only */}
-      {isAdminOrManager && salesReps.length > 0 && (
+      {showFilters && isAdminOrManager && salesReps.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSelectedRepId(null)}
@@ -275,7 +281,8 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
 
       {listTab === 'status' && <SalesOrderStatusOverview orders={filteredOrders} onOpen={setSelectedOrderId} />}
 
-      {/* Orders list */}
+      {showFilters && <button type="button" onClick={() => { setStatusFilter('all'); setSelectedRepId(null); }} className="text-xs text-info hover:underline">Clear filters</button>}
+            {/* Orders list */}
       {listTab === 'orders' && (
       <div className="bg-surface/50 rounded-xl border border-subtle/60 overflow-hidden">
         {filteredOrders.length === 0 ? (
