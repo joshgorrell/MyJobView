@@ -5,6 +5,7 @@ import {createTransactionalBaseEquipmentAudit} from './postgresTransactionalBase
 import {createLockedRevisionReader} from './postgresLockedRevisionReader.mjs';
 import {inspectMjvCurrentSalesOrderEquipment} from './mjvCurrentEquipmentAdapter.mjs';
 const hold=reason=>Object.freeze({ok:false,authorized:false,snapshotReady:false,quoteReady:false,reason});
+const exactQuantity=v=>{const s=String(v);if(!/^(?:0|[1-9]\\d*)(?:\\.0+)?$/.test(s))return null;const n=Number(s);return Number.isSafeInteger(n)?n:null;};
 const sameRevision=(a,b)=>a.connectionGeneration===b.connectionGeneration&&a.revision===b.revision&&
  a.sourceFingerprint===b.sourceFingerprint&&a.organizationId===b.organizationId&&a.proposalId===b.proposalId&&b.state==='candidate';
 export function createTransactionalCurrentEquipmentInspection(client,readPrivateCurrentContent){
@@ -35,7 +36,7 @@ export function createTransactionalCurrentEquipmentInspection(client,readPrivate
     const line=entry?.line,expected=scanned.get(line?.id);
     if(!expected||observed.has(line.id)||line.organization_id!==current.organizationId||
        line.proposal_id!==current.proposalId||line.product_id!==expected.productId||
-       String(line.quantity)!==String(expected.quantity))
+       exactQuantity(line.quantity)!==expected.quantity)
      return hold('current_equipment_rows_differ_from_locked_scan');
     observed.add(line.id);
    }
