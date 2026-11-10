@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {checkPersistedEquipmentCertificate as check} from '../../src/lib/techsafe/persistedCertificateGate.mjs';
-const fingerprint='a'.repeat(64);\nconst contentFingerprint='c'.repeat(64);
+const fingerprint='a'.repeat(64);
+const contentFingerprint='c'.repeat(64);
 const connection={connectionId:'conn-1',salesOrderId:'order-1',organizationId:'org-1',proposalId:'proposal-1',generation:2,active:true,enabled:true};
 const ledger={connectionId:'conn-1',orderId:'order-1',organizationId:'org-1',proposalId:'proposal-1',generation:2,revision:5,state:'candidate',fingerprint};
 const certificate={connectionId:'conn-1',orderId:'order-1',organizationId:'org-1',proposalId:'proposal-1',generation:2,revision:5,state:'certified',sourceCommitted:true,approvalVerified:true,transactionVerified:true,fingerprint,contentFingerprint};
@@ -23,7 +24,12 @@ const rejects=[
  {certificate:{...certificate,sourceCommitted:false}},
  {certificate:{...certificate,approvalVerified:false}},
  {certificate:{...certificate,state:'candidate'}},
- {certificate:{...certificate,fingerprint:'b'.repeat(64)}},\n {certificate:{...certificate,contentFingerprint:undefined}},\n {certificate:{...certificate,contentFingerprint:'0'.repeat(64)}},\n {certificate:{...certificate,contentFingerprint:'d'.repeat(64)}},\n {freshEvidence:{...freshEvidence,contentFingerprint:undefined}},\n {freshEvidence:{...freshEvidence,contentFingerprint:'d'.repeat(64)}},
+ {certificate:{...certificate,fingerprint:'b'.repeat(64)}},
+ {certificate:{...certificate,contentFingerprint:undefined}},
+ {certificate:{...certificate,contentFingerprint:'0'.repeat(64)}},
+ {certificate:{...certificate,contentFingerprint:'d'.repeat(64)}},
+ {freshEvidence:{...freshEvidence,contentFingerprint:undefined}},
+ {freshEvidence:{...freshEvidence,contentFingerprint:'d'.repeat(64)}},
  {certificate:{...certificate,organizationId:'other'}},
  {freshEvidence:{...freshEvidence,fingerprint:'b'.repeat(64)}},
  {freshEvidence:{...freshEvidence,revision:6}},
@@ -32,7 +38,9 @@ const rejects=[
  {freshEvidence:{...freshEvidence,orderId:'other'}},
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:6,fingerprint,contentFingerprint}},
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:3,revision:1,fingerprint,contentFingerprint}},
- {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint:'b'.repeat(64),contentFingerprint}},\n {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint,contentFingerprint:'d'.repeat(64)}},\n {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint:'b'.repeat(64),contentFingerprint}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint,contentFingerprint:'d'.repeat(64)}},
+ {lastDelivered:{connectionId:'conn-1',orderId:'order-1',generation:2,revision:5,fingerprint}},
  {lastDelivered:{connectionId:'conn-2',orderId:'order-1',generation:2,revision:5,fingerprint,contentFingerprint}},
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',organizationId:'org-2',proposalId:'proposal-1',generation:2,revision:4,fingerprint,contentFingerprint}},
  {lastDelivered:{connectionId:'conn-1',orderId:'order-1',organizationId:'org-1',proposalId:'proposal-2',generation:2,revision:4,fingerprint,contentFingerprint}},
