@@ -42,6 +42,13 @@ export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,r
       evidence.sourceManifest?.baseLineSource==='current_proposal_line_items' ||
       evidence.sourceManifest?.baseLineSource==='post_application_current')
     return held('current_equipment_must_not_replay_change_orders');
+  // Unknown provenance is not an original baseline. Current MJV equipment
+  // already includes applied changes; only a trusted reader's independently
+  // verified approval-time rows can be used by this legacy history reducer.
+  if (Array.isArray(evidence.changeOrders) && evidence.changeOrders.length>0 &&
+      (evidence.sourceManifest?.baseLineSource!=='verified_original_approval_rows' ||
+       evidence.sourceManifest?.originalBasisVerified!==true))
+    return held('original_equipment_baseline_unverified');
   let result;
   try {
     result=reconcileApprovedSalesOrderEquipment({

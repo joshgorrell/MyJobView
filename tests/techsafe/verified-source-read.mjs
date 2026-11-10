@@ -54,6 +54,23 @@ for(const patch of [
  assert.equal(result.authorized,false);assert.equal(result.snapshotReady,false);
  assert.deepEqual(result.items,[]);
 }
+// A plausible complete manifest cannot turn post-application equipment into
+// the original approval-time baseline for a second change-order replay.
+const change={id:'co-1',salesOrderId:'sales-1',organizationId:'tenant-1',proposalId:'approved-proposal-1',status:'approved',customerApproved:true,revision:3,
+ lines:[{id:'co-line-1',organizationId:'tenant-1',changeOrderId:'co-1',actionType:'modify_quantity',proposalLineItemId:'base-1',newQuantity:3}]};
+const changeManifest={...evidence.sourceManifest,changeOrderCount:1,totalChangeOrderCount:1,changeLineCount:1};
+for(const manifest of [changeManifest,{...changeManifest,baseLineSource:'unknown'},
+ {...changeManifest,baseLineSource:'verified_original_approval_rows'},
+ {...changeManifest,baseLineSource:'verified_original_approval_rows',originalBasisVerified:false}]){
+ const result=await run({changeOrders:[change],sourceManifest:manifest});
+ assert.equal(result.reason,'original_equipment_baseline_unverified');
+ assert.equal(result.authorized,false);assert.equal(result.snapshotReady,false);
+ assert.deepEqual(result.items,[]);
+}
+const original=await run({changeOrders:[change],sourceManifest:{...changeManifest,baseLineSource:'verified_original_approval_rows',originalBasisVerified:true}});
+assert.equal(original.ok,true,JSON.stringify(original));
+assert.equal(original.items[0].quantity,3);
+assert.equal(original.authorized,false);assert.equal(original.snapshotReady,false);
 const pending=await run({sourceManifest:{...evidence.sourceManifest,totalChangeOrderCount:1,unapprovedChangeOrderCount:1}});
 assert.equal(pending.ok,true,'pending changes do not invalidate previously approved equipment');
 assert.deepEqual(pending.items,[{sourceLineId:'base-1',productId:'product-1',quantity:2}]);
