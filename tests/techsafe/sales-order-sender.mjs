@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createTechsafeSalesOrderSender} from '../../supabase/functions/_shared/techsafe-sales-order-sender.mjs';
 const c='11111111-1111-4111-8111-111111111111',o='22222222-2222-4222-8222-222222222222',org='33333333-3333-4333-8333-333333333333',p='44444444-4444-4444-8444-444444444444',l='55555555-5555-4555-8555-555555555555',e='66666666-6666-4666-8666-666666666666';
-const row={binding:{connection_id:c,organization_id:org,sales_order_id:o,proposal_id:p,connection_generation:1,proposal_status:'approved',approved_at:'2026-11-10',full_name:'Customer'},lines:[{id:l,product_id:l,product_organization_id:org,quantity:1,unit_price:'100.00'}],changes:[],line_count:1,change_count:0};
+const row={binding:{connection_id:c,organization_id:org,sales_order_id:o,proposal_id:p,connection_generation:1,proposal_status:'approved',approved_at:'2026-11-10',full_name:'Customer'},lines:[{id:l,product_id:l,product_organization_id:org,quantity:1,unit_price:'100.00',item_type:'material',catalog_item_type:'material'}],changes:[],line_count:1,change_count:0};
 const digest=s=>createHash('sha256').update(s).digest('hex');
 let read=0,sent=0,certifications=0;
 const client={query:async()=>{read++;return {rows:[row]};}};
@@ -10,7 +10,7 @@ const args={connectionId:c,orderId:o,enabled:true,endpoint:'https://techsafe.exa
 const make=extras=>createTechsafeSalesOrderSender({client,digest,fetchImpl:async()=>{sent++;return {status:200,json:async()=>({accepted:true,connectionId:c,orderId:o,sourceRevision:'1',eventId:e,generation:1})};},...extras});
 assert.equal((await make({})({...args,enabled:false})).reason,'integration_disabled');assert.equal(read,0);
 assert.equal((await make({})(args)).reason,'trusted_source_authority_unavailable');assert.equal(read,0);
-const certifySource=async({binding,generation,fingerprint})=>{certifications++;return {verified:true,sourceAuthorized:true,scopeVerified:true,snapshotReady:true,...binding,generation,revision:1,eventId:e,fingerprint,snapshot:{schemaVersion:2,environment:'sandbox',connectionId:c,sourceInstanceId:'mjv',organizationId:org,orderId:o,generation:1,revision:1,eventId:e,complete:true,scopeState:'committed',orderStatus:'open',currency:'USD',minimumUnitValueCents:0,customerRef:'customer',customerName:'Customer',siteRef:'site',lines:[]}};};
+const certifySource=async({binding,generation,fingerprint})=>{certifications++;return {verified:true,sourceAuthorized:true,scopeVerified:true,snapshotReady:true,...binding,generation,revision:1,eventId:e,fingerprint,snapshot:{schemaVersion:2,environment:'sandbox',connectionId:c,sourceInstanceId:'mjv',organizationId:org,orderId:o,generation:1,revision:1,eventId:e,complete:true,scopeState:'committed',orderStatus:'open',currency:'USD',minimumUnitValueCents:0,customerRef:'customer',customerName:'Customer',siteRef:'site',lines:[{sourceLineId:l,productRef:l,productKind:'equipment',scope:'included',customerSupplied:false,techsafeExcluded:false,quantity:1,unitEquipmentValueCents:10000}]}};};
 const authorizeForDelivery=async()=>({authorized:true,connectionId:c,organizationId:org,orderId:o,proposalId:p,generation:1,revision:1,eventId:e});
 assert.equal((await make({certifySource,authorizeForDelivery})(args)).accepted,true);assert.equal(sent,1);
 assert.equal((await make({certifySource:async x=>({...await certifySource(x),fingerprint:'0'.repeat(64)}),authorizeForDelivery})(args)).reason,'source_certificate_unverified');

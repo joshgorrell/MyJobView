@@ -5,6 +5,7 @@
 import {createLiveSalesOrderPreflight} from './techsafe-live-sales-order-preflight.mjs';
 import {fingerprintCurrentSalesOrder} from './techsafe-current-order-fingerprint.mjs';
 import {sendTechsafeV2Snapshot} from './techsafe-v2-snapshot-http.mjs';
+import {validateTechsafeCurrentEquipmentSnapshot} from './techsafe-current-snapshot-consistency.mjs';
 const held=reason=>({accepted:false,reason});
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(v);
 export function createTechsafeSalesOrderSender({client,digest,certifySource,authorizeForDelivery,fetchImpl}={}){
@@ -42,6 +43,8 @@ export function createTechsafeSalesOrderSender({client,digest,certifySource,auth
    !Number.isSafeInteger(certificate.revision)||certificate.revision<1||
    !uuid(certificate.eventId)||certificate.fingerprint!==fingerprint.fingerprint)
    return held('source_certificate_unverified');
+  const consistency=validateTechsafeCurrentEquipmentSnapshot(observed.source,certificate.snapshot);
+  if(!consistency.valid)return held(consistency.reason);
   const source={valid:true,connection_id:binding.connectionId,organization_id:binding.organizationId,
    sales_order_id:binding.orderId,approved_proposal_id:binding.proposalId,equipment:[]};
   return sendTechsafeV2Snapshot({endpoint,token,allowedOrigin,binding,source,
