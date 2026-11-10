@@ -16,12 +16,15 @@ assert.equal(found.lines[0].salesPriceResolved,false);
 assert.deepEqual(calls[0].args,[connectionId,orderId]);
 assert.equal((await read({...args,client:{}})).reason,'private_sql_binding_unverified');
 assert.equal((await read({...args,orderId:'wrong'})).reason,'private_sql_binding_unverified');
-const mismatch=createPrivateSqlCurrentContentReader({query:async()=>({rows:[{source:{...raw,organizationId:ids[4]}}]})});
-assert.equal((await mismatch({...args,client:undefined})).ok,false);
-const malformed=createPrivateSqlCurrentContentReader({query:async()=>({rows:[{source:{...raw,readModelVersion:2}}]})});
-assert.equal((await malformed({...args,client:undefined})).ok,false);
-const unavailable=createPrivateSqlCurrentContentReader({query:async()=>({rows:[]})});
-assert.equal((await unavailable({...args,client:undefined})).ok,false);
+const mismatchClient={query:async()=>({rows:[{source:{...raw,organizationId:ids[4]}}]})};
+const mismatch=createPrivateSqlCurrentContentReader(mismatchClient);
+assert.equal((await mismatch({...args,client:mismatchClient})).reason,'private_sql_source_binding_mismatch');
+const malformedClient={query:async()=>({rows:[{source:{...raw,readModelVersion:2}}]})};
+const malformed=createPrivateSqlCurrentContentReader(malformedClient);
+assert.equal((await malformed({...args,client:malformedClient})).reason,'private_sql_source_binding_mismatch');
+const unavailableClient={query:async()=>({rows:[]})};
+const unavailable=createPrivateSqlCurrentContentReader(unavailableClient);
+assert.equal((await unavailable({...args,client:unavailableClient})).reason,'private_sql_source_unavailable');
 // End-to-end owned transaction with actual SQL function: version 1 must hold
 // and ROLLBACK, never commit or dispatch even if the SQL returns a plausible row.
 const statements=[],released=[];let ledgerReads=0;
