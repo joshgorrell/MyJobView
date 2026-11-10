@@ -9,7 +9,6 @@ import { LeadDetail } from '../Leads/LeadDetail';
 import { LeadForm } from '../Leads/LeadForm';
 import ConnectionForm from '../Connections/ConnectionForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
-import PrintProspectsView from '../Leads/PrintProspectsView';
 import { formatDistanceToNow } from '../../lib/utils';
 import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
 
@@ -34,10 +33,6 @@ export function PipelineBoard() {
   const [timeFilter, setTimeFilter] = useState<number>(14);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
-  const [_showProspects, _setShowProspects] = useState(() => {
-    const saved = localStorage.getItem('pipeline_show_prospects');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const openLead = (id: string) => {
@@ -56,7 +51,6 @@ export function PipelineBoard() {
   const [selectedWidgets, setSelectedWidgets] = useState<string[]>(['contacts', 'connections', 'leads', 'fishbowl']);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showPrintLeads, setShowPrintLeads] = useState(false);
-  const [showPrintProspects, setShowPrintProspects] = useState(false);
   const [salesReps, setSalesReps] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
 
   // All available widget definitions
@@ -76,14 +70,6 @@ export function PipelineBoard() {
       color: 'text-blue-700',
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-300'
-    },
-    {
-      id: 'prospects',
-      name: 'Prospects',
-      description: 'Prospective customers',
-      color: 'text-purple-700',
-      bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-300'
     },
     {
       id: 'leads',
@@ -263,18 +249,12 @@ export function PipelineBoard() {
       const showAll = viewMode === 'all' && canViewAllPipeline;
 
       // Build all independent queries
-      const contactsPromise = (selectedWidgets.includes('contacts') || selectedWidgets.includes('prospects'))
+      const contactsPromise = (selectedWidgets.includes('contacts'))
         ? (async () => {
             let contactsQuery = supabase
               .from('contacts')
               .select(`
-                *,
-                prospect_competitor_relationships!prospect_competitor_relationships_prospect_id_fkey(
-                  id,
-                  relationship_type,
-                  relationship_strength,
-                  competitors:competitors(id, name)
-                )
+                *
               `)
               .gte('created_at', dateCutoff)
               .order('created_at', { ascending: false });
@@ -402,14 +382,6 @@ export function PipelineBoard() {
             items: nonProspectContacts,
             count: nonProspectContacts.length
           });
-        } else if (def.id === 'prospects') {
-          // Only show prospects in prospects widget
-          const prospectContacts = contacts.filter((c: any) => c.contact_type === 'prospect');
-          stagesData.push({
-            ...def,
-            items: prospectContacts,
-            count: prospectContacts.length
-          });
         } else if (def.id === 'connections') {
           stagesData.push({
             ...def,
@@ -527,7 +499,6 @@ export function PipelineBoard() {
   function handleAddNew(stageId: string) {
     switch (stageId) {
       case 'contacts':
-      case 'prospects':
         setShowContactForm(true);
         break;
       case 'connections':
@@ -700,11 +671,10 @@ export function PipelineBoard() {
                     {stage.name}
                   </h3>
                   <div className="flex items-center gap-1">
-                    {(stage.id === 'leads' || stage.id === 'prospects') && (
+                    {stage.id === 'leads' && (
                       <button
                         onClick={() => {
-                          if (stage.id === 'leads') setShowPrintLeads(true);
-                          else setShowPrintProspects(true);
+                          setShowPrintLeads(true);
                         }}
                         className="p-1.5 hover:bg-white/50 active:bg-white/70 rounded transition-colors touch-manipulation"
                         title={`Print ${stage.name} report`}
@@ -740,7 +710,7 @@ export function PipelineBoard() {
                     const isNew = daysOld <= 14;
 
                     // Render different card types based on stage
-                    if (stage.id === 'contacts' || stage.id === 'prospects') {
+                    if (stage.id === 'contacts') {
                       const isProspect = item.contact_type === 'prospect';
                       const currentCompetitors = item.prospect_competitor_relationships?.filter(
                         (rel: any) => rel.relationship_type === 'current_supplier'
@@ -1047,14 +1017,6 @@ export function PipelineBoard() {
               </p>
             </div>
           )}
-          {selectedWidgets.includes('prospects') && (
-            <div className="p-4 bg-purple-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Prospects</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {filteredStages.find(s => s.id === 'prospects')?.count || 0}
-              </p>
-            </div>
-          )}
           {selectedWidgets.includes('leads') && (
             <div className="p-4 bg-green-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Leads</p>
@@ -1337,20 +1299,6 @@ export function PipelineBoard() {
             repName={viewMode === 'all' ? 'All Reps' : (profile?.full_name || 'Unknown Rep')}
             viewMode={viewMode}
             onClose={() => setShowPrintLeads(false)}
-            salesReps={salesReps}
-            isAdminOrManager={profile?.role === 'admin' || profile?.role === 'manager'}
-          />
-        );
-      })()}
-
-      {showPrintProspects && (() => {
-        const prospectsStage = filteredStages.find(s => s.id === 'prospects');
-        return (
-          <PrintProspectsView
-            prospects={prospectsStage?.items || []}
-            repName={viewMode === 'all' ? 'All Reps' : (profile?.full_name || 'Unknown Rep')}
-            viewMode={viewMode}
-            onClose={() => setShowPrintProspects(false)}
             salesReps={salesReps}
             isAdminOrManager={profile?.role === 'admin' || profile?.role === 'manager'}
           />
