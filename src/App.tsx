@@ -49,7 +49,7 @@ const LeadsHistory = lazy(() => import('./components/Feed/LeadsHistory').then(m 
 const ServiceRequestForm = lazy(() => import('./components/Service/ServiceRequestForm').then(m => ({ default: m.ServiceRequestForm })));
 const MasterFeed = lazy(() => import('./components/Feed/MasterFeed').then(m => ({ default: m.MasterFeed })));
 const QuickFlowUpdateModal = lazy(() => import('./components/Flow/QuickFlowUpdateModal').then(m => ({ default: m.QuickFlowUpdateModal })));
-const FishbowlView = lazy(() => import('./components/Fishbowl/FishbowlView').then(m => ({ default: m.FishbowlView })));
+
 const BusinessCardPage = lazy(() => import('./components/BusinessCard/BusinessCardPage').then(m => ({ default: m.BusinessCardPage })));
 const CompanyDirectory = lazy(() => import('./components/CompanyDirectory/CompanyDirectory').then(m => ({ default: m.CompanyDirectory })));
 const MyCardView = lazy(() => import('./components/BusinessCard/MyCardView').then(m => ({ default: m.MyCardView })));
@@ -1059,7 +1059,7 @@ function AppContent() {
             ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard /> }] : []),
             ...(checkModuleAccess('prospects') ? [{ key: 'prospects', label: 'Prospects', content: <ProspectsPage /> }] : []),
             ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
-            ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Fishbowl', content: <FishbowlView onLeadClick={setSelectedLeadId} /> }] : []),
+            ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
           ]} />}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
