@@ -24,7 +24,7 @@ interface PipelineStage {
   count: number;
 }
 
-export function PipelineBoard() {
+export function PipelineBoard({ onNavigate }: { onNavigate?: (module: 'proposals' | 'sales_orders') => void }) {
   const { profile, loading: authLoading } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -512,6 +512,13 @@ export function PipelineBoard() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Stage navigation uses the existing operational modules; no duplicate editors. */}
+      <nav aria-label="Sales pipeline stages" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white">Prospects <span className="block text-xs font-normal text-gray-300">Coming in the Sales workspace</span></div>
+        <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white">Leads <span className="block text-xs font-normal text-gray-300">See Leads below</span></div>
+        <button type="button" onClick={() => onNavigate?.('proposals')} disabled={!onNavigate} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">Proposals <span className="block text-xs font-normal text-gray-300">Open Proposals module ↗</span></button>
+        <button type="button" onClick={() => onNavigate?.('sales_orders')} disabled={!onNavigate} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">Sales Orders <span className="block text-xs font-normal text-gray-300">Open Sales Orders module ↗</span></button>
+      </nav>
       {/* Header Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
