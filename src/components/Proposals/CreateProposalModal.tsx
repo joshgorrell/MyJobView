@@ -22,6 +22,7 @@ type SearchResult = {
   contact_name: string;
   company_name?: string | null;
   email?: string | null;
+  phone?: string | null;
   zip_code?: string | null;
   source: 'contact' | 'lead';
   raw: Contact | Lead;
@@ -57,6 +58,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   const { profile } = useAuth();
   const savedDraft = prefill ? null : readProposalDraft();
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState('');
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(savedDraft?.selectedResult || null);
   const [selectedLocation, setSelectedLocation] = useState<CustomerLocation | null>(savedDraft?.selectedLocation || null);
   const [searchQuery, setSearchQuery] = useState(prefill?.contactSearchName || savedDraft?.searchQuery || '');
@@ -104,41 +106,46 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
 
   const runSearch = useCallback(async (query: string) => {
     setLoading(true);
+    setSearchError('');
     try {
       const q = query.trim();
       let contactQuery = supabase
         .from('contacts')
-        .select('id, contact_name, company_name, email, zip_code')
+        .select('id, contact_name, company_name, email, phone, zip_code')
         .order('contact_name')
         .limit(25);
 
       let leadQuery = supabase
         .from('leads')
-        .select('id, contact_name, company_name, email, assigned_to, office_id')
+        .select('id, contact_name, company_name, email, phone, assigned_to, office_id')
+        .is('converted_at', null)
         .not('status', 'in', '("closed_won","closed_lost")')
         .order('contact_name')
         .limit(25);
 
       if (q) {
         contactQuery = contactQuery.or(
-          `contact_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`
+          `contact_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`
         );
         leadQuery = leadQuery.or(
           `contact_name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`
         );
       }
 
-      const [{ data: contacts }, { data: leads }] = await Promise.all([
+      const [{ data: contacts, error: contactsError }, { data: leads, error: leadsError }] = await Promise.all([
         contactQuery,
         leadQuery,
       ]);
 
+      if (contactsError) throw contactsError;
+      if (leadsError) throw leadsError;
       const results: SearchResult[] = [
         ...(contacts || []).map(c => ({
           id: c.id,
           contact_name: c.contact_name,
           company_name: c.company_name,
           email: c.email,
+          phone: c.phone,
           zip_code: c.zip_code,
           source: 'contact' as const,
           raw: c as Contact,
@@ -148,6 +155,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
           contact_name: l.contact_name,
           company_name: l.company_name,
           email: l.email,
+          phone: l.phone,
           zip_code: null,
           source: 'lead' as const,
           raw: l as Lead,
@@ -157,6 +165,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
       setSearchResults(results);
     } catch (err) {
       console.error('Search error:', err);
+      setSearchResults([]);
+      setSearchError('Unable to search Contacts and Leads. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -740,6 +750,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-white"></div>
                       Searching...
                     </div>
+                  ) : searchError ? (
+                    <div role="alert" className="text-red-300 py-4 text-sm">{searchError}</div>
                   ) : searchResults.length === 0 ? (
                     <div className="text-center text-gray-400 py-4 text-sm">No contacts or leads found</div>
                   ) : (
@@ -770,6 +782,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                             {result.email && (
                               <div className="text-sm text-gray-400 truncate">{result.email}</div>
                             )}
+                            {result.phone && <div className="text-sm text-gray-400 truncate">{result.phone}</div>}
+                            {result.zip_code && <div className="text-xs text-gray-500">ZIP: {result.zip_code}</div>}
                           </div>
                         </div>
                       </button>
