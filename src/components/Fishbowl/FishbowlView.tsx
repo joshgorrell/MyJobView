@@ -82,7 +82,9 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
           )
         `)
         .eq('is_fishbowl', true)
-        .eq('status', 'unclaimed');
+        .eq('status', 'unclaimed')
+        .is('assigned_to', null)
+        .is('converted_at', null);
 
       if (hasOfficeAssignments) {
         const officeIds = userOffices.map(uo => uo.office_id);
