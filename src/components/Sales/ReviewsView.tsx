@@ -814,23 +814,23 @@ export default function ReviewsView() {
         </div>
       )}
 
-      <header className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-gray-700 pb-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-700 pb-2 sm:pb-3">
         <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-cyan-300" /><h1 className="text-xl font-bold text-white">Feedback</h1></div>
-        {canRequestGoogleReviews && <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex min-h-11 max-w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-gray-950 hover:bg-amber-300"><Star className="h-4 w-4" />Ask for a Google Review</button>}
+        {canRequestGoogleReviews && <button type="button" onClick={() => { setGoogleOnlyMode(true); setSendMethod('email'); setActiveTab('send'); }} className="inline-flex min-h-11 max-w-full items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-semibold text-gray-950 hover:bg-amber-300 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"><Star className="h-4 w-4" />Ask for a Google Review</button>}
       </header>
 
-      <nav aria-label="Feedback sections" className="flex gap-1 overflow-x-auto border-b border-gray-700">
-        {(canViewCustomerFeedback || canManageCustomerFeedback || canViewLostOpportunities) && <button type="button" onClick={() => setActiveTab('inbox')} aria-current={activeTab === 'inbox' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-3 py-2 text-sm font-semibold ${activeTab === 'inbox' ? 'border-cyan-400 bg-cyan-950/30 text-white' : 'border-transparent text-gray-300 hover:bg-gray-800'}`}>Overview</button>}
+      <nav aria-label="Feedback sections" className="flex gap-0.5 overflow-x-auto border-b border-gray-700 sm:gap-1">
+        {(canViewCustomerFeedback || canManageCustomerFeedback || canViewLostOpportunities) && <button type="button" onClick={() => setActiveTab('inbox')} aria-current={activeTab === 'inbox' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-2 py-1 text-xs font-semibold sm:rounded-t-lg sm:px-3 sm:py-2 sm:text-sm ${activeTab === 'inbox' ? 'border-cyan-400 sm:bg-cyan-950/30 text-white' : 'border-transparent text-gray-300 hover:bg-gray-800'}`}>Overview</button>}
         {(canViewCustomerFeedback || canManageCustomerFeedback) && <button type="button" onClick={() => {
           if (canViewCustomerFeedback) { setGoogleOnlyMode(false); setActiveTab('dashboard'); }
           else { setGoogleOnlyMode(!canManageCustomerFeedback); setLifecycleType('manual'); setSendMethod(canManageCustomerFeedback ? 'satisfaction' : 'email'); setActiveTab('send'); }
-        }} aria-current={activeTab === 'dashboard' || activeTab === 'send' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'dashboard' || activeTab === 'send' ? 'border-amber-400 bg-amber-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+        }} aria-current={activeTab === 'dashboard' || activeTab === 'send' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-2 py-1 text-center transition sm:rounded-t-lg sm:py-2 ${activeTab === 'dashboard' || activeTab === 'send' ? 'border-amber-400 sm:bg-amber-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
           <Star className="mr-1 hidden h-4 w-4 text-amber-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Job Reviews</span>
         </button>}
-        {canManageCustomerFeedback && <button type="button" onClick={() => setActiveTab('proposal')} aria-current={activeTab === 'proposal' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'proposal' ? 'border-cyan-400 bg-cyan-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+        {canManageCustomerFeedback && <button type="button" onClick={() => setActiveTab('proposal')} aria-current={activeTab === 'proposal' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-2 py-1 text-center transition sm:rounded-t-lg sm:py-2 ${activeTab === 'proposal' ? 'border-cyan-400 sm:bg-cyan-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
           <FileText className="mr-1 hidden h-4 w-4 text-cyan-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Proposal Check</span>
         </button>}
-        {(canViewLostOpportunities || canSendLostOpportunities) && <button type="button" onClick={() => setActiveTab('lost')} aria-current={activeTab === 'lost' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-2 py-2 text-center transition ${activeTab === 'lost' ? 'border-violet-400 bg-violet-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
+        {(canViewLostOpportunities || canSendLostOpportunities) && <button type="button" onClick={() => setActiveTab('lost')} aria-current={activeTab === 'lost' ? 'page' : undefined} className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-2 py-1 text-center transition sm:rounded-t-lg sm:py-2 ${activeTab === 'lost' ? 'border-violet-400 sm:bg-violet-950/30' : 'border-transparent bg-transparent hover:bg-gray-800'}`}>
           <MessageSquare className="mr-1 hidden h-4 w-4 text-violet-400 sm:inline" /><span className="text-xs font-semibold text-white sm:text-sm">Lost Opportunities</span>
         </button>}
       </nav>
@@ -838,10 +838,10 @@ export default function ReviewsView() {
       {activeTab === 'inbox' && <FeedbackInbox onNavigate={tab => setActiveTab(tab)} canJob={canViewCustomerFeedback} canProposal={canManageCustomerFeedback} canLost={canViewLostOpportunities} />}
 
       {(activeTab === 'dashboard' || (activeTab === 'send' && !googleOnlyMode)) && canManageCustomerFeedback && (
-        <section aria-label="Job review emails" className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <section aria-label="Job review emails" className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 xl:grid-cols-5">
           {jobReviewEmails.map(email => <article key={email.type} className={`relative min-w-0 rounded-xl border bg-gray-800 ${activeTab === 'send' && lifecycleType === email.type ? 'border-amber-400' : 'border-gray-700'}`}>
-            <button type="button" onClick={() => { setLifecycleType(email.type); setGoogleOnlyMode(false); setSendMethod('satisfaction'); setEditedSubject(''); setPersonalNote(''); setActiveTab('send'); }} className="h-full min-h-16 min-w-0 w-full rounded-xl p-3 pr-12 text-left hover:bg-gray-700/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400">
-              <h2 className="text-sm font-semibold text-white">{email.title}</h2><p title={email.description} className="mt-1 truncate text-xs leading-relaxed text-gray-400">{email.description}</p>
+            <button type="button" onClick={() => { setLifecycleType(email.type); setGoogleOnlyMode(false); setSendMethod('satisfaction'); setEditedSubject(''); setPersonalNote(''); setActiveTab('send'); }} className="h-full min-h-14 min-w-0 w-full rounded-xl px-3 py-2 pr-12 text-left sm:min-h-16 sm:p-3 sm:pr-12 hover:bg-gray-700/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400">
+              <h2 className="text-[13px] font-semibold leading-snug text-white sm:text-sm">{email.title}</h2><p title={email.description} className="mt-0.5 truncate text-xs leading-snug text-gray-400 sm:mt-1 sm:leading-relaxed">{email.description}</p>
             </button>
             <button type="button" aria-label={`Preview example: ${email.title}`} title="Preview example" disabled={loadingPreview} onClick={() => void fetchSatisfactionPreview(email.type, true)} className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-50"><Eye className="h-4 w-4" /></button>
           </article>)}
