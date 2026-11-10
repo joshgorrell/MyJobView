@@ -13,13 +13,11 @@ import { SalesGoalLeaderboard } from './SalesGoalLeaderboard';
 import { SalesAttentionList } from './SalesAttentionList';
 import { ManagerRepSelector } from './ManagerRepSelector';
 import { DashboardSkeleton } from './DashboardSkeleton';
-import { HotLeadsCard } from './HotLeadsCard';
-import { StaleLeadsCard } from './StaleLeadsCard';
 import { DeclineReasonsCard } from './DeclineReasonsCard';
 import { PeriodStatsRow } from './PeriodStatsRow';
 import { RecentProposalsCard } from './RecentProposalsCard';
 import { RecentActivityCard } from './RecentActivityCard';
-import { RefreshCw, AlertCircle, LayoutDashboard, FileText, Activity, BarChart3, Sunrise } from 'lucide-react';
+import { RefreshCw, AlertCircle, LayoutDashboard, FileText, Activity, Sunrise } from 'lucide-react';
 import { DailyRecap } from './DailyRecap';
 import { useSalesDashboardRecords } from '../../hooks/useSalesDashboardRecords';
 import { buildSalesLists, periodBounds, SALES_LIST_LABELS, type SalesPeriod, type SalesListKey, type SalesRecord } from '../../lib/salesDashboardRecords';
@@ -56,7 +54,6 @@ interface SalesDashboardPageProps {
 const TAB_CONFIG: { key: DashboardTab; label: string; icon: typeof LayoutDashboard }[] = [
   { key: 'daily_recap', label: 'Daily Recap', icon: Sunrise },
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
   { key: 'proposals', label: 'Proposals', icon: FileText },
   { key: 'activity', label: 'Activity', icon: Activity },
 ];
@@ -158,7 +155,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   }, [data]);
 
   const handleNavigate = useCallback((tab: string) => {
-    setActiveTab(tab === 'performance' ? 'overview' : tab as DashboardTab);
+    setActiveTab(tab === 'performance' || tab === 'pipeline' ? 'overview' : tab as DashboardTab);
   }, []);
 
   const handleNavigateToProposals = useCallback(() => { setListSource(null); setListReason(null); setSelectedList('created'); }, []);
@@ -168,7 +165,7 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
   const header = (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-6">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-white">Sales Dashboard</h1>
+          <h2 className="text-lg sm:text-xl font-bold text-white">Sales Performance</h2>
           <p className="text-xs sm:text-sm text-gray-300 mt-0.5">
             {loading ? 'Loading sales data…' : isManagerView ? `Viewing: ${data?.repDisplayName}` : data?.repDisplayName}
           </p>
@@ -309,52 +306,12 @@ export function SalesDashboardPage({ onProposalClick, onRepContextChange, onNavi
           </div>
           <SalesAttentionList items={attentionItems} onNavigate={handleNavigate} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HotLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.hotLeads ?? []} onNavigateToPipeline={() => selectList('hot')} />
-            <StaleLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.staleLeads ?? []} onNavigateToPipeline={() => selectList('staleLeads')} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <RecentProposalsCard onProposalClick={onProposalClick} proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
             <RecentActivityCard onOpenRecord={openRecord} activities={data.recentActivity ?? []} onNavigateToActivity={handleNavigateToActivity} />
           </div>
           {(data.declineReasons ?? []).length > 0 && (
             <DeclineReasonsCard onReasonClick={(reason, source) => { setListSource(source || null); setListReason(reason); setSelectedList('lost'); }} reasons={data.declineReasons ?? []} />
           )}
-        </div>
-      )}
-
-      {activeTab === 'pipeline' && (
-        <div className="space-y-6">
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Pipeline Summary</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Total Pipeline Value</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {data.pipeline.total >= 1000 ? `$${(data.pipeline.total / 1000).toFixed(0)}K` : `$${data.pipeline.total.toFixed(0)}`}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Active Proposals</p>
-                <button onClick={() => selectList('pipeline')} className="text-2xl font-bold text-blue-700 hover:underline">{data.pipeline.count}</button>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Close Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{data.closeRate.pct}%</p>
-                <button onClick={() => selectList('closed')} className="text-xs text-blue-700 hover:underline mt-0.5">{data.closeRate.wonCount} won / {data.closeRate.wonCount + data.closeRate.lostCount} closed</button>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Run Rate (90d)</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {data.runRate90Day >= 1000 ? `$${(data.runRate90Day / 1000).toFixed(0)}K` : `$${data.runRate90Day.toFixed(0)}`}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <HotLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.hotLeads ?? []} onNavigateToPipeline={() => selectList('hot')} />
-            <StaleLeadsCard onLeadClick={id => onOpenRecord?.({ id, kind: 'lead', title: 'Lead', customer: '', status: '', date: '' })} leads={data.staleLeads ?? []} onNavigateToPipeline={() => selectList('staleLeads')} />
-          </div>
-          <RecentProposalsCard onProposalClick={onProposalClick} proposals={data.recentProposals ?? []} onNavigateToProposals={handleNavigateToProposals} />
         </div>
       )}
 

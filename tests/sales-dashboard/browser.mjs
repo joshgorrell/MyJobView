@@ -34,7 +34,7 @@ try {
     await favorites.getByRole('button',{name:'Favorite 7',exact:true}).click();assert.ok((await page.evaluate(()=>window.calls)).some(c=>c[0]==='favorite'&&c[1]==='favorite_7'));
 
     assert.equal(await page.locator('select').filter({has:page.locator('option[value="rep2"]')}).inputValue(), 'rep1');
-    for(const name of ['Daily Recap','Overview','Pipeline','Proposals','Activity']) assert.equal(await page.getByRole('button',{name,exact:true}).count(),1);
+    for(const name of ['Daily Recap','Overview','Proposals','Activity']) assert.equal(await page.getByRole('button',{name,exact:true}).count(),1);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.getByRole('button',{name:/^Ready to Bill/}).click();
     await page.getByRole('button',{name:/WO-1/}).click();
