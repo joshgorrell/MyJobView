@@ -8,10 +8,11 @@ const id=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const hash=x=>typeof x==='string'&&/^[0-9a-f]{64}$/.test(x)&&x!=='0'.repeat(64);
 const positive=x=>Number.isSafeInteger(x)&&x>0;
 export async function inspectSerializableEquipmentCandidate({
- connectionId,orderId,withSerializableSourceTransaction
+ connectionId,orderId,withSerializableSourceTransaction,certify=false
 }={}) {
  if(!id(connectionId)||!id(orderId))return hold('invalid_source_identity');
  if(typeof withSerializableSourceTransaction!=='function')return hold('serializable_transaction_unavailable');
+ if(typeof certify!=='boolean')return hold('invalid_certification_mode');
  try {
   let callbackInvocations=0;
   let callbackResult;
@@ -60,6 +61,18 @@ export async function inspectSerializableEquipmentCandidate({
       current.revision!==source.revision||current.sourceFingerprint!==source.sourceFingerprint||
       current.state!=='candidate')
     return hold('source_changed_during_transaction');
+   if(certify){
+    if(typeof tx.persistCertificate!=='function')throw new Error('trusted_certificate_writer_unavailable');
+    const persisted=await tx.persistCertificate(evidence);
+    // Throw rather than return a hold: the enclosing transaction must roll back
+    // if a writer cannot confirm the certificate insertion.
+    if(persisted?.ok!==true||persisted.authorized!==false||
+       persisted.snapshotReady!==false||
+       persisted.reason!=='certificate_persisted_not_dispatch_authorized')
+     throw new Error('certificate_persistence_unverified');
+    return {...evidence,certificateId:persisted.certificateId,
+     authorized:false,snapshotReady:false,reason:'certificate_persisted_not_dispatch_authorized'};
+   }
    return {...evidence,authorized:false,snapshotReady:false,
     reason:'serializable_candidate_not_certified'};
    })();
