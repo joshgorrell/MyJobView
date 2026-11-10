@@ -8,6 +8,10 @@ export function inspectMjvCurrentSalesOrderEquipment({source,minimumUnitValueCen
  try{
   // This is a trusted-source DATA ADAPTER, not an authority check. The caller
   // must independently verify approval, tenant, transaction and revision.
+  // The existing private read_order_source SQL returns raw diagnostic facts.
+  // It explicitly sets salesPriceResolved=false and membership.verified=false.
+  // Do not promote its caller-supplied flags to a certified current projection.
+  if(source?.readModelVersion===1)return held('private_read_model_requires_verified_scope_and_price');
   if(!source||source.trustedCurrentOrderRead!==true||
      source.currentEquipmentComplete!==true||source.approvedSalesOrder!==true||
      !id(source.organizationId)||!source.order||!id(source.order.id)||

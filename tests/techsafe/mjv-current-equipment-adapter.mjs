@@ -23,6 +23,13 @@ for(const mutate of [
  s=>{s.customer.id='other'},
  s=>{s.lines[0].line.quantity='2.5'},
 ]){const bad=source();mutate(bad);const r=inspect({source:bad});assert.equal(r.ok,false);assert.equal(r.snapshotReady,false);}
+// The already-existing SQL read_order_source returns diagnostic rows only.
+// Even if a caller forges the adapter flags, raw read-model v1 cannot pass.
+const raw=source();raw.readModelVersion=1;
+assert.equal(inspect({source:raw}).reason,'private_read_model_requires_verified_scope_and_price');
+raw.lines[0].salesPriceResolved=false;
+raw.lines[0].membership.verified=false;
+assert.equal(inspect({source:raw}).ok,false);
 const removed=source();removed.lines[0].membership.scope='removed';
 assert.deepEqual(inspect({source:removed}).lines,[]);
 console.log('PASS: MJV current Sales Order equipment adapter reuses existing projection and never authorizes sync');
