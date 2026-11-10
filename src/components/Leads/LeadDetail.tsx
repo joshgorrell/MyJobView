@@ -379,7 +379,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
     if (!profile || !lead) return;
 
     try {
-      const { error } = await supabase
+      const { data: claimedRows, error } = await supabase
         .from('leads')
         .update({
           assigned_to: profile.id,
@@ -387,9 +387,18 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           is_fishbowl: false,
           claimed_at: new Date().toISOString(),
         })
-        .eq('id', leadId);
+        .eq('id', leadId)
+        .eq('status', 'unclaimed')
+        .eq('is_fishbowl', true)
+        .is('assigned_to', null)
+        .select('id');
 
       if (error) throw error;
+      if (!claimedRows?.length) {
+        notify('This lead is no longer available to claim. Refresh to see its current assignment.', { theme: 'blue', tone: 'error' });
+        await loadLead();
+        return;
+      }
 
       await supabase.from('feed_events').insert([
         {
