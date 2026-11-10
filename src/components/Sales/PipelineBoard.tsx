@@ -10,7 +10,7 @@ import { LeadForm } from '../Leads/LeadForm';
 import ConnectionForm from '../Connections/ConnectionForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Building2, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
 
 
 interface PipelineStage {
@@ -318,64 +318,14 @@ export function PipelineBoard() {
         lead.is_fishbowl === true && lead.status === 'unclaimed' && lead.assigned_to == null
       );
 
-      // Batch-fetch last connection and next scheduled connection for contacts (depends on contact IDs)
-      if (contacts && contacts.length > 0) {
-        const contactIds = contacts.map((c: any) => c.id);
-
-        const [{ data: allConnections }, { data: allScheduled }] = await Promise.all([
-          supabase
-            .from('connections')
-            .select('contact_id, connection_date, connection_type')
-            .in('contact_id', contactIds)
-            .order('connection_date', { ascending: false }),
-          supabase
-            .from('scheduled_connection_occurrences')
-            .select(`
-              prospect_id,
-              scheduled_date,
-              scheduled_connections!inner(connection_type)
-            `)
-            .in('prospect_id', contactIds)
-            .eq('is_completed', false)
-            .eq('is_skipped', false)
-            .gte('scheduled_date', new Date().toISOString().split('T')[0])
-            .order('scheduled_date', { ascending: true })
-        ]);
-
-        const lastConnectionMap = new Map<string, any>();
-        for (const conn of (allConnections || [])) {
-          if (!lastConnectionMap.has(conn.contact_id)) {
-            lastConnectionMap.set(conn.contact_id, {
-              connection_date: conn.connection_date,
-              connection_type: conn.connection_type
-            });
-          }
-        }
-        const nextScheduledMap = new Map<string, any>();
-        for (const sched of (allScheduled || [])) {
-          if (!nextScheduledMap.has(sched.prospect_id)) {
-            nextScheduledMap.set(sched.prospect_id, {
-              scheduled_date: sched.scheduled_date,
-              connection_type: (sched.scheduled_connections as any)?.connection_type
-            });
-          }
-        }
-
-        for (const contact of contacts) {
-          const lc = lastConnectionMap.get(contact.id);
-          if (lc) contact.last_connection = lc;
-          const ns = nextScheduledMap.get(contact.id);
-          if (ns) contact.next_scheduled_connection = ns;
-        }
-      }
-
       // Build stages based on selected widgets
       const stagesData = [];
 
       // Add stages in the order they appear in stageDefinitions (which respects selectedWidgets order)
       for (const def of stageDefinitions) {
         if (def.id === 'contacts') {
-          // Filter out prospects from contacts widget
+          // Legacy lead/prospect contact classifications are excluded from new-contact activity.
+          // Actual opportunities are shown through the canonical Leads widget.
           const nonProspectContacts = contacts.filter((c: any) => c.contact_type !== 'prospect' && c.contact_type !== 'lead');
           stagesData.push({
             ...def,
@@ -1264,40 +1214,13 @@ export function PipelineBoard() {
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Contacts</h3>
                     <p className="text-gray-700 leading-relaxed mb-3">
-                      A <strong>Contact</strong> is a person or company in your database. Contacts can be classified
-                      as a <strong>Customer</strong> (existing client), a <strong>Prospect</strong> (future opportunity being nurtured),
-                      or a <strong>Lead</strong> (hot inbound inquiry). They are the foundation of your CRM and every
-                      interaction is tracked against them.
+                      A <strong>Contact</strong> is a person or company in your database. Contacts store people and company details. Sales opportunities are managed separately as
+                      <strong> Leads</strong>, linked to their contact records. You can log interactions against contacts.
                     </p>
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                       <p className="text-sm text-gray-600">
                         <strong>Example:</strong> A homeowner you installed a system for last year (Customer), or a new
-                        business you met at a networking event (Prospect or Lead depending on their buying intent).
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Prospects */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Prospects</h3>
-                    <p className="text-gray-700 leading-relaxed mb-3">
-                      A <strong>Prospect</strong> is a future opportunity that needs long-term nurturing — someone
-                      who is not ready to buy right now but has potential down the road. You can track which competitors
-                      they currently use and the strength of those relationships, so you know when and how to make your move.
-                      A Lead can be downgraded to a Prospect if the timing isn't right yet.
-                    </p>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-sm text-gray-600">
-                        <strong>Example:</strong> A property manager locked into a contract with a competitor for another
-                        year. You stay in touch and track the competitor relationship so you're top of mind when they\'re
-                        ready to switch.
+                        business you met at a networking event (Contact). Create a Lead when there is a sales opportunity.
                       </p>
                     </div>
                   </div>
@@ -1313,7 +1236,7 @@ export function PipelineBoard() {
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Leads</h3>
                     <p className="text-gray-700 leading-relaxed mb-3">
-                      A <strong>Lead</strong> is a hot opportunity — someone ready to buy now or very soon. Leads have
+                      A <strong>Lead</strong> is a sales opportunity, including inquiries that need follow-up before the customer is ready to buy. Leads have
                       a priority level (Urgent, High, Medium, Low), a temperature rating, and are assigned to a specific
                       salesperson once claimed. An unclaimed lead sits in the <strong>Fishbowl</strong> until a rep
                       picks it up. Once claimed, it appears in that rep's active pipeline. Leads close as
@@ -1393,11 +1316,11 @@ export function PipelineBoard() {
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-blue-600 font-bold">2.</span>
-                        <span>They're not ready to buy yet, so you mark them as a <strong>Prospect</strong> and log regular <strong>Connections</strong> to stay on their radar.</span>
+                        <span>When there is an opportunity, create a <strong>Lead</strong> and log <strong>Connections</strong> to follow up, even if the customer is not ready yet.</span>
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-blue-600 font-bold">3.</span>
-                        <span>When they're finally ready, you create a <strong>Lead</strong> and work it to close.</span>
+                        <span>Keep the <strong>Lead</strong> updated as the opportunity progresses, then create a proposal when appropriate.</span>
                       </p>
                     </div>
                   </div>
@@ -1418,7 +1341,7 @@ export function PipelineBoard() {
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-green-600 font-bold">4.</span>
-                        <span>If the timing isn't right, the Lead can be downgraded to a <strong>Prospect</strong> for long-term nurturing.</span>
+                        <span>If the timing isn't right, keep the <strong>Lead</strong> for follow-up without creating another record.</span>
                       </p>
                     </div>
                   </div>
