@@ -215,7 +215,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
 
       <div className="flex gap-2 border-b border-subtle" role="tablist" aria-label="Sales order views">
         <button role="tab" aria-selected={listTab === 'orders'} onClick={() => setListTab('orders')} className={`px-4 py-2 text-sm font-medium ${listTab === 'orders' ? 'border-b-2 border-blue-500 text-primary' : 'text-muted'}`}>Sales Orders</button>
-        <button role="tab" aria-selected={listTab === 'status'} onClick={() => setListTab('status')} className={`px-4 py-2 text-sm font-medium ${listTab === 'status' ? 'border-b-2 border-blue-500 text-primary' : 'text-muted'}`}>Status</button>
+        <button role="tab" aria-selected={listTab === 'status'} onClick={() => { setListTab('status'); if (statusFilter === 'complete' || statusFilter === 'closed') setStatusFilter('all'); }} className={`px-4 py-2 text-sm font-medium ${listTab === 'status' ? 'border-b-2 border-blue-500 text-primary' : 'text-muted'}`}>Status</button>
       </div>
 
       {/* Search and compact filters */}
@@ -245,8 +245,8 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           <option value="pending_po">Pending PO</option>
           <option value="planning">Planning</option>
           <option value="active">Active</option>
-          <option value="complete">Complete</option>
-          <option value="closed">Closed</option>
+          {listTab === 'orders' && <option value="complete">Complete</option>}
+          {listTab === 'orders' && <option value="closed">Closed</option>}
         </select>
       </div>}
 
