@@ -78,6 +78,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
         .select('*')
         .eq('organization_id', profile.organization_id)
         .in('status', ['unclaimed', 'claimed', 'in_progress'])
+        .is('converted_at', null)
         .lt('created_at', cutoff)
         .order('created_at', { ascending: true })
         .range(stalePage * 100, stalePage * 100 + 100);
@@ -147,6 +148,8 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
           assigned_profile:profiles!leads_assigned_to_fkey (full_name)
         `);
 
+      // Converted opportunities remain historical records, not active Leads.
+      query = query.is('converted_at', null);
       if (viewFilter === 'my') {
         query = query.or(`created_by.eq.${profile!.id},assigned_to.eq.${profile!.id}`);
       }
@@ -183,6 +186,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
           assigned_profile:profiles!leads_assigned_to_fkey (full_name)
         `)
         .eq('status', 'claimed')
+        .is('converted_at', null)
         .not('claimed_at', 'is', null)
         .gte('claimed_at', since.toISOString())
         .order('claimed_at', { ascending: false })
