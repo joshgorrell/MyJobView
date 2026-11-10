@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { loadProjectSummaries } from '../../lib/projectOverview';
 
 type Order = {
   id: string; order_number: string; status: string; contract_total: number;
@@ -13,6 +15,7 @@ const number = (value: unknown) => Number(value) || 0;
 const OPEN = new Set(['pending_deposit', 'pending_po', 'planning', 'active']);
 
 export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; onOpen: (id: string) => void }) {
+  const { profile } = useAuth();
   const [metrics, setMetrics] = useState<Record<string, Metrics>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,35 +25,31 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!ids) { setMetrics({}); return; }
+      if (!ids || !profile?.organization_id) { setMetrics({}); return; }
       setLoading(true); setError('');
       try {
         const next: Record<string, Metrics> = {};
         for (const order of openOrders) next[order.id] = { estimated: 0, actual: 0, invoiced: 0, due: 0 };
         const projectIds = [...new Set(openOrders.map(o => o.project_id).filter((id): id is string => !!id))];
-        const [invoicesResult, workResult] = await Promise.all([
+        const [invoicesResult, projectSummaries] = await Promise.all([
           supabase.from('invoices').select('sales_order_id,total,amount_due,status').in('sales_order_id', openOrders.map(o => o.id)),
-          projectIds.length ? supabase.from('work_orders').select('project_id,estimated_hours,actual_hours').in('project_id', projectIds) : Promise.resolve({ data: [], error: null })
+          projectIds.length ? loadProjectSummaries(profile.organization_id, projectIds) : Promise.resolve([])
         ]);
         if (invoicesResult.error) throw invoicesResult.error;
-        if (workResult.error) throw workResult.error;
+
         for (const invoice of invoicesResult.data || []) {
           const item = next[invoice.sales_order_id];
           if (!item || invoice.status === 'void' || invoice.status === 'cancelled') continue;
           item.invoiced += number(invoice.total);
           item.due += number(invoice.amount_due);
         }
-        const byProject = new Map<string, Metrics>();
-        for (const work of workResult.data || []) {
-          const key = work.project_id as string;
-          const item = byProject.get(key) || { estimated: 0, actual: 0, invoiced: 0, due: 0 };
-          item.estimated += number(work.estimated_hours);
-          item.actual += number(work.actual_hours);
-          byProject.set(key, item);
-        }
+        const byProject = new Map(projectSummaries.map(summary => [summary.project.id, summary]));
         for (const order of openOrders) {
-          const labor = order.project_id ? byProject.get(order.project_id) : null;
-          if (labor) { next[order.id].estimated = labor.estimated; next[order.id].actual = labor.actual; }
+          const project = order.project_id ? byProject.get(order.project_id) : null;
+          if (project) {
+            next[order.id].estimated = project.goalHours ?? 0;
+            next[order.id].actual = project.fieldHours;
+          }
         }
         if (!cancelled) setMetrics(next);
       } catch (e) {
@@ -59,7 +58,7 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
     }
     void load();
     return () => { cancelled = true; };
-  }, [ids]);
+  }, [ids, profile?.organization_id]);
   const rows = openOrders.map(order => {
     const m = metrics[order.id];
     const pct = m?.estimated ? m.actual / m.estimated * 100 : null;
@@ -87,7 +86,7 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
       </div>)}
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-xs text-muted">Labor used versus estimated hours. This is budget consumption, not verified project completion.</p>
+      <p className="text-xs text-muted">Field labor used versus field labor target (same calculation as Project Management). This is budget consumption, not physical completion.</p>
       <select aria-label="Sort open sales orders" value={sort} onChange={e=>setSort(e.target.value)} className="bg-surface text-primary border border-subtle rounded-lg p-2 text-sm">
         <option value="overrun">Highest labor usage</option><option value="unbilled">Most unbilled</option>
         <option value="due">Largest amount due</option><option value="oldest">Oldest orders</option>
