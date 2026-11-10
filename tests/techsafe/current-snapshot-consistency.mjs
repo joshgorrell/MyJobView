@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {validateTechsafeCurrentEquipmentSnapshot as check} from '../../supabase/functions/_shared/techsafe-current-snapshot-consistency.mjs';
+const org='org',line={id:'line',product_id:'product',product_organization_id:org,item_type:'material',catalog_item_type:'material',quantity:2,unit_price:'19.99',is_hidden:false,is_customer_supplied:false};
+const source={binding:{organization_id:org},lines:[line]};
+const equipment={sourceLineId:'line',productRef:'product',productKind:'equipment',scope:'included',quantity:2,unitEquipmentValueCents:1999};
+assert.equal(check(source,{lines:[equipment]}).valid,true);
+for(const l of [{...equipment,quantity:3},{...equipment,unitEquipmentValueCents:2000},{...equipment,productRef:'other'},{...equipment,scope:'removed'}])assert.equal(check(source,{lines:[l]}).valid,false);
+assert.equal(check(source,{lines:[]}).reason,'eligible_equipment_omitted');
+assert.equal(check(source,{lines:[equipment,equipment]}).reason,'duplicate_snapshot_line');
+assert.equal(check({...source,lines:[{...line,is_customer_supplied:true}]},{lines:[equipment]}).valid,false);
+assert.equal(check({...source,lines:[{...line,is_hidden:true}]},{lines:[{...equipment,scope:'removed'}]}).valid,true);
+assert.equal(check({...source,lines:[{...line,unit_price:'19.999'}]},{lines:[equipment]}).valid,false);
+assert.equal(check({...source,lines:[{...line,product_organization_id:'other'}]},{lines:[equipment]}).valid,false);
+console.log('Current equipment snapshot consistency checks passed');
