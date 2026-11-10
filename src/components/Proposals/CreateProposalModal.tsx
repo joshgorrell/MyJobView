@@ -403,11 +403,22 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
         const lead = selectedResult.raw as Lead;
         resolvedLeadId = lead.id;
 
-        const { data: existingContact } = await supabase
-          .from('contacts')
-          .select('id')
-          .eq('email', lead.email || '')
-          .maybeSingle();
+        // Never match a blank email, and never silently choose between duplicates.
+        // A duplicate match must be resolved by selecting the existing Contact.
+        const normalizedEmail = lead.email?.trim().toLowerCase() || '';
+        let existingContact: { id: string } | null = null;
+        if (normalizedEmail) {
+          const { data: matches, error: matchError } = await supabase
+            .from('contacts')
+            .select('id')
+            .ilike('email', normalizedEmail)
+            .limit(2);
+          if (matchError) throw matchError;
+          if ((matches || []).length > 1) {
+            throw new Error('Multiple contacts share this email. Select the correct existing Contact before creating a proposal.');
+          }
+          existingContact = matches?.[0] || null;
+        }
 
         if (existingContact) {
           resolvedContactId = existingContact.id;
