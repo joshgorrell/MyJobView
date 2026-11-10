@@ -469,11 +469,11 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
               </div>
 
               {showResults && contactSearch.trim().length >= 2 && (
-                <div className="absolute z-10 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-subtle bg-surface shadow-lg">
+                <div className="relative mt-1 w-full rounded-lg border border-subtle bg-surface shadow-lg">
                   {searchError ? <p role="alert" className="p-3 text-sm text-red-500">{searchError}</p> : contactResults.length === 0 && !searching ? (
                     <div className="px-4 py-3 text-sm text-muted">No customers found. Use + Add Contact to create one.</div>
                   ) : (
-                    contactResults.map((contact) => (
+                    contactResults.slice(0, 8).map((contact) => (
                       <button
                         type="button"
                         key={contact.id}
@@ -494,6 +494,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
                       </button>
                     ))
                   )}
+                  {contactResults.length > 8 && <p className="px-4 py-2 text-xs text-muted">Showing the first 8 matches. Refine your search to find another customer.</p>}
                 </div>
               )}
               <p className="text-xs text-muted mt-1">Search your existing customer database by name, company, email, or phone number.</p>
