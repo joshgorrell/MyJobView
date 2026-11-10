@@ -70,7 +70,9 @@ export async function inspectSerializableEquipmentCandidate({
     // if a writer cannot confirm the certificate insertion.
     if(persisted?.ok!==true||persisted.authorized!==false||
        persisted.snapshotReady!==false||
-       persisted.reason!=='certificate_persisted_not_dispatch_authorized')
+       persisted.reason!=='certificate_persisted_not_dispatch_authorized'||
+       typeof persisted.certificateId!=='string'||
+       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(persisted.certificateId))
      throw new Error('certificate_persistence_unverified');
     return {...evidence,certificateId:persisted.certificateId,
      authorized:false,snapshotReady:false,reason:'certificate_persisted_not_dispatch_authorized'};

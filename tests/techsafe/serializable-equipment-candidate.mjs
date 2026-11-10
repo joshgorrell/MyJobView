@@ -40,15 +40,19 @@ const certified=await inspect({connectionId:'conn-1',orderId:'sales-1',certify:t
   persistCalls++;
   assert.equal(evidence.contentFingerprint,good.contentFingerprint);
   return {ok:true,authorized:false,snapshotReady:false,
-   reason:'certificate_persisted_not_dispatch_authorized',certificateId:'cert-1'};
+   reason:'certificate_persisted_not_dispatch_authorized',certificateId:'00000000-0000-0000-0000-000000000009'};
  }})});
 assert.equal(persistCalls,1);
 assert.equal(certified.reason,'certificate_persisted_not_dispatch_authorized');
-assert.equal(certified.certificateId,'cert-1');
+assert.equal(certified.certificateId,'00000000-0000-0000-0000-000000000009');
 assert.equal(certified.authorized,false);
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',certify:true,
  withSerializableSourceTransaction:async callback=>callback(tx())})).reason,'serializable_transaction_aborted');
 assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',certify:true,
  withSerializableSourceTransaction:async callback=>callback({...tx(),
  persistCertificate:async()=>({ok:false,authorized:false,snapshotReady:false})})})).reason,'serializable_transaction_aborted');
+assert.equal((await inspect({connectionId:'conn-1',orderId:'sales-1',certify:true,
+ withSerializableSourceTransaction:async callback=>callback({...tx(),
+ persistCertificate:async()=>({ok:true,authorized:false,snapshotReady:false,
+ reason:'certificate_persisted_not_dispatch_authorized',certificateId:'fake'})})})).reason,'serializable_transaction_aborted');
 console.log('PASS: serializable approved Sales Order candidate stays inert and rejects stale or incomplete source');
