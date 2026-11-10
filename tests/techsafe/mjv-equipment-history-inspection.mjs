@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {inspectMjvEquipmentHistory as inspect} from '../../src/lib/techsafe/mjvEquipmentHistoryInspection.mjs';
+import {copy,binding,history} from './fixtures/equipment-history.mjs';
+const h=history(),source=JSON.stringify(h);
+const result=inspect({model:h.currentModel,pairs:h.pairs,binding});
+assert.equal(result.ok,true);assert.equal(result.checkedApplications,8);
+for(const flag of ['authorized','snapshotReady','quoteReady','originalScopeVerified','scopeVerified'])assert.equal(result[flag],false);
+assert.equal(JSON.stringify(h),source,'history inspection must not mutate MJV facts');
+const missing=inspect({model:h.currentModel,pairs:null,binding});assert.equal(missing.ok,false);
+const gap=copy(h);gap.pairs[3].beforeLines[0].line.quantity='55.00';
+assert.equal(inspect({model:gap.currentModel,pairs:gap.pairs,binding}).reason,'equipment_history_unverified');
+const changed=copy(h);changed.currentModel.equipmentEvidence.inputs[0].inputHash='f'.repeat(64);
+assert.equal(inspect({model:changed.currentModel,pairs:changed.pairs,binding}).reason,'application_evidence_unverified');
+const wrong={...binding,organizationId:'foreign'};
+assert.equal(inspect({model:h.currentModel,pairs:h.pairs,binding:wrong}).ok,false);
+console.log('PASS: existing MJV equipment continuity composed without source replay or export authorization');
