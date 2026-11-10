@@ -428,6 +428,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
   return (
     <QuickActionModal
+      pageScroll
       title="New Lead"
       subtitle="Add a new sales opportunity"
       icon={<Users className="w-5 h-5 text-primary" />}

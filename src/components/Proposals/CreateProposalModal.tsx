@@ -518,8 +518,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   const isLeadSelected = selectedResult?.source === 'lead';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto overscroll-contain p-0 sm:p-4">
+      <div className="bg-gray-800 rounded-none sm:rounded-lg shadow-xl w-full max-w-full sm:max-w-2xl mx-auto min-h-full sm:min-h-0 flex flex-col">
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700 flex-shrink-0">
           <h2 className="text-lg sm:text-xl font-bold text-white">Create New Proposal</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white flex-shrink-0">
@@ -528,7 +528,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+        <div className="flex-1 p-3 sm:p-4 space-y-3">
           {prefill && (
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-900/40 border border-blue-700/50 rounded-lg">
               <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0" />
@@ -765,7 +765,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                   />
                 </div>
 
-                <div className="max-h-48 overflow-y-auto space-y-1 border border-gray-700 rounded-lg p-2">
+                <div className="space-y-1 border border-gray-700 rounded-lg p-2">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-gray-400 py-4 text-sm">
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-500 border-t-white"></div>

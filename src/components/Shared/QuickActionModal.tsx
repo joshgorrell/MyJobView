@@ -6,6 +6,7 @@ interface QuickActionModalProps {
   stableHeight?: boolean;
   scrollBody?: boolean;
   wide?: boolean;
+  pageScroll?: boolean;
   title: string;
   subtitle?: string;
   icon: ReactNode;
@@ -22,6 +23,7 @@ export function QuickActionModal({
   stableHeight = false,
   scrollBody = true,
   wide = false,
+  pageScroll = false,
   title,
   subtitle,
   icon,
@@ -169,19 +171,18 @@ export function QuickActionModal({
       {/* Sheet / Dialog */}
       <div
         className={`
-          fixed bottom-0 left-0 right-0 z-[61]
-          flex items-end
-          sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4
+          fixed inset-0 z-[61]
+          ${pageScroll ? 'overflow-y-auto overscroll-contain block p-0 sm:p-4' : 'flex items-end sm:flex sm:items-center sm:justify-center sm:p-4'}
         `}
         style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
       >
         <div
           className={`
             qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl ${wide ? 'lg:max-w-6xl' : ''}
-            rounded-t-2xl sm:rounded-xl
+            ${pageScroll ? 'rounded-none sm:rounded-xl mx-auto min-h-full sm:min-h-0' : 'rounded-t-2xl sm:rounded-xl'}
             shadow-2xl border-t sm:border border-subtle
             flex flex-col
-            ${stableHeight ? 'h-[92svh] sm:h-[90svh]' : 'max-h-[92svh] sm:max-h-[90svh]'}
+            ${pageScroll ? '' : stableHeight ? 'h-[92svh] sm:h-[90svh]' : 'max-h-[92svh] sm:max-h-[90svh]'}
             relative
           `}
           ref={dialogRef}
@@ -190,7 +191,7 @@ export function QuickActionModal({
           aria-labelledby={titleId}
           aria-describedby={subtitle ? subtitleId : undefined}
           tabIndex={-1}
-          style={{ maxHeight: viewport ? `min(var(--qam-max-height), ${viewport.height}px)` : 'var(--qam-max-height)' }}
+          style={pageScroll ? undefined : { maxHeight: viewport ? `min(var(--qam-max-height), ${viewport.height}px)` : 'var(--qam-max-height)' }}
           onKeyDown={event => {
             if (event.defaultPrevented || (event.target as Element).closest('[role="dialog"]') !== dialogRef.current) return;
             if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
@@ -271,7 +272,7 @@ export function QuickActionModal({
           <div
             ref={scrollRef}
             {...(showSuccess ? { inert: '' } : {})}
-            className={`qam-body qam-safe-bottom flex flex-col min-h-0 min-w-0 ${scrollBody ? 'qam-scroll overflow-y-auto' : 'flex-1 overflow-hidden'}`}
+            className={`qam-body qam-safe-bottom flex flex-col min-h-0 min-w-0 ${pageScroll ? 'overflow-visible' : scrollBody ? 'qam-scroll overflow-y-auto' : 'flex-1 overflow-hidden'}`}
           >
             {children}
           </div>
