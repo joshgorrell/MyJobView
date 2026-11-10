@@ -53,7 +53,6 @@ const pages = [
   "project_work_orders",
   "projects",
   "proposals",
-  "prospects",
   "pto_management",
   "punchlist",
   "purchase_orders",
