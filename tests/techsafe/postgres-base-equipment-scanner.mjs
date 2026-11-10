@@ -9,6 +9,8 @@ function fixture({missingOrder=false,wrongOrder=false,lines=[{id:ids[3],organiza
 }
 const f=fixture(),good=await f.scan(scope);
 assert.equal(good.ok,true);assert.equal(good.authorized,false);
+assert.equal(good.baseLinesAreCurrent,true);
+assert.equal(good.baseLineSource,'current_proposal_line_items');
 assert.equal(good.approvalVerified,false);assert.equal(good.sourceManifestComplete,false);
 assert.equal(good.baseLineCount,1);assert.equal(good.baseLines[0].quantity,2);
 assert.equal(Object.isFrozen(good.baseLines),true);
