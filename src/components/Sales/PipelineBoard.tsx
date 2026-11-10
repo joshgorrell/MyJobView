@@ -1341,7 +1341,7 @@ export function PipelineBoard() {
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-green-600 font-bold">4.</span>
-                        <span>If the timing isn't right, keep the <strong>Lead</strong> for follow-up rather than creating a separate Prospect.</span>
+                        <span>If the timing isn't right, keep the <strong>Lead</strong> for follow-up without creating another record.</span>
                       </p>
                     </div>
                   </div>
