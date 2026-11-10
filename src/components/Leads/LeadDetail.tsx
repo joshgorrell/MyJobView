@@ -672,9 +672,9 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
   const canClaim = lead.is_fishbowl && lead.status === 'unclaimed' && profile?.role === 'sales';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full mx-auto my-0 sm:my-4 flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
+      <div className="bg-surface text-primary shadow-2xl max-w-4xl w-full mx-auto min-h-screen sm:min-h-0 sm:my-6 sm:rounded-2xl border border-subtle flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-subtle">
           <div className="min-w-0 flex-1 pr-2">
             <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{lead.contact_name}</h2>
             {lead.company_name && <p className="text-sm sm:text-base text-gray-600 truncate">{lead.company_name}</p>}
@@ -707,40 +707,12 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           </div>
         </div>
 
-        <div className="p-4 space-y-3">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
-              {creatorProfile && (
-                <div className="flex items-center gap-2 text-blue-900">
-                  <UserCircle className="w-4 h-4 text-blue-600" />
-                  <span><strong>Created by:</strong> {creatorProfile.full_name}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-blue-900">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span><strong>Created:</strong> {new Date(lead.created_at).toLocaleString()} ({formatDistanceToNow(lead.created_at)})</span>
-              </div>
-            </div>
+        <div className="p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-secondary">
+            {creatorProfile && <span className="inline-flex items-center gap-1.5"><UserCircle className="w-4 h-4" /> Created by {creatorProfile.full_name}</span>}
+            <span className="inline-flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {new Date(lead.created_at).toLocaleDateString()} · {formatDistanceToNow(lead.created_at)}</span>
+            {(() => { const priorityInfo = getPriorityInfo(lead.priority || 'medium'); return <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${priorityInfo.color}`} title={priorityInfo.timeframe}><span>{priorityInfo.emoji}</span>{priorityInfo.label} priority</span>; })()}
           </div>
-
-          {(() => {
-            const priorityInfo = getPriorityInfo(lead.priority || 'medium');
-            return (
-              <div className={`${priorityInfo.bgColor} border ${priorityInfo.color.split(' ')[1]} rounded-lg p-3`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <h3 className="font-medium text-sm">Follow-up Priority</h3>
-                  </div>
-                  <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border ${priorityInfo.color} font-medium text-sm`}>
-                    <span>{priorityInfo.emoji}</span>
-                    <span>{priorityInfo.label}</span>
-                  </div>
-                </div>
-                <p className="mt-1.5 text-xs font-medium opacity-75">{priorityInfo.timeframe}</p>
-              </div>
-            );
-          })()}
 
           {isEditing ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
@@ -863,68 +835,20 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
               </div>
             </div>
           ) : (
-            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" />
-                Customer Information
-              </h3>
-
-              <div className="space-y-2">
-                <div className="bg-white rounded-lg px-3 py-2">
-                  <div className="text-sm font-medium text-gray-500 mb-1">Contact Name</div>
-                  <div className="text-sm font-semibold text-gray-900">{lead.contact_name}</div>
-                </div>
-
-                {lead.company_name && (
-                  <div className="bg-white rounded-lg px-3 py-2">
-                    <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                      <Building2 className="w-4 h-4" />
-                      Company
-                    </div>
-                    <div className="text-sm font-semibold text-gray-900">{lead.company_name}</div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {lead.email && (
-                    <div className="bg-white rounded-lg px-3 py-2">
-                      <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                        <Mail className="w-4 h-4" />
-                        Email
-                      </div>
-                      <a href={`mailto:${lead.email}`} className="text-base font-medium text-blue-600 hover:text-blue-700 break-all">
-                        {lead.email}
-                      </a>
-                    </div>
-                  )}
-
-                  {lead.phone && (
-                    <div className="bg-white rounded-lg px-3 py-2">
-                      <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        Phone
-                      </div>
-                      <a href={`tel:${lead.phone}`} className="text-base font-medium text-blue-600 hover:text-blue-700">
-                        {lead.phone}
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {assignedProfile && (
-                  <div className="bg-white rounded-lg px-3 py-2">
-                    <div className="text-sm font-medium text-gray-500 mb-1">Assigned To</div>
-                    <div className="text-base font-medium text-gray-900">{assignedProfile.full_name}</div>
-                  </div>
-                )}
+            <section className="rounded-xl border border-subtle p-4 space-y-3" aria-label="Lead contact information">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><User className="w-4 h-4" /> Contact</h3>
+                <span className="text-xs text-secondary">{assignedProfile ? `Assigned to ${assignedProfile.full_name}` : 'Sales Department · Unclaimed'}</span>
               </div>
-            </div>
-          )}
-
-          {!isEditing && (
-            <section className="rounded-lg border border-gray-200 bg-white px-3 py-3" aria-label="Lead Description">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Description</h3>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{lead.opportunity_description?.trim() || 'No description provided.'}</p>
+              {lead.company_name && <div className="text-sm text-secondary flex items-center gap-2"><Building2 className="w-4 h-4" />{lead.company_name}</div>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                {lead.email && <a href={`mailto:${lead.email}`} className="inline-flex min-w-0 items-center gap-2 rounded-lg bg-surface-hover px-3 py-2 text-blue-500 hover:underline break-all"><Mail className="w-4 h-4 shrink-0" />{lead.email}</a>}
+                {lead.phone && <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-2 rounded-lg bg-surface-hover px-3 py-2 text-blue-500 hover:underline"><Phone className="w-4 h-4 shrink-0" />{lead.phone}</a>}
+              </div>
+              <div className="border-t border-subtle pt-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary mb-1">Opportunity</h4>
+                <p className="text-sm text-primary whitespace-pre-wrap break-words">{lead.opportunity_description?.trim() || 'No description provided.'}</p>
+              </div>
             </section>
           )}
 
@@ -942,12 +866,12 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           )}
 
           {!isEditing && lead.status && lead.assigned_to && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Lead Status</label>
+            <div className="rounded-xl border border-subtle p-3">
+              <label className="block text-sm font-semibold text-primary mb-2">Lead Status</label>
               <select
                 value={lead.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 bg-surface border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 text-primary text-sm"
               >
                 <option value="unclaimed">Unclaimed</option>
                 <option value="claimed">Claimed / In Progress</option>
@@ -955,9 +879,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                 <option value="closed_lost">Closed Lost</option>
                 <option value="escalated">Escalated</option>
               </select>
-              <p className="text-xs text-gray-500 mt-2">
-                Update the status to track progress on this lead
-              </p>
+
             </div>
           )}
 
