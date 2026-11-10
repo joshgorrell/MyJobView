@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { FileText, DollarSign, Calendar, User, Search, CheckCircle, Clock, AlertCircle, ChevronRight, Building2, X } from 'lucide-react';
 import { SalesOrderDetail } from './SalesOrderDetail';
+import { SalesOrderStatusOverview } from './SalesOrderStatusOverview';
 import { ErrorBoundary } from '../Shared/ErrorBoundary';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
@@ -66,6 +67,7 @@ function getBalanceDue(order: SalesOrder): number {
 export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal, officeIdFilter, onClearOfficeFilter, officeNameFilter }: SalesOrdersViewProps = {}) {
   const { profile } = useAuth();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [listTab, setListTab] = useState<'orders' | 'status'>('orders');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -210,6 +212,11 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
         </div>
       )}
 
+      <div className="flex gap-2 border-b border-subtle" role="tablist" aria-label="Sales order views">
+        <button role="tab" aria-selected={listTab === 'orders'} onClick={() => setListTab('orders')} className={`px-4 py-2 text-sm font-medium ${listTab === 'orders' ? 'border-b-2 border-blue-500 text-primary' : 'text-muted'}`}>Sales Orders</button>
+        <button role="tab" aria-selected={listTab === 'status'} onClick={() => setListTab('status')} className={`px-4 py-2 text-sm font-medium ${listTab === 'status' ? 'border-b-2 border-blue-500 text-primary' : 'text-muted'}`}>Status</button>
+      </div>
+
       {/* Search + Status filter */}
       <div className="flex items-center gap-2">
         <div className="flex-1 relative">
@@ -266,7 +273,10 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
         </div>
       )}
 
+      {listTab === 'status' && <SalesOrderStatusOverview orders={filteredOrders} onOpen={setSelectedOrderId} />}
+
       {/* Orders list */}
+      {listTab === 'orders' && (
       <div className="bg-surface/50 rounded-xl border border-subtle/60 overflow-hidden">
         {filteredOrders.length === 0 ? (
           <div className="p-8 sm:p-12 text-center">
@@ -461,6 +471,8 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           </>
         )}
       </div>
+
+      )}
 
       {/* Count footer */}
       {filteredOrders.length > 0 && (
