@@ -56,7 +56,7 @@ function readProposalDraft(): ProposalDraft | null {
 
 export default function CreateProposalModal({ onClose, onCreated, contactId, leadId: initialLeadId, prefill }: CreateProposalModalProps) {
   const { profile } = useAuth();
-  const savedDraft = prefill ? null : readProposalDraft();
+  const savedDraft = prefill || contactId || initialLeadId ? null : readProposalDraft();
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchError, setSearchError] = useState('');
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(savedDraft?.selectedResult || null);
@@ -662,7 +662,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
                   <div className="mt-2 flex items-start gap-2 px-3 py-2 bg-amber-900/20 border border-amber-600/30 rounded-lg">
                     <UserPlus className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-300">
-                      This is a lead. A contact record will be created automatically when you create this proposal, and the lead will remain in your pipeline. Locations can be added after the customer record exists.
+                      Creating this proposal uses the linked Contact and removes this Lead from active Leads. If no Contact is linked, one will be matched or created. Lead history is preserved.
                     </p>
                   </div>
                 )}
