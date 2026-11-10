@@ -17,6 +17,13 @@ export function createTransactionalBaseEquipmentAudit(client){
   let first;
   try{first=await readRevision({connectionId,orderId});}
   catch{return hold('locked_revision_unverified');}
+  // A held/malformed revision must never be promoted by a successful base scan.
+  if(first?.ok===false||!Number.isSafeInteger(first?.revision)||first.revision<1||
+     !Number.isSafeInteger(first?.connectionGeneration)||first.connectionGeneration<1||
+     typeof first.organizationId!=='string'||typeof first.proposalId!=='string'||
+     !/^[0-9a-f]{64}$/.test(first.sourceFingerprint||'')||
+     first.sourceFingerprint==='0'.repeat(64)||first.state!=='candidate')
+   return hold('locked_revision_unverified');
   let base;
   try{base=await scanBase({orderId,organizationId:first.organizationId,proposalId:first.proposalId});}
   catch{return hold('base_equipment_read_failed');}
@@ -24,7 +31,10 @@ export function createTransactionalBaseEquipmentAudit(client){
   let last;
   try{last=await readRevision({connectionId,orderId});}
   catch{return hold('locked_revision_changed');}
-  if(first.connectionGeneration!==last.connectionGeneration||
+  if(last?.ok===false||!Number.isSafeInteger(last?.revision)||last.revision<1||
+     !Number.isSafeInteger(last?.connectionGeneration)||last.connectionGeneration<1||
+     last.state!=='candidate'||
+     first.connectionGeneration!==last.connectionGeneration||
      first.revision!==last.revision||
      first.sourceFingerprint!==last.sourceFingerprint||
      first.organizationId!==last.organizationId||
