@@ -323,3 +323,21 @@
 @media(max-height:600px) {
   .team-message-body > .team-message-recipients { flex:none; overflow:visible; }
 }
+
+/* Compact Flow workspace: activity begins directly beneath the toolbar. */
+.flow .flow-heading{padding:10px 12px 5px}
+.flow .flow-heading h2{margin:0}
+.flow .flow-toolbar{padding:0 12px 6px;min-height:42px}
+.flow .flow-day{padding:4px 12px}
+.flow .flow-column-head{padding-block:5px}
+.flow .flow-row-main{padding-block:6px}
+.flow .flow-mark-shown,.flow .flow-pending-refresh{min-width:32px;min-height:32px;padding:5px;position:relative}
+.flow .flow-pending-refresh{color:var(--flow-accent);gap:4px}
+.flow .flow-pending-count{font-size:11px;font-weight:650}
+.flow .flow-mark-shown:disabled{opacity:.35}
+@media(max-width:640px){
+  .flow .flow-heading{padding:8px 10px 4px}
+  .flow .flow-toolbar{padding:0 10px 5px;gap:3px}
+  .flow .flow-mark-shown,.flow .flow-pending-refresh{min-width:30px;padding:4px}
+  .flow .flow-day{padding:4px 10px}
+}
