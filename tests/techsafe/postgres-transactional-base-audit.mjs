@@ -19,6 +19,8 @@ function fixture({isolation='serializable',active=true,revision=3,changed=false,
 const f=fixture(),result=await f.audit(scope);
 assert.equal(result.ok,true);assert.equal(result.authorized,false);
 assert.equal(result.snapshotReady,false);assert.equal(result.approvalVerified,false);
+assert.equal(result.baseLinesAreCurrent,true);
+assert.equal(result.baseLineSource,'current_proposal_line_items');
 assert.equal(result.sourceManifestComplete,false);
 assert.equal(result.baseLineCount,1);assert.equal(result.revision,3);
 assert.equal(f.calls.filter(c=>c.sql.includes('order_revision_ledger')).length,2);
