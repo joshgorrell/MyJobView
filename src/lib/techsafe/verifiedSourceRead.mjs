@@ -36,6 +36,14 @@ export async function inspectVerifiedSalesOrderEquipment({connectionId,orderId,r
     evidence.salesOrder?.id!==orderId ||
     evidence.sourceManifest?.complete!==true || evidence.sourceManifest?.approvalEvidenceVerified!==true)
     return held('authoritative_evidence_unverified');
+  // MJV's public.apply_change_order already mutates proposal_line_items. A
+  // scanner reading those current rows must NEVER feed them into the legacy
+  // reducer as if they were original pre-change base rows: that double-applies
+  // approved additions/quantity updates. Hold rather than fabricate a base.
+  if (evidence.baseLinesAreCurrent===true ||
+      evidence.sourceManifest?.baseLineSource==='current_proposal_line_items' ||
+      evidence.sourceManifest?.baseLineSource==='post_application_current')
+    return held('current_equipment_must_not_replay_change_orders');
   let result;
   try {
     result=reconcileApprovedSalesOrderEquipment({
