@@ -53,13 +53,13 @@ BEGIN
   SET assigned_to=v_actor, status='claimed', is_fishbowl=FALSE, claimed_at=clock_timestamp()
   WHERE id=p_lead_id;
 
-  INSERT INTO public.feed_events(event_type,lead_id,user_id,metadata)
+  INSERT INTO public.feed_events(event_type,lead_id,user_id,metadata,organization_id)
   VALUES ('lead_claimed',p_lead_id,v_actor,
     jsonb_build_object('claim_method','sales_department','original_source',v_lead.lead_source,
-      'previous_assignee',v_lead.assigned_to,'new_assignee',v_actor));
+      'previous_assignee',v_lead.assigned_to,'new_assignee',v_actor),v_org);
 
-  INSERT INTO public.notifications(user_id,type,lead_id,title,body)
-  VALUES (v_actor,'lead_claimed',p_lead_id,'Lead Claimed','You claimed ' || v_lead.contact_name);
+  INSERT INTO public.notifications(user_id,type,lead_id,title,body,organization_id)
+  VALUES (v_actor,'lead_claimed',p_lead_id,'Lead Claimed','You claimed ' || v_lead.contact_name,v_org);
 
   IF v_lead.created_by IS NOT NULL AND v_lead.created_by <> v_actor
      AND v_lead.priority IN ('high','urgent') THEN
@@ -70,7 +70,7 @@ BEGIN
       INSERT INTO public.notifications(user_id,type,lead_id,title,body)
       VALUES (v_lead.created_by,'lead_status_update',p_lead_id,
         CASE WHEN v_lead.priority='urgent' THEN 'Urgent' ELSE 'High' END || ' Priority Lead Claimed',
-        coalesce(v_actor_name,'Sales representative') || ' claimed your ' || v_lead.priority || ' priority lead: ' || v_lead.contact_name);
+        coalesce(v_actor_name,'Sales representative') || ' claimed your ' || v_lead.priority || ' priority lead: ' || v_lead.contact_name,v_org);
     END IF;
   END IF;
   RETURN TRUE;
