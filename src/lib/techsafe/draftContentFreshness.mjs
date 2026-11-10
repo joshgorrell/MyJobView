@@ -16,10 +16,13 @@ export async function preflightTechsafeDraftContent({connectionId,orderId,readCo
   else secondSource=source;
   return source;
  };
- const first=await inspectAndProjectTechsafeDraft({connectionId,orderId,readConsistentSource:wrapped,minimumUnitValueCents});
- if(!first.ok)return held(first.reason);
- const second=await inspectAndProjectTechsafeDraft({connectionId,orderId,readConsistentSource:wrapped,minimumUnitValueCents});
- if(!second.ok)return held(second.reason);
+ let first,second;
+ try {
+  first=await inspectAndProjectTechsafeDraft({connectionId,orderId,readConsistentSource:wrapped,minimumUnitValueCents});
+  if(!first.ok)return held(first.reason);
+  second=await inspectAndProjectTechsafeDraft({connectionId,orderId,readConsistentSource:wrapped,minimumUnitValueCents});
+  if(!second.ok)return held(second.reason);
+ } catch { return held('authoritative_read_failed'); }
  if(reads!==2)return held('incomplete_source_reads');
  const sourceScope=x=>x&&x.connectionId===connectionId&&x.orderId===orderId&&
   x.salesOrder?.id===orderId&&x.salesOrder?.organizationId===x.connectionOrganizationId&&
@@ -30,6 +33,11 @@ export async function preflightTechsafeDraftContent({connectionId,orderId,readCo
   return held('source_revision_rollback');
  if(secondSource.connectionGeneration!==firstSource.connectionGeneration||second.revision!==first.revision)
   return held('source_changed_during_preflight');
+ if(firstSource.ledgerGeneration!==firstSource.connectionGeneration||
+    secondSource.ledgerGeneration!==secondSource.connectionGeneration||
+    firstSource.connectionOrganizationId!==secondSource.connectionOrganizationId||
+    firstSource.connectionProposalId!==secondSource.connectionProposalId)
+  return held('source_scope_changed');
  if(firstSource.sourceFingerprint!==secondSource.sourceFingerprint||
     firstSource.ledgerFingerprint!==secondSource.ledgerFingerprint)
   return held('source_fingerprint_changed');
