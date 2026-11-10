@@ -13,7 +13,7 @@ interface LeadsHistoryProps {
   initialTab?: 'all' | 'shared';
 }
 
-type ViewTab = 'all' | 'shared' | 'recently_claimed';
+type ViewTab = 'all' | 'shared' | 'recently_claimed' | 'stale';
 
 export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryProps) {
   const { profile, loading: authLoading } = useAuth();
@@ -30,6 +30,9 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'name' | 'priority'>('newest');
   const [activeTab, setActiveTab] = useState<ViewTab>(initialTab);
+  const [staleDays, setStaleDays] = useState(90);
+  const [staleCandidates, setStaleCandidates] = useState<LeadWithDetails[]>([]);
+  const [staleLoading, setStaleLoading] = useState(false);
   const [recentlyClaimedDays, setRecentlyClaimedDays] = useState<7 | 14 | 30>(7);
 
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
@@ -61,6 +64,37 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
     if (authLoading || !profile) return;
     loadRecentlyClaimed();
   }, [recentlyClaimedDays, authLoading, profile]);
+
+  // Review-only queue: never delete or archive based solely on age.
+  // Avoid treating record views or metadata edits as meaningful customer contact.
+  async function loadStaleCandidates() {
+    if (!isAdminOrManager || !profile?.organization_id) return;
+    setStaleLoading(true);
+    try {
+      const cutoff = new Date(Date.now() - staleDays * 86400000).toISOString();
+      const { data, error } = await supabase.from('leads')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .in('status', ['unclaimed', 'claimed', 'in_progress'])
+        .lt('created_at', cutoff)
+        .order('created_at', { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      const now = Date.now();
+      setStaleCandidates((data || []).filter(lead => {
+        if (lead.reminder_date && new Date(lead.reminder_date).getTime() > now) return false;
+        const lastContact = lead.last_contact_date ? new Date(lead.last_contact_date).getTime() : 0;
+        return !lastContact || lastContact < Date.now() - staleDays * 86400000;
+      }));
+    } catch (error) {
+      console.error('Unable to load stale lead review', error);
+      setStaleCandidates([]);
+    } finally { setStaleLoading(false); }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'stale' && isAdminOrManager) void loadStaleCandidates();
+  }, [activeTab, staleDays, profile?.organization_id]);
 
   async function loadSalesReps() {
     try {
@@ -294,6 +328,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
             <Users className="w-4 h-4" />
             Sales Department
           </button>
+          {isAdminOrManager && <button onClick={() => setActiveTab('stale')} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'stale' ? 'border-slate-700 text-slate-800' : 'border-transparent text-gray-500'}`}><AlertCircle className="w-4 h-4" />Stale Review</button>}
           <button
             onClick={() => setActiveTab('recently_claimed')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -313,6 +348,20 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
         </div>
 
         {activeTab === 'shared' && <FishbowlView onLeadClick={onLeadClick} />}
+
+        {isAdminOrManager && activeTab === 'stale' && (
+          <section className="p-4 sm:p-6 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h3 className="font-semibold text-gray-800">Stale Lead Review</h3><p className="text-xs text-gray-500">Review only. No automatic archive or deletion; linked records must be checked before any cleanup.</p></div>
+              <label className="text-sm text-gray-600">Inactivity threshold <select className="ml-2 rounded border p-1" value={staleDays} onChange={e => setStaleDays(Number(e.target.value))}><option value={60}>60 days</option><option value={90}>90 days</option><option value={120}>120 days</option><option value={180}>180 days</option></select></label>
+            </div>
+            {staleLoading ? <p className="text-sm text-gray-500">Loading candidates…</p> : staleCandidates.length === 0 ? <p className="text-sm text-gray-500">No candidates found in the first 500 eligible records.</p> : (
+              <div className="divide-y rounded-lg border border-gray-200">
+                {staleCandidates.map(lead => <button key={lead.id} onClick={() => onLeadClick(lead.id)} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between gap-3"><span className="min-w-0"><span className="block font-medium text-sm truncate">{lead.contact_name || lead.company_name || 'Unnamed lead'}</span><span className="block text-xs text-gray-500">Last contact: {lead.last_contact_date || 'Not recorded'} · {lead.status}</span></span><ChevronRight className="w-4 h-4 text-gray-400" /></button>)}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Toolbar — All Leads tab */}
         {activeTab === 'all' && (
