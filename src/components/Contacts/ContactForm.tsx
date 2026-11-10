@@ -1,3 +1,4 @@
+import { missingContactFields } from '../../lib/contactCompleteness';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, AtSign, AlertCircle, Upload, Scan, FileText, CircleUser as UserCircle2, Zap, Users, TrendingUp, UserCheck, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
@@ -766,6 +767,18 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
               </button>
             </div>
           )}
+          {(() => {
+            const missing = missingContactFields({
+              full_name: [formData.first_name, formData.last_name].filter(Boolean).join(' ') || formData.company_name,
+              phone: formData.phone || formData.business_phone,
+              email: formData.email,
+              street_address: formData.street_address,
+              city: formData.city,
+              state: formData.state,
+              zip_code: formData.zip_code,
+            });
+            return missing.length > 0 ? <p className="text-xs text-amber-400" role="status">Incomplete contact — missing: {missing.join(', ')}. You can complete these details later.</p> : null;
+          })()}
           {/* Contact Type Selector */}
           <div>
             <label className="block text-sm font-medium text-secondary mb-2">
