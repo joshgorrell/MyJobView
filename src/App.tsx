@@ -1042,7 +1042,7 @@ function AppContent() {
             />
           )}
           {['sales_dashboard', 'sales_performance', 'pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && (
-            <WorkspaceTabs key={activeTab} title="Sales" initial={['sales_dashboard', 'sales_performance'].includes(activeTab) ? 'performance' : 'pipeline'} tabs={[
+            <WorkspaceTabs key={activeTab} title="Sales" initial={['sales_dashboard', 'sales_performance'].includes(activeTab) ? 'performance' : 'pipeline'} onSelect={(tab) => setActiveTab(tab === 'performance' ? 'sales_dashboard' : checkModuleAccess('pipeline_board') ? 'pipeline_board' : checkModuleAccess('leads') ? 'leads' : 'fishbowl')} tabs={[
               ...(['pipeline_board', 'leads', 'fishbowl'].some(key => checkModuleAccess(key)) ? [{
                 key: 'pipeline', label: 'Pipeline',
                 content: <WorkspaceTabs title="" initial={['leads', 'fishbowl'].includes(activeTab) ? activeTab : 'pipeline_board'} onSelect={setActiveTab} tabs={[
