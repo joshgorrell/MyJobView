@@ -11,5 +11,5 @@ export function showWorkspaceMenu(key: string, access: (key: string) => boolean)
     && !(workspaceParents[key] && access(workspaceParents[key]));
 }
 export function workspaceMenuLabel(key: string, fallback: string) {
-  return key === 'payroll' ? 'Time & Payroll' : (key === 'pipeline_board' || key === 'sales_dashboard') ? 'Sales' : fallback;
+  return key === 'payroll' ? 'Time & Payroll' : (key === 'pipeline_board' || key === 'sales_dashboard') ? 'Sales Dashboard' : fallback;
 }
