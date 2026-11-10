@@ -9,7 +9,6 @@ import { formatPhoneNumber, formatCurrency } from '../../lib/utils';
 import { offlineSupabaseUpdate, offlineSupabaseDelete, offlineSupabaseInsert } from '../../lib/offlineSupport';
 import { lookupTaxRateByZip } from '../../lib/taxCalculations';
 import { ContactHistory } from './ContactHistory';
-import CreateProposalModal from '../Proposals/CreateProposalModal';
 import DesignBriefModal from '../Sales/DesignBriefModal';
 import { CreateWorkOrderModal } from '../Production/CreateWorkOrderModal';
 import { TaskForm } from '../Tasks/TaskForm';
@@ -124,7 +123,6 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   const [punchlistExpirationEmailsEnabled, setPunchlistExpirationEmailsEnabled] = useState((contact as any).punchlist_expiration_emails_enabled !== false);
   const [savingPunchlistExpirationEmails, setSavingPunchlistExpirationEmails] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'photos' | 'appointments' | 'portal' | 'flow' | 'payments_credits'>('overview');
-  const [showCreateProposal, setShowCreateProposal] = useState(false);
   const [showDesignBrief, setShowDesignBrief] = useState(false);
   const [showCreateWorkOrder, setShowCreateWorkOrder] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -1352,7 +1350,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
                     switch (action) {
                       case 'proposal':
-                        setShowCreateProposal(true);
+                        window.location.assign(`/proposals?createContactId=${encodeURIComponent(contact.id)}`);
                         break;
                       case 'design-brief':
                         setShowDesignBrief(true);
@@ -3121,22 +3119,7 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
         </div>
       )}
 
-      {showCreateProposal && (
-        <CreateProposalModal
-          onClose={() => setShowCreateProposal(false)}
-          onCreated={(proposalId) => {
-            setShowCreateProposal(false);
-            if (onNavigateToProposal) {
-              onNavigateToProposal(proposalId);
-            } else {
-              setActiveTab('history');
-            }
-          }}
-          contactId={contact.id}
-        />
-      )}
-
-      {showDesignBrief && (
+{showDesignBrief && (
         <DesignBriefModal
           onClose={() => setShowDesignBrief(false)}
           contactId={contact.id}
