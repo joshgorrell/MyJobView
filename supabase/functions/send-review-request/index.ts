@@ -41,7 +41,7 @@ function buildReviewRequestEmail(params: {
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#111827;border-radius:16px 16px 0 0;padding:36px 44px 32px;text-align:center;border-bottom:3px solid #06b6d4;">
         <div style="margin-bottom:20px;">${logoBlock}</div>
-        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">Your Opinion Matters</h1>
+        <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:28px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">How did we do?</h1>
         <p style="color:#94a3b8;margin:0;font-size:15px;">to us and to your community</p>
         <div style="margin-top:20px;"><span style="font-size:24px;letter-spacing:3px;color:#f59e0b;">&#9733;&#9733;&#9733;&#9733;&#9733;</span></div>
       </td></tr>
@@ -171,26 +171,13 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const template = await getEmailTemplate(
-      'review_request',
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     let subject: string;
     let emailHtml: string;
 
     // Always deliver the branded HTML layout. A saved text template must never
     // replace the CTA with a raw tracking URL (the preview uses branded HTML).
     // Preserve customized subject lines while keeping click tracking inside the button.
-    const placeholders = {
-      customer_name: customerName,
-      company_name: settings.company_name,
-      review_url: reviewUrl,
-    };
-    subject = template
-      ? replacePlaceholders(template.subject, placeholders)
-      : (subjectName ? `We'd love your feedback, ${subjectName}!` : "We'd love your feedback!");
+    subject = `How did we do, ${subjectName || customerName || 'Valued Customer'}?`;
     emailHtml = buildReviewRequestEmail({
       customerName,
       companyName: settings.company_name,
