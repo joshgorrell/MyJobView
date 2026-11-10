@@ -1,4 +1,4 @@
--- Draft migration for #558. Requires PostgreSQL/RLS review before merge.
+-- Atomic shared-lead claim function. Keep tenant ownership on every notification.
 -- Claims are serialized by row lock; audit event and notifications commit with ownership.
 CREATE OR REPLACE FUNCTION public.claim_shared_lead(p_lead_id uuid)
 RETURNS boolean
@@ -67,7 +67,7 @@ BEGIN
     FROM public.profiles
     WHERE id=v_lead.created_by AND organization_id=v_org;
     IF v_notify_creator IS DISTINCT FROM FALSE THEN
-      INSERT INTO public.notifications(user_id,type,lead_id,title,body)
+      INSERT INTO public.notifications(user_id,type,lead_id,title,body,organization_id)
       VALUES (v_lead.created_by,'lead_status_update',p_lead_id,
         CASE WHEN v_lead.priority='urgent' THEN 'Urgent' ELSE 'High' END || ' Priority Lead Claimed',
         coalesce(v_actor_name,'Sales representative') || ' claimed your ' || v_lead.priority || ' priority lead: ' || v_lead.contact_name,v_org);
