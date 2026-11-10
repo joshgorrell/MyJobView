@@ -203,6 +203,8 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    let newlyCreatedContactId: string | null = null;
+    let leadSaved = false;
 
     try {
       const isFishbowl = formData.assignment === 'fishbowl';
@@ -220,9 +222,12 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
           phone: formData.phone.trim() || null,
           email: formData.email.trim() || null,
           created_by: profile?.id,
+          organization_id: profile?.organization_id,
+          contact_type: formData.is_business ? 'business' : 'person',
         }).select('id').single();
         if (contactError || !createdContact?.id) throw contactError || new Error('Unable to create contact');
         contactId = createdContact.id;
+        newlyCreatedContactId = createdContact.id;
       }
       const leadData = {
         company_name: (formData.is_business ? formData.company_name : null) || null,
@@ -244,6 +249,7 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
 
       const leadResult = await offlineSupabaseInsert('leads', leadData);
       if (leadResult.error) throw leadResult.error;
+      leadSaved = true;
       const lead = Array.isArray(leadResult.data) ? leadResult.data[0] : leadResult.data;
 
       if (formData.tags && lead) {
@@ -411,6 +417,10 @@ export function LeadForm({ onClose, onSuccess, aiPrefill }: LeadFormProps) {
         window.location.hash = `#lead/${lead.id}`;
       }
     } catch (error) {
+      if (newlyCreatedContactId && !leadSaved) {
+        const { error: cleanupError } = await supabase.from('contacts').delete().eq('id', newlyCreatedContactId);
+        if (cleanupError) console.error('Could not clean up contact after lead creation failed:', cleanupError);
+      }
       console.error('Error creating lead:', error);
       notify('Failed to create lead. Please try again.', { theme: 'blue', tone: 'error' });
     } finally {
