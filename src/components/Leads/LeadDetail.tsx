@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase';
 import { Lead, LeadMessage, LeadTag, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from '../../lib/utils';
-import { TaskList } from '../Tasks/TaskList';
 import { ConvertLeadToProspectModal } from './ConvertLeadToProspectModal';
 
 interface LeadDetailProps {
@@ -420,6 +419,20 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           metadata: { assigned_to: selectedAssignee, assigned_to_name: assignee.full_name },
         },
       ]);
+
+      // Record the handoff for the previous salesperson in Flow.
+      if (lead.assigned_to && lead.assigned_to !== selectedAssignee) {
+        const { error: flowError } = await supabase.from('flow_events').insert({
+          organization_id: lead.organization_id, actor_id: profile.id,
+          actor_name: profile.full_name || 'MJV', customer_name: lead.contact_name,
+          contact_id: lead.contact_id, office_id: lead.office_id,
+          category: 'sales', event_type: 'leads.reassigned_away',
+          summary: `Lead reassigned · ${lead.contact_name} → ${assignee.full_name}`,
+          source_table: 'leads', source_id: leadId, required_module: 'feed',
+          activity_recipient_user_id: lead.assigned_to,
+        });
+        if (flowError) console.error('Unable to record reassignment in previous rep Flow:', flowError);
+      }
 
       // Notify the assigned rep
       await supabase.from('notifications').insert([
@@ -865,43 +878,17 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             </div>
           )}
 
-          {!isEditing && lead.status && lead.assigned_to && (
-            <div className="rounded-xl border border-subtle p-3">
-              <label className="block text-sm font-semibold text-primary mb-2">Lead Status</label>
-              <select
-                value={lead.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="w-full px-3 py-2 bg-surface border border-subtle rounded-lg focus:ring-2 focus:ring-blue-500 text-primary text-sm"
-              >
-                <option value="unclaimed">Unclaimed</option>
-                <option value="claimed">Claimed / In Progress</option>
-                <option value="closed_won">Closed Won</option>
-                <option value="closed_lost">Closed Lost</option>
-                <option value="escalated">Escalated</option>
-              </select>
-
-            </div>
-          )}
-
           {!isEditing && (
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-purple-600" />
-                Follow-up Reminder
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-subtle px-3 py-2 text-sm">
+              <span className="text-secondary">Lead status</span>
+              <span className="font-medium text-primary">{lead.status === 'closed_won' || lead.status === 'closed_lost' ? 'Closed' : Date.now() - new Date(lead.created_at).getTime() >= 90 * 86400000 ? 'Stale' : 'Active'}</span>
+              <label className="ml-auto flex flex-wrap items-center gap-2 text-secondary">
+                <Calendar className="w-4 h-4" /> Reminder
+                <input type="datetime-local" aria-label="Follow-up reminder" value={reminderDate}
+                  onChange={(e) => { setReminderDate(e.target.value); void handleReminderDateChange(e.target.value); }}
+                  disabled={savingReminder}
+                  className="rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-primary disabled:opacity-50" />
               </label>
-              <input
-                type="datetime-local"
-                value={reminderDate}
-                onChange={(e) => {
-                  setReminderDate(e.target.value);
-                  handleReminderDateChange(e.target.value);
-                }}
-                disabled={savingReminder}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm disabled:opacity-50"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                {savingReminder ? 'Saving reminder...' : 'Set a follow-up date to create a Google Calendar reminder (requires Google Calendar connection in My Settings)'}
-              </p>
             </div>
           )}
 
@@ -963,10 +950,6 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             </div>
           )}
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <TaskList leadId={leadId} />
-          </div>
-
           {canClaim && (
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 rounded-lg p-4 mb-4">
               <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -984,58 +967,20 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             </div>
           )}
 
-          {lead.is_fishbowl && (profile?.role === 'admin' || profile?.role === 'manager') && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-500 rounded-lg p-4 mb-4">
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="flex-1 text-center sm:text-left">
-                  <h4 className="font-semibold text-blue-800 text-sm sm:text-base">Assign this lead</h4>
-                  <p className="text-blue-700 text-xs sm:text-sm mt-1">Assign this lead to a specific sales rep</p>
-                </div>
-                <button
-                  onClick={() => setShowAssignModal(true)}
-                  className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl"
-                >
-                  Assign Lead
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-gradient-to-r from-green-50 to-teal-50 border-2 border-green-400 rounded-lg p-4 mb-4">
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="flex-1 text-center sm:text-left">
-                <h4 className="font-semibold text-green-800 text-sm sm:text-base flex items-center gap-2 justify-center sm:justify-start">
-                  <FileText className="w-4 h-4" />
-                  Ready to put a proposal together?
-                </h4>
-                <p className="text-green-700 text-xs sm:text-sm mt-1">Create a proposal directly from this lead — no conversion needed</p>
-              </div>
-              <button
-                onClick={() => window.location.assign(`/proposals?createLeadId=${encodeURIComponent(lead.id)}`)}
-                className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl"
-              >
-                Create Proposal
+          {!isEditing && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => window.location.assign(`/proposals?createLeadId=${encodeURIComponent(lead.id)}`)}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+                <FileText className="w-4 h-4" /> Create Proposal
               </button>
-            </div>
-          </div>
-
-          {profile?.can_view_prospects && lead.status !== 'closed_won' && lead.status !== 'closed_lost' && (
-            <div className="bg-gradient-to-r from-blue-50 to-sky-50 border-2 border-blue-400 rounded-lg p-4 mb-4">
-              <div className="flex flex-col sm:flex-row items-center gap-3">
-                <div className="flex-1 text-center sm:text-left">
-                  <h4 className="font-semibold text-blue-800 text-sm sm:text-base flex items-center gap-2 justify-center sm:justify-start">
-                    <Clock className="w-4 h-4" />
-                    Not ready to buy? Too early to pursue?
-                  </h4>
-                  <p className="text-blue-700 text-xs sm:text-sm mt-1">Downgrade to a Prospect and schedule your next follow-up</p>
-                </div>
-                <button
-                  onClick={() => setShowConvertModal(true)}
-                  className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl"
-                >
-                  Downgrade to Prospect
-                </button>
-              </div>
+              <button type="button" onClick={() => setShowAssignModal(true)}
+                className="rounded-lg border border-subtle px-3 py-2.5 text-sm font-medium text-primary hover:bg-surface-hover">
+                {lead.assigned_to ? 'Reassign Lead' : 'Assign Lead'}
+              </button>
+              {profile?.can_view_prospects && lead.status !== 'closed_won' && lead.status !== 'closed_lost' && (
+                <button type="button" onClick={() => setShowConvertModal(true)}
+                  className="text-xs text-secondary underline underline-offset-2 hover:text-primary sm:ml-auto">Downgrade to Prospect</button>
+              )}
             </div>
           )}
 
