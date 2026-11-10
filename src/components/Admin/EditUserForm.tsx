@@ -1,4 +1,4 @@
-import { formatBirthDate, parseBirthDate } from '../../utils/birthDate';
+import { formatBirthDate, parseBirthDate, displayBirthDate } from '../../utils/birthDate';
 import { SalesCompensationFields, defaultSalesCompensation, validateSalesCompensation, type SalesCompensationValues } from './SalesCompensationFields';
 import { UserModuleAccess } from './UserModuleAccess';
 import { effectiveModuleAccess, isPermissionModule, permissionLabel, permissionOverridesMap } from '../../lib/permissionCatalog';
@@ -146,7 +146,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     full_name: user.full_name,
     first_name: (user as any).first_name || '',
     last_name: (user as any).last_name || '',
-    birth_date: (user as any).birth_date ? String((user as any).birth_date).split('-').slice(1).concat(String((user as any).birth_date).split('-')[0]).join('/') : '',
+    birth_date: '',
     birthday_visible: (user as any).birthday_visible ?? true,
     username: user.username,
     email: user.email,
@@ -204,6 +204,17 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [isEmployee, setIsEmployee] = useState(false);
   const [showEmployeeSetup, setShowEmployeeSetup] = useState(false);
   const [classification, setClassification] = useState<string>('unreviewed');
+  useEffect(() => {
+    let active = true;
+    supabase.rpc('get_employee_birth_date', { p_user_id: user.id })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) console.error('Unable to load date of birth:', error);
+        else setFormData((prev) => ({ ...prev, birth_date: displayBirthDate(data as string | null) }));
+      });
+    return () => { active = false; };
+  }, [user.id]);
+
   const [showNonEmployeeConfirm, setShowNonEmployeeConfirm] = useState(false);
   const [conversionDate, setConversionDate] = useState('');
   const [conversionBusy, setConversionBusy] = useState(false);
@@ -661,7 +672,6 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         full_name: formData.full_name,
         first_name: formData.first_name || null,
         last_name: formData.last_name || null,
-        birth_date: parsedBirthDate,
         birthday_visible: formData.birthday_visible,
         username: formData.username,
         role: formData.role,
@@ -705,6 +715,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (updateError) throw new Error(`Database error: ${updateError.message} (${updateError.code})`);
       if (!updatedProfile) throw new Error('Update succeeded but no data returned.');
       profileSaved = true;
+      const { error: birthDateError } = await supabase.rpc('set_employee_birth_date', { p_user_id: user.id, p_birth_date: parsedBirthDate });
+      if (birthDateError) throw new Error(`Birthday could not be saved: ${birthDateError.message}`);
 
       if (['sales', 'admin', 'manager', 'sales_manager'].includes(formData.role)) {
         await supabase.rpc('recalculate_sales_quota_for_user', {
