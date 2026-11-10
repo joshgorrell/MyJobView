@@ -1,4 +1,4 @@
-// Private transactional audit of actual Sales Order base equipment.
+// Private transactional audit of current (post-change) Sales Order equipment.
 // Explicitly NOT the authoritative source reader: no approval attestation,
 // change-order completeness, equipment valuation, certificate or delivery.
 import {createLockedRevisionReader} from './postgresLockedRevisionReader.mjs';
