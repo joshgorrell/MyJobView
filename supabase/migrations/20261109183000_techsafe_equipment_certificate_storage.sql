@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS techsafe_source.equipment_snapshot_certificates (
  connection_generation bigint NOT NULL CHECK (connection_generation>0),
  source_revision bigint NOT NULL CHECK (source_revision>0),
  source_fingerprint text NOT NULL CHECK (source_fingerprint ~ '^[0-9a-f]{64}$' AND source_fingerprint<>repeat('0',64)),
+ -- This digest covers ALL reconciled equipment content, including descriptions, prices and exclusions.
  equipment_fingerprint text NOT NULL CHECK (equipment_fingerprint ~ '^[0-9a-f]{64}$' AND equipment_fingerprint<>repeat('0',64)),
- canonical_version text NOT NULL CHECK (canonical_version='mjv-techsafe-equipment-evidence-v1'),
+ canonical_version text NOT NULL CHECK (canonical_version='mjv-techsafe-complete-equipment-v1'),
  equipment_count integer NOT NULL CHECK (equipment_count>=0 AND equipment_count<=10000),
  state text NOT NULL DEFAULT 'held' CHECK (state IN ('held','certified','revoked')),
  certified_at timestamptz,
