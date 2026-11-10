@@ -13,7 +13,10 @@ export function createPostgresBaseEquipmentScanner(client){
    `SELECT id,organization_id,proposal_id FROM public.sales_orders
      WHERE id=$1 AND organization_id=$2 AND proposal_id=$3 FOR SHARE`,
    [orderId,organizationId,proposalId]);
-  if(order.rows?.length!==1)return hold('sales_order_scope_unverified');
+  if(order.rows?.length!==1||order.rows[0]?.id!==orderId||
+     order.rows[0]?.organization_id!==organizationId||
+     order.rows[0]?.proposal_id!==proposalId)
+   return hold('sales_order_scope_unverified');
   // The approved Sales Order references proposal_line_items through proposal_id.
   // Read all base lines; no product filtering that could conceal incomplete data.
   const lines=await client.query(
