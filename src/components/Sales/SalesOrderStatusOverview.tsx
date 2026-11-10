@@ -113,7 +113,25 @@ export function SalesOrderStatusOverview({ orders, onOpen }: { orders: Order[]; 
     </div>
     {error && <p role="alert" className="text-danger text-sm">Status figures unavailable: {error}</p>}
     {loading && <p role="status" className="text-muted text-sm">Refreshing labor and billing figures…</p>}
-    <div className="rounded-xl border border-subtle overflow-x-auto">
+    <div className="md:hidden space-y-3">
+      {rows.map(({ order, m, pct, unbilled }) => <button type="button" key={order.id} onClick={() => onOpen(order.id)} className="w-full text-left rounded-xl border border-subtle bg-surface p-4 space-y-3 hover:bg-elevated/40">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><div className="font-semibold text-primary truncate">{order.contact?.full_name || 'Unknown customer'}</div><div className="text-xs text-muted">SO-{order.order_number} · {new Date(order.created_at).toLocaleDateString()}</div></div>
+          <span className="text-xs text-info whitespace-nowrap">View order →</span>
+        </div>
+        <div className="text-xs text-muted">Rep: {order.sales_rep?.full_name || '—'} · PM: {m?.pm || '—'}</div>
+        <div>
+          <div className="flex justify-between items-center gap-2 text-xs mb-1"><span className="text-muted">Field labor budget used</span><span className={pct !== null && pct > 100 ? 'font-bold text-danger' : pct !== null && pct >= 90 ? 'font-bold text-warning' : 'font-semibold text-primary'}>{pct !== null ? `${pct.toFixed(0)}% (${m?.actual.toFixed(1)} / ${m?.estimated.toFixed(1)}h)` : 'No estimate'}</span></div>
+          <div className="h-2.5 rounded-full bg-elevated overflow-hidden">{pct !== null && <div className={`h-full rounded-full ${pct > 100 ? 'bg-red-500' : pct >= 90 ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${Math.min(100, pct)}%` }} />}</div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 border-t border-subtle pt-3">
+          <div><div className="text-xs text-muted">Order</div><div className="text-sm font-semibold text-primary">{m ? money(m.contract) : '—'}</div></div>
+          <div><div className="text-xs text-muted">Unbilled</div><div className="text-sm font-semibold text-primary">{m ? money(unbilled) : '—'}</div></div>
+          <div><div className="text-xs text-muted">Due</div><div className="text-sm font-semibold text-warning">{m ? money(m.due) : '—'}</div></div>
+        </div>
+      </button>)}
+    </div>
+    <div className="hidden md:block rounded-xl border border-subtle overflow-x-auto">
       <table className="w-full min-w-[790px] text-sm">
         <thead className="bg-elevated text-muted text-xs"><tr>
           <th className="text-left p-3">Sales Order / Customer</th><th className="text-left p-3">Sales Rep</th><th className="text-left p-3">Project Manager</th>
