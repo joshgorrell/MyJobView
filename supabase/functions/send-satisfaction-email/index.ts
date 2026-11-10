@@ -2,6 +2,13 @@ import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings } from '../_shared/emailTemplates.ts';
 
+function satisfactionSubject(surveyType: string, name: string): string {
+  if (surveyType === 'one_year') return name ? `How’s everything after your first year, ${name}?` : 'How’s everything after your first year?';
+  if (surveyType === 'post_test_tune') return name ? `How did Test & Tune go, ${name}?` : 'How did Test & Tune go?';
+  if (surveyType === 'job_completion') return name ? `How did we do, ${name}?` : 'How did we do?';
+  return name ? `We’d love your feedback, ${name}` : 'We’d love your feedback';
+}
+
 function injectNoteIntoHtml(html: string, note: string): string {
     if (!note.trim()) return html;
     const noteBlock = `
@@ -204,14 +211,7 @@ Deno.serve(async (req: Request) => {
         responseToken: previewToken,
         surveyType,
       });
-      const firstName = previewName;
-      let subject = surveyType === 'one_year'
-        ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
-        : surveyType === 'post_test_tune'
-          ? (firstName ? `How did Test & Tune go, ${firstName}?` : 'How did Test & Tune go?')
-          : surveyType === 'job_completion'
-            ? (firstName ? `How did we do, ${firstName}?` : 'How did we do?')
-            : (firstName ? `We’d love your feedback, ${firstName}` : 'We’d love your feedback');
+      const subject = satisfactionSubject(surveyType, previewName);
       return new Response(JSON.stringify({ success: true, preview: true, subject, html: emailHtml }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -288,12 +288,7 @@ Deno.serve(async (req: Request) => {
       surveyType,
     });
 
-    const firstName = finalCustomerName;
-    let subject = surveyType === 'one_year'
-      ? (firstName ? `How’s everything after your first year, ${firstName}?` : 'How’s everything after your first year?')
-      : surveyType === 'post_test_tune'
-        ? (firstName ? `How did Test & Tune go, ${firstName}?` : 'How did Test & Tune go?')
-        : (firstName ? `How did we do, ${firstName}?` : 'How did we do?');
+    let subject = satisfactionSubject(surveyType, finalCustomerName);
 
     if (typeof customSubject === 'string' && customSubject.trim()) subject = customSubject.trim().slice(0, 200);
     if (typeof personalNote === 'string') emailHtml = injectNoteIntoHtml(emailHtml, personalNote.slice(0, 5000));
