@@ -95,8 +95,8 @@ export function PipelineBoard() {
     },
     {
       id: 'fishbowl',
-      name: 'Fishbowl',
-      description: 'Available to claim',
+      name: 'Sales Department',
+      description: 'Unclaimed leads available to sales reps',
       color: 'text-teal-700',
       bgColor: 'bg-teal-50',
       borderColor: 'border-teal-300'
@@ -314,47 +314,28 @@ export function PipelineBoard() {
           })()
         : Promise.resolve([]);
 
-      const leadsPromise = selectedWidgets.includes('leads')
-        ? (async () => {
-            let leadsQuery = supabase
-              .from('leads')
-              .select(`
-                *,
-                assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)
-              `)
-              .eq('is_fishbowl', false)
-              .order('created_at', { ascending: false });
+      // A single leads query powers both the assigned and shared Sales Department views.
+      // Keep the legacy 'fishbowl' widget key for existing saved preferences.
+      const leadRecordsPromise = (selectedWidgets.includes('leads') || selectedWidgets.includes('fishbowl'))
+        ? supabase
+            .from('leads')
+            .select(`*, assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)`)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as any[], error: null });
 
-            if (!showAll && profile?.id) {
-              leadsQuery = leadsQuery.or(`assigned_to.eq.${profile.id},assigned_to.is.null`);
-            }
-
-            const { data } = await leadsQuery;
-            return data || [];
-          })()
-        : Promise.resolve([]);
-
-      const fishbowlPromise = selectedWidgets.includes('fishbowl')
-        ? (async () => {
-            let fishbowlQuery = supabase
-              .from('leads')
-              .select('*')
-              .eq('is_fishbowl', true)
-              .or('status.eq.unclaimed,assigned_to.is.null')
-              .order('created_at', { ascending: false });
-
-            const { data } = await fishbowlQuery;
-            return data || [];
-          })()
-        : Promise.resolve([]);
-
-      // Run all independent queries in parallel
-      const [contacts, connections, leads, fishbowl] = await Promise.all([
+      const [contacts, connections, leadResult] = await Promise.all([
         contactsPromise,
         connectionsPromise,
-        leadsPromise,
-        fishbowlPromise
+        leadRecordsPromise
       ]);
+      if (leadResult.error) throw leadResult.error;
+      const allLeadRecords = leadResult.data || [];
+      const leads = allLeadRecords.filter((lead: any) =>
+        !lead.is_fishbowl && (showAll || !profile?.id || lead.assigned_to === profile.id || lead.assigned_to == null)
+      );
+      const fishbowl = allLeadRecords.filter((lead: any) =>
+        lead.is_fishbowl === true && lead.status === 'unclaimed' && lead.assigned_to == null
+      );
 
       // Batch-fetch last connection and next scheduled connection for contacts (depends on contact IDs)
       if (contacts && contacts.length > 0) {
@@ -1083,7 +1064,7 @@ export function PipelineBoard() {
           )}
           {selectedWidgets.includes('fishbowl') && (
             <div className="p-4 bg-teal-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Fishbowl Items</p>
+              <p className="text-sm text-gray-600 mb-1">Sales Department Leads</p>
               <p className="text-2xl font-bold text-teal-600">
                 {filteredStages.find(s => s.id === 'fishbowl')?.count || 0}
               </p>
@@ -1213,7 +1194,7 @@ export function PipelineBoard() {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-gray-900">New Fishbowl Entry</h2>
+              <h2 className="text-xl font-bold text-gray-900">New Sales Department Lead</h2>
               <button
                 onClick={() => setShowFishbowlForm(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1242,7 +1223,7 @@ export function PipelineBoard() {
               Are you sure you want to claim <strong>{leadToClaim.name}</strong>?
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              This will assign the lead to you and move it from the Fishbowl to your Leads list.
+              This will assign the lead to you and move it from the Sales Department queue to your Leads list.
             </p>
             <div className="flex gap-3">
               <button
