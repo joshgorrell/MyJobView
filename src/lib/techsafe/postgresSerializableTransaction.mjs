@@ -38,6 +38,9 @@ export function createSerializableSourceTransaction(pool, makeReader, persistCer
    // Fail closed: the coordinator never returns a delivery authorization.
    if(!result||result.authorized!==false||result.snapshotReady!==false)
     throw new Error('transaction_result_not_inert');
+   // A held or incomplete source inspection must not commit any incidental
+   // writes performed by a reader or a future certificate writer.
+   if(result.ok!==true)throw new Error('transaction_source_held');
    await client.query('COMMIT');
    committed=true;
    return result;
