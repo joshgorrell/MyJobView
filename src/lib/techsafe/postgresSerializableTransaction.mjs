@@ -24,19 +24,22 @@ export function createSerializableSourceTransaction(pool, makeReader, persistCer
    // Only a trusted server module can construct the source reader. The client
    // is never exposed to the callback or to a request-supplied JSON object.
    const reader=makeReader(client);
-   if(!reader||typeof reader.readConsistentSource!=='function'||
-      typeof reader.readCompleteEquipmentDetails!=='function'||
-      typeof reader.readCurrentRevision!=='function')
-    throw new Error('trusted_source_reader_missing');
+   const legacy=reader&&typeof reader.readConsistentSource==='function'&&
+     typeof reader.readCompleteEquipmentDetails==='function'&&
+     typeof reader.readCurrentRevision==='function';
+   const current=reader&&typeof reader.inspectCurrentEquipment==='function';
+   // Two explicit trusted reader contracts. Never require a fake legacy
+   // reader to execute the current Sales Order inspection path.
+   if(!legacy&&!current)throw new Error('trusted_source_reader_missing');
    const result=await callback(Object.freeze({
     ...(persistCertificate?{persistCertificate:evidence=>persistCertificate({client,evidence})}:{}),
     isolationLevel:'serializable',serverOwned:true,
-    readConsistentSource:reader.readConsistentSource.bind(reader),
-    readCompleteEquipmentDetails:reader.readCompleteEquipmentDetails.bind(reader),
-    readCurrentRevision:reader.readCurrentRevision.bind(reader),
-    ...(typeof reader.inspectCurrentEquipment==='function'?{
-      inspectCurrentEquipment:reader.inspectCurrentEquipment.bind(reader)
-    }:{})
+    ...(legacy?{
+      readConsistentSource:reader.readConsistentSource.bind(reader),
+      readCompleteEquipmentDetails:reader.readCompleteEquipmentDetails.bind(reader),
+      readCurrentRevision:reader.readCurrentRevision.bind(reader)
+    }:{}),
+    ...(current?{inspectCurrentEquipment:reader.inspectCurrentEquipment.bind(reader)}:{})
    }));
    // Fail closed: the coordinator never returns a delivery authorization.
    if(!result||result.authorized!==false||result.snapshotReady!==false)

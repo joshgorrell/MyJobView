@@ -86,4 +86,33 @@ await assert.rejects(()=>failWrapped(async tx=>{
  return inert;
 }));
 assert.equal(failureFixture.queries.at(-1),'ROLLBACK');
+
+// The current-equipment path is a first-class contract, not three fake
+// legacy methods. Neither interface is implicitly available to the other.
+const currentOnly=fixture();
+const currentOnlyExecutor=createSerializableSourceTransaction(
+ {connect:async()=>currentOnly.client},
+ ()=>({inspectCurrentEquipment:async ({orderId})=>({
+   ok:true,authorized:false,snapshotReady:false,orderId
+ })}));
+const currentResult=await currentOnlyExecutor(async tx=>{
+ assert.equal(typeof tx.inspectCurrentEquipment,'function');
+ assert.equal('readConsistentSource' in tx,false);
+ assert.equal('readCompleteEquipmentDetails' in tx,false);
+ assert.equal('readCurrentRevision' in tx,false);
+ return tx.inspectCurrentEquipment({orderId:'test-order'});
+});
+assert.equal(currentResult.orderId,'test-order');
+assert.equal(currentOnly.queries.at(-1),'COMMIT');
+const missingCurrent=fixture();
+const missingCurrentExecutor=createSerializableSourceTransaction(
+ {connect:async()=>missingCurrent.client},()=>({inspectCurrentEquipment:null}));
+await assert.rejects(()=>missingCurrentExecutor(async()=>inert),/trusted_source_reader_missing/);
+assert.equal(missingCurrent.queries.at(-1),'ROLLBACK');
+const legacyOnly=fixture();
+await legacyOnly.withTx(async tx=>{
+ assert.equal('inspectCurrentEquipment' in tx,false);
+ return inert;
+});
+
 console.log('PASS: server-owned PostgreSQL SERIALIZABLE transaction commit/rollback/isolation and connection disposal');
