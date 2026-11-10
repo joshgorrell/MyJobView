@@ -36,6 +36,10 @@ declare global {
 export function TechMap() {
   const [techLocations, setTechLocations] = useState<TechLocation[]>([]);
   const [selectedTech, setSelectedTech] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [mapError, setMapError] = useState<string | null>(null);
+  const hasFittedMap = useRef(false);
+  const visibleLocations = techLocations.filter(t => roleFilter === 'all' || t.technician?.role?.toLowerCase() === roleFilter);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -115,7 +119,7 @@ export function TechMap() {
     if (mapReady) {
       updateMarkers();
     }
-  }, [techLocations, mapReady, historyMode]);
+  }, [techLocations, mapReady, historyMode, roleFilter]);
 
   useEffect(() => {
     if (!historyMode && selectedTech && googleMapRef.current) {
@@ -204,6 +208,7 @@ export function TechMap() {
         setApiKey(data.google_maps_api_key);
       } else {
         console.warn('No Google Maps API key found in settings');
+        setMapError('Google Maps is not configured for this dealer.');
       }
     } catch (error) {
       console.error('Error loading API key:', error);
@@ -238,6 +243,7 @@ export function TechMap() {
     script.onerror = (error) => {
       console.error('Failed to load Google Maps script:', error);
       console.error('Check if the API key is valid and has Maps JavaScript API enabled');
+      setMapError('Google Maps could not load. Check the Maps JavaScript API configuration.');
     };
     document.head.appendChild(script);
   }
@@ -251,6 +257,7 @@ export function TechMap() {
         return;
       } else {
         console.error('Map container never became ready after 20 retries');
+        setMapError('Map container did not initialize. Please reload this page.');
         return;
       }
     }
@@ -262,6 +269,7 @@ export function TechMap() {
         return;
       } else {
         console.error('Google Maps API never loaded after 20 retries');
+        setMapError('Google Maps initialization timed out.');
         return;
       }
     }
@@ -284,6 +292,7 @@ export function TechMap() {
       console.log('Google Maps initialized successfully');
     } catch (error) {
       console.error('Error initializing Google Maps:', error);
+      setMapError('Google Maps failed to initialize.');
     }
   }
 
@@ -309,12 +318,12 @@ export function TechMap() {
       return;
     }
 
-    console.log(`Updating markers for ${techLocations.length} technicians`);
+    console.log(`Updating markers for ${visibleLocations.length} employees`);
 
     const existingMarkers = new Set(markersRef.current.keys());
     const currentTechs = new Set<string>();
 
-    techLocations.forEach(tech => {
+    visibleLocations.forEach(tech => {
       currentTechs.add(tech.technician_id);
       const position = { lat: tech.latitude, lng: tech.longitude };
 
@@ -391,14 +400,15 @@ export function TechMap() {
       }
     });
 
-    if (!historyMode && techLocations.length > 0) {
+    if (!historyMode && visibleLocations.length > 0 && !hasFittedMap.current) {
       const bounds = new window.google.maps.LatLngBounds();
-      techLocations.forEach(tech => {
+      visibleLocations.forEach(tech => {
         bounds.extend({ lat: tech.latitude, lng: tech.longitude });
       });
       googleMapRef.current.fitBounds(bounds);
 
-      if (techLocations.length === 1) {
+      hasFittedMap.current = true;
+      if (visibleLocations.length === 1) {
         googleMapRef.current.setZoom(15);
       }
     }
@@ -595,6 +605,12 @@ export function TechMap() {
       </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white p-4 text-gray-900">
+        {!historyMode && <label className="text-sm">Employee role
+          <select aria-label="Filter employees by role" className="block rounded border p-2" value={roleFilter} onChange={e => { setRoleFilter(e.target.value); hasFittedMap.current = false; }}>
+            <option value="all">All employees</option>
+            {[...new Set(techLocations.map(t => t.technician?.role?.toLowerCase()).filter(Boolean))].sort().map(role => <option key={role} value={role}>{role}</option>)}
+          </select>
+        </label>}
         <button type="button" className="rounded border px-3 py-2" onClick={() => setHistoryMode(v => !v)}>{historyMode ? 'Return to live map' : 'View route history'}</button>
         {historyMode && <label>History technician
           <select className="block rounded border p-2" value={selectedTech || ''} onChange={e => setSelectedTech(e.target.value || null)}>
@@ -609,7 +625,7 @@ export function TechMap() {
         {/* Map Area */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            {!apiKey ? (
+            {mapError ? <div role="alert" className="rounded-lg bg-red-50 p-5 text-red-800">{mapError}</div> : !apiKey ? (
               <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
                 <div className="text-center">
                   <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -643,7 +659,7 @@ export function TechMap() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  {techLocations.filter(t => t.status?.status === 'available').length}
+                  {visibleLocations.filter(t => t.status?.status === 'available').length}
                 </div>
                 <div className="text-xs text-gray-600">Available</div>
               </div>
@@ -674,11 +690,11 @@ export function TechMap() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
-                Active Technicians ({techLocations.length})
+                Active Employees ({visibleLocations.length})
               </h3>
             </div>
             <div className="divide-y divide-gray-200">
-              {techLocations.map(tech => (
+              {visibleLocations.map(tech => (
                 <div
                   key={tech.id}
                   className={`p-4 cursor-pointer transition-colors ${
