@@ -7,13 +7,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LeadForm } from '../Leads/LeadForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { FishbowlView } from '../Fishbowl/FishbowlView';
+import { LeadConversionReport } from '../Leads/LeadConversionReport';
 
 interface LeadsHistoryProps {
   onLeadClick: (leadId: string) => void;
   initialTab?: 'all' | 'shared';
 }
 
-type ViewTab = 'all' | 'shared' | 'recently_claimed' | 'stale';
+type ViewTab = 'all' | 'shared' | 'recently_claimed' | 'stale' | 'report';
 
 export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryProps) {
   const { profile, loading: authLoading } = useAuth();
@@ -354,6 +355,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
             <Users className="w-4 h-4" />
             Sales Department
           </button>
+          {isAdminOrManager && <button onClick={() => setActiveTab('report')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'report' ? 'border-slate-700 text-slate-800' : 'border-transparent text-gray-500'}`}>Conversion Report</button>}
           {isAdminOrManager && <button onClick={() => setActiveTab('stale')} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'stale' ? 'border-slate-700 text-slate-800' : 'border-transparent text-gray-500'}`}><AlertCircle className="w-4 h-4" />Stale Review</button>}
           <button
             onClick={() => setActiveTab('recently_claimed')}
@@ -374,6 +376,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
         </div>
 
         {activeTab === 'shared' && <FishbowlView onLeadClick={onLeadClick} />}
+        {isAdminOrManager && activeTab === 'report' && <LeadConversionReport />}
 
         {isAdminOrManager && activeTab === 'stale' && (
           <section className="p-4 sm:p-6 space-y-3">
