@@ -29,4 +29,19 @@ assert.equal((await run({...reordered,equipmentDetails:[{...secondDetail,unitEqu
 const rejected=await preflight({connectionId:'bad id',orderId:'sales-1',readConsistentSource:async()=>{throw Error('must not read')}});
 assert.equal(rejected.reason,'invalid_source_identity');
 assert.equal((await preflight({connectionId:'conn-1',orderId:'sales-1'})).reason,'authoritative_reader_unavailable');
+for(const failAt of [1,2]){
+ let calls=0;
+ const result=await preflight({connectionId:'conn-1',orderId:'sales-1',readConsistentSource:async()=>{
+  calls++;
+  if(calls===failAt)throw Error('database unavailable: secret connection info');
+  return source;
+ }});
+ assert.equal(result.reason,'authoritative_read_failed');
+ assert.equal(result.ok,false);assert.equal(result.authorized,false);assert.equal(result.snapshotReady,false);
+ assert.equal(result.lines.length,0);
+ assert.equal(calls,failAt);
+ assert.ok(!JSON.stringify(result).includes('secret connection info'));
+}
+assert.equal((await run({...source,connectionProposalId:'other'})).result.ok,false);
+assert.equal((await run({...source,ledgerGeneration:3})).result.ok,false);
 console.log('Techsafe draft content freshness: PASS (inspection only, not certified)');
