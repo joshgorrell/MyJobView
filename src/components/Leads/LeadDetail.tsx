@@ -852,42 +852,6 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             </section>
           )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {lead.email && (
-                    <div className="bg-white rounded-lg px-3 py-2">
-                      <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                        <Mail className="w-4 h-4" />
-                        Email
-                      </div>
-                      <a href={`mailto:${lead.email}`} className="text-base font-medium text-blue-600 hover:text-blue-700 break-all">
-                        {lead.email}
-                      </a>
-                    </div>
-                  )}
-
-                  {lead.phone && (
-                    <div className="bg-white rounded-lg px-3 py-2">
-                      <div className="text-sm font-medium text-gray-500 mb-1 flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        Phone
-                      </div>
-                      <a href={`tel:${lead.phone}`} className="text-base font-medium text-blue-600 hover:text-blue-700">
-                        {lead.phone}
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {assignedProfile && (
-                  <div className="bg-white rounded-lg px-3 py-2">
-                    <div className="text-sm font-medium text-gray-500 mb-1">Assigned To</div>
-                    <div className="text-base font-medium text-gray-900">{assignedProfile.full_name}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => (
