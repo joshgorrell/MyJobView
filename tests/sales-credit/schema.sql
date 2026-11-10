@@ -10,6 +10,8 @@ CREATE TABLE sales_orders(id uuid PRIMARY KEY,organization_id uuid,created_by uu
 CREATE TABLE change_orders(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid,status text,is_billable boolean,change_amount numeric,tax_amount numeric);
 CREATE TABLE projects(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid);
 CREATE TABLE invoices(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,invoice_type text,source_type text,status text,project_id uuid,sales_order_id uuid,proposal_id uuid,billed_from_proposal boolean,work_order_billing_request_id uuid,security_billing_cycle_id uuid,invoice_date date,subtotal numeric,total numeric,tax_amount numeric);
+CREATE TABLE invoice_line_items(id uuid PRIMARY KEY,organization_id uuid,invoice_id uuid);
+CREATE TABLE invoice_line_item_sources(id uuid PRIMARY KEY,organization_id uuid,invoice_line_item_id uuid,source_type text,invoice_id uuid);
 CREATE TABLE work_order_invoice_links(id uuid PRIMARY KEY,organization_id uuid,invoice_id uuid);
 CREATE TABLE security_contracts(id uuid PRIMARY KEY,organization_id uuid,contact_id uuid,created_by_user_id uuid);
 CREATE TABLE security_billing_cycles(id uuid PRIMARY KEY,organization_id uuid,contract_id uuid);
