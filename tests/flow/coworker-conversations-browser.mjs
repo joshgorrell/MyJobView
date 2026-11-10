@@ -140,7 +140,7 @@ try {
  // Representative header/bookmark space and long directories must not clip the first-message form.
  for (const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[820,1180],[1024,650],[1194,744],[1280,680]]) {
   await page.setViewportSize({width,height});await page.goto(url+'?emptyInbox&longDirectory');await messages();
-  await page.getByRole('button',{name:'Julie',exact:true}).waitFor();
+  await page.getByRole('searchbox',{name:'Search people'}).waitFor();
   if(width>=1024){
    const tabs=await page.locator('.flow-view-tabs').boundingBox();
    const audience=await filters().boundingBox();
