@@ -152,60 +152,12 @@ export function FishbowlView({ onLeadClick }: FishbowlViewProps) {
     setClaiming(leadId);
 
     try {
-      const { data: leadData } = await supabase
-        .from('leads')
-        .select('created_by, priority')
-        .eq('id', leadId)
-        .single();
-
-      const { error } = await supabase
-        .from('leads')
-        .update({
-          assigned_to: profile.id,
-          status: 'claimed',
-          is_fishbowl: false,
-          claimed_at: new Date().toISOString(),
-        })
-        .eq('id', leadId);
-
+      const { data: claimed, error } = await supabase.rpc('claim_shared_lead', { p_lead_id: leadId });
       if (error) throw error;
-
-      await supabase.from('feed_events').insert([
-        {
-          event_type: 'lead_claimed',
-          lead_id: leadId,
-          user_id: profile.id,
-        },
-      ]);
-
-      await supabase.from('notifications').insert([
-        {
-          user_id: profile.id,
-          type: 'lead_claimed',
-          lead_id: leadId,
-          title: 'Lead Claimed',
-          body: `You claimed ${leadName}`,
-        },
-      ]);
-
-      if (leadData?.created_by && (leadData.priority === 'high' || leadData.priority === 'urgent')) {
-        const { data: creator } = await supabase
-          .from('profiles')
-          .select('notify_on_lead_status')
-          .eq('id', leadData.created_by)
-          .single();
-
-        if (creator?.notify_on_lead_status !== false && leadData.created_by !== profile.id) {
-          await supabase.from('notifications').insert([
-            {
-              user_id: leadData.created_by,
-              type: 'lead_status_update',
-              lead_id: leadId,
-              title: `${leadData.priority === 'urgent' ? 'Urgent' : 'High'} Priority Lead Claimed`,
-              body: `${profile.full_name} claimed your ${leadData.priority} priority lead: ${leadName}`,
-            },
-          ]);
-        }
+      if (!claimed) {
+        notify('Another sales rep has already claimed this lead.', { theme: 'blue', tone: 'error' });
+        await loadFishbowlLeads();
+        return;
       }
 
       loadFishbowlLeads();
