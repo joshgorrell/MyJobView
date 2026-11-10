@@ -17,7 +17,9 @@ export function createTransactionalBaseEquipmentAudit(client){
   let first;
   try{first=await readRevision({connectionId,orderId});}
   catch{return hold('locked_revision_unverified');}
-  const base=await scanBase({orderId,organizationId:first.organizationId,proposalId:first.proposalId});
+  let base;
+  try{base=await scanBase({orderId,organizationId:first.organizationId,proposalId:first.proposalId});}
+  catch{return hold('base_equipment_read_failed');}
   if(base.ok!==true)return hold(base.reason||'base_equipment_unverified');
   let last;
   try{last=await readRevision({connectionId,orderId});}
