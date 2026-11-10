@@ -91,7 +91,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     return () => window.removeEventListener('mjv-service-request-created', handleCreated);
   }, [scoped]);
   const [mentionsOnly, setMentionsOnly] = useState(false);
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [todayOnly, setTodayOnly] = useState(() => { try { return window.localStorage.getItem('mjv-flow-today') !== 'off'; } catch { return true; } });
+  const [dayBoundary, setDayBoundary] = useState(0);
+  useEffect(() => { try { window.localStorage.setItem('mjv-flow-today', todayOnly ? 'on' : 'off'); } catch { /* storage unavailable */ } }, [todayOnly]);
+  useEffect(() => { const interval = window.setInterval(() => setDayBoundary(value => value + 1), 60_000); return () => window.clearInterval(interval); }, []);
+  const todayMode = view === 'all' && todayOnly;
   const [showFilters, setShowFilters] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -119,11 +123,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
     return { ...scopeFilters(target ? { ...scope, ...targetScope(target) } : scope),
-      source_id: focusUpdateId || undefined, search: debouncedSearch, my_work: false, new_only: newOnly, mentions_only: mentionsOnly, category, kind, office_id: office, actor_id: actor, location_id: location,
-      since: todayOnly ? today.toISOString() : from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
-      until: todayOnly ? tomorrow.toISOString() : until?.toISOString(),
+      source_id: focusUpdateId || undefined, search: debouncedSearch, my_work: false, new_only: todayMode ? false : newOnly, mentions_only: mentionsOnly, category, kind, office_id: office, actor_id: actor, location_id: location,
+      since: todayMode ? today.toISOString() : from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+      until: todayMode ? tomorrow.toISOString() : until?.toISOString(),
     };
-  }, [scope, target, focusUpdateId, debouncedSearch, newOnly, mentionsOnly, todayOnly, category, kind, office, actor, location, from, to]);
+  }, [scope, target, focusUpdateId, debouncedSearch, newOnly, mentionsOnly, todayMode, dayBoundary, category, kind, office, actor, location, from, to]);
   const flow = useFlow(filters);
   useEffect(() => {
     if (!createdRequestId) return;
@@ -198,7 +202,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   // Keep the normal Flow chronology and presentation for every item, including new service requests.
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const newShown = visibleEvents.filter(e => !e.viewed).length;
-  const activeFilterCount = chips.length + Number(todayOnly) + Number(mentionsOnly) + Number(newOnly);
+  const activeFilterCount = chips.length + Number(mentionsOnly) + Number(newOnly && !todayMode);
   return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2></div>
       {(canPost || (view === 'messages' && (canMessageCustomers || hasModuleAccess('feed')))) && <div className="flow-heading-actions">
@@ -214,7 +218,8 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       {view !== 'tasks' && view !== 'messages' && <>
       <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
-      <button className={`flow-unread ${newOnly ? 'flow-selected' : ''}`} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" /><span className="flow-desktop-label">New only</span><span className="flow-mobile-label">New</span></button>
+      {!todayMode && <button className={`flow-unread ${newOnly ? 'flow-selected' : ''}`} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" /><span className="flow-desktop-label">New only</span><span className="flow-mobile-label">New</span></button>}
+      <button className={`flow-today ${todayMode ? 'flow-selected' : ''}`} aria-pressed={todayMode} title="Keep all of today's activity visible" onClick={() => { setTodayOnly(!todayOnly); if (view !== 'all') changeView('all'); }}>Today</button>
       <button className="flow-filter-toggle" aria-controls={filtersId} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}><Filter size={14} />Filters{activeFilterCount ? ` (${activeFilterCount})` : ''}</button>
       <button className={`flow-search-toggle ${search ? 'flow-selected' : ''}`} aria-label={showSearch ? 'Hide activity search' : 'Search activity'} aria-expanded={showSearch || !!search} aria-controls={searchId} onClick={() => { if (showSearch || search) { setSearch(''); setShowSearch(false); } else setShowSearch(true); }}><Search size={16} /></button>
       <button className="flow-mark-shown" aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={16} /></button>

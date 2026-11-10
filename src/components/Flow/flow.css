@@ -341,3 +341,12 @@
   .flow .flow-mark-shown,.flow .flow-pending-refresh{min-width:30px;padding:4px}
   .flow .flow-day{padding:4px 10px}
 }
+
+/* Today is a compact peer of Filters, including narrow workspace cards. */
+.flow .flow-toolbar > .flow-today{display:inline-flex;align-items:center;justify-content:center;min-height:32px;order:0}
+.flow .flow-toolbar > .flow-filter-toggle{order:1}
+.flow .flow-toolbar > .flow-search-toggle{order:2}
+.flow .flow-toolbar > .flow-mark-shown{order:3}
+.flow .flow-toolbar > .flow-pending-refresh{order:4}
+@container (max-width:1000px){.flow .flow-toolbar > .flow-today{display:inline-flex}}
+@media(max-width:640px){.flow .flow-toolbar > .flow-today{grid-area:auto;min-height:32px}}
