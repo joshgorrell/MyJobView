@@ -320,6 +320,7 @@ export function PipelineBoard() {
         ? supabase
             .from('leads')
             .select(`*, assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)`)
+            .is('converted_at', null)
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as any[], error: null });
 
