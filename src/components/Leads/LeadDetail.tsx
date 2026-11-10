@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
-import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, Clock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Lead, LeadMessage, LeadTag, Profile } from '../../lib/types';
 import { useAuth } from '../../contexts/AuthContext';
@@ -420,20 +420,6 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
         },
       ]);
 
-      // Record the handoff for the previous salesperson in Flow.
-      if (lead.assigned_to && lead.assigned_to !== selectedAssignee) {
-        const { error: flowError } = await supabase.from('flow_events').insert({
-          organization_id: lead.organization_id, actor_id: profile.id,
-          actor_name: profile.full_name || 'MJV', customer_name: lead.contact_name,
-          contact_id: lead.contact_id, office_id: lead.office_id,
-          category: 'sales', event_type: 'leads.reassigned_away',
-          summary: `Lead reassigned · ${lead.contact_name} → ${assignee.full_name}`,
-          source_table: 'leads', source_id: leadId, required_module: 'feed',
-          activity_recipient_user_id: lead.assigned_to,
-        });
-        if (flowError) console.error('Unable to record reassignment in previous rep Flow:', flowError);
-      }
-
       // Notify the assigned rep
       await supabase.from('notifications').insert([
         {
@@ -513,62 +499,6 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
     }
   }
 
-  async function handleStatusChange(newStatus: string) {
-    if (!lead || !profile) return;
-
-    const oldStatus = lead.status;
-
-    try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ status: newStatus })
-        .eq('id', leadId);
-
-      if (error) throw error;
-
-      await supabase.from('feed_events').insert([
-        {
-          event_type: 'lead_status_changed',
-          lead_id: leadId,
-          user_id: profile.id,
-          metadata: { old_status: oldStatus, new_status: newStatus },
-        },
-      ]);
-
-      if (lead.created_by && (lead.priority === 'high' || lead.priority === 'urgent') && lead.created_by !== profile.id) {
-        const { data: creator } = await supabase
-          .from('profiles')
-          .select('notify_on_lead_status')
-          .eq('id', lead.created_by)
-          .single();
-
-        if (creator?.notify_on_lead_status !== false) {
-          const statusLabels: Record<string, string> = {
-            unclaimed: 'Unclaimed',
-            claimed: 'Claimed',
-            closed_won: 'Closed Won',
-            closed_lost: 'Closed Lost',
-            escalated: 'Escalated',
-          };
-
-          await supabase.from('notifications').insert([
-            {
-              user_id: lead.created_by,
-              type: 'lead_status_update',
-              lead_id: leadId,
-              title: `${lead.priority === 'urgent' ? 'Urgent' : 'High'} Priority Lead Status Update`,
-              body: `${profile.full_name} changed your ${lead.priority} priority lead (${lead.contact_name}) status to ${statusLabels[newStatus] || newStatus}`,
-            },
-          ]);
-        }
-      }
-
-      loadLead();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      notify('Failed to update status', { theme: 'blue', tone: 'error' });
-    }
-  }
 
   async function handleReminderDateChange(newDate: string) {
     if (!lead || !profile) return;
