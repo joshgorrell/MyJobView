@@ -59,7 +59,9 @@ export async function inspectSerializableEquipmentCandidate({
    const current=await tx.readCurrentRevision({connectionId,orderId});
    if(!current||current.connectionGeneration!==source.connectionGeneration||
       current.revision!==source.revision||current.sourceFingerprint!==source.sourceFingerprint||
-      current.state!=='candidate')
+      current.state!=='candidate'||
+      (current.organizationId!==undefined&&current.organizationId!==source.connectionOrganizationId)||
+      (current.proposalId!==undefined&&current.proposalId!==source.connectionProposalId))
     return hold('source_changed_during_transaction');
    if(certify){
     if(typeof tx.persistCertificate!=='function')throw new Error('trusted_certificate_writer_unavailable');
