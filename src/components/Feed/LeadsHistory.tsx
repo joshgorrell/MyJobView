@@ -33,6 +33,8 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
   const [staleDays, setStaleDays] = useState(90);
   const [staleCandidates, setStaleCandidates] = useState<LeadWithDetails[]>([]);
   const [staleLoading, setStaleLoading] = useState(false);
+  const [staleHasMore, setStaleHasMore] = useState(false);
+  const [stalePage, setStalePage] = useState(0);
   const [recentlyClaimedDays, setRecentlyClaimedDays] = useState<7 | 14 | 30>(7);
 
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
@@ -78,14 +80,16 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
         .in('status', ['unclaimed', 'claimed', 'in_progress'])
         .lt('created_at', cutoff)
         .order('created_at', { ascending: true })
-        .limit(500);
+        .range(stalePage * 100, stalePage * 100 + 100);
       if (error) throw error;
+      setStaleHasMore((data || []).length > 100);
       const now = Date.now();
-      setStaleCandidates((data || []).filter(lead => {
+      const pageCandidates = (data || []).slice(0, 100).filter(lead => {
         if (lead.reminder_date && new Date(lead.reminder_date).getTime() > now) return false;
         const lastContact = lead.last_contact_date ? new Date(lead.last_contact_date).getTime() : 0;
-        return !lastContact || lastContact < Date.now() - staleDays * 86400000;
-      }));
+        return !lastContact || lastContact < now - staleDays * 86400000;
+      });
+      setStaleCandidates(previous => stalePage === 0 ? pageCandidates : [...previous, ...pageCandidates.filter(candidate => !previous.some(existing => existing.id === candidate.id))]);
     } catch (error) {
       console.error('Unable to load stale lead review', error);
       setStaleCandidates([]);
@@ -94,7 +98,7 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
 
   useEffect(() => {
     if (activeTab === 'stale' && isAdminOrManager) void loadStaleCandidates();
-  }, [activeTab, staleDays, profile?.organization_id]);
+  }, [activeTab, staleDays, stalePage, profile?.organization_id, isAdminOrManager]);
 
   async function loadSalesReps() {
     try {
@@ -353,13 +357,14 @@ export function LeadsHistory({ onLeadClick, initialTab = 'all' }: LeadsHistoryPr
           <section className="p-4 sm:p-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h3 className="font-semibold text-gray-800">Stale Lead Review</h3><p className="text-xs text-gray-500">Review only. No automatic archive or deletion; linked records must be checked before any cleanup.</p></div>
-              <label className="text-sm text-gray-600">Inactivity threshold <select className="ml-2 rounded border p-1" value={staleDays} onChange={e => setStaleDays(Number(e.target.value))}><option value={60}>60 days</option><option value={90}>90 days</option><option value={120}>120 days</option><option value={180}>180 days</option></select></label>
+              <label className="text-sm text-gray-600">Inactivity threshold <select className="ml-2 rounded border p-1" value={staleDays} onChange={e => { setStaleCandidates([]); setStalePage(0); setStaleDays(Number(e.target.value)); }}><option value={60}>60 days</option><option value={90}>90 days</option><option value={120}>120 days</option><option value={180}>180 days</option></select></label>
             </div>
-            {staleLoading ? <p className="text-sm text-gray-500">Loading candidates…</p> : staleCandidates.length === 0 ? <p className="text-sm text-gray-500">No candidates found in the first 500 eligible records.</p> : (
+            {staleLoading ? <p className="text-sm text-gray-500">Loading candidates…</p> : staleCandidates.length === 0 ? <p className="text-sm text-gray-500">No candidates found on this page. More older records may remain.</p> : (
               <div className="divide-y rounded-lg border border-gray-200">
                 {staleCandidates.map(lead => <button key={lead.id} onClick={() => onLeadClick(lead.id)} className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between gap-3"><span className="min-w-0"><span className="block font-medium text-sm truncate">{lead.contact_name || lead.company_name || 'Unnamed lead'}</span><span className="block text-xs text-gray-500">Last contact: {lead.last_contact_date || 'Not recorded'} · {lead.status}</span></span><ChevronRight className="w-4 h-4 text-gray-400" /></button>)}
               </div>
             )}
+            {staleHasMore && <button type="button" disabled={staleLoading} onClick={() => setStalePage(page => page + 1)} className="text-sm text-blue-700 hover:underline disabled:opacity-50">Load more candidates</button>}
           </section>
         )}
 
