@@ -145,6 +145,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
     full_name: user.full_name,
     first_name: (user as any).first_name || '',
     last_name: (user as any).last_name || '',
+    birthday_mmdd: (user as any).birthday_mmdd || '',
+    birthday_visible: (user as any).birthday_visible ?? true,
     username: user.username,
     email: user.email,
     role: user.role,
@@ -649,11 +651,20 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         if (!response.ok) throw new Error(result.error || 'Failed to update email');
       }
 
+      if (formData.birthday_mmdd) {
+        const validFormat = /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(formData.birthday_mmdd);
+        const [month, day] = formData.birthday_mmdd.split('-').map(Number);
+        if (!validFormat || new Date(Date.UTC(2000, month - 1, day)).getUTCMonth() !== month - 1) {
+          throw new Error('Birthday must be a valid MM-DD date (for example 04-23).');
+        }
+      }
       const updateData = {
         ...notifications,
         full_name: formData.full_name,
         first_name: formData.first_name || null,
         last_name: formData.last_name || null,
+        birthday_mmdd: formData.birthday_mmdd || null,
+        birthday_visible: formData.birthday_visible,
         username: formData.username,
         role: formData.role,
         role_id: formData.role_id || null,
@@ -1014,6 +1025,26 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                       </div>
                     </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Birthday (MM-DD, optional)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
+                    placeholder="MM-DD"
+                    value={formData.birthday_mmdd}
+                    onChange={(e) => setFormData({ ...formData, birthday_mmdd: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Month and day only; no birth year stored.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input type="checkbox" checked={formData.birthday_visible}
+                    onChange={(e) => setFormData({ ...formData, birthday_visible: e.target.checked })} />
+                  Show birthday in Company Messages
+                </label>
+              </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">
                         Username (@ mention name) *

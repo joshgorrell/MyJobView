@@ -88,6 +88,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
     full_name: '',
     first_name: '',
     last_name: '',
+    birthday_mmdd: '',
+    birthday_visible: true,
     username: '',
     role: 'sales' as 'admin' | 'finance' | 'manager' | 'sales' | 'tech' | 'service_manager',
     role_id: '' as string,
@@ -313,6 +315,19 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
       return;
     }
 
+    if (formData.birthday_mmdd && !/^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(formData.birthday_mmdd)) {
+      setError('Birthday must be MM-DD (for example 04-23).');
+      setLoading(false);
+      return;
+    }
+    if (formData.birthday_mmdd) {
+      const [month, day] = formData.birthday_mmdd.split('-').map(Number);
+      if (new Date(Date.UTC(2000, month - 1, day)).getUTCMonth() !== month - 1) {
+        setError('Enter a valid birthday month and day.');
+        setLoading(false);
+        return;
+      }
+    }
     try {
       // Check if username is already taken
       if (formData.username) {
@@ -405,6 +420,8 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
         .from('profiles')
         .update({
           ...notifications,
+          birthday_mmdd: formData.birthday_mmdd || null,
+          birthday_visible: formData.birthday_visible,
           email_leads: formData.email_leads,
           notify_lost_opportunity_submissions: formData.notify_lost_opportunity_submissions,
           can_create_proposals: formData.can_create_proposals,
@@ -553,6 +570,26 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   />
                   <p className="text-xs text-gray-500 mt-1">Optional - for QuickBooks payroll</p>
                 </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Birthday (MM-DD, optional)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
+                    placeholder="MM-DD"
+                    value={formData.birthday_mmdd}
+                    onChange={(e) => setFormData({ ...formData, birthday_mmdd: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 text-white rounded-lg"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Month and day only; no birth year stored.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input type="checkbox" checked={formData.birthday_visible}
+                    onChange={(e) => setFormData({ ...formData, birthday_visible: e.target.checked })} />
+                  Show birthday in Company Messages
+                </label>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Username (@ mention name)</label>
