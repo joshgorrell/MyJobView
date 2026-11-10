@@ -379,63 +379,12 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
     if (!profile || !lead) return;
 
     try {
-      const { data: claimedRows, error } = await supabase
-        .from('leads')
-        .update({
-          assigned_to: profile.id,
-          status: 'claimed',
-          is_fishbowl: false,
-          claimed_at: new Date().toISOString(),
-        })
-        .eq('id', leadId)
-        .eq('status', 'unclaimed')
-        .eq('is_fishbowl', true)
-        .is('assigned_to', null)
-        .select('id');
-
+      const { data: claimed, error } = await supabase.rpc('claim_shared_lead', { p_lead_id: leadId });
       if (error) throw error;
-      if (!claimedRows?.length) {
-        notify('This lead is no longer available to claim. Refresh to see its current assignment.', { theme: 'blue', tone: 'error' });
+      if (!claimed) {
+        notify('Another sales rep has already claimed this lead.', { theme: 'blue', tone: 'error' });
         await loadLead();
         return;
-      }
-
-      await supabase.from('feed_events').insert([
-        {
-          event_type: 'lead_claimed',
-          lead_id: leadId,
-          user_id: profile.id,
-        },
-      ]);
-
-      await supabase.from('notifications').insert([
-        {
-          user_id: profile.id,
-          type: 'lead_claimed',
-          lead_id: leadId,
-          title: 'Lead Claimed',
-          body: `You claimed ${lead.contact_name}`,
-        },
-      ]);
-
-      if (lead.created_by && (lead.priority === 'high' || lead.priority === 'urgent')) {
-        const { data: creator } = await supabase
-          .from('profiles')
-          .select('notify_on_lead_status')
-          .eq('id', lead.created_by)
-          .single();
-
-        if (creator?.notify_on_lead_status !== false && lead.created_by !== profile.id) {
-          await supabase.from('notifications').insert([
-            {
-              user_id: lead.created_by,
-              type: 'lead_status_update',
-              lead_id: leadId,
-              title: `${lead.priority === 'urgent' ? 'Urgent' : 'High'} Priority Lead Claimed`,
-              body: `${profile.full_name} claimed your ${lead.priority} priority lead: ${lead.contact_name}`,
-            },
-          ]);
-        }
       }
 
       setShowClaimConfirm(false);
