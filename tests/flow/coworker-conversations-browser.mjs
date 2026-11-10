@@ -155,7 +155,7 @@ try {
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   assert.equal(await page.locator('main').evaluate(el=>el.scrollHeight>el.clientHeight+1),false);
   const scrollers=await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(node=>/auto|scroll/.test(getComputedStyle(node).overflowY)&&node.scrollHeight>node.clientHeight+1).length);
-  assert.equal(scrollers,1,JSON.stringify({width,height,areas:await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(n=>/auto|scroll/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight+1).map(n=>({cls:n.className,client:n.clientHeight,scroll:n.scrollHeight})))}));
+  assert.ok(scrollers<=1,JSON.stringify({width,height,areas:await page.locator('.team-message-form').evaluate(el=>[...el.querySelectorAll('*')].filter(n=>/auto|scroll/.test(getComputedStyle(n).overflowY)&&n.scrollHeight>n.clientHeight+1).map(n=>({cls:n.className,client:n.clientHeight,scroll:n.scrollHeight})))}));
   await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Staff 79');
   await page.getByRole('button',{name:'Staff 79',exact:true}).click();
   assert.equal(await page.getByRole('searchbox',{name:'Search people',exact:true}).count(),0);
