@@ -70,11 +70,32 @@ Deno.serve(async (request: Request) => {
   }
   // Repair Flow/notification handoffs after durable classification. This is
   // independent of transcription retries: never re-download processed audio.
-  const { data: processed, error: processedError } = await db.from('voicemail_messages')
-    .select('id,organization_id,department,summary,state,urgent')
+  // Keyset cursor avoids repeatedly scanning the same oldest 100 messages.
+  // Cursor is persisted so each scheduled run advances across the backlog.
+  const { data: checkpoint, error: checkpointError } = await db
+    .from('phone_voicemail_reconciliation_cursor')
+    .select('last_updated_at,last_id').eq('name', 'flow').maybeSingle();
+  if (checkpointError) return json(503, { error: 'handoff_cursor_lookup_failed' });
+  const batchSize = 100;
+  const baseQuery = () => db.from('voicemail_messages')
+    .select('id,organization_id,department,summary,state,urgent,updated_at')
     .in('state', ['ready', 'review'])
-    .order('updated_at', { ascending: true }).limit(100);
+    .order('updated_at', { ascending: true })
+    .order('id', { ascending: true }).limit(batchSize);
+  const cursorFilter = checkpoint?.last_updated_at && checkpoint?.last_id
+    ? `updated_at.gt.${checkpoint.last_updated_at},and(updated_at.eq.${checkpoint.last_updated_at},id.gt.${checkpoint.last_id})`
+    : null;
+  const { data: processed, error: processedError } = await (
+    cursorFilter ? baseQuery().or(cursorFilter) : baseQuery()
+  );
   if (processedError) return json(503, { error: 'handoff_reconciliation_lookup_failed' });
+  // End of dataset: rewind for the next run. Previously failed handoffs and
+  // newly granted department recipients will be revisited on subsequent scans.
+  if (!processed?.length && cursorFilter) {
+    const { error: rewindError } = await db.from('phone_voicemail_reconciliation_cursor')
+      .upsert({ name: 'flow', last_updated_at: null, last_id: null });
+    if (rewindError) return json(503, { error: 'handoff_cursor_rewind_failed' });
+  }
   let repaired = 0;
   let handoffFailed = 0;
   for (const message of processed ?? []) {
@@ -88,6 +109,12 @@ Deno.serve(async (request: Request) => {
     } catch {
       handoffFailed++;
     }
+  }
+  if (processed?.length) {
+    const last = processed[processed.length - 1];
+    const { error: advanceError } = await db.from('phone_voicemail_reconciliation_cursor')
+      .upsert({ name: 'flow', last_updated_at: last.updated_at, last_id: last.id });
+    if (advanceError) return json(503, { error: 'handoff_cursor_advance_failed' });
   }
   return json(failed || handoffFailed ? 503 : 200, {
     checked: (data ?? []).length, dispatched, failed,
