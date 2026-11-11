@@ -350,3 +350,21 @@
 .flow .flow-toolbar > .flow-pending-refresh{order:4}
 @container (max-width:1000px){.flow .flow-toolbar > .flow-today{display:inline-flex}}
 @media(max-width:640px){.flow .flow-toolbar > .flow-today{grid-area:auto;min-height:32px}}
+
+/* Flow controls share the heading row with Create; keep the view switcher and
+   all activity actions together instead of stacking a second toolbar. */
+.flow .flow-heading{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;padding:8px 12px 6px}
+.flow .flow-heading>div:first-child{flex:0 0 auto;min-width:0}
+.flow .flow-heading>.flow-toolbar{order:1;flex:1 1 auto;min-width:0;min-height:36px;padding:0;gap:4px;justify-content:flex-end}
+.flow .flow-heading>.flow-heading-actions{order:2;flex:0 0 auto;margin:0}
+.flow .flow-heading .flow-view-tabs{margin-right:auto}
+.flow .flow-heading .flow-toolbar>.flow-today{order:0}
+.flow .flow-heading .flow-toolbar>.flow-mentions{order:0}
+.flow .flow-heading .flow-toolbar>.flow-unread{order:0}
+.flow .flow-heading .flow-toolbar>.flow-filter-toggle{order:1}
+.flow .flow-heading .flow-toolbar>.flow-search-toggle{order:2}
+.flow .flow-heading .flow-toolbar>.flow-mark-shown{order:3}
+.flow .flow-heading .flow-toolbar>.flow-pending-refresh{order:4}
+@container (max-width:1000px){.flow .flow-heading .flow-toolbar>.flow-mentions,.flow .flow-heading .flow-toolbar>.flow-unread{display:none}}
+@container (max-width:700px){.flow .flow-heading .flow-toolbar>.flow-today{display:inline-flex}}
+@media(max-width:640px){.flow .flow-heading{gap:4px;padding:6px 8px}.flow .flow-heading h2{font-size:15px}.flow .flow-heading>.flow-toolbar{gap:2px}.flow .flow-heading .flow-toolbar>.flow-filter-toggle{font-size:0;min-width:32px;padding:4px}.flow .flow-heading .flow-toolbar>.flow-filter-toggle svg{width:16px;height:16px}.flow .flow-heading .flow-toolbar>.flow-today{font-size:11px;padding:4px 6px}.flow .flow-heading .flow-primary{min-width:36px;padding:5px}}
