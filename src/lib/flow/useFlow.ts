@@ -102,6 +102,37 @@ export function useFlow(filters: FlowFilters) {
     };
   }, [userId, organizationId, filterKey]);
 
+  const markAllViewed = async (scope: Pick<FlowFilters, 'contact_id' | 'project_id' | 'work_order_id'> = {}) => {
+    if (!userId) return;
+    try {
+      let before: number | undefined;
+      let total = 0;
+      for (;;) {
+        const { data, error: fetchError } = await supabase.rpc('get_flow_events', {
+          p_filters: { ...scope, new_only: true }, p_limit: PAGE_SIZE,
+          ...(before === undefined ? {} : { p_before: before }),
+        });
+        if (fetchError) throw fetchError;
+        const page = (data || []) as FlowEvent[];
+        if (!page.length) break;
+        const { error: writeError } = await supabase.from('flow_event_views').upsert(
+          page.map(event => ({ event_id: event.id, user_id: userId })),
+          { onConflict: 'user_id,event_id', ignoreDuplicates: true },
+        );
+        if (writeError) throw writeError;
+        total += page.length;
+        if (page.length < PAGE_SIZE) break;
+        const lastId = page[page.length - 1].id;
+        if (lastId === before) throw new Error('Activity pagination did not advance');
+        before = lastId;
+      }
+      if (total) { readRevision.current++; window.dispatchEvent(new Event('flow-views-changed')); }
+      await refresh();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Could not mark all activity viewed. Please retry.');
+    }
+  };
+
   const markViewed = async (ids: number[], viewed = true) => {
     if (!userId || !ids.length) return;
     const version = generation.current;
@@ -115,5 +146,5 @@ export function useFlow(filters: FlowFilters) {
       window.dispatchEvent(new Event('flow-views-changed'));
     } catch { setError('Viewed status could not be saved. Please try again.'); }
   };
-  return { events, loading, loadingMore, hasMore, error, pending, connected, refresh, loadMore, markViewed };
+  return { events, loading, loadingMore, hasMore, error, pending, connected, refresh, loadMore, markViewed, markAllViewed };
 }
