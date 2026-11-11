@@ -390,17 +390,20 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     }
   }
 
+  const localDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
   async function snoozeLead(leadId: string, nextDate: string) {
     if (!nextDate || !/^\\d{4}-\\d{2}-\\d{2}$/.test(nextDate)) return;
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = localDay(new Date());
     if (nextDate <= today) {
       notify('Choose a future follow-up date.', { theme: 'violet', tone: 'warning' });
       return;
     }
     setSnoozing(true);
     try {
-      const { error } = await supabase.from('leads').update({ next_follow_up: nextDate }).eq('id', leadId).is('converted_at', null);
+      const { data, error } = await supabase.from('leads').update({ next_follow_up: nextDate }).eq('id', leadId).is('converted_at', null).select('id');
       if (error) throw error;
+      if (!data?.length) throw new Error('Lead is no longer open or cannot be updated');
       setSnoozeLeadId(null);
       await loadPipelineData();
       notify('Follow-up snoozed.', { theme: 'violet', tone: 'success' });
@@ -903,12 +906,12 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                                       const date = new Date();
                                       if ('months' in option) date.setMonth(date.getMonth() + option.months);
                                       else date.setDate(date.getDate() + option.days);
-                                      void snoozeLead(item.id, date.toLocaleDateString('en-CA'));
+                                      void snoozeLead(item.id, localDay(date));
                                     }} className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{option.label}</button>
                                   ))}
                                 </div>
                                 <label className="block text-xs text-gray-600">Custom follow-up date
-                                  <input type="date" min={new Date(Date.now() + 86400000).toLocaleDateString('en-CA')} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
+                                  <input type="date" min={localDay(new Date(new Date().setDate(new Date().getDate() + 1)))} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
                                 </label>
                               </div>
                             )}
