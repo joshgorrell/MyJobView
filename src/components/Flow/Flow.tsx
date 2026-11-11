@@ -216,6 +216,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   // Reuse the per-user notification read state rather than treating all
   // voicemail records or assignments as unread.
   const [notificationCounts, setNotificationCounts] = useState({ messages: 0, tasks: 0, voicemails: 0 });
+  const [unreadCustomerMessages, setUnreadCustomerMessages] = useState(0);
   useEffect(() => {
     if (scoped || !profile?.id || !profile?.organization_id) return;
     let cancelled = false;
@@ -247,10 +248,42 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       document.removeEventListener('visibilitychange', refreshOnFocus);
     };
   }, [scoped, profile?.id, profile?.organization_id]);
+  // Customer messages use their canonical message read flag, not notifications.
+  // RLS restricts this count to customer threads visible to the current employee.
+  useEffect(() => {
+    if (scoped || !profile?.id || !profile?.organization_id || !canMessageCustomers) {
+      setUnreadCustomerMessages(0);
+      return;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      const { data: threads, error: threadError } = await supabase.from('message_threads')
+        .select('id').eq('organization_id', profile.organization_id);
+      if (cancelled || threadError) return;
+      const ids = (threads ?? []).map(thread => thread.id);
+      if (!ids.length) { setUnreadCustomerMessages(0); return; }
+      let total = 0;
+      for (let i = 0; i < ids.length; i += 100) {
+        const { count, error } = await supabase.from('messages')
+          .select('id', { count: 'exact', head: true })
+          .in('thread_id', ids.slice(i, i + 100))
+          .eq('author_type', 'customer').eq('is_internal', false).eq('is_read', false);
+        if (cancelled || error) return;
+        total += count ?? 0;
+      }
+      if (!cancelled) setUnreadCustomerMessages(total);
+    };
+    void refresh();
+    const onFocus = () => { if (!document.hidden) void refresh(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    const timer = window.setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); };
+  }, [scoped, profile?.id, profile?.organization_id, canMessageCustomers]);
   const tabCount = (id: FlowView) => id === 'all'
     ? unreadFlow
     : id === 'activity' ? unreadActivity
-    : id === 'messages' ? notificationCounts.messages
+    : id === 'messages' ? Math.max(notificationCounts.messages, unreadCustomerMessages)
     : id === 'tasks' ? notificationCounts.tasks
     : canViewVoicemail ? notificationCounts.voicemails : 0;
   const unreadActivity = flow.events.filter(event => !event.viewed && matchesView(event, 'activity', 'all')).length;
