@@ -83,7 +83,8 @@
     "test:customer-proposals:browser": "node tests/customer-proposals/browser.mjs",
     "test:tech-stats:browser": "npm run build && node tests/labor-dashboard/production-browser.mjs",
     "test:techsafe:dispatch": "node tests/techsafe/draft-dispatch.mjs && node tests/techsafe/source-reread-canonical.mjs && node tests/techsafe/draft-http-transport.mjs",
-    "test:lead-proposal-conversion": "node tests/leads/proposal-conversion-contract.mjs"
+    "test:lead-proposal-conversion": "node tests/leads/proposal-conversion-contract.mjs && node tests/leads/pipeline-stage-contract.mjs",
+    "test:pipeline-stages": "node tests/leads/pipeline-stage-contract.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

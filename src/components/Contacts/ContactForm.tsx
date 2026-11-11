@@ -80,7 +80,7 @@ export function ContactForm({ onClose, onSuccess, initialSalesStatus }: ContactF
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [_uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [salesStatus, setSalesStatus] = useState<'customer' | 'prospect' | 'lead'>(draft?.salesStatus ?? initialSalesStatus ?? 'customer');
+  const [salesStatus, setSalesStatus] = useState<'customer' | 'prospect' | 'lead'>(initialSalesStatus ?? draft?.salesStatus ?? 'customer');
   const [leadDestination, setLeadDestination] = useState<'fishbowl' | 'assign'>(draft?.leadDestination ?? 'fishbowl');
   const [assignedTo, setAssignedTo] = useState<string>(draft?.assignedTo ?? '');
   const [opportunityDetails, setOpportunityDetails] = useState(draft?.opportunityDetails ?? '');

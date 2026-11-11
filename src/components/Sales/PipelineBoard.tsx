@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { ContactDetail } from '../Contacts/ContactDetail';
+import { PipelineStageOverview } from './PipelineStageOverview';
 import { ContactForm } from '../Contacts/ContactForm';
 import { LeadDetail } from '../Leads/LeadDetail';
 import { LeadForm } from '../Leads/LeadForm';
@@ -24,7 +25,7 @@ interface PipelineStage {
   count: number;
 }
 
-export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSalesOrders = false }: { onNavigate?: (module: 'proposals' | 'sales_orders') => void; canViewProposals?: boolean; canViewSalesOrders?: boolean }) {
+export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSalesOrders = false }: { onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void; canViewProposals?: boolean; canViewSalesOrders?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     }
   };
   const [showContactForm, setShowContactForm] = useState(false);
+  const [contactFormInitialStatus, setContactFormInitialStatus] = useState<'customer' | 'prospect'>('customer');
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showConnectionForm, setShowConnectionForm] = useState(false);
   const [showFishbowlForm, setShowFishbowlForm] = useState(false);
@@ -304,6 +306,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
             .from('leads')
             .select(`*, assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)`)
             .is('converted_at', null)
+            .not('status', 'in', '(closed_won,closed_lost)')
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as any[], error: null });
 
@@ -479,6 +482,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   function handleAddNew(stageId: string) {
     switch (stageId) {
       case 'contacts':
+        setContactFormInitialStatus('customer');
         setShowContactForm(true);
         break;
       case 'connections':
@@ -542,13 +546,23 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Stage navigation uses the existing operational modules; no duplicate editors. */}
-      <nav aria-label="Sales pipeline stages" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white">Prospects <span className="block text-xs font-normal text-gray-300">Prospect tracking pending</span></div>
-        <button type="button" onClick={() => document.getElementById("pipeline-leads")?.scrollIntoView({ behavior: "smooth", block: "start" })} disabled={!selectedWidgets.includes("leads")} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50">Leads <span className="block text-xs font-normal text-gray-300">{stages.find(stage => stage.id === "leads")?.count ?? 0} open leads · View below</span></button>
-        <button type="button" onClick={() => onNavigate?.('proposals')} disabled={!onNavigate || !canViewProposals} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">Proposals <span className="block text-xs font-normal text-gray-300">Open Proposals module ↗</span></button>
-        <button type="button" onClick={() => onNavigate?.('sales_orders')} disabled={!onNavigate || !canViewSalesOrders} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">Sales Orders <span className="block text-xs font-normal text-gray-300">Open Sales Orders module ↗</span></button>
-      </nav>
+      {/* Four real stages, backed by the canonical Contacts, Leads, Proposals and Sales Orders tables. */}
+      <PipelineStageOverview
+        showAll={viewMode === 'all' && canViewAllPipeline}
+        canViewProposals={canViewProposals}
+        canViewSalesOrders={canViewSalesOrders}
+        onOpenLeads={() => {
+          if (selectedWidgets.includes('leads')) document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          else onNavigate?.('leads');
+        }}
+        onOpenProposals={() => onNavigate?.('proposals')}
+        onOpenSalesOrders={() => onNavigate?.('sales_orders')}
+        onOpenProspect={handleContactClick}
+        onAddProspect={() => {
+          setContactFormInitialStatus('prospect');
+          setShowContactForm(true);
+        }}
+      />
       {/* Header Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
@@ -1048,6 +1062,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
             </div>
             <div className="p-6">
               <ContactForm
+                initialSalesStatus={contactFormInitialStatus}
                 onClose={() => setShowContactForm(false)}
                 onSuccess={() => {
                   setShowContactForm(false);
