@@ -36,13 +36,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const { data: grants, error: grantError } = await db.from('phone_voicemail_department_access')
     .select('department').eq('organization_id', profile.organization_id).eq('user_id', user.id);
   if (grantError) return respond(503, { error: 'permissions_unavailable' });
-  const allowed = permittedVoicemailDepartments(profile.role, (grants ?? []).map(g => g.department));
-  if (allowed.length === 0) return respond(403, { error: 'access_denied' });
+  const permittedDepartments = permittedVoicemailDepartments(profile.role, (grants ?? []).map(g => g.department));
+  if (permittedDepartments.length === 0) return respond(403, { error: 'access_denied' });
   let query = db.from('voicemail_messages')
     .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested')
     .eq('organization_id', profile.organization_id)
     .in('state', ['ready', 'review']);
-  if (profile.role !== 'admin') query = query.in('department', allowed);
+  if (profile.role !== 'admin') query = query.in('department', permittedDepartments);
   const { data, error } = await query.order('received_at', { ascending: false }).limit(50);
   if (error) return respond(503, { error: 'voicemail_unavailable' });
   return respond(200, { messages: data ?? [] });
