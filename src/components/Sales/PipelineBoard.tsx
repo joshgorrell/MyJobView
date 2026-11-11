@@ -401,7 +401,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     }
     setSnoozing(true);
     try {
-      const { data, error } = await supabase.from('leads').update({ next_follow_up: nextDate }).eq('id', leadId).is('converted_at', null).select('id');
+      const { data, error } = await supabase.from('leads').update({ reminder_date: `${nextDate}T09:00:00` }).eq('id', leadId).is('converted_at', null).select('id');
       if (error) throw error;
       if (!data?.length) throw new Error('Lead is no longer open or cannot be updated');
       setSnoozeLeadId(null);
@@ -895,7 +895,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                             </span>
                           </div>
                         )}
-                        {(Boolean(item.next_follow_up) && String(item.next_follow_up).slice(0, 10) <= localDay(new Date())) && (
+                        {(Boolean(item.reminder_date) && String(item.reminder_date).slice(0, 10) <= localDay(new Date())) && (
                           <div className="mb-2">
                             <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
                             {snoozeLeadId === item.id && (
