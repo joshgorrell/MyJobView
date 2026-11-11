@@ -385,3 +385,23 @@
 
 /* Flow tab unread counters */
 .flow-tab-unread { display:inline-flex; align-items:center; justify-content:center; min-width:1.25rem; height:1.25rem; margin-left:.4rem; padding:0 .3rem; border-radius:999px; background:#dc2626; color:white; font-size:.7rem; font-weight:700; line-height:1; }
+
+/* Prevent narrow mobile Flow filters from overlapping adjacent hit targets. */
+@media (max-width: 700px) {
+  .flow-messaging .flow-toolbar > .flow-message-filters {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 100%;
+    margin-left: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .flow-messaging .flow-toolbar > .flow-message-filters > button {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    padding-inline: 2px;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+}
