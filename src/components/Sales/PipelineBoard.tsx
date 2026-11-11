@@ -36,6 +36,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
+  const [snoozeLeadId, setSnoozeLeadId] = useState<string | null>(null);
+  const [snoozing, setSnoozing] = useState(false);
   const openLead = (id: string) => {
     setSelectedLead(id);
     if (profile?.id && profile.organization_id) {
@@ -385,6 +387,28 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     } catch (error) {
       console.error('Error claiming lead:', error);
       notify('Failed to claim lead. Please try again.', { theme: 'violet', tone: 'error' });
+    }
+  }
+
+  async function snoozeLead(leadId: string, nextDate: string) {
+    if (!nextDate || !/^\\d{4}-\\d{2}-\\d{2}$/.test(nextDate)) return;
+    const today = new Date().toLocaleDateString('en-CA');
+    if (nextDate <= today) {
+      notify('Choose a future follow-up date.', { theme: 'violet', tone: 'warning' });
+      return;
+    }
+    setSnoozing(true);
+    try {
+      const { error } = await supabase.from('leads').update({ next_follow_up: nextDate }).eq('id', leadId).is('converted_at', null);
+      if (error) throw error;
+      setSnoozeLeadId(null);
+      await loadPipelineData();
+      notify('Follow-up snoozed.', { theme: 'violet', tone: 'success' });
+    } catch (error) {
+      console.error('Unable to snooze lead', error);
+      notify('Unable to snooze follow-up.', { theme: 'violet', tone: 'error' });
+    } finally {
+      setSnoozing(false);
     }
   }
 
@@ -866,6 +890,28 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                             }`}>
                               {item.priority}
                             </span>
+                          </div>
+                        )}
+                        {(followUpOverdue || followUpToday) && (
+                          <div className="mb-2">
+                            <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
+                            {snoozeLeadId === item.id && (
+                              <div onClick={e => e.stopPropagation()} className="mt-2 rounded border border-gray-200 bg-white p-2 space-y-2">
+                                <div className="flex flex-wrap gap-1">
+                                  {([{ label: 'Tomorrow', days: 1 }, { label: '3 days', days: 3 }, { label: '1 week', days: 7 }, { label: '1 month', months: 1 }, { label: '3 months', months: 3 }, { label: '6 months', months: 6 }] as const).map(option => (
+                                    <button key={option.label} type="button" disabled={snoozing} onClick={() => {
+                                      const date = new Date();
+                                      if ('months' in option) date.setMonth(date.getMonth() + option.months);
+                                      else date.setDate(date.getDate() + option.days);
+                                      void snoozeLead(item.id, date.toLocaleDateString('en-CA'));
+                                    }} className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{option.label}</button>
+                                  ))}
+                                </div>
+                                <label className="block text-xs text-gray-600">Custom follow-up date
+                                  <input type="date" min={new Date(Date.now() + 86400000).toLocaleDateString('en-CA')} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
+                                </label>
+                              </div>
+                            )}
                           </div>
                         )}
                         {/* Show assigned rep info */}
