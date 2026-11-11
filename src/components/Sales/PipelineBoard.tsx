@@ -393,7 +393,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const localDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
   async function snoozeLead(leadId: string, nextDate: string) {
-    if (!nextDate || !/^\\d{4}-\\d{2}-\\d{2}$/.test(nextDate)) return;
+    if (!nextDate || !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return;
     const today = localDay(new Date());
     if (nextDate <= today) {
       notify('Choose a future follow-up date.', { theme: 'violet', tone: 'warning' });
