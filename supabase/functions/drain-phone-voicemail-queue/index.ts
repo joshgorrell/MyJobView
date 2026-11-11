@@ -1,6 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { MAX_VOICEMAIL_ATTEMPTS, nextVoicemailRetry } from '../_shared/phone-voicemail-retry.ts';
+import { publishVoicemailToFlow } from '../_shared/phone-voicemail-flow.ts';
 
 /**
  * Internal queue drainer for verified, already-persisted voicemail events.
@@ -67,5 +68,29 @@ Deno.serve(async (request: Request) => {
       else failed++;
     } catch { failed++; }
   }
-  return json(failed ? 503 : 200, { checked: (data ?? []).length, dispatched, failed });
+  // Repair Flow/notification handoffs after durable classification. This is
+  // independent of transcription retries: never re-download processed audio.
+  const { data: processed, error: processedError } = await db.from('voicemail_messages')
+    .select('id,organization_id,department,summary,state,urgent')
+    .in('state', ['ready', 'review'])
+    .order('updated_at', { ascending: false }).limit(100);
+  if (processedError) return json(503, { error: 'handoff_reconciliation_lookup_failed' });
+  let repaired = 0;
+  let handoffFailed = 0;
+  for (const message of processed ?? []) {
+    try {
+      await publishVoicemailToFlow(db, {
+        id: message.id, organizationId: message.organization_id,
+        department: message.department, summary: message.summary,
+        state: message.state, urgent: Boolean(message.urgent),
+      });
+      repaired++;
+    } catch {
+      handoffFailed++;
+    }
+  }
+  return json(failed || handoffFailed ? 503 : 200, {
+    checked: (data ?? []).length, dispatched, failed,
+    handoffsChecked: (processed ?? []).length, handoffsSucceeded: repaired, handoffsFailed: handoffFailed,
+  });
 });
