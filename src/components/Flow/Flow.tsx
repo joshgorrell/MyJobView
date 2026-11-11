@@ -236,8 +236,16 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       setNotificationCounts(counts);
     };
     void loadCounts();
-    const timer = window.setInterval(() => { void loadCounts(); }, 30000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    const refreshOnFocus = () => { if (!document.hidden) void loadCounts(); };
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    const timer = window.setInterval(() => { if (!document.hidden) void loadCounts(); }, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
   }, [scoped, profile?.id, profile?.organization_id]);
   const tabCount = (id: FlowView) => id === 'all'
     ? unreadFlow
