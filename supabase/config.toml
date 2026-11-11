@@ -309,3 +309,7 @@ verify_jwt = false
 # Internal voicemail processor requires PHONE_DISPATCHER_WORKER_SECRET.
 [functions.process-phone-voicemail]
 verify_jwt = false
+
+# Internal queue drain; requires PHONE_DISPATCHER_SCHEDULER_SECRET.
+[functions.drain-phone-voicemail-queue]
+verify_jwt = false
