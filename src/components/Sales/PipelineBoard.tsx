@@ -618,6 +618,28 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
         </div>
       </div>
 
+      {/* Aging reflects currently displayed leads, not historical funnel conversions. */}
+      {selectedWidgets.includes('leads') && (() => {
+        const leads = filteredStages.find(stage => stage.id === 'leads')?.items || [];
+        const aging = [30, 60, 90].map(days => ({
+          days,
+          count: leads.filter(lead => lead.created_at && getDaysOld(lead.created_at) >= days).length,
+        }));
+        return (
+          <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4" aria-label="Lead aging">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="text-sm font-semibold text-gray-800">Open lead aging</span>
+              {aging.map(({ days, count }) => (
+                <span key={days} className={`text-xs sm:text-sm ${count > 0 && days >= 90 ? 'text-amber-700 font-semibold' : 'text-gray-600'}`}>
+                  {days}+ days: <strong>{count}</strong>
+                </span>
+              ))}
+              <span className="text-xs text-gray-500">Based on creation date; counts overlap and follow the current filters.</span>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="overflow-x-auto pb-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
           {filteredStages.map(stage => (
