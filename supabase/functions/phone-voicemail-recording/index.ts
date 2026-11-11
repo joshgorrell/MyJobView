@@ -1,3 +1,4 @@
+import { canReadVoicemail } from '../_shared/phone-voicemail-acl.ts';
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
@@ -31,10 +32,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (authError || !user) return respond(401, { error: 'unauthorized' });
   const { data: profile, error: profileError } = await auth.from('profiles')
     .select('organization_id,role').eq('id', user.id).maybeSingle();
-  // Admin-only until voicemail department ACLs are implemented and verified.
-  if (profileError || !profile?.organization_id || profile.role !== 'admin') {
-    return respond(403, { error: 'admin_required' });
-  }
+  if (profileError || !profile?.organization_id) return respond(403, { error: 'access_denied' });
   let id: string;
   try {
     const body = await request.json() as { id?: unknown };
@@ -45,12 +43,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
     id = body.id;
   } catch { return respond(400, { error: 'invalid_json' }); }
   const db = createClient(url, service, { auth: { persistSession: false } });
+  const { data: grants, error: grantError } = await db.from('phone_voicemail_department_access')
+    .select('department').eq('organization_id', profile.organization_id).eq('user_id', user.id);
+  if (grantError) return respond(503, { error: 'permissions_unavailable' });
   const { data: item, error } = await db.from('voicemail_messages')
-    .select('recording_path,state,organization_id,ringcentral_account_id,ringcentral_extension_id')
+    .select('recording_path,state,department,organization_id,ringcentral_account_id,ringcentral_extension_id')
     .eq('id', id).eq('organization_id', profile.organization_id)
     .in('state', ['ready', 'review']).maybeSingle();
   if (error) return respond(503, { error: 'recording_unavailable' });
-  if (!item?.recording_path) return respond(404, { error: 'recording_not_found' });
+  if (!item?.recording_path ||
+      !canReadVoicemail(profile.role, (grants ?? []).map(g => g.department), item.department, item.state)) {
+    return respond(404, { error: 'recording_not_found' });
+  }
   // Ensure the stored object is scoped to the same organization and mailbox.
   const prefix = [profile.organization_id, item.ringcentral_account_id,
     item.ringcentral_extension_id].join('/') + '/';

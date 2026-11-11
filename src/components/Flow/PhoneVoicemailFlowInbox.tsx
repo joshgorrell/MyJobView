@@ -12,6 +12,7 @@ export function PhoneVoicemailFlowInbox() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(true);
   const [audioId, setAudioId] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -49,7 +50,11 @@ export function PhoneVoicemailFlowInbox() {
           'phone-voicemail-inbox', { method: 'GET' },
         );
         if (cancelled) return;
-        if (requestError) throw requestError;
+        if (requestError) {
+          const status = (requestError as { context?: { status?: number } }).context?.status;
+          if (status === 403) { setAuthorized(false); return; }
+          throw requestError;
+        }
         setMessages(Array.isArray(data?.messages) ? data.messages : []);
         setError('');
       } catch {
@@ -61,6 +66,7 @@ export function PhoneVoicemailFlowInbox() {
     void load();
     return () => { cancelled = true; };
   }, []);
+  if (!authorized) return null;
   if (loading) return <p className="text-sm text-gray-500">Loading voicemail…</p>;
   return (
     <section className="space-y-2" aria-label="Phone voicemail inbox">
