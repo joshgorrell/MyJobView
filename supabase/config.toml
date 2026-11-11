@@ -322,3 +322,6 @@ verify_jwt = false
 
 [functions.ringcentral-connection-management]
 verify_jwt = true
+
+[functions.phone-voicemail-inbox]
+verify_jwt = true

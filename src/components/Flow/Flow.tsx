@@ -14,6 +14,7 @@ import { FlowTargetPicker } from './FlowTargetPicker';
 import { FlowWaveIcon } from './FlowWaveIcon';
 import './flow.css';
 import { CustomerConversations, CustomerConversationsProps } from './CustomerConversations';
+import { PhoneVoicemailFlowInbox } from './PhoneVoicemailFlowInbox';
 
 type Option = { id: string; name: string };
 const FLOW_KINDS: Record<string, string> = { messages: 'Messages', discussions: 'Team', updates: 'Updates', tasks: 'Assignments', activity: 'Other activity' };
@@ -228,6 +229,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
 
     <div className="flow-content">
+    {!scoped && view === 'all' && profile?.role === 'admin' && <PhoneVoicemailFlowInbox />}
     {view === 'tasks' && hasModuleAccess('tasks') && tasksContent}
     {view !== 'tasks' && view !== 'messages' && showFilters && <div className="flow-filters" id={filtersId}>
       <label>Content type<select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">All content types</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
