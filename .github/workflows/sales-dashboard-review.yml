@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'src/components/SalesDashboard/**'
+      - 'src/components/Sales/**'
+      - 'tests/leads/**'
+      - 'supabase/migrations/*lead*.sql'
       - 'src/hooks/useSalesDashboard*.ts'
       - 'src/lib/salesDashboard*.ts'
       - 'src/lib/companySalesDashboard.ts'
@@ -27,6 +30,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: node tests/leads/proposal-conversion-database.mjs
       - run: node tests/sales-dashboard/records.mjs
       - run: node tests/sales-dashboard/pagination.mjs
       - run: node tests/sales-dashboard/rep-default.mjs
