@@ -1,15 +1,54 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { PhoneCall, ExternalLink, Loader2 } from 'lucide-react';
 
-/**
- * Connection initiation only. Provider credentials never enter the browser.
- * A successful RingCentral OAuth callback registers a disabled mailbox;
- * an administrator must separately approve activation after testing.
- */
+type Connection = {
+  accountId: string;
+  status: string;
+  updatedAt: string;
+  mailboxes: { extensionId: string; enabled: boolean }[];
+};
+/** Credentials are never returned to the browser. */
 export function RingCentralSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  async function loadConnections() {
+    setLoading(true);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        'ringcentral-connection-management', { method: 'GET' },
+      );
+      if (invokeError) throw invokeError;
+      setConnections(Array.isArray(data?.connections) ? data.connections : []);
+    } catch {
+      setError('Connection status is unavailable. Check the RingCentral integration configuration.');
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { void loadConnections(); }, []);
+  async function disconnect(accountId: string) {
+    if (disconnecting) return;
+    if (!window.confirm(`Disconnect RingCentral account ${accountId}? This disables voicemail ingestion for its mailboxes. Existing voicemail history is retained.`)) return;
+    setDisconnecting(accountId);
+    setError('');
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        'ringcentral-connection-management', {
+          method: 'DELETE', body: { accountId, confirm: true },
+        },
+      );
+      if (invokeError || data?.disconnected !== true) throw new Error('Disconnect failed');
+      await loadConnections();
+    } catch {
+      setError('Unable to disconnect RingCentral. Please try again.');
+    } finally {
+      setDisconnecting(null);
+    }
+  }
   async function connect() {
     if (busy) return;
     setBusy(true);
@@ -51,6 +90,36 @@ export function RingCentralSettings() {
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
         {busy ? 'Connecting…' : 'Connect RingCentral'}
       </button>
+      <div className="space-y-3 border-t border-gray-200 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <h5 className="font-medium text-gray-900">Connected accounts</h5>
+          <button type="button" onClick={() => void loadConnections()} disabled={loading}
+            className="text-sm text-blue-700 hover:underline disabled:opacity-50">Refresh</button>
+        </div>
+        {loading && <p className="text-sm text-gray-500">Checking connections…</p>}
+        {!loading && connections.length === 0 && <p className="text-sm text-gray-500">No connected RingCentral accounts.</p>}
+        {connections.map(connection => (
+          <div key={connection.accountId} className="rounded-lg border border-gray-200 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-medium text-sm text-gray-900">Account {connection.accountId}</p>
+                <p className="text-xs text-gray-500">Status: {connection.status}</p>
+              </div>
+              <button type="button" disabled={disconnecting !== null}
+                onClick={() => void disconnect(connection.accountId)}
+                className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
+                {disconnecting === connection.accountId ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+            <div className="text-xs text-gray-600">
+              {connection.mailboxes.length === 0 ? 'No registered mailboxes' :
+                connection.mailboxes.map(m => (
+                  <p key={m.extensionId}>Extension {m.extensionId}: {m.enabled ? 'Enabled' : 'Disabled'}</p>
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <p className="text-xs text-gray-500">
         Requires a configured RingCentral OAuth application and an MJV administrator account.
