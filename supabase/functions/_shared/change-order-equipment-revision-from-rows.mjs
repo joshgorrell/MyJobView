@@ -25,7 +25,7 @@ function equipment(lines,label) {
     const computed=BigInt(qty)*price;
     if(line.newTotalCents!==null && BigInt(line.newTotalCents)!==computed)
       throw new Error(label+': equipment total disagrees with quantity times price');
-    out.push({lineId:line.lineId,productId:line.productId,quantity:qty,unitPriceCents:Number(price)});
+    out.push({lineId:line.lineId,action:'add',productId:line.productId,quantity:qty,unitPriceCents:Number(price)});
   }
   return out;
 }
