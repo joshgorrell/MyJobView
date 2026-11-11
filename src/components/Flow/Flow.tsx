@@ -54,7 +54,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const scoped = !!(contactId || projectId || workOrderId);
   const [canViewVoicemail, setCanViewVoicemail] = useState(false);
   useEffect(() => {
-    if (scoped || !profile?.id) { setCanViewVoicemail(false); return; }
+    if (scoped || !profile?.id || typeof supabase.functions?.invoke !== 'function') { setCanViewVoicemail(false); return; }
     let cancelled = false;
     setCanViewVoicemail(false);
     void supabase.functions.invoke('phone-voicemail-inbox', { method: 'GET' })
