@@ -39,7 +39,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (request.method === 'GET') {
     const { data: people, error: peopleError } = await db.from('profiles')
       .select('id,full_name,email,role').eq('organization_id', organizationId)
-      .eq('is_active', true).order('full_name').limit(250);
+      .eq('is_active', true).eq('my_job_view_enabled', true)
+      .order('full_name').limit(250);
     const { data: grants, error: grantsError } = await db.from('phone_voicemail_department_access')
       .select('user_id,department').eq('organization_id', organizationId);
     if (peopleError || grantsError) return respond(503, { error: 'permissions_unavailable' });
@@ -60,7 +61,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   } catch { return respond(400, { error: 'invalid_json' }); }
   const { data: target, error: targetError } = await db.from('profiles')
     .select('id').eq('id', targetId).eq('organization_id', organizationId)
-    .eq('is_active', true).maybeSingle();
+    .eq('is_active', true).eq('my_job_view_enabled', true).maybeSingle();
   if (targetError || !target) return respond(404, { error: 'user_not_found' });
   const { error: saveError } = await db.rpc('replace_phone_voicemail_department_grants', {
     p_organization_id: organizationId, p_user_id: targetId, p_departments: departments,

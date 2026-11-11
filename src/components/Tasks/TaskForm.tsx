@@ -339,7 +339,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
         if (calendarProfile?.google_calendar_connected) {
           try {
             const { data: { session } } = await supabase.auth.getSession();
-            const action = task?.google_calendar_event_id ? 'update' : 'create';
+            const action = (task as Task & { google_calendar_event_id?: string | null })?.google_calendar_event_id ? 'update' : 'create';
 
             await fetch(
               `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-event`,
@@ -356,7 +356,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                   reminderDate: taskData.reminder_date,
                   title: `Task: ${formData.title}`,
                   description: `Task reminder\n\n${formData.description || ''}`,
-                  eventId: task?.google_calendar_event_id,
+                  eventId: (task as Task & { google_calendar_event_id?: string | null })?.google_calendar_event_id,
                 }),
               }
             );
