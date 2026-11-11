@@ -1,3 +1,4 @@
+import { requireCustomerZip } from '../../lib/customerZip';
 import { useCompletion } from '../../hooks/useCompletion';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -122,18 +123,7 @@ export function DuplicateProposalModal({
         throw new Error('Please select a contact');
       }
 
-      // Validate that the target contact has a ZIP code
-      const { data: targetContact, error: contactError } = await supabase
-        .from('contacts')
-        .select('zip_code')
-        .eq('id', targetContactId)
-        .single();
-
-      if (contactError) throw contactError;
-
-      if (!targetContact.zip_code || !targetContact.zip_code.trim()) {
-        throw new Error('The selected contact does not have a ZIP code. A ZIP code is required for sales tax calculation. Please add a ZIP code to the contact first.');
-      }
+      if (!await requireCustomerZip(targetContactId)) return;
 
       const {data:newId,error:copyError}=await supabase.rpc('duplicate_job_proposal',{p_source:proposalId,p_contact:targetContactId,p_title:newTitle,p_include:includeLineItems});
       if(copyError)throw copyError;

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { CustomerZipPrompt } from './components/Shared/CustomerZipPrompt';
 import { FeedbackHost } from './components/Shared/FeedbackHost';
 import { PortalProposalEngagement } from './components/Portal/PortalProposalEngagement';
 import './index.css';
@@ -27,6 +28,7 @@ createRoot(document.getElementById('root')!).render(
   <>
     <App />
     <FeedbackHost />
+    <CustomerZipPrompt />
     <PortalProposalEngagement />
   </>
 );

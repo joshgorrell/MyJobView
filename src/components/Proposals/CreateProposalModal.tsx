@@ -1,3 +1,4 @@
+import { requireCustomerZip, validCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -315,7 +316,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   }
 
   async function updateContactZipCode() {
-    if (!selectedResult || selectedResult.source !== 'contact' || !zipCode.trim()) {
+    if (!selectedResult || selectedResult.source !== 'contact' || !validCustomerZip(zipCode)) {
       notify('Please enter a ZIP code', { theme: 'violet', tone: 'warning' });
       return;
     }
@@ -352,7 +353,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
     }
 
     const effectiveZip = selectedLocation?.zip_code || selectedResult.zip_code || zipCode;
-    if (!effectiveZip || !effectiveZip.trim()) {
+    if (!validCustomerZip(effectiveZip)) {
       notify('ZIP code is required for sales tax calculation. Please enter a ZIP code on the selected location or customer.', { theme: 'violet', tone: 'warning' });
       return;
     }
@@ -478,6 +479,8 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
         }
       }
 
+      if (!validCustomerZip(selectedLocation?.zip_code) && !await requireCustomerZip(resolvedContactId, zipCode)) return;
+
       const { data: proposal, error: proposalError } = await supabase
         .from('proposals')
         .insert({
@@ -514,7 +517,7 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
   }
 
   const effectiveZip = selectedLocation?.zip_code || selectedResult?.zip_code || zipCode;
-  const needsZip = selectedResult && !effectiveZip;
+  const needsZip = selectedResult && !validCustomerZip(selectedLocation?.zip_code || selectedResult.zip_code);
   const isLeadSelected = selectedResult?.source === 'lead';
 
   return (

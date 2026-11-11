@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+let record={id:'customer',contact_name:'New construction',zip_code:null},fail=false;
+globalThis.__zipTestClient={from:()=>({select(){return this},eq(){return this},update(value){this.value=value;return this},async single(){if(fail)return {error:new Error('Save denied')};if(this.value)record={...record,...this.value};return {data:record};}})};
+const source=readFileSync('src/lib/customerZip.ts','utf8').replace("import { supabase } from './supabase';",'const supabase = globalThis.__zipTestClient;');
+const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const m=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+for(const value of [null,'','1234','ABCDE','123456','12345-12'])assert.equal(m.validCustomerZip(value),false);
+for(const value of ['66610','66610-1234',' 66502 '])assert.equal(m.validCustomerZip(value),true);
+const cancelled=m.requireCustomerZip('customer');await new Promise(r=>setTimeout(r,0));assert.equal(m.getZipRequest().contactId,'customer');m.finishZipRequest(null);assert.equal(await cancelled,null);
+assert.equal(await m.requireCustomerZip('customer','66502'),'66502');assert.equal(record.zip_code,'66502');assert.equal(m.getZipRequest(),null);
+assert.equal(await m.requireCustomerZip('customer'),'66502');record.zip_code=null;fail=true;await assert.rejects(m.requireCustomerZip('customer','66610'),/Save denied/);
+console.log('ZIP runtime checks passed: formatting, completion request, cancel, save-before-continue, existing ZIP and save failure.');
+delete globalThis.__zipTestClient;

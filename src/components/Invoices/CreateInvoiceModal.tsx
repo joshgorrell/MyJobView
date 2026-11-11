@@ -1,3 +1,4 @@
+import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -553,6 +554,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const customerZip = await requireCustomerZip(selectedContactId);
+      if (!customerZip) return;
       const subtotal = calculateSubtotal();
       const tax = calculateTax();
       const total = calculateTotal();
@@ -583,12 +586,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           billing_address_line2: billing.billing_address_line2 || null,
           billing_city: billing.billing_city || null,
           billing_state: billing.billing_state || null,
-          billing_zip: billing.billing_zip || null,
+          billing_zip: billing.billing_zip || customerZip,
           bill_to_contact_id: billToContact?.id || null,
           jobsite_address: jobsiteAddress,
           jobsite_city: jobsiteCity,
           jobsite_state: jobsiteState,
-          jobsite_zip: jobsiteZip,
+          jobsite_zip: jobsiteZip || customerZip,
           created_by: user.id
         })
         .select()

@@ -1,3 +1,4 @@
+import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -423,6 +424,7 @@ export function CreateSOInvoiceModal({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      if (!await requireCustomerZip(order.contact?.id || order.contact_id)) return;
 
       const selectedCORows = selectedRows.filter(r => r.type === 'change_order');
       const hasContractRow = selectedRows.some(r => r.type === 'contract');

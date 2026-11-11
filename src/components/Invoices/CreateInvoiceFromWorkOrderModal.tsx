@@ -1,3 +1,4 @@
+import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, Plus, Trash2, Save, Clock, Wrench, Package, AlertCircle, Search, CheckCircle, DollarSign, FileText, ChevronUp, ChevronDown, StickyNote, Eye, EyeOff, MapPin } from 'lucide-react';
@@ -570,6 +571,8 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
     if (publish && (openClocks || reviewOrders.some(w=>w.status!=='completed'))) { notify('Clock out all technicians before billing.', { theme: 'emerald', tone: 'info' }); return; }
     setSubmitting(true);
     try {
+      const customerZip = await requireCustomerZip(selectedWorkOrder.contact_id);
+      if (!customerZip) return;
       const taxResult = computeInvoiceTax({
         lineItems: lineItems.map(item => ({
           amount: item.amount,
@@ -587,7 +590,7 @@ export function CreateInvoiceFromWorkOrderModal({ onClose, onSuccess, preSelecte
       const selectedWO = workOrders.find(wo => selectedWorkOrderIds.includes(wo.id));
       const {data: invoiceId, error} = await supabase.rpc('save_work_order_invoice', {
         p_request_id:retryKey.current,p_work_order_ids:selectedWorkOrderIds,p_invoice_id:draftInvoiceId,p_publish:publish,p_portal:portalVisible,
-        p_header:{invoice_date:invoiceDate,due_date:dueDate || invoiceDate,notes:notes || null,tax_environment:taxEnvironment,tax_project_type:taxProjectType,tax_rate:taxRate,tax_amount:tax,payment_terms:normalizePaymentTerms(selectedWO?.contacts?.default_payment_terms) || 'due_on_receipt',...billing},
+        p_header:{invoice_date:invoiceDate,due_date:dueDate || invoiceDate,notes:notes || null,tax_environment:taxEnvironment,tax_project_type:taxProjectType,tax_rate:taxRate,tax_amount:tax,payment_terms:normalizePaymentTerms(selectedWO?.contacts?.default_payment_terms) || 'due_on_receipt',...billing,billing_zip:billing.billing_zip || customerZip},
         p_lines:lineItems.map(item => ({description:item.description,quantity:item.quantity,unit_price:item.unit_price,item_type:item.item_type || 'material',is_taxable:true,source_part_id:item.source_part_id || null,product_id:item.product_id || null,sku:item.sku || null,cost:item.cost ?? null,notes:item.notes || null,notes_visible_on_invoice:item.notes_visible_on_invoice || false})),
       });
       if(error) throw error;
