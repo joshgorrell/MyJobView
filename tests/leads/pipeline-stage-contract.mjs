@@ -23,4 +23,12 @@ assert.match(board, /initialSalesStatus=\{contactFormInitialStatus\}/, 'New Pros
 assert.match(board, /\.not\('status', 'in', '\(closed_won,closed_lost\)'\)/, 'Closed Leads must not remain in the open Leads widget');
 assert.match(contactForm, /initialSalesStatus \?\? draft\?\.salesStatus/, 'Explicit Prospect quick-create must override an old draft');
 assert.doesNotMatch(leadDetail, /window\.location\.href = '\/pipeline'/, 'Prospect downgrade must not navigate to obsolete /pipeline route');
+const contactDetail = read('src/components/Contacts/ContactDetail.tsx');
+const promotion = read('supabase/migrations/20261111193000_promote_prospect_on_lead_insert.sql');
+assert.match(contactDetail, /if \(target === 'lead'\) \{[\s\S]*?setShowConvertForm\(true\)/, 'Prospect conversion must create a real Lead, not only relabel the Contact');
+assert.match(promotion, /AFTER INSERT ON public\.leads/, 'Prospect promotion must be tied to canonical Lead creation');
+assert.match(promotion, /SET contact_type = 'lead'/, 'Prospect Contact must move out of Prospects');
+assert.match(promotion, /AND contact_type = 'prospect'/, 'Only Prospect Contacts should be reclassified');
+assert.match(promotion, /AND organization_id = NEW\.organization_id/, 'Prospect promotion must be tenant scoped');
+
 console.log('Pipeline stage contract checks passed.');
