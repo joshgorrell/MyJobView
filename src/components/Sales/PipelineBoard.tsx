@@ -895,7 +895,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                             </span>
                           </div>
                         )}
-                        {(followUpOverdue || followUpToday) && (
+                        {(Boolean(item.next_follow_up) && String(item.next_follow_up).slice(0, 10) <= localDay(new Date())) && (
                           <div className="mb-2">
                             <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
                             {snoozeLeadId === item.id && (
