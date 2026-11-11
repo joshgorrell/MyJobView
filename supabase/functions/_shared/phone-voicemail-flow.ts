@@ -19,7 +19,7 @@ export async function publishVoicemailToFlow(
     .eq('source_table', 'voicemail_messages').eq('source_id', input.id)
     .eq('event_type', eventType).limit(1);
   if (lookupError) throw Error('voicemail_flow_lookup_failed');
-  if (existing?.length) return;
+  if (!existing?.length) {
 
   const department = input.department ?? 'Unclassified';
   const { error: eventError } = await db.from('flow_events').insert({
@@ -34,6 +34,7 @@ export async function publishVoicemailToFlow(
     is_internal: true,
   });
   if (eventError) throw Error('voicemail_flow_insert_failed');
+  }
 
   // Department grants are the only source of notification recipients. Do not
   // guess recipients based on a receiving RingCentral mailbox.
@@ -43,8 +44,15 @@ export async function publishVoicemailToFlow(
     .eq('department', input.department);
   if (recipientsError) throw Error('voicemail_recipient_lookup_failed');
   if (!recipients?.length) return;
+  const { data: alreadyNotified, error: notifiedError } = await db.from('notifications')
+    .select('user_id').eq('organization_id', input.organizationId)
+    .eq('related_id', input.id).eq('type', 'phone_voicemail');
+  if (notifiedError) throw Error('voicemail_notification_lookup_failed');
+  const notified = new Set((alreadyNotified ?? []).map(({ user_id }) => user_id));
+  const pending = recipients.filter(({ user_id }) => !notified.has(user_id));
+  if (!pending.length) return;
   const { error: notificationError } = await db.from('notifications').insert(
-    recipients.map(({ user_id }) => ({
+    pending.map(({ user_id }) => ({
       organization_id: input.organizationId,
       user_id,
       type: 'phone_voicemail',
