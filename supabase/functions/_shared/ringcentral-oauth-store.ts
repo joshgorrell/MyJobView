@@ -9,12 +9,37 @@ export class SupabaseRingCentralOAuthStore implements OAuthConnectionStore {
     if (error) throw Error('RingCentral connection lookup failed');
     return data as OAuthConnectionRow | null;
   }
-  async rotate(previous: OAuthConnectionRow, next: Partial<OAuthConnectionRow>): Promise<boolean> {
+  async acquireRefreshLease(previous: OAuthConnectionRow, leaseId: string, now: number): Promise<boolean> {
     const { data, error } = await this.db.from('ringcentral_oauth_connections')
-      .update({ ...next, updated_at: new Date().toISOString() })
+      .update({
+        refresh_lease_id: leaseId,
+        refresh_lease_expires_at: new Date(now + 120_000).toISOString(),
+      })
       .eq('organization_id', previous.organization_id)
       .eq('ringcentral_account_id', previous.ringcentral_account_id)
       .eq('token_version', previous.token_version)
+      .eq('status', 'connected')
+      .or(`refresh_lease_id.is.null,refresh_lease_expires_at.lt.${new Date(now).toISOString()}`)
+      .select('refresh_lease_id');
+    if (error) throw Error('RingCentral refresh lease acquisition failed');
+    return Array.isArray(data) && data.length === 1 && data[0].refresh_lease_id === leaseId;
+  }
+  async releaseRefreshLease(previous: OAuthConnectionRow, leaseId: string): Promise<void> {
+    const { error } = await this.db.from('ringcentral_oauth_connections')
+      .update({ refresh_lease_id: null, refresh_lease_expires_at: null })
+      .eq('organization_id', previous.organization_id)
+      .eq('ringcentral_account_id', previous.ringcentral_account_id)
+      .eq('refresh_lease_id', leaseId);
+    if (error) throw Error('RingCentral refresh lease release failed');
+  }
+  async rotate(previous: OAuthConnectionRow, next: Partial<OAuthConnectionRow>, leaseId: string): Promise<boolean> {
+    const { data, error } = await this.db.from('ringcentral_oauth_connections')
+      .update({ ...next, refresh_lease_id: null, refresh_lease_expires_at: null,
+        updated_at: new Date().toISOString() })
+      .eq('organization_id', previous.organization_id)
+      .eq('ringcentral_account_id', previous.ringcentral_account_id)
+      .eq('token_version', previous.token_version)
+      .eq('refresh_lease_id', leaseId)
       .eq('status', 'connected').select('token_version');
     if (error) throw Error('RingCentral connection rotation failed');
     return Array.isArray(data) && data.length === 1;
