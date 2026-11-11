@@ -15,6 +15,7 @@ interface TechLocation {
   timestamp: string;
   battery_level: number | null;
   heartbeat_at?: string | null;
+  location_source: 'gps' | 'clock_in';
   is_active: boolean;
   technician: {
     full_name: string;
@@ -50,6 +51,8 @@ export function TechMap() {
   );
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [clockedInCount, setClockedInCount] = useState(0);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -315,6 +318,11 @@ export function TechMap() {
     }
   }
 
+  function isStale(timestamp: string): boolean {
+    const age = Date.now() - Date.parse(timestamp);
+    return !Number.isFinite(age) || age > 5 * 60 * 1000;
+  }
+
   function getMarkerColor(status?: string): string {
 
     switch (status) {
@@ -352,7 +360,7 @@ export function TechMap() {
         marker.setIcon({
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 10,
-          fillColor: getMarkerColor(tech.status?.status),
+          fillColor: isStale(tech.timestamp) || tech.location_source === 'clock_in' ? '#9ca3af' : getMarkerColor(tech.status?.status),
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
@@ -364,12 +372,12 @@ export function TechMap() {
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             scale: 10,
-            fillColor: getMarkerColor(tech.status?.status),
+            fillColor: isStale(tech.timestamp) || tech.location_source === 'clock_in' ? '#9ca3af' : getMarkerColor(tech.status?.status),
             fillOpacity: 1,
             strokeColor: '#ffffff',
             strokeWeight: 2,
           },
-          title: tech.technician.full_name,
+          title: `${tech.technician.full_name} — ${tech.location_source === 'clock_in' ? 'Clock-in position only' : isStale(tech.timestamp) ? 'Stale GPS position' : 'Recent GPS position'}`,
         });
 
         const infoWindow = new window.google.maps.InfoWindow({
@@ -388,7 +396,7 @@ export function TechMap() {
                 </div>
               ` : ''}
               <div style="font-size: 14px; color: #666;">
-                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)}${Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 ? ' — last location, connectivity unknown' : ''}
+                <strong>Updated:</strong> ${getTimeSince(tech.timestamp)} — ${tech.location_source === 'clock_in' ? 'Clock-in location only, not live GPS' : isStale(tech.timestamp) ? 'Stale GPS location' : 'Recent GPS location'}
               </div>
               ${tech.accuracy > 100 ? `
                 <div style="font-size: 12px; color: #f59e0b; margin-top: 4px;">
@@ -438,11 +446,13 @@ export function TechMap() {
       const today = formatDateInTimezone(new Date().toISOString(), organizationTimezone);
 
       // Get all clocked-in technicians with their clock-in location
-      const { data: dailyClocks } = await supabase
+      const { data: dailyClocks, error: clockError } = await supabase
         .from('daily_clock_entries')
         .select('id, technician_id, status, clock_in, clock_in_latitude, clock_in_longitude, profiles!technician_id(full_name, role, primary_office_id)')
         .eq('entry_date', today)
         .is('clock_out', null);
+      if (clockError) throw clockError;
+      setClockedInCount((dailyClocks || []).filter(c => c.status === 'clocked_in').length);
 
       const { data: activeBreaks } = await supabase
         .from('daily_clock_breaks')
@@ -536,7 +546,7 @@ export function TechMap() {
         }
 
         // Show ALL clocked-in technicians on the map
-        if (clock.status === 'clocked_in' && locationData) {
+        if (clock.status === 'clocked_in' && locationData && Number.isFinite(locationData.latitude) && Number.isFinite(locationData.longitude) && Math.abs(locationData.latitude) <= 90 && Math.abs(locationData.longitude) <= 180) {
           latestLocations.set(techId, {
             id: locationData.id,
             technician_id: techId,
@@ -546,7 +556,8 @@ export function TechMap() {
             heading: locationData.heading,
             speed: locationData.speed,
             timestamp: locationData.timestamp,
-            battery_level: null,
+            battery_level: breadcrumb?.battery_level ?? null,
+            location_source: breadcrumb ? 'gps' : 'clock_in',
             heartbeat_at: heartbeatByTech.get(techId)?.daily_clock_entry_id === clock.id ? heartbeatByTech.get(techId)?.last_seen_at : null,
             is_active: true,
             technician: clock.profiles,
@@ -561,8 +572,10 @@ export function TechMap() {
 
       setTechLocations(Array.from(latestLocations.values()));
       setLastUpdate(new Date());
+      setLocationError(null);
     } catch (error) {
       console.error('Error loading tech locations:', error);
+      setLocationError('Employee locations could not be refreshed. Displayed positions may be outdated.');
     } finally {
       setLoading(false);
     }
@@ -644,6 +657,8 @@ export function TechMap() {
         {historyMode && <label>Date <input type="date" className="block rounded border p-2" value={historyDate} onChange={e => setHistoryDate(e.target.value)} /></label>}
         {historyMode && <span className="text-sm">{historyLoading ? 'Loading route…' : historyError || (selectedTech ? historyPoints.length + ' GPS points' : 'Select a technician for route history')}</span>}
       </div>
+      {locationError && <div role="alert" className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">{locationError}</div>}
+      {!loading && !locationError && clockedInCount > visibleLocations.length && roleFilter === 'all' && officeFilter === 'all' && <p className="text-xs text-gray-300">{clockedInCount - visibleLocations.length} clocked-in employee(s) have no usable GPS or clock-in coordinates.</p>}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
         {/* Map Area */}
         <div className="lg:col-span-2">
@@ -759,6 +774,7 @@ export function TechMap() {
                         {Math.round(tech.speed)} mph
                       </div>
                     )}
+                    <div className="text-xs text-gray-600">{tech.location_source === 'clock_in' ? 'Clock-in position only' : isStale(tech.timestamp) ? 'Stale GPS — last known position' : 'Recent GPS position'}</div>
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Clock className="w-3 h-3" />
                       Last GPS: {getTimeSince(tech.timestamp)}
