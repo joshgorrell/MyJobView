@@ -517,8 +517,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     <div className="space-y-4 sm:space-y-6">
       {/* Stage navigation uses the existing operational modules; no duplicate editors. */}
       <nav aria-label="Sales pipeline stages" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white">Prospects <span className="block text-xs font-normal text-gray-300">Coming in the Sales workspace</span></div>
-        <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white">Leads <span className="block text-xs font-normal text-gray-300">See Leads below</span></div>
+        <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-sm font-semibold text-white">Prospects <span className="block text-xs font-normal text-gray-300">Prospect tracking pending</span></div>
+        <button type="button" onClick={() => document.getElementById("pipeline-leads")?.scrollIntoView({ behavior: "smooth", block: "start" })} disabled={!selectedWidgets.includes("leads")} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50">Leads <span className="block text-xs font-normal text-gray-300">{stages.find(stage => stage.id === "leads")?.count ?? 0} open leads · View below</span></button>
         <button type="button" onClick={() => onNavigate?.('proposals')} disabled={!onNavigate || !canViewProposals} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">Proposals <span className="block text-xs font-normal text-gray-300">Open Proposals module ↗</span></button>
         <button type="button" onClick={() => onNavigate?.('sales_orders')} disabled={!onNavigate || !canViewSalesOrders} className="rounded-lg border border-white/15 bg-white/5 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50">Sales Orders <span className="block text-xs font-normal text-gray-300">Open Sales Orders module ↗</span></button>
       </nav>
@@ -646,7 +646,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       <div className="overflow-x-auto pb-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
           {filteredStages.map(stage => (
-            <div key={stage.id} className="flex flex-col">
+            <div key={stage.id} id={`pipeline-${stage.id}`} className="flex flex-col scroll-mt-6">
               <div className={`${stage.bgColor} border-2 ${stage.borderColor} rounded-t-lg p-3 sm:p-4`}>
                 <div className="flex items-center justify-between mb-1">
                   <h3 className={`text-sm sm:text-base font-semibold ${stage.color}`}>
