@@ -328,3 +328,6 @@ verify_jwt = true
 
 [functions.phone-voicemail-recording]
 verify_jwt = true
+
+[functions.phone-voicemail-permissions]
+verify_jwt = true
