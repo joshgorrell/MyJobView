@@ -313,3 +313,9 @@ verify_jwt = false
 # Internal queue drain; requires PHONE_DISPATCHER_SCHEDULER_SECRET.
 [functions.drain-phone-voicemail-queue]
 verify_jwt = false
+
+[functions.ringcentral-oauth-start]
+verify_jwt = true
+
+[functions.ringcentral-oauth-callback]
+verify_jwt = false
