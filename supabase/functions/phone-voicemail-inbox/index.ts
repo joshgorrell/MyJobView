@@ -1,3 +1,4 @@
+import { permittedVoicemailDepartments } from '../_shared/phone-voicemail-acl.ts';
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
@@ -30,16 +31,19 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (authError || !user) return respond(401, { error: 'unauthorized' });
   const { data: profile, error: profileError } = await auth.from('profiles')
     .select('organization_id,role').eq('id', user.id).maybeSingle();
-  // Until department ACL integration is complete, only tenant admins can read transcripts.
-  if (profileError || !profile?.organization_id || profile.role !== 'admin') {
-    return respond(403, { error: 'admin_required' });
-  }
+  if (profileError || !profile?.organization_id) return respond(403, { error: 'access_denied' });
   const db = createClient(url, service, { auth: { persistSession: false } });
-  const { data, error } = await db.from('voicemail_messages')
+  const { data: grants, error: grantError } = await db.from('phone_voicemail_department_access')
+    .select('department').eq('organization_id', profile.organization_id).eq('user_id', user.id);
+  if (grantError) return respond(503, { error: 'permissions_unavailable' });
+  const allowed = permittedVoicemailDepartments(profile.role, (grants ?? []).map(g => g.department));
+  if (allowed.length === 0) return respond(403, { error: 'access_denied' });
+  let query = db.from('voicemail_messages')
     .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested')
     .eq('organization_id', profile.organization_id)
-    .in('state', ['ready', 'review'])
-    .order('received_at', { ascending: false }).limit(50);
+    .in('state', ['ready', 'review']);
+  if (profile.role !== 'admin') query = query.in('department', allowed);
+  const { data, error } = await query.order('received_at', { ascending: false }).limit(50);
   if (error) return respond(503, { error: 'voicemail_unavailable' });
   return respond(200, { messages: data ?? [] });
 });
