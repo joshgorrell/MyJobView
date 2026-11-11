@@ -15,6 +15,7 @@ export function RingCentralSettings() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null);
   async function loadConnections() {
     setLoading(true);
     try {
@@ -32,7 +33,6 @@ export function RingCentralSettings() {
   useEffect(() => { void loadConnections(); }, []);
   async function disconnect(accountId: string) {
     if (disconnecting) return;
-    if (!window.confirm(`Disconnect RingCentral account ${accountId}? This disables voicemail ingestion for its mailboxes. Existing voicemail history is retained.`)) return;
     setDisconnecting(accountId);
     setError('');
     try {
@@ -42,6 +42,7 @@ export function RingCentralSettings() {
         },
       );
       if (invokeError || data?.disconnected !== true) throw new Error('Disconnect failed');
+      setConfirmAccountId(null);
       await loadConnections();
     } catch {
       setError('Unable to disconnect RingCentral. Please try again.');
@@ -106,11 +107,31 @@ export function RingCentralSettings() {
                 <p className="text-xs text-gray-500">Status: {connection.status}</p>
               </div>
               <button type="button" disabled={disconnecting !== null}
-                onClick={() => void disconnect(connection.accountId)}
+                onClick={() => setConfirmAccountId(connection.accountId)}
                 className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
                 {disconnecting === connection.accountId ? 'Disconnecting…' : 'Disconnect'}
               </button>
             </div>
+            {confirmAccountId === connection.accountId && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-3">
+                <p className="text-sm text-red-900">
+                  Disconnect account {connection.accountId}? Its mailboxes will be disabled,
+                  and MJV's saved authorization will be removed. Existing voicemail history is retained.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void disconnect(connection.accountId)}
+                    disabled={disconnecting !== null}
+                    className="rounded-lg bg-red-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+                    Confirm disconnect
+                  </button>
+                  <button type="button" onClick={() => setConfirmAccountId(null)}
+                    disabled={disconnecting !== null}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="text-xs text-gray-600">
               {connection.mailboxes.length === 0 ? 'No registered mailboxes' :
                 connection.mailboxes.map(m => (
