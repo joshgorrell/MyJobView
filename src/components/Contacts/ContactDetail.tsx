@@ -487,8 +487,6 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
 
       if (target === 'prospect') {
         updateData.contact_type = 'prospect';
-      } else if (target === 'lead') {
-        updateData.contact_type = 'lead';
       } else if (target === 'customer') {
         // Preserve original entity shape (person vs business); default to 'person'
         const originalEntityType = (contactAny.contact_type === 'business') ? 'business' : 'person';
