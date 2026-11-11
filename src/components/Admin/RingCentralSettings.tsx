@@ -1,3 +1,4 @@
+import { PhoneVoicemailPermissions } from './PhoneVoicemailPermissions';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { PhoneCall, ExternalLink, Loader2 } from 'lucide-react';
@@ -141,6 +142,7 @@ export function RingCentralSettings() {
           </div>
         ))}
       </div>
+      <PhoneVoicemailPermissions />
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <p className="text-xs text-gray-500">
         Requires a configured RingCentral OAuth application and an MJV administrator account.
