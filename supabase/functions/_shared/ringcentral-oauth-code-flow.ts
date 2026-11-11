@@ -1,7 +1,6 @@
 import { encryptOAuthToken } from './ringcentral-token-crypto.ts';
 
 const ORIGINS = new Set(['https://platform.ringcentral.com', 'https://platform.devtest.ringcentral.com']);
-const enc = new TextEncoder();
 function b64url(bytes: Uint8Array): string {
   let s = '';
   for (const b of bytes) s += String.fromCharCode(b);
