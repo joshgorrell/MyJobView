@@ -33,7 +33,7 @@ export async function publishVoicemailToFlow(
     required_module: 'feed',
     is_internal: true,
   });
-  if (eventError) throw Error('voicemail_flow_insert_failed');
+  if (eventError && eventError.code !== '23505') throw Error('voicemail_flow_insert_failed');
   }
 
   // Department grants are the only source of notification recipients. Do not
@@ -51,15 +51,13 @@ export async function publishVoicemailToFlow(
   const notified = new Set((alreadyNotified ?? []).map(({ user_id }) => user_id));
   const pending = recipients.filter(({ user_id }) => !notified.has(user_id));
   if (!pending.length) return;
-  const { error: notificationError } = await db.from('notifications').insert(
-    pending.map(({ user_id }) => ({
-      organization_id: input.organizationId,
-      user_id,
-      type: 'phone_voicemail',
+  for (const { user_id } of pending) {
+    const { error: notificationError } = await db.from('notifications').insert({
+      organization_id: input.organizationId, user_id, type: 'phone_voicemail',
       title: input.urgent ? 'Urgent voicemail' : 'New department voicemail',
       body: `A ${input.department} voicemail is ready for review in MJV.`,
       related_id: input.id,
-    })),
-  );
-  if (notificationError) throw Error('voicemail_notification_insert_failed');
+    });
+    if (notificationError && notificationError.code !== '23505') throw Error('voicemail_notification_insert_failed');
+  }
 }
