@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DollarSign, Map, Calendar, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, ChevronRight } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
+import { RingCentralSettings } from './RingCentralSettings';
 
 interface CompanySettings {
   google_maps_api_key?: string;
@@ -33,7 +34,7 @@ interface OrgPaymentSettings {
 }
 
 export function IntegrationsSettings() {
-  const [activeIntegration, setActiveIntegration] = useState<'payment_processor' | 'quickbooks' | 'google_maps' | 'google_calendar' | 'twilio' | 'openai' | 'resend'>(() => { const params = new URLSearchParams(window.location.search); return params.get('integration') === 'quickbooks' || params.has('qbo') ? 'quickbooks' : 'payment_processor'; });
+  const [activeIntegration, setActiveIntegration] = useState<'payment_processor' | 'quickbooks' | 'google_maps' | 'google_calendar' | 'twilio' | 'openai' | 'resend' | 'ringcentral'>(() => { const params = new URLSearchParams(window.location.search); return params.get('integration') === 'quickbooks' || params.has('qbo') ? 'quickbooks' : 'payment_processor'; });
   const [settings, setSettings] = useState<CompanySettings>({});
   const [originalSettings, setOriginalSettings] = useState<CompanySettings>({});
   const [loading, setLoading] = useState(false);
@@ -414,6 +415,17 @@ export function IntegrationsSettings() {
             Google Calendar
           </button>
           <button
+            onClick={() => setActiveIntegration('ringcentral')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeIntegration === 'ringcentral'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            RingCentral
+          </button>
+          <button
             onClick={() => setActiveIntegration('twilio')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'twilio'
@@ -448,6 +460,8 @@ export function IntegrationsSettings() {
           </button>
         </nav>
       </div>
+
+      {activeIntegration === 'ringcentral' && <RingCentralSettings />}
 
       {/* Payment Processor Integration */}
       {activeIntegration === 'payment_processor' && (
