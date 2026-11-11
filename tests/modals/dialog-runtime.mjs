@@ -64,6 +64,7 @@ const invoice = harness('src/components/Invoices/CreateInvoiceModal.tsx', {
   '../../contexts/AuthContext': { useAuth: () => ({ companySettings: { id: 'company' } }) },
   '../../lib/utils': { formatCurrency: value => `$${value}` },
   '../../lib/taxCalculations': { computeInvoiceTax: () => ({ taxAmount: 0 }) },
+  '../../lib/customerZip': { requireCustomerZip: async () => '66603' },
   '../Products/ProductStatusNotice': { default: 'ProductStatusNotice' },
   '../Shared/ContactSearchSelect': { ContactSearchSelect: 'ContactSearchSelect' },
   '../Proposals/InlineProductSearch': { default: 'InlineProductSearch' },
