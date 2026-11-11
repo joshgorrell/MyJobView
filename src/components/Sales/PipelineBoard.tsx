@@ -797,6 +797,11 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                     // Leads and Fishbowl
                     const isAssignedToMe = item.assigned_to === profile?.id;
                     const isAssigned = !!item.assigned_to;
+                    const followUpDate = item.next_follow_up ? new Date(item.next_follow_up) : null;
+                    const followUpDay = followUpDate && !Number.isNaN(followUpDate.getTime()) ? followUpDate.toISOString().slice(0, 10) : null;
+                    const todayDay = new Date().toISOString().slice(0, 10);
+                    const followUpOverdue = !!followUpDay && followUpDay < todayDay;
+                    const followUpToday = followUpDay === todayDay;
 
                     return (
                       <div
@@ -866,6 +871,13 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                             }`}>
                               {item.priority}
                             </span>
+                          </div>
+                        )}
+                        {(followUpOverdue || followUpToday) && (
+                          <div className={`mb-2 flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${followUpOverdue ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            {followUpOverdue ? 'Follow-up overdue' : 'Follow-up due today'}
+                            <span className="ml-auto">{followUpDay}</span>
                           </div>
                         )}
                         {/* Show assigned rep info */}
