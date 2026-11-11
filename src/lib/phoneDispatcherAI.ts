@@ -53,14 +53,18 @@ export function buildVoicemailMessage(
     department,
     failed: result.failed || !transcript || !summary || !recordingAvailable,
   });
+  // A potential alarm/safety emergency must not disappear into junk quarantine.
+  const safeDecision: VoicemailDecision = result.urgent && decision.kind === 'junk'
+    ? { kind: 'review', notifyAdmin: true, reason: 'uncertain_spam' }
+    : decision;
   const reviewReasons: string[] = [];
-  if (decision.kind === 'review') reviewReasons.push(decision.reason);
-  if (result.urgent && decision.kind !== 'route') reviewReasons.push('urgent_requires_review');
+  if (safeDecision.kind === 'review') reviewReasons.push(safeDecision.reason);
+  if (result.urgent && safeDecision.kind !== 'route') reviewReasons.push('urgent_requires_review');
   return {
     transcript,
     summary,
     department,
-    decision,
+    decision: safeDecision,
     urgent: Boolean(result.urgent),
     callbackRequested: Boolean(result.callbackRequested),
     recordingAvailable,
