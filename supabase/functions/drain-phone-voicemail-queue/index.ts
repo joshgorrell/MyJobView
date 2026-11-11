@@ -73,7 +73,7 @@ Deno.serve(async (request: Request) => {
   const { data: processed, error: processedError } = await db.from('voicemail_messages')
     .select('id,organization_id,department,summary,state,urgent')
     .in('state', ['ready', 'review'])
-    .order('updated_at', { ascending: false }).limit(100);
+    .order('updated_at', { ascending: true }).limit(100);
   if (processedError) return json(503, { error: 'handoff_reconciliation_lookup_failed' });
   let repaired = 0;
   let handoffFailed = 0;
