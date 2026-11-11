@@ -61,6 +61,7 @@ export function TechMap() {
   const initRetryCount = useRef(0);
   const [historyDate, setHistoryDate] = useState(() => formatDateInTimezone(new Date().toISOString(), 'America/Chicago'));
   const [organizationTimezone, setOrganizationTimezone] = useState('America/Chicago');
+  const timezoneRef = useRef('America/Chicago');
   const [historyMode, setHistoryMode] = useState(false);
   const [historyPoints, setHistoryPoints] = useState<Array<{ latitude: number; longitude: number; recorded_at: string }>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -121,7 +122,9 @@ export function TechMap() {
 
   useEffect(() => {
     void getOrganizationTimezone().then(timezone => {
+      timezoneRef.current = timezone;
       setOrganizationTimezone(timezone);
+      void loadTechLocations();
       setHistoryDate(formatDateInTimezone(new Date().toISOString(), timezone));
     });
   }, []);
@@ -357,6 +360,7 @@ export function TechMap() {
       if (markersRef.current.has(tech.technician_id)) {
         const marker = markersRef.current.get(tech.technician_id);
         marker.setPosition(position);
+        marker.setTitle(`${tech.technician.full_name} — ${tech.location_source === 'clock_in' ? 'Clock-in position only' : isStale(tech.timestamp) ? 'Stale GPS position' : 'Recent GPS position'}`);
         marker.setIcon({
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 10,
@@ -443,7 +447,7 @@ export function TechMap() {
 
   async function loadTechLocations() {
     try {
-      const today = formatDateInTimezone(new Date().toISOString(), organizationTimezone);
+      const today = formatDateInTimezone(new Date().toISOString(), timezoneRef.current);
 
       // Get all clocked-in technicians with their clock-in location
       const { data: dailyClocks, error: clockError } = await supabase
