@@ -923,7 +923,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                     </div>
                     {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).length > 0 && <p className="mt-1 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).join(', ')}</p>}
                     <div className="flex flex-wrap items-center gap-x-4">
-                    <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 text-sm text-blue-500">
+                    <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 lg:min-h-6 text-sm text-blue-500">
                       {showCustomerDetails ? 'Hide request contact details' : 'Edit request contact details'}
                     </button>
                     </div>
@@ -1043,7 +1043,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </div>
           )}
 
-<details className="border-t border-subtle pt-2"><summary className="min-h-11 cursor-pointer text-sm text-secondary">{formData.contact_id ? 'Change job site or address' : '+ Location (optional)'}</summary>
+<details className="border-t border-subtle pt-2"><summary className="min-h-11 lg:min-h-9 cursor-pointer text-sm text-secondary">{formData.contact_id ? 'Change job site or address' : '+ Location (optional)'}</summary>
           {/* Location Section */}
           <div className="space-y-3 lg:space-y-2">
             <h3 className="font-semibold text-primary flex items-center gap-2">
