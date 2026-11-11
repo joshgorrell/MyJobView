@@ -42,9 +42,9 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
   useEffect(() => { if (requestId) setActiveTab('queue'); }, [requestId]);
 
   return (
-    <div className="w-full max-w-full min-w-0 space-y-2 sm:space-y-4">
-      {hasModuleAccess('punchlist') && <div className="flex justify-end"><a href="/test-and-tune" className="inline-flex min-h-10 items-center rounded-lg border border-subtle px-3 py-2 text-sm text-info hover:underline">Test &amp; Tune →</a></div>}
-      <div className="flex items-center gap-1 min-w-0 max-w-full pb-1">
+    <div className="w-full max-w-full min-w-0 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 min-w-0 max-w-full">
+      <div className="flex flex-wrap items-center gap-1 min-w-0">
         {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -52,10 +52,10 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 min-h-11 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 min-h-11 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  : 'text-muted hover:bg-elevated hover:text-primary'
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -63,6 +63,8 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
             </button>
           );
         })}
+      </div>
+      {hasModuleAccess('punchlist') && <a href="/test-and-tune" className="inline-flex min-h-11 shrink-0 items-center px-2 text-xs sm:text-sm text-info hover:underline">Test &amp; Tune →</a>}
       </div>
 
       {activeTab === 'intake' && <button type="button" onClick={() => setManualOpen(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"><Plus className="h-4 w-4" /> New Intake</button>}
