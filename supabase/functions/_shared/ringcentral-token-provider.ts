@@ -19,8 +19,8 @@ export interface OAuthConnectionStore {
 }
 /**
  * Only called from trusted server workers after mailbox/org verification.
- * CAS prevents stale refresh responses from overwriting a newer rotation.
- * On conflict, reread once; never reuse a rotated refresh token.
+ * A tenant-scoped DB lease prevents concurrent use of the same refresh token.
+ * CAS and lease ownership also protect against stale worker writes.
  */
 export async function getRingCentralAccessToken(
   store: OAuthConnectionStore,
@@ -62,6 +62,8 @@ export async function getRingCentralAccessToken(
     return next.accessToken;
   } finally {
     // No-op if successful rotation already cleared the lease.
-    await store.releaseRefreshLease(connection, leaseId);
+    try { await store.releaseRefreshLease(connection, leaseId); } catch {
+      // The 120-second lease expiry provides recovery if cleanup fails.
+    }
   }
 }
