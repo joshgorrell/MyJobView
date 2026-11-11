@@ -411,11 +411,12 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
   }
 
   return (
-    <div className="space-y-3 sm:space-y-4 w-full max-w-full min-w-0">
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-2 w-full max-w-full min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base sm:text-2xl font-bold text-primary">{requestId ? 'Service Request' : 'Work Order Request Queue'}</h2>
-          {!requestId && <p className="text-muted text-sm mt-1">
+          <h2 className="text-base sm:text-lg font-bold text-primary">{requestId ? 'Service Request' : 'Service Requests'}</h2>
+          {!requestId && <p className="text-muted text-xs mt-0.5">
             {queueRequests.length} active {queueRequests.length === 1 ? 'request' : 'requests'}
             {needsInfoRequests.length > 0 && (
               <span className="text-amber-400 ml-2">· {needsInfoRequests.length} awaiting more info</span>
@@ -424,6 +425,8 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
         </div>
 
         {!requestId && <button
+          aria-expanded={showFilters}
+          aria-controls="service-request-filters"
           onClick={() => setShowFilters(!showFilters)}
           className="shrink-0 min-h-11 flex items-center gap-1.5 px-2 sm:px-4 py-2 text-xs sm:text-sm bg-canvas text-primary rounded-lg hover:bg-elevated transition-colors"
         >
@@ -435,10 +438,10 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
       {requestId && <a href="/service-requests" className="inline-flex min-h-11 items-center text-sm text-blue-500 underline">Back to service request queue</a>}
 
       {/* Tabs */}
-      {!requestId && <div className="flex gap-1 p-1 bg-canvas rounded-lg w-full max-w-full min-w-0 sm:w-fit">
+      {!requestId && <div className="flex gap-1 p-1 bg-canvas rounded-lg w-full max-w-full min-w-0 sm:w-auto">
         <button
           onClick={() => setActiveTab('queue')}
-          className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2.5 min-h-11 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'queue'
               ? 'bg-orange-600 text-primary'
               : 'text-muted hover:text-primary hover:bg-elevated'
@@ -456,7 +459,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
         </button>
         <button
           onClick={() => setActiveTab('needs_info')}
-          className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2 sm:px-4 min-h-11 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+          className={`flex-1 min-w-0 sm:flex-none flex items-center justify-center gap-1.5 px-2.5 min-h-11 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
             activeTab === 'needs_info'
               ? 'bg-amber-600 text-primary'
               : 'text-muted hover:text-primary hover:bg-elevated'
@@ -474,8 +477,10 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
         </button>
       </div>}
 
+      </div>
+
       {!requestId && showFilters && (
-        <div className="bg-canvas rounded-lg p-4 space-y-3">
+        <div id="service-request-filters" className="bg-canvas rounded-lg p-3 space-y-2">
           <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div>
               <label className="block text-sm font-medium text-muted mb-2">Priority</label>
@@ -545,17 +550,17 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
       )}
 
       {loadError ? <div role="alert" className="rounded-lg border border-red-500/40 p-4 text-primary">{loadError} <button type="button" onClick={() => void loadData()} className="underline">Retry</button></div> : requestId && !requests.length ? <div role="alert" className="rounded-lg border border-subtle p-4 text-primary">Service request not found or you do not have access.</div> : filteredRequests.length === 0 ? (
-        <div className="bg-canvas rounded-lg p-12 text-center">
+        <div className="bg-canvas rounded-lg px-4 py-6 text-center">
           {activeTab === 'needs_info' ? (
             <>
-              <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-primary mb-2">All Clear</h3>
+              <CheckCircle className="w-9 h-9 text-green-400 mx-auto mb-2" />
+              <h3 className="text-base font-semibold text-primary mb-1">All Clear</h3>
               <p className="text-muted">No requests are waiting on more information.</p>
             </>
           ) : (
             <>
-              <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-primary mb-2">Queue Empty</h3>
+              <CheckCircle className="w-9 h-9 text-green-400 mx-auto mb-2" />
+              <h3 className="text-base font-semibold text-primary mb-1">Queue Empty</h3>
               <p className="text-muted">All service requests have been scheduled!</p>
             </>
           )}
