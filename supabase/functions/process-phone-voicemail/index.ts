@@ -1,6 +1,9 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { RingCentralVoicemailAPI } from '../_shared/ringcentral-voicemail-api.ts';
+import { RingCentralOAuthClient } from '../_shared/ringcentral-oauth.ts';
+import { SupabaseRingCentralOAuthStore } from '../_shared/ringcentral-oauth-store.ts';
+import { getRingCentralAccessToken } from '../_shared/ringcentral-token-provider.ts';
 import { VoicemailTranscriptionAPI } from '../_shared/voicemail-transcription-api.ts';
 import { VoicemailClassificationAPI } from '../_shared/voicemail-classification-api.ts';
 import { nextVoicemailRetry, voicemailAudioType, voicemailAudioExtension } from '../_shared/phone-voicemail-retry.ts';
@@ -8,8 +11,8 @@ import { nextVoicemailRetry, voicemailAudioType, voicemailAudioExtension } from 
 /**
  * Explicitly invoked, single-message processing worker.
  * This is NOT a public voicemail upload endpoint. Until per-organization
- * OAuth token storage is ready, the worker requires one configured RingCentral
- * account and will refuse to process any other account.
+ * OAuth authorization is configured, the worker fails closed. Account access
+ * is resolved from a tenant-scoped encrypted connection, never webhook input.
  */
 Deno.serve(async (request: Request) => {
   const respond = (status: number, data: unknown) =>
@@ -20,10 +23,11 @@ Deno.serve(async (request: Request) => {
   if (!secret || !bearer || bearer !== 'Bearer ' + secret) return respond(401, { error: 'unauthorized' });
   const url = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const accountId = Deno.env.get('RINGCENTRAL_WORKER_ACCOUNT_ID');
-  const accessToken = Deno.env.get('RINGCENTRAL_WORKER_ACCESS_TOKEN');
+  const oauthClientId = Deno.env.get('RINGCENTRAL_CLIENT_ID');
+  const oauthClientSecret = Deno.env.get('RINGCENTRAL_CLIENT_SECRET');
+  const encryptionKey = Deno.env.get('PHONE_DISPATCHER_TOKEN_ENCRYPTION_KEY');
   const aiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!url || !serviceKey || !accountId || !accessToken || !aiKey) {
+  if (!url || !serviceKey || !oauthClientId || !oauthClientSecret || !encryptionKey || !aiKey) {
     return respond(503, { error: 'not_configured' });
   }
   let id: string;
@@ -39,7 +43,6 @@ Deno.serve(async (request: Request) => {
     .eq('id', id).eq('state', 'received').maybeSingle();
   if (readError) return respond(503, { error: 'lookup_failed' });
   if (!item) return respond(202, { status: 'not_pending' });
-  if (item.ringcentral_account_id !== accountId) return respond(403, { error: 'account_not_configured' });
   const { data: mailbox, error: mailboxError } = await db.from('ringcentral_mailboxes')
     .select('id').eq('organization_id', item.organization_id)
     .eq('ringcentral_account_id', item.ringcentral_account_id)
@@ -53,6 +56,11 @@ Deno.serve(async (request: Request) => {
   if (!claimed?.length) return respond(202, { status: 'already_claimed' });
 
   try {
+    const accessToken = await getRingCentralAccessToken(
+      new SupabaseRingCentralOAuthStore(db),
+      new RingCentralOAuthClient(oauthClientId, oauthClientSecret),
+      encryptionKey, item.organization_id, item.ringcentral_account_id,
+    );
     const api = new RingCentralVoicemailAPI(accessToken);
     const message = await api.getVoicemail(item.ringcentral_extension_id, item.ringcentral_message_id);
     const audio = await api.downloadRecording(message);
