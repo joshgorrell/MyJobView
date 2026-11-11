@@ -319,3 +319,6 @@ verify_jwt = true
 
 [functions.ringcentral-oauth-callback]
 verify_jwt = false
+
+[functions.ringcentral-connection-management]
+verify_jwt = true
