@@ -56,7 +56,7 @@ try {
   const own=await page.getByText('Coworker reply '+width,{exact:true}).evaluate(e=>e.parentElement.parentElement.parentElement.className);assert.match(own,/justify-end/);
   const other=await page.getByText('Install follow-up',{exact:true}).last().evaluate(e=>e.parentElement.parentElement.parentElement.className);assert.match(other,/justify-start/);
   await page.screenshot({path:'/tmp/mjv-coworker-conversation-'+width+'.png'});
-  await reply.fill('Draft for Jesse');await filters().getByRole('button',{name:'Customer',exact:true}).click();try { await page.getByRole('heading',{name:'Customer conversations',exact:true}).first().waitFor(); } catch (error) {
+  await reply.fill('Draft for Jesse');await reply.blur();await filters().getByRole('button',{name:'Customer',exact:true}).click();try { await page.getByRole('heading',{name:'Customer conversations',exact:true}).first().waitFor(); } catch (error) {
      const snapshot = await page.evaluate(() => ({
        selectedFilter: [...document.querySelectorAll('[aria-label="Message filters"] button')].map(b => ({ label: b.textContent, pressed: b.getAttribute('aria-pressed') })),
        inboxText: document.querySelector('.flow-customer-inbox')?.textContent?.slice(0, 1200),
