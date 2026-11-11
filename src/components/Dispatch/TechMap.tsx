@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { createTimestampInTimezone, formatDateInTimezone, getOrganizationTimezone } from '../../lib/timezoneUtils';
 import { MapPin, Navigation, Battery, Clock, RefreshCw } from 'lucide-react';
 
@@ -18,6 +19,7 @@ interface TechLocation {
   technician: {
     full_name: string;
     role: string;
+    primary_office_id?: string | null;
   };
   status?: {
     status: string;
@@ -36,10 +38,16 @@ declare global {
 export function TechMap() {
   const [techLocations, setTechLocations] = useState<TechLocation[]>([]);
   const [selectedTech, setSelectedTech] = useState<string | null>(null);
+  const { profile } = useAuth();
   const [roleFilter, setRoleFilter] = useState('all');
+  const [officeFilter, setOfficeFilter] = useState('all');
+  const [offices, setOffices] = useState<Array<{ id: string; office_name: string }>>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const hasFittedMap = useRef(false);
-  const visibleLocations = techLocations.filter(t => roleFilter === 'all' || t.technician?.role?.toLowerCase() === roleFilter);
+  const visibleLocations = techLocations.filter(t =>
+    (roleFilter === 'all' || t.technician?.role?.toLowerCase() === roleFilter) &&
+    (officeFilter === 'all' || t.technician?.primary_office_id === officeFilter)
+  );
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -98,6 +106,17 @@ export function TechMap() {
   }, []);
 
   useEffect(() => {
+    if (!profile?.organization_id) return;
+    let cancelled = false;
+    void supabase.from('company_offices').select('id,office_name').eq('organization_id', profile.organization_id).order('office_name')
+      .then(({ data, error }) => {
+        if (error) console.error('Unable to load Live Map offices', error);
+        if (!cancelled) setOffices(data || []);
+      });
+    return () => { cancelled = true; };
+  }, [profile?.organization_id]);
+
+  useEffect(() => {
     void getOrganizationTimezone().then(timezone => {
       setOrganizationTimezone(timezone);
       setHistoryDate(formatDateInTimezone(new Date().toISOString(), timezone));
@@ -119,7 +138,7 @@ export function TechMap() {
     if (mapReady) {
       updateMarkers();
     }
-  }, [techLocations, mapReady, historyMode, roleFilter]);
+  }, [techLocations, mapReady, historyMode, roleFilter, officeFilter]);
 
   useEffect(() => {
     if (!historyMode && selectedTech && googleMapRef.current) {
@@ -421,7 +440,7 @@ export function TechMap() {
       // Get all clocked-in technicians with their clock-in location
       const { data: dailyClocks } = await supabase
         .from('daily_clock_entries')
-        .select('id, technician_id, status, clock_in, clock_in_latitude, clock_in_longitude, profiles!technician_id(full_name, role)')
+        .select('id, technician_id, status, clock_in, clock_in_latitude, clock_in_longitude, profiles!technician_id(full_name, role, primary_office_id)')
         .eq('entry_date', today)
         .is('clock_out', null);
 
@@ -607,6 +626,12 @@ export function TechMap() {
           <select aria-label="Filter employees by role" className="block max-w-[180px] rounded border px-2 py-1.5 text-sm" value={roleFilter} onChange={e => { setRoleFilter(e.target.value); hasFittedMap.current = false; }}>
             <option value="all">All employees</option>
             {[...new Set(techLocations.map(t => t.technician?.role?.toLowerCase()).filter(Boolean))].sort().map(role => <option key={role} value={role}>{role}</option>)}
+          </select>
+        </label>}
+        {!historyMode && offices.length > 1 && <label className="text-sm">Office
+          <select aria-label="Filter employees by office" className="block max-w-[180px] rounded border px-2 py-1.5 text-sm" value={officeFilter} onChange={e => { setOfficeFilter(e.target.value); hasFittedMap.current = false; }}>
+            <option value="all">All offices</option>
+            {offices.map(office => <option key={office.id} value={office.id}>{office.office_name}</option>)}
           </select>
         </label>}
         <button type="button" className="rounded border px-2.5 py-1.5 text-sm" onClick={() => setHistoryMode(v => !v)}>{historyMode ? 'Return to live map' : 'View route history'}</button>
