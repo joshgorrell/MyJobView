@@ -56,6 +56,7 @@ export function TechMap() {
   const latestLocationRequest = useRef(0);
   // The mount-time interval and realtime listeners must use the latest authenticated profile.
   const loadTechLocationsRef = useRef<() => Promise<void>>(async () => {});
+  const realtimeRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -85,6 +86,16 @@ export function TechMap() {
       void loadTechLocationsRef.current();
     }, 30000); // Refresh every 30 seconds
 
+    // Coalesce GPS bursts into one refresh. Without this, each breadcrumb
+    // invalidates the previous request, potentially starving the map forever.
+    const scheduleRealtimeRefresh = () => {
+      if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current = setTimeout(() => {
+        realtimeRefreshTimer.current = null;
+        void loadTechLocationsRef.current();
+      }, 250);
+    };
+
     const locationsChannel = supabase
       .channel('tech-locations')
       .on('postgres_changes', {
@@ -92,19 +103,19 @@ export function TechMap() {
         schema: 'public',
         table: 'gps_breadcrumbs'
       }, () => {
-        void loadTechLocationsRef.current();
+        scheduleRealtimeRefresh();
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'enhanced_gps_breadcrumbs'
       }, () => {
-        void loadTechLocationsRef.current();
+        scheduleRealtimeRefresh();
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'daily_clock_entries'
       }, () => {
-        void loadTechLocationsRef.current();
+        scheduleRealtimeRefresh();
       })
       .subscribe();
 
@@ -112,6 +123,8 @@ export function TechMap() {
       mountedRef.current = false;
       latestLocationRequest.current += 1;
       clearInterval(interval);
+      if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+      realtimeRefreshTimer.current = null;
       locationsChannel.unsubscribe();
     };
   }, []);
