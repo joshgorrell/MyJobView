@@ -114,6 +114,13 @@ export function TechMap() {
     };
   }, []);
 
+  // The initial mount can run before AuthContext has loaded the dealer profile.
+  // Re-fetch active shifts when the organization becomes available or changes.
+  useEffect(() => {
+    if (!profile?.organization_id) return;
+    void loadTechLocations();
+  }, [profile?.organization_id]);
+
   useEffect(() => {
     if (!profile?.organization_id) return;
     let cancelled = false;
