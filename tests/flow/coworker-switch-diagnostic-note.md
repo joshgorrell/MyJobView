@@ -1,0 +1,1 @@
+Browser test failure investigation: `coworker-conversations-browser.mjs` times out waiting for Customer conversations after switching from Coworkers. Add DOM/filter/page-error diagnostic at the exact failing assertion before changing production conversation behavior or test timing.
