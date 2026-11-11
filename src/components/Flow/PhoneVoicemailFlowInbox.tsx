@@ -12,6 +12,35 @@ export function PhoneVoicemailFlowInbox() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [audioId, setAudioId] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBusy, setAudioBusy] = useState(false);
+  const [audioError, setAudioError] = useState('');
+  async function listen(id: string) {
+    if (audioBusy) return;
+    if (audioId === id) { setAudioId(null); setAudioUrl(null); return; }
+    setAudioId(id);
+    setAudioUrl(null);
+    setAudioError('');
+    setAudioBusy(true);
+    try {
+      const { data, error: requestError } = await supabase.functions.invoke(
+        'phone-voicemail-recording', { method: 'POST', body: { id } },
+      );
+      if (requestError || typeof data?.url !== 'string') throw new Error('Audio unavailable');
+      const target = new URL(data.url);
+      const expected = new URL(import.meta.env.VITE_SUPABASE_URL);
+      if (target.origin !== expected.origin ||
+          !target.pathname.includes('/storage/v1/object/sign/phone-voicemail-recordings/')) {
+        throw new Error('Unexpected audio URL');
+      }
+      setAudioUrl(target.toString());
+    } catch {
+      setAudioError('Recording unavailable. Please try again.');
+    } finally {
+      setAudioBusy(false);
+    }
+  }
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -51,6 +80,20 @@ export function PhoneVoicemailFlowInbox() {
           </div>
           <p className="text-sm">{message.summary || 'No summary available'}</p>
           {message.department && <p className="text-xs text-gray-500">Suggested department: {message.department}</p>}
+          <div className="space-y-2">
+            <button type="button" disabled={audioBusy}
+              className="text-xs text-blue-700 underline disabled:opacity-50"
+              onClick={() => void listen(message.id)}>
+              {audioId === message.id && audioUrl ? 'Close recording' :
+                audioBusy && audioId === message.id ? 'Loading recording…' : 'Listen to recording'}
+            </button>
+            {audioId === message.id && audioUrl && (
+              <audio controls preload="none" src={audioUrl} className="w-full" aria-label="Voicemail recording" />
+            )}
+            {audioId === message.id && audioError && (
+              <p role="alert" className="text-xs text-red-700">{audioError}</p>
+            )}
+          </div>
           {message.transcript && (
             <div>
               <button type="button" className="text-xs text-blue-700 underline"
