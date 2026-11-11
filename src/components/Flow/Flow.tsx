@@ -209,14 +209,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
         <button className={`flow-primary ${view === 'messages' ? 'flow-new-message' : 'flow-create-action'}`} aria-label={view === 'messages' ? 'New message' : 'Create in Flow'} title={view === 'messages' ? 'New message' : 'Create in Flow'} aria-haspopup="dialog" aria-expanded={createMode!==null} aria-controls={`${controlId}-create-options`}
           onClick={() => { if (view === 'messages') { setMessageFilter('all'); setMessageRequest(n => n + 1); } else setCreateMode('choose'); }}><Plus size={20} />{view === 'messages' && <span>New message</span>}</button>
       </div>}
-    </header>
-    {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
     <div className="flow-toolbar">
       <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => changeView(item.id)}>{item.label}</button>)}</div>
       <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => changeView(e.target.value as FlowView)}>{views.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
       {view === 'messages' && <div className="flow-message-filters" role="group" aria-label="Message filters">{MESSAGE_FILTERS.map(item => <button key={item.id} aria-pressed={messageFilter === item.id} className={messageFilter === item.id ? 'flow-selected' : ''} onClick={() => { setMessageFilter(item.id); setThreadId(null); }}>{item.label}</button>)}</div>}
       {view !== 'tasks' && view !== 'messages' && <>
-      <button className={`flow-today ${todayOnly ? 'flow-selected' : ''}`} aria-pressed={todayOnly} onClick={() => setTodayOnly(!todayOnly)}>Today</button>
       <button className={`flow-mentions ${mentionsOnly ? 'flow-selected' : ''}`} aria-pressed={mentionsOnly} onClick={() => setMentionsOnly(!mentionsOnly)}>@ Mentions</button>
       {!todayMode && <button className={`flow-unread ${newOnly ? 'flow-selected' : ''}`} aria-pressed={newOnly} onClick={() => setNewOnly(!newOnly)}><span className="flow-dot" /><span className="flow-desktop-label">New only</span><span className="flow-mobile-label">New</span></button>}
       <button className={`flow-today ${todayMode ? 'flow-selected' : ''}`} aria-pressed={todayMode} title="Keep all of today's activity visible" onClick={() => { setTodayOnly(!todayOnly); if (view !== 'all') changeView('all'); }}>Today</button>
@@ -224,10 +221,11 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
       <button className={`flow-search-toggle ${search ? 'flow-selected' : ''}`} aria-label={showSearch ? 'Hide activity search' : 'Search activity'} aria-expanded={showSearch || !!search} aria-controls={searchId} onClick={() => { if (showSearch || search) { setSearch(''); setShowSearch(false); } else setShowSearch(true); }}><Search size={16} /></button>
       <button className="flow-mark-shown" aria-label="Mark shown viewed" title="Mark shown viewed" onClick={() => void markShown()} disabled={marking || !newShown || flow.loading}><CheckCheck size={16} /></button>
       {flow.pending > 0 && <button className="flow-pending-refresh" aria-label={`${flow.pending} new activities available; show updates`} title={`${flow.pending} new activities — show updates`} onClick={() => void flow.refresh()}><span className="flow-dot" /><span className="flow-pending-count">{flow.pending > 50 ? '50+' : flow.pending}</span></button>}
-      <button className="flow-refresh" aria-label="Refresh Flow" title="Refresh Flow" onClick={() => void flow.refresh()} disabled={flow.loading}><RefreshCw size={15} /></button>
       <label className={`flow-search ${showSearch || search ? 'flow-search--open' : ''}`} id={searchId}><Search size={16} /><input ref={searchInput} aria-label="Search activity" placeholder="Search customer, job or activity…" value={search} onChange={e => setSearch(e.target.value)} />{search && <button onClick={() => setSearch('')} aria-label="Clear search"><X size={14} /></button>}</label>
       </>}
     </div>
+     </header>
+    {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
 
     <div className="flow-content">
     {view === 'tasks' && hasModuleAccess('tasks') && tasksContent}
