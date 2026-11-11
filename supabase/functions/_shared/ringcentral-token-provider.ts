@@ -13,7 +13,9 @@ export interface OAuthConnectionRow {
 }
 export interface OAuthConnectionStore {
   read(accountId: string, organizationId: string): Promise<OAuthConnectionRow | null>;
-  rotate(previous: OAuthConnectionRow, next: Partial<OAuthConnectionRow>): Promise<boolean>;
+  acquireRefreshLease(previous: OAuthConnectionRow, leaseId: string, now: number): Promise<boolean>;
+  rotate(previous: OAuthConnectionRow, next: Partial<OAuthConnectionRow>, leaseId: string): Promise<boolean>;
+  releaseRefreshLease(previous: OAuthConnectionRow, leaseId: string): Promise<void>;
 }
 /**
  * Only called from trusted server workers after mailbox/org verification.
@@ -37,24 +39,29 @@ export async function getRingCentralAccessToken(
   if (connection.refresh_expires_at && Date.parse(connection.refresh_expires_at) <= now) {
     throw Error('RingCentral authorization expired');
   }
-  const refresh = await decryptOAuthToken(
-    connection.encrypted_refresh_token, encryptionKey, organizationId, accountId, 'refresh');
-  const next = await oauth.refresh(refresh, now);
-  const rotated = await store.rotate(connection, {
-    encrypted_access_token: await encryptOAuthToken(
-      next.accessToken, encryptionKey, organizationId, accountId, 'access'),
-    encrypted_refresh_token: await encryptOAuthToken(
-      next.refreshToken, encryptionKey, organizationId, accountId, 'refresh'),
-    access_expires_at: next.expiresAt,
-    refresh_expires_at: next.refreshExpiresAt ?? connection.refresh_expires_at,
-    token_version: connection.token_version + 1,
-  });
-  if (rotated) return next.accessToken;
-  const latest = await read();
-  if (!latest || latest.status !== 'connected' ||
-      latest.token_version <= connection.token_version ||
-      Date.parse(latest.access_expires_at) <= now + 60_000) {
-    throw Error('Concurrent RingCentral refresh not yet usable');
+  // Acquire a database-backed lease BEFORE calling RingCentral. A CAS performed
+  // after refresh cannot prevent two workers using the same single-use token.
+  const leaseId = crypto.randomUUID();
+  if (!await store.acquireRefreshLease(connection, leaseId, now)) {
+    throw Error('RingCentral refresh already in progress; retry later');
   }
-  return decryptAccess(latest);
+  try {
+    const refresh = await decryptOAuthToken(
+      connection.encrypted_refresh_token, encryptionKey, organizationId, accountId, 'refresh');
+    const next = await oauth.refresh(refresh, now);
+    const rotated = await store.rotate(connection, {
+      encrypted_access_token: await encryptOAuthToken(
+        next.accessToken, encryptionKey, organizationId, accountId, 'access'),
+      encrypted_refresh_token: await encryptOAuthToken(
+        next.refreshToken, encryptionKey, organizationId, accountId, 'refresh'),
+      access_expires_at: next.expiresAt,
+      refresh_expires_at: next.refreshExpiresAt ?? connection.refresh_expires_at,
+      token_version: connection.token_version + 1,
+    }, leaseId);
+    if (!rotated) throw Error('RingCentral refresh lease lost; retry later');
+    return next.accessToken;
+  } finally {
+    // No-op if successful rotation already cleared the lease.
+    await store.releaseRefreshLease(connection, leaseId);
+  }
 }
