@@ -1,3 +1,4 @@
+import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -152,6 +153,7 @@ export function CreateInvoiceFromCOModal({ order, changeOrders, onClose, onSucce
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      if (!await requireCustomerZip(order.contact?.id || order.contact_id)) return;
 
       const totals = calculateTotals();
       const selected = getSelectedLineItems();
