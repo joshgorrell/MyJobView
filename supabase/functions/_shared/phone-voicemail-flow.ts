@@ -44,14 +44,24 @@ export async function publishVoicemailToFlow(
     .eq('department', input.department);
   if (recipientsError) throw Error('voicemail_recipient_lookup_failed');
   if (!recipients?.length) return;
+  // Grants alone are insufficient: a user can be disabled or moved to a
+  // different organization after their department access was assigned.
+  const grantedIds = [...new Set(recipients.map(({ user_id }) => user_id))];
+  const { data: activeProfiles, error: profilesError } = await db.from('profiles')
+    .select('id').eq('organization_id', input.organizationId)
+    .eq('is_active', true).eq('my_job_view_enabled', true)
+    .in('id', grantedIds);
+  if (profilesError) throw Error('voicemail_recipient_authorization_failed');
+  const eligible = new Set((activeProfiles ?? []).map(({ id }) => id));
+  if (!eligible.size) return;
   const { data: alreadyNotified, error: notifiedError } = await db.from('notifications')
     .select('user_id').eq('organization_id', input.organizationId)
     .eq('related_id', input.id).eq('type', 'phone_voicemail');
   if (notifiedError) throw Error('voicemail_notification_lookup_failed');
   const notified = new Set((alreadyNotified ?? []).map(({ user_id }) => user_id));
-  const pending = recipients.filter(({ user_id }) => !notified.has(user_id));
+  const pending = grantedIds.filter((user_id) => eligible.has(user_id) && !notified.has(user_id));
   if (!pending.length) return;
-  for (const { user_id } of pending) {
+  for (const user_id of pending) {
     const { error: notificationError } = await db.from('notifications').insert({
       organization_id: input.organizationId, user_id, type: 'phone_voicemail',
       title: input.urgent ? 'Urgent voicemail' : 'New department voicemail',
