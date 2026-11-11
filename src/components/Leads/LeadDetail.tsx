@@ -463,8 +463,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
 
   function handleConvertSuccess(_contactId: string) {
     setShowConvertModal(false);
-    onClose();
-    window.location.href = '/pipeline';
+    onClose(); // Parent refreshes the Pipeline; do not navigate to an obsolete route.
   }
 
 
