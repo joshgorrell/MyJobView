@@ -469,6 +469,13 @@ export function ContactDetail({ contact, canEdit = true, onBack, onConverted, on
   }
 
   async function handleConvertContact(target: 'lead' | 'customer' | 'prospect') {
+    if (target === 'lead') {
+      // A Lead is a real opportunity record, not just a contact_type label.
+      // Reuse the existing Lead intake flow so assignment, priority and the linked Lead are created.
+      setShowConversionModal(false);
+      setShowConvertForm(true);
+      return;
+    }
     setConvertingContact(true);
     try {
       const updateData: any = {
