@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { RingCentralVoicemailAPI } from '../_shared/ringcentral-voicemail-api.ts';
 import { VoicemailTranscriptionAPI } from '../_shared/voicemail-transcription-api.ts';
 import { VoicemailClassificationAPI } from '../_shared/voicemail-classification-api.ts';
+import { nextVoicemailRetry, voicemailAudioType, voicemailAudioExtension } from '../_shared/phone-voicemail-retry.ts';
 
 /**
  * Explicitly invoked, single-message processing worker.
@@ -34,7 +35,7 @@ Deno.serve(async (request: Request) => {
 
   const db = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: item, error: readError } = await db.from('voicemail_messages')
-    .select('id,organization_id,ringcentral_account_id,ringcentral_extension_id,ringcentral_message_id,state')
+    .select('id,organization_id,ringcentral_account_id,ringcentral_extension_id,ringcentral_message_id,state,retry_count')
     .eq('id', id).eq('state', 'received').maybeSingle();
   if (readError) return respond(503, { error: 'lookup_failed' });
   if (!item) return respond(202, { status: 'not_pending' });
@@ -57,7 +58,8 @@ Deno.serve(async (request: Request) => {
     const audio = await api.downloadRecording(message);
     // The supported RingCentral voicemail audio format must be confirmed
     // in sandbox before enabling live processing.
-    const transcript = (await new VoicemailTranscriptionAPI(aiKey).transcribe(audio, 'audio/mpeg')).text;
+    const mime = voicemailAudioType(audio);
+    const transcript = (await new VoicemailTranscriptionAPI(aiKey).transcribe(audio, mime)).text;
     const classification = await new VoicemailClassificationAPI(aiKey).classify(transcript);
     const urgent = classification.urgent;
     const spam = classification.spamConfidence;
@@ -68,9 +70,9 @@ Deno.serve(async (request: Request) => {
     const state = quarantined ? 'quarantined' : ready ? 'ready' : 'review';
     // Recordings live only in a PRIVATE storage bucket. Never return public URLs.
     const path = [item.organization_id, item.ringcentral_account_id,
-      item.ringcentral_extension_id, item.ringcentral_message_id + '.mp3'].join('/');
+      item.ringcentral_extension_id, item.ringcentral_message_id + '.' + voicemailAudioExtension(mime)].join('/');
     const { error: uploadError } = await db.storage.from('phone-voicemail-recordings')
-      .upload(path, audio, { contentType: 'audio/mpeg', upsert: false });
+      .upload(path, audio, { contentType: mime, upsert: false });
     if (uploadError && uploadError.message !== 'The resource already exists') throw Error('recording_storage_failed');
     const { data: updated, error: updateError } = await db.from('voicemail_messages').update({
       state, transcript, summary: classification.summary,
@@ -87,7 +89,10 @@ Deno.serve(async (request: Request) => {
   } catch (error) {
     console.error('Phone dispatcher worker failed', error instanceof Error ? error.name : 'unknown');
     await db.from('voicemail_messages').update({
-      state: 'failed', last_error: 'processing_failed', updated_at: new Date().toISOString(),
+      state: 'failed', last_error: 'processing_failed',
+      retry_count: Math.min(5, (item.retry_count ?? 0) + 1),
+      next_retry_at: nextVoicemailRetry(Math.min(5, (item.retry_count ?? 0) + 1)),
+      updated_at: new Date().toISOString(),
     }).eq('id', id).eq('state', 'processing');
     return respond(503, { error: 'processing_failed' });
   }
