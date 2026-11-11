@@ -11,6 +11,14 @@ assert.deepEqual(one,snap({changeOrderId:co,organizationId:org,rows:[row]}));
 assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[row,row]}),/Duplicate/);
 assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[{...row,organization_id:co}]}),/Cross-order/);
 assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[{...row,new_unit_price:'1.234'}]}),/currency/);
-assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[{...row,action_type:'modify'}]}),/original proposal line/);
+assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[{...row,action_type:'modify_quantity'}]}),/original proposal line/);
 assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[{...row,product_id:null}]}),/catalog product/);
+for(const action of ['remove','modify_quantity','modify_price','modify_labor']) {
+  const original='55555555-5555-4555-8555-555555555555';
+  const parsed=snap({changeOrderId:co,organizationId:org,rows:[{...row,action_type:action,proposal_line_item_id:original}]});
+  assert.equal(parsed[0].action,action);
+  assert.equal(parsed[0].proposalLineItemId,original);
+}
+assert.equal(snap({changeOrderId:co,organizationId:org,rows:[{...row,action_type:'modify_modifiers',product_id:null}]}).length,1);
+assert.throws(()=>snap({changeOrderId:co,organizationId:org,rows:[{...row,action_type:'modify'}]}),/Unsupported/);
 console.log('Change-order source snapshot tests passed');

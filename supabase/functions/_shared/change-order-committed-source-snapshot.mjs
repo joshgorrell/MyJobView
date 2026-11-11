@@ -32,7 +32,7 @@ export function snapshotChangeOrderLines({changeOrderId,organizationId,rows}) {
     if(uuid(row.change_order_id,'line change order')!==changeOrderId.toLowerCase() ||
        uuid(row.organization_id,'line organization')!==organizationId.toLowerCase())
       throw new Error('Cross-order or cross-organization change-order line');
-    if(!['add','remove','modify'].includes(row.action_type))
+    if(!['add','remove','modify_quantity','modify_price','modify_labor','modify_modifiers'].includes(row.action_type))
       throw new Error('Unsupported change-order action: '+row.action_type);
     const result={
       lineId,action:row.action_type,
@@ -58,7 +58,7 @@ export function snapshotChangeOrderLines({changeOrderId,organizationId,rows}) {
     };
     if(result.action==='add'&&!result.productId && result.itemType!=='labor')
       throw new Error('Added non-labor line requires catalog product');
-    if(result.action!=='add'&&!result.proposalLineItemId)
+    if(['remove','modify_quantity','modify_price','modify_labor'].includes(result.action)&&!result.proposalLineItemId)
       throw new Error('Existing line mutation requires original proposal line identity');
     return result;
   });
