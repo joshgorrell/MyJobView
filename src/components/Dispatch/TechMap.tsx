@@ -458,13 +458,15 @@ export function TechMap() {
     const requestId = ++latestLocationRequest.current;
     const isCurrent = () => mountedRef.current && requestId === latestLocationRequest.current;
     try {
-      const today = formatDateInTimezone(new Date().toISOString(), timezoneRef.current);
-
-      // Get all clocked-in technicians with their clock-in location
+      // Active shifts may cross midnight. Filtering by today's entry_date
+      // would make an employee disappear from the map at midnight.
+      // Scope by organization, not by the shift's start date.
+      if (!profile?.organization_id) return;
       const { data: dailyClocks, error: clockError } = await supabase
         .from('daily_clock_entries')
         .select('id, technician_id, status, clock_in, clock_in_latitude, clock_in_longitude, profiles!technician_id(full_name, role, primary_office_id)')
-        .eq('entry_date', today)
+        .eq('organization_id', profile.organization_id)
+        .eq('status', 'clocked_in')
         .is('clock_out', null);
       if (clockError) throw clockError;
       if (!isCurrent()) return;
