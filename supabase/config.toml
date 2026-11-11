@@ -300,3 +300,8 @@ verify_jwt = false
 
 [functions.send-service-approval]
 verify_jwt = false
+
+# RingCentral authenticates via webhook verification-token, not Supabase JWT.
+# Handler remains disabled until its server-side secret and mailbox registry are configured.
+[functions.ringcentral-voicemail-webhook]
+verify_jwt = false
