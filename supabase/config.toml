@@ -150,15 +150,6 @@ verify_jwt = true
 [functions.get-client-ip]
 verify_jwt = false
 
-[functions.google-calendar-auth]
-verify_jwt = true
-
-[functions.google-calendar-callback]
-verify_jwt = false
-
-[functions.google-calendar-event]
-verify_jwt = true
-
 [functions.google-maps-proxy]
 verify_jwt = false
 
@@ -293,7 +284,6 @@ verify_jwt = true
 # Public opaque-token endpoint validates the share link and returns limited proposal data.
 [functions.view-shared-proposal]
 verify_jwt = false
-
 
 [functions.service-approval-payment-methods]
 verify_jwt = false
