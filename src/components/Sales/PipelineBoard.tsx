@@ -32,6 +32,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
   const [timeFilter, setTimeFilter] = useState<number>(14);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [leadAgeFilter, setLeadAgeFilter] = useState<number | null>(null);
   const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
@@ -395,9 +396,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const getDaysOld = (createdAt: string) => {
     const date = new Date(createdAt);
     const today = new Date();
-    const diffTime = Math.abs(today.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    const diffTime = today.getTime() - date.getTime();
+    return Number.isFinite(diffTime) ? Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24))) : 0;
   };
 
   // Filter items based on search query
@@ -438,6 +438,9 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   // Filter stages based on search
   const filteredStages = stages.map(stage => {
     let filteredItems = stage.items.filter(item => filterItems(item, stage.id));
+    if (stage.id === 'leads' && leadAgeFilter !== null) {
+      filteredItems = filteredItems.filter(item => item.created_at && getDaysOld(item.created_at) >= leadAgeFilter);
+    }
 
     return {
       ...stage,
@@ -620,7 +623,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
 
       {/* Aging reflects currently displayed leads, not historical funnel conversions. */}
       {selectedWidgets.includes('leads') && (() => {
-        const leads = filteredStages.find(stage => stage.id === 'leads')?.items || [];
+        const leads = stages.find(stage => stage.id === 'leads')?.items.filter(item => filterItems(item, 'leads')) || [];
         const aging = [30, 60, 90].map(days => ({
           days,
           count: leads.filter(lead => lead.created_at && getDaysOld(lead.created_at) >= days).length,
@@ -634,7 +637,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                   {days}+ days: <strong>{count}</strong>
                 </span>
               ))}
-              <span className="text-xs text-gray-500">Based on creation date; counts overlap and follow the current filters.</span>
+              <span className="text-xs text-gray-500">Select an age to filter Leads below. Counts overlap; based on creation date and current search/rep filters.</span>
             </div>
           </div>
         );
