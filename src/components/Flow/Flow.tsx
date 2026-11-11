@@ -52,6 +52,16 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   const { profile } = useAuth();
   const { hasModuleAccess } = useDepartments();
   const scoped = !!(contactId || projectId || workOrderId);
+  const [canViewVoicemail, setCanViewVoicemail] = useState(false);
+  useEffect(() => {
+    if (scoped || !profile?.id || typeof supabase.functions?.invoke !== 'function') { setCanViewVoicemail(false); return; }
+    let cancelled = false;
+    setCanViewVoicemail(false);
+    void supabase.functions.invoke('phone-voicemail-inbox', { method: 'GET' })
+      .then(({ error }) => { if (!cancelled) setCanViewVoicemail(!error); })
+      .catch(() => { if (!cancelled) setCanViewVoicemail(false); });
+    return () => { cancelled = true; };
+  }, [scoped, profile?.id]);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
   const [view, setView] = useState<FlowView>(initialTaskView || (!hasModuleAccess('feed') && !hasModuleAccess('messages') && !!tasksContent) ? 'tasks' : conversationProps.openThreadId ? 'messages' : 'all');
   const workspaceSize = useConversationHeight(view === 'messages' && !scoped);
@@ -194,7 +204,10 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   }
   const baseViews = scoped || hasModuleAccess('feed') || hasModuleAccess('messages') ? FLOW_VIEWS : [];
   const taskViews = tasksContent && !scoped && hasModuleAccess('tasks') ? [...baseViews, { id: 'tasks' as FlowView, label: TASKS_LABEL }] : baseViews;
-  const views = !scoped ? [...taskViews, { id: 'voicemails' as FlowView, label: 'Voicemails' }] : taskViews;
+  const views = !scoped && canViewVoicemail ? [...taskViews, { id: 'voicemails' as FlowView, label: 'Voicemails' }] : taskViews;
+  useEffect(() => {
+    if (view === 'voicemails' && !canViewVoicemail) setView('all');
+  }, [view, canViewVoicemail]);
   // Keep the normal Flow chronology and presentation for every item, including new service requests.
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const activeFilterCount = chips.length + Number(mentionsOnly);
@@ -225,7 +238,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     {createMode&&<FlowCreateModal scope={chosenScope} initial={createMode} canInteract={hasModuleAccess('feed')&&canPost} onClose={()=>setCreateMode(null)} onSaved={()=>{setCreateMode(null);void flow.refresh();}}/>}
 
     <div className="flow-content">
-    {!scoped && view === 'voicemails' && <PhoneVoicemailFlowInbox />}
+    {!scoped && view === 'voicemails' && canViewVoicemail && <PhoneVoicemailFlowInbox />}
     {view === 'tasks' && hasModuleAccess('tasks') && tasksContent}
     {view !== 'tasks' && view !== 'messages' && view !== 'voicemails' && showFilters && <div className="flow-filters" id={filtersId}>
       <label>Content type<select aria-label="Show activity type" value={kind} onChange={e => setKind(e.target.value)}><option value="">All content types</option>{Object.entries(FLOW_KINDS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
@@ -242,7 +255,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     {view === 'messages' && messageFilter === 'customer' && !canMessageCustomers && <p>You do not have customer messaging access.</p>}
     {view === 'messages' && messageFilter === 'coworkers' && !hasModuleAccess('feed') && <p>You do not have coworker messaging access.</p>}
     {(view === 'messages' && (canMessageCustomers || hasModuleAccess('feed'))) && <div className="flow-customer-inbox">
-      <CustomerConversations fitScreen={!scoped} newMessageRequested={messageRequest} conversationType={messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'} includeCustomers={canMessageCustomers} includeCoworkers={hasModuleAccess('feed')} unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
+      <CustomerConversations key={`${messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'}-${scoped ? 'scoped' : 'global'}`} fitScreen={!scoped} newMessageRequested={messageRequest} conversationType={messageFilter === 'customer' ? 'customer' : messageFilter === 'coworkers' ? 'coworkers' : 'all'} includeCustomers={canMessageCustomers} includeCoworkers={hasModuleAccess('feed')} unreadOnly={messageFilter === 'unread'} hideFilters {...conversationProps} {...chosenScope} openThreadId={threadId || conversationProps.openThreadId}
         onThreadSelected={id => { setThreadId(id); conversationProps.onThreadSelected?.(id); }} />
     </div>}
     {(view !== 'tasks' && view !== 'messages' && view !== 'voicemails') && <>
