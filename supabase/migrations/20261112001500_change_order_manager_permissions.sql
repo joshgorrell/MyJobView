@@ -54,7 +54,7 @@ BEGIN
    'committedRevisionCount',v_committed,'additionCount',v_additions,
    'tracedAdditionCount',v_traced);
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.unlock_change_order(p_change_order_id uuid, p_reason text DEFAULT NULL::text)
  RETURNS jsonb
@@ -110,5 +110,4 @@ BEGIN
    to_jsonb(v_co));
  RETURN jsonb_build_object('success',true);
 END;
-$function$
-
+$function$;
