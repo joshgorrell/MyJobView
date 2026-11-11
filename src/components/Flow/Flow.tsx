@@ -198,6 +198,10 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   // Keep the normal Flow chronology and presentation for every item, including new service requests.
   const visibleEvents = flow.events.filter(event => matchesView(event, view, messageFilter));
   const activeFilterCount = chips.length + Number(mentionsOnly);
+  // Counts only items whose read status is actually known. Conversation,
+  // assignment and voicemail counts require their own recipient read-state APIs.
+  const unreadActivity = flow.events.filter(event => !event.viewed && matchesView(event, 'activity', 'all')).length;
+  const unreadFlow = flow.events.filter(event => !event.viewed).length;
   return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
     <header className="flow-heading"><div><h2><FlowWaveIcon className="text-xl" />{workOrderId ? 'Work Order Flow' : projectId ? 'Project Flow' : contactId ? 'Customer Flow' : 'Flow'}</h2></div>
       {(canPost || (view === 'messages' && (canMessageCustomers || hasModuleAccess('feed')))) && <div className="flow-heading-actions">
@@ -205,7 +209,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
           onClick={() => { if (view === 'messages') { setMessageFilter('all'); setMessageRequest(n => n + 1); } else setCreateMode('choose'); }}><Plus size={20} />{view === 'messages' && <span>New message</span>}</button>
       </div>}
     <div className="flow-toolbar">
-      <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => changeView(item.id)}>{item.label}</button>)}</div>
+      <div className="flow-view-tabs" role="tablist" aria-label="Flow view">{views.map(item => <button key={item.id} role="tab" aria-selected={view === item.id} className={view === item.id ? 'flow-selected' : ''} onClick={() => changeView(item.id)}>{item.label}{(item.id === 'all' ? unreadFlow : item.id === 'activity' ? unreadActivity : 0) > 0 && <span className="flow-tab-unread" aria-label={`${item.id === 'all' ? unreadFlow : unreadActivity} unread`}>{(item.id === 'all' ? unreadFlow : unreadActivity) > 99 ? '99+' : item.id === 'all' ? unreadFlow : unreadActivity}</span>}</button>)}</div>
       <select className="flow-view-select" aria-label="Flow view" value={view} onChange={e => changeView(e.target.value as FlowView)}>{views.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
       {view === 'messages' && <div className="flow-message-filters" role="group" aria-label="Message filters">{MESSAGE_FILTERS.map(item => <button key={item.id} aria-pressed={messageFilter === item.id} className={messageFilter === item.id ? 'flow-selected' : ''} onClick={() => { setMessageFilter(item.id); setThreadId(null); }}>{item.label}</button>)}</div>}
       {view !== 'tasks' && view !== 'messages' && view !== 'voicemails' && <>
