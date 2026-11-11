@@ -54,6 +54,8 @@ export function TechMap() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [clockedInCount, setClockedInCount] = useState(0);
   const latestLocationRequest = useRef(0);
+  // The mount-time interval and realtime listeners must use the latest authenticated profile.
+  const loadTechLocationsRef = useRef<() => Promise<void>>(async () => {});
   const mountedRef = useRef(true);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -75,12 +77,12 @@ export function TechMap() {
   useEffect(() => {
     mountedRef.current = true;
     loadApiKey();
-    loadTechLocations();
+    void loadTechLocationsRef.current();
     void loadHistoryTechnicians();
 
 
     const interval = setInterval(() => {
-      loadTechLocations();
+      void loadTechLocationsRef.current();
     }, 30000); // Refresh every 30 seconds
 
     const locationsChannel = supabase
@@ -90,19 +92,19 @@ export function TechMap() {
         schema: 'public',
         table: 'gps_breadcrumbs'
       }, () => {
-        loadTechLocations();
+        void loadTechLocationsRef.current();
       })
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'enhanced_gps_breadcrumbs'
       }, () => {
-        loadTechLocations();
+        void loadTechLocationsRef.current();
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'daily_clock_entries'
       }, () => {
-        loadTechLocations();
+        void loadTechLocationsRef.current();
       })
       .subscribe();
 
@@ -616,6 +618,9 @@ export function TechMap() {
       if (isCurrent()) setLoading(false);
     }
   }
+
+  // Refresh the callback each render so long-lived listeners never capture a stale profile.
+  loadTechLocationsRef.current = loadTechLocations;
 
   function getStatusColor(status?: string) {
     switch (status) {
