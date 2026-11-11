@@ -3,7 +3,7 @@
 // necessary consistency check, NOT original-approval or delivery authority.
 const held=reason=>({valid:false,reason});
 const cents=value=>{if(typeof value!=='string'&&typeof value!=='number')return null;
- const m=/^(0|[1-9]\\d{0,13})(?:\\.(\\d{1,2}))?$/.exec(String(value));
+ const m=/^(0|[1-9]\d{0,13})(?:\.(\d{1,2}))?$/.exec(String(value));
  if(!m)return null;const n=BigInt(m[1])*100n+BigInt((m[2]||'').padEnd(2,'0'));
  return n<=BigInt(Number.MAX_SAFE_INTEGER)?Number(n):null;};
 export function validateTechsafeCurrentEquipmentSnapshot(source,snapshot){
@@ -23,8 +23,8 @@ export function validateTechsafeCurrentEquipmentSnapshot(source,snapshot){
   const row=rows.get(l.sourceLineId);
   if(!row)return held('snapshot_line_not_in_source');
   if(l.productKind!=='equipment'){
-   if(l.productKind==='unclassified'||l.productKind==='miscellaneous'&&
-      ['material','both'].includes(row.item_type)&&row.catalog_item_type==='material')
+   if(['material','both'].includes(row.item_type)&&row.catalog_item_type==='material'&&
+      row.is_hidden!==true&&row.is_customer_supplied!==true)
     return held('eligible_equipment_reclassified');
    if(l.productRef!==null&&l.productRef!==row.product_id)
     return held('non_equipment_product_mismatch');
