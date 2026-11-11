@@ -62,15 +62,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
     .select('id').eq('id', targetId).eq('organization_id', organizationId)
     .eq('is_active', true).maybeSingle();
   if (targetError || !target) return respond(404, { error: 'user_not_found' });
-  // Replace grants for one user only. If insertion fails, report failure.
-  const { error: deleteError } = await db.from('phone_voicemail_department_access')
-    .delete().eq('organization_id', organizationId).eq('user_id', targetId);
-  if (deleteError) return respond(503, { error: 'save_failed' });
-  if (departments.length) {
-    const { error: insertError } = await db.from('phone_voicemail_department_access').insert(
-      departments.map(department => ({ organization_id: organizationId, user_id: targetId, department })),
-    );
-    if (insertError) return respond(503, { error: 'save_failed' });
-  }
+  const { error: saveError } = await db.rpc('replace_phone_voicemail_department_grants', {
+    p_organization_id: organizationId, p_user_id: targetId, p_departments: departments,
+  });
+  if (saveError) return respond(503, { error: 'save_failed' });
   return respond(200, { saved: true });
 });
