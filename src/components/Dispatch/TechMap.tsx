@@ -53,6 +53,8 @@ export function TechMap() {
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [locationError, setLocationError] = useState<string | null>(null);
   const [clockedInCount, setClockedInCount] = useState(0);
+  const latestLocationRequest = useRef(0);
+  const mountedRef = useRef(true);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,7 @@ export function TechMap() {
   const historyEndpointsRef = useRef<any[]>([]);
 
   useEffect(() => {
+    mountedRef.current = true;
     loadApiKey();
     loadTechLocations();
     void loadHistoryTechnicians();
@@ -104,6 +107,8 @@ export function TechMap() {
       .subscribe();
 
     return () => {
+      mountedRef.current = false;
+      latestLocationRequest.current += 1;
       clearInterval(interval);
       locationsChannel.unsubscribe();
     };
@@ -326,6 +331,10 @@ export function TechMap() {
     return !Number.isFinite(age) || age > 5 * 60 * 1000;
   }
 
+  function escapeMapHtml(value: string): string {
+    return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] || character);
+  }
+
   function getMarkerColor(status?: string): string {
 
     switch (status) {
@@ -387,9 +396,9 @@ export function TechMap() {
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
             <div style="padding: 8px; min-width: 200px;">
-              <h3 style="font-weight: bold; margin: 0 0 8px 0; color: #111;">${tech.technician.full_name}</h3>
+              <h3 style="font-weight: bold; margin: 0 0 8px 0; color: #111;">${escapeMapHtml(tech.technician.full_name)}</h3>
               <div style="font-size: 14px; color: #666; margin-bottom: 4px;">
-                <strong>Status:</strong> ${tech.status?.status?.replace('_', ' ') || 'Unknown'}
+                <strong>Status:</strong> ${escapeMapHtml(tech.status?.status?.replace('_', ' ') || 'Unknown')}
               </div>
               <div style="font-size: 14px; color: #666; margin-bottom: 4px;">
                 <strong>Location:</strong> ${tech.latitude.toFixed(6)}, ${tech.longitude.toFixed(6)}
@@ -446,6 +455,8 @@ export function TechMap() {
   }
 
   async function loadTechLocations() {
+    const requestId = ++latestLocationRequest.current;
+    const isCurrent = () => mountedRef.current && requestId === latestLocationRequest.current;
     try {
       const today = formatDateInTimezone(new Date().toISOString(), timezoneRef.current);
 
@@ -456,6 +467,7 @@ export function TechMap() {
         .eq('entry_date', today)
         .is('clock_out', null);
       if (clockError) throw clockError;
+      if (!isCurrent()) return;
       setClockedInCount((dailyClocks || []).filter(c => c.status === 'clocked_in').length);
 
       const { data: activeBreaks } = await supabase
@@ -574,14 +586,17 @@ export function TechMap() {
         }
       });
 
+      if (!isCurrent()) return;
       setTechLocations(Array.from(latestLocations.values()));
       setLastUpdate(new Date());
       setLocationError(null);
     } catch (error) {
-      console.error('Error loading tech locations:', error);
-      setLocationError('Employee locations could not be refreshed. Displayed positions may be outdated.');
+      if (isCurrent()) {
+        console.error('Error loading tech locations:', error);
+        setLocationError('Employee locations could not be refreshed. Displayed positions may be outdated.');
+      }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }
 
