@@ -50,7 +50,6 @@ export interface Profile {
 
 export interface Lead {
   priority?: string | null;
-  google_calendar_event_id?: string | null;
   id: string;
   company_name: string | null;
   contact_name: string;
@@ -230,7 +229,6 @@ export interface Task {
   reminder_date?: string | null;
   assigned_to?: string | null;
   assigned_department_id?: string | null;
-  google_calendar_event_id?: string | null;
   user_id: string;
   title: string;
   description: string;
