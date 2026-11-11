@@ -915,11 +915,11 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                         setFormData(prev => ({ ...prev, contact_id: null, customer_location_id: null, customer_name: '', customer_phone: '', customer_email: '', job_location_address: '', job_location_city: '', job_location_state: '', job_location_zip: '' }));
                       }}>Change</button>}
                     </div>
-                    <div aria-label="Request customer details" className="space-y-1 text-sm text-secondary break-words">
+                    <div aria-label="Request customer details" className="flex flex-col lg:flex-row lg:flex-wrap gap-x-3 gap-y-1 text-sm lg:text-xs text-secondary break-words">
                       {originalContact?.company_name && originalContact.company_name !== formData.customer_name && <p>{originalContact.company_name}</p>}
-                      <p>{formData.customer_phone ? <a className="inline-flex min-h-9 items-center text-blue-500 underline" href={`tel:${formData.customer_phone}`}>{formData.customer_phone}</a> : 'No phone on file'}</p>
-                      <p>{formData.customer_email ? <a className="inline-flex min-h-9 items-center text-blue-500 underline break-all" href={`mailto:${formData.customer_email}`}>{formData.customer_email}</a> : 'No email on file'}</p>
-                      <p><span className="font-medium">Service address: </span>{[formData.job_location_address, formData.job_location_city, formData.job_location_state, formData.job_location_zip].filter(Boolean).join(', ') || 'No service address on file'}</p>
+                      <p>{formData.customer_phone ? <a className="inline-flex min-h-9 lg:min-h-6 items-center text-blue-500 underline" href={`tel:${formData.customer_phone}`}>{formData.customer_phone}</a> : 'No phone on file'}</p>
+                      <p>{formData.customer_email ? <a className="inline-flex min-h-9 lg:min-h-6 items-center text-blue-500 underline break-all" href={`mailto:${formData.customer_email}`}>{formData.customer_email}</a> : 'No email on file'}</p>
+                      <p className="w-full"><span className="font-medium">Service address: </span>{[formData.job_location_address, formData.job_location_city, formData.job_location_state, formData.job_location_zip].filter(Boolean).join(', ') || 'No service address on file'}</p>
                     </div>
                     {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).length > 0 && <p className="mt-1 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).join(', ')}</p>}
                     <div className="flex flex-wrap items-center gap-x-4">
