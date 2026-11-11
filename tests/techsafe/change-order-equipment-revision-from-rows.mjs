@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {planEquipmentRevisionFromRows as plan} from '../../supabase/functions/_shared/change-order-equipment-revision-from-rows.mjs';
+const co='11111111-1111-4111-8111-111111111111',org='22222222-2222-4222-8222-222222222222',id='33333333-3333-4333-8333-333333333333',product='44444444-4444-4444-8444-444444444444';
+const row=(quantity,price='250.00')=>({id,change_order_id:co,organization_id:org,action_type:'add',product_id:product,item_type:'material',new_quantity:String(quantity),new_unit_price:price,new_total:(quantity*Number(price)).toFixed(2)});
+const run=(a,b)=>plan({changeOrderId:co,organizationId:org,committedRows:a,stagedRows:b});
+assert.equal(run([row(4)],[row(6)]).totalDeltaCents,'50000');
+assert.equal(run([row(6)],[row(4)]).totalDeltaCents,'-50000');
+assert.equal(run([row(4)],[row(4,'275.00')]).totalDeltaCents,'10000');
+assert.equal(run([row(4)],[row(4)]).changed,false);
+assert.equal(run([],[row(4)]).effects[0].operation,'add');
+assert.equal(run([row(4)],[]).effects[0].operation,'remove');
+assert.throws(()=>run([row(4)],[{...row(6),action_type:'modify_quantity'}]),/non-add/);
+assert.throws(()=>run([row(4)],[{...row(6),labor_hours:'2'}]),/labor/);
+assert.throws(()=>run([row(4)],[{...row(6),new_total:'1499.00'}]),/disagrees/);
+assert.throws(()=>run([row(4)],[{...row(6),new_quantity:'6.5'}]),/fractional/);
+assert.throws(()=>run([row(4)],[{...row(6),organization_id:co}]),/Cross-order/);
+console.log('DB row equipment revision planner tests passed');
