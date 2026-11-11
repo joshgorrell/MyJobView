@@ -479,18 +479,26 @@ export function TechMap() {
       if (!isCurrent()) return;
       setClockedInCount((dailyClocks || []).filter(c => c.status === 'clocked_in').length);
 
-      const { data: activeBreaks } = await supabase
+      // Restrict ancillary lookups to the active shifts and employees in this dealer.
+      // An unscoped lookup can be expensive and could associate another dealer's job.
+      const clockedInTechIds = [...new Set((dailyClocks || []).map(c => c.technician_id))];
+      const activeShiftEntryIds = (dailyClocks || []).map(c => c.id);
+      const emptyId = '00000000-0000-0000-0000-000000000000';
+      const { data: activeBreaks, error: breaksError } = await supabase
         .from('daily_clock_breaks')
         .select('daily_clock_entry_id')
+        .in('daily_clock_entry_id', activeShiftEntryIds.length ? activeShiftEntryIds : [emptyId])
         .is('break_end', null);
+      if (breaksError) throw breaksError;
 
-      const { data: activeJobs } = await supabase
+      const { data: activeJobs, error: jobsError } = await supabase
         .from('time_entries')
         .select('technician_id, work_order:work_orders(id, title)')
+        .in('technician_id', clockedInTechIds.length ? clockedInTechIds : [emptyId])
         .is('clock_out', null).overrideTypes<{ technician_id: string; work_order: { id: string; title: string } | null }[], { merge: false }>();
+      if (jobsError) throw jobsError;
 
       // Get GPS breadcrumbs for clocked-in technicians (get latest for each tech, no time limit)
-      const clockedInTechIds = dailyClocks?.map(c => c.technician_id) || [];
 
       const { data: breadcrumbs, error } = await supabase
         .from('gps_breadcrumbs')
