@@ -56,7 +56,14 @@ try {
   const own=await page.getByText('Coworker reply '+width,{exact:true}).evaluate(e=>e.parentElement.parentElement.parentElement.className);assert.match(own,/justify-end/);
   const other=await page.getByText('Install follow-up',{exact:true}).last().evaluate(e=>e.parentElement.parentElement.parentElement.className);assert.match(other,/justify-start/);
   await page.screenshot({path:'/tmp/mjv-coworker-conversation-'+width+'.png'});
-  await reply.fill('Draft for Jesse');await filters().getByRole('button',{name:'Customer',exact:true}).click();await page.getByRole('heading',{name:'Customer conversations',exact:true}).first().waitFor();await page.getByRole('heading',{name:'Customer question',exact:true}).first().click();await page.getByText('Adjust the TV',{exact:true}).waitFor();assert.equal(await page.getByPlaceholder('Type your message…').inputValue(),'','Coworker drafts never follow a customer thread');
+  await reply.fill('Draft for Jesse');await filters().getByRole('button',{name:'Customer',exact:true}).click();try { await page.getByRole('heading',{name:'Customer conversations',exact:true}).first().waitFor(); } catch (error) {
+     const snapshot = await page.evaluate(() => ({
+       selectedFilter: [...document.querySelectorAll('[aria-label="Message filters"] button')].map(b => ({ label: b.textContent, pressed: b.getAttribute('aria-pressed') })),
+       inboxText: document.querySelector('.flow-customer-inbox')?.textContent?.slice(0, 1200),
+       pageText: document.body.innerText.slice(0, 1500),
+     }));
+     throw new Error('Customer conversation switch diagnostic: '+JSON.stringify({width,snapshot,pageErrors:errors}),{cause:error});
+   } await page.getByRole('heading',{name:'Customer question',exact:true}).first().click();await page.getByText('Adjust the TV',{exact:true}).waitFor();assert.equal(await page.getByPlaceholder('Type your message…').inputValue(),'','Coworker drafts never follow a customer thread');
   await filters().getByRole('button',{name:'Unread',exact:true}).click();if(await page.getByRole('button',{name:'Back to conversations',exact:true}).isVisible())await page.getByRole('button',{name:'Back to conversations',exact:true}).click();await page.getByRole('heading',{name:'Department update',exact:true}).first().waitFor();assert.equal(await page.getByRole('heading',{name:'Jesse',exact:true}).first().count(),0,'Read coworker thread leaves Unread list');
   await page.screenshot({path:'/tmp/mjv-coworker-inbox-'+width+'.png'});
  }
