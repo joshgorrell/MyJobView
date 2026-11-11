@@ -7,6 +7,7 @@ import { getRingCentralAccessToken } from '../_shared/ringcentral-token-provider
 import { VoicemailTranscriptionAPI } from '../_shared/voicemail-transcription-api.ts';
 import { VoicemailClassificationAPI } from '../_shared/voicemail-classification-api.ts';
 import { nextVoicemailRetry, voicemailAudioType, voicemailAudioExtension } from '../_shared/phone-voicemail-retry.ts';
+import { publishVoicemailToFlow } from '../_shared/phone-voicemail-flow.ts';
 
 /**
  * Explicitly invoked, single-message processing worker.
@@ -93,6 +94,17 @@ Deno.serve(async (request: Request) => {
       last_error: null, updated_at: new Date().toISOString(),
     }).eq('id', id).eq('state', 'processing').select('id');
     if (updateError || !updated?.length) throw Error('persistence_failed');
+    // Classification is already durable; a Flow outage must not re-download or
+    // re-transcribe the voicemail. Reconciliation is handled separately.
+    try {
+      await publishVoicemailToFlow(db, {
+        id: item.id, organizationId: item.organization_id,
+        department: classification.department, summary: classification.summary,
+        state, urgent,
+      });
+    } catch (handoffError) {
+      console.error('Phone dispatcher Flow handoff failed', handoffError instanceof Error ? handoffError.message : 'unknown');
+    }
     return respond(200, { status: state });
   } catch (error) {
     console.error('Phone dispatcher worker failed', error instanceof Error ? error.name : 'unknown');
