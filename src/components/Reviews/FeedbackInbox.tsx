@@ -30,17 +30,32 @@ export default function FeedbackInbox({ onNavigate, canJob, canProposal, canLost
         supabase.from('activity_notification_reads').select('activity_id').eq('user_id', userId).eq('activity_type', 'feedback'),
         supabase.from('activity_notification_baselines').select('started_at').eq('user_id', userId).eq('activity_type', 'feedback').maybeSingle(),
         canJob ? supabase.from('customer_satisfaction').select('id,customer_name,rating,comment,responded_at').eq('organization_id', org).not('responded_at', 'is', null).order('responded_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
-        canProposal ? supabase.from('proposal_check_reporting').select('id,recipient_name,recipient_email').limit(500) : Promise.resolve({ data: [], error: null }),
+        canProposal ? supabase.from('proposal_check_reporting').select('id,recipient_name,recipient_email').eq('organization_id', org).limit(500) : Promise.resolve({ data: [], error: null }),
         canLost ? supabase.from('review_requests').select('id,recipient_name,recipient_email').eq('organization_id', org).eq('request_type', 'lost_opportunity').limit(500) : Promise.resolve({ data: [], error: null }),
       ]);
-      if ([reads, baselines, jobs, emails, requests].some(result => result.error)) throw new Error('Unable to load some feedback responses.');
+      const failures: string[] = [];
+      for (const [label, result] of [
+        ['Viewed status', reads], ['Viewed status baseline', baselines],
+        ['Job Reviews', jobs], ['Proposal Check', emails], ['Lost Opportunities', requests],
+      ] as const) {
+        if (result.error) {
+          failures.push(label);
+          console.error(`Feedback inbox: ${label} failed`, result.error);
+        }
+      }
       const emailIds = (emails.data || []).map(row => row.id);
       const requestIds = (requests.data || []).map(row => row.id);
       const [proposals, lost] = await Promise.all([
         canProposal && emailIds.length ? supabase.from('proposal_check_events').select('id,email_id,choice,message,created_at').eq('kind', 'message').in('email_id', emailIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
         canLost && requestIds.length ? supabase.from('lost_review_responses').select('request_id,reasons,message,created_at').in('request_id', requestIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [], error: null }),
       ]);
-      if (proposals.error || lost.error) throw new Error('Unable to load submitted feedback.');
+      for (const [label, result] of [['Proposal Check responses', proposals], ['Lost Opportunity responses', lost]] as const) {
+        if (result.error) {
+          failures.push(label);
+          console.error(`Feedback inbox: ${label} failed`, result.error);
+        }
+      }
+      if (failures.length) setError(`Unable to load: ${failures.join(', ')}. Available responses are shown; counts may be incomplete.`);
       const proposalEvents = proposals.data || [];
       const emailNames = new Map((emails.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
       const requestNames = new Map((requests.data || []).map(row => [row.id, row.recipient_name || row.recipient_email || 'Customer']));
@@ -95,7 +110,7 @@ export default function FeedbackInbox({ onNavigate, canJob, canProposal, canLost
     </div>
     {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
     {loading && !items.length && <p className="text-sm text-gray-400">Loading feedback…</p>}
-    {!loading && !visible.length && <p className="text-sm text-gray-400">{onlyNew ? 'No new feedback.' : 'No customer feedback received yet.'}</p>}
+    {!loading && !error && !visible.length && <p className="text-sm text-gray-400">{onlyNew ? 'No new feedback.' : 'No customer feedback received yet.'}</p>}
     <div className="space-y-2">
       {visible.map(item => <button type="button" key={item.kind + item.id} onClick={() => void open(item)} className="w-full rounded-lg border border-gray-700 bg-gray-900 p-3 text-left hover:border-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
         <div className="flex flex-wrap items-center gap-2">
