@@ -227,6 +227,7 @@ export interface Task {
   work_order_id?: string | null;
   proposal_id?: string | null;
   reminder_date?: string | null;
+  google_calendar_event_id?: string | null;
   assigned_to?: string | null;
   assigned_department_id?: string | null;
   user_id: string;
