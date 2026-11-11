@@ -240,7 +240,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [scoped, profile?.id, profile?.organization_id]);
   const tabCount = (id: FlowView) => id === 'all'
-    ? unreadFlow + notificationCounts.messages + notificationCounts.tasks + (canViewVoicemail ? notificationCounts.voicemails : 0)
+    ? unreadFlow
     : id === 'activity' ? unreadActivity
     : id === 'messages' ? notificationCounts.messages
     : id === 'tasks' ? notificationCounts.tasks
