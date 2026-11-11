@@ -161,20 +161,12 @@ export function ChangeOrderApprovalFlowModal({
         show_on_report: isBillable ? true : (billableType === 'external' ? showOnReport : false),
       };
 
-      const { error: updateError } = await supabase.from('change_orders').update(updates).eq('id', changeOrder.id);
-      if (updateError) throw new Error(`Failed to update change order: ${updateError.message}`);
-
-      if (isBillable && changeOrder.sales_order_id) {
-        await supabase.from('sales_orders').update({
-          contract_total: changeOrder.new_contract_total,
-        }).eq('id', changeOrder.sales_order_id);
-      }
-
-      // Apply the CO line item changes to the proposal (lock it in)
-      const { error: applyError } = await supabase.rpc('apply_change_order', {
+      // Approval and Sales Order application must succeed or fail in one database transaction.
+      const { error: approveError } = await supabase.rpc('approve_and_apply_change_order', {
         p_change_order_id: changeOrder.id,
+        p_options: updates,
       });
-      if (applyError) throw applyError;
+      if (approveError) throw approveError;
 
       // Trigger the parent refresh immediately so the list shows locked state
       onSuccess();

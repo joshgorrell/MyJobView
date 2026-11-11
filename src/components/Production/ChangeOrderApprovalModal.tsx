@@ -247,35 +247,21 @@ export function ChangeOrderApprovalModal({ isOpen, onClose, changeOrderId, onSuc
           .eq('id', proposalId);
       }
 
-      const { error: coError } = await supabase
-        .from('change_orders')
-        .update({
+      // A single RPC atomically approves, auto-locks and applies the change order.
+      // The database recalculation trigger owns contract_total; never overwrite it from a stale client snapshot.
+      const { error: approveError } = await supabase.rpc('approve_and_apply_change_order', {
+        p_change_order_id: changeOrderId,
+        p_options: {
           status: 'approved',
           is_active: false,
           approved_by: profile!.id,
           approval_date: new Date().toISOString(),
           is_billable: isBillable,
           billable_type: isBillable ? null : billableType,
-          show_on_report: isBillable ? true : (billableType === 'external' ? showOnReport : false)
-        })
-        .eq('id', changeOrderId);
-
-      if (coError) throw coError;
-
-      if (changeOrder?.sales_order_id && isBillable) {
-        const { error: soError } = await supabase
-          .from('sales_orders')
-          .update({ contract_total: changeOrder.new_contract_total })
-          .eq('id', changeOrder.sales_order_id);
-
-        if (soError) throw soError;
-      }
-
-      // Apply the CO line item changes to the proposal (lock it in)
-      const { error: applyError } = await supabase.rpc('apply_change_order', {
-        p_change_order_id: changeOrderId,
+          show_on_report: isBillable ? true : (billableType === 'external' ? showOnReport : false),
+        },
       });
-      if (applyError) throw applyError;
+      if (approveError) throw approveError;
 
       onSuccess();
       onClose();
