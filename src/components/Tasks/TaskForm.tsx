@@ -329,43 +329,6 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
         }
       }
 
-      if (formData.reminder_date && taskId) {
-        const { data: calendarProfile } = await supabase
-          .from('profiles')
-          .select('google_calendar_connected')
-          .eq('id', profile.id)
-          .single();
-
-        if (calendarProfile?.google_calendar_connected) {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const action = task?.google_calendar_event_id ? 'update' : 'create';
-
-            await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-event`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session?.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action,
-                  entityType: 'task',
-                  entityId: taskId,
-                  reminderDate: taskData.reminder_date,
-                  title: `Task: ${formData.title}`,
-                  description: `Task reminder\n\n${formData.description || ''}`,
-                  eventId: task?.google_calendar_event_id,
-                }),
-              }
-            );
-          } catch (calError) {
-            console.error('Failed to create calendar event:', calError);
-          }
-        }
-      }
-
       clearSavedData();
       setShowSuccess(true);
       await new Promise(resolve => setTimeout(resolve, 900));
