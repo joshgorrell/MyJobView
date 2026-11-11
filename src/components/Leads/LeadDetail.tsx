@@ -502,86 +502,25 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
 
   async function handleReminderDateChange(newDate: string) {
     if (!lead || !profile) return;
+    if (newDate && Number.isNaN(new Date(newDate).getTime())) {
+      notify('Enter a valid follow-up date.', { theme: 'blue', tone: 'warning' });
+      return;
+    }
 
     setSavingReminder(true);
     try {
-      const { data: calendarProfile } = await supabase
-        .from('profiles')
-        .select('google_calendar_connected')
-        .eq('id', profile.id)
-        .single();
-
-      if (!calendarProfile?.google_calendar_connected) {
-        notify('Please connect your Google Calendar in My Settings to use reminders.', { theme: 'blue', tone: 'warning' });
-        setSavingReminder(false);
-        return;
-      }
-
-      if (!newDate) {
-        if (lead.google_calendar_event_id) {
-          const { data: { session } } = await supabase.auth.getSession();
-          await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-event`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session?.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                action: 'delete',
-                entityType: 'lead',
-                entityId: leadId,
-                eventId: lead.google_calendar_event_id,
-              }),
-            }
-          );
-        } else {
-          await supabase
-            .from('leads')
-            .update({ reminder_date: null })
-            .eq('id', leadId);
-        }
-        setReminderDate('');
-        loadLead();
-        setSavingReminder(false);
-        return;
-      }
-
-      const reminderDateUTC = new Date(newDate).toISOString();
-
-      const { data: { session } } = await supabase.auth.getSession();
-      const action = lead.google_calendar_event_id ? 'update' : 'create';
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-event`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action,
-            entityType: 'lead',
-            entityId: leadId,
-            reminderDate: reminderDateUTC,
-            title: `Follow up: ${lead.contact_name}${lead.company_name ? ` (${lead.company_name})` : ''}`,
-            description: `Lead follow-up reminder\n\nContact: ${lead.contact_name}\n${lead.company_name ? `Company: ${lead.company_name}\n` : ''}${lead.email ? `Email: ${lead.email}\n` : ''}${lead.phone ? `Phone: ${lead.phone}\n` : ''}${lead.opportunity_description ? `\nOpportunity: ${lead.opportunity_description}` : ''}`,
-            eventId: lead.google_calendar_event_id,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to create calendar event');
-      }
-
-      loadLead();
-      notify('Reminder saved and calendar event created!', { theme: 'blue', tone: 'success' });
+      const { data, error } = await supabase
+        .from('leads')
+        .update({ reminder_date: newDate ? new Date(newDate).toISOString() : null })
+        .eq('id', leadId)
+        .select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('Lead follow-up could not be updated');
+      await loadLead();
+      notify(newDate ? 'Follow-up saved.' : 'Follow-up cleared.', { theme: 'blue', tone: 'success' });
     } catch (error) {
-      console.error('Error saving reminder:', error);
-      notify('Failed to save reminder', { theme: 'blue', tone: 'error' });
+      console.error('Error saving follow-up:', error);
+      notify('Failed to save follow-up', { theme: 'blue', tone: 'error' });
     } finally {
       setSavingReminder(false);
     }
