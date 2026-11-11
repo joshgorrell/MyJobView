@@ -5,8 +5,20 @@ import { registerRingCentralState } from '../_shared/ringcentral-oauth-state.ts'
 import { SupabaseRingCentralStateStore } from '../_shared/ringcentral-oauth-state-store.ts';
 
 Deno.serve(async (request: Request): Promise<Response> => {
+  const allowedOrigin = Deno.env.get('PHONE_DISPATCHER_APP_ORIGIN');
+  const incomingOrigin = request.headers.get('origin');
+  const cors = allowedOrigin && incomingOrigin === allowedOrigin
+    ? { 'access-control-allow-origin': allowedOrigin, 'vary': 'Origin',
+        'access-control-allow-headers': 'authorization,apikey,content-type,x-client-info',
+        'access-control-allow-methods': 'POST, OPTIONS' } : {};
+  if (request.method === 'OPTIONS') return new Response(null, {
+    status: incomingOrigin === allowedOrigin && !!allowedOrigin ? 204 : 403, headers: cors,
+  });
+  if (incomingOrigin && incomingOrigin !== allowedOrigin) {
+    return new Response('Forbidden origin', { status: 403 });
+  }
   const reply = (status: number, data: unknown) => new Response(JSON.stringify(data), {
-    status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors },
   });
   if (request.method !== 'POST') return reply(405, { error: 'method_not_allowed' });
   const url = Deno.env.get('SUPABASE_URL');
