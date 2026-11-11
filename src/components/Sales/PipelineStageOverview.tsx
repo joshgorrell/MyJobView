@@ -83,7 +83,7 @@ export function PipelineStageOverview({
         if (!showAll) {
           // Shared, unclaimed Leads remain visible to salespeople alongside their own Leads.
           prospectQuery = prospectQuery.or('assigned_to.eq.' + userId + ',created_by.eq.' + userId);
-          leadQuery = leadQuery.or('assigned_to.eq.' + userId + ',created_by.eq.' + userId + ',and(is_fishbowl.eq.true,assigned_to.is.null)');
+          leadQuery = leadQuery.or('assigned_to.eq.' + userId + ',assigned_to.is.null');
           proposalQuery = proposalQuery.eq('created_by', userId);
           orderQuery = orderQuery.or('sales_rep_id.eq.' + userId + ',created_by.eq.' + userId);
         } else {
