@@ -8,6 +8,9 @@ export function createSalesOrderChangeHistoryInventory(client){
  return async ({orderId,organizationId,proposalId,committedChangeProvenance}={})=>{
   if(![orderId,organizationId,proposalId].every(uuid)||!Array.isArray(committedChangeProvenance)||
      committedChangeProvenance.length>10000)return hold('invalid_change_history_scope');
+  // Query by Sales Order ID alone. Filtering by tenant/proposal in SQL
+  // would silently hide mis-scoped change orders and falsely report
+  // a complete history. Validate every returned row below instead.
   let response;
   try{response=await client.query(
    `SELECT co.id,co.organization_id,co.sales_order_id,co.proposal_id,
@@ -16,9 +19,9 @@ export function createSalesOrderChangeHistoryInventory(client){
      li.id AS change_line_id,li.organization_id AS line_organization_id
     FROM public.change_orders co
     LEFT JOIN public.change_order_line_items li ON li.change_order_id=co.id
-    WHERE co.organization_id=$1 AND co.sales_order_id=$2 AND co.proposal_id=$3
+    WHERE co.sales_order_id=$1
     ORDER BY co.id,li.id FOR SHARE OF co`,
-   [organizationId,orderId,proposalId]);
+   [orderId]);
   }catch{return hold('change_history_inventory_read_failed');}
   if(!Array.isArray(response.rows)||response.rows.length>10000)
    return hold('change_history_inventory_count_invalid');
