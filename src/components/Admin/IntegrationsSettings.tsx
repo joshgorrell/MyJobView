@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Map, Calendar, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, ChevronRight } from 'lucide-react';
+import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, ChevronRight } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
 import { RingCentralSettings } from './RingCentralSettings';
 import { TechsafeSettings } from './TechsafeSettings';
@@ -34,7 +34,7 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
-const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'google_calendar', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe'] as const;
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe'] as const;
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
@@ -424,17 +424,7 @@ export function IntegrationsSettings() {
             <Map className="w-4 h-4" />
             Google Maps
           </button>
-          <button
-            onClick={() => selectIntegration('google_calendar')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'google_calendar'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Google Calendar
-          </button>
+
           <button
             onClick={() => selectIntegration('techsafe')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'techsafe' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
@@ -810,54 +800,6 @@ export function IntegrationsSettings() {
                 {saveMessage}
               </span>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Google Calendar Integration */}
-      {activeIntegration === 'google_calendar' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 space-y-6">
-          <div>
-            <h4 className="text-base font-semibold mb-2 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Google Calendar Sync
-            </h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Sync appointments and schedules with Google Calendar. Users can connect their individual calendars from their user preferences.
-            </p>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Calendar className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div>
-                <h5 className="font-medium text-blue-900 mb-1">User-Level Configuration</h5>
-                <p className="text-sm text-blue-700">
-                  Google Calendar integration is configured per user. Each user can connect their own Google Calendar
-                  by going to their User Preferences and clicking "Connect Google Calendar".
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h5 className="font-medium text-gray-900 mb-2">Setup Instructions:</h5>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-              <li>Create a project in Google Cloud Console</li>
-              <li>Enable the Google Calendar API</li>
-              <li>Create OAuth 2.0 credentials</li>
-              <li>Add authorized redirect URIs</li>
-              <li>Configure OAuth consent screen</li>
-            </ol>
-            <a
-              href="https://developers.google.com/calendar/api/quickstart/js"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            >
-              View Google Calendar API Documentation
-              <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
         </div>
       )}
