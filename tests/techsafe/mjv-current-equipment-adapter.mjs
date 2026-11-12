@@ -32,4 +32,22 @@ raw.lines[0].membership.verified=false;
 assert.equal(inspect({source:raw}).ok,false);
 const removed=source();removed.lines[0].membership.scope='removed';
 assert.deepEqual(inspect({source:removed}).lines,[]);
+// Change-order lifecycle is internal to MJV. Techsafe must consume the current
+// committed Sales Order rows, not independently apply CO additions/removals.
+const withDraft=source();
+withDraft.changeOrders=[{status:'draft',action_type:'add',quantity:99,product_id:'draft-only'}];
+assert.deepEqual(inspect({source:withDraft}).lines,good.lines);
+const withApproved=source();
+withApproved.changeOrders=[{status:'approved',is_locked:true,action_type:'add',quantity:99,product_id:'double-count'}];
+assert.deepEqual(inspect({source:withApproved}).lines,good.lines);
+// Unlocking an approved CO for correction must not affect Techsafe until MJV
+// commits a new Sales Order equipment snapshot.
+const editing=source();
+editing.changeOrders=[{status:'approved',is_locked:false,new_quantity:6}];
+assert.deepEqual(inspect({source:editing}).lines,good.lines);
+editing.lines[0].line.quantity='6.00';
+assert.equal(inspect({source:editing}).lines[0].quantity,6);
+// No current committed equipment source: a CO payload alone cannot invent it.
+const onlyCO=source();onlyCO.lines=[];onlyCO.changeOrders=withApproved.changeOrders;
+assert.deepEqual(inspect({source:onlyCO}).lines,[]);
 console.log('PASS: MJV current Sales Order equipment adapter reuses existing projection and never authorizes sync');
