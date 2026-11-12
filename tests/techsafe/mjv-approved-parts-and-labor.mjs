@@ -11,6 +11,13 @@ const source=()=>({trustedCurrentOrderRead:true,currentEquipmentComplete:true,ap
 const good=inspect({source:source()});
 assert.equal(good.ok,true);assert.equal(good.authorized,false);assert.equal(good.snapshotReady,false);
 assert.deepEqual(good.lines.map(x=>[x.sourceLineId,x.productKind,x.quantity,x.unitEquipmentValueCents]),[['labor','labor',2,12550],['part','equipment',4,10000]]);
+// Dealer minimum applies to each product unit, never to extended quantities or labor.
+const minimum=inspect({source:source(),minimumUnitValueCents:25000});
+assert.equal(minimum.ok,true);
+assert.deepEqual(minimum.lines.map(x=>x.productKind),['labor']);
+assert.equal(minimum.lines[0].unitEquipmentValueCents,12550);
+const expensive=source();expensive.lines[0].unitSalePrice='250.00';
+assert.deepEqual(inspect({source:expensive,minimumUnitValueCents:25000}).lines.map(x=>x.productKind),['labor','equipment']);
 const changed=source();changed.lines[0].line.quantity='6.00';assert.equal(inspect({source:changed}).lines[1].quantity,6);
 const pending=source();pending.changeOrders=[{status:'draft',action_type:'add',new_quantity:99}];assert.deepEqual(inspect({source:pending}).lines,good.lines);
 const editing=source();editing.changeOrders=[{status:'approved',is_locked:false,new_quantity:99}];assert.deepEqual(inspect({source:editing}).lines,good.lines);
