@@ -33,8 +33,27 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'google_calendar', 'twilio', 'openai', 'resend', 'ringcentral'] as const;
+type IntegrationId = typeof integrationIds[number];
+function integrationFromUrl(): IntegrationId {
+  const params = new URLSearchParams(window.location.search);
+  const selected = params.get('integration');
+  return integrationIds.find(id => id === selected) ?? (params.has('qbo') ? 'quickbooks' : 'payment_processor');
+}
+
 export function IntegrationsSettings() {
-  const [activeIntegration, setActiveIntegration] = useState<'payment_processor' | 'quickbooks' | 'google_maps' | 'google_calendar' | 'twilio' | 'openai' | 'resend' | 'ringcentral'>(() => { const params = new URLSearchParams(window.location.search); return params.get('integration') === 'quickbooks' || params.has('qbo') ? 'quickbooks' : 'payment_processor'; });
+  const [activeIntegration, setActiveIntegration] = useState<IntegrationId>(integrationFromUrl);
+  function selectIntegration(id: IntegrationId) {
+    setActiveIntegration(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('integration', id);
+    window.history.replaceState(window.history.state, '', url.toString());
+  }
+  useEffect(() => {
+    const sync = () => setActiveIntegration(integrationFromUrl());
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
   const [settings, setSettings] = useState<CompanySettings>({});
   const [originalSettings, setOriginalSettings] = useState<CompanySettings>({});
   const [loading, setLoading] = useState(false);
@@ -275,18 +294,19 @@ export function IntegrationsSettings() {
         <p className="text-sm text-gray-600">Connect and configure external services</p>
       </div>
 
-      {/* Warning Banner */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <h5 className="font-medium text-yellow-900 mb-1">Important: Verify API Keys Before Saving</h5>
-            <p className="text-sm text-yellow-700">
-              Password managers may auto-fill these fields incorrectly. Always verify the values using the show/hide toggles before saving changes to avoid overwriting your API keys.
-            </p>
+      {(['google_maps', 'twilio', 'openai'] as IntegrationId[]).includes(activeIntegration) && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h5 className="font-medium text-yellow-900 mb-1">Important: Verify API Keys Before Saving</h5>
+              <p className="text-sm text-yellow-700">
+                Password managers may auto-fill these fields incorrectly. Always verify the values using the show/hide toggles before saving changes to avoid overwriting your API keys.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
@@ -368,7 +388,7 @@ export function IntegrationsSettings() {
       <div className="border-b border-gray-200">
         <nav className="flex gap-1 flex-wrap -mb-px">
           <button
-            onClick={() => setActiveIntegration('payment_processor')}
+            onClick={() => selectIntegration('payment_processor')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'payment_processor'
                 ? 'border-blue-600 text-blue-600'
@@ -382,7 +402,7 @@ export function IntegrationsSettings() {
             )}
           </button>
           <button
-            onClick={() => setActiveIntegration('quickbooks')}
+            onClick={() => selectIntegration('quickbooks')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'quickbooks'
                 ? 'border-blue-600 text-blue-600'
@@ -393,7 +413,7 @@ export function IntegrationsSettings() {
             QuickBooks
           </button>
           <button
-            onClick={() => setActiveIntegration('google_maps')}
+            onClick={() => selectIntegration('google_maps')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'google_maps'
                 ? 'border-blue-600 text-blue-600'
@@ -404,7 +424,7 @@ export function IntegrationsSettings() {
             Google Maps
           </button>
           <button
-            onClick={() => setActiveIntegration('google_calendar')}
+            onClick={() => selectIntegration('google_calendar')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'google_calendar'
                 ? 'border-blue-600 text-blue-600'
@@ -415,7 +435,7 @@ export function IntegrationsSettings() {
             Google Calendar
           </button>
           <button
-            onClick={() => setActiveIntegration('ringcentral')}
+            onClick={() => selectIntegration('ringcentral')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'ringcentral'
                 ? 'border-blue-600 text-blue-600'
@@ -426,7 +446,7 @@ export function IntegrationsSettings() {
             RingCentral
           </button>
           <button
-            onClick={() => setActiveIntegration('twilio')}
+            onClick={() => selectIntegration('twilio')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'twilio'
                 ? 'border-blue-600 text-blue-600'
@@ -437,7 +457,7 @@ export function IntegrationsSettings() {
             Twilio SMS
           </button>
           <button
-            onClick={() => setActiveIntegration('resend')}
+            onClick={() => selectIntegration('resend')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'resend'
                 ? 'border-blue-600 text-blue-600'
@@ -448,7 +468,7 @@ export function IntegrationsSettings() {
             Email / Resend
           </button>
           <button
-            onClick={() => setActiveIntegration('openai')}
+            onClick={() => selectIntegration('openai')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'openai'
                 ? 'border-blue-600 text-blue-600'
@@ -523,7 +543,7 @@ export function IntegrationsSettings() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setActiveIntegration('quickbooks')}
+                    onClick={() => selectIntegration('quickbooks')}
                     className="inline-flex items-center gap-1.5 text-sm font-medium text-green-800 hover:text-green-900"
                   >
                     Go to QuickBooks Settings
