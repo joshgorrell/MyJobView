@@ -19,7 +19,12 @@ export function createCurrentSalesOrderSourceReader(client){
   const current=await scan({orderId,organizationId,proposalId});
   if(current.ok!==true)return hold(current.reason||'current_sales_order_unverified');
   const items=[],issues=[];let soldLaborCents=0;
+  if(current.approvedRemovalEvidenceRead!==true||!Array.isArray(current.removedLineIds))
+   return hold('approved_removal_evidence_unavailable');
+  const removed=new Set(current.removedLineIds);
   for(const row of current.baseLines){
+   // Explicitly removed items are no longer sold, regardless of the hidden flag.
+   if(removed.has(row.id))continue;
    // Hidden is a presentation flag, not a Techsafe product exclusion.
    // Current sold lines remain part of the approved Sales Order even when
    // hidden from a proposal display. Customer-supplied items are different.
@@ -61,6 +66,7 @@ export function createCurrentSalesOrderSourceReader(client){
    source:'current_approved_sales_order',equipment:Object.freeze(items),
    soldLaborCents,issues:Object.freeze(issues),
    currentRowsInspected:current.baseLineCount,
+   approvedRemovalCount:removed.size,
    pendingEditExclusionVerified:false,
    noChangeOrderReplay:true});
  };
