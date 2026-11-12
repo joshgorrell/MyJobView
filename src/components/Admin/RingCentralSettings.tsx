@@ -69,7 +69,7 @@ export function RingCentralSettings() {
           }
         }
         const reason = typeof response?.error === 'string' && /^[a-z0-9_]{1,80}$/.test(response.error)
-          ? response.error.replaceAll('_', ' ') : 'Subscription request failed';
+          ? response.error.replace(/_/g, ' ') : 'Subscription request failed';
         const providerStatus = typeof response?.http_status === 'number'
           ? ` (RingCentral HTTP ${response.http_status})` : '';
         throw new Error(`${reason}${providerStatus}${status ? ` · MJV HTTP ${status}` : ''}`);
