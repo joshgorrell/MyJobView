@@ -40,6 +40,27 @@ for(const invalidQuantity of ['1.5','NaN','10001','-1','1e3',null]){
  const result=await fixture({lines:[{id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:null,quantity:invalidQuantity}]}).scan(scope);
  assert.equal(result.ok,false,'Reject invalid PostgreSQL numeric quantity '+String(invalidQuantity));
 }
+const priced=await fixture({lines:[{
+ id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:ids[4],
+ quantity:'2.00',item_type:'both',unit_price:'250.50',line_total:'501.00',
+ labor_total:'125.25',committed_change_order_line_id:ids[0],
+ is_hidden:false,is_customer_supplied:false
+}]}).scan(scope);
+assert.equal(priced.ok,true);
+assert.equal(priced.baseLines[0].unitSalePriceCents,25050);
+assert.equal(priced.baseLines[0].lineSaleTotalCents,50100);
+assert.equal(priced.baseLines[0].laborSaleTotalCents,12525);
+assert.equal(priced.baseLines[0].itemType,'both');
+assert.equal(priced.baseLines[0].committedChangeOrderLineId,ids[0]);
+assert.equal(priced.baseLines[0].soldComponentsResolved,true);
+assert.equal(priced.authorized,false);
+const unresolved=await fixture({lines:[{
+ id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:ids[4],
+ quantity:1,unit_price:'1.999',line_total:'2',labor_total:null
+}]}).scan(scope);
+assert.equal(unresolved.ok,true);
+assert.equal(unresolved.baseLines[0].soldComponentsResolved,false);
+assert.equal(unresolved.baseLines[0].unitSalePriceCents,null);
 const invalid=fixture();
 assert.equal((await invalid.scan({...scope,proposalId:'untrusted'})).ok,false);
 assert.equal(invalid.calls.length,0);
