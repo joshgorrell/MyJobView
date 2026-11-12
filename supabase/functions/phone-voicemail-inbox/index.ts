@@ -55,7 +55,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return respond(200, { ok: true });
   }
   let query = db.from('voicemail_messages')
-    .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested')
+    .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested,assigned_user_id,workflow_status,completed_at')
     .eq('organization_id', profile.organization_id)
     .in('state', ['ready', 'review']);
   if (profile.role !== 'admin') query = query.in('department', permittedDepartments);
