@@ -70,7 +70,7 @@ Deno.serve(async (request: Request) => {
             const filters = Array.isArray(subscription.eventFilters) ? subscription.eventFilters : [];
             return subscription.status === 'Active' &&
               filters.some((filter: unknown) => typeof filter === 'string' &&
-                filter.includes('/message-store/instant?type=VoiceMail'));
+                (filter.includes('/voicemail') || filter.includes('/message-store')));
           });
           subscription_check = relevant.length ? 'active' : 'missing';
           subscription_expiration = relevant.length && typeof relevant[0].expirationTime === 'string'
