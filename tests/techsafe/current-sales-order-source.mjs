@@ -49,6 +49,10 @@ const unknown=await reader({rows:[{...sourceRows[0],labor_total:null}]}).read(sc
 assert.equal(unknown.soldLaborCents,0);
 assert.ok(unknown.issues.some(x=>x.reason==='labor_amount_unresolved'));
 const hidden=await reader({rows:[{...sourceRows[0],is_hidden:true}]}).read(scope);
-assert.equal(hidden.equipment.length,0);
-assert.ok(hidden.issues.some(x=>x.reason==='line_eligibility_unverified'));
+assert.equal(hidden.equipment.length,1);
+assert.equal(hidden.soldLaborCents,33750);
+assert.equal(hidden.issues.length,0);
+const supplied=await reader({rows:[{...sourceRows[0],is_customer_supplied:true}]}).read(scope);
+assert.equal(supplied.equipment.length,0);
+assert.equal(supplied.soldLaborCents,0);
 console.log('PASS: current Sales Order preview reads sold unit prices and all labor without change-order history or transport authorization');
