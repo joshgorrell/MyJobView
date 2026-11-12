@@ -24,7 +24,7 @@ export function createChangeOrderCommitCoverageInspector(client){
       GROUP BY co.id,co.organization_id,co.sales_order_id,co.status,
         co.is_active,co.is_locked,co.approval_date,
         co.requires_customer_approval,co.customer_approved
-      ORDER BY co.id FOR SHARE OF co`,[orderId]);
+      ORDER BY co.id`,[orderId]);
   }catch{return hold('commit_coverage_read_failed');}
   if(!Array.isArray(result.rows)||result.rows.length>10000)
    return hold('commit_coverage_invalid');
