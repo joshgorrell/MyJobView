@@ -17,7 +17,7 @@ export function createSalesOrderChangeHistoryInventory(client){
     FROM public.change_orders co
     LEFT JOIN public.change_order_line_items li ON li.change_order_id=co.id
     WHERE co.organization_id=$1 AND co.sales_order_id=$2 AND co.proposal_id=$3
-    ORDER BY co.id,li.id FOR SHARE OF co,li`,
+    ORDER BY co.id,li.id FOR SHARE OF co`,
    [organizationId,orderId,proposalId]);
   }catch{return hold('change_history_inventory_read_failed');}
   if(!Array.isArray(response.rows)||response.rows.length>10000)
