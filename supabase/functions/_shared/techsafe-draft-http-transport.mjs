@@ -6,11 +6,11 @@ const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
 const revision=v=>typeof v==='string'&&/^[1-9][0-9]{0,18}$/.test(v);
 const held=reason=>({accepted:false,reason});
 const validHost=hostname=>{
- const host=hostname.toLowerCase().replace(/\\.$/,'');
+ const host=hostname.toLowerCase().replace(/[.]$/,'');
  if(!host||host==='localhost'||host.endsWith('.localhost')||host.endsWith('.local')||
     host.endsWith('.internal')||host.endsWith('.test')||host.endsWith('.invalid'))return false;
  // No IP literals: prevent direct calls to private, loopback or link-local ranges.
- if(/^\\[/.test(host)||/^[0-9.]+$/.test(host))return false;
+ if(host.startsWith('[')||/^[0-9.]+$/.test(host))return false;
  return host.includes('.')&&host.split('.').every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
 };
 const validSnapshot=(content,binding,sourceRevision)=>{
