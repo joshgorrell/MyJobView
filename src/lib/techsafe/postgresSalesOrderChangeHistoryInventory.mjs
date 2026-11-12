@@ -32,7 +32,9 @@ export function createSalesOrderChangeHistoryInventory(client){
     customerApproved:row.customer_approved,lineCount:0});
    const prior=orders.get(row.id);
    if(prior.status!==row.status||prior.active!==row.is_active||prior.locked!==row.is_locked||
-      prior.approvedAt!==row.approval_date)return hold('change_history_inventory_inconsistent');
+      prior.approvedAt!==row.approval_date||
+      prior.requiresCustomerApproval!==row.requires_customer_approval||
+      prior.customerApproved!==row.customer_approved)return hold('change_history_inventory_inconsistent');
    if(row.change_line_id!==null){
     if(!uuid(row.change_line_id)||row.line_organization_id!==organizationId||lines.has(row.change_line_id))
      return hold('change_history_line_scope_mismatch');
@@ -49,10 +51,27 @@ export function createSalesOrderChangeHistoryInventory(client){
   // A complete inventory of CURRENT records is not proof that historical
   // applied removals/edits survived in the current line list.
   const unreferencedLines=lines.size-referenced.size;
+  const unreferencedByOrder=new Map();
+  for(const [lineId,changeOrderId] of lines)
+   if(!referenced.has(lineId))
+    unreferencedByOrder.set(changeOrderId,(unreferencedByOrder.get(changeOrderId)||0)+1);
+  let approvedUnreferencedLines=0,unresolvedChangeOrders=0;
+  for(const [changeOrderId,order] of orders){
+   const approved=order.active===true&&order.locked===true&&
+    Boolean(order.approvedAt)&&
+    (order.requiresCustomerApproval!==true||order.customerApproved===true);
+   if(approved)approvedUnreferencedLines+=unreferencedByOrder.get(changeOrderId)||0;
+   else unresolvedChangeOrders++;
+  }
+  // Unreferenced lines may be removals, replacements or history not present
+  // in the current equipment list. They must NOT be counted as current stock.
+  const needsHistoricalReconciliation=approvedUnreferencedLines>0||
+   unresolvedChangeOrders>0;
   return Object.freeze({ok:true,authorized:false,snapshotReady:false,
    reason:'change_history_enumerated_original_application_history_unverified',
    changeOrderCount:orders.size,changeLineCount:lines.size,
    committedLineReferences:referenced.size,unreferencedChangeLines:unreferencedLines,
+   approvedUnreferencedLines,unresolvedChangeOrders,needsHistoricalReconciliation,
    historyCompletenessCertified:false});
  };
 }
