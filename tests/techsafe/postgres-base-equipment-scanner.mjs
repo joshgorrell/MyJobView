@@ -61,6 +61,22 @@ const unresolved=await fixture({lines:[{
 assert.equal(unresolved.ok,true);
 assert.equal(unresolved.baseLines[0].soldComponentsResolved,false);
 assert.equal(unresolved.baseLines[0].unitSalePriceCents,null);
+for(const invalidMoney of ['1.999','1e3','-1','NaN','Infinity','0.001','99999999999999.00']){
+ const result=await fixture({lines:[{
+  id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:ids[4],
+  quantity:1,unit_price:invalidMoney,line_total:'1.00',labor_total:'0.00'
+ }]}).scan(scope);
+ assert.equal(result.ok,true);
+ assert.equal(result.baseLines[0].unitSalePriceCents,null);
+ assert.equal(result.baseLines[0].soldComponentsResolved,false);
+ assert.equal(result.authorized,false);
+}
+const zeroLabor=await fixture({lines:[{
+ id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:ids[4],
+ quantity:1,unit_price:'250',line_total:'250',labor_total:'0'
+}]}).scan(scope);
+assert.equal(zeroLabor.baseLines[0].soldComponentsResolved,true);
+assert.equal(zeroLabor.baseLines[0].laborSaleTotalCents,0);
 const invalid=fixture();
 assert.equal((await invalid.scan({...scope,proposalId:'untrusted'})).ok,false);
 assert.equal(invalid.calls.length,0);
