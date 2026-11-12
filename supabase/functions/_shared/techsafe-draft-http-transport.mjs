@@ -3,6 +3,8 @@
 // This module neither issues source authority nor enables checkout/coverage.
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(v);
+// Techsafe accepts approved change-order lines as change:<line-id>.
+const sourceLineId=v=>id(v)||(typeof v==='string'&&v.startsWith('change:')&&id(v.slice(7)));
 const revision=v=>typeof v==='string'&&/^[1-9][0-9]{0,18}$/.test(v);
 const held=reason=>({accepted:false,reason});
 const validHost=hostname=>{
@@ -35,7 +37,7 @@ const validSnapshot=(content,binding,sourceRevision)=>{
  const seen=new Set();let total=0;
  for(const line of content.lines){
   if(!object(line)||Object.keys(line).some(k=>!lineFields.has(k))||
-     !id(line.sourceLineId)||seen.has(line.sourceLineId)||
+     !sourceLineId(line.sourceLineId)||seen.has(line.sourceLineId)||
      !kinds.has(line.productKind)||
      (line.productRef!==null&&!id(line.productRef))||
      (line.productKind==='equipment'&&!id(line.productRef))||
