@@ -28,6 +28,7 @@ export function inspectApprovedSalesOrderLabor({source}={}){
   const cents=BigInt(d)*100n+BigInt(f.padEnd(2,'0'));
   if(!Number.isSafeInteger(quantity)||quantity>10000||cents>BigInt(Number.MAX_SAFE_INTEGER)||
    BigInt(quantity)*cents>BigInt(Number.MAX_SAFE_INTEGER))return held('labor_value_overflow');
+  if(quantity===0||cents===0n)continue;
   labor.push(Object.freeze({sourceLineId:line.id,productKind:'labor',quantity,
    unitEquipmentValueCents:Number(cents)}));
  }
