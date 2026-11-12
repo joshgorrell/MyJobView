@@ -6,6 +6,7 @@ import {createPostgresBaseEquipmentScanner} from './postgresBaseEquipmentScanner
 import {createCommittedChangeProvenanceReader} from './postgresCommittedChangeProvenance.mjs';
 import {createSalesOrderApprovalEvidenceReader} from './postgresSalesOrderApprovalEvidence.mjs';
 import {createSalesOrderChangeHistoryInventory} from './postgresSalesOrderChangeHistoryInventory.mjs';
+import {inspectCurrentSoldComponents} from './inspectCurrentSoldComponents.mjs';
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 export function createTransactionalBaseEquipmentAudit(client){
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
@@ -51,6 +52,8 @@ export function createTransactionalBaseEquipmentAudit(client){
     proposalId:first.proposalId,committedChangeProvenance:changes.provenance});}
   catch{return hold('change_history_inventory_read_failed');}
   if(history.ok!==true)return hold(history.reason||'change_history_inventory_unverified');
+  const sold=inspectCurrentSoldComponents({baseLines:base.baseLines,history});
+  if(sold.ok!==true)return hold(sold.reason||'sold_component_inspection_failed');
   let last;
   try{last=await readRevision({connectionId,orderId});}
   catch{return hold('locked_revision_changed');}
@@ -77,6 +80,7 @@ export function createTransactionalBaseEquipmentAudit(client){
    approvedUnreferencedLines:history.approvedUnreferencedLines,
    unresolvedChangeOrders:history.unresolvedChangeOrders,
    needsHistoricalReconciliation:history.needsHistoricalReconciliation,
+   soldComponentInspection:sold,
    historyCompletenessCertified:false,approvalVerified:false,
    sourceManifestComplete:false});
  };
