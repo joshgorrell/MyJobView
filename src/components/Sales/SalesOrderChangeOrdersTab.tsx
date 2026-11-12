@@ -1109,123 +1109,60 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                               <History className="w-4 h-4" />
                               Items Changed
                             </h5>
-                            <div className="space-y-1.5">
-                              {coLineItems.filter(item => {
-                                const isModify = item.action_type === 'modify_quantity' || item.action_type === 'modify_price' || item.action_type === 'modify_labor';
-                                return !(isModify && item.change_amount === 0);
-                              }).map((item) => {
-                                const isAdd = item.action_type === 'add';
-                                const isRemove = item.action_type === 'remove';
-                                const isModifiers = item.action_type === 'modify_modifiers';
-
-                                const amountColor = item.change_amount > 0 ? 'text-green-400' : item.change_amount < 0 ? 'text-red-400' : 'text-gray-400';
-                                const amountPrefix = item.change_amount > 0 ? '+' : item.change_amount < 0 ? '-' : '';
-
-                                const rowBg = isAdd
-                                  ? 'bg-green-900/20 border-green-700/30'
-                                  : isRemove
-                                  ? 'bg-red-900/20 border-red-700/30'
-                                  : isModifiers
-                                  ? 'bg-amber-900/20 border-amber-700/30'
-                                  : 'bg-blue-900/20 border-blue-700/30';
-
-                                const badge = isAdd
-                                  ? { label: 'Added', color: 'bg-green-500/20 text-green-400' }
-                                  : isRemove
-                                  ? { label: item.remove_scope === 'parts_only' ? 'Removed (parts only)' : 'Removed', color: 'bg-red-500/20 text-red-400' }
-                                  : isModifiers
-                                  ? { label: 'Modifiers', color: 'bg-amber-500/20 text-amber-400' }
-                                  : item.action_type === 'modify_labor'
-                                  ? { label: 'Labor Changed', color: 'bg-orange-500/20 text-orange-400' }
-                                  : { label: 'Modified', color: 'bg-blue-500/20 text-blue-400' };
-
-                                return (
-                                  <div key={item.id} className={`rounded-lg border px-3 py-2.5 ${rowBg}`}>
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${badge.color}`}>
-                                            {badge.label}
-                                          </span>
-                                          {!isModifiers && (
-                                            <span className="text-sm font-medium text-gray-200 truncate">
-                                              {item.product_name}
-                                            </span>
-                                          )}
-                                          {item.room_name && (
-                                            <span className="text-xs text-gray-500 truncate">
-                                              {item.room_name}
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {(item.sku || item.manufacturer_name) && !isModifiers && (
-                                          <p className="text-xs text-gray-400 mt-1 break-words">
-                                            {item.manufacturer_name && <span>{item.manufacturer_name}</span>}
-                                            {item.sku && <span className="font-semibold text-gray-300">{item.manufacturer_name ? ' · ' : ''}Model: {item.sku}</span>}
-                                          </p>
-                                        )}
-
-                                        {isAdd && (
-                                          <p className="text-xs text-gray-400 mt-1">
-                                            {item.new_quantity} x ${item.new_unit_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            {item.new_labor_total > 0 && (
-                                              <span className="ml-2 text-gray-500">+ ${item.new_labor_total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} labor</span>
-                                            )}
-                                          </p>
-                                        )}
-
-                                        {isRemove && (
-                                          <p className="text-xs text-gray-400 mt-1">
-                                            Was: {item.original_quantity} x ${(item.original_unit_price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            {item.remove_scope === 'parts_only' && item.original_labor_total != null && item.original_labor_total > 0 && (
-                                              <span className="ml-2 text-gray-500">(labor retained)</span>
-                                            )}
-                                          </p>
-                                        )}
-
-                                        {(item.action_type === 'modify_quantity' || item.action_type === 'modify_price') && (
-                                          <p className="text-xs text-gray-400 mt-1">
-                                            {item.original_quantity} x ${(item.original_unit_price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            <ArrowRight className="inline w-3 h-3 mx-1.5 text-gray-600" />
-                                            {item.new_quantity} x ${item.new_unit_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                          </p>
-                                        )}
-
-                                        {item.action_type === 'modify_labor' && (
-                                          <p className="text-xs text-gray-400 mt-1">
-                                            Labor: ${(item.original_labor_total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            <ArrowRight className="inline w-3 h-3 mx-1.5 text-gray-600" />
-                                            ${item.new_labor_total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            {item.labor_hours != null && item.labor_rate != null && (
-                                              <span className="ml-2 text-gray-500">({item.labor_hours}h @ ${item.labor_rate}/hr)</span>
-                                            )}
-                                          </p>
-                                        )}
-
-                                        {isModifiers && item.modifier_adjustments && item.modifier_adjustments.length > 0 && (
-                                          <div className="mt-1.5 space-y-0.5">
-                                            {item.modifier_adjustments.map((adj, i) => (
-                                              <p key={i} className="text-xs text-gray-400">
-                                                <span className="text-gray-300">{adj.label}:</span>{' '}
-                                                {adj.old_value}%
-                                                <ArrowRight className="inline w-3 h-3 mx-1.5 text-gray-600" />
-                                                {adj.new_value}%
-                                              </p>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {!isModifiers && (
-                                        <span className={`text-sm font-semibold flex-shrink-0 ${amountColor}`}>
-                                          {amountPrefix}${Math.abs(item.change_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                            <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-strong" role="region" aria-label="Change order line items — scroll horizontally for more columns" tabIndex={0}>
+                              <table className="w-full text-xs">
+                                <thead className="bg-surface text-muted">
+                                  <tr>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">Change</th>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">Manufacturer</th>
+                                    <th className="text-left py-2 px-3 whitespace-nowrap">SKU / Model</th>
+                                    <th className="text-left py-2 px-3 min-w-[220px]">Description</th>
+                                    <th className="text-right py-2 px-3 whitespace-nowrap">Qty</th>
+                                    <th className="text-right py-2 px-3 whitespace-nowrap">Price</th>
+                                    <th className="text-right py-2 px-3 whitespace-nowrap">Labor Total</th>
+                                    <th className="text-right py-2 px-3 whitespace-nowrap">Change Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {coLineItems.filter(item => {
+                                    const isModify = item.action_type === 'modify_quantity' || item.action_type === 'modify_price' || item.action_type === 'modify_labor';
+                                    return !(isModify && item.change_amount === 0);
+                                  }).map(item => {
+                                    const isAdd = item.action_type === 'add';
+                                    const isRemove = item.action_type === 'remove';
+                                    const isModifiers = item.action_type === 'modify_modifiers';
+                                    const label = isAdd ? 'Added' : isRemove ? 'Removed' : isModifiers ? 'Modifiers' : item.action_type === 'modify_labor' ? 'Labor Changed' : 'Modified';
+                                    const signedAmount = item.change_amount > 0 ? '+' : item.change_amount < 0 ? '−' : '';
+                                    return (
+                                      <tr key={item.id} className="border-t border-strong hover:bg-elevated/40">
+                                        <td className="py-2 px-3 whitespace-nowrap">
+                                          <span className={`rounded px-1.5 py-0.5 font-medium ${isAdd ? 'bg-green-500/15 text-green-400' : isRemove ? 'bg-red-500/15 text-red-400' : 'bg-blue-500/15 text-blue-400'}`}>{label}</span>
+                                        </td>
+                                        <td className="py-2 px-3 text-muted whitespace-nowrap">{isModifiers ? '—' : item.manufacturer_name || '—'}</td>
+                                        <td className="py-2 px-3 text-primary font-medium whitespace-nowrap">{isModifiers ? '—' : item.sku || '—'}</td>
+                                        <td className="py-2 px-3 text-primary">
+                                          <div className="font-medium">{isModifiers ? 'Contract modifiers' : item.product_name || '—'}</div>
+                                          {item.room_name && <div className="text-muted mt-0.5">{item.room_name}</div>}
+                                          {isRemove && item.remove_scope === 'parts_only' && <div className="text-muted mt-0.5">Labor retained</div>}
+                                          {isModifiers && item.modifier_adjustments?.map((adj,i) => <div key={i} className="text-muted">{adj.label}: {adj.old_value}% → {adj.new_value}%</div>)}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-muted whitespace-nowrap">
+                                          {isModifiers || item.action_type === 'modify_labor' ? '—' : isRemove ? item.original_quantity ?? '—' : item.action_type === 'modify_quantity' ? `${item.original_quantity ?? '—'} → ${item.new_quantity}` : item.new_quantity}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-muted whitespace-nowrap">
+                                          {isModifiers || item.action_type === 'modify_labor' ? '—' : item.action_type === 'modify_price' ? `${formatCurrency(item.original_unit_price ?? 0)} → ${formatCurrency(item.new_unit_price)}` : formatCurrency(isRemove ? item.original_unit_price ?? 0 : item.new_unit_price)}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-muted whitespace-nowrap">
+                                          {isModifiers ? '—' : formatCurrency(isRemove ? item.original_labor_total ?? 0 : item.new_labor_total ?? 0)}
+                                        </td>
+                                        <td className={`py-2 px-3 text-right font-semibold whitespace-nowrap ${item.change_amount > 0 ? 'text-green-400' : item.change_amount < 0 ? 'text-red-400' : 'text-muted'}`}>
+                                          {isModifiers ? '—' : `${signedAmount}${formatCurrency(Math.abs(item.change_amount))}`}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         )}
