@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 
 type Voicemail = {
   id: string; received_at: string; caller_number: string | null;
-  state: 'ready' | 'review'; summary: string | null; transcript: string | null;
+  state: 'ready' | 'review'; is_read: boolean; summary: string | null; transcript: string | null;
   department: string | null; urgent: boolean; callback_requested: boolean;
 };
 export function PhoneVoicemailFlowInbox() {
@@ -17,6 +17,12 @@ export function PhoneVoicemailFlowInbox() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
   const [audioError, setAudioError] = useState('');
+  async function markRead(id: string) {
+    const { error: readError } = await supabase.functions.invoke('phone-voicemail-inbox', { method: 'POST', body: { id } });
+    if (readError) { setError('Could not mark voicemail as read. Please try again.'); return; }
+    setMessages(old => old.map(message => message.id === id ? { ...message, is_read: true } : message));
+    window.dispatchEvent(new Event('flow-voicemail-views-changed'));
+  }
   async function listen(id: string) {
     if (audioBusy) return;
     if (audioId === id) { setAudioId(null); setAudioUrl(null); return; }
@@ -36,6 +42,7 @@ export function PhoneVoicemailFlowInbox() {
         throw new Error('Unexpected audio URL');
       }
       setAudioUrl(target.toString());
+      void markRead(id);
     } catch {
       setAudioError('Recording unavailable. Please try again.');
     } finally {
@@ -83,6 +90,7 @@ export function PhoneVoicemailFlowInbox() {
             {message.urgent && <span className="font-semibold text-red-700">Urgent</span>}
             {message.callback_requested && <span>Callback requested</span>}
             {message.state === 'review' && <span>Needs review</span>}
+            {!message.is_read && <span className="font-semibold text-blue-700">Unread</span>}
           </div>
           <p className="text-sm">{message.summary || 'No summary available'}</p>
           {message.department && <p className="text-xs text-gray-500">Suggested department: {message.department}</p>}
@@ -103,7 +111,7 @@ export function PhoneVoicemailFlowInbox() {
           {message.transcript && (
             <div>
               <button type="button" className="text-xs text-blue-700 underline"
-                onClick={() => setExpanded(expanded === message.id ? null : message.id)}>
+                onClick={() => { if (expanded !== message.id) void markRead(message.id); setExpanded(expanded === message.id ? null : message.id); }}>
                 {expanded === message.id ? 'Hide transcript' : 'Read transcript'}
               </button>
               {expanded === message.id && (
