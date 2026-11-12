@@ -280,10 +280,15 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     const timer = window.setInterval(() => { if (!document.hidden) void refresh(); }, 30000);
     return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); };
   }, [scoped, profile?.id, profile?.organization_id, canMessageCustomers]);
+  // Coworker conversations already persist per-user read state through flow_event_views.
+  // Count only other employees' visible discussion posts, never our own sent messages.
+  const unreadCoworkerMessages = flow.events.filter(event =>
+    event.source_table === 'discussion_posts' && !event.viewed && event.actor_id !== profile?.id
+  ).length;
   const tabCount = (id: FlowView) => id === 'all'
     ? unreadFlow
     : id === 'activity' ? unreadActivity
-    : id === 'messages' ? Math.max(notificationCounts.messages, unreadCustomerMessages)
+    : id === 'messages' ? Math.max(notificationCounts.messages, unreadCustomerMessages + unreadCoworkerMessages)
     : id === 'tasks' ? notificationCounts.tasks
     : canViewVoicemail ? notificationCounts.voicemails : 0;
   const unreadActivity = flow.events.filter(event => !event.viewed && matchesView(event, 'activity', 'all')).length;
