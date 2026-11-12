@@ -52,8 +52,7 @@ export async function sendTechsafeDraft({endpoint,token,binding,sourceRevision,c
   if(!response||response.status!==200)return held('receiver_not_confirmed');
   const receipt=await response.json();
   if(!object(receipt)||receipt.accepted!==true||receipt.connectionId!==binding.connectionId||
-   receipt.orderId!==binding.orderId||receipt.organizationId!==binding.organizationId||
-   receipt.sourceRevision!==sourceRevision||!id(receipt.draftId))
+   receipt.orderId!==binding.orderId||receipt.sourceRevision!==sourceRevision||!id(receipt.draftId))
    return held('receiver_receipt_unverified');
   return {accepted:true,reason:'draft_received',draftId:receipt.draftId,sourceRevision};
  }catch{return held('transport_failed');}
