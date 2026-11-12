@@ -6,7 +6,7 @@ const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const safeCount=x=>Number.isSafeInteger(x)&&x>=0&&x<=10000;
 const quantity=x=>{
  if(typeof x!=='number'&&typeof x!=='string')return null;
- if(!/^\\d{1,5}(?:\\.0{1,6})?$/.test(String(x)))return null;
+ if(!/^\d{1,5}(?:\.0{1,6})?$/.test(String(x)))return null;
  const n=Number(x);return safeCount(n)?n:null;
 };
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
