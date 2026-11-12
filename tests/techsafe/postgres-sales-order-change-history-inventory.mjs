@@ -11,7 +11,9 @@ async function run(rows,refs=[item]){
  const reader=createSalesOrderChangeHistoryInventory({async query(sql,args){
   assert.ok(sql.includes('LEFT JOIN public.change_order_line_items'));
   assert.ok(sql.includes('FOR SHARE OF co'));
-  assert.deepEqual(args,[ids[1],ids[0],ids[2]]);
+  assert.deepEqual(args,[ids[0]]);
+  assert.ok(sql.includes('WHERE co.sales_order_id=$1'));
+  assert.ok(!sql.includes('WHERE co.organization_id='));
   return {rows};
  }});
  return reader({...scope,committedChangeProvenance:refs});
