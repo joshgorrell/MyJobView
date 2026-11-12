@@ -28,12 +28,16 @@ assert.equal(f.calls.filter(c=>c.sql.includes('integration_connections')).length
 assert.ok(f.calls.filter(c=>c.sql.includes('FOR UPDATE')).length===4);
 for(const bad of [
  {isolation:'read committed'},{active:false},{revision:0},
- {changed:true},{ledgerState:'held'},{fingerprint:'0'.repeat(64)},{product:null},{orderPresent:false},{baseReadThrows:true}
+ {changed:true},{ledgerState:'held'},{fingerprint:'0'.repeat(64)},{orderPresent:false},{baseReadThrows:true}
 ]){
  const x=fixture(bad);
  const v=await x.audit(scope);
  assert.equal(v.ok,false);assert.equal(v.authorized,false);
 }
+const standaloneLabor=await fixture({product:null}).audit(scope);
+assert.equal(standaloneLabor.ok,true,'Standalone labor without catalog product is a valid current Sales Order row');
+assert.equal(standaloneLabor.authorized,false);
+assert.equal(standaloneLabor.baseLines[0].productId,null);
 assert.equal((await fixture({baseReadThrows:true}).audit(scope)).reason,'base_equipment_read_failed');
 for(const opts of [{ledgerState:'held'},{fingerprint:'0'.repeat(64)}]){
  const x=fixture(opts),v=await x.audit(scope);
