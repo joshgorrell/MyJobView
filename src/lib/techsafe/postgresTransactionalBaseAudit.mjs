@@ -3,11 +3,13 @@
 // change-order completeness, equipment valuation, certificate or delivery.
 import {createLockedRevisionReader} from './postgresLockedRevisionReader.mjs';
 import {createPostgresBaseEquipmentScanner} from './postgresBaseEquipmentScanner.mjs';
+import {createCommittedChangeProvenanceReader} from './postgresCommittedChangeProvenance.mjs';
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 export function createTransactionalBaseEquipmentAudit(client){
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
  const readRevision=createLockedRevisionReader(client);
  const scanBase=createPostgresBaseEquipmentScanner(client);
+ const inspectChanges=createCommittedChangeProvenanceReader(client);
  return async ({connectionId,orderId}={})=>{
   // Lock connection then ledger, before reading the approved-order base rows.
   // This must run inside the caller's SERIALIZABLE transaction.
@@ -28,6 +30,13 @@ export function createTransactionalBaseEquipmentAudit(client){
   try{base=await scanBase({orderId,organizationId:first.organizationId,proposalId:first.proposalId});}
   catch{return hold('base_equipment_read_failed');}
   if(base.ok!==true)return hold(base.reason||'base_equipment_unverified');
+  // Source-owned change-order provenance is checked in the SAME transaction
+  // as current lines and the locked revision, never in an independent read.
+  let changes;
+  try{changes=await inspectChanges({orderId,organizationId:first.organizationId,
+    proposalId:first.proposalId,baseLines:base.baseLines});}
+  catch{return hold('committed_change_provenance_read_failed');}
+  if(changes.ok!==true)return hold(changes.reason||'committed_change_provenance_unverified');
   let last;
   try{last=await readRevision({connectionId,orderId});}
   catch{return hold('locked_revision_changed');}
@@ -46,7 +55,8 @@ export function createTransactionalBaseEquipmentAudit(client){
    connectionGeneration:first.connectionGeneration,revision:first.revision,
    sourceFingerprint:first.sourceFingerprint,baseLinesAreCurrent:true,
    baseLineSource:'current_proposal_line_items',baseLines:base.baseLines,
-   baseLineCount:base.baseLineCount,approvalVerified:false,
+   baseLineCount:base.baseLineCount,committedChangeProvenance:changes.provenance,
+   committedChangeProvenanceInspected:true,approvalVerified:false,
    sourceManifestComplete:false});
  };
 }
