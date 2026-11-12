@@ -513,24 +513,32 @@ export function TechMap() {
         .is('clock_out', null).overrideTypes<{ technician_id: string; work_order: { id: string; title: string } | null }[], { merge: false }>();
       if (jobsError) throw jobsError;
 
-      // Get GPS breadcrumbs for clocked-in technicians (get latest for each tech, no time limit)
-
-      const { data: breadcrumbs, error } = await supabase
-        .from('gps_breadcrumbs')
-        .select('*')
-        .in('technician_id', clockedInTechIds.length > 0 ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000'])
-        .order('recorded_at', { ascending: false }).limit(500);
-
-      if (error) throw error;
-
-      // Native mobile writes enhanced breadcrumbs; legacy web tracking writes basic breadcrumbs.
-      // Select the newest point across both sources, scoped to the active daily clock entry.
-      const { data: nativeBreadcrumbs, error: nativeError } = await supabase
-        .from('enhanced_gps_breadcrumbs')
-        .select('id, technician_id, daily_clock_entry_id, latitude, longitude, accuracy, heading, speed, captured_at, battery_level')
-        .in('technician_id', clockedInTechIds.length ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000'])
-        .order('captured_at', { ascending: false }).limit(500);
-      if (nativeError) console.error('Unable to load native GPS breadcrumbs:', nativeError);
+      // A global 500-row limit can hide quieter employees when one device
+      // uploads many breadcrumbs. Fetch the newest eligible point per active
+      // employee from each source, bounded by that employee's clock-in time.
+      const latestGps = await Promise.all((dailyClocks || []).map(async clock => {
+        const [legacy, native] = await Promise.all([
+          supabase.from('gps_breadcrumbs')
+            .select('id,technician_id,daily_clock_entry_id,latitude,longitude,accuracy,heading,speed,recorded_at,battery_level')
+            .eq('technician_id', clock.technician_id)
+            .gte('recorded_at', clock.clock_in)
+            .order('recorded_at', { ascending: false }).limit(20),
+          supabase.from('enhanced_gps_breadcrumbs')
+            .select('id,technician_id,daily_clock_entry_id,latitude,longitude,accuracy,heading,speed,captured_at,battery_level')
+            .eq('technician_id', clock.technician_id)
+            .gte('captured_at', clock.clock_in)
+            .order('captured_at', { ascending: false }).limit(20)
+        ]);
+        if (legacy.error) throw legacy.error;
+        if (native.error) throw native.error;
+        return {
+          legacy: (legacy.data || []).find(p => !p.daily_clock_entry_id || p.daily_clock_entry_id === clock.id),
+          native: (native.data || []).find(p => !p.daily_clock_entry_id || p.daily_clock_entry_id === clock.id)
+        };
+      }));
+      if (!isCurrent()) return;
+      const breadcrumbs = latestGps.flatMap(result => result.legacy ? [result.legacy] : []);
+      const nativeBreadcrumbs = latestGps.flatMap(result => result.native ? [result.native] : []);
 
       const { data: heartbeats } = await supabase.from('technician_tracking_heartbeats').select('technician_id,daily_clock_entry_id,last_seen_at').in('technician_id', clockedInTechIds.length ? clockedInTechIds : ['00000000-0000-0000-0000-000000000000']);
       const heartbeatByTech = new Map((heartbeats || []).map(h => [h.technician_id, h]));
