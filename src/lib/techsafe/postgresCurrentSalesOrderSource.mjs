@@ -20,8 +20,12 @@ export function createCurrentSalesOrderSourceReader(client){
   if(current.ok!==true)return hold(current.reason||'current_sales_order_unverified');
   const items=[],issues=[];let soldLaborCents=0;
   for(const row of current.baseLines){
-   if(row.hidden!==false||row.customerSupplied!==false){
-    issues.push({lineId:row.id,reason:'line_eligibility_unverified'});
+   // Hidden is a presentation flag, not a Techsafe product exclusion.
+   // Current sold lines remain part of the approved Sales Order even when
+   // hidden from a proposal display. Customer-supplied items are different.
+   if(row.customerSupplied===true)continue;
+   if(row.customerSupplied!==false){
+    issues.push({lineId:row.id,reason:'customer_supply_flag_unverified'});
     continue;
    }
    if(!cents(row.laborSaleTotalCents)){
