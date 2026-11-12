@@ -54,6 +54,24 @@ for(const kind of ['line','product','exclusion']){
  const r=row();if(kind==='exclusion')r.exclusion={product_id:'product-1',organization_id:'other',excluded:false,miscellaneous_placeholder:false};else r[kind].organization_id='other';
  assert.throws(()=>select(r));
 }
+
+// Full v2 receiver projection must transmit all sold equipment, including
+// below-minimum items, and sold labor; Techsafe decides product eligibility.
+const cheap=row({unitSalePrice:'100.00'});
+cheap.line.id='cheap-line';cheap.membership.sourceLineId='cheap-line';
+const laborSold=row({unitSalePrice:'750.00'});
+laborSold.line.id='labor-line';laborSold.membership.sourceLineId='labor-line';
+laborSold.line.item_type='labor';laborSold.product={...laborSold.product,id:'labor-product',item_type:'labor'};
+laborSold.line.product_id='labor-product';
+const full=prepareSalesEquipment({...input([row(),cheap,laborSold]),receiverFullSnapshot:true});
+assert.equal(full.valid,true);
+assert.equal(full.equipment.length,3);
+assert.equal(full.equipment.find(x=>x.sourceLineId==='cheap-line').unitEquipmentValueCents,10000);
+assert.equal(full.equipment.find(x=>x.sourceLineId==='labor-line').productKind,'labor');
+assert.equal(full.equipment.find(x=>x.sourceLineId==='labor-line').unitEquipmentValueCents,75000);
+assert.equal(prepareSalesEquipment(input([row(),cheap,laborSold])).equipment.length,1,
+ 'Legacy equipment-only selection must remain unchanged');
+
 const output=select(row());assert.equal(output.snapshotReady,false);assert.equal(output.quoteReady,false);
 assert.deepEqual(Object.keys(output.equipment[0]).sort(),['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','description'].sort());
 // Optional local cross-repository check against the actual Techsafe contract.
