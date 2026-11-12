@@ -37,6 +37,7 @@ Deno.serve(async (request: Request) => {
   async function providerFailure(response: Response, code: string) {
     let provider_code: string | null = null;
     let provider_message: string | null = null;
+    let invalid_parameter: string | null = null;
     try {
       const body = await response.json() as {
         errorCode?: unknown; message?: unknown;
@@ -48,12 +49,16 @@ Deno.serve(async (request: Request) => {
         provider_code = rawCode;
       }
       const rawMessage = issue?.message ?? body.message;
+      if (typeof rawMessage === 'string') {
+        const match = rawMessage.match(/^Parameter \[([A-Za-z][A-Za-z0-9_.-]{0,63})\] value is invalid\.?$/);
+        if (match) invalid_parameter = match[1];
+      }
       if (typeof rawMessage === 'string' && rawMessage.length <= 240 &&
           !/https?:|token|secret|authorization|bearer|password|key/i.test(rawMessage)) {
         provider_message = rawMessage;
       }
     } catch { /* A non-JSON provider response is not exposed. */ }
-    return reply(502, { error: code, http_status: response.status, provider_code, provider_message });
+    return reply(502, { error: code, http_status: response.status, provider_code, provider_message, invalid_parameter });
   }
   const bearer = request.headers.get('authorization');
   if (!bearer?.startsWith('Bearer ')) return reply(401, { error: 'unauthorized' });
