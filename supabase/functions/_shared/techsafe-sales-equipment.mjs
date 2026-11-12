@@ -27,6 +27,7 @@ function miscellaneous(product){
 export function prepareSalesEquipment(input){
  if(!object(input)||!id(input.organizationId)||!id(input.orderId)||!id(input.proposalId)||!Array.isArray(input.lines)||input.lines.length>10000)fail('invalid_source_input');
  if(!Number.isSafeInteger(input.minimumUnitValueCents)||input.minimumUnitValueCents<0)fail('invalid_minimum');
+ const fullSnapshot=input.receiverFullSnapshot===true;
  const equipment=[],excluded=[],issues=[],seen=new Set(),productFacts=new Map();let total=0;
  for(const row of input.lines){
   if(!object(row)||!object(row.line)||!id(row.line.id)||seen.has(row.line.id))fail('invalid_line_identity');
@@ -49,7 +50,9 @@ export function prepareSalesEquipment(input){
   else if(exclusion?.excluded)reason='product_opt_out';
   else if(line.product_id===null)reason='non_product';
   else if(product===null){issues.push({sourceLineId:line.id,code:'product_unavailable'});continue;}
-  else if(line.item_type==='labor'||product.item_type==='labor')reason='labor';
+  else if(line.item_type==='labor'||product.item_type==='labor'){
+   if(!fullSnapshot){excluded.push({sourceLineId:line.id,reason:'labor'});continue;}
+  }
   else if(!['material','both'].includes(line.item_type)||product.item_type!=='material'){issues.push({sourceLineId:line.id,code:'classification_unverified'});continue;}
   if(reason){excluded.push({sourceLineId:line.id,reason});continue;}
   if(!object(membership)||membership.verified!==true||membership.orderId!==input.orderId||membership.sourceLineId!==line.id||!['included','removed'].includes(membership.scope)){
@@ -63,12 +66,13 @@ export function prepareSalesEquipment(input){
   try{cents=salesPriceToCents(row.unitSalePrice);count=quantity(line.quantity);}
   catch(error){issues.push({sourceLineId:line.id,code:error.code});continue;}
   if(count===0||cents===0){excluded.push({sourceLineId:line.id,reason:'zero_value_or_quantity'});continue;}
-  if(cents<input.minimumUnitValueCents){excluded.push({sourceLineId:line.id,reason:'below_minimum'});continue;}
+  if(!fullSnapshot&&cents<input.minimumUnitValueCents){excluded.push({sourceLineId:line.id,reason:'below_minimum'});continue;}
   const extended=count*cents;total+=extended;
   if(!Number.isSafeInteger(extended)||!Number.isSafeInteger(total)){issues.push({sourceLineId:line.id,code:'value_overflow'});continue;}
   if(typeof line.description!=='string'||line.description.length>4000)fail('invalid_description');
   // Deliberate allowlist: no cost, margin, catalog price, labor, tax or source dump.
-  equipment.push(Object.freeze({sourceLineId:line.id,productRef:line.product_id,productKind:'equipment',
+  const laborKind=line.item_type==='labor'||product.item_type==='labor';
+  equipment.push(Object.freeze({sourceLineId:line.id,productRef:line.product_id,productKind:laborKind?'labor':'equipment',
    scope:'included',customerSupplied:false,techsafeExcluded:false,quantity:count,
    unitEquipmentValueCents:cents,description:line.description}));
  }
