@@ -2,6 +2,8 @@
 // A private diagnostic source read is NOT authorization to transmit.
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const id=v=>typeof v==='string'&&v.length>0&&v.length<=128&&/^[A-Za-z0-9_-]+$/.test(v);
+// Techsafe accepts approved change-order lines as change:<line-id>.
+const sourceLineId=v=>id(v)||(typeof v==='string'&&v.startsWith('change:')&&id(v.slice(7)));
 const integer=v=>Number.isSafeInteger(v)&&v>=1;
 const nonnegative=v=>Number.isSafeInteger(v)&&v>=0;
 const kinds=new Set(['equipment','miscellaneous','labor','fee','tax','consumable','subscription','unclassified']);
@@ -34,7 +36,7 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   snapshot.eventId!==eventId||snapshot.complete!==true||
   snapshot.scopeState!=='committed'||!Array.isArray(snapshot.lines)||
   snapshot.lines.some(l=>!object(l)||Object.keys(l).some(k=>!lineKeys.has(k))||
-   !id(l.sourceLineId)||!['included','removed'].includes(l.scope)))
+   !sourceLineId(l.sourceLineId)||!['included','removed'].includes(l.scope)))
   return held('snapshot_contract_unverified');
  if(!['production','sandbox'].includes(snapshot.environment)||!id(snapshot.sourceInstanceId)||
   !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
