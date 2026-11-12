@@ -34,7 +34,7 @@ export interface WebhookDecision {
 }
 const MAX_TOKEN_LENGTH = 1024;
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const EXTENSION_EVENT = /^\/restapi\/v1\.0\/account\/([^/]+)\/extension\/([^/]+)\/message-store(?:\/([^/?]+))?$/;
+const EXTENSION_EVENT = /^\/restapi\/v1\.0\/account\/([^/]+)\/extension\/([^/]+)\/(?:message-store|voicemail)(?:\/([^/?]+))?(?:\?.*)?$/;
 
 function parseEvent(value: unknown): VoicemailEvent | null {
   if (!value || typeof value !== 'object') return null;
