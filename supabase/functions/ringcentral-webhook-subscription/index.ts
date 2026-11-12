@@ -93,13 +93,17 @@ Deno.serve(async (request: Request) => {
     if (!listResponse.ok) return reply(502, { error: 'subscription_lookup_failed', http_status: listResponse.status });
     const list = await listResponse.json();
     const records = Array.isArray(list.records) ? list.records : [];
-    const filter = '/restapi/v1.0/account/' + accountId + '/extension/' + extensionId + '/voicemail';
+    // The OAuth token is scoped to the connected extension. RingCentral supports
+    // ~ aliases for the authenticated account and extension, avoiding a stale or
+    // incorrectly persisted account ID being interpreted as an extension ID.
+    const filter = '/restapi/v1.0/account/~/extension/~/voicemail';
+    const explicitFilter = '/restapi/v1.0/account/' + accountId + '/extension/' + extensionId + '/voicemail';
     const address = url.replace(/\/$/, '') + '/functions/v1/ringcentral-voicemail-webhook';
     const matches = records.filter((record: Record<string, unknown>) => {
       const mode = record.deliveryMode as Record<string, unknown> | undefined;
       const filters = Array.isArray(record.eventFilters) ? record.eventFilters : [];
       return record.status === 'Active' && mode?.transportType === 'WebHook' &&
-        mode.address === address && filters.includes(filter);
+        mode.address === address && (filters.includes(filter) || filters.includes(explicitFilter));
     });
     if (matches.length > 1) return reply(409, { error: 'multiple_matching_subscriptions' });
     if (matches.length === 1) {
@@ -118,7 +122,7 @@ Deno.serve(async (request: Request) => {
     // exists for this extension but points elsewhere; require investigation.
     const conflicting = records.some((record: Record<string, unknown>) =>
       record.status === 'Active' && Array.isArray(record.eventFilters) &&
-      record.eventFilters.includes(filter));
+      (record.eventFilters.includes(filter) || record.eventFilters.includes(explicitFilter)));
     if (conflicting) return reply(409, { error: 'existing_voicemail_subscription_requires_review' });
     const created = await fetch(api, {
       method: 'POST', redirect: 'error',
