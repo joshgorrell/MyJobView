@@ -452,7 +452,9 @@ export function ChangeOrderReportModal({ co, order, onClose }: Props) {
     return (
       <tr className="border-b border-gray-100">
         <td className="py-2.5 px-3 text-sm">
-          <div className="font-medium text-gray-900">{item.product_name || '—'}</div>\n          {item.sku && <div className=\"text-xs font-semibold text-slate-600 mt-0.5\">Model: {item.sku}</div>}\n          {item.manufacturer_name && <div className=\"text-xs text-gray-500 mt-0.5\">{item.manufacturer_name}</div>}
+          <div className="font-medium text-gray-900">{item.product_name || '—'}</div>
+          {item.sku && <div className="text-xs font-semibold text-slate-600 mt-0.5">Model: {item.sku}</div>}
+          {item.manufacturer_name && <div className="text-xs text-gray-500 mt-0.5">{item.manufacturer_name}</div>}
           {item.room_name && <div className="text-xs text-gray-400 mt-0.5">{item.room_name}</div>}
           {isAdd && item.new_labor_total > 0 && (
             <div className="text-xs text-gray-400 mt-0.5">+ {fmt(item.new_labor_total)} labor</div>
