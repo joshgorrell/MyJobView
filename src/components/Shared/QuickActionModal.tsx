@@ -7,6 +7,7 @@ interface QuickActionModalProps {
   scrollBody?: boolean;
   wide?: boolean;
   pageScroll?: boolean;
+  mobilePageScroll?: boolean;
   title: string;
   subtitle?: string;
   icon: ReactNode;
@@ -24,6 +25,7 @@ export function QuickActionModal({
   scrollBody = true,
   wide = false,
   pageScroll = false,
+  mobilePageScroll = false,
   title,
   subtitle,
   icon,
@@ -55,6 +57,19 @@ export function QuickActionModal({
       visibleViewport.removeEventListener('scroll', update);
     };
   }, []);
+
+  useEffect(() => {
+    if (!mobilePageScroll || window.innerWidth >= 1024) return;
+    const field = document.activeElement;
+    if (!(field instanceof HTMLElement) || !dialogRef.current?.contains(field) || !field.matches('input, textarea, select')) return;
+    const frame = requestAnimationFrame(() => {
+      const bounds = field.getBoundingClientRect();
+      const top = viewport?.top || 0;
+      const bottom = top + (viewport?.height || window.innerHeight);
+      if (bounds.top < top || bounds.bottom > bottom) field.scrollIntoView({ block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mobilePageScroll, viewport]);
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -126,6 +141,15 @@ export function QuickActionModal({
           -webkit-overflow-scrolling: touch;
           overscroll-behavior: contain;
         }
+        @media (max-width: 1023px) {
+          .qam-mobile-page {
+            max-height: none !important;
+            min-height: 100%;
+            border-radius: 0;
+            animation: none;
+          }
+          .qam-mobile-page > .qam-body { overflow: visible; flex: none; }
+        }
         /* iOS safe-area-aware padding for home indicator */
         .qam-safe-bottom {
           padding-bottom: max(env(safe-area-inset-bottom), 0px);
@@ -172,13 +196,13 @@ export function QuickActionModal({
       <div
         className={`
           fixed inset-0 z-[61]
-          ${pageScroll ? 'overflow-y-auto overscroll-contain block p-0 sm:p-4' : 'flex items-end sm:flex sm:items-center sm:justify-center sm:p-4'}
+          ${pageScroll ? 'overflow-y-auto overscroll-contain block p-0 sm:p-4' : mobilePageScroll ? 'qam-scroll overflow-y-auto block p-0 lg:flex lg:items-center lg:justify-center lg:p-4 lg:overflow-hidden' : 'flex items-end sm:flex sm:items-center sm:justify-center sm:p-4'}
         `}
         style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
       >
         <div
           className={`
-            qam-sheet min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl ${wide ? 'lg:max-w-6xl' : ''}
+            qam-sheet ${mobilePageScroll ? 'qam-mobile-page mx-auto' : ''} min-w-0 outline-none bg-canvas text-primary w-full sm:max-w-2xl ${wide ? 'lg:max-w-6xl' : ''}
             ${pageScroll ? 'rounded-none sm:rounded-xl mx-auto min-h-full sm:min-h-0' : 'rounded-t-2xl sm:rounded-xl'}
             shadow-2xl border-t sm:border border-subtle
             flex flex-col

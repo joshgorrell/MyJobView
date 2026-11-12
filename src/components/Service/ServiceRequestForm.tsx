@@ -118,6 +118,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [warrantyReferences, setWarrantyReferences] = useState<string[]>([]);
   const projectLoadVersion = useRef(0);
   const customerSearchVersion = useRef(0);
+  const contactLoadVersion = useRef(0);
   const aiPrefillApplied = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +127,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
   const [showSuccess, setShowSuccess] = useState(false);
 
   const [originalContact, setOriginalContact] = useState<{
+    company_name: string;
     phone: string;
     email: string;
     street_address: string;
@@ -211,7 +213,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }));
 
     if (aiPrefill.contactId) {
-      loadContact(aiPrefill.contactId);
+      loadContact(aiPrefill.contactId, aiPrefill);
       setShowNewCustomer(false);
     } else if (aiPrefill.customerName) {
       setShowNewCustomer(true);
@@ -271,7 +273,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         setLocations(next);
         const defaultSite = next.find(site => site.is_default);
         // Existing and AI-supplied request addresses must survive asynchronous loading.
-        if (!isEditMode && !aiPrefill?.jobAddress && !locationTouched.current && requestType === 'service' && defaultSite) {
+        if (!isEditMode && !locationTouched.current && requestType === 'service' && defaultSite) {
           selectLocation(defaultSite);
         }
       });
@@ -318,7 +320,8 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }
   }
 
-  async function loadContact(contactId: string) {
+  async function loadContact(contactId: string, requestDetails?: AIPrefill) {
+    const version = ++contactLoadVersion.current;
     try {
       const { data, error } = await supabase
         .from('contacts')
@@ -327,27 +330,10 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
         .single();
 
       if (error) throw error;
+      if (version !== contactLoadVersion.current) return;
 
       if (data) {
-        setOriginalContact({
-          phone: data.phone || '',
-          email: data.email || '',
-          street_address: data.street_address || '',
-          city: data.city || '',
-          state: data.state || '',
-          zip_code: data.zip_code || '',
-        });
-        setFormData(prev => ({
-          ...prev,
-          contact_id: data.id,
-          customer_name: data.full_name || data.company_name || '',
-          customer_phone: data.phone || '',
-          customer_email: data.email || '',
-          job_location_address: data.street_address || '',
-          job_location_city: data.city || '',
-          job_location_state: data.state || '',
-          job_location_zip: data.zip_code || ''
-        }));
+        selectContact(data, requestDetails);
       }
     } catch (error) {
       console.error('Error loading contact:', error);
@@ -428,12 +414,14 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     }
   }
 
-  function selectContact(contact: any) {
-    locationTouched.current = false;
+  function selectContact(contact: any, requestDetails?: AIPrefill) {
+    contactLoadVersion.current++;
+    locationTouched.current = requestDetails?.jobAddress !== undefined;
     setShowCustomerDetails(false);
     setShowAddressFields(false);
     setShowNewCustomer(false);
     setOriginalContact({
+      company_name: contact.company_name || '',
       phone: contact.phone || '',
       email: contact.email || '',
       street_address: contact.street_address || '',
@@ -445,13 +433,13 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       ...prev,
       contact_id: contact.id,
       customer_location_id: null,
-      customer_name: contact.full_name || contact.company_name || '',
-      customer_phone: contact.phone || '',
-      customer_email: contact.email || '',
-      job_location_address: contact.street_address || '',
-      job_location_city: contact.city || '',
-      job_location_state: contact.state || '',
-      job_location_zip: contact.zip_code || ''
+      customer_name: requestDetails?.customerName ?? (contact.full_name || contact.company_name || ''),
+      customer_phone: requestDetails?.customerPhone ?? (contact.phone || ''),
+      customer_email: requestDetails?.customerEmail ?? (contact.email || ''),
+      job_location_address: requestDetails?.jobAddress ?? (contact.street_address || ''),
+      job_location_city: requestDetails?.jobCity ?? (contact.city || ''),
+      job_location_state: requestDetails?.jobState ?? (contact.state || ''),
+      job_location_zip: requestDetails?.jobZip ?? (contact.zip_code || '')
     }));
     setSearchQuery('');
     setSearchResults([]);
@@ -806,15 +794,16 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
       accentColor={isEditMode ? 'from-amber-600 to-orange-700' : 'from-blue-600 to-cyan-700'}
       onClose={onClose}
       scrollBody={false}
+      mobilePageScroll
       wide
       showSuccess={showSuccess}
       successMessage="Service request created successfully."
     >
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-        <div className="service-request-compact qam-scroll overflow-y-auto min-h-0 min-w-0 flex-1 p-3 sm:p-4 lg:py-2 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-2 lg:items-start">
+        <form onSubmit={handleSubmit} className="flex flex-col lg:flex-1 min-h-0 min-w-0 lg:overflow-hidden">
+        <div className="service-request-compact qam-scroll lg:overflow-y-auto min-h-0 min-w-0 lg:flex-1 p-3 sm:p-4 lg:py-2 space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-2 lg:items-start">
           <div className="lg:col-span-2">
           <div className="space-y-2 lg:space-y-0 lg:flex lg:items-center lg:justify-between [&>div]:mb-0">
-          {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
+          {!isEditMode && <AIFormFill kind="service" onFill={prefill => { if (prefill.contactId) { loadContact(prefill.contactId, prefill); setShowNewCustomer(false); } else if (prefill.customerName) { setShowNewCustomer(true); setSearchQuery(prefill.customerName); } setFormData(previous => ({ ...previous, customer_name: prefill.customerName ?? previous.customer_name, customer_phone: prefill.customerPhone ?? previous.customer_phone, customer_email: prefill.customerEmail ?? previous.customer_email, job_location_address: prefill.jobAddress ?? previous.job_location_address, job_location_city: prefill.jobCity ?? previous.job_location_city, job_location_state: prefill.jobState ?? previous.job_location_state, job_location_zip: prefill.jobZip ?? previous.job_location_zip, job_description: prefill.jobDescription ?? previous.job_description, priority: prefill.priority === 'normal' || prefill.priority === 'urgent' ? prefill.priority : previous.priority, notes: prefill.notes ?? previous.notes })); }} />}
 
           {!isEditMode&&<p className="text-sm text-secondary">For remaining project work, use the <a href="/?tab=punchlist" target="_blank" rel="noopener noreferrer" className="text-info underline">Project Punchlist</a>.</p>}
           </div>
@@ -853,7 +842,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                 </div>
 
                 {(searching || searchQuery.trim().length >= 2) && (
-                <div className="max-h-64 overflow-y-auto rounded-lg border border-subtle bg-surface">
+                <div className="rounded-lg border border-subtle bg-surface">
                 {searching && (
                   <div className="text-center py-4 text-muted">
                     <div className="animate-spin inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
@@ -918,6 +907,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                         </a>
                       </div>
                       {!isEditMode && <button type="button" className="shrink-0 min-h-10 text-sm text-blue-500" onClick={() => {
+                        contactLoadVersion.current++;
                         locationTouched.current = false;
                         setOriginalContact(null);
                         setShowCustomerDetails(false);
@@ -925,9 +915,15 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
                         setFormData(prev => ({ ...prev, contact_id: null, customer_location_id: null, customer_name: '', customer_phone: '', customer_email: '', job_location_address: '', job_location_city: '', job_location_state: '', job_location_zip: '' }));
                       }}>Change</button>}
                     </div>
+                    <div aria-label="Request customer details" className="flex flex-col lg:flex-row lg:flex-wrap gap-x-3 gap-y-1 text-sm lg:text-xs text-secondary break-words">
+                      {originalContact?.company_name && originalContact.company_name !== formData.customer_name && <p>{originalContact.company_name}</p>}
+                      <p>{formData.customer_phone ? <a className="inline-flex min-h-9 lg:min-h-6 items-center text-blue-500 underline" href={`tel:${formData.customer_phone}`}>{formData.customer_phone}</a> : 'No phone on file'}</p>
+                      <p>{formData.customer_email ? <a className="inline-flex min-h-9 lg:min-h-6 items-center text-blue-500 underline break-all" href={`mailto:${formData.customer_email}`}>{formData.customer_email}</a> : 'No email on file'}</p>
+                      <p className="w-full"><span className="font-medium">Service address: </span>{[formData.job_location_address, formData.job_location_city, formData.job_location_state, formData.job_location_zip].filter(Boolean).join(', ') || 'No service address on file'}</p>
+                    </div>
                     {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).length > 0 && <p className="mt-1 text-xs text-amber-400">Incomplete contact — missing: {missingContactFields({ full_name: formData.customer_name, phone: formData.customer_phone, email: formData.customer_email, street_address: formData.job_location_address, city: formData.job_location_city, state: formData.job_location_state, zip_code: formData.job_location_zip }).join(', ')}</p>}
                     <div className="flex flex-wrap items-center gap-x-4">
-                    <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 text-sm text-blue-500">
+                    <button type="button" aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails(value => !value)} className="min-h-10 lg:min-h-6 text-sm text-blue-500">
                       {showCustomerDetails ? 'Hide request contact details' : 'Edit request contact details'}
                     </button>
                     </div>
@@ -1047,7 +1043,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
             </div>
           )}
 
-<details className="border-t border-subtle pt-2"><summary className="min-h-11 cursor-pointer text-sm text-secondary">{formData.job_location_address || '+ Location (optional)'}</summary>
+<details className="border-t border-subtle pt-2"><summary className="min-h-11 lg:min-h-9 cursor-pointer text-sm text-secondary">{formData.contact_id ? 'Change job site or address' : '+ Location (optional)'}</summary>
           {/* Location Section */}
           <div className="space-y-3 lg:space-y-2">
             <h3 className="font-semibold text-primary flex items-center gap-2">

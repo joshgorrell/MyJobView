@@ -77,3 +77,41 @@ assert.match(approvalEmailSource,/attempt\.description/,'Customer approval email
 assert.match(approvalEmailSource,/wrapInEmailLayout\(/,'Approval email must use the shared branded layout');
 assert.match(approvalEmailSource,/reply_to:settings\.reply_to_email \|\| settings\.company_email \|\| settings\.from_email/,'Approval email must route customer replies to configured inbox');
 assert.match(approvalEmailSource,/company_logo_url/,'Approval email must use configured company logo');
+
+// Contact loads can finish out of order while staff change the selected customer.
+const pendingContacts = new Map();
+const contactFixture = { from(table) {
+  let id;
+  const q = {select:()=>q,eq:(key,value)=>{if(key==='id')id=value;return q;},order:()=>q,
+    single:()=>new Promise(resolve=>pendingContacts.set(id,resolve)),
+    then:resolve=>Promise.resolve({data:[],error:null}).then(resolve)};
+  return q;
+}};
+const customerHarness=harness('src/components/Service/ServiceRequestForm.tsx', {setTimeout:()=>0,clearTimeout(){}}, {
+  '../../lib/supabase':{supabase:contactFixture},'../../contexts/AuthContext':{useAuth:()=>({profile:{id:'staff',role:'sales'}})},
+  '../Shared/AddressAutocomplete':{AddressAutocomplete:'Address'},'../Shared/QuickActionModal':{QuickActionModal:'Modal'},'../Shared/AIFormFill':{AIFormFill:'AIFormFill'},
+});
+const customerProps={onClose(){},prefilledContactId:'old'};
+let customerTree=customerHarness.render(customerProps,'ServiceRequestForm');
+for(const effect of customerHarness.effects.splice(0))effect();
+const renderCustomer=()=>customerTree=customerHarness.render(customerProps,'ServiceRequestForm');
+renderCustomer();
+nodes(customerTree).find(n=>n.type==='AIFormFill').props.onFill({contactId:'new',customerPhone:'555-REQUEST',jobAddress:'Request-specific site'});
+pendingContacts.get('new')({data:{id:'new',full_name:'New Customer',company_name:'New Company',phone:'555-MASTER',email:'new@example.com',street_address:'Master site'},error:null});
+await new Promise(setImmediate);renderCustomer();
+pendingContacts.get('old')({data:{id:'old',full_name:'Old Customer',phone:'555-OLD',email:'old@example.com'},error:null});
+await new Promise(setImmediate);renderCustomer();
+const customerSummary=()=>nodes(customerTree).find(n=>n.props?.['aria-label']==='Request customer details');
+assert.match(text(customerSummary()),/New Company/);
+assert.match(text(customerSummary()),/555-REQUEST/);
+assert.match(text(customerSummary()),/new@example.com/);
+assert.match(text(customerSummary()),/Request-specific site/);
+assert.doesNotMatch(text(customerSummary()),/555-OLD|Master site/,'Late loads must not restore the old customer or overwrite request-specific data');
+assert.equal(nodes(customerSummary()).find(n=>n.type==='a'&&n.props.href.startsWith('tel:')).props.href,'tel:555-REQUEST');
+nodes(customerTree).find(n=>n.type==='button'&&text(n)==='Edit request contact details').props.onClick();renderCustomer();
+nodes(customerTree).find(n=>n.props?.placeholder==='Phone').props.onChange({target:{value:'555-EDITED'}});renderCustomer();
+assert.match(text(customerSummary()),/555-EDITED/,'Summary follows request-specific edits');
+nodes(customerTree).find(n=>n.type==='button'&&text(n)==='Change').props.onClick();renderCustomer();
+assert.equal(customerSummary(),undefined,'Changing customers clears the previous summary');
+assert.equal(nodes(customerTree).find(n=>n.type==='Modal').props.mobilePageScroll,true);
+console.log('Customer summary, tappable contact links, request-specific edits, and stale-load protection passed.');
