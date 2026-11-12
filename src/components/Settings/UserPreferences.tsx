@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import { NotificationPreferenceFields } from './NotificationPreferenceFields';
 import { useState, useEffect } from 'react';
-import { Bell, Save, Calendar, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
+import { Bell, Save, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToPushNotifications, unsubscribeFromPushNotifications, checkPushSubscription } from '../../lib/pushNotifications';
@@ -19,10 +19,6 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [calendarConnected, setCalendarConnected] = useState(false);
-  const [calendarEmail, setCalendarEmail] = useState('');
   const [pushEnabled, setPushEnabled] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
   const [offices, setOffices] = useState<any[]>([]);
@@ -64,7 +60,7 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('notify_on_mention, notify_on_lead_assigned, notify_on_fishbowl, notify_on_escalated, notify_on_lead_status, notify_on_product_requests, google_calendar_connected, google_calendar_email')
+        .select('notify_on_mention, notify_on_lead_assigned, notify_on_fishbowl, notify_on_escalated, notify_on_lead_status, notify_on_product_requests')
         .eq('id', profile.id)
         .single();
 
@@ -78,8 +74,6 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
           notify_on_lead_status: data.notify_on_lead_status ?? true,
           notify_on_product_requests: data.notify_on_product_requests ?? true,
         });
-        setCalendarConnected(data.google_calendar_connected ?? false);
-        setCalendarEmail(data.google_calendar_email || '');
       }
     } catch (error) {
       console.error('Error loading preferences:', error);
@@ -206,88 +200,6 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
       notify('Failed to save preferences', { theme: 'blue', tone: 'error' });
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleConnectCalendar() {
-    setConnecting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-calendar-auth`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        throw new Error(result.error || 'Failed to get authorization URL');
-      }
-
-      const { authUrl } = result;
-
-      const popup = window.open(authUrl, 'Google Calendar Authorization', 'width=600,height=700');
-
-      const handleMessage = (event: MessageEvent) => {
-        if (event.data.type === 'google-auth-success') {
-          window.removeEventListener('message', handleMessage);
-          loadPreferences();
-          notify('Google Calendar connected successfully!', { theme: 'blue', tone: 'success' });
-        } else if (event.data.type === 'google-auth-error') {
-          window.removeEventListener('message', handleMessage);
-          notify('Failed to connect Google Calendar', { theme: 'blue', tone: 'error' });
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-
-      const checkPopup = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkPopup);
-          setConnecting(false);
-        }
-      }, 500);
-    } catch (error) {
-      console.error('Error connecting calendar:', error);
-      notify(`Failed to connect Google Calendar: ${error instanceof Error ? error.message : 'Unknown error'}`, { theme: 'blue', tone: 'error' });
-      setConnecting(false);
-    }
-  }
-
-  async function handleDisconnectCalendar() {
-    if (!profile) return;
-    setDisconnecting(true);
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          google_access_token: null,
-          google_refresh_token: null,
-          google_token_expires_at: null,
-          google_calendar_connected: false,
-          google_calendar_email: null,
-        })
-        .eq('id', profile.id);
-
-      if (error) throw error;
-
-      setCalendarConnected(false);
-      setCalendarEmail('');
-      notify('Google Calendar disconnected successfully!', { theme: 'blue', tone: 'success' });
-    } catch (error) {
-      console.error('Error disconnecting calendar:', error);
-      notify('Failed to disconnect Google Calendar', { theme: 'blue', tone: 'error' });
-    } finally {
-      setDisconnecting(false);
     }
   }
 
@@ -587,59 +499,6 @@ export function UserPreferences({ directoryEnabled = false, onOpenDirectory }: {
           </div>
         </div>
       )}
-
-      <div>
-        <div className="mb-6">
-          <h3 className="text-xl font-bold text-primary mb-2 flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-brand" />
-            Google Calendar Integration
-          </h3>
-          <p className="text-secondary">Connect your Google Calendar to automatically create reminders</p>
-        </div>
-
-        <div className="bg-canvas border border-subtle rounded-lg p-6">
-          {calendarConnected ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-success">
-                <CheckCircle className="w-6 h-6" />
-                <div>
-                  <div className="font-semibold">Connected</div>
-                  <div className="text-sm text-secondary">{calendarEmail}</div>
-                </div>
-              </div>
-              <p className="text-sm text-secondary">
-                When you set reminder dates on leads, tasks, or discussions, calendar events will automatically be created in your Google Calendar.
-              </p>
-              <button
-                onClick={() => setConfirmModal({ title: 'Disconnect Google Calendar', message: 'Are you sure you want to disconnect your Google Calendar? Future reminders will not be synced.', onConfirm: handleDisconnectCalendar })}
-                disabled={disconnecting}
-                className="px-4 py-2 bg-red-600 text-primary rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <XCircle className="w-4 h-4" />
-                {disconnecting ? 'Disconnecting...' : 'Disconnect Calendar'}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-muted">
-                <XCircle className="w-6 h-6" />
-                <div className="font-semibold">Not Connected</div>
-              </div>
-              <p className="text-sm text-secondary">
-                Connect your Google Calendar to automatically create calendar reminders when you set follow-up dates on leads, tasks, and discussions.
-              </p>
-              <button
-                onClick={handleConnectCalendar}
-                disabled={connecting}
-                className="px-4 py-2 bg-blue-600 text-primary rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Calendar className="w-4 h-4" />
-                {connecting ? 'Connecting...' : 'Connect Google Calendar'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
 
       <div>
         <div className="mb-6">
