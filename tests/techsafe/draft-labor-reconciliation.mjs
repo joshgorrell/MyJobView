@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {reconcileTechsafeDraftLabor as merge} from '../../src/lib/techsafe/draftLaborReconciliation.mjs';
+const lines=[{sourceLineId:'speaker',productKind:'equipment',quantity:2,unitEquipmentValueCents:30000},
+ {sourceLineId:'install',productKind:'labor',quantity:1,unitEquipmentValueCents:150000}];
+const run=(incomingLines=lines,existingDraft=null)=>merge({incomingLines,existingDraft,minimumUnitValueCents:25000});
+assert.equal(run().ok,true);assert.equal(run().lines[1].unitEquipmentValueCents,150000);
+const draft={lifecycle:'draft',lines:[{...lines[1],dealerLaborOverrideCents:200000}]};
+const updated=run([{...lines[0],unitEquipmentValueCents:40000},{...lines[1],unitEquipmentValueCents:170000}],draft);
+assert.equal(updated.ok,true);assert.equal(updated.lines[0].unitEquipmentValueCents,40000);
+assert.equal(updated.lines[1].unitEquipmentValueCents,170000);
+assert.equal(updated.lines[1].dealerLaborOverrideCents,200000);
+assert.equal(updated.lines[1].mjvSalesOrderLaborCents,170000);
+assert.equal(updated.lines[1].dealerLaborCoverageCents,200000);
+assert.equal(run(lines,{lifecycle:'draft',lines:[{...lines[1],dealerLaborOverrideCents:0}]}).lines[1].dealerLaborOverrideCents,0);
+assert.equal(run(lines,{lifecycle:'draft',lines:[{...lines[1],dealerLaborOverrideCents:0}]}).lines[1].dealerLaborCoverageCents,0);
+assert.equal(run(lines,{lifecycle:'draft',lines:[lines[1]]}).lines[1].dealerLaborOverrideCents,null);
+assert.equal(run(lines,{lifecycle:'draft',lines:[lines[1]]}).lines[1].dealerLaborCoverageCents,150000);
+assert.equal(run(lines,{lifecycle:'purchased',lines:[]}).ok,false);
+assert.equal(run(lines,{lifecycle:'active',lines:[]}).ok,false);
+assert.equal(run([{...lines[0],unitEquipmentValueCents:24999},lines[1]]).ok,false);
+assert.equal(run([lines[1]]).lines[0].productKind,'labor');
+assert.equal(run(lines,{lifecycle:'draft',lines:[{...lines[1],dealerLaborOverrideCents:-1}]}).ok,false);
+console.log('Techsafe draft refresh preserves dealer labor overrides, equipment follows MJV, purchased plans frozen');
