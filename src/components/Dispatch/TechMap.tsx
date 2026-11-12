@@ -89,7 +89,10 @@ export function TechMap() {
     // Coalesce GPS bursts into one refresh. Without this, each breadcrumb
     // invalidates the previous request, potentially starving the map forever.
     const scheduleRealtimeRefresh = () => {
-      if (realtimeRefreshTimer.current) clearTimeout(realtimeRefreshTimer.current);
+      // Schedule at most one refresh per window, measured from the FIRST event.
+      // Resetting the timer on every GPS update could postpone refresh forever
+      // while devices continuously report more often than every 250ms.
+      if (realtimeRefreshTimer.current) return;
       realtimeRefreshTimer.current = setTimeout(() => {
         realtimeRefreshTimer.current = null;
         void loadTechLocationsRef.current();
