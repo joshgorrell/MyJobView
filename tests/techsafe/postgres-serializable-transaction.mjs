@@ -115,4 +115,11 @@ await legacyOnly.withTx(async tx=>{
  return inert;
 });
 
+const releasedMalformed=[];
+const malformed=createSerializableSourceTransaction(
+ {connect:async()=>({release:error=>releasedMalformed.push(error)})},
+ ()=>({readConsistentSource:async()=>({}),readCompleteEquipmentDetails:async()=>[],readCurrentRevision:async()=>({})}));
+await assert.rejects(()=>malformed(async()=>inert),/invalid_postgres_client/);
+assert.equal(releasedMalformed.length,1);
+assert.ok(releasedMalformed[0] instanceof Error);
 console.log('PASS: server-owned PostgreSQL SERIALIZABLE transaction commit/rollback/isolation and connection disposal');

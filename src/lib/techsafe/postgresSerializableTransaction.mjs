@@ -9,8 +9,10 @@ export function createSerializableSourceTransaction(pool, makeReader, persistCer
  return async callback=>{
   if(typeof callback!=='function')throw new TypeError('transaction_callback_required');
   const client=await pool.connect();
-  if(!client||typeof client.query!=='function'||typeof client.release!=='function')
+  if(!client||typeof client.query!=='function'||typeof client.release!=='function') {
+   if(typeof client?.release==='function')client.release(new Error('invalid_postgres_client'));
    throw new TypeError('invalid_postgres_client');
+  }
   let begun=false,committed=false,failed=false;
   try {
    // Explicit read-write transaction: a future certificate writer must use

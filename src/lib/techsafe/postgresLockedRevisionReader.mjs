@@ -3,6 +3,7 @@
 // source reader and certificate writer. This is NOT a complete source reader.
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
 const integer=x=>typeof x==='string'&&/^[1-9][0-9]*$/.test(x)&&BigInt(x)<=BigInt(Number.MAX_SAFE_INTEGER);
+const validNumber=x=>(typeof x==='string'||(typeof x==='number'&&Number.isSafeInteger(x)))&&integer(String(x));
 export function createLockedRevisionReader(client) {
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
  return async function readCurrentRevision({connectionId,orderId}={}) {
@@ -15,8 +16,8 @@ export function createLockedRevisionReader(client) {
      WHERE connection_id=$1 AND sales_order_id=$2 FOR UPDATE`,
    [connectionId,orderId]);
   const c=connection.rows?.[0];
-  if(!c||c.enabled!==true||c.status!=='active'||!uuid(c.organization_id)||
-     !uuid(c.proposal_id)||!integer(String(c.connection_generation)))
+  if(connection.rows?.length!==1||!c||c.enabled!==true||c.status!=='active'||!uuid(c.organization_id)||
+     !uuid(c.proposal_id)||!validNumber(c.connection_generation))
    throw new Error('connection_not_active_or_unverified');
   const ledger=await client.query(
    `SELECT organization_id,proposal_id,connection_generation,revision,
@@ -25,9 +26,9 @@ export function createLockedRevisionReader(client) {
      WHERE connection_id=$1 AND sales_order_id=$2 FOR UPDATE`,
    [connectionId,orderId]);
   const l=ledger.rows?.[0];
-  if(!l||l.organization_id!==c.organization_id||l.proposal_id!==c.proposal_id||
+  if(ledger.rows?.length!==1||!l||l.organization_id!==c.organization_id||l.proposal_id!==c.proposal_id||
      String(l.connection_generation)!==String(c.connection_generation)||
-     !integer(String(l.revision))||l.state!=='candidate'||
+     !validNumber(l.revision)||l.state!=='candidate'||
      typeof l.source_fingerprint!=='string'||
      !/^[0-9a-f]{64}$/.test(l.source_fingerprint)||
      l.source_fingerprint==='0'.repeat(64))
