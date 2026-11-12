@@ -7,6 +7,7 @@ import {createCommittedChangeProvenanceReader} from './postgresCommittedChangePr
 import {createSalesOrderApprovalEvidenceReader} from './postgresSalesOrderApprovalEvidence.mjs';
 import {createSalesOrderChangeHistoryInventory} from './postgresSalesOrderChangeHistoryInventory.mjs';
 import {inspectCurrentSoldComponents} from './inspectCurrentSoldComponents.mjs';
+import {createChangeOrderHistoricalEvidenceReader} from './postgresChangeOrderHistoricalEvidence.mjs';
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 export function createTransactionalBaseEquipmentAudit(client){
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
@@ -15,6 +16,7 @@ export function createTransactionalBaseEquipmentAudit(client){
  const inspectChanges=createCommittedChangeProvenanceReader(client);
  const inspectApproval=createSalesOrderApprovalEvidenceReader(client);
  const inspectHistory=createSalesOrderChangeHistoryInventory(client);
+ const inspectHistoricalEvents=createChangeOrderHistoricalEvidenceReader(client);
  return async ({connectionId,orderId}={})=>{
   // Lock connection then ledger, before reading the approved-order base rows.
   // This must run inside the caller's SERIALIZABLE transaction.
@@ -52,6 +54,13 @@ export function createTransactionalBaseEquipmentAudit(client){
     proposalId:first.proposalId,committedChangeProvenance:changes.provenance});}
   catch{return hold('change_history_inventory_read_failed');}
   if(history.ok!==true)return hold(history.reason||'change_history_inventory_unverified');
+  let historicalEvents;
+  try{historicalEvents=await inspectHistoricalEvents({orderId,
+    organizationId:first.organizationId,proposalId:first.proposalId});}
+  catch{return hold('historical_evidence_read_failed');}
+  if(historicalEvents.ok!==true)return hold(historicalEvents.reason||'historical_evidence_unverified');
+  if(historicalEvents.changeOrderCount!==history.changeOrderCount)
+   return hold('historical_change_order_inventory_mismatch');
   const sold=inspectCurrentSoldComponents({baseLines:base.baseLines,history});
   if(sold.ok!==true)return hold(sold.reason||'sold_component_inspection_failed');
   let last;
@@ -81,6 +90,7 @@ export function createTransactionalBaseEquipmentAudit(client){
    unresolvedChangeOrders:history.unresolvedChangeOrders,
    needsHistoricalReconciliation:history.needsHistoricalReconciliation,
    soldComponentInspection:sold,
+   historicalEventEvidence:historicalEvents,
    historyCompletenessCertified:false,approvalVerified:false,
    sourceManifestComplete:false});
  };
