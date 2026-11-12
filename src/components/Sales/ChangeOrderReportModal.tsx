@@ -29,6 +29,8 @@ interface COLineItem {
   id: string;
   action_type: 'add' | 'remove' | 'modify_quantity' | 'modify_price' | 'modify_labor' | 'modify_modifiers';
   product_name: string;
+  sku: string | null;
+  manufacturer_name: string | null;
   product_description: string | null;
   room_name: string | null;
   original_quantity: number | null;
@@ -72,7 +74,7 @@ export function ChangeOrderReportModal({ co, order, onClose }: Props) {
         const [lineItemsRes, orgRes, companyRes, officeRes] = await Promise.all([
           supabase
             .from('change_order_line_items')
-            .select('id, action_type, product_name, product_description, room_name, original_quantity, original_unit_price, original_total, original_labor_total, new_quantity, new_unit_price, new_total, new_labor_total, change_amount, item_type, labor_hours, labor_rate, remove_scope, modifier_adjustments, sort_order')
+            .select('id, action_type, product_name, sku, manufacturer_name, product_description, room_name, original_quantity, original_unit_price, original_total, original_labor_total, new_quantity, new_unit_price, new_total, new_labor_total, change_amount, item_type, labor_hours, labor_rate, remove_scope, modifier_adjustments, sort_order')
             .eq('change_order_id', co.id)
             .order('sort_order'),
           supabase.from('organizations').select('name, logo_url, header_logo_url').eq('id', profile?.organization_id).maybeSingle(),
@@ -89,6 +91,10 @@ export function ChangeOrderReportModal({ co, order, onClose }: Props) {
     }
     load();
   }, [co.id]);
+
+  function escapeHtml(value: string) {
+    return value.replace(/[&<>\"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' })[char] || char);
+  }
 
   function fmt(n: number) {
     return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -235,7 +241,7 @@ export function ChangeOrderReportModal({ co, order, onClose }: Props) {
       return `
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
-            <div style="font-weight:500;color:#111;">${item.product_name || '—'}</div>
+            <div style="font-weight:500;color:#111;">${escapeHtml(item.product_name || '—')}</div>\n            ${item.sku ? `<div style=\"font-size:11px;font-weight:600;color:#334155;margin-top:2px;\">Model: ${escapeHtml(item.sku)}</div>` : ''}\n            ${item.manufacturer_name ? `<div style=\"font-size:11px;color:#64748b;margin-top:2px;\">${escapeHtml(item.manufacturer_name)}</div>` : ''}
             ${item.room_name ? `<div style="font-size:11px;color:#6b7280;margin-top:2px;">${item.room_name}</div>` : ''}
             ${laborNote}
           </td>
@@ -447,6 +453,8 @@ export function ChangeOrderReportModal({ co, order, onClose }: Props) {
       <tr className="border-b border-gray-100">
         <td className="py-2.5 px-3 text-sm">
           <div className="font-medium text-gray-900">{item.product_name || '—'}</div>
+          {item.sku && <div className="text-xs font-semibold text-slate-600 mt-0.5">Model: {item.sku}</div>}
+          {item.manufacturer_name && <div className="text-xs text-gray-500 mt-0.5">{item.manufacturer_name}</div>}
           {item.room_name && <div className="text-xs text-gray-400 mt-0.5">{item.room_name}</div>}
           {isAdd && item.new_labor_total > 0 && (
             <div className="text-xs text-gray-400 mt-0.5">+ {fmt(item.new_labor_total)} labor</div>
