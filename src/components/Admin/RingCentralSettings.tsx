@@ -21,7 +21,8 @@ export function RingCentralSettings() {
   const [diagnosticsError, setDiagnosticsError] = useState('');
   const [diagnostics, setDiagnostics] = useState<{
     connections: Array<{status: string; extension_number?: string | null; extension_name?: string | null;
-      registered_mailbox?: boolean; mailbox_enabled?: boolean; http_status?: number}>;
+      registered_mailbox?: boolean; mailbox_enabled?: boolean; http_status?: number;
+      subscription_check?: 'active' | 'missing' | 'unavailable'; subscription_expiration?: string | null}>;
     mailboxes: Array<{extension_id: string; display_name: string | null; enabled: boolean}>;
   } | null>(null);
   async function checkConnection() {
@@ -205,6 +206,8 @@ export function RingCentralSettings() {
                 Connection: {connection.status}
                 {connection.extension_number && ` · Extension ${connection.extension_number}`}
                 {connection.extension_name && ` · ${connection.extension_name}`}
+                {connection.subscription_check && ` · Voicemail subscription: ${connection.subscription_check}`}
+                {connection.subscription_expiration && ` · Expires: ${new Date(connection.subscription_expiration).toLocaleString()}`}
                 {connection.registered_mailbox !== undefined && ` · Registered: ${connection.registered_mailbox ? 'yes' : 'no'}`}
                 {connection.mailbox_enabled !== undefined && ` · Enabled: ${connection.mailbox_enabled ? 'yes' : 'no'}`}
               </p>
