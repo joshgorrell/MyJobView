@@ -34,7 +34,7 @@ export interface WebhookDecision {
 }
 const MAX_TOKEN_LENGTH = 1024;
 const MESSAGE_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const EXTENSION_EVENT = /^\/restapi\/v1\.0\/account\/([^/]+)\/extension\/([^/]+)\/message-store(?:\/([^/?]+))?$/;
+const EXTENSION_EVENT = /^\/restapi\/v1\.0\/account\/([^/]+)\/extension\/([^/]+)\/(?:message-store|voicemail)(?:\/([^/?]+))?(?:\?.*)?$/;
 
 function parseEvent(value: unknown): VoicemailEvent | null {
   if (!value || typeof value !== 'object') return null;
@@ -51,7 +51,8 @@ function parseEvent(value: unknown): VoicemailEvent | null {
   const [ , accountId, extensionId ] = match;
   if (!MESSAGE_ID.test(accountId) || !MESSAGE_ID.test(extensionId)) return null;
   // Message store notifications can include non-voicemail messages.
-  if (body?.type !== 'VoiceMail') return null;
+  // Dedicated /voicemail events may omit the message-store type field.
+  if (!input.event.includes('/voicemail') && body?.type !== 'VoiceMail') return null;
   return { accountId, extensionId, messageId };
 }
 export async function validateRingCentralWebhook(
