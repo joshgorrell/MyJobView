@@ -9,7 +9,7 @@ const nonnegative=v=>Number.isSafeInteger(v)&&v>=0;
 const kinds=new Set(['equipment','miscellaneous','labor','fee','tax','consumable','subscription','unclassified']);
 const held=reason=>({ready:false,reason,snapshot:null});
 const lineKeys=new Set(['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','manufacturer','model','sku','description','room','serialNumber','productCategory','originalPurchaseDate']);
-const allowed=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','customerRef','customerName','siteRef','lines']);
+const allowed=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','soldLaborCents','customerRef','customerName','siteRef','lines']);
 export function prepareTechsafeTransportSnapshot({source,authority,binding,revision,eventId}={}){
  if(!object(binding)||!['connectionId','organizationId','orderId','proposalId'].every(k=>id(binding[k])))
   return held('binding_unverified');
@@ -40,7 +40,8 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   return held('snapshot_contract_unverified');
  if(!['production','sandbox'].includes(snapshot.environment)||!id(snapshot.sourceInstanceId)||
   !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
-  !nonnegative(snapshot.minimumUnitValueCents)||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
+  !nonnegative(snapshot.minimumUnitValueCents)||
+  (snapshot.soldLaborCents!==undefined&&!nonnegative(snapshot.soldLaborCents))||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
   typeof snapshot.customerName!=='string'||!snapshot.customerName.trim()||snapshot.customerName.length>256||
   [...snapshot.customerName].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)||snapshot.lines.length>10000||
   (['cancelled','deleted'].includes(snapshot.orderStatus)&&snapshot.lines.length>0))
