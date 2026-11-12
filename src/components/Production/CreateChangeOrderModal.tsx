@@ -112,6 +112,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
   const [reason, setReason] = useState('customer_request');
   const [type, setType] = useState<'addition' | 'deletion' | 'modification' | 'credit'>('addition');
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [editingLineIndex, setEditingLineIndex] = useState<number | null>(null);
 
   // Remove dialog state
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
@@ -385,6 +386,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       parent_index: null,
     };
     setLineItems([...lineItems, newItem]);
+    setEditingLineIndex(lineItems.length);
   }
 
   function getAccessoriesForIndex(parentIdx: number): { item: LineItem; index: number }[] {
@@ -578,6 +580,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
     });
 
     setLineItems(result);
+    setEditingLineIndex(null);
   }
 
   function applyOriginalModifiers() {
@@ -1146,6 +1149,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                           <th className="text-right py-2 px-3 whitespace-nowrap">Price</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">Labor Total</th>
                           <th className="text-right py-2 px-3 whitespace-nowrap">Change Total</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">Edit</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1168,13 +1172,21 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                             <td className={`py-2 px-3 text-right whitespace-nowrap font-semibold ${item.change_amount < 0 ? 'text-red-700' : 'text-green-700'}`}>
                               {item.change_amount > 0 ? '+' : item.change_amount < 0 ? '−' : ''}{formatCurrency(Math.abs(item.change_amount))}
                             </td>
+                            <td className="py-2 px-3 text-right">
+                              <button type="button" onClick={() => setEditingLineIndex(editingLineIndex === index ? null : index)}
+                                aria-expanded={editingLineIndex === index} aria-label={`Edit ${item.product_name || 'line item'}`}
+                                className="rounded border border-gray-300 px-2 py-1 font-medium text-blue-700 hover:bg-blue-50 whitespace-nowrap">
+                                {editingLineIndex === index ? 'Close' : 'Edit'}
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-xs text-gray-500">Edit product selections, quantities, prices, labor and accessories in the item details below. The grid updates as you edit.</p>
+                  <p className="text-xs text-gray-500">Select Edit on a grid row to adjust its product, quantities, pricing, labor, or accessories. Only the selected row editor is shown.</p>
                   {lineItems.map((item, index) => {
+                    if (editingLineIndex !== index) return null;
                     const isAccessory = item.parent_index !== null && item.parent_index !== undefined;
                     const accessories = getAccessoriesForIndex(index);
                     const hasAccessories = accessories.length > 0;
