@@ -34,6 +34,11 @@ assert.equal(pending.ok,true);
 assert.equal(pending.unresolvedChangeOrders,1);
 assert.equal(pending.approvedUnreferencedLines,0);
 assert.equal(pending.needsHistoricalReconciliation,true);
+const staleDraft=await run([{...row,status:'draft'}],[]);
+assert.equal(staleDraft.ok,true);
+assert.equal(staleDraft.unresolvedChangeOrders,1);
+assert.equal(staleDraft.approvedUnreferencedLines,0);
+assert.equal(staleDraft.needsHistoricalReconciliation,true);
 assert.equal((await run([row,{...row,customer_approved:false}])).ok,false);
 for(const rows of [[],[{...row,organization_id:ids[5]}],[{...row,sales_order_id:ids[5]}],
  [{...row,line_organization_id:ids[5]}],[row,row]]){

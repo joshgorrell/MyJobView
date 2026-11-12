@@ -27,6 +27,7 @@ for(const bad of [
  [],[{...row,organization_id:ids[7]}],[{...row,sales_order_id:ids[7]}],
  [{...row,proposal_id:ids[7]}],[{...row,proposal_line_item_id:ids[7]}],
  [{...row,is_locked:false}],[{...row,approval_date:null}],
+ [{...row,status:'draft'}],[{...row,status:'pending_approval'}],
  [{...row,customer_approved:false}],[row,row]
 ]){
  const x=await check(bad);assert.equal(x.result.ok,false);
