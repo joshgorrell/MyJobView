@@ -95,6 +95,23 @@ for(const mutation of [
  else {const result=attempt();assert.equal(result.valid,false);assert.equal(result.equipment.length,0);}
 }
 
+
+const mixed=row();
+mixed.line.item_type='both';
+mixed.line.labor_total=450;
+const mixedFull=prepareSalesEquipment({...input([mixed]),receiverFullSnapshot:true});
+assert.equal(mixedFull.valid,false,'A complete receiver snapshot must not omit sold labor on a mixed line');
+assert.deepEqual(mixedFull.equipment,[]);
+assert.equal(mixedFull.issues[0].code,'mixed_material_labor_split_unverified');
+assert.equal(prepareSalesEquipment(input([mixed])).equipment.length,1,
+ 'Existing equipment-only candidate remains compatible');
+const mixedWithEquipment=row();
+mixedWithEquipment.line={...mixedWithEquipment.line,id:'second-equipment'};
+mixedWithEquipment.membership={verified:true,scope:'included',orderId:'order-1',sourceLineId:'second-equipment'};
+const partialMixed=prepareSalesEquipment({...input([mixed,mixedWithEquipment]),receiverFullSnapshot:true});
+assert.equal(partialMixed.valid,false);
+assert.deepEqual(partialMixed.equipment,[],'Never emit partial v2 receiver snapshot when labor split is unknown');
+
 const output=select(row());assert.equal(output.snapshotReady,false);assert.equal(output.quoteReady,false);
 assert.deepEqual(Object.keys(output.equipment[0]).sort(),['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','description'].sort());
 // Optional local cross-repository check against the actual Techsafe contract.
