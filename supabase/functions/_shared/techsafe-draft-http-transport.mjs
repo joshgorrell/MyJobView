@@ -15,7 +15,7 @@ const validHost=hostname=>{
  if(host.startsWith('[')||/^[0-9.]+$/.test(host))return false;
  return host.includes('.')&&host.split('.').every(label=>/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
 };
-const snapshotFields=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','customerRef','customerName','siteRef','lines']);
+const snapshotFields=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','soldLaborCents','customerRef','customerName','siteRef','lines']);
 const lineFields=new Set(['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','manufacturer','model','sku','description','room','serialNumber','productCategory','originalPurchaseDate']);
 const kinds=new Set(['equipment','miscellaneous','labor','fee','tax','consumable','subscription','unclassified']);
 const nonnegative=x=>Number.isSafeInteger(x)&&x>=0;
@@ -39,6 +39,7 @@ const validSnapshot=(content,binding,sourceRevision)=>{
    !['production','sandbox'].includes(content.environment)||
    !['open','completed','cancelled','deleted'].includes(content.orderStatus)||
    content.currency!=='USD'||!nonnegative(content.minimumUnitValueCents)||
+   (content.soldLaborCents!==undefined&&!nonnegative(content.soldLaborCents))||
    !id(content.customerRef)||!id(content.siteRef)||
    typeof content.customerName!=='string'||!content.customerName.trim()||
    content.customerName.length>256||[...content.customerName].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)||
