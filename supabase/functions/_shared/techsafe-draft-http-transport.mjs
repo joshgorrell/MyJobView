@@ -29,7 +29,7 @@ const validSnapshot=(content,binding,sourceRevision)=>{
    content.currency!=='USD'||!nonnegative(content.minimumUnitValueCents)||
    !id(content.customerRef)||!id(content.siteRef)||
    typeof content.customerName!=='string'||!content.customerName.trim()||
-   content.customerName.length>256||/[\\x00-\\x1f\\x7f]/.test(content.customerName)||
+   content.customerName.length>256||[...content.customerName].some(ch=>ch.charCodeAt(0)<32||ch.charCodeAt(0)===127)||
    (['cancelled','deleted'].includes(content.orderStatus)&&content.lines?.length>0)||
    !Array.isArray(content.lines)||content.lines.length>10000)return false;
  const seen=new Set();let total=0;
