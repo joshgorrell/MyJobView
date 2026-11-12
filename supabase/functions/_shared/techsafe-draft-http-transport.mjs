@@ -77,7 +77,16 @@ export async function sendTechsafeDraft({endpoint,token,binding,sourceRevision,c
    !['created','updated','duplicate','ignore_older','preserve_coverage_snapshot','held','suppressed'].includes(receipt.action)||
    (['created','updated'].includes(receipt.action)&&!id(receipt.proposalId)))
    return held('receiver_receipt_unverified');
-  return {accepted:true,reason:'snapshot_received',action:receipt.action,
-   proposalId:receipt.proposalId??null,sourceRevision};
+  // A committed receipt is not necessarily a materialized or editable draft.
+  // Duplicate, older, suppressed and purchased-plan-preservation outcomes must
+  // never be reported to a caller as successful draft creation.
+  const materialized=['created','updated'].includes(receipt.action);
+  const reason=materialized?'draft_materialized':({
+   duplicate:'snapshot_duplicate',ignore_older:'snapshot_older',
+   preserve_coverage_snapshot:'purchased_coverage_preserved',
+   held:'source_held_by_receiver',suppressed:'draft_suppressed'
+  })[receipt.action];
+  return {accepted:true,materialized,reason,action:receipt.action,
+   proposalId:materialized?receipt.proposalId:null,sourceRevision};
  }catch{return held('transport_failed');}
 }
