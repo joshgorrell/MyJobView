@@ -2,6 +2,7 @@
 // Connection credentials are supplied by trusted server storage, never source rows.
 import {sendTechsafeDraft} from './techsafe-draft-http-transport.mjs';
 import {createPrivateTechsafeCredentialReader} from './techsafe-private-receiver-credentials.mjs';
+import {createDenoTechsafeSecretReader} from './techsafe-environment-secret-reader.mjs';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const held=reason=>({accepted:false,materialized:false,reason});
 export function createTechsafeReceiverDelivery({readCredentials,fetchImpl}={}){
@@ -29,4 +30,14 @@ export function createTechsafeReceiverDelivery({readCredentials,fetchImpl}={}){
   return sendTechsafeDraft({endpoint:credentials.endpoint,token:credentials.token,
    binding,sourceRevision,content,...(fetchImpl?{fetchImpl}:{})});
  };
+}
+
+/** Deno server entrypoints use this factory after the source certificate and
+ * delivery authorization are independently verified. It never reads a token
+ * from an HTTP request, a source row, or a browser-provided value. */
+export function createDenoTechsafeReceiverDelivery({fetchImpl}={}) {
+ return createTechsafeReceiverDelivery({
+  readCredentials:createDenoTechsafeSecretReader(),
+  ...(fetchImpl?{fetchImpl}:{}),
+ });
 }
