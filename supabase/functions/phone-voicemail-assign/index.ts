@@ -100,30 +100,14 @@ Deno.serve(async (request: Request) => {
     return respond(400, { error: 'reassignment_required' });
   }
   const nextStatus = status ?? message.workflow_status;
-  const updates = {
-    department: nextDepartment, assigned_user_id: nextAssignee, workflow_status: nextStatus,
-    completed_at: nextStatus === 'completed' ? new Date().toISOString() : null,
-    completed_by: nextStatus === 'completed' ? user.id : null,
-    updated_at: new Date().toISOString(),
-  };
-  // Conditional update prevents two reviewers from silently overwriting each other's changes.
-  let updateQuery = db.from('voicemail_messages').update(updates)
-    .eq('organization_id', org).eq('id', message.id)
-    .eq('workflow_status', message.workflow_status);
-  updateQuery = message.assigned_user_id === null ? updateQuery.is('assigned_user_id', null)
-    : updateQuery.eq('assigned_user_id', message.assigned_user_id);
-  updateQuery = message.department === null ? updateQuery.is('department', null)
-    : updateQuery.eq('department', message.department);
-  const { data: updated, error: updateError } = await updateQuery.select('id').maybeSingle();
-  if (updateError) return respond(503, { error: 'assignment_save_failed' });
-  if (!updated) return respond(409, { error: 'voicemail_changed_reload' });
-  const { error: historyError } = await db.from('phone_voicemail_assignment_history').insert({
-    organization_id: org, voicemail_id: message.id, actor_user_id: user.id,
-    from_department: message.department, to_department: nextDepartment,
-    from_user_id: message.assigned_user_id, to_user_id: nextAssignee,
-    from_status: message.workflow_status, to_status: nextStatus, note: note ?? null,
+  const { data: committed, error: commitError } = await db.rpc('commit_phone_voicemail_assignment', {
+    p_organization_id: org, p_voicemail_id: message.id, p_actor_user_id: user.id,
+    p_expected_department: message.department, p_expected_assignee: message.assigned_user_id,
+    p_expected_status: message.workflow_status, p_department: nextDepartment,
+    p_assignee: nextAssignee, p_status: nextStatus, p_note: note ?? null,
   });
-  if (historyError) return respond(503, { error: 'assignment_saved_history_failed' });
+  if (commitError) return respond(503, { error: 'assignment_save_failed' });
+  if (!committed) return respond(409, { error: 'voicemail_changed_reload' });
   return respond(200, { ok: true, department: nextDepartment, assigned_user_id: nextAssignee,
     workflow_status: nextStatus });
 });
