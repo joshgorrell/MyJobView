@@ -1135,6 +1135,45 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                 </div>
               ) : (
                 <div className="space-y-3">
+                  <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-gray-200" role="region" aria-label="Change Order line items — scroll horizontally for more columns" tabIndex={0}>
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="text-left py-2 px-3 whitespace-nowrap">Change</th>
+                          <th className="text-left py-2 px-3 whitespace-nowrap">SKU / Model</th>
+                          <th className="text-left py-2 px-3 min-w-[220px]">Description</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">Qty</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">Price</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">Labor Total</th>
+                          <th className="text-right py-2 px-3 whitespace-nowrap">Change Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lineItems.map((item, index) => (
+                          <tr key={index} className="border-t border-gray-200 hover:bg-gray-50">
+                            <td className="py-2 px-3 whitespace-nowrap">
+                              <span className={`rounded px-1.5 py-0.5 font-medium ${item.action_type === 'remove' ? 'bg-red-50 text-red-700' : item.action_type === 'add' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+                                {item.action_type === 'add' ? 'Added' : item.action_type === 'remove' ? 'Removed' : item.action_type === 'modify_quantity' ? 'Qty Changed' : 'Price Changed'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 whitespace-nowrap font-medium text-gray-800">{item.sku || '—'}</td>
+                            <td className="py-2 px-3 text-gray-900">
+                              <div className="font-medium">{item.product_name || 'Select a product below'}</div>
+                              {item.install_location && <div className="text-gray-500">{item.install_location}</div>}
+                              {item.parent_index != null && <div className="text-blue-600">Accessory</div>}
+                            </td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">{item.action_type === 'remove' ? item.original_quantity ?? item.new_quantity : item.new_quantity}</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">{formatCurrency(item.action_type === 'remove' ? item.original_unit_price ?? item.new_unit_price : item.new_unit_price)}</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">{formatCurrency(item.labor_total || 0)}</td>
+                            <td className={`py-2 px-3 text-right whitespace-nowrap font-semibold ${item.change_amount < 0 ? 'text-red-700' : 'text-green-700'}`}>
+                              {item.change_amount > 0 ? '+' : item.change_amount < 0 ? '−' : ''}{formatCurrency(Math.abs(item.change_amount))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-gray-500">Edit product selections, quantities, prices, labor and accessories in the item details below. The grid updates as you edit.</p>
                   {lineItems.map((item, index) => {
                     const isAccessory = item.parent_index !== null && item.parent_index !== undefined;
                     const accessories = getAccessoriesForIndex(index);
