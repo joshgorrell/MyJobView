@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { DollarSign, Map, Calendar, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, ChevronRight } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
 import { RingCentralSettings } from './RingCentralSettings';
+import { TechsafeSettings } from './TechsafeSettings';
 
 interface CompanySettings {
   google_maps_api_key?: string;
@@ -33,7 +34,7 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
-const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'google_calendar', 'twilio', 'openai', 'resend', 'ringcentral'] as const;
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'google_calendar', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe'] as const;
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
@@ -435,6 +436,13 @@ export function IntegrationsSettings() {
             Google Calendar
           </button>
           <button
+            onClick={() => selectIntegration('techsafe')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'techsafe' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+          >
+            <Check className="w-4 h-4" />
+            Techsafe
+          </button>
+          <button
             onClick={() => selectIntegration('ringcentral')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeIntegration === 'ringcentral'
@@ -482,6 +490,7 @@ export function IntegrationsSettings() {
       </div>
 
       {activeIntegration === 'ringcentral' && <RingCentralSettings />}
+      {activeIntegration === 'techsafe' && <TechsafeSettings />}
 
       {/* Payment Processor Integration */}
       {activeIntegration === 'payment_processor' && (
