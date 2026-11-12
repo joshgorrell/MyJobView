@@ -37,8 +37,9 @@ export function createCommittedChangeProvenanceReader(client){
       !uuid(row.change_order_id)||!uuid(row.proposal_line_item_id))
     return hold('committed_change_scope_unverified');
    // The live MJV change-order workflow uses approved vs draft status.
-   // A draft with a stale approval timestamp must never qualify as applied.
-   if(row.status!=='approved'||row.is_active!==true||row.is_locked!==true||
+   // MJV apply_change_order marks an applied approved change is_active=false.
+   // A draft or an approved-but-not-yet-applied change must never qualify.
+   if(row.status!=='approved'||row.is_active!==false||row.is_locked!==true||
       !row.approval_date||row.requires_customer_approval===true&&row.customer_approved!==true)
     return hold('committed_change_approval_unverified');
    byId.set(row.id,row);

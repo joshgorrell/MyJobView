@@ -29,7 +29,7 @@ function fixture({isolation='serializable',active=true,revision=3,changed=false,
    id:ids[4],organization_id:ids[2],change_order_id:ids[4],proposal_line_item_id:ids[0],
    order_organization_id:ids[2],sales_order_id:ids[1],proposal_id:ids[3],
    status:'approved',approval_date:'2026-11-12',customer_approved:true,
-   requires_customer_approval:true,is_active:true,is_locked:true
+   requires_customer_approval:true,is_active:false,is_locked:true
   }]:[]};
   throw Error('unexpected query');
  }};
