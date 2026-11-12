@@ -23,7 +23,8 @@ export function prepareOrderContent(input){
   return {valid:false,draftEligible:true,content:null,excluded:[],issues:[{code:'customer_name_unresolved'}],snapshotReady:false,quoteReady:false};
  }
  const selected=prepareSalesEquipment({organizationId:input.organizationId,orderId:order.id,proposalId:order.proposal_id,
-  minimumUnitValueCents:input.minimumUnitValueCents,lines:input.lines});
+  minimumUnitValueCents:input.minimumUnitValueCents,lines:input.lines,
+  receiverFullSnapshot:input.receiverFullSnapshot===true});
  const content=selected.valid?Object.freeze({schemaVersion:2,organizationId:input.organizationId,orderId:order.id,
   orderStatus:statuses[order.status],currency:'USD',minimumUnitValueCents:input.minimumUnitValueCents,
   customerRef:customer.id,customerName,siteRef,lines:Object.freeze([...selected.equipment])}):null;
