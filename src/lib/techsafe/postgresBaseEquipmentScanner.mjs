@@ -9,6 +9,14 @@ const quantity=x=>{
  if(!/^\d{1,5}(?:\.0{1,6})?$/.test(String(x)))return null;
  const n=Number(x);return safeCount(n)?n:null;
 };
+const money=x=>{
+ if(x===null||x===undefined)return null;
+ if(typeof x!=='number'&&typeof x!=='string')return null;
+ const match=/^(0|[1-9]\\d{0,12})(?:\\.(\\d{1,2}))?$/.exec(String(x));
+ if(!match)return null;
+ const cents=Number(match[1])*100+Number((match[2]||'').padEnd(2,'0'));
+ return Number.isSafeInteger(cents)?cents:null;
+};
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 export function createPostgresBaseEquipmentScanner(client){
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
@@ -26,7 +34,7 @@ export function createPostgresBaseEquipmentScanner(client){
   // The approved Sales Order references proposal_line_items through proposal_id.
   // Read all CURRENT lines; no product filtering that could conceal data.
   const lines=await client.query(
-   `SELECT * FROM public.proposal_line_items
+   `SELECT id,organization_id,proposal_id,product_id,quantity,item_type,unit_price,line_total,labor_total,committed_change_order_line_id,is_hidden,is_customer_supplied FROM public.proposal_line_items
      WHERE organization_id=$1 AND proposal_id=$2 ORDER BY id FOR SHARE`,
    [organizationId,proposalId]);
   if(!Array.isArray(lines.rows)||!safeCount(lines.rows.length))
@@ -39,8 +47,18 @@ export function createPostgresBaseEquipmentScanner(client){
       count===null)
     return hold('base_equipment_row_unverified');
    seen.add(line.id);
+   // Read sold financial components, not catalog MSRP, cost or labor hours.
+   // Null values remain unresolved and cannot authorize a full snapshot.
+   const unitSalePriceCents=money(line.unit_price);
+   const lineSaleTotalCents=money(line.line_total);
+   const laborSaleTotalCents=money(line.labor_total);
    baseLines.push(Object.freeze({id:line.id,organizationId,proposalId,
-    productId:line.product_id,quantity:count}));
+    productId:line.product_id,quantity:count,
+    itemType:line.item_type??null,
+    unitSalePriceCents,lineSaleTotalCents,laborSaleTotalCents,
+    committedChangeOrderLineId:line.committed_change_order_line_id??null,
+    hidden:line.is_hidden??null,customerSupplied:line.is_customer_supplied??null,
+    soldComponentsResolved:unitSalePriceCents!==null&&lineSaleTotalCents!==null&&laborSaleTotalCents!==null}));
   }
   // This is intentionally NOT readConsistentSource. An authoritative reader
   // must independently prove approval, exhaustive change orders, revisions,
