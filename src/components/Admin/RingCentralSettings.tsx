@@ -17,6 +17,29 @@ export function RingCentralSettings() {
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
+  const [diagnosticsError, setDiagnosticsError] = useState('');
+  const [diagnostics, setDiagnostics] = useState<{
+    connections: Array<{status: string; extension_number?: string | null; extension_name?: string | null;
+      registered_mailbox?: boolean; mailbox_enabled?: boolean; http_status?: number}>;
+    mailboxes: Array<{extension_id: string; display_name: string | null; enabled: boolean}>;
+  } | null>(null);
+  async function checkConnection() {
+    setDiagnosticsBusy(true);
+    setDiagnosticsError('');
+    try {
+      const { data, error: diagnosticError } = await supabase.functions.invoke('ringcentral-mailbox-diagnostics', { method: 'GET' });
+      if (diagnosticError) {
+        const status = (diagnosticError as { context?: { status?: number } }).context?.status;
+        throw new Error(status === 403 ? 'Only an MJV administrator can run connection diagnostics.' :
+          'Connection check failed. Confirm RingCentral integration configuration and try again.');
+      }
+      if (!Array.isArray(data?.connections) || !Array.isArray(data?.mailboxes)) throw new Error('Invalid diagnostics response.');
+      setDiagnostics(data);
+    } catch (err) {
+      setDiagnosticsError(err instanceof Error ? err.message : 'Connection check failed.');
+    } finally { setDiagnosticsBusy(false); }
+  }
   async function loadConnections() {
     setLoading(true);
     try {
@@ -141,6 +164,37 @@ export function RingCentralSettings() {
             </div>
           </div>
         ))}
+      </div>
+      <div className="space-y-3 border-t border-gray-200 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h5 className="font-medium text-gray-900">Connection diagnostics</h5>
+            <p className="text-xs text-gray-500">Verify OAuth renewal and the connected mailbox without changing phone routing.</p>
+          </div>
+          <button type="button" disabled={diagnosticsBusy}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            onClick={() => void checkConnection()}>
+            {diagnosticsBusy ? 'Checking…' : 'Check RingCentral connection'}
+          </button>
+        </div>
+        {diagnosticsError && <p role="alert" className="text-sm text-red-700">{diagnosticsError}</p>}
+        {diagnostics && (
+          <div className="rounded-lg border border-gray-200 p-3 space-y-1 text-sm" aria-live="polite">
+            {diagnostics.connections.length === 0 && <p>No RingCentral account connected.</p>}
+            {diagnostics.connections.map((connection, i) => (
+              <p key={i}>
+                Connection: {connection.status}
+                {connection.extension_number && ` · Extension ${connection.extension_number}`}
+                {connection.extension_name && ` · ${connection.extension_name}`}
+                {connection.registered_mailbox !== undefined && ` · Registered: ${connection.registered_mailbox ? 'yes' : 'no'}`}
+                {connection.mailbox_enabled !== undefined && ` · Enabled: ${connection.mailbox_enabled ? 'yes' : 'no'}`}
+              </p>
+            ))}
+            {diagnostics.mailboxes.map(mailbox => (
+              <p key={mailbox.extension_id}>Mailbox {mailbox.display_name || mailbox.extension_id}: {mailbox.enabled ? 'enabled' : 'disabled'}</p>
+            ))}
+          </div>
+        )}
       </div>
       <PhoneVoicemailPermissions />
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
