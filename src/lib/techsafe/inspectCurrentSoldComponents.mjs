@@ -28,6 +28,12 @@ export function inspectCurrentSoldComponents({baseLines,history}={}){
    unresolvedLines++;
    continue;
   }
+  // Sold labor is independently recorded even on material rows.
+  // Count it before material reconciliation; do not lose it when a line
+  // contains an unresolved discount, bundle, or embedded labor amount.
+  if(line.laborSaleTotalCents>0||line.itemType==='labor')laborLines++;
+  laborSoldCents+=line.laborSaleTotalCents;
+  if(!Number.isSafeInteger(laborSoldCents))return hold('sold_component_total_overflow');
   if(line.productId!==null){
    equipmentLines++;
    // Do not treat line_total as material alone: mixed item lines can include labor.
@@ -39,16 +45,20 @@ export function inspectCurrentSoldComponents({baseLines,history}={}){
    }
    if(line.itemType==='material'){
     if(line.lineSaleTotalCents!==line.unitSalePriceCents*line.quantity){
-     issues.push({lineId:line.id,reason:'sold_unit_extended_total_mismatch'});
+     const extended=line.unitSalePriceCents*line.quantity;
+     const reason=line.lineSaleTotalCents===extended+line.laborSaleTotalCents
+      ?'extended_total_includes_labor'
+      :line.lineSaleTotalCents<extended
+       ?'discount_or_credit_requires_allocation'
+       :'sold_extended_total_requires_allocation';
+     issues.push({lineId:line.id,reason});
      unresolvedLines++;
      continue;
     }
     materialSoldCents+=line.lineSaleTotalCents;
    }
   }
-  if(line.laborSaleTotalCents>0||line.itemType==='labor')laborLines++;
-  laborSoldCents+=line.laborSaleTotalCents;
-  if(!Number.isSafeInteger(materialSoldCents)||!Number.isSafeInteger(laborSoldCents))
+  if(!Number.isSafeInteger(materialSoldCents))
    return hold('sold_component_total_overflow');
  }
  const blockers=new Set();
