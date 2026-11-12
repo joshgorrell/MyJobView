@@ -74,6 +74,9 @@ export function createTransactionalBaseEquipmentAudit(client){
    originalLineMembershipVerified:false,changeHistoryInventoryInspected:true,
    changeOrderCount:history.changeOrderCount,changeLineCount:history.changeLineCount,
    unreferencedChangeLines:history.unreferencedChangeLines,
+   approvedUnreferencedLines:history.approvedUnreferencedLines,
+   unresolvedChangeOrders:history.unresolvedChangeOrders,
+   needsHistoricalReconciliation:history.needsHistoricalReconciliation,
    historyCompletenessCertified:false,approvalVerified:false,
    sourceManifestComplete:false});
  };
