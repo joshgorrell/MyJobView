@@ -266,6 +266,12 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
   }
 
   async function deleteCO(co: ChangeOrderSummary) {
+    // Approved changes are committed financial records; never run legacy snapshot reverts.
+    if (co.status !== 'draft' || co.is_locked) {
+      console.error('Only unlocked draft change orders can be deleted.');
+      setConfirmDeleteId(null);
+      return;
+    }
     setDeletingId(co.id);
     try {
       // Fetch the full change order including the snapshot
@@ -660,7 +666,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                         </button>
                       )}
 
-                      {co.is_locked && canUnlock && (
+                      {co.is_locked && co.status !== 'approved' && canUnlock && (
                         <button
                           onClick={() => { setConfirmUnlockId(co.id); setUnlockError(null); }}
                           title="Unlock this change order to allow edits and re-approval"
@@ -715,7 +721,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {co.status === 'approved' && (
+                        {false && co.status === 'approved' && (
                           (co.amount_billed || 0) === 0 ? (
                             <button
                               onClick={() => setConfirmDeleteId(co.id)}
@@ -788,7 +794,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                                 Delete & Revert
                               </button>
                             )}
-                            {co.status === 'approved' && (co.amount_billed || 0) === 0 && (
+                            {false && co.status === 'approved' && (co.amount_billed || 0) === 0 && (
                               <button
                                 onClick={() => { setConfirmDeleteId(co.id); setOverflowMenuId(null); }}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"
@@ -862,7 +868,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-amber-300">Unlock this change order?</p>
                         <p className="text-xs text-amber-400/80 mt-0.5">
-                          The change order will be reset to draft status. Any existing approval records will be cleared and it will need to go through approval again before being applied.
+                          Only uncommitted change orders can be unlocked. Approved change orders retain their customer approval and must use the controlled revision process.
                         </p>
                         {unlockError && (
                           <p className="text-xs text-red-400 mt-1.5">{unlockError}</p>
