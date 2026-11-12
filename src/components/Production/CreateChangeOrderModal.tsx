@@ -16,6 +16,7 @@ interface LineItem {
   action_type: 'add' | 'remove' | 'modify_quantity' | 'modify_price';
   product_id?: string;
   product_name: string;
+  sku?: string | null;
   product_description?: string;
   item_type: 'material' | 'labor' | 'both';
   original_quantity?: number;
@@ -58,6 +59,7 @@ interface Product {
   id: string;
   name: string;
   description: string;
+  sku?: string | null;
   retail_price: number;
   unit_price?: number;
   our_price?: number;
@@ -215,7 +217,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, description, retail_price, item_type')
+        .select('id, name, description, sku, retail_price, item_type')
         .order('name');
 
       if (error) throw error;
@@ -435,6 +437,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
       ...updated[index],
       product_id: productId,
       product_name: product.name,
+      sku: product.sku || null,
       product_description: product.description,
       new_unit_price: unitPrice,
       item_type: (product.item_type as 'material' | 'labor' | 'both') || 'material',
@@ -507,6 +510,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
             action_type: updated[parentIdx].action_type,
             product_id: accProduct.id,
             product_name: accProduct.name,
+            sku: accProduct.sku || null,
             product_description: accProduct.description,
             item_type: (accProduct.item_type as 'material' | 'labor' | 'both') || 'material',
             new_quantity: accQty,
@@ -1211,7 +1215,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                                   <option value="">Select product...</option>
                                   {products.map(p => (
                                     <option key={p.id} value={p.id}>
-                                      {p.name} - ${p.retail_price.toFixed(2)}
+                                      {p.sku ? `${p.sku} · ` : ''}{p.name} - ${p.retail_price.toFixed(2)}
                                     </option>
                                   ))}
                                 </select>
@@ -1228,6 +1232,11 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs">
+                          <div><span className="block font-semibold text-gray-500 uppercase">SKU / Model</span><span className="font-medium text-gray-900 break-all">{item.sku || '—'}</span></div>
+                          <div className="sm:col-span-2"><span className="block font-semibold text-gray-500 uppercase">Description</span><span className="text-gray-900">{item.product_name || 'Select a product'}</span></div>
                         </div>
 
                         {(item.item_type === 'material' || item.item_type === 'both') && (
@@ -1658,7 +1667,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                       >
                         <div className="flex items-center gap-1.5">
                           {isAccessory && <Link2 className="w-3 h-3 text-blue-400 flex-shrink-0" />}
-                          <span>{item.product_name || 'Unnamed item'}</span>
+                          <span>{item.sku ? `${item.sku} · ` : ''}{item.product_name || 'Unnamed item'}</span>
                           <span className="text-gray-500">({item.action_type} · x{item.new_quantity})</span>
                         </div>
                         <span className={`font-semibold ${item.change_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
