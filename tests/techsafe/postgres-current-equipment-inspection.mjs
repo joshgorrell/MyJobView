@@ -3,12 +3,18 @@ import {createTransactionalCurrentEquipmentInspection} from '../../src/lib/techs
 const ids=Array.from({length:6},(_,i)=>'00000000-0000-0000-0000-'+String(i+1).padStart(12,'0'));
 const [connectionId,orderId,organizationId,proposalId,lineId,productId]=ids;
 const scope={connectionId,orderId};
-function fixture({changeRevision=false,quantity='2.00',product=productId,missingPrice=false,missingMembership=false,raw=false,missingLine=false}={}){
+function fixture({changeRevision=false,quantity='2.00',product=productId,missingPrice=false,missingMembership=false,raw=false,missingLine=false,approvalValid=true}={}){
  let reads=0,contentReads=0;const calls=[];
  const client={async query(sql){calls.push(sql);
   if(sql.includes('SHOW transaction_isolation'))return {rows:[{transaction_isolation:'serializable'}]};
   if(sql.includes('integration_connections'))return {rows:[{organization_id:organizationId,proposal_id:proposalId,connection_generation:'2',enabled:true,status:'active'}]};
   if(sql.includes('order_revision_ledger')){reads++;return {rows:[{organization_id:organizationId,proposal_id:proposalId,connection_generation:'2',revision:String(changeRevision&&reads===3?4:3),state:'candidate',source_fingerprint:'a'.repeat(64)}]};}
+  if(sql.includes('public.proposals p JOIN public.sales_orders so'))return {rows:approvalValid?[{
+   id:proposalId,sales_order_id:orderId,status:'approved',approved_at:'2026-11-12',
+   approval_completed_at:null,accepted_via_method:'portal',approved_by:ids[5],
+   contact_id:ids[0],order_id:orderId,organization_id:organizationId,
+   proposal_id:proposalId,order_contact_id:ids[0]
+  }]:[]};
   if(sql.includes('public.sales_orders'))return {rows:[{id:orderId,organization_id:organizationId,proposal_id:proposalId}]};
   if(sql.includes('public.proposal_line_items'))return {rows:[{id:lineId,organization_id:organizationId,proposal_id:proposalId,product_id:productId,quantity:2}]};
   throw Error('unexpected SQL');}};
@@ -36,6 +42,7 @@ for(const [options,reason] of [
  [{missingPrice:true},'current_sales_order_equipment_incomplete'],
  [{missingMembership:true},'current_sales_order_equipment_incomplete'],
  [{raw:true},'private_current_content_unverified'],
+ [{approvalValid:false},'approved_sales_order_binding_missing'],
  [{changeRevision:true},'current_equipment_revision_changed']
  ]){const x=fixture(options),r=await x.run(scope);assert.equal(r.reason,reason,JSON.stringify({options,r}));assert.equal(r.authorized,false);assert.equal(r.snapshotReady,false);}
 assert.equal((await fixture().run({connectionId:'wrong',orderId})).ok,false);
