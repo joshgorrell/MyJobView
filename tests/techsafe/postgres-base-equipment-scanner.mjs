@@ -21,13 +21,24 @@ assert.ok(f.calls.every(c=>c.sql.includes('FOR SHARE')));
 assert.deepEqual(f.calls[1].params,[ids[1],ids[2]]);
 for(const x of [
  {missingOrder:true},{wrongOrder:true},
- {lines:[{id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:null,quantity:2}]},
  {lines:[{id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:ids[4],quantity:-1}]},
  {lines:[{id:ids[3],organization_id:ids[1],proposal_id:ids[4],product_id:ids[4],quantity:2}]},
  {lines:Array(10001).fill(null)}
 ]) {
  const result=await fixture(x).scan(scope);
  assert.equal(result.ok,false);assert.equal(result.authorized,false);
+}
+const standalone=await fixture({lines:[
+ {id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:null,quantity:'2.000000'},
+ {id:ids[4],organization_id:ids[1],proposal_id:ids[2],product_id:ids[3],quantity:'1.00'}
+]}).scan(scope);
+assert.equal(standalone.ok,true);
+assert.equal(standalone.baseLineCount,2);
+assert.deepEqual(standalone.baseLines.map(l=>[l.productId,l.quantity]),[[null,2],[ids[3],1]]);
+assert.equal(standalone.authorized,false);
+for(const invalidQuantity of ['1.5','NaN','10001','-1','1e3',null]){
+ const result=await fixture({lines:[{id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:null,quantity:invalidQuantity}]}).scan(scope);
+ assert.equal(result.ok,false,'Reject invalid PostgreSQL numeric quantity '+String(invalidQuantity));
 }
 const invalid=fixture();
 assert.equal((await invalid.scan({...scope,proposalId:'untrusted'})).ok,false);

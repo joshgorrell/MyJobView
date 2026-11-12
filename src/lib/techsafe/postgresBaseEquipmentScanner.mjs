@@ -4,6 +4,11 @@
 // Its output must NEVER be passed as a certified sourceManifest.
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
 const safeCount=x=>Number.isSafeInteger(x)&&x>=0&&x<=10000;
+const quantity=x=>{
+ if(typeof x!=='number'&&typeof x!=='string')return null;
+ if(!/^\\d{1,5}(?:\\.0{1,6})?$/.test(String(x)))return null;
+ const n=Number(x);return safeCount(n)?n:null;
+};
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 export function createPostgresBaseEquipmentScanner(client){
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
@@ -28,13 +33,14 @@ export function createPostgresBaseEquipmentScanner(client){
    return hold('base_equipment_count_invalid');
   const seen=new Set(),baseLines=[];
   for(const line of lines.rows){
+   const count=quantity(line.quantity);
    if(!uuid(line.id)||seen.has(line.id)||line.organization_id!==organizationId||
-      line.proposal_id!==proposalId||!uuid(line.product_id)||
-      !safeCount(line.quantity))
+      line.proposal_id!==proposalId||(line.product_id!==null&&!uuid(line.product_id))||
+      count===null)
     return hold('base_equipment_row_unverified');
    seen.add(line.id);
    baseLines.push(Object.freeze({id:line.id,organizationId,proposalId,
-    productId:line.product_id,quantity:line.quantity}));
+    productId:line.product_id,quantity:count}));
   }
   // This is intentionally NOT readConsistentSource. An authoritative reader
   // must independently prove approval, exhaustive change orders, revisions,
