@@ -125,6 +125,8 @@ export function GoogleCalendarSettings() {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { user } } = await supabase.auth.getUser();
 
+      let synced = 0;
+      let failed = 0;
       for (const apt of appointments) {
         try {
           const response = await fetch(
@@ -151,14 +153,18 @@ export function GoogleCalendarSettings() {
           );
 
           if (!response.ok) {
+            failed++;
             console.error(`Failed to sync appointment ${apt.id}`);
+          } else {
+            synced++;
           }
         } catch (error) {
+          failed++;
           console.error(`Error syncing appointment ${apt.id}:`, error);
         }
       }
 
-      notify(`Synced ${appointments.length} appointment(s) to Google Calendar`, { theme: 'blue', tone: 'success' });
+      notify(`${synced} appointment(s) sent to Google Calendar${failed ? `; ${failed} failed` : ''}`, { theme: 'blue', tone: failed ? 'warning' : 'success' });
       await loadConnectionStatus();
     } catch (error) {
       console.error('Error syncing:', error);
@@ -206,32 +212,10 @@ export function GoogleCalendarSettings() {
           </div>
 
           <div className="space-y-3">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-2">Sync Settings</h4>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="auto-sync"
-                    defaultChecked
-                    className="rounded border-gray-300"
-                  />
-                  <label htmlFor="auto-sync">
-                    Automatically sync new appointments
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="two-way-sync"
-                    className="rounded border-gray-300"
-                  />
-                  <label htmlFor="two-way-sync">
-                    Enable two-way sync (updates from Google Calendar)
-                  </label>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-gray-600">
+              Sync Now sends eligible MJV appointments to your connected Google Calendar.
+              Automatic and two-way sync settings are not available here.
+            </p>
 
             <div className="flex gap-3">
               <button
