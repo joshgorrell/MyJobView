@@ -56,14 +56,14 @@ export function RingCentralSettings() {
       if (invokeError || (data?.status !== 'created' && data?.status !== 'renewed')) {
         // Supabase FunctionsHttpError puts non-2xx JSON in context, not data.
         // Show safe server error codes and HTTP status instead of a generic message.
-        let response = data as { error?: string; http_status?: number; provider_code?: string; provider_message?: string } | null;
+        let response = data as { error?: string; http_status?: number; provider_code?: string; invalid_parameter?: string; provider_message?: string } | null;
         let status: number | undefined;
         if (invokeError) {
           const context = (invokeError as { context?: Response }).context;
           if (context && typeof context.status === 'number') {
             status = context.status;
             try {
-              const body = await context.json() as { error?: string; http_status?: number; provider_code?: string; provider_message?: string };
+              const body = await context.json() as { error?: string; http_status?: number; provider_code?: string; invalid_parameter?: string; provider_message?: string };
               response = body;
             } catch { /* Gateway errors may not return JSON. */ }
           }
@@ -73,6 +73,7 @@ export function RingCentralSettings() {
         const providerStatus = typeof response?.http_status === 'number'
           ? ` (RingCentral HTTP ${response.http_status})` : '';
         const detail = typeof response?.provider_message === 'string' ? ` · ${response.provider_message}` :
+          typeof response?.invalid_parameter === 'string' ? ` · Invalid parameter: ${response.invalid_parameter}` :
           typeof response?.provider_code === 'string' ? ` · ${response.provider_code}` : '';
         throw new Error(`${reason}${providerStatus}${status ? ` · MJV HTTP ${status}` : ''}${detail}`);
       }
