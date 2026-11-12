@@ -6,6 +6,7 @@ type Voicemail = {
   id: string; received_at: string; caller_number: string | null;
   state: 'ready' | 'review'; is_read: boolean; summary: string | null; transcript: string | null;
   department: string | null; urgent: boolean; callback_requested: boolean;
+  assigned_user_id: string | null; workflow_status: 'new' | 'assigned' | 'in_progress' | 'completed';
 };
 export function PhoneVoicemailFlowInbox() {
   const [messages, setMessages] = useState<Voicemail[]>([]);
@@ -17,6 +18,24 @@ export function PhoneVoicemailFlowInbox() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
   const [audioError, setAudioError] = useState('');
+  const [people, setPeople] = useState<{id: string; full_name: string | null}[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  async function saveAssignment(message: Voicemail, changes: Record<string, string | null>) {
+    setSavingId(message.id);
+    try {
+      const { data, error: saveError } = await supabase.functions.invoke('phone-voicemail-assign', {
+        method: 'POST', body: { id: message.id, ...changes },
+      });
+      if (saveError || !data?.ok) throw new Error('save_failed');
+      setMessages(old => old.map(item => item.id === message.id ? {
+        ...item, department: data.department, assigned_user_id: data.assigned_user_id,
+        workflow_status: data.workflow_status,
+      } : item));
+      setError('');
+    } catch { setError('Could not save voicemail assignment. Refresh and try again.'); }
+    finally { setSavingId(null); }
+  }
   async function markRead(id: string) {
     const { error: readError } = await supabase.functions.invoke('phone-voicemail-inbox', { method: 'POST', body: { id } });
     if (readError) { setError('Could not mark voicemail as read. Please try again.'); return; }
@@ -63,6 +82,11 @@ export function PhoneVoicemailFlowInbox() {
           throw requestError;
         }
         setMessages(Array.isArray(data?.messages) ? data.messages : []);
+        const { data: options, error: optionsError } = await supabase.functions.invoke('phone-voicemail-assign', { method: 'GET' });
+        if (!cancelled && !optionsError) {
+          setPeople(Array.isArray(options?.people) ? options.people : []);
+          setDepartments(Array.isArray(options?.departments) ? options.departments : []);
+        }
         setError('');
       } catch {
         if (!cancelled) setError('Voicemail inbox is temporarily unavailable.');
@@ -93,7 +117,35 @@ export function PhoneVoicemailFlowInbox() {
             {!message.is_read && <span className="font-semibold text-blue-700">Unread</span>}
           </div>
           <p className="text-sm">{message.summary || 'No summary available'}</p>
-          {message.department && <p className="text-xs text-gray-500">Suggested department: {message.department}</p>}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <label className="text-xs text-gray-600">Department
+              <select aria-label="Voicemail department" className="mt-1 block w-full rounded border p-2 text-sm"
+                value={message.department ?? ''} disabled={savingId === message.id || departments.length === 0}
+                onChange={e => void saveAssignment(message, { department: e.target.value || null, assigned_user_id: null })}>
+                <option value="">Unassigned</option>
+                {departments.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-gray-600">Assigned to
+              <select aria-label="Voicemail assignee" className="mt-1 block w-full rounded border p-2 text-sm"
+                value={message.assigned_user_id ?? ''} disabled={savingId === message.id || people.length === 0}
+                onChange={e => void saveAssignment(message, { assigned_user_id: e.target.value || null,
+                  workflow_status: e.target.value ? 'assigned' : 'new' })}>
+                <option value="">Unassigned</option>
+                {people.map(person => <option key={person.id} value={person.id}>{person.full_name || 'Employee'}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-gray-600">Follow-up status
+              <select aria-label="Voicemail follow-up status" className="mt-1 block w-full rounded border p-2 text-sm"
+                value={message.workflow_status || 'new'} disabled={savingId === message.id}
+                onChange={e => void saveAssignment(message, { workflow_status: e.target.value })}>
+                <option value="new">New</option>
+                <option value="assigned">Assigned</option>
+                <option value="in_progress">In progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </label>
+          </div>
           <div className="space-y-2">
             <button type="button" disabled={audioBusy}
               className="text-xs text-blue-700 underline disabled:opacity-50"
