@@ -54,7 +54,25 @@ export function RingCentralSettings() {
         'ringcentral-webhook-subscription', { method: 'POST', body: {} },
       );
       if (invokeError || (data?.status !== 'created' && data?.status !== 'renewed')) {
-        throw new Error(typeof data?.error === 'string' ? data.error : 'Subscription request failed. Check integration configuration.');
+        // Supabase FunctionsHttpError puts non-2xx JSON in context, not data.
+        // Show safe server error codes and HTTP status instead of a generic message.
+        let response = data as { error?: string; http_status?: number } | null;
+        let status: number | undefined;
+        if (invokeError) {
+          const context = (invokeError as { context?: Response }).context;
+          if (context && typeof context.status === 'number') {
+            status = context.status;
+            try {
+              const body = await context.json() as { error?: string; http_status?: number };
+              response = body;
+            } catch { /* Gateway errors may not return JSON. */ }
+          }
+        }
+        const reason = typeof response?.error === 'string' && /^[a-z0-9_]{1,80}$/.test(response.error)
+          ? response.error.replaceAll('_', ' ') : 'Subscription request failed';
+        const providerStatus = typeof response?.http_status === 'number'
+          ? ` (RingCentral HTTP ${response.http_status})` : '';
+        throw new Error(`${reason}${providerStatus}${status ? ` · MJV HTTP ${status}` : ''}`);
       }
       setSubscriptionResult(data.status === 'created' ? 'Subscription created.' : 'Subscription renewed.');
       await checkConnection();
