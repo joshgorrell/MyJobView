@@ -4,7 +4,7 @@ const ids=['00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-00000
 const scope={orderId:ids[0],organizationId:ids[1],proposalId:ids[2]};
 function fixture({missingOrder=false,wrongOrder=false,lines=[{id:ids[3],organization_id:ids[1],proposal_id:ids[2],product_id:ids[4],quantity:2}]}={}){
  const calls=[];
- const client={async query(sql,params){calls.push({sql,params});return {rows:sql.includes('sales_orders')?(missingOrder?[]:[{id:wrongOrder?ids[4]:ids[0],organization_id:ids[1],proposal_id:ids[2]}]):lines}}};
+ const client={async query(sql,params){calls.push({sql,params});return {rows:sql.includes('FROM public.change_order_line_items')?[]:sql.includes('sales_orders')?(missingOrder?[]:[{id:wrongOrder?ids[4]:ids[0],organization_id:ids[1],proposal_id:ids[2]}]):lines}}};
  return {calls,scan:createPostgresBaseEquipmentScanner(client)};
 }
 const f=fixture(),good=await f.scan(scope);
@@ -14,10 +14,12 @@ assert.equal(good.baseLineSource,'current_proposal_line_items');
 assert.equal(good.approvalVerified,false);assert.equal(good.sourceManifestComplete,false);
 assert.equal(good.baseLineCount,1);assert.equal(good.baseLines[0].quantity,2);
 assert.equal(Object.isFrozen(good.baseLines),true);
-assert.equal(f.calls.length,2);
+assert.equal(f.calls.length,3);
 assert.match(f.calls[0].sql,/FROM public\.sales_orders/);
 assert.match(f.calls[1].sql,/FROM public\.proposal_line_items/);
 assert.ok(f.calls.every(c=>c.sql.includes('FOR SHARE')));
+assert.match(f.calls[2].sql,/action_type='remove'/);
+assert.deepEqual(good.removedLineIds,[]);
 assert.deepEqual(f.calls[1].params,[ids[1],ids[2]]);
 for(const x of [
  {missingOrder:true},{wrongOrder:true},

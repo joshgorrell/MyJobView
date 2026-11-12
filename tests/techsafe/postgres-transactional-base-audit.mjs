@@ -15,6 +15,7 @@ function fixture({isolation='serializable',active=true,revision=3,changed=false,
    contact_id:ids[4],order_id:ids[1],organization_id:ids[2],
    proposal_id:ids[3],order_contact_id:ids[4]
   }]:[]};
+  if(sql.includes('FROM public.change_order_line_items coli'))return {rows:[]};
   if(sql.includes('FROM public.change_orders co'))return {rows:committedChange?[{
    id:ids[4],organization_id:ids[2],sales_order_id:ids[1],proposal_id:ids[3],
    status:'approved',is_active:true,is_locked:true,approval_date:'2026-11-12',
