@@ -29,7 +29,7 @@ export function createPrivateTechsafeCredentialReader({readSecret}={}) {
   try { url=new URL(secret.endpoint); }
   catch { return held('private_credentials_unavailable'); }
   if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||
-   !url.hostname||url.pathname!=='/functions/v1/mjv-import')
+   url.hostname!=='ywvrmjfhixgzdyfuhdpv.supabase.co'||url.port!==''||url.pathname!=='/functions/v1/mjv-import')
    return held('private_credentials_unavailable');
   return {ok:true,connectionId,organizationId,generation,
    endpoint:url.href,token:secret.token};

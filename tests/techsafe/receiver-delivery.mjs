@@ -10,7 +10,7 @@ const snapshot={schemaVersion:2,environment:'sandbox',connectionId:'02e394ef-957
  {sourceLineId:'tv',productRef:'product',productKind:'equipment',scope:'included',
  customerSupplied:false,techsafeExcluded:false,quantity:1,unitEquipmentValueCents:30000}]};
 const credentials={connectionId:'02e394ef-9576-4a2a-b352-6506b23529d0',organizationId:'b324e4e3-cd2e-4c68-8df8-3e27c7e08f15',generation:1,
- endpoint:'https://techsafe.example.com/functions/v1/mjv-import',
+ endpoint:'https://ywvrmjfhixgzdyfuhdpv.supabase.co/functions/v1/mjv-import',
  token:'a'.repeat(48)};
 let reads=0,calls=0;
 const deliver=createTechsafeReceiverDelivery({

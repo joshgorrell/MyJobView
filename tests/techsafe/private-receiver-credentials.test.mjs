@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPrivateTechsafeCredentialReader} from '../../supabase/functions/_shared/techsafe-private-receiver-credentials.mjs';
 const binding={connectionId:'02e394ef-9576-4a2a-b352-6506b23529d0',organizationId:'b324e4e3-cd2e-4c68-8df8-3e27c7e08f15',generation:1};
-const valid={...binding,endpoint:'https://example.supabase.co/functions/v1/mjv-import',token:'A'.repeat(48)};
+const valid={...binding,endpoint:'https://ywvrmjfhixgzdyfuhdpv.supabase.co/functions/v1/mjv-import',token:'A'.repeat(48)};
 test('accepts correctly bound private receiver credentials',async()=>{
  const read=createPrivateTechsafeCredentialReader({readSecret:async()=>valid});
  assert.deepEqual(await read(binding),{ok:true,...valid});
@@ -14,7 +14,7 @@ test('rejects stale generation, foreign organization and missing token',async()=
  }
 });
 test('rejects insecure or unrelated destinations',async()=>{
- for(const endpoint of ['http://example.com/functions/v1/mjv-import','https://example.com/other','https://u:p@example.com/functions/v1/mjv-import','https://example.com/functions/v1/mjv-import?token=x']){
+ for(const endpoint of ['http://example.com/functions/v1/mjv-import','https://example.com/other','https://u:p@example.com/functions/v1/mjv-import','https://example.com/functions/v1/mjv-import?token=x','https://attacker.supabase.co/functions/v1/mjv-import','https://ywvrmjfhixgzdyfuhdpv.supabase.co:8443/functions/v1/mjv-import']){
   const read=createPrivateTechsafeCredentialReader({readSecret:async()=>({...valid,endpoint})});
   assert.equal((await read(binding)).ok,false);
  }

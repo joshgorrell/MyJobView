@@ -16,7 +16,7 @@ try {
  assert.equal(reads,1);
  assert.equal(network,0);
  globalThis.Deno={env:{get:()=>JSON.stringify([{...binding,generation:2,
-  endpoint:'https://techsafe.example.com/functions/v1/mjv-import',token:'A'.repeat(48)}])}};
+  endpoint:'https://ywvrmjfhixgzdyfuhdpv.supabase.co/functions/v1/mjv-import',token:'A'.repeat(48)}])}};
  const stale=await deliver({binding,connection,sourceRevision:'1',content:{generation:1}});
  assert.equal(stale.reason,'credentials_unavailable');
  assert.equal(network,0);
