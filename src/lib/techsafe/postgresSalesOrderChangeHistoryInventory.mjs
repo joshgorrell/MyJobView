@@ -60,7 +60,7 @@ export function createSalesOrderChangeHistoryInventory(client){
     unreferencedByOrder.set(changeOrderId,(unreferencedByOrder.get(changeOrderId)||0)+1);
   let approvedUnreferencedLines=0,unresolvedChangeOrders=0;
   for(const [changeOrderId,order] of orders){
-   const approved=order.active===true&&order.locked===true&&
+   const approved=order.status==='approved'&&order.active===true&&order.locked===true&&
     Boolean(order.approvedAt)&&
     (order.requiresCustomerApproval!==true||order.customerApproved===true);
    if(approved)approvedUnreferencedLines+=unreferencedByOrder.get(changeOrderId)||0;
