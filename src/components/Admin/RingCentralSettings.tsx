@@ -19,6 +19,7 @@ export function RingCentralSettings() {
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const [subscriptionBusy, setSubscriptionBusy] = useState(false);
+  const [confirmSubscription, setConfirmSubscription] = useState(false);
   const [subscriptionResult, setSubscriptionResult] = useState('');
   const [diagnosticsError, setDiagnosticsError] = useState('');
   const [diagnostics, setDiagnostics] = useState<{
@@ -44,7 +45,8 @@ export function RingCentralSettings() {
     } finally { setDiagnosticsBusy(false); }
   }
   async function manageSubscription() {
-    if (subscriptionBusy || !window.confirm('Create or renew the RingCentral voicemail notification subscription for the connected mailbox? This does not enable voicemail processing or change call routing.')) return;
+    if (subscriptionBusy) return;
+    setConfirmSubscription(false);
     setSubscriptionBusy(true);
     setSubscriptionResult('');
     try {
@@ -212,7 +214,7 @@ export function RingCentralSettings() {
           </div>
           <button type="button" disabled={subscriptionBusy || loading || connections.length !== 1}
             className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
-            onClick={() => void manageSubscription()}>
+            onClick={() => setConfirmSubscription(true)}>
             {subscriptionBusy ? 'Configuring…' : 'Create / renew voicemail subscription'}
           </button>
           <button type="button" disabled={diagnosticsBusy}
@@ -221,6 +223,17 @@ export function RingCentralSettings() {
             {diagnosticsBusy ? 'Checking…' : 'Check RingCentral connection'}
           </button>
         </div>
+        {confirmSubscription && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+            <p className="text-sm text-blue-950">Create or renew the RingCentral voicemail notification subscription for the connected mailbox? This does not enable voicemail processing or change call routing.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={subscriptionBusy} onClick={() => void manageSubscription()}
+                className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Confirm subscription</button>
+              <button type="button" disabled={subscriptionBusy} onClick={() => setConfirmSubscription(false)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium">Cancel</button>
+            </div>
+          </div>
+        )}
         {subscriptionResult && <p role="status" className="text-sm text-gray-700">{subscriptionResult}</p>}
         {diagnosticsError && <p role="alert" className="text-sm text-red-700">{diagnosticsError}</p>}
         {diagnostics && (
