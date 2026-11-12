@@ -35,3 +35,14 @@ export function createTechsafeEnvironmentSecretReader({getEnv}={}) {
   return found.length===1?found[0]:null;
  };
 }
+
+/** Deno Edge Function entrypoints can use this factory without passing
+ * credentials through requests. No environment access occurs at import time. */
+export function createDenoTechsafeSecretReader() {
+ return createTechsafeEnvironmentSecretReader({
+  getEnv:name=>{
+   if(typeof Deno==='undefined'||typeof Deno.env?.get!=='function')return undefined;
+   return Deno.env.get(name);
+  },
+ });
+}
