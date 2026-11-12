@@ -101,6 +101,9 @@ export function RingCentralSettings() {
       setBusy(false);
     }
   }
+  const enabledMailboxCount = connections.reduce((count, connection) =>
+    count + connection.mailboxes.filter(mailbox => mailbox.enabled).length, 0);
+  const hasConnectedAccount = connections.some(connection => connection.status === 'connected');
   return (
     <section className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 space-y-4">
       <div className="flex items-center gap-2">
@@ -120,6 +123,17 @@ export function RingCentralSettings() {
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
         {busy ? 'Connecting…' : 'Connect RingCentral'}
       </button>
+      {!loading && !error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="status">
+          <p className="font-semibold">Voicemail ingestion: {enabledMailboxCount === 0 ? 'Not active' : 'Not yet verified'}</p>
+          <p className="mt-1">
+            {!hasConnectedAccount ? 'Connect a RingCentral account before configuring voicemail ingestion.' :
+              enabledMailboxCount === 0 ? 'RingCentral is connected, but no registered mailbox is enabled for voicemail ingestion.' :
+              'At least one mailbox is enabled. This does not confirm webhook subscription, delivery, transcription, or Flow routing.'}
+          </p>
+          <p className="mt-1">Use Connection diagnostics below to verify account identity. Enabling mailboxes and RingCentral webhook delivery require separate verification; this screen does not change call routing.</p>
+        </div>
+      )}
       <div className="space-y-3 border-t border-gray-200 pt-4">
         <div className="flex items-center justify-between gap-2">
           <h5 className="font-medium text-gray-900">Connected accounts</h5>
