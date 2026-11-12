@@ -60,6 +60,32 @@ export function createPostgresBaseEquipmentScanner(client){
     hidden:line.is_hidden??null,customerSupplied:line.is_customer_supplied??null,
     soldComponentsResolved:unitSalePriceCents!==null&&lineSaleTotalCents!==null&&laborSaleTotalCents!==null}));
   }
+  // MJV's apply_change_order marks a removed product is_hidden=true; however
+  // ordinary sold products can also be hidden for display. Distinguish them
+  // using the actual approved, applied change-order remove actions.
+  let removalRows;
+  try {
+   removalRows=await client.query(
+    `SELECT coli.proposal_line_item_id AS removed_line_id
+       FROM public.change_order_line_items coli
+       JOIN public.change_orders co ON co.id=coli.change_order_id
+         AND co.organization_id=coli.organization_id
+      WHERE co.sales_order_id=$1 AND co.organization_id=$2
+        AND co.status='approved' AND co.is_locked=true
+        AND co.is_active=false AND coli.action_type='remove'
+      ORDER BY coli.proposal_line_item_id FOR SHARE OF co,coli`,
+    [orderId,organizationId]);
+  } catch { return hold('approved_removal_evidence_unavailable'); }
+  if(!Array.isArray(removalRows.rows)||!safeCount(removalRows.rows.length))
+   return hold('approved_removal_evidence_invalid');
+  const removedLineIds=new Set();
+  for(const row of removalRows.rows){
+   if(!uuid(row.removed_line_id)||!seen.has(row.removed_line_id))
+    return hold('approved_removal_target_unverified');
+   removedLineIds.add(row.removed_line_id);
+  }
+  if(baseLines.some(line=>removedLineIds.has(line.id)&&line.hidden!==true))
+   return hold('approved_removal_not_reflected_in_current_lines');
   // This is intentionally NOT readConsistentSource. An authoritative reader
   // must independently prove approval, exhaustive change orders, revisions,
   // full equipment details and a transaction-consistent source manifest.
@@ -67,6 +93,6 @@ export function createPostgresBaseEquipmentScanner(client){
    reason:'current_lines_read_approval_and_change_orders_unverified',
    baseLinesAreCurrent:true,baseLineSource:'current_proposal_line_items',
    orderId,organizationId,proposalId,baseLines:Object.freeze(baseLines),
-   baseLineCount:baseLines.length,approvalVerified:false,sourceManifestComplete:false});
+   baseLineCount:baseLines.length,removedLineIds:Object.freeze([...removedLineIds]),approvedRemovalEvidenceRead:true,approvalVerified:false,sourceManifestComplete:false});
  };
 }
