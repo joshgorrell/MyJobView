@@ -32,6 +32,29 @@ Deno.serve(async (request: Request) => {
   if (!url || !anon || !service || !clientId || !clientSecret || !encryptionKey || !verificationToken) {
     return reply(503, { error: 'not_configured' });
   }
+  // Surface only a bounded provider error code/message for troubleshooting.
+  // Never return raw response bodies, callback URLs, headers, or secrets.
+  async function providerFailure(response: Response, code: string) {
+    let provider_code: string | null = null;
+    let provider_message: string | null = null;
+    try {
+      const body = await response.json() as {
+        errorCode?: unknown; message?: unknown;
+        errors?: Array<{ errorCode?: unknown; message?: unknown }>;
+      };
+      const issue = Array.isArray(body.errors) ? body.errors[0] : undefined;
+      const rawCode = issue?.errorCode ?? body.errorCode;
+      if (typeof rawCode === 'string' && /^[A-Za-z0-9_.-]{1,64}$/.test(rawCode)) {
+        provider_code = rawCode;
+      }
+      const rawMessage = issue?.message ?? body.message;
+      if (typeof rawMessage === 'string' && rawMessage.length <= 240 &&
+          !/https?:|token|secret|authorization|bearer|password|key/i.test(rawMessage)) {
+        provider_message = rawMessage;
+      }
+    } catch { /* A non-JSON provider response is not exposed. */ }
+    return reply(502, { error: code, http_status: response.status, provider_code, provider_message });
+  }
   const bearer = request.headers.get('authorization');
   if (!bearer?.startsWith('Bearer ')) return reply(401, { error: 'unauthorized' });
   const auth = createClient(url, anon, {
@@ -87,7 +110,7 @@ Deno.serve(async (request: Request) => {
       const renewal = await fetch(api + '/' + id + '/renew', {
         method: 'POST', headers, redirect: 'error',
       });
-      if (!renewal.ok) return reply(502, { error: 'subscription_renewal_failed', http_status: renewal.status });
+      if (!renewal.ok) return await providerFailure(renewal, 'subscription_renewal_failed');
       const renewed = await renewal.json();
       return reply(200, { status: 'renewed', expiration_time: renewed.expirationTime ?? null });
     }
@@ -106,7 +129,7 @@ Deno.serve(async (request: Request) => {
         deliveryMode: { transportType: 'WebHook', address, verificationToken },
       }),
     });
-    if (!created.ok) return reply(502, { error: 'subscription_creation_failed', http_status: created.status });
+    if (!created.ok) return await providerFailure(created, 'subscription_creation_failed');
     const result = await created.json();
     return reply(200, { status: 'created', expiration_time: result.expirationTime ?? null });
   } catch {
