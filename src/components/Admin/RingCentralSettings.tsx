@@ -41,6 +41,10 @@ export function RingCentralSettings() {
     } finally { setDiagnosticsBusy(false); }
   }
   async function loadConnections() {
+    // A refresh or disconnect invalidates the previous diagnostic snapshot.
+    setDiagnostics(null);
+    setDiagnosticsError('');
+    setError('');
     setLoading(true);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke(
@@ -49,6 +53,7 @@ export function RingCentralSettings() {
       if (invokeError) throw invokeError;
       setConnections(Array.isArray(data?.connections) ? data.connections : []);
     } catch {
+      setConnections([]);
       setError('Connection status is unavailable. Check the RingCentral integration configuration.');
     } finally {
       setLoading(false);
@@ -122,7 +127,7 @@ export function RingCentralSettings() {
             className="text-sm text-blue-700 hover:underline disabled:opacity-50">Refresh</button>
         </div>
         {loading && <p className="text-sm text-gray-500">Checking connections…</p>}
-        {!loading && connections.length === 0 && <p className="text-sm text-gray-500">No connected RingCentral accounts.</p>}
+        {!loading && !error && connections.length === 0 && <p className="text-sm text-gray-500">No connected RingCentral accounts.</p>}
         {connections.map(connection => (
           <div key={connection.accountId} className="rounded-lg border border-gray-200 p-3 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -159,7 +164,7 @@ export function RingCentralSettings() {
             <div className="text-xs text-gray-600">
               {connection.mailboxes.length === 0 ? 'No registered mailboxes' :
                 connection.mailboxes.map(m => (
-                  <p key={m.extensionId}>Extension {m.extensionId}: {m.enabled ? 'Enabled' : 'Disabled'}</p>
+                  <p key={m.extensionId}>RingCentral extension ID {m.extensionId}: {m.enabled ? 'Enabled' : 'Disabled'}</p>
                 ))}
             </div>
           </div>
