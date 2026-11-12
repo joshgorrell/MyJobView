@@ -72,6 +72,29 @@ assert.equal(full.equipment.find(x=>x.sourceLineId==='labor-line').unitEquipment
 assert.equal(prepareSalesEquipment(input([row(),cheap,laborSold])).equipment.length,1,
  'Legacy equipment-only selection must remain unchanged');
 
+
+const laborWithoutCatalog=row({unitSalePrice:'125.00'});
+laborWithoutCatalog.line={...laborWithoutCatalog.line,id:'standalone-labor',product_id:null,item_type:'labor',description:'On-site installation labor'};
+laborWithoutCatalog.product=null;
+laborWithoutCatalog.membership={verified:true,scope:'included',orderId:'order-1',sourceLineId:'standalone-labor'};
+const laborOnly=prepareSalesEquipment({...input([laborWithoutCatalog]),receiverFullSnapshot:true});
+assert.equal(laborOnly.valid,true);
+assert.equal(laborOnly.equipment.length,1);
+assert.equal(laborOnly.equipment[0].productKind,'labor');
+assert.equal(laborOnly.equipment[0].productRef,null);
+assert.equal(laborOnly.equipment[0].unitEquipmentValueCents,12500);
+assert.equal(prepareSalesEquipment(input([laborWithoutCatalog])).equipment.length,0,'Legacy equipment-only output unchanged');
+for(const mutation of [
+ {salesPriceResolved:false},
+ {membership:{verified:false,scope:'included',orderId:'order-1',sourceLineId:'standalone-labor'}},
+ {line:{...laborWithoutCatalog.line,organization_id:'other'}}
+]){
+ const altered={...laborWithoutCatalog,...mutation};
+ const attempt=()=>prepareSalesEquipment({...input([altered]),receiverFullSnapshot:true});
+ if(mutation.line)assert.throws(attempt,/tenant/);
+ else {const result=attempt();assert.equal(result.valid,false);assert.equal(result.equipment.length,0);}
+}
+
 const output=select(row());assert.equal(output.snapshotReady,false);assert.equal(output.quoteReady,false);
 assert.deepEqual(Object.keys(output.equipment[0]).sort(),['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','description'].sort());
 // Optional local cross-repository check against the actual Techsafe contract.
