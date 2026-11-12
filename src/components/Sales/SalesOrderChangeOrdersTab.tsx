@@ -26,6 +26,8 @@ interface COLineItemDisplay {
   id: string;
   action_type: 'add' | 'remove' | 'modify_quantity' | 'modify_price' | 'modify_labor' | 'modify_modifiers';
   product_name: string;
+  sku: string | null;
+  manufacturer_name: string | null;
   room_name: string | null;
   original_quantity: number | null;
   original_unit_price: number | null;
@@ -103,7 +105,7 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
       const [lineItemsRes, statusEventsRes] = await Promise.all([
         supabase
           .from('change_order_line_items')
-          .select('id, action_type, product_name, room_name, original_quantity, original_unit_price, original_total, original_labor_total, new_quantity, new_unit_price, new_total, new_labor_total, change_amount, item_type, labor_hours, labor_rate, remove_scope, modifier_adjustments')
+          .select('id, action_type, product_name, sku, manufacturer_name, room_name, original_quantity, original_unit_price, original_total, original_labor_total, new_quantity, new_unit_price, new_total, new_labor_total, change_amount, item_type, labor_hours, labor_rate, remove_scope, modifier_adjustments')
           .eq('change_order_id', changeOrderId)
           .order('sort_order'),
         supabase
@@ -1156,6 +1158,13 @@ export function SalesOrderChangeOrdersTab({ order, changeOrders, onRefresh }: Sa
                                             </span>
                                           )}
                                         </div>
+
+                                        {(item.sku || item.manufacturer_name) && !isModifiers && (
+                                          <p className="text-xs text-gray-400 mt-1 break-words">
+                                            {item.manufacturer_name && <span>{item.manufacturer_name}</span>}
+                                            {item.sku && <span className="font-semibold text-gray-300">{item.manufacturer_name ? ' · ' : ''}Model: {item.sku}</span>}
+                                          </p>
+                                        )}
 
                                         {isAdd && (
                                           <p className="text-xs text-gray-400 mt-1">
