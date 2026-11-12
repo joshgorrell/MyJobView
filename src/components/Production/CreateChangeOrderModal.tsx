@@ -396,6 +396,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
   }
 
   function updateLineItem(index: number, field: keyof LineItem, value: any) {
+    if ((field === 'new_quantity' || field === 'new_unit_price') && (!Number.isFinite(value) || value < 0)) return;
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
 
@@ -1166,8 +1167,20 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                               {item.install_location && <div className="text-gray-500">{item.install_location}</div>}
                               {item.parent_index != null && <div className="text-blue-600">Accessory</div>}
                             </td>
-                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">{item.action_type === 'remove' ? item.original_quantity ?? item.new_quantity : item.new_quantity}</td>
-                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">{formatCurrency(item.action_type === 'remove' ? item.original_unit_price ?? item.new_unit_price : item.new_unit_price)}</td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">
+                              {item.action_type === 'remove' ? (item.original_quantity ?? item.new_quantity) : (
+                                <input type="number" min="0" step="0.01" aria-label={`Quantity for ${item.product_name || 'item'}`}
+                                  value={item.new_quantity} onChange={e => updateLineItem(index, 'new_quantity', Number(e.target.value))}
+                                  className="w-20 rounded border border-gray-300 bg-white px-2 py-1 text-right text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">
+                              {item.action_type === 'remove' ? formatCurrency(item.original_unit_price ?? item.new_unit_price) : (
+                                <input type="number" min="0" step="0.01" aria-label={`Unit price for ${item.product_name || 'item'}`}
+                                  value={item.new_unit_price} onChange={e => updateLineItem(index, 'new_unit_price', Number(e.target.value))}
+                                  className="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-right text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+                              )}
+                            </td>
                             <td className="py-2 px-3 text-right whitespace-nowrap text-gray-700">{formatCurrency(item.labor_total || 0)}</td>
                             <td className={`py-2 px-3 text-right whitespace-nowrap font-semibold ${item.change_amount < 0 ? 'text-red-700' : 'text-green-700'}`}>
                               {item.change_amount > 0 ? '+' : item.change_amount < 0 ? '−' : ''}{formatCurrency(Math.abs(item.change_amount))}
@@ -1184,7 +1197,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-xs text-gray-500">Select Edit on a grid row to adjust its product, quantities, pricing, labor, or accessories. Only the selected row editor is shown.</p>
+                  <p className="text-xs text-gray-500">Edit quantity and unit price directly in the grid. Use Edit for product selection, labor, accessories, and advanced details.</p>
                   {lineItems.map((item, index) => {
                     if (editingLineIndex !== index) return null;
                     const isAccessory = item.parent_index !== null && item.parent_index !== undefined;
