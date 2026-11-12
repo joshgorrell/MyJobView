@@ -13,6 +13,14 @@ assert.equal(calls,1,'Invalid payloads and endpoints must not send HTTP');
 assert.equal((await sendTechsafeDraft({...base,fetchImpl:async()=>({status:200,json:async()=>({accepted:true,connectionId:'connection',orderId:'order',sourceRevision:'6',generation:1,eventId:'event',action:'created',proposalId:'draft'})})})).reason,'receiver_receipt_unverified');
 assert.equal((await sendTechsafeDraft({...base,fetchImpl:async()=>({status:409})})).reason,'receiver_not_confirmed');
 assert.equal((await sendTechsafeDraft({...base,fetchImpl:async()=>{throw Error('network')}})).reason,'transport_failed');
+const approvedChange={...content,lines:[{...content.lines[0],sourceLineId:'change:approved_line'}]};
+const changed=await sendTechsafeDraft({...base,content:approvedChange,fetchImpl:async(_url,init)=>{
+ assert.equal(JSON.parse(init.body).lines[0].sourceLineId,'change:approved_line');
+ return {status:200,json:async()=>({accepted:true,connectionId:'connection',orderId:'order',sourceRevision:'7',generation:1,eventId:'event',action:'updated',proposalId:'draft'})};
+}});
+assert.equal(changed.accepted,true);
+const invalidChange=await sendTechsafeDraft({...base,content:{...content,lines:[{...content.lines[0],sourceLineId:'change:bad:extra'}]},fetchImpl:fake});
+assert.equal(invalidChange.reason,'invalid_authorized_payload');
 const duplicate=await sendTechsafeDraft({...base,fetchImpl:async()=>({status:200,json:async()=>({accepted:true,connectionId:'connection',orderId:'order',sourceRevision:'7',generation:1,eventId:'event',action:'duplicate'})})});
 assert.equal(duplicate.accepted,true);
 assert.equal(duplicate.action,'duplicate');
