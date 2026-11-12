@@ -22,7 +22,12 @@ assert.equal(liveStyle.unresolvedLines,1);
 assert.equal(liveStyle.laborSoldCents,22500);
 assert.equal(liveStyle.laborLines,1);
 assert.equal(liveStyle.materialSoldCents,0);
-assert.ok(liveStyle.issues.some(x=>x.reason==='sold_extended_total_requires_allocation'));
+assert.ok(liveStyle.issues.some(x=>x.reason==='discount_or_credit_requires_allocation'));
+const embeddedLabor=inspect({baseLines:[{...material,quantity:1,
+ unitSalePriceCents:29995,lineSaleTotalCents:63745,laborSaleTotalCents:33750}],history});
+assert.equal(embeddedLabor.unresolvedLines,1);
+assert.equal(embeddedLabor.laborSoldCents,33750);
+assert.ok(embeddedLabor.issues.some(x=>x.reason==='extended_total_includes_labor'));
 const belowThreshold=inspect({baseLines:[{...material,unitSalePriceCents:10000,lineSaleTotalCents:20000}],history});
 assert.equal(belowThreshold.ok,true);
 assert.equal(belowThreshold.materialSoldCents,20000); // inspection does not apply dealer threshold
