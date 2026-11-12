@@ -4,7 +4,7 @@ import {prepareTechsafeDraftCandidate} from './techsafe-draft-candidate.mjs';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const digest=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 const epoch=v=>typeof v==='string'&&/^\d{1,12}(?:\.\d{1,6})?$/.test(v);
-export function prepareTechsafeCandidateFromBundle(bundle,binding){
+export function prepareTechsafeCandidateFromBundle(bundle,binding,{receiverFullSnapshot=false}={}){
  const held=code=>({valid:false,content:null,excluded:[],issues:[{code}],
   equipmentMembershipResolved:false,scopeVerified:false,snapshotReady:false,quoteReady:false});
  if(!object(bundle)||bundle.bundleVersion!==1||!digest(bundle.inputFingerprint)
@@ -29,7 +29,8 @@ export function prepareTechsafeCandidateFromBundle(bundle,binding){
   bundle.currentModel.order.organization_id!==binding.organizationId)
   return held('source_bundle_binding_mismatch');
  const candidate=prepareTechsafeDraftCandidate({
-  currentModel:bundle.currentModel,basis:bundle.basis,pairs:bundle.pairs
+  currentModel:bundle.currentModel,basis:bundle.basis,pairs:bundle.pairs,
+  receiverFullSnapshot:receiverFullSnapshot===true
  },binding);
  // Fingerprint is diagnostic, not an authorization signature. No transport,
  // persistence, activation or authoritative revision is produced here.

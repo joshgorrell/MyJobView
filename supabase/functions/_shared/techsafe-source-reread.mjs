@@ -13,12 +13,12 @@ const canonical=value=>{
  return value;
 };
 export const techsafeContentEqual=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
-export function compareTechsafeSourceReread(first,latest,binding){
+export function compareTechsafeSourceReread(first,latest,binding,{receiverFullSnapshot=false}={}){
  const held=reason=>({matches:false,reason,content:null,scopeVerified:false,snapshotReady:false,quoteReady:false});
  if(!first||!latest||typeof first!=='object'||typeof latest!=='object')return held('source_reread_unavailable');
- const initial=prepareTechsafeCandidateFromBundle(first,binding);
+ const initial=prepareTechsafeCandidateFromBundle(first,binding,{receiverFullSnapshot});
  if(!initial.valid)return held('initial_source_unverified');
- const current=prepareTechsafeCandidateFromBundle(latest,binding);
+ const current=prepareTechsafeCandidateFromBundle(latest,binding,{receiverFullSnapshot});
  if(!current.valid)return held('latest_source_unverified');
  if(first.inputFingerprint!==latest.inputFingerprint)return held('source_input_changed');
  if(!techsafeContentEqual(initial.content,current.content))return held('source_candidate_changed');
