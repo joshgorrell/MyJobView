@@ -48,9 +48,9 @@ export function prepareSalesEquipment(input){
   let reason;
   if(exclusion?.miscellaneous_placeholder||product&&miscellaneous(product))reason='miscellaneous';
   else if(exclusion?.excluded)reason='product_opt_out';
-  else if(line.product_id===null)reason='non_product';
-  else if(product===null){issues.push({sourceLineId:line.id,code:'product_unavailable'});continue;}
-  else if(line.item_type==='labor'||product.item_type==='labor'){
+  else if(line.product_id===null&&!(fullSnapshot&&line.item_type==='labor'))reason='non_product';
+  else if(product===null&&!(fullSnapshot&&line.product_id===null&&line.item_type==='labor')){issues.push({sourceLineId:line.id,code:'product_unavailable'});continue;}
+  else if(line.item_type==='labor'||product?.item_type==='labor'){
    if(!fullSnapshot){excluded.push({sourceLineId:line.id,reason:'labor'});continue;}
   }
   else if(!['material','both'].includes(line.item_type)||product.item_type!=='material'){issues.push({sourceLineId:line.id,code:'classification_unverified'});continue;}
@@ -71,7 +71,7 @@ export function prepareSalesEquipment(input){
   if(!Number.isSafeInteger(extended)||!Number.isSafeInteger(total)){issues.push({sourceLineId:line.id,code:'value_overflow'});continue;}
   if(typeof line.description!=='string'||line.description.length>4000)fail('invalid_description');
   // Deliberate allowlist: no cost, margin, catalog price, labor, tax or source dump.
-  const laborKind=line.item_type==='labor'||product.item_type==='labor';
+  const laborKind=line.item_type==='labor'||product?.item_type==='labor';
   equipment.push(Object.freeze({sourceLineId:line.id,productRef:line.product_id,productKind:laborKind?'labor':'equipment',
    scope:'included',customerSupplied:false,techsafeExcluded:false,quantity:count,
    unitEquipmentValueCents:cents,description:line.description}));
