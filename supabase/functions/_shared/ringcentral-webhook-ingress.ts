@@ -51,7 +51,8 @@ function parseEvent(value: unknown): VoicemailEvent | null {
   const [ , accountId, extensionId ] = match;
   if (!MESSAGE_ID.test(accountId) || !MESSAGE_ID.test(extensionId)) return null;
   // Message store notifications can include non-voicemail messages.
-  if (body?.type !== 'VoiceMail') return null;
+  // Dedicated /voicemail events may omit the message-store type field.
+  if (!input.event.includes('/voicemail') && body?.type !== 'VoiceMail') return null;
   return { accountId, extensionId, messageId };
 }
 export async function validateRingCentralWebhook(
