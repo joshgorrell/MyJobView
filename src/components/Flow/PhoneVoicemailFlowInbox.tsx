@@ -21,6 +21,29 @@ export function PhoneVoicemailFlowInbox() {
   const [people, setPeople] = useState<{id: string; full_name: string | null}[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
+  const [diagnosticsError, setDiagnosticsError] = useState('');
+  const [diagnostics, setDiagnostics] = useState<{
+    connections: Array<{status: string; extension_number?: string | null; extension_name?: string | null;
+      registered_mailbox?: boolean; mailbox_enabled?: boolean; http_status?: number}>;
+    mailboxes: Array<{extension_id: string; display_name: string | null; enabled: boolean}>;
+  } | null>(null);
+  async function checkConnection() {
+    setDiagnosticsBusy(true);
+    setDiagnosticsError('');
+    try {
+      const { data, error: diagnosticError } = await supabase.functions.invoke('ringcentral-mailbox-diagnostics', { method: 'GET' });
+      if (diagnosticError) {
+        const status = (diagnosticError as { context?: { status?: number } }).context?.status;
+        throw new Error(status === 403 ? 'Only an MJV administrator can run connection diagnostics.' :
+          'Connection check failed. Confirm RingCentral integration secrets and try again.');
+      }
+      if (!Array.isArray(data?.connections) || !Array.isArray(data?.mailboxes)) throw new Error('Invalid diagnostics response.');
+      setDiagnostics(data);
+    } catch (err) {
+      setDiagnosticsError(err instanceof Error ? err.message : 'Connection check failed.');
+    } finally { setDiagnosticsBusy(false); }
+  }
   async function saveAssignment(message: Voicemail, changes: Record<string, string | null>) {
     setSavingId(message.id);
     try {
@@ -104,6 +127,37 @@ export function PhoneVoicemailFlowInbox() {
       <h3 className="flex items-center gap-2 text-sm font-semibold">
         <PhoneIncoming className="w-4 h-4" aria-hidden="true" /> Phone voicemail
       </h3>
+      <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-gray-600">RingCentral connection and mailbox verification (administrators)</p>
+          <button type="button" disabled={diagnosticsBusy}
+            className="rounded border border-gray-300 px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            onClick={() => void checkConnection()}>
+            {diagnosticsBusy ? 'Checking…' : 'Check RingCentral connection'}
+          </button>
+        </div>
+        {diagnosticsError && <p role="alert" className="text-xs text-red-700">{diagnosticsError}</p>}
+        {diagnostics && (
+          <div className="space-y-1 text-xs" aria-live="polite">
+            {diagnostics.connections.length === 0 && <p>No RingCentral account connected.</p>}
+            {diagnostics.connections.map((connection, i) => (
+              <p key={i}>
+                Connection: {connection.status}
+                {connection.extension_number && ` · Extension ${connection.extension_number}`}
+                {connection.extension_name && ` · ${connection.extension_name}`}
+                {connection.registered_mailbox !== undefined && ` · Registered: ${connection.registered_mailbox ? 'yes' : 'no'}`}
+                {connection.mailbox_enabled !== undefined && ` · Enabled: ${connection.mailbox_enabled ? 'yes' : 'no'}`}
+              </p>
+            ))}
+            {diagnostics.mailboxes.map(mailbox => (
+              <p key={mailbox.extension_id}>
+                Mailbox {mailbox.display_name || mailbox.extension_id}: {mailbox.enabled ? 'enabled' : 'disabled'}
+              </p>
+            ))}
+            <p className="text-gray-500">This check does not activate mailboxes or change call routing.</p>
+          </div>
+        )}
+      </div>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {!error && messages.length === 0 && <p className="text-sm text-gray-500">No voicemail messages to review.</p>}
       {messages.map(message => (
