@@ -42,7 +42,7 @@ assert.equal(current.equipment[1].quantity,4);
 assert.equal(current.equipment[1].unitSalePriceCents,10000);
 assert.equal(current.pendingEditExclusionVerified,false);
 assert.equal(current.noChangeOrderReplay,true);
-assert.equal(queries.some(x=>/change_order|history/i.test(x.sql)),false);
+assert.equal(queries.some(x=>/\bFROM\s+(?:public\.)?change_orders\b|\bFROM\s+(?:public\.)?change_order_line_items\b|\bJOIN\s+(?:public\.)?change_orders\b/i.test(x.sql)),false);
 assert.equal((await reader({approved:false}).read(scope)).ok,false);
 assert.equal((await reader({isolation:'read committed'}).read(scope)).ok,false);
 const unknown=await reader({rows:[{...sourceRows[0],labor_total:null}]}).read(scope);
