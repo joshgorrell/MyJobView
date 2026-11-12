@@ -4,7 +4,7 @@ const ids=Array.from({length:7},(_,i)=>'00000000-0000-0000-0000-'+String(i+1).pa
 const scope={orderId:ids[0],organizationId:ids[1],proposalId:ids[2]};
 const item={changeOrderId:ids[3],changeOrderLineId:ids[4]};
 const row={id:ids[3],organization_id:ids[1],sales_order_id:ids[0],proposal_id:ids[2],
- status:'approved',is_active:true,is_locked:true,approval_date:'2026-11-12',
+ status:'approved',is_active:false,is_locked:true,approval_date:'2026-11-12',
  requires_customer_approval:true,customer_approved:true,
  change_line_id:ids[4],line_organization_id:ids[1]};
 async function run(rows,refs=[item]){
@@ -29,17 +29,20 @@ assert.equal(unreferenced.ok,true);
 assert.equal(unreferenced.unreferencedChangeLines,1);
 assert.equal(unreferenced.approvedUnreferencedLines,1);
 assert.equal(unreferenced.needsHistoricalReconciliation,true);
-const pending=await run([{...row,is_locked:false,approval_date:null}],[]);
+const pending=await run([{...row,is_active:true,is_locked:false,approval_date:null}],[]);
 assert.equal(pending.ok,true);
 assert.equal(pending.unresolvedChangeOrders,1);
 assert.equal(pending.approvedUnreferencedLines,0);
 assert.equal(pending.needsHistoricalReconciliation,true);
-const staleDraft=await run([{...row,status:'draft'}],[]);
+const staleDraft=await run([{...row,status:'draft',is_active:true}],[]);
 assert.equal(staleDraft.ok,true);
 assert.equal(staleDraft.unresolvedChangeOrders,1);
 assert.equal(staleDraft.approvedUnreferencedLines,0);
 assert.equal(staleDraft.needsHistoricalReconciliation,true);
 assert.equal((await run([row,{...row,customer_approved:false}])).ok,false);
+const notApplied=await run([{...row,is_active:true}],[]);
+assert.equal(notApplied.unresolvedChangeOrders,1);
+assert.equal(notApplied.approvedUnreferencedLines,0);
 for(const rows of [[],[{...row,organization_id:ids[5]}],[{...row,sales_order_id:ids[5]}],
  [{...row,line_organization_id:ids[5]}],[row,row]]){
  const result=await run(rows);assert.equal(result.ok,false);assert.equal(result.authorized,false);
