@@ -1,10 +1,12 @@
 // Server-only adapter between MJV's certified dispatch and Techsafe's HTTP receiver.
 // Connection credentials are supplied by trusted server storage, never source rows.
 import {sendTechsafeDraft} from './techsafe-draft-http-transport.mjs';
+import {createPrivateTechsafeCredentialReader} from './techsafe-private-receiver-credentials.mjs';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const held=reason=>({accepted:false,materialized:false,reason});
 export function createTechsafeReceiverDelivery({readCredentials,fetchImpl}={}){
  if(typeof readCredentials!=='function')throw new TypeError('private_credential_reader_required');
+ const privateCredentials=createPrivateTechsafeCredentialReader({readSecret:readCredentials});
  return async ({binding,sourceRevision,content,connection}={})=>{
   if(!object(binding)||!object(connection)||connection.enabled!==true||
      connection.status!=='active'||connection.connectionId!==binding.connectionId||
@@ -16,10 +18,10 @@ export function createTechsafeReceiverDelivery({readCredentials,fetchImpl}={}){
   // Credentials must come from private server storage, not the bundle or
   // connection object. Do not log tokens or include them in receipts.
   let credentials;
-  try{credentials=await readCredentials({connectionId:binding.connectionId,
+  try{credentials=await privateCredentials({connectionId:binding.connectionId,
     organizationId:binding.organizationId,generation:connection.generation});}
   catch{return held('credentials_unavailable');}
-  if(!object(credentials)||credentials.connectionId!==binding.connectionId||
+  if(!object(credentials)||credentials.ok!==true||credentials.connectionId!==binding.connectionId||
      credentials.organizationId!==binding.organizationId||
      credentials.generation!==connection.generation||
      typeof credentials.endpoint!=='string'||typeof credentials.token!=='string')
