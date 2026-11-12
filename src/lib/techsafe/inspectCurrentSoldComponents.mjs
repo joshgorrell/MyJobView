@@ -45,7 +45,13 @@ export function inspectCurrentSoldComponents({baseLines,history}={}){
    }
    if(line.itemType==='material'){
     if(line.lineSaleTotalCents!==line.unitSalePriceCents*line.quantity){
-     issues.push({lineId:line.id,reason:'sold_extended_total_requires_allocation'});
+     const extended=line.unitSalePriceCents*line.quantity;
+     const reason=line.lineSaleTotalCents===extended+line.laborSaleTotalCents
+      ?'extended_total_includes_labor'
+      :line.lineSaleTotalCents<extended
+       ?'discount_or_credit_requires_allocation'
+       :'sold_extended_total_requires_allocation';
+     issues.push({lineId:line.id,reason});
      unresolvedLines++;
      continue;
     }
