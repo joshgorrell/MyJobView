@@ -20,15 +20,15 @@ export function createCurrentSalesOrderSourceReader(client){
   if(current.ok!==true)return hold(current.reason||'current_sales_order_unverified');
   const items=[],issues=[];let soldLaborCents=0;
   for(const row of current.baseLines){
+   if(row.hidden!==false||row.customerSupplied!==false){
+    issues.push({lineId:row.id,reason:'line_eligibility_unverified'});
+    continue;
+   }
    if(!cents(row.laborSaleTotalCents)){
     issues.push({lineId:row.id,reason:'labor_amount_unresolved'});
    }else{
     soldLaborCents+=row.laborSaleTotalCents;
     if(!Number.isSafeInteger(soldLaborCents))return hold('sold_labor_overflow');
-   }
-   if(row.hidden!==false||row.customerSupplied!==false){
-    issues.push({lineId:row.id,reason:'line_eligibility_unverified'});
-    continue;
    }
    if(row.productId===null)continue; // Standalone labor, never a product.
    if(!cents(row.unitSalePriceCents)||!cents(row.lineSaleTotalCents)){
