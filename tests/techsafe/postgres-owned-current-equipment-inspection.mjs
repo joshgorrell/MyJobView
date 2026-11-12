@@ -2,12 +2,18 @@ import assert from 'node:assert/strict';
 import {createOwnedCurrentEquipmentInspection} from '../../src/lib/techsafe/postgresOwnedCurrentEquipmentInspection.mjs';
 const ids=Array.from({length:6},(_,i)=>'00000000-0000-0000-0000-'+String(i+1).padStart(12,'0'));
 const [connectionId,orderId,organizationId,proposalId,lineId,productId]=ids;
-function fixture({isolation='serializable',drift=false,price=true,readerThrows=false}={}){
+function fixture({isolation='serializable',drift=false,price=true,readerThrows=false,approvalValid=true}={}){
  const queries=[],released=[];let revisions=0;
  const client={async query(sql){queries.push(sql);
   if(sql==='SHOW transaction_isolation')return {rows:[{transaction_isolation:isolation}]};
   if(sql.includes('integration_connections'))return {rows:[{organization_id:organizationId,proposal_id:proposalId,connection_generation:'2',enabled:true,status:'active'}]};
   if(sql.includes('order_revision_ledger')){revisions++;return {rows:[{organization_id:organizationId,proposal_id:proposalId,connection_generation:'2',revision:String(drift&&revisions===3?4:3),state:'candidate',source_fingerprint:'a'.repeat(64)}]};}
+  if(sql.includes('public.proposals p JOIN public.sales_orders so'))return {rows:approvalValid?[{
+   id:proposalId,sales_order_id:orderId,status:'approved',approved_at:'2026-11-12',
+   approval_completed_at:null,accepted_via_method:'portal',approved_by:ids[5],
+   contact_id:ids[0],order_id:orderId,organization_id:organizationId,
+   proposal_id:proposalId,order_contact_id:ids[0]
+  }]:[]};
   if(sql.includes('public.sales_orders'))return {rows:[{id:orderId,organization_id:organizationId,proposal_id:proposalId}]};
   if(sql.includes('public.proposal_line_items'))return {rows:[{id:lineId,organization_id:organizationId,proposal_id:proposalId,product_id:productId,quantity:2}]};
   if(sql==='BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE'||sql==='COMMIT'||sql==='ROLLBACK')return {rows:[]};
@@ -29,7 +35,7 @@ assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.lines[0]
 assert.equal(result.authorized,false);assert.equal(result.snapshotReady,false);assert.equal(result.quoteReady,false);
 assert.equal(good.queries[0],'BEGIN ISOLATION LEVEL SERIALIZABLE READ WRITE');
 assert.equal(good.queries.at(-1),'COMMIT');assert.deepEqual(good.released,[undefined]);
-for(const options of [{isolation:'read committed'},{drift:true},{price:false},{readerThrows:true}]){
+for(const options of [{isolation:'read committed'},{drift:true},{price:false},{readerThrows:true},{approvalValid:false}]){
  const f=fixture(options);await assert.rejects(()=>f.run({connectionId,orderId}));
  assert.equal(f.queries.at(-1),'ROLLBACK');assert.equal(f.queries.includes('COMMIT'),false);
  assert.ok(f.released[0] instanceof Error);
