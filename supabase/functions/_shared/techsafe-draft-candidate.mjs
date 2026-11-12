@@ -11,6 +11,8 @@ export function prepareTechsafeDraftCandidate(input,binding){
  const stop=code=>{throw Error(code);};
  try{
   const model=input?.currentModel;
+  // Explicit receiver-mode opt-in; never infer authority from source data.
+  const receiverFullSnapshot=input?.receiverFullSnapshot===true;
   const readiness=assessDraftEligibility(model);
   if(!readiness.eligible)stop(readiness.reason);
   // Supported early orders still require full approval/application evidence.
@@ -40,10 +42,11 @@ export function prepareTechsafeDraftCandidate(input,binding){
     salesPriceResolved:price.salesPriceResolved,unitSalePrice:price.unitSalePrice};
   });
   const prepared=prepareOrderContent({organizationId:model.organizationId,currency:model.currency,order:model.order,customer:model.customer,
-   site:model.site,minimumUnitValueCents:model.minimumUnitValueCents,lines});
+   site:model.site,minimumUnitValueCents:model.minimumUnitValueCents,lines,
+   receiverFullSnapshot});
   result.excluded=prepared.excluded;result.issues=prepared.issues;
   if(!prepared.valid)return result;
-  if(!prepared.content.lines.length){result.issues.push({code:'no_eligible_equipment'});return result;}
+  if(!prepared.content.lines.length){result.issues.push({code:receiverFullSnapshot?'no_sold_equipment_or_labor':'no_eligible_equipment'});return result;}
   result.valid=true;result.content=prepared.content;result.equipmentMembershipResolved=true;
  }catch(error){result.issues.push({code:error.message||'draft_candidate_unavailable'});}
  // A prepared business candidate is still not an authorized source envelope.
