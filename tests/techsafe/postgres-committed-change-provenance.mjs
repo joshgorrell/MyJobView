@@ -6,7 +6,7 @@ const line={id:ids[3],organizationId:ids[1],proposalId:ids[2],committedChangeOrd
 const row={id:ids[4],organization_id:ids[1],change_order_id:ids[5],proposal_line_item_id:ids[3],
  order_organization_id:ids[1],sales_order_id:ids[0],proposal_id:ids[2],
  status:'approved',approval_date:'2026-11-12T00:00:00Z',
- customer_approved:true,requires_customer_approval:true,is_active:true,is_locked:true};
+ customer_approved:true,requires_customer_approval:true,is_active:false,is_locked:true};
 async function check(rows,baseLines=[line]){
  let calls=0;
  const read=createCommittedChangeProvenanceReader({async query(sql,params){
@@ -26,7 +26,7 @@ assert.equal(good.result.provenance[0].sourceLineId,ids[3]);
 for(const bad of [
  [],[{...row,organization_id:ids[7]}],[{...row,sales_order_id:ids[7]}],
  [{...row,proposal_id:ids[7]}],[{...row,proposal_line_item_id:ids[7]}],
- [{...row,is_locked:false}],[{...row,approval_date:null}],
+ [{...row,is_locked:false}],[{...row,is_active:true}],[{...row,approval_date:null}],
  [{...row,status:'draft'}],[{...row,status:'pending_approval'}],
  [{...row,customer_approved:false}],[row,row]
 ]){
