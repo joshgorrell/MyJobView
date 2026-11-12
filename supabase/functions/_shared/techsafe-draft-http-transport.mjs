@@ -19,6 +19,16 @@ const snapshotFields=new Set(['schemaVersion','environment','connectionId','sour
 const lineFields=new Set(['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','manufacturer','model','sku','description','room','serialNumber','productCategory','originalPurchaseDate']);
 const kinds=new Set(['equipment','miscellaneous','labor','fee','tax','consumable','subscription','unclassified']);
 const nonnegative=x=>Number.isSafeInteger(x)&&x>=0;
+const textFields=['manufacturer','model','sku','description','room','serialNumber','productCategory'];
+const validDate=v=>{
+ if(v===null||v===undefined||v==='')return true;
+ if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+ const date=new Date(v+'T00:00:00.000Z');
+ return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===v;
+};
+const validDetails=line=>textFields.every(k=>line[k]===undefined||line[k]===null||
+ (typeof line[k]==='string'&&line[k].length<=(k==='description'?4000:256)))&&
+ validDate(line.originalPurchaseDate);
 const validSnapshot=(content,binding,sourceRevision)=>{
  if(!object(content)||Object.keys(content).some(k=>!snapshotFields.has(k))||content.schemaVersion!==2||content.connectionId!==binding.connectionId||
    content.organizationId!==binding.organizationId||content.orderId!==binding.orderId||
@@ -43,7 +53,7 @@ const validSnapshot=(content,binding,sourceRevision)=>{
      (line.productKind==='equipment'&&!id(line.productRef))||
      !['included','removed'].includes(line.scope)||
      !nonnegative(line.quantity)||line.quantity>10000||
-     !nonnegative(line.unitEquipmentValueCents)||
+     !nonnegative(line.unitEquipmentValueCents)||!validDetails(line)||
      typeof line.customerSupplied!=='boolean'||typeof line.techsafeExcluded!=='boolean')return false;
   seen.add(line.sourceLineId);
   total+=line.quantity*line.unitEquipmentValueCents;
