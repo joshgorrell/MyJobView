@@ -20,6 +20,18 @@ export function inspectApprovedSalesOrderLabor({source}={}){
    row.membership.sourceLineId!==line.id||!['included','removed'].includes(row.membership.scope))
    return held('labor_membership_unverified');
   if(row.membership.scope==='removed')continue;
+  // Match the equipment adapter's customer-supplied and explicit exclusion rules.
+  // Labor must never be silently included when ownership/exclusion is unknown.
+  if(typeof line.is_customer_supplied!=='boolean')return held('labor_customer_supplied_unverified');
+  if(line.is_customer_supplied)continue;
+  if(row.exclusion!==null&&row.exclusion!==undefined){
+   if(row.exclusion.organization_id!==source.organizationId||
+      row.exclusion.product_id!==line.product_id||
+      typeof row.exclusion.excluded!=='boolean'||
+      typeof row.exclusion.miscellaneous_placeholder!=='boolean')
+    return held('labor_exclusion_unverified');
+   if(row.exclusion.excluded||row.exclusion.miscellaneous_placeholder)continue;
+  }
   if(row.salesPriceResolved!==true||!/^\d{1,12}(?:\.\d{1,2})?$/.test(String(row.unitSalePrice))||
    !/^\d{1,5}(?:\.0{1,2})?$/.test(String(line.quantity)))
    return held('labor_selling_price_or_quantity_unverified');
@@ -28,6 +40,7 @@ export function inspectApprovedSalesOrderLabor({source}={}){
   const cents=BigInt(d)*100n+BigInt(f.padEnd(2,'0'));
   if(!Number.isSafeInteger(quantity)||quantity>10000||cents>BigInt(Number.MAX_SAFE_INTEGER)||
    BigInt(quantity)*cents>BigInt(Number.MAX_SAFE_INTEGER))return held('labor_value_overflow');
+  if(quantity===0||cents===0n)continue;
   labor.push(Object.freeze({sourceLineId:line.id,productKind:'labor',quantity,
    unitEquipmentValueCents:Number(cents)}));
  }
