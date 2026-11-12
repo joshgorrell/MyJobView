@@ -1,7 +1,7 @@
 import { notify } from '../../lib/feedback';
 import { NotificationPreferenceFields } from './NotificationPreferenceFields';
 import { useState, useEffect } from 'react';
-import { Bell, Save, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
+import { Bell, Save, CheckCircle, XCircle, Smartphone, Building2, Eye, CreditCard, Award } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { subscribeToPushNotifications, unsubscribeFromPushNotifications, checkPushSubscription } from '../../lib/pushNotifications';
