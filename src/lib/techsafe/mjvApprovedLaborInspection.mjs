@@ -20,8 +20,8 @@ export function inspectApprovedSalesOrderLabor({source}={}){
    row.membership.sourceLineId!==line.id||!['included','removed'].includes(row.membership.scope))
    return held('labor_membership_unverified');
   if(row.membership.scope==='removed')continue;
-  if(row.salesPriceResolved!==true||!/^\\d{1,12}(?:\\.\\d{1,2})?$/.test(String(row.unitSalePrice))||
-   !/^\\d{1,5}(?:\\.0{1,2})?$/.test(String(line.quantity)))
+  if(row.salesPriceResolved!==true||!/^\d{1,12}(?:\.\d{1,2})?$/.test(String(row.unitSalePrice))||
+   !/^\d{1,5}(?:\.0{1,2})?$/.test(String(line.quantity)))
    return held('labor_selling_price_or_quantity_unverified');
   const quantity=Number(line.quantity);
   const [d,f='']=String(row.unitSalePrice).split('.');
