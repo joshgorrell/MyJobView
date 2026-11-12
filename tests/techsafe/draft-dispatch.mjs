@@ -9,9 +9,11 @@ assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,loadConnection:a
 assert.equal(called,0,'Inactive connection must not read source');
 assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,loadConnection:async()=>{throw Error('offline')}})).reason,'integration_unavailable');
 assert.equal((await dispatchTechsafeDraft({...deps,enabled:true})).reason,'source_bundle_unavailable');
-assert.equal(called,2,'Only the private connection and bundle reads may execute');
+assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,
+ readCertifiedAuthority:async()=>{throw Error('must not certify invalid source')}})).reason,'source_bundle_unavailable');
+assert.equal(called,4,'Both invalid-source calls may only read the private connection and bundle, never deliver');
 assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,loadConnection:async()=>({enabled:true,status:'active',connectionId:'connection',organizationId:'org',orderId:'order',proposalId:'unapproved'})})).reason,'connection_inactive_or_unverified');
-assert.equal(called,2,'Wrong approved proposal must not read any source bundle');
+assert.equal(called,4,'Wrong approved proposal must not read any source bundle');
 assert.equal((await dispatchTechsafeDraft({...deps,enabled:true,binding:{...binding,organizationId:'another'}})).reason,'connection_inactive_or_unverified');
 console.log('Techsafe dispatch boundary holds disabled, inactive, invalid and unavailable integrations; never delivers');
 
