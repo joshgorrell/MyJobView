@@ -30,7 +30,10 @@ export function createCurrentSalesOrderSourceReader(client){
     soldLaborCents+=row.laborSaleTotalCents;
     if(!Number.isSafeInteger(soldLaborCents))return hold('sold_labor_overflow');
    }
-   if(row.productId===null)continue; // Standalone labor, never a product.
+   if(row.productId===null){
+    if(row.itemType!=='labor')issues.push({lineId:row.id,reason:'unclassified_nonproduct_line'});
+    continue; // Standalone labor, never a product.
+   }
    if(!cents(row.unitSalePriceCents)||!cents(row.lineSaleTotalCents)){
     issues.push({lineId:row.id,reason:'product_sold_price_unresolved'});
     continue;
@@ -42,7 +45,7 @@ export function createCurrentSalesOrderSourceReader(client){
    // Eligibility is determined from unit SELLING price, not line extension.
    // An adjusted line total may reflect discounts or labor; it must not
    // silently replace the source's explicit per-unit selling price.
-   if(row.quantity<1){
+   if(!Number.isSafeInteger(row.quantity)||row.quantity<1){
     issues.push({lineId:row.id,reason:'product_quantity_invalid'});
     continue;
    }
@@ -51,11 +54,12 @@ export function createCurrentSalesOrderSourceReader(client){
     lineSaleTotalCents:row.lineSaleTotalCents,
     laborSaleTotalCents:row.laborSaleTotalCents}));
   }
-  return Object.freeze({ok:true,authorized:false,snapshotReady:false,
-   reason:'current_sales_order_read_pending_edit_approval_boundary',
+  const sourceComplete=issues.length===0;
+  return Object.freeze({ok:sourceComplete,authorized:false,snapshotReady:false,
+   reason:sourceComplete?'current_sales_order_read_pending_edit_approval_boundary':'current_sales_order_contains_unresolved_lines',
    orderId,organizationId,proposalId,contactId:approved.contactId,
    source:'current_approved_sales_order',equipment:Object.freeze(items),
-   soldLaborCents,issues:Object.freeze(issues),
+   soldLaborCents,issues:Object.freeze(issues),sourceComplete,
    currentRowsInspected:current.baseLineCount,
    pendingEditExclusionVerified:false,
    noChangeOrderReplay:true});
