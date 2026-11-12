@@ -9,7 +9,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const cors = allowed && origin === allowed ? {
     'access-control-allow-origin': allowed, vary: 'Origin',
     'access-control-allow-headers': 'authorization,apikey,content-type,x-client-info',
-    'access-control-allow-methods': 'GET,OPTIONS',
+    'access-control-allow-methods': 'GET,POST,OPTIONS',
   } : {};
   const respond = (status: number, value: unknown) => new Response(JSON.stringify(value), {
     status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors },
@@ -18,7 +18,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     status: allowed && origin === allowed ? 204 : 403, headers: cors,
   });
   if (origin && origin !== allowed) return respond(403, { error: 'forbidden_origin' });
-  if (request.method !== 'GET') return respond(405, { error: 'method_not_allowed' });
+  if (!['GET', 'POST'].includes(request.method)) return respond(405, { error: 'method_not_allowed' });
   const url = Deno.env.get('SUPABASE_URL');
   const anon = Deno.env.get('SUPABASE_ANON_KEY');
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -38,6 +38,22 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (grantError) return respond(503, { error: 'permissions_unavailable' });
   const permittedDepartments = permittedVoicemailDepartments(profile.role, (grants ?? []).map(g => g.department));
   if (permittedDepartments.length === 0) return respond(403, { error: 'access_denied' });
+  if (request.method === 'POST') {
+    let payload: { id?: unknown };
+    try { payload = await request.json(); } catch { return respond(400, { error: 'invalid_body' }); }
+    if (typeof payload.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.id)) return respond(400, { error: 'invalid_id' });
+    const { data: target, error: targetError } = await db.from('voicemail_messages')
+      .select('id,department,state').eq('organization_id', profile.organization_id).eq('id', payload.id).maybeSingle();
+    if (targetError) return respond(503, { error: 'voicemail_unavailable' });
+    if (!target || !['ready','review'].includes(target.state) ||
+        (profile.role !== 'admin' && !permittedDepartments.includes(target.department))) return respond(404, { error: 'not_found' });
+    const { error: markError } = await db.from('phone_voicemail_views').upsert({
+      organization_id: profile.organization_id, voicemail_id: target.id, user_id: user.id,
+      viewed_at: new Date().toISOString(),
+    }, { onConflict: 'voicemail_id,user_id' });
+    if (markError) return respond(503, { error: 'read_state_unavailable' });
+    return respond(200, { ok: true });
+  }
   let query = db.from('voicemail_messages')
     .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested')
     .eq('organization_id', profile.organization_id)
@@ -45,5 +61,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (profile.role !== 'admin') query = query.in('department', permittedDepartments);
   const { data, error } = await query.order('received_at', { ascending: false }).limit(50);
   if (error) return respond(503, { error: 'voicemail_unavailable' });
-  return respond(200, { messages: data ?? [] });
+  const ids = (data ?? []).map(message => message.id);
+  if (!ids.length) return respond(200, { messages: [], unread_count: 0 });
+  const { data: views, error: viewError } = await db.from('phone_voicemail_views')
+    .select('voicemail_id').eq('organization_id', profile.organization_id)
+    .eq('user_id', user.id).in('voicemail_id', ids);
+  if (viewError) return respond(503, { error: 'read_state_unavailable' });
+  const viewed = new Set((views ?? []).map(view => view.voicemail_id));
+  const messages = (data ?? []).map(message => ({ ...message, is_read: viewed.has(message.id) }));
+  return respond(200, { messages, unread_count: messages.filter(message => !message.is_read).length });
 });

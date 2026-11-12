@@ -217,6 +217,21 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   // voicemail records or assignments as unread.
   const [notificationCounts, setNotificationCounts] = useState({ messages: 0, tasks: 0, voicemails: 0 });
   const [unreadCustomerMessages, setUnreadCustomerMessages] = useState(0);
+  const [unreadVoicemails, setUnreadVoicemails] = useState(0);
+  useEffect(() => {
+    if (scoped || !canViewVoicemail) { setUnreadVoicemails(0); return; }
+    let cancelled = false;
+    const refresh = async () => {
+      const { data, error } = await supabase.functions.invoke('phone-voicemail-inbox', { method: 'GET' });
+      if (!cancelled && !error && typeof data?.unread_count === 'number') setUnreadVoicemails(data.unread_count);
+    };
+    void refresh();
+    const onRefresh = () => { if (!document.hidden) void refresh(); };
+    window.addEventListener('flow-voicemail-views-changed', onRefresh);
+    window.addEventListener('focus', onRefresh);
+    const timer = window.setInterval(onRefresh, 30000);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('focus', onRefresh); window.removeEventListener('flow-voicemail-views-changed', onRefresh); };
+  }, [scoped, canViewVoicemail]);
   useEffect(() => {
     if (scoped || !profile?.id || !profile?.organization_id) return;
     let cancelled = false;
@@ -290,7 +305,7 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     : id === 'activity' ? unreadActivity
     : id === 'messages' ? Math.max(notificationCounts.messages, unreadCustomerMessages + unreadCoworkerMessages)
     : id === 'tasks' ? notificationCounts.tasks
-    : canViewVoicemail ? notificationCounts.voicemails : 0;
+    : canViewVoicemail ? Math.max(notificationCounts.voicemails, unreadVoicemails) : 0;
   const unreadActivity = flow.events.filter(event => !event.viewed && matchesView(event, 'activity', 'all')).length;
   const unreadFlow = flow.events.filter(event => !event.viewed).length;
   return <div ref={workspaceSize.ref} style={view === 'messages' && !scoped ? { height: workspaceSize.height } : undefined} className={`${scoped ? 'flow-embedded' : 'flow-workspace'} ${view === 'messages' ? 'flow-messaging' : ''}`}><section className={`flow ${!scoped?'flow--workspace':''} ${dark ? 'flow--dark' : ''}`} aria-label="Activity Flow">
