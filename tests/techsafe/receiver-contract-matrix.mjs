@@ -30,6 +30,10 @@ for(const [action,proposalId] of [['created','native'],['updated','native'],['du
  const result=await sendTechsafeDraft({...args,fetchImpl:receiver(action,proposalId)});
  assert.equal(result.accepted,true,action);
  assert.equal(result.action,action);
+ assert.equal(result.materialized,action==='created'||action==='updated');
+ assert.equal(result.proposalId,action==='created'||action==='updated'?'native':null);
+ if(action==='preserve_coverage_snapshot')assert.equal(result.reason,'purchased_coverage_preserved');
+ if(action==='suppressed')assert.equal(result.reason,'draft_suppressed');
 }
 assert.equal(captured.length,6);
 const malicious={...snapshot,internalCostCents:100};
