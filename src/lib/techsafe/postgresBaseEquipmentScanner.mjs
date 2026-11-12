@@ -12,7 +12,7 @@ const quantity=x=>{
 const money=x=>{
  if(x===null||x===undefined)return null;
  if(typeof x!=='number'&&typeof x!=='string')return null;
- const match=/^(0|[1-9]\\d{0,12})(?:\\.(\\d{1,2}))?$/.exec(String(x));
+ const match=/^(0|[1-9]\d{0,12})(?:\.(\d{1,2}))?$/.exec(String(x));
  if(!match)return null;
  const cents=Number(match[1])*100+Number((match[2]||'').padEnd(2,'0'));
  return Number.isSafeInteger(cents)?cents:null;
