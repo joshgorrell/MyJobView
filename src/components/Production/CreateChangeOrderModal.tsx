@@ -1667,7 +1667,7 @@ export function CreateChangeOrderModal({ isOpen, onClose, salesOrderId: initialS
                       >
                         <div className="flex items-center gap-1.5">
                           {isAccessory && <Link2 className="w-3 h-3 text-blue-400 flex-shrink-0" />}
-                          <span>{item.product_name || 'Unnamed item'}</span>
+                          <span>{item.sku ? `${item.sku} · ` : ''}{item.product_name || 'Unnamed item'}</span>
                           <span className="text-gray-500">({item.action_type} · x{item.new_quantity})</span>
                         </div>
                         <span className={`font-semibold ${item.change_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
