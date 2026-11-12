@@ -19,6 +19,7 @@ const validSnapshot=(content,binding,sourceRevision)=>{
    !Number.isSafeInteger(content.generation)||content.generation<1||
    !Number.isSafeInteger(content.revision)||String(content.revision)!==sourceRevision||
    content.complete!==true||content.scopeState!=='committed'||
+   !id(content.eventId)||!id(content.sourceInstanceId)||
    !['production','sandbox'].includes(content.environment)||
    !Array.isArray(content.lines)||content.lines.length>10000)return false;
  const seen=new Set();
@@ -42,8 +43,9 @@ export async function sendTechsafeDraft({endpoint,token,binding,sourceRevision,c
  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||!validHost(url.hostname))return held('invalid_endpoint');
  if(typeof token!=='string'||token.length<32||token.length>4096||/[\r\n]/.test(token))return held('credentials_unavailable');
  if(typeof fetchImpl!=='function')return held('transport_unavailable');
- const body=JSON.stringify({schemaVersion:2,connectionId:binding.connectionId,organizationId:binding.organizationId,
-  orderId:binding.orderId,proposalId:binding.proposalId,sourceRevision,content});
+ // Techsafe mjv-import expects the full v2 snapshot at the HTTP root, not
+ // a nested {content,sourceRevision} envelope. Proposal ID is MJV-only binding.
+ const body=JSON.stringify(content);
  if(body.length>1048576)return held('payload_too_large');
  try{
   const response=await fetchImpl(url.toString(),{method:'POST',headers:{'Content-Type':'application/json',
@@ -52,8 +54,12 @@ export async function sendTechsafeDraft({endpoint,token,binding,sourceRevision,c
   if(!response||response.status!==200)return held('receiver_not_confirmed');
   const receipt=await response.json();
   if(!object(receipt)||receipt.accepted!==true||receipt.connectionId!==binding.connectionId||
-   receipt.orderId!==binding.orderId||receipt.sourceRevision!==sourceRevision||!id(receipt.draftId))
+   receipt.orderId!==binding.orderId||receipt.sourceRevision!==sourceRevision||
+   receipt.generation!==content.generation||receipt.eventId!==content.eventId||
+   !['created','updated','duplicate','ignore_older','preserve_coverage_snapshot','held','suppressed'].includes(receipt.action)||
+   (['created','updated'].includes(receipt.action)&&!id(receipt.proposalId)))
    return held('receiver_receipt_unverified');
-  return {accepted:true,reason:'draft_received',draftId:receipt.draftId,sourceRevision};
+  return {accepted:true,reason:'snapshot_received',action:receipt.action,
+   proposalId:receipt.proposalId??null,sourceRevision};
  }catch{return held('transport_failed');}
 }
