@@ -18,6 +18,8 @@ export function RingCentralSettings() {
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null);
   const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
+  const [subscriptionBusy, setSubscriptionBusy] = useState(false);
+  const [subscriptionResult, setSubscriptionResult] = useState('');
   const [diagnosticsError, setDiagnosticsError] = useState('');
   const [diagnostics, setDiagnostics] = useState<{
     connections: Array<{status: string; extension_number?: string | null; extension_name?: string | null;
@@ -40,6 +42,23 @@ export function RingCentralSettings() {
     } catch (err) {
       setDiagnosticsError(err instanceof Error ? err.message : 'Connection check failed.');
     } finally { setDiagnosticsBusy(false); }
+  }
+  async function manageSubscription() {
+    if (subscriptionBusy || !window.confirm('Create or renew the RingCentral voicemail notification subscription for the connected mailbox? This does not enable voicemail processing or change call routing.')) return;
+    setSubscriptionBusy(true);
+    setSubscriptionResult('');
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        'ringcentral-webhook-subscription', { method: 'POST', body: {} },
+      );
+      if (invokeError || (data?.status !== 'created' && data?.status !== 'renewed')) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Subscription request failed. Check integration configuration.');
+      }
+      setSubscriptionResult(data.status === 'created' ? 'Subscription created.' : 'Subscription renewed.');
+      await checkConnection();
+    } catch (err) {
+      setSubscriptionResult(err instanceof Error ? err.message : 'Subscription request failed.');
+    } finally { setSubscriptionBusy(false); }
   }
   async function loadConnections() {
     // A refresh or disconnect invalidates the previous diagnostic snapshot.
@@ -191,12 +210,18 @@ export function RingCentralSettings() {
             <h5 className="font-medium text-gray-900">Connection diagnostics</h5>
             <p className="text-xs text-gray-500">Verify OAuth renewal and the connected mailbox without changing phone routing.</p>
           </div>
+          <button type="button" disabled={subscriptionBusy || loading || connections.length !== 1}
+            className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            onClick={() => void manageSubscription()}>
+            {subscriptionBusy ? 'Configuring…' : 'Create / renew voicemail subscription'}
+          </button>
           <button type="button" disabled={diagnosticsBusy}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
             onClick={() => void checkConnection()}>
             {diagnosticsBusy ? 'Checking…' : 'Check RingCentral connection'}
           </button>
         </div>
+        {subscriptionResult && <p role="status" className="text-sm text-gray-700">{subscriptionResult}</p>}
         {diagnosticsError && <p role="alert" className="text-sm text-red-700">{diagnosticsError}</p>}
         {diagnostics && (
           <div className="rounded-lg border border-gray-200 p-3 space-y-1 text-sm" aria-live="polite">
