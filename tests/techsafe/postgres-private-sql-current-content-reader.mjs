@@ -32,6 +32,12 @@ const txClient={async query(sql){statements.push(sql);
  if(sql==='SHOW transaction_isolation')return {rows:[{transaction_isolation:'serializable'}]};
  if(sql.includes('integration_connections'))return {rows:[{organization_id:organizationId,proposal_id:proposalId,connection_generation:'2',enabled:true,status:'active'}]};
  if(sql.includes('order_revision_ledger')){ledgerReads++;return {rows:[{organization_id:organizationId,proposal_id:proposalId,connection_generation:'2',revision:'3',state:'candidate',source_fingerprint:'a'.repeat(64)}]};}
+ if(sql.includes('public.proposals p JOIN public.sales_orders so'))return {rows:[{
+  id:proposalId,sales_order_id:orderId,status:'approved',approved_at:'2026-11-12',
+  contact_id:connectionId,order_id:orderId,organization_id:organizationId,
+  proposal_id:proposalId,order_contact_id:connectionId
+ }]};
+ if(sql.includes('FROM public.change_orders co'))return {rows:[]};
  if(sql.includes('public.sales_orders'))return {rows:[{id:orderId,organization_id:organizationId,proposal_id:proposalId}]};
  if(sql.includes('public.proposal_line_items'))return {rows:[{id:lineId,organization_id:organizationId,proposal_id:proposalId,product_id:ids[0],quantity:2}]};
  if(sql.includes('techsafe_source.read_order_source'))return {rows:[{source:raw}]};
