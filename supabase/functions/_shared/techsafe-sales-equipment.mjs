@@ -55,6 +55,14 @@ export function prepareSalesEquipment(input){
   }
   else if(!['material','both'].includes(line.item_type)||product.item_type!=='material'){issues.push({sourceLineId:line.id,code:'classification_unverified'});continue;}
   if(reason){excluded.push({sourceLineId:line.id,reason});continue;}
+  // A 'both' line can contain separately sold labor as well as equipment.
+  // The current private reader only resolves equipment unit price. A complete
+  // receiver snapshot cannot silently discard the labor component or guess
+  // its amount from an aggregate. Hold until source-owned split is attested.
+  if(fullSnapshot&&line.item_type==='both'){
+   issues.push({sourceLineId:line.id,code:'mixed_material_labor_split_unverified'});
+   continue;
+  }
   if(!object(membership)||membership.verified!==true||membership.orderId!==input.orderId||membership.sourceLineId!==line.id||!['included','removed'].includes(membership.scope)){
    issues.push({sourceLineId:line.id,code:'scope_unverified'});continue;
   }
