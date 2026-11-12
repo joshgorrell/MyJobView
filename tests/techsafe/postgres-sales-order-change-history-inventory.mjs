@@ -20,9 +20,19 @@ const valid=await run([row]);
 assert.equal(valid.ok,true);assert.equal(valid.authorized,false);
 assert.equal(valid.historyCompletenessCertified,false);
 assert.equal(valid.changeOrderCount,1);assert.equal(valid.unreferencedChangeLines,0);
+assert.equal(valid.needsHistoricalReconciliation,false);
+assert.equal(valid.approvedUnreferencedLines,0);
 const unreferenced=await run([row],[]);
 assert.equal(unreferenced.ok,true);
 assert.equal(unreferenced.unreferencedChangeLines,1);
+assert.equal(unreferenced.approvedUnreferencedLines,1);
+assert.equal(unreferenced.needsHistoricalReconciliation,true);
+const pending=await run([{...row,is_locked:false,approval_date:null}],[]);
+assert.equal(pending.ok,true);
+assert.equal(pending.unresolvedChangeOrders,1);
+assert.equal(pending.approvedUnreferencedLines,0);
+assert.equal(pending.needsHistoricalReconciliation,true);
+assert.equal((await run([row,{...row,customer_approved:false}])).ok,false);
 for(const rows of [[],[{...row,organization_id:ids[5]}],[{...row,sales_order_id:ids[5]}],
  [{...row,line_organization_id:ids[5]}],[row,row]]){
  const result=await run(rows);assert.equal(result.ok,false);assert.equal(result.authorized,false);
