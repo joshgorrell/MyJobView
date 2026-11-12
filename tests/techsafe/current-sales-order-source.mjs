@@ -14,7 +14,7 @@ const sourceRows=[
  quantity:4,item_type:'material',unit_price:'100.00',line_total:'400.00',
  labor_total:'0',committed_change_order_line_id:null,is_hidden:false,is_customer_supplied:false}
 ];
-function reader({rows=sourceRows,approved=true,isolation='serializable'}={}){
+function reader({rows=sourceRows,approved=true,isolation='serializable',removed=[]}={}){
  const queries=[];
  const client={query:async(sql,args)=>{
   queries.push({sql,args});
@@ -25,7 +25,7 @@ function reader({rows=sourceRows,approved=true,isolation='serializable'}={}){
     order_contact_id:contactId,approved_at:'2026-11-12T00:00:00Z',status:'approved'}]:[]};
   if(sql.includes('FROM public.sales_orders'))return {rows:[{id:orderId,organization_id:organizationId,proposal_id:proposalId}]};
   if(sql.includes('FROM public.proposal_line_items'))return {rows};
-  if(sql.includes('FROM public.change_order_line_items'))return {rows:[]};
+  if(sql.includes('FROM public.change_order_line_items'))return {rows:removed.map(removed_line_id=>({removed_line_id}))};
   throw Error('unexpected query: '+sql);
  }};
  return {read:createCurrentSalesOrderSourceReader(client),queries};
@@ -53,6 +53,14 @@ const hidden=await reader({rows:[{...sourceRows[0],is_hidden:true}]}).read(scope
 assert.equal(hidden.equipment.length,1);
 assert.equal(hidden.soldLaborCents,33750);
 assert.equal(hidden.issues.length,0);
+const removedLine=await reader({rows:[{...sourceRows[0],is_hidden:true},sourceRows[1]],removed:[line1]}).read(scope);
+assert.equal(removedLine.ok,true);
+assert.equal(removedLine.equipment.length,0);
+assert.equal(removedLine.soldLaborCents,20000);
+assert.equal(removedLine.approvedRemovalCount,1);
+const mismatch=await reader({rows:[sourceRows[0]],removed:[line1]}).read(scope);
+assert.equal(mismatch.ok,false);
+assert.equal(mismatch.reason,'approved_removal_not_reflected_in_current_lines');
 const supplied=await reader({rows:[{...sourceRows[0],is_customer_supplied:true}]}).read(scope);
 assert.equal(supplied.equipment.length,0);
 assert.equal(supplied.soldLaborCents,0);
