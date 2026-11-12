@@ -1,7 +1,7 @@
 import { PhoneVoicemailPermissions } from './PhoneVoicemailPermissions';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { PhoneCall, ExternalLink, Loader2 } from 'lucide-react';
+import { PhoneCall, ExternalLink, Loader2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 type Connection = {
   accountId: string;
@@ -12,6 +12,7 @@ type Connection = {
 /** Credentials are never returned to the browser. */
 export function RingCentralSettings() {
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState('');
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +103,7 @@ export function RingCentralSettings() {
       setLoading(false);
     }
   }
-  useEffect(() => { void loadConnections(); }, []);
+  useEffect(() => { void loadConnections(); void checkConnection(); }, []);
   async function disconnect(accountId: string) {
     if (disconnecting) return;
     setDisconnecting(accountId);
@@ -147,141 +148,96 @@ export function RingCentralSettings() {
   const enabledMailboxCount = connections.reduce((count, connection) =>
     count + connection.mailboxes.filter(mailbox => mailbox.enabled).length, 0);
   const hasConnectedAccount = connections.some(connection => connection.status === 'connected');
+  const current = diagnostics?.connections.find(c => c.status === 'connected');
+  const subscriptionActive = current?.subscription_check === 'active';
+  const mailboxReady = current?.registered_mailbox && current?.mailbox_enabled;
+  const status = !hasConnectedAccount ? 'Not connected' :
+    !subscriptionActive ? 'Setup needs attention' :
+    !mailboxReady ? 'Mailbox needs attention' : 'Connected — delivery not yet verified';
   return (
-    <section className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 space-y-4">
-      <div className="flex items-center gap-2">
-        <PhoneCall className="w-5 h-5 text-blue-600" aria-hidden="true" />
-        <h4 className="font-semibold text-gray-900">RingCentral — AI Phone Dispatcher</h4>
-      </div>
-      <p className="text-sm text-gray-600">
-        Securely authorize your company's RingCentral account to prepare voicemail
-        transcription and routing into Flow. No passwords or API tokens are entered here.
-      </p>
-      <p className="text-sm text-gray-600">
-        Connecting does not change your phone system, enable voicemail processing,
-        or activate any mailbox. Mailboxes stay disabled until reviewed.
-      </p>
-      <button type="button" disabled={busy} onClick={connect}
-        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-        {busy ? 'Connecting…' : 'Connect RingCentral'}
-      </button>
-      {!loading && !error && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="status">
-          <p className="font-semibold">Voicemail ingestion: {enabledMailboxCount === 0 ? 'Not active' : 'Not yet verified'}</p>
-          <p className="mt-1">
-            {!hasConnectedAccount ? 'Connect a RingCentral account before configuring voicemail ingestion.' :
-              enabledMailboxCount === 0 ? 'RingCentral is connected, but no registered mailbox is enabled for voicemail ingestion.' :
-              'At least one mailbox is enabled. This does not confirm webhook subscription, delivery, transcription, or Flow routing.'}
-          </p>
-          <p className="mt-1">Use Connection diagnostics below to verify account identity. Enabling mailboxes and RingCentral webhook delivery require separate verification; this screen does not change call routing.</p>
+    <section className="space-y-5 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="flex items-center gap-2 text-lg font-semibold text-gray-900"><PhoneCall className="h-5 w-5 text-blue-600" />RingCentral</h4>
+          <p className="mt-1 text-sm text-gray-600">Connect your phone system and deliver voicemail notifications to Flow.</p>
         </div>
-      )}
-      <div className="space-y-3 border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between gap-2">
-          <h5 className="font-medium text-gray-900">Connected accounts</h5>
-          <button type="button" onClick={() => void loadConnections()} disabled={loading}
-            className="text-sm text-blue-700 hover:underline disabled:opacity-50">Refresh</button>
-        </div>
-        {loading && <p className="text-sm text-gray-500">Checking connections…</p>}
-        {!loading && !error && connections.length === 0 && <p className="text-sm text-gray-500">No connected RingCentral accounts.</p>}
-        {connections.map(connection => (
-          <div key={connection.accountId} className="rounded-lg border border-gray-200 p-3 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-medium text-sm text-gray-900">Account {connection.accountId}</p>
-                <p className="text-xs text-gray-500">Status: {connection.status}</p>
-              </div>
-              <button type="button" disabled={disconnecting !== null}
-                onClick={() => setConfirmAccountId(connection.accountId)}
-                className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
-                {disconnecting === connection.accountId ? 'Disconnecting…' : 'Disconnect'}
-              </button>
-            </div>
-            {confirmAccountId === connection.accountId && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-3">
-                <p className="text-sm text-red-900">
-                  Disconnect account {connection.accountId}? Its mailboxes will be disabled,
-                  and MJV's saved authorization will be removed. Existing voicemail history is retained.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => void disconnect(connection.accountId)}
-                    disabled={disconnecting !== null}
-                    className="rounded-lg bg-red-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
-                    Confirm disconnect
-                  </button>
-                  <button type="button" onClick={() => setConfirmAccountId(null)}
-                    disabled={disconnecting !== null}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="text-xs text-gray-600">
-              {connection.mailboxes.length === 0 ? 'No registered mailboxes' :
-                connection.mailboxes.map(m => (
-                  <p key={m.extensionId}>RingCentral extension ID {m.extensionId}: {m.enabled ? 'Enabled' : 'Disabled'}</p>
-                ))}
-            </div>
-          </div>
-        ))}
+        <button type="button" onClick={() => { void loadConnections(); void checkConnection(); }} disabled={loading || diagnosticsBusy}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:opacity-50">
+          <RefreshCw className="h-4 w-4" /> Refresh status
+        </button>
       </div>
-      <div className="space-y-3 border-t border-gray-200 pt-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h5 className="font-medium text-gray-900">Connection diagnostics</h5>
-            <p className="text-xs text-gray-500">Verify OAuth renewal and the connected mailbox without changing phone routing.</p>
-          </div>
-          <button type="button" disabled={subscriptionBusy || loading || connections.length !== 1}
-            className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
-            onClick={() => setConfirmSubscription(true)}>
-            {subscriptionBusy ? 'Configuring…' : 'Create / renew voicemail subscription'}
-          </button>
-          <button type="button" disabled={diagnosticsBusy}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium disabled:opacity-50"
-            onClick={() => void checkConnection()}>
-            {diagnosticsBusy ? 'Checking…' : 'Check RingCentral connection'}
-          </button>
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4" aria-live="polite">
+        <div className="flex items-center gap-2 font-medium text-gray-900">
+          {subscriptionActive && mailboxReady ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <AlertCircle className="h-5 w-5 text-amber-600" />}
+          {loading || diagnosticsBusy ? 'Checking RingCentral…' : status}
         </div>
-        {confirmSubscription && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
-            <p className="text-sm text-blue-950">Create or renew the RingCentral voicemail notification subscription for the connected mailbox? This does not enable voicemail processing or change call routing.</p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" disabled={subscriptionBusy} onClick={() => void manageSubscription()}
-                className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Confirm subscription</button>
-              <button type="button" disabled={subscriptionBusy} onClick={() => setConfirmSubscription(false)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium">Cancel</button>
-            </div>
-          </div>
-        )}
-        {subscriptionResult && <p role="status" className="text-sm text-gray-700">{subscriptionResult}</p>}
-        {diagnosticsError && <p role="alert" className="text-sm text-red-700">{diagnosticsError}</p>}
-        {diagnostics && (
-          <div className="rounded-lg border border-gray-200 p-3 space-y-1 text-sm" aria-live="polite">
-            {diagnostics.connections.length === 0 && <p>No RingCentral account connected.</p>}
-            {diagnostics.connections.map((connection, i) => (
-              <p key={i}>
-                Connection: {connection.status}
-                {connection.extension_number && ` · Extension ${connection.extension_number}`}
-                {connection.extension_name && ` · ${connection.extension_name}`}
-                {connection.subscription_check && ` · Voicemail subscription: ${connection.subscription_check}`}
-                {connection.subscription_expiration && ` · Expires: ${new Date(connection.subscription_expiration).toLocaleString()}`}
-                {connection.registered_mailbox !== undefined && ` · Registered: ${connection.registered_mailbox ? 'yes' : 'no'}`}
-                {connection.mailbox_enabled !== undefined && ` · Enabled: ${connection.mailbox_enabled ? 'yes' : 'no'}`}
-              </p>
-            ))}
-            {diagnostics.mailboxes.map(mailbox => (
-              <p key={mailbox.extension_id}>Mailbox {mailbox.display_name || mailbox.extension_id}: {mailbox.enabled ? 'enabled' : 'disabled'}</p>
-            ))}
-          </div>
-        )}
+        <p className="mt-1 text-xs text-gray-600">An active subscription and enabled mailbox do not guarantee voicemail transcription or Flow delivery until a test succeeds.</p>
+        {diagnosticsError && <p role="alert" className="mt-2 text-sm text-red-700">{diagnosticsError}</p>}
       </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h5 className="font-semibold text-gray-900">1. Connection</h5>
+          <p className="mt-1 text-sm text-gray-600">{current ? `${current.extension_name || 'Connected account'}${current.extension_number ? ' · Ext. ' + current.extension_number : ''}` : hasConnectedAccount ? 'Connected' : 'Not connected'}</p>
+          <p className="mt-1 text-xs text-gray-500">Authorization only; phone routing is unchanged.</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h5 className="font-semibold text-gray-900">2. Voicemail subscription</h5>
+          <p className="mt-1 text-sm font-medium">{current?.subscription_check || 'Not checked'}</p>
+          {current?.subscription_expiration && <p className="mt-1 text-xs text-gray-600">Expires {new Date(current.subscription_expiration).toLocaleString()}</p>}
+          <p className="mt-1 text-xs text-gray-500">Renewal is manual until automatic renewal is configured.</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h5 className="font-semibold text-gray-900">3. Mailboxes</h5>
+          <p className="mt-1 text-sm">{diagnostics?.mailboxes.length ? `${diagnostics.mailboxes.filter(m => m.enabled).length} of ${diagnostics.mailboxes.length} enabled` : 'No mailbox status yet'}</p>
+          <p className="mt-1 text-xs text-gray-500">Enabling a mailbox allows MJV to receive its notifications.</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {!hasConnectedAccount && <button type="button" disabled={busy} onClick={() => void connect()}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          <ExternalLink className="h-4 w-4" />{busy ? 'Connecting…' : 'Connect RingCentral'}
+        </button>}
+        <button type="button" disabled={subscriptionBusy || loading || connections.length !== 1} onClick={() => setConfirmSubscription(true)}
+          className="rounded-lg border border-blue-300 px-4 py-2 text-sm font-medium text-blue-800 disabled:opacity-50">
+          {subscriptionBusy ? 'Working…' : subscriptionActive ? 'Renew subscription' : 'Create voicemail subscription'}
+        </button>
+        <button type="button" disabled={diagnosticsBusy} onClick={() => void checkConnection()}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50">
+          {diagnosticsBusy ? 'Checking…' : 'Check connection'}
+        </button>
+      </div>
+      {confirmSubscription && <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <p className="text-sm text-blue-950">Create or renew RingCentral voicemail notifications? This will not change call routing or mailbox enablement.</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={subscriptionBusy} onClick={() => void manageSubscription()} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white">Confirm</button>
+          <button type="button" disabled={subscriptionBusy} onClick={() => setConfirmSubscription(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm">Cancel</button>
+        </div>
+      </div>}
+      {subscriptionResult && <p role="status" className="text-sm text-gray-700">{subscriptionResult}</p>}
       <PhoneVoicemailPermissions />
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <p className="text-xs text-gray-500">
-        Requires a configured RingCentral OAuth application and an MJV administrator account.
-      </p>
+      <div className="border-t border-gray-200 pt-4">
+        <button type="button" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced}
+          className="text-sm font-medium text-gray-600 hover:text-gray-900">{showAdvanced ? 'Hide advanced settings' : 'Advanced settings & account management'}</button>
+        {showAdvanced && <div className="mt-4 space-y-3">
+          <p className="text-xs text-gray-500">Account IDs are technical identifiers, not extension numbers. Disconnecting disables registered mailboxes and removes saved authorization; voicemail history is retained.</p>
+          {connections.map(connection => <div key={connection.accountId} className="rounded-lg border border-gray-200 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><p className="text-sm font-medium">Account {connection.accountId}</p><p className="text-xs text-gray-500">Status: {connection.status}</p></div>
+              <button type="button" disabled={disconnecting !== null} onClick={() => setConfirmAccountId(connection.accountId)}
+                className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-700">Disconnect</button>
+            </div>
+            {connection.mailboxes.map(m => <p key={m.extensionId} className="mt-1 text-xs text-gray-600">Mailbox ID {m.extensionId}: {m.enabled ? 'Enabled' : 'Disabled'}</p>)}
+            {confirmAccountId === connection.accountId && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-sm text-red-900">Disconnect this RingCentral account and disable its mailboxes?</p>
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={disconnecting !== null} onClick={() => void disconnect(connection.accountId)} className="rounded-lg bg-red-700 px-3 py-2 text-sm text-white">Confirm disconnect</button>
+                <button type="button" onClick={() => setConfirmAccountId(null)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">Cancel</button>
+              </div>
+            </div>}
+          </div>)}
+          {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        </div>}
+      </div>
     </section>
   );
 }
