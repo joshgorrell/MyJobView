@@ -27,12 +27,17 @@ export function reconcileTechsafeDraftLabor({incomingLines,existingDraft,minimum
   }
   const old=previous.get(line.sourceLineId);
   if(old&&old.productKind!=='labor')return held('draft_line_kind_conflict');
-  if(old&&old.dealerLaborOverrideCents!==undefined&&!validCents(old.dealerLaborOverrideCents))
+  if(old&&old.dealerLaborOverrideCents!==undefined&&old.dealerLaborOverrideCents!==null&&!validCents(old.dealerLaborOverrideCents))
    return held('invalid_dealer_labor_override');
   // Preserve the explicit dealer override, including zero, on draft refresh.
   // Without one, imported labor always reflects the latest MJV selling value.
-  const override=old?.dealerLaborOverrideCents;
-  output.push(Object.freeze({...line,...(override===undefined?{}:{dealerLaborOverrideCents:override})}));
+  const override=old?.dealerLaborOverrideCents??undefined;
+  if(!Number.isSafeInteger(line.quantity*line.unitEquipmentValueCents))return held('labor_value_overflow');
+  output.push(Object.freeze({...line,
+   // Source reference is always current, even after a dealer override.
+   mjvSalesOrderLaborCents:line.quantity*line.unitEquipmentValueCents,
+   dealerLaborCoverageCents:override===undefined?line.quantity*line.unitEquipmentValueCents:override,
+   dealerLaborOverrideCents:override===undefined?null:override}));
  }
  return {ok:true,reason:'draft_labor_reconciled_not_authorized',authorized:false,
   lines:Object.freeze(output)};

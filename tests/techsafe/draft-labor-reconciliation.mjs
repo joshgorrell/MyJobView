@@ -9,8 +9,12 @@ const updated=run([{...lines[0],unitEquipmentValueCents:40000},{...lines[1],unit
 assert.equal(updated.ok,true);assert.equal(updated.lines[0].unitEquipmentValueCents,40000);
 assert.equal(updated.lines[1].unitEquipmentValueCents,170000);
 assert.equal(updated.lines[1].dealerLaborOverrideCents,200000);
+assert.equal(updated.lines[1].mjvSalesOrderLaborCents,170000);
+assert.equal(updated.lines[1].dealerLaborCoverageCents,200000);
 assert.equal(run(lines,{lifecycle:'draft',lines:[{...lines[1],dealerLaborOverrideCents:0}]}).lines[1].dealerLaborOverrideCents,0);
-assert.equal(run(lines,{lifecycle:'draft',lines:[lines[1]]}).lines[1].dealerLaborOverrideCents,undefined);
+assert.equal(run(lines,{lifecycle:'draft',lines:[{...lines[1],dealerLaborOverrideCents:0}]}).lines[1].dealerLaborCoverageCents,0);
+assert.equal(run(lines,{lifecycle:'draft',lines:[lines[1]]}).lines[1].dealerLaborOverrideCents,null);
+assert.equal(run(lines,{lifecycle:'draft',lines:[lines[1]]}).lines[1].dealerLaborCoverageCents,150000);
 assert.equal(run(lines,{lifecycle:'purchased',lines:[]}).ok,false);
 assert.equal(run(lines,{lifecycle:'active',lines:[]}).ok,false);
 assert.equal(run([{...lines[0],unitEquipmentValueCents:24999},lines[1]]).ok,false);
