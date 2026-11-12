@@ -53,9 +53,34 @@ Deno.serve(async (request: Request) => {
       });
       if (!response.ok) { results.push({ status: 'identity_lookup_failed', http_status: response.status }); continue; }
       const identity = await response.json();
+      // Read-only provider inspection; never expose callback URLs or event payloads.
+      let subscription_check: 'active' | 'missing' | 'unavailable' = 'unavailable';
+      let subscription_expiration: string | null = null;
+      try {
+        const subscriptionsResponse = await fetch(
+          'https://platform.ringcentral.com/restapi/v1.0/subscription', {
+            headers: { authorization: 'Bearer ' + token, accept: 'application/json' },
+            redirect: 'error',
+          },
+        );
+        if (subscriptionsResponse.ok) {
+          const payload = await subscriptionsResponse.json();
+          const subscriptions = Array.isArray(payload.records) ? payload.records : [];
+          const relevant = subscriptions.filter((subscription: Record<string, unknown>) => {
+            const filters = Array.isArray(subscription.eventFilters) ? subscription.eventFilters : [];
+            return subscription.status === 'Active' &&
+              filters.some((filter: unknown) => typeof filter === 'string' &&
+                filter.includes('/message-store/instant?type=VoiceMail'));
+          });
+          subscription_check = relevant.length ? 'active' : 'missing';
+          subscription_expiration = relevant.length && typeof relevant[0].expirationTime === 'string'
+            ? relevant[0].expirationTime : null;
+        }
+      } catch { /* Provider inspection unavailable: never claim no subscription. */ }
       const extensionId = String(identity.id ?? '');
       results.push({
-        status: 'connected', extension_number: identity.extensionNumber ?? null,
+        status: 'connected', subscription_check, subscription_expiration,
+        extension_number: identity.extensionNumber ?? null,
         extension_name: identity.name ?? null,
         registered_mailbox: (mailboxes ?? []).some(m =>
           m.ringcentral_account_id === connection.ringcentral_account_id && m.ringcentral_extension_id === extensionId),
