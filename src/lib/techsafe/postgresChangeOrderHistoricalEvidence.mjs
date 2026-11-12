@@ -16,7 +16,7 @@ export function createChangeOrderHistoricalEvidenceReader(client){
      FROM public.change_orders co
      LEFT JOIN public.change_order_history h ON h.change_order_id=co.id
      WHERE co.sales_order_id=$1
-     ORDER BY co.id,h.created_at,h.id FOR SHARE OF co,h`,
+     ORDER BY co.id,h.created_at,h.id FOR SHARE OF co`,
    [orderId]);}
   catch{return hold('historical_evidence_read_failed');}
   if(!Array.isArray(response?.rows)||response.rows.length>10000)
