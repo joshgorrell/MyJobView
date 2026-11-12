@@ -25,6 +25,7 @@ function reader({rows=sourceRows,approved=true,isolation='serializable'}={}){
     order_contact_id:contactId,approved_at:'2026-11-12T00:00:00Z',status:'approved'}]:[]};
   if(sql.includes('FROM public.sales_orders'))return {rows:[{id:orderId,organization_id:organizationId,proposal_id:proposalId}]};
   if(sql.includes('FROM public.proposal_line_items'))return {rows};
+  if(sql.includes('FROM public.change_order_line_items'))return {rows:[]};
   throw Error('unexpected query: '+sql);
  }};
  return {read:createCurrentSalesOrderSourceReader(client),queries};
