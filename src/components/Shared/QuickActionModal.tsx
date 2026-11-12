@@ -41,6 +41,7 @@ export function QuickActionModal({
   const titleId = useId();
   const subtitleId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
   // Match the originating header instead of imposing a single success color.
   const accent = successAccent || ({ cyan: '#22d3ee', teal: '#2dd4bf', emerald: '#34d399', green: '#4ade80', violet: '#a78bfa', purple: '#c084fc', amber: '#fbbf24', orange: '#fb923c', rose: '#fb7185', red: '#f87171' }[accentColor.match(/from-([a-z]+)-/)?.[1] || ''] || '#60a5fa');
   const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null);
@@ -58,17 +59,34 @@ export function QuickActionModal({
     };
   }, []);
 
+  // On iOS the keyboard shrinks visualViewport without resizing the layout viewport.
+  // Scroll the actual mobile sheet container, not the body (which is intentionally locked).
   useEffect(() => {
     if (!mobilePageScroll || window.innerWidth >= 1024) return;
-    const field = document.activeElement;
-    if (!(field instanceof HTMLElement) || !dialogRef.current?.contains(field) || !field.matches('input, textarea, select')) return;
-    const frame = requestAnimationFrame(() => {
-      const bounds = field.getBoundingClientRect();
-      const top = viewport?.top || 0;
-      const bottom = top + (viewport?.height || window.innerHeight);
-      if (bounds.top < top || bounds.bottom > bottom) field.scrollIntoView({ block: 'nearest' });
-    });
-    return () => cancelAnimationFrame(frame);
+    const container = mobileScrollRef.current;
+    if (!container) return;
+    let frame = 0;
+    const revealFocusedField = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const field = document.activeElement;
+        if (!(field instanceof HTMLElement) || !container.contains(field) || !field.matches('input, textarea, select')) return;
+        const fieldBounds = field.getBoundingClientRect();
+        const containerBounds = container.getBoundingClientRect();
+        // Leave room beneath customer search for autocomplete matches.
+        const desiredTop = containerBounds.top + 96;
+        const availableBottom = containerBounds.bottom - 24;
+        if (fieldBounds.top > desiredTop || fieldBounds.bottom > availableBottom) {
+          container.scrollTop += fieldBounds.top - desiredTop;
+        }
+      });
+    };
+    container.addEventListener('focusin', revealFocusedField);
+    revealFocusedField();
+    return () => {
+      container.removeEventListener('focusin', revealFocusedField);
+      cancelAnimationFrame(frame);
+    };
   }, [mobilePageScroll, viewport]);
 
   useEffect(() => {
@@ -194,9 +212,10 @@ export function QuickActionModal({
 
       {/* Sheet / Dialog */}
       <div
+        ref={mobileScrollRef}
         className={`
           fixed inset-0 z-[61]
-          ${pageScroll ? 'overflow-y-auto overscroll-contain block p-0 sm:p-4' : mobilePageScroll ? 'qam-scroll overflow-y-auto block p-0 lg:flex lg:items-center lg:justify-center lg:p-4 lg:overflow-hidden' : 'flex items-end sm:flex sm:items-center sm:justify-center sm:p-4'}
+          ${pageScroll ? 'overflow-y-auto overscroll-contain block p-0 sm:p-4' : mobilePageScroll ? 'qam-scroll overflow-y-auto block p-0 scroll-pt-24 lg:flex lg:items-center lg:justify-center lg:p-4 lg:overflow-hidden' : 'flex items-end sm:flex sm:items-center sm:justify-center sm:p-4'}
         `}
         style={viewport ? { top: viewport.top, height: viewport.height, bottom: 'auto' } : undefined}
       >
