@@ -5,6 +5,7 @@ import {createLockedRevisionReader} from './postgresLockedRevisionReader.mjs';
 import {createPostgresBaseEquipmentScanner} from './postgresBaseEquipmentScanner.mjs';
 import {createCommittedChangeProvenanceReader} from './postgresCommittedChangeProvenance.mjs';
 import {createSalesOrderApprovalEvidenceReader} from './postgresSalesOrderApprovalEvidence.mjs';
+import {createSalesOrderChangeHistoryInventory} from './postgresSalesOrderChangeHistoryInventory.mjs';
 const hold=reason=>({ok:false,authorized:false,snapshotReady:false,reason});
 export function createTransactionalBaseEquipmentAudit(client){
  if(!client||typeof client.query!=='function')throw new TypeError('trusted_postgres_client_required');
@@ -12,6 +13,7 @@ export function createTransactionalBaseEquipmentAudit(client){
  const scanBase=createPostgresBaseEquipmentScanner(client);
  const inspectChanges=createCommittedChangeProvenanceReader(client);
  const inspectApproval=createSalesOrderApprovalEvidenceReader(client);
+ const inspectHistory=createSalesOrderChangeHistoryInventory(client);
  return async ({connectionId,orderId}={})=>{
   // Lock connection then ledger, before reading the approved-order base rows.
   // This must run inside the caller's SERIALIZABLE transaction.
@@ -44,6 +46,11 @@ export function createTransactionalBaseEquipmentAudit(client){
     proposalId:first.proposalId,baseLines:base.baseLines});}
   catch{return hold('committed_change_provenance_read_failed');}
   if(changes.ok!==true)return hold(changes.reason||'committed_change_provenance_unverified');
+  let history;
+  try{history=await inspectHistory({orderId,organizationId:first.organizationId,
+    proposalId:first.proposalId,committedChangeProvenance:changes.provenance});}
+  catch{return hold('change_history_inventory_read_failed');}
+  if(history.ok!==true)return hold(history.reason||'change_history_inventory_unverified');
   let last;
   try{last=await readRevision({connectionId,orderId});}
   catch{return hold('locked_revision_changed');}
@@ -64,7 +71,10 @@ export function createTransactionalBaseEquipmentAudit(client){
    baseLineSource:'current_proposal_line_items',baseLines:base.baseLines,
    baseLineCount:base.baseLineCount,committedChangeProvenance:changes.provenance,
    committedChangeProvenanceInspected:true,approvalMetadataInspected:true,
-   originalLineMembershipVerified:false,approvalVerified:false,
+   originalLineMembershipVerified:false,changeHistoryInventoryInspected:true,
+   changeOrderCount:history.changeOrderCount,changeLineCount:history.changeLineCount,
+   unreferencedChangeLines:history.unreferencedChangeLines,
+   historyCompletenessCertified:false,approvalVerified:false,
    sourceManifestComplete:false});
  };
 }

@@ -15,6 +15,7 @@ function fixture({changeRevision=false,quantity='2.00',product=productId,missing
    contact_id:ids[0],order_id:orderId,organization_id:organizationId,
    proposal_id:proposalId,order_contact_id:ids[0]
   }]:[]};
+  if(sql.includes('FROM public.change_orders co'))return {rows:[]};
   if(sql.includes('public.sales_orders'))return {rows:[{id:orderId,organization_id:organizationId,proposal_id:proposalId}]};
   if(sql.includes('public.proposal_line_items'))return {rows:[{id:lineId,organization_id:organizationId,proposal_id:proposalId,product_id:productId,quantity:2}]};
   throw Error('unexpected SQL');}};
