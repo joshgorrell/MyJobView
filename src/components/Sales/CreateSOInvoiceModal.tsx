@@ -597,7 +597,12 @@ export function CreateSOInvoiceModal({
         p_co_links: coLinks.map(({ invoice_id: _invoiceId, ...item }) => item),
         p_account_credit: accountCreditPayload,
       });
-      if (createError || !invoiceId) throw createError || new Error('Invoice creation failed');
+      if (createError || !invoiceId) {
+        if (createError?.code === 'PGRST202' || createError?.code === '42883') {
+          throw new Error('Sales Order invoice creation is unavailable: the database migration has not been deployed. Contact your administrator.');
+        }
+        throw createError || new Error('Invoice creation failed');
+      }
       const invoiceData = { id: invoiceId };
 
       if (sendToCustomer && hasCustomerEmail) {
@@ -622,7 +627,7 @@ export function CreateSOInvoiceModal({
       onSuccess(invoiceData.id);
     } catch (error) {
       console.error('Error creating invoice:', error);
-      notify('Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
+      notify(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
