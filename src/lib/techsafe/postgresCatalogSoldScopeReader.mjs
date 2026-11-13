@@ -35,7 +35,9 @@ export function createTechsafeCatalogSoldScopeReader(client){
      CASE WHEN COALESCE(pli.item_type,'part')='labor' THEN 0
        WHEN pli.quantity>0 THEN pli.line_total / pli.quantity
        ELSE NULL END AS "unitPrice",
-     CASE WHEN COALESCE(pli.item_type,'part')='labor'\n       THEN COALESCE(pli.labor_total,pli.line_total,0)\n       ELSE COALESCE(pli.labor_total,0) END AS "soldLabor",
+     CASE WHEN COALESCE(pli.item_type,'part')='labor'
+       THEN COALESCE(pli.labor_total,pli.line_total,0)
+       ELSE COALESCE(pli.labor_total,0) END AS "soldLabor",
      pli.committed_change_order_line_id AS "committedChangeLineId",
      COALESCE(pli.is_customer_supplied,false) AS "customerSupplied",
      (COALESCE(pli.item_type,'part')='labor') AS "laborOnly",
