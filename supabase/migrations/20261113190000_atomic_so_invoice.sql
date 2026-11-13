@@ -16,6 +16,7 @@ DECLARE
   v_billed numeric;
   v_new numeric;
   v_status text;
+  v_expected_links integer;
 BEGIN
   IF jsonb_typeof(p_invoice) IS DISTINCT FROM 'object'
     OR jsonb_typeof(p_line_items) IS DISTINCT FROM 'array'
@@ -61,20 +62,26 @@ BEGIN
          (item->>'amount')::numeric, item->>'description_snapshot'
   FROM jsonb_array_elements(p_schedule_allocations) item;
 
+  -- Duplicate CO ids must not be billed twice in one request.
+  SELECT count(*) INTO v_expected_links FROM jsonb_array_elements(p_co_links);
+  IF v_expected_links <> (SELECT count(DISTINCT item->>'change_order_id') FROM jsonb_array_elements(p_co_links) item) THEN
+    RAISE EXCEPTION 'Duplicate Change Order billing links';
+  END IF;
   -- Lock COs in deterministic order. Recalculate from authoritative stored
   -- amounts, never client-provided previous balances.
   FOR v_co IN
     SELECT co.id, co.change_amount, co.tax_amount, co.amount_billed,
            (item->>'amount_billed')::numeric AS delta,
-           item->>'company_id' AS company_id
+           so.company_id AS company_id
     FROM jsonb_array_elements(p_co_links) item
     JOIN public.change_orders co ON co.id = (item->>'change_order_id')::uuid
+    JOIN public.sales_orders so ON so.id = co.sales_order_id
     WHERE co.sales_order_id = v_so AND co.status = 'approved'
       AND co.is_billable IS DISTINCT FROM false
     ORDER BY co.id
     FOR UPDATE OF co
   LOOP
-    IF v_co.delta IS NULL OR v_co.delta = 0 THEN
+    IF v_co.delta IS NULL OR v_co.delta = 0 OR (v_co.change_amount < 0 AND v_co.delta > 0) OR (v_co.change_amount >= 0 AND v_co.delta < 0) THEN
       RAISE EXCEPTION 'Invalid Change Order billing amount';
     END IF;
     v_total := CASE WHEN v_co.change_amount < 0
@@ -96,7 +103,7 @@ BEGIN
     SET amount_billed = v_new, billing_status = v_status
     WHERE id = v_co.id;
   END LOOP;
-  IF (SELECT count(*) FROM jsonb_array_elements(p_co_links)) <>
+  IF v_expected_links <>
      (SELECT count(*) FROM jsonb_array_elements(p_co_links) item
       JOIN public.change_orders co ON co.id = (item->>'change_order_id')::uuid
       WHERE co.sales_order_id = v_so AND co.status = 'approved'
