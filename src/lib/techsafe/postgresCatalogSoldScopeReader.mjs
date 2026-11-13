@@ -26,6 +26,16 @@ export function createTechsafeCatalogSoldScopeReader(client){
         AND pli.organization_id=co.organization_id AND pli.committed_change_order_line_id=li.id)))`,
     [orderId,c.organization_id,c.proposal_id]);
    if(Number(pending.rows?.[0]?.count)!==0)return held('approved_change_scope_unreconciled');
+   // Approved removals can supersede original proposal rows. Until the
+   // committed removal ledger is reconciled, never certify those rows as sold.
+   const removals=await client.query(`SELECT count(*)::int count
+    FROM public.change_orders co
+    JOIN public.change_order_line_items li ON li.change_order_id=co.id
+     AND li.organization_id=co.organization_id
+    WHERE co.sales_order_id=$1 AND co.organization_id=$2
+     AND co.status='approved' AND li.action_type='remove'`,
+    [orderId,c.organization_id]);
+   if(Number(removals.rows?.[0]?.count)!==0)return held('approved_removal_scope_requires_reconciliation');
    const result=await client.query(`SELECT pli.id AS \"lineId\",pli.product_id AS \"productId\",
      pli.description,pli.quantity,pli.unit_price AS \"unitPrice\",
      COALESCE(pli.labor_total,0) AS \"soldLabor\",
@@ -40,7 +50,15 @@ export function createTechsafeCatalogSoldScopeReader(client){
    // A missing catalog reference is not a Misc item. Never infer or create a product.
    if(result.rows.some(row=>!row.catalog_found))return held('catalog_product_reconciliation_required');
    const items=normalizeSoldEquipmentItems(result.rows.filter(row=>!row.customer_supplied).map(row=>({...row,minimumEligibleUnitPrice})));
-   return {ready:true,reason:null,items,eligibleItems:items.filter(x=>x.eligibleByUnitMinimum),
+   // Labor-only rows and customer-supplied equipment labor must not disappear.
+   const labor=await client.query(`SELECT COALESCE(SUM(CASE
+    WHEN item_type='labor' THEN COALESCE(labor_total,line_total)
+    ELSE COALESCE(labor_total,0) END),0)::numeric AS total
+    FROM public.proposal_line_items
+    WHERE proposal_id=$1 AND organization_id=$2`,[c.proposal_id,c.organization_id]);
+   const soldLaborTotalCents=Math.round(Number(labor.rows?.[0]?.total)*100);
+   if(!Number.isSafeInteger(soldLaborTotalCents)||soldLaborTotalCents<0)return held('invalid_total_sold_labor');
+   return {ready:true,reason:null,items,soldLaborTotalCents,eligibleItems:items.filter(x=>x.eligibleByUnitMinimum),
     equipmentCents:items.reduce((sum,x)=>sum+x.equipmentTotalCents,0),
     equipmentLinkedLaborCents:items.reduce((sum,x)=>sum+x.soldLaborCents,0)};
   }catch{return held('source_query_or_validation_failed');}
