@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
+import { TechsafeOrderSync } from './TechsafeOrderSync';
 import { supabase } from '../../lib/supabase';
 
 type Status = {
@@ -69,7 +70,7 @@ export function TechsafeSettings() {
       <div className="rounded-md border border-amber-200 bg-amber-50 p-4 flex gap-3">
         <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />
         <div className="text-sm text-amber-900"><strong>Automatic synchronization is not verified as ready</strong>
-          <p className="mt-1">A registered active connection, certified source reader and enabled server sync are all required. This page cannot activate transmission.</p>
+          <p className="mt-1">A registered active connection, certified source reader and enabled server sync are all required. Only active connections can be sent below.</p>
         </div>
       </div>
     )}
@@ -90,6 +91,7 @@ export function TechsafeSettings() {
         <p>Live draft sync: <strong>{enabled ? 'Enabled' : 'Disabled'}</strong></p>
       </> : null}
     </div>
-    <p className="text-xs text-gray-500">Read-only organization-scoped diagnostics. A connection record alone does not certify a source reader or enable customer data transfer. No credentials or customer data are shown.</p>
+    <TechsafeOrderSync />
+    <p className="text-xs text-gray-500">Organization-scoped diagnostics. A connection record alone does not certify a source reader or enable customer data transfer. No credentials or customer data are shown.</p>
   </section>;
 }

@@ -1,3 +1,4 @@
+import {withTechsafeBrowserCors} from '../_shared/techsafe-browser-handler.mjs';
 import postgres from 'npm:postgres@3.4.7';
 import {createClient} from 'npm:@supabase/supabase-js@2.94.0';
 import {createNativeTechsafeSendHandler} from '../_shared/techsafe-native-send-handler.mjs';
@@ -47,4 +48,4 @@ const handler=createNativeTechsafeSendHandler({enabled:configured,
    return result.rows.length===1?result.rows[0].organization_id:null;
   }finally{client.release();}
  },sendOrder:sender});
-Deno.serve(handler);
+Deno.serve(withTechsafeBrowserCors(handler));
