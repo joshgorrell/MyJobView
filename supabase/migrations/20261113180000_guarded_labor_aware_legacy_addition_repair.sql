@@ -44,7 +44,20 @@ BEGIN
      OR v_line.new_unit_price IS NULL OR v_line.new_unit_price < 0
      OR COALESCE(v_line.product_description,v_line.product_name) IS NULL
   THEN RAISE EXCEPTION 'Addition has invalid sold values'; END IF;
-  -- A later approved removal of this product must block automatic recovery.\n  -- The final committed scope must be independently reviewed even if none matches.\n  IF EXISTS (SELECT 1 FROM public.change_orders later\n      JOIN public.change_order_line_items removed\n        ON removed.change_order_id=later.id AND removed.organization_id=v_org\n      WHERE later.sales_order_id=v_co.sales_order_id\n        AND later.organization_id=v_org AND later.status='approved'\n        AND later.approval_date>v_co.approval_date\n        AND removed.action_type='remove'\n        AND (removed.proposal_line_item_id=v_line.proposal_line_item_id\n          OR (v_line.product_id IS NOT NULL AND removed.product_id=v_line.product_id)\n          OR (removed.product_name IS NOT NULL AND removed.product_name=v_line.product_name)))\n  THEN RAISE EXCEPTION 'Later approved removal may supersede addition'; END IF;\n  -- Prevent concurrent duplicate repairs; also check existing legacy unlinked
+  -- A later approved removal of this product must block automatic recovery.
+  -- The final committed scope must be independently reviewed even if none matches.
+  IF EXISTS (SELECT 1 FROM public.change_orders later
+      JOIN public.change_order_line_items removed
+        ON removed.change_order_id=later.id AND removed.organization_id=v_org
+      WHERE later.sales_order_id=v_co.sales_order_id
+        AND later.organization_id=v_org AND later.status='approved'
+        AND later.approval_date>v_co.approval_date
+        AND removed.action_type='remove'
+        AND ((v_line.proposal_line_item_id IS NOT NULL AND removed.proposal_line_item_id=v_line.proposal_line_item_id)
+          OR (v_line.product_id IS NOT NULL AND removed.product_id=v_line.product_id)
+          OR (removed.product_name IS NOT NULL AND removed.product_name=v_line.product_name)))
+  THEN RAISE EXCEPTION 'Later approved removal may supersede addition'; END IF;
+  -- Prevent concurrent duplicate repairs; also check existing legacy unlinked
   -- rows matching the exact addition before inserting.
   PERFORM pg_advisory_xact_lock(hashtextextended(v_proposal_id::text,0));
   SELECT id INTO v_existing FROM public.proposal_line_items
@@ -64,16 +77,20 @@ BEGIN
   END IF;
   INSERT INTO public.proposal_line_items(
     proposal_id,product_id,description,quantity,unit_price,line_total,
-    is_taxable,item_type,labor_phase_id,sort_order,organization_id,\n    labor_total,
+    is_taxable,item_type,labor_phase_id,sort_order,organization_id,
+    labor_total,
     committed_change_order_line_id,created_at,updated_at)
   VALUES(v_proposal_id,v_line.product_id,
     COALESCE(v_line.product_description,v_line.product_name),
     v_line.new_quantity,v_line.new_unit_price,
     ROUND(v_line.new_quantity*v_line.new_unit_price,2),
     COALESCE(v_line.is_taxable,true),v_line.item_type,v_line.labor_phase_id,
-    v_line.sort_order,v_org,COALESCE(v_line.new_labor_total,0),\n    v_line.id,now(),now())
+    v_line.sort_order,v_org,COALESCE(v_line.new_labor_total,0),
+    v_line.id,now(),now())
   RETURNING id INTO v_inserted;
-  -- Proposal line_total is equipment only. labor_total is separately stored\n  -- and included once by the proposal totals calculation.\n  PERFORM public.calculate_proposal_totals(v_proposal_id);
+  -- Proposal line_total is equipment only. labor_total is separately stored
+  -- and included once by the proposal totals calculation.
+  PERFORM public.calculate_proposal_totals(v_proposal_id);
   RETURN v_inserted;
 END;
 $$;
