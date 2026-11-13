@@ -7,7 +7,8 @@ import {createDenoTechsafeSecretReader} from '../_shared/techsafe-environment-se
 // Opt-in backend runtime. SQL credentials must be private SQL credentials,
 // never an anon/service-role API key or a request-supplied value.
 const enabled=Deno.env.get('TECHSAFE_NATIVE_SENDER_ENABLED')==='true';
-const databaseUrl=Deno.env.get('TECHSAFE_SOURCE_DATABASE_URL');
+// Supabase's built-in SQL URL stays on the server; no password copy is needed.
+const databaseUrl=Deno.env.get('TECHSAFE_SOURCE_DATABASE_URL')??Deno.env.get('SUPABASE_DB_URL');
 const supabaseUrl=Deno.env.get('SUPABASE_URL');
 const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 let sql: ReturnType<typeof postgres>|null=null;

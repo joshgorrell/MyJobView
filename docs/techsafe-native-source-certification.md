@@ -8,7 +8,8 @@ private receiver credentials. It is disabled by default. It does not activate an
 `techsafe-send-sales-order` Edge Function independently verifies dealer-admin
 identity and organization before invoking the composed sender. It is disabled
 unless `TECHSAFE_NATIVE_SENDER_ENABLED=true` and a private
-`TECHSAFE_SOURCE_DATABASE_URL` is configured; receiver secrets remain separate.
+`TECHSAFE_SOURCE_DATABASE_URL` (or the built-in server-only `SUPABASE_DB_URL`)
+is available; receiver secrets remain separate.
 
 Apply `20261113152226_techsafe_native_approval_basis.sql` before using this path.
 The deferred native proposal-approval trigger records sold facts only when the
