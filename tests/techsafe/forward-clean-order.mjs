@@ -19,7 +19,7 @@ const read=(lines=source,changes=approved,enabled=true)=>createTechsafeCatalogSo
  throw Error('unexpected query');
 }})({connectionId,orderId,minimumEligibleUnitPrice:250});
 const ok=await read();assert.equal(ok.ready,true);assert.equal(ok.eligibleItems.length,2);
-assert.deepEqual(ok.eligibleItems.map(x=>x.productId).sort(),[id(101),id(103)].sort());
+assert.deepEqual(ok.eligibleItems.map(x=>x.catalogProductId).sort(),[id(101),id(103)].sort());
 assert.equal(ok.equipmentCents,133990);assert.equal(ok.soldLaborTotalCents,40000);
 assert.deepEqual(ok.removedSourceLineIds,[id(4)]);
 assert.equal((await read(source,approved,false)).reason,'connection_not_active');
