@@ -175,7 +175,9 @@ export function CreateSOInvoiceModal({
     isSelected: preSelectedIds.includes(s.id), isNegative: false,
     scheduleRowId: s.id, sourcePhaseId: s.sourcePhaseId,
   }));
-  const allRows: BillingRow[] = [originalContractRow, ...scheduleRows, ...coRows];
+  // Scheduled rows partition the original contract; never show a second full-contract
+  // row alongside them or Select All would invoice the same contract twice.
+  const allRows: BillingRow[] = [...(scheduleRows.length ? [] : [originalContractRow]), ...scheduleRows, ...coRows];
 
   function calcDueDate(fromDate: string, terms: string): string {
     if (!fromDate) return '';
