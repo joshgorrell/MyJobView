@@ -1065,6 +1065,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
           billingScheduleAmount={billingScheduleAmount}
           billingScheduleTitle={billingScheduleTitle}
           billingSchedulePhaseId={billingSchedulePhaseId}
+          billingScheduleRows={billingSchedule.filter(e => !e.isSynthetic).map(e => ({ id: e.id, title: e.title, amount: e.resolvedAmount, sourcePhaseId: e.sourcePhaseId }))}
           onClose={() => { setShowCreateModal(false); setPreSelectedIds([]); setBillingScheduleAmount(undefined); setBillingScheduleTitle(undefined); setBillingSchedulePhaseId(undefined); }}
           onSuccess={handleInvoiceCreated}
         />
