@@ -26,6 +26,7 @@ interface BillingScheduleEntry {
   invoiceId?: string;
   isSynthetic?: boolean;
   sourcePhaseId?: string;
+  invoicedAmount?: number;
 }
 
 interface Invoice {
@@ -212,8 +213,13 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
         return;
       }
 
-      // Use proposal total (tax-inclusive) as the baseline for percentage phases,
-      // matching how DepositConfiguration sets them up.
+      // Use allocation history rather than invoice-title guesses for current rows.
+      const { data: balances, error: balancesError } = await supabase
+        .from('sales_order_billing_row_balances')
+        .select('billing_row_id, invoiced_amount, scheduled_remaining')
+        .eq('sales_order_id', order.id);
+      if (balancesError) throw balancesError;
+      const billedByRow = new Map((balances || []).map(b => [b.billing_row_id, Number(b.invoiced_amount || 0)]));
 
       const entries: BillingScheduleEntry[] = phases.map(phase => {
         const resolvedAmount = phase.scheduled_amount;
@@ -224,13 +230,16 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
         // Fallback: title/amount match for invoices created before billing_phase_id existed
         const fallbackInvoice = phaseInvoice ? undefined : activeInvoiceList.find(inv => {
           if (inv.billing_phase_id) return false; // already linked to a different phase
-          const titleMatch = !!(inv.invoice_title && phase.title &&
-            inv.invoice_title.toLowerCase().includes(phase.title.toLowerCase()));
+          const titleMatch = !!(inv.invoice_title && phase.description &&
+            inv.invoice_title.toLowerCase().includes(phase.description.toLowerCase()));
           const amountMatch = Math.abs((inv.total || 0) - resolvedAmount) < 1;
           return titleMatch || amountMatch;
         });
 
         const linkedInvoice = phaseInvoice || fallbackInvoice;
+        const allocated = billedByRow.get(phase.id) || 0;
+        const hasHistoricalMatch = !!linkedInvoice && allocated === 0;
+        const fullyBilled = allocated >= resolvedAmount - 0.005 || hasHistoricalMatch;
 
         return {
           id: phase.id,
@@ -240,7 +249,8 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
           amount: phase.scheduled_amount,
           sourcePhaseId: phase.source_phase_id || undefined,
           resolvedAmount,
-          status: linkedInvoice ? 'invoiced' : 'unbilled',
+          invoicedAmount: allocated,
+          status: fullyBilled ? 'invoiced' : 'unbilled',
           invoiceId: linkedInvoice?.id,
         };
       });
@@ -248,13 +258,14 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
       setBillingSchedule(entries);
     } catch (err) {
       console.error('Error loading billing schedule:', err);
+      setBillingSchedule([]);
     } finally {
       setScheduleLoading(false);
     }
   }
 
   async function saveScheduleEntry(entry: BillingScheduleEntry, title: string, amount: number) {
-    if (entry.isSynthetic || !title.trim() || !Number.isFinite(amount) || amount < 0) return;
+    if (entry.isSynthetic || !title.trim() || !Number.isFinite(amount) || amount < (entry.invoicedAmount || 0)) return;
     setScheduleSaving(true);
     try {
       const { error } = await supabase.from('sales_order_billing_rows')
@@ -282,6 +293,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   }
 
   async function handleDeleteScheduleEntry(entry: BillingScheduleEntry) {
+    if (entry.isSynthetic || (entry.invoicedAmount || 0) > 0 || entry.status === 'invoiced') return;
     setActionLoading(true);
     try {
       const { error } = await supabase
@@ -748,6 +760,9 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                               </span>
                             )}
                           </div>
+                          {(entry.invoicedAmount || 0) > 0 && (
+                            <p className="text-xs text-amber-400 mt-1">${fmt(entry.invoicedAmount || 0)} invoiced · ${fmt(Math.max(0, entry.resolvedAmount - (entry.invoicedAmount || 0)))} remaining</p>
+                          )}
                           {entry.notes && (
                             <p className="text-xs text-gray-500 mt-0.5 truncate">{entry.notes}</p>
                           )}
@@ -770,7 +785,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                                 <DollarSign className="w-3 h-3" />
                                 Bill
                               </button>
-                              {!entry.isSynthetic && (
+                              {!entry.isSynthetic && !(entry.invoicedAmount || 0) && (
                                 <button
                                   onClick={() => setDeleteScheduleConfirm(entry)}
                                   className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors touch-manipulation"
