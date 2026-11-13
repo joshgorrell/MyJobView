@@ -1,7 +1,7 @@
 import { PhoneVoicemailPermissions } from './PhoneVoicemailPermissions';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { PhoneCall, ExternalLink, Loader2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { PhoneCall, ExternalLink, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 
 type Connection = {
   accountId: string;
@@ -145,8 +145,6 @@ export function RingCentralSettings() {
       setBusy(false);
     }
   }
-  const enabledMailboxCount = connections.reduce((count, connection) =>
-    count + connection.mailboxes.filter(mailbox => mailbox.enabled).length, 0);
   const hasConnectedAccount = connections.some(connection => connection.status === 'connected');
   const current = diagnostics?.connections.find(c => c.status === 'connected');
   const subscriptionActive = current?.subscription_check === 'active';
