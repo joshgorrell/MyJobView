@@ -73,7 +73,7 @@ async function allocateBillingAmount(
 
 interface BillingRow {
   id: string;
-  type: 'contract' | 'change_order';
+  type: 'contract' | 'schedule' | 'change_order';
   label: string;
   remainingAmount: number;
   selectedAmount: number;
@@ -81,6 +81,8 @@ interface BillingRow {
   isSelected: boolean;
   isNegative: boolean;
   coData?: ChangeOrderSummary;
+  scheduleRowId?: string;
+  sourcePhaseId?: string;
 }
 
 interface CreateSOInvoiceModalProps {
@@ -93,6 +95,7 @@ interface CreateSOInvoiceModalProps {
   billingScheduleAmount?: number;
   billingScheduleTitle?: string;
   billingSchedulePhaseId?: string;
+  billingScheduleRows?: { id: string; title: string; amount: number; sourcePhaseId?: string }[];
   onClose: () => void;
   onSuccess: (invoiceId: string) => void;
 }
@@ -110,6 +113,7 @@ export function CreateSOInvoiceModal({
   billingScheduleAmount,
   billingScheduleTitle,
   billingSchedulePhaseId,
+  billingScheduleRows = [],
   onClose,
   onSuccess,
 }: CreateSOInvoiceModalProps) {
@@ -165,7 +169,15 @@ export function CreateSOInvoiceModal({
       };
     });
 
-  const allRows: BillingRow[] = [originalContractRow, ...coRows];
+  const scheduleRows: BillingRow[] = billingScheduleRows.map(s => ({
+    id: s.id, type: 'schedule' as const, label: s.title,
+    remainingAmount: s.amount, selectedAmount: s.amount, inputValue: s.amount.toFixed(2),
+    isSelected: preSelectedIds.includes(s.id), isNegative: false,
+    scheduleRowId: s.id, sourcePhaseId: s.sourcePhaseId,
+  }));
+  // Scheduled rows partition the original contract; never show a second full-contract
+  // row alongside them or Select All would invoice the same contract twice.
+  const allRows: BillingRow[] = [...(scheduleRows.length ? [] : [originalContractRow]), ...scheduleRows, ...coRows];
 
   function calcDueDate(fromDate: string, terms: string): string {
     if (!fromDate) return '';
@@ -195,6 +207,28 @@ export function CreateSOInvoiceModal({
   const initialTerms = normalizePaymentTerms(order.contact?.default_payment_terms) || normalizePaymentTerms(order.payment_terms) || '';
 
   const [rows, setRows] = useState<BillingRow[]>(allRows);
+  const [allocationsLoaded, setAllocationsLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function loadAllocatedScheduleBalances() {
+      if (!billingScheduleRows.length) { setAllocationsLoaded(true); return; }
+      const { data, error } = await supabase.from('sales_order_billing_row_balances')
+        .select('billing_row_id, scheduled_remaining')
+        .eq('sales_order_id', order.id);
+      if (!active) return;
+      if (error) { console.error('Unable to load billing row balances:', error); return; }
+      const remaining = new Map((data || []).map(r => [r.billing_row_id, Number(r.scheduled_remaining)]));
+      setRows(prev => prev.map(r => {
+        if (r.type !== 'schedule') return r;
+        const amount = Math.max(0, remaining.get(r.id) ?? r.remainingAmount);
+        return { ...r, remainingAmount: amount, selectedAmount: amount, inputValue: amount.toFixed(2) };
+      }));
+      setAllocationsLoaded(true);
+    }
+    loadAllocatedScheduleBalances();
+    return () => { active = false; };
+  }, [order.id]);
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [invoiceTitle, setInvoiceTitle] = useState(billingScheduleTitle || '');
   const [invoiceDate, setInvoiceDate] = useState(today);
@@ -392,7 +426,7 @@ export function CreateSOInvoiceModal({
   }
 
   async function handleCreateClick() {
-    if (selectedRows.length === 0) return;
+    if (selectedRows.length === 0 || !allocationsLoaded) return;
     if (isOverBilling) return;
     if (creditMemoType === 'account_credit' && !creditMemoAccountConfirmed) return;
 
@@ -416,7 +450,7 @@ export function CreateSOInvoiceModal({
   }
 
   async function handleSubmit() {
-    if (selectedRows.length === 0) return;
+    if (selectedRows.length === 0 || !allocationsLoaded) return;
     if (isOverBilling) return;
     setSubmitting(true);
 
@@ -465,13 +499,13 @@ export function CreateSOInvoiceModal({
           amount_due: finalTotals.total,
           notes: notes || null,
           invoice_title: invoiceTitle || autoTitle,
-          source_type: billingSchedulePhaseId ? 'billing_phase' : selectedCORows.length > 0 ? 'change_order' : 'progress',
+          source_type: billingSchedulePhaseId || selectedRows.some(r => r.type === 'schedule') ? 'billing_phase' : selectedCORows.length > 0 ? 'change_order' : 'progress',
           includes_change_orders: selectedCORows.length > 0,
           tax_environment: taxEnv,
           tax_project_type: taxProjType,
           payment_terms: paymentTerms || null,
           invoice_type: invoiceType,
-          billing_phase_id: billingSchedulePhaseId || null,
+          billing_phase_id: billingSchedulePhaseId || (selectedRows.length === 1 ? selectedRows[0].sourcePhaseId : null) || null,
           created_by: user.id,
           created_by_name: profile?.full_name || null,
         })
@@ -482,6 +516,7 @@ export function CreateSOInvoiceModal({
 
       const lineItems: any[] = [];
       const coLinks: any[] = [];
+      const scheduleLinks: any[] = [];
       let sortOrder = 0;
 
       const { partsTaxable, laborTaxable } = getTaxApplicability(taxEnv, taxProjType);
@@ -493,7 +528,7 @@ export function CreateSOInvoiceModal({
         const { subtotal } = backCalcTotals(absAmount);
 
         let allocations: ClassificationAllocation[] = [];
-        if (row.type === 'contract' && order.proposal?.id) {
+        if ((row.type === 'contract' || row.type === 'schedule') && order.proposal?.id) {
           allocations = await allocateBillingAmount('proposal', order.proposal.id, subtotal);
         } else if (row.type === 'change_order') {
           allocations = await allocateBillingAmount('change_order', row.id, subtotal);
@@ -528,6 +563,11 @@ export function CreateSOInvoiceModal({
           });
         }
 
+        if (row.type === 'schedule' && row.scheduleRowId && row.selectedAmount > 0) {
+          scheduleLinks.push({ billing_row_id: row.scheduleRowId, invoice_id: invoiceData.id,
+            amount: row.selectedAmount, description_snapshot: row.label });
+        }
+
         if (row.type === 'change_order' && row.coData) {
           const isNeg = row.isNegative;
           const fullCOTotal = isNeg
@@ -549,6 +589,11 @@ export function CreateSOInvoiceModal({
       if (lineItems.length > 0) {
         const { error: itemsError } = await supabase.from('invoice_line_items').insert(lineItems);
         if (itemsError) throw itemsError;
+      }
+
+      if (scheduleLinks.length > 0) {
+        const { error: allocationError } = await supabase.from('sales_order_billing_row_allocations').insert(scheduleLinks);
+        if (allocationError) throw allocationError;
       }
 
       if (coLinks.length > 0) {
@@ -639,7 +684,8 @@ export function CreateSOInvoiceModal({
     && !hasRowOverMax
     && !needsAccountCreditAck
     && !submitting
-    && !checkingFirstInvoice;
+    && !checkingFirstInvoice
+    && allocationsLoaded;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4 overflow-y-auto">

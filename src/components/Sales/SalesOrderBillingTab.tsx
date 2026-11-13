@@ -431,7 +431,10 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
 
   function openBillAll() {
     const ids: string[] = [];
-    if (originalRemaining > 0) ids.push('contract');
+    if (originalRemaining > 0) {
+      const scheduleIds = billingSchedule.filter(e => !e.isSynthetic && e.status === 'unbilled').map(e => e.id);
+      ids.push(...(scheduleIds.length ? scheduleIds : ['contract']));
+    }
     unbilledCOs.forEach(co => ids.push(co.id));
     setPreSelectedIds(ids);
     setShowCreateModal(true);
@@ -451,8 +454,8 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   }
 
   function openBillScheduleEntry(entry: BillingScheduleEntry) {
-    setPreSelectedIds(['contract']);
-    setBillingScheduleAmount(entry.resolvedAmount);
+    setPreSelectedIds([entry.isSynthetic ? 'contract' : entry.id]);
+    setBillingScheduleAmount(entry.isSynthetic ? entry.resolvedAmount : undefined);
     setBillingScheduleTitle(entry.title);
     setBillingSchedulePhaseId(entry.sourcePhaseId);
     setShowCreateModal(true);
@@ -1065,6 +1068,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
           billingScheduleAmount={billingScheduleAmount}
           billingScheduleTitle={billingScheduleTitle}
           billingSchedulePhaseId={billingSchedulePhaseId}
+          billingScheduleRows={billingSchedule.filter(e => !e.isSynthetic).map(e => ({ id: e.id, title: e.title, amount: e.resolvedAmount, sourcePhaseId: e.sourcePhaseId }))}
           onClose={() => { setShowCreateModal(false); setPreSelectedIds([]); setBillingScheduleAmount(undefined); setBillingScheduleTitle(undefined); setBillingSchedulePhaseId(undefined); }}
           onSuccess={handleInvoiceCreated}
         />
