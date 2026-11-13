@@ -6,7 +6,10 @@ PostgreSQL approval verification, certificate/export persistence, the existing
 Sales Order sender, immediate delivery reauthorization, and generation-bound
 private receiver credentials. It is disabled by default. It does not activate an existing connection. The authenticated
 `techsafe-send-sales-order` Edge Function independently verifies dealer-admin
-identity and organization before invoking the composed sender. It is disabled
+identity and organization before invoking the composed sender. Trusted backend
+invocation may use the existing project service key, compared server-side in
+constant time; a decoded JWT role claim is never accepted as authority. Both
+paths retain the same native source certificate and active-binding gates. It is disabled
 unless `TECHSAFE_NATIVE_SENDER_ENABLED=true` and a private
 `TECHSAFE_SOURCE_DATABASE_URL` (or the built-in server-only `SUPABASE_DB_URL`)
 is available; receiver secrets remain separate.

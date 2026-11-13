@@ -2,6 +2,7 @@ import postgres from 'npm:postgres@3.4.7';
 import {createClient} from 'npm:@supabase/supabase-js@2.94.0';
 import {createNativeTechsafeSendHandler} from '../_shared/techsafe-native-send-handler.mjs';
 import {createNativeTechsafeOrderSender} from '../_shared/techsafe-native-order-sender.mjs';
+import {createTechsafeServiceAuthenticator} from '../_shared/techsafe-service-auth.mjs';
 import {createDenoTechsafeSecretReader} from '../_shared/techsafe-environment-secret-reader.mjs';
 
 // Opt-in backend runtime. SQL credentials must be private SQL credentials,
@@ -30,6 +31,7 @@ const pool={connect:async()=>{
 const sender=configured?createNativeTechsafeOrderSender({pool,sourceInstanceId:new URL(supabaseUrl!).hostname.split('.')[0],
  environment:'production',readSecret:createDenoTechsafeSecretReader(),enabled:true}):undefined;
 const handler=createNativeTechsafeSendHandler({enabled:configured,
+ authenticateService:createTechsafeServiceAuthenticator(serviceKey),
  authenticateAdmin:async(authorization:string|null)=>{
   if(!admin||!authorization?.startsWith('Bearer '))return null;
   const {data,error}=await admin.auth.getUser(authorization.slice(7));
