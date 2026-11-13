@@ -32,7 +32,7 @@ export function TechsafeOrderSync() {
      try {reason=(await error.context.json()).reason;} catch { /* Show safe fallback. */ }
     }
     setFailed(true);
-    setMessage(typeof reason==='string' && /^[a-z_]{1,96}$/.test(reason) ? `Import not confirmed: ${reason.replaceAll('_',' ')}.` : 'Import not confirmed. The connection may be held or the server may be unavailable.');
+    setMessage(typeof reason==='string' && /^[a-z_]{1,96}$/.test(reason) ? `Import not confirmed: ${reason.replace(/_/g,' ')}.` : 'Import not confirmed. The connection may be held or the server may be unavailable.');
    } else setMessage('Techsafe confirmed receipt of this Sales Order. No coverage was purchased.');
   } catch {setFailed(true);setMessage('Import not confirmed. Check the connection before retrying.');}
   finally {setSending(false);}
