@@ -481,9 +481,7 @@ export function CreateSOInvoiceModal({
       // Recompute final totals at submit time (taxEnv/taxProjType may have been edited in confirmation modal)
       const finalTotals = computeInvoiceTotals();
 
-      const { data: invoiceData, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
+      const invoicePayload = {
           company_id: profile?.organization_id || order.organization_id,
           organization_id: order.organization_id,
           contact_id: order.contact?.id || order.contact_id,
@@ -508,11 +506,7 @@ export function CreateSOInvoiceModal({
           billing_phase_id: billingSchedulePhaseId || (selectedRows.length === 1 ? selectedRows[0].sourcePhaseId : null) || null,
           created_by: user.id,
           created_by_name: profile?.full_name || null,
-        })
-        .select()
-        .single();
-
-      if (invoiceError) throw invoiceError;
+      };
 
       const lineItems: any[] = [];
       const coLinks: any[] = [];
@@ -550,7 +544,7 @@ export function CreateSOInvoiceModal({
           const lineTax = isTaxable ? Math.abs(allocAmount) * taxRate * (allocAmount < 0 ? -1 : 1) : 0;
 
           lineItems.push({
-            invoice_id: invoiceData.id,
+            invoice_id: undefined,
             description: `${row.label} — ${CLASSIFICATION_LABELS[code] || code}`,
             quantity: 1,
             unit_price: allocAmount,
@@ -564,7 +558,7 @@ export function CreateSOInvoiceModal({
         }
 
         if (row.type === 'schedule' && row.scheduleRowId && row.selectedAmount > 0) {
-          scheduleLinks.push({ billing_row_id: row.scheduleRowId, invoice_id: invoiceData.id,
+          scheduleLinks.push({ billing_row_id: row.scheduleRowId, invoice_id: undefined,
             amount: row.selectedAmount, description_snapshot: row.label });
         }
 
@@ -576,7 +570,7 @@ export function CreateSOInvoiceModal({
           const totalBilledAfter = (row.coData.amount_billed || 0) + row.selectedAmount;
           coLinks.push({
             company_id: profile?.organization_id || order.organization_id,
-            invoice_id: invoiceData.id,
+            invoice_id: undefined,
             change_order_id: row.id,
             amount_billed: row.selectedAmount,
             fully_billed: isNeg
@@ -586,65 +580,25 @@ export function CreateSOInvoiceModal({
         }
       }
 
-      if (lineItems.length > 0) {
-        const { error: itemsError } = await supabase.from('invoice_line_items').insert(lineItems);
-        if (itemsError) throw itemsError;
-      }
-
-      if (scheduleLinks.length > 0) {
-        const { error: allocationError } = await supabase.from('sales_order_billing_row_allocations').insert(scheduleLinks);
-        if (allocationError) throw allocationError;
-      }
-
-      if (coLinks.length > 0) {
-        const { error: linksError } = await supabase.from('invoice_change_order_links').insert(coLinks);
-        if (linksError) throw linksError;
-
-        for (const link of coLinks) {
-          const co = changeOrders.find(c => c.id === link.change_order_id);
-          const isNeg = (co?.change_amount || 0) < 0;
-          const coTotal = co
-            ? isNeg
-              ? (co.change_amount || 0) - Math.abs(co.tax_amount || 0)
-              : Math.abs(co.change_amount || 0) + (co.tax_amount || 0)
-            : link.amount_billed;
-          const previousBilled = co?.amount_billed || 0;
-          const newAmountBilled = previousBilled + link.amount_billed;
-
-          let newStatus: string;
-          if (isNeg) {
-            newStatus = newAmountBilled <= coTotal + 0.01 ? 'fully_billed' : 'partially_billed';
-            if (newAmountBilled >= 0) newStatus = 'unbilled';
-          } else {
-            if (newAmountBilled <= 0) {
-              newStatus = 'unbilled';
-            } else if (coTotal > 0 && newAmountBilled >= coTotal - 0.01) {
-              newStatus = 'fully_billed';
-            } else {
-              newStatus = 'partially_billed';
-            }
-          }
-
-          await supabase
-            .from('change_orders')
-            .update({ amount_billed: newAmountBilled, billing_status: newStatus })
-            .eq('id', link.change_order_id);
-        }
-      }
-
-      if (isCreditMemoInvoice && creditMemoType === 'account_credit') {
-        await supabase.from('customer_account_credits').insert({
-          organization_id: order.organization_id,
-          contact_id: order.contact?.id || order.contact_id,
-          sales_order_id: order.id,
-          source_invoice_id: invoiceData.id,
-          amount: Math.abs(invoiceTotal),
-          amount_applied: 0,
-          status: 'open',
-          notes: `Credit memo issued from SO #${order.order_number} — insufficient future billing to absorb on this sales order.`,
-          created_by: user.id,
-        });
-      }
+      // Single database transaction: invoice, line items, row allocations,
+      // CO links/balances and optional account credit commit or roll back together.
+      const accountCreditPayload = isCreditMemoInvoice && creditMemoType === 'account_credit' ? {
+        organization_id: order.organization_id,
+        contact_id: order.contact?.id || order.contact_id,
+        sales_order_id: order.id,
+        amount: Math.abs(invoiceTotal), amount_applied: 0, status: 'open',
+        notes: `Credit memo issued from SO #${order.order_number} — insufficient future billing to absorb on this sales order.`,
+        created_by: user.id,
+      } : null;
+      const { data: invoiceId, error: createError } = await supabase.rpc('create_sales_order_invoice_atomic', {
+        p_invoice: invoicePayload,
+        p_line_items: lineItems.map(({ invoice_id: _invoiceId, ...item }) => item),
+        p_schedule_allocations: scheduleLinks.map(({ invoice_id: _invoiceId, ...item }) => item),
+        p_co_links: coLinks.map(({ invoice_id: _invoiceId, ...item }) => item),
+        p_account_credit: accountCreditPayload,
+      });
+      if (createError || !invoiceId) throw createError || new Error('Invoice creation failed');
+      const invoiceData = { id: invoiceId };
 
       if (sendToCustomer && hasCustomerEmail) {
         setSendStatus('sending');
