@@ -5,7 +5,7 @@ const row={binding:{connection_id:c,sales_order_id:o,organization_id:org,proposa
 let seen;
 const inspect=createLiveSalesOrderPreflight({query:async(sql,params)=>{seen={sql,params};return {rows:[row]};}});
 assert.deepEqual((await inspect({connectionId:c,orderId:o})).reason,'source_certificate_and_revision_required');
-assert.deepEqual(seen.params,[c,o]);assert.match(seen.sql,/public\\.proposal_line_items/);assert.match(seen.sql,/public\\.sales_orders/);
+assert.deepEqual(seen.params,[c,o]);assert.match(seen.sql,/public\.proposal_line_items/);assert.match(seen.sql,/public\.sales_orders/);
 for(const [change,reason] of [[{binding:{...row.binding,proposal_status:'draft'}},'source_incomplete'],[{lines:[{...row.lines[0],product_organization_id:o}]},'cross_tenant_product'],[{changes:[{status:'approved',is_active:true,approval_date:'2026-01-02'}],change_count:1},'change_order_application_unverified'],[{lines:[{...row.lines[0],unit_price:null}]},'line_price_or_quantity_unresolved'],[{binding:{...row.binding,approved_at:null}},'approval_evidence_unavailable']]){
  const check=createLiveSalesOrderPreflight({query:async()=>({rows:[{...row,...change}]})});
  assert.equal((await check({connectionId:c,orderId:o})).reason,reason);

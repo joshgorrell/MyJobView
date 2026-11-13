@@ -17,13 +17,15 @@ export function projectCurrentSalesOrderForTechsafe(source,{minimumUnitValueCent
   if(!item||!id(item.sourceLineId)||!id(item.productRef)||
      !Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>10000||
      !integer(item.unitSalePriceCents)||!integer(item.lineSaleTotalCents)||
-     seen.has(item.sourceLineId))
+     seen.has(item.sourceLineId)||
+     (item.description!==undefined&&(typeof item.description!=='string'||item.description.length>4000)))
    return held('source_product_mapping_invalid');
   seen.add(item.sourceLineId);
   // Unit SELLING price, never line extension or catalog price.
   // Preserve below-minimum rows in the receiver snapshot: Techsafe applies
   // the dealer's threshold without losing context on source refresh.
   lines.push(Object.freeze({sourceLineId:item.sourceLineId,productRef:item.productRef,
+   ...(item.description!==undefined?{description:item.description}:{}),
    productKind:'equipment',scope:'included',customerSupplied:false,
    techsafeExcluded:false,quantity:item.quantity,
    unitEquipmentValueCents:item.unitSalePriceCents}));

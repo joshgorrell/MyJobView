@@ -65,3 +65,30 @@ const supplied=await reader({rows:[{...sourceRows[0],is_customer_supplied:true}]
 assert.equal(supplied.equipment.length,0);
 assert.equal(supplied.soldLaborCents,0);
 console.log('PASS: current Sales Order preview reads sold unit prices and all labor without change-order history or transport authorization');
+
+// Ad-hoc approved additions can be material without a catalog product ID.
+const manualRow={...sourceRows[0],product_id:null,description:'85-inch QLED TV',unit_price:'1999.95'};
+const manual=await reader({rows:[manualRow,sourceRows[1]]}).read(scope);
+assert.equal(manual.ok,true);
+assert.equal(manual.issues.length,0);
+assert.equal(manual.equipment.length,1);
+assert.equal(manual.equipment[0].productRef,`line_${line1}`);
+assert.equal(manual.equipment[0].description,'85-inch QLED TV');
+assert.equal(manual.soldLaborCents,53750);
+const {prepareCurrentSalesOrderTechsafeSnapshot}=await import('../../supabase/functions/_shared/techsafe-current-order-snapshot.mjs');
+const mapped=prepareCurrentSalesOrderTechsafeSnapshot({source:manual,
+ connection:{connectionId:line3,...scope,generation:1},revision:1,eventId:line2,
+ sourceInstanceId:'mjv',customerName:'Test Customer',siteRef:'site',minimumUnitValueCents:25000});
+assert.equal(mapped.ready,true);
+assert.equal(mapped.snapshot.lines[0].description,'85-inch QLED TV');
+assert.equal(mapped.snapshot.lines[0].productRef,`line_${line1}`);
+assert.equal(mapped.snapshot.lines[0].unitEquipmentValueCents,199995);
+for(const description of [null,'',' '.repeat(2),'x'.repeat(4001)]){
+ const invalid=await reader({rows:[{...manualRow,description}]}).read(scope);
+ assert.ok(invalid.issues.some(x=>x.reason==='manual_equipment_description_unresolved'));
+}
+const unknownType=await reader({rows:[{...manualRow,item_type:'both'}]}).read(scope);
+assert.ok(unknownType.issues.some(x=>x.reason==='product_type_or_split_unverified'));
+const manualRemoved=await reader({rows:[{...manualRow,is_hidden:true}],removed:[line1]}).read(scope);
+assert.equal(manualRemoved.equipment.length,0);
+assert.equal(manualRemoved.soldLaborCents,0);

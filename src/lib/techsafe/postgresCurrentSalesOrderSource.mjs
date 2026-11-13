@@ -39,7 +39,14 @@ export function createCurrentSalesOrderSourceReader(client){
     soldLaborCents+=row.laborSaleTotalCents;
     if(!Number.isSafeInteger(soldLaborCents))return hold('sold_labor_overflow');
    }
-   if(row.productId===null)continue; // Standalone labor, never a product.
+   // Missing catalog linkage does not make a sold material row labor.
+   // Only an explicitly classified standalone labor row can be omitted.
+   if(row.productId===null&&row.itemType==='labor')continue;
+   if(row.productId===null&&(typeof row.description!=='string'||
+      !row.description.trim()||row.description.length>4000)){
+    issues.push({lineId:row.id,reason:'manual_equipment_description_unresolved'});
+    continue;
+   }
    if(!cents(row.unitSalePriceCents)||!cents(row.lineSaleTotalCents)){
     issues.push({lineId:row.id,reason:'product_sold_price_unresolved'});
     continue;
@@ -55,7 +62,8 @@ export function createCurrentSalesOrderSourceReader(client){
     issues.push({lineId:row.id,reason:'product_quantity_invalid'});
     continue;
    }
-   items.push(Object.freeze({sourceLineId:row.id,productRef:row.productId,
+   items.push(Object.freeze({sourceLineId:row.id,productRef:row.productId??`line_${row.id}`,
+    ...(row.description!==null?{description:row.description}:{}),
     quantity:row.quantity,unitSalePriceCents:row.unitSalePriceCents,
     lineSaleTotalCents:row.lineSaleTotalCents,
     laborSaleTotalCents:row.laborSaleTotalCents}));

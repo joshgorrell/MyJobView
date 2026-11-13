@@ -16,7 +16,7 @@ export async function fingerprintCurrentSalesOrder({binding,lines,changes}={},di
   if(!plain(l)||!id(l.id)||seen.has(l.id)||!id(l.product_id)&&l.product_id!==null||
    l.product_id&&l.product_organization_id!==binding.organization_id||
    !Number.isSafeInteger(Number(l.quantity))||Number(l.quantity)<0||Number(l.quantity)>10000||
-   !/^(0|[1-9]\\d{0,13})(?:\\.\\d{1,2})?$/.test(money(l.unit_price)??''))
+   !/^(0|[1-9]\d{0,13})(?:\.\d{1,2})?$/.test(money(l.unit_price)??''))
    return hold('invalid_current_line');
   seen.add(l.id);
   // Preserve hidden/removed rows as tombstones. The receiver can distinguish

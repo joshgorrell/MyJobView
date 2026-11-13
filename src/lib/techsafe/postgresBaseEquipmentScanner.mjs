@@ -34,7 +34,7 @@ export function createPostgresBaseEquipmentScanner(client){
   // The approved Sales Order references proposal_line_items through proposal_id.
   // Read all CURRENT lines; no product filtering that could conceal data.
   const lines=await client.query(
-   `SELECT id,organization_id,proposal_id,product_id,quantity,item_type,unit_price,line_total,labor_total,committed_change_order_line_id,is_hidden,is_customer_supplied FROM public.proposal_line_items
+   `SELECT id,organization_id,proposal_id,product_id,description,quantity,item_type,unit_price,line_total,labor_total,committed_change_order_line_id,is_hidden,is_customer_supplied FROM public.proposal_line_items
      WHERE organization_id=$1 AND proposal_id=$2 ORDER BY id FOR SHARE`,
    [organizationId,proposalId]);
   if(!Array.isArray(lines.rows)||!safeCount(lines.rows.length))
@@ -53,7 +53,7 @@ export function createPostgresBaseEquipmentScanner(client){
    const lineSaleTotalCents=money(line.line_total);
    const laborSaleTotalCents=money(line.labor_total);
    baseLines.push(Object.freeze({id:line.id,organizationId,proposalId,
-    productId:line.product_id,quantity:count,
+    productId:line.product_id,description:line.description??null,quantity:count,
     itemType:line.item_type??null,
     unitSalePriceCents,lineSaleTotalCents,laborSaleTotalCents,
     committedChangeOrderLineId:line.committed_change_order_line_id??null,
