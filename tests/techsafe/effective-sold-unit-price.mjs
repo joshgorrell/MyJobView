@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {createTechsafeCatalogSoldScopeReader} from '../../src/lib/techsafe/postgresCatalogSoldScopeReader.mjs';
+const source=await readFile(new URL('../../src/lib/techsafe/postgresCatalogSoldScopeReader.mjs',import.meta.url),'utf8');
+assert.ok(source.includes('pli.line_total / pli.quantity'));
+const connectionId='02e394ef-9576-4a2a-b352-6506b23529d0',orderId='d8b30c4b-70d0-4180-aca0-907db5a5fa27';
+const line={id:'6e6ed19b-e214-4ad2-ac86-f82775d41a8d',productId:'715017c5-c899-4cc0-8b83-b2c2a634c380',catalogOwned:true,description:'Speakers',quantity:2,unitPrice:149.98,soldLabor:202.5};
+const reader=row=>createTechsafeCatalogSoldScopeReader({query:async sql=>sql.includes('FROM techsafe_source.integration_connections')?{rows:[{organization_id:'org',proposal_id:'proposal',actual_proposal_id:'proposal',enabled:true,status:'active',approval_status:'approved',approved_at:'date'}]}:sql.includes('FROM public.change_orders co')?{rows:[]}:{rows:[row]}});
+const result=await reader(line)({connectionId,orderId,minimumEligibleUnitPrice:250});
+assert.equal(result.ready,true);assert.equal(result.equipmentCents,29996);assert.equal(result.eligibleItems.length,0);
+assert.equal((await reader({...line,unitPrice:100/3})({connectionId,orderId,minimumEligibleUnitPrice:250})).reason,'sold_line_unit_price_requires_reconciliation');
+console.log('PASS sold unit amount and indivisible cents hold');
