@@ -1,0 +1,33 @@
+name: Techsafe source reconciliation
+on:
+  pull_request:
+    paths:
+      - 'src/lib/techsafe/**'
+      - 'tests/techsafe/**'
+      - '.github/workflows/techsafe-source-reconciliation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/techsafe/**'
+      - 'tests/techsafe/**'
+      - '.github/workflows/techsafe-source-reconciliation.yml'
+permissions:
+  contents: read
+jobs:
+  source-reconciliation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Techsafe reconciliation unit and reader tests
+        run: |
+          node tests/techsafe/approved-scope-gate.mjs
+          node tests/techsafe/approved-scope-labor-only.mjs
+          node tests/techsafe/approved-removal-reconciliation.mjs
+          node tests/techsafe/catalog-sold-scope-reader.mjs
+          node tests/techsafe/catalog-removals-and-labor.mjs
+          node tests/techsafe/catalog-tenant-and-threshold.mjs
+          node tests/techsafe/catalog-provenance-audit.mjs
