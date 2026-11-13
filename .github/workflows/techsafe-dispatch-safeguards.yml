@@ -1,13 +1,20 @@
 name: Techsafe dispatch safeguards
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/techsafe-*.mjs'
+      - 'src/lib/techsafe/**'
+      - 'supabase/migrations/*techsafe*.sql'
+      - 'tests/techsafe/**'
+      - '.github/workflows/techsafe-dispatch-safeguards.yml'
   pull_request:
     paths:
       - 'supabase/functions/_shared/techsafe-*.mjs'
       - 'tests/techsafe/**'
       - 'supabase/functions/_shared/change-order-*.mjs'
       - 'src/lib/techsafe/**'
-      - 'supabase/migrations/*techsafe*revision*.sql'
-      - 'supabase/migrations/*techsafe*equipment*.sql'
+      - 'supabase/migrations/*techsafe*.sql'
       - 'package.json'
       - '.github/workflows/techsafe-dispatch-safeguards.yml'
   workflow_dispatch:
@@ -64,3 +71,19 @@ jobs:
         run: |
           PGPASSWORD=test_only_password createdb -h postgres -U techsafe_test techsafe_serializable_test
           TECHSAFE_TEST_DATABASE_URL=postgres://techsafe_test:test_only_password@postgres:5432/techsafe_serializable_test bash tests/techsafe/postgres-serializable-source-race.sh
+
+  native-approval-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated pinned PostgreSQL test engine
+        run: |
+          npm install --prefix "$RUNNER_TEMP/techsafe-native-db" --no-audit --no-fund --ignore-scripts @electric-sql/pglite@0.3.14
+          mkdir -p node_modules/@electric-sql
+          ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
+      - name: Verify native approval capture and real persisted sender authority
+        run: node tests/techsafe/native-approval-basis-postgres.mjs
