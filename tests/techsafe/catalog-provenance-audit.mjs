@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const sql=fs.readFileSync(new URL('../../scripts/techsafe-sales-order-catalog-provenance-audit.sql',import.meta.url),'utf8');
+assert.match(sql,/WHERE so.id=\$1/);
+assert.match(sql,/catalog_company_mismatch/);
+assert.match(sql,/approved_addition_missing_catalog_id/);
+assert.match(sql,/approved_removal_untraced/);
+assert.match(sql,/committed_change_order_line_id/);
+assert.doesNotMatch(sql,/\b(INSERT|UPDATE|DELETE|TRUNCATE|ALTER|DROP)\s+(INTO|TABLE|FROM|public\.)/i);
+console.log('PASS read-only catalog and change-order provenance audit contract');
