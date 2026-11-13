@@ -32,14 +32,28 @@ BEGIN
   IF p_invoice ? 'id' OR p_invoice ? 'qbo_invoice_id' THEN
     RAISE EXCEPTION 'Invoice identity is assigned by the database';
   END IF;
-  INSERT INTO public.invoices
-  SELECT (jsonb_populate_record(NULL::public.invoices, p_invoice)).*
+  INSERT INTO public.invoices (
+    company_id, organization_id, contact_id, project_id, sales_order_id,
+    invoice_date, due_date, status, subtotal, tax_amount, total,
+    amount_paid, amount_due, notes, invoice_title, source_type,
+    includes_change_orders, tax_environment, tax_project_type, payment_terms,
+    invoice_type, billing_phase_id, created_by, created_by_name
+  ) SELECT company_id, organization_id, contact_id, project_id, sales_order_id,
+    invoice_date, due_date, status, subtotal, tax_amount, total,
+    amount_paid, amount_due, notes, invoice_title, source_type,
+    includes_change_orders, tax_environment, tax_project_type, payment_terms,
+    invoice_type, billing_phase_id, created_by, created_by_name
+  FROM jsonb_populate_record(NULL::public.invoices, p_invoice)
   RETURNING * INTO v_invoice;
   v_id := v_invoice.id;
 
-  INSERT INTO public.invoice_line_items
-  SELECT (jsonb_populate_record(NULL::public.invoice_line_items, item || jsonb_build_object('invoice_id',v_id))).*
-  FROM jsonb_array_elements(p_line_items) item;
+  INSERT INTO public.invoice_line_items (
+    invoice_id, description, quantity, unit_price, amount, item_type,
+    is_taxable, tax_amount, tax_classification_id, sort_order
+  )
+  SELECT v_id, description, quantity, unit_price, amount, item_type,
+    is_taxable, tax_amount, tax_classification_id, sort_order
+  FROM jsonb_populate_recordset(NULL::public.invoice_line_items, p_line_items);
 
   INSERT INTO public.sales_order_billing_row_allocations
     (billing_row_id, invoice_id, amount, description_snapshot)
@@ -92,8 +106,11 @@ BEGIN
 
   IF p_account_credit IS NOT NULL THEN
     INSERT INTO public.customer_account_credits
-    SELECT (jsonb_populate_record(NULL::public.customer_account_credits,
-      p_account_credit || jsonb_build_object('source_invoice_id',v_id))).*;
+      (organization_id, contact_id, sales_order_id, source_invoice_id,
+       amount, amount_applied, status, notes, created_by)
+    SELECT organization_id, contact_id, sales_order_id, v_id,
+       amount, amount_applied, status, notes, created_by
+    FROM jsonb_populate_record(NULL::public.customer_account_credits, p_account_credit);
   END IF;
   RETURN v_id;
 END;
