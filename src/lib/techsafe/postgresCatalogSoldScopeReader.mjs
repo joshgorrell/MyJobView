@@ -4,8 +4,9 @@ const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}
 const held=reason=>({ready:false,reason,items:[]});
 export function createTechsafeCatalogSoldScopeReader(client){
  if(!client||typeof client.query!=='function')throw TypeError('trusted_postgres_client_required');
- return async({connectionId,orderId,minimumEligibleUnitPrice=0}={})=>{
+ return async({connectionId,orderId,minimumEligibleUnitPrice}={})=>{
   if(!uuid(connectionId)||!uuid(orderId))return held('invalid_binding');
+  if(!Number.isFinite(Number(minimumEligibleUnitPrice))||Number(minimumEligibleUnitPrice)<=0)return held('dealer_eligibility_minimum_required');
   try{
    const bound=await client.query(`SELECT c.organization_id,c.proposal_id,c.enabled,c.status,
     so.proposal_id actual_proposal_id,p.status approval_status,p.approved_at,p.approval_completed_at
@@ -42,7 +43,7 @@ export function createTechsafeCatalogSoldScopeReader(client){
    const removedIds=new Set();
    let removedLaborCents=0;
    for(const row of removals.rows){
-    if(!uuid(row.line_id)||removedIds.has(row.line_id)||row.remove_scope!=='parts_and_labor'
+    if(!uuid(row.line_id)||removedIds.has(row.line_id)||row.current_quantity===null||row.remove_scope!=='parts_and_labor'
       ||Number(row.new_quantity)!==0||Number(row.original_quantity)!==Number(row.current_quantity)
       ||!Number.isFinite(Number(row.current_labor))||Number(row.current_labor)<0)
       return held('approved_removal_scope_requires_reconciliation');
@@ -53,15 +54,18 @@ export function createTechsafeCatalogSoldScopeReader(client){
      pli.description,pli.quantity,pli.unit_price AS \"unitPrice\",
      COALESCE(pli.labor_total,0) AS \"soldLabor\",
      COALESCE(pli.is_customer_supplied,false) AS customer_supplied,
-     pr.id IS NOT NULL AS catalog_found,
+     (pr.id IS NOT NULL AND pr.company_id=pr_source.company_id) AS catalog_found,
      (lower(pr.name)='miscellaneous item') AS \"isMisc\"
      FROM public.proposal_line_items pli
+     JOIN public.proposals pr_source ON pr_source.id=pli.proposal_id AND pr_source.organization_id=pli.organization_id
      LEFT JOIN public.products pr ON pr.id=pli.product_id
      WHERE pli.proposal_id=$1 AND pli.organization_id=$2
        AND COALESCE(pli.item_type,'part')<>'labor'
      ORDER BY pli.id`,[c.proposal_id,c.organization_id]);
    // A missing catalog reference is not a Misc item. Never infer or create a product.
    if(result.rows.some(row=>!row.catalog_found))return held('catalog_product_reconciliation_required');
+   // A removed source line must exist in this exact proposal, not just in CO history.
+   if([...removedIds].some(id=>!result.rows.some(row=>row.lineId===id)))return held('approved_removal_source_line_missing');
    const items=normalizeSoldEquipmentItems(result.rows.filter(row=>!row.customer_supplied&&!removedIds.has(row.lineId)).map(row=>({...row,minimumEligibleUnitPrice})));
    // Labor-only rows and customer-supplied equipment labor must not disappear.
    const labor=await client.query(`SELECT COALESCE(SUM(CASE
