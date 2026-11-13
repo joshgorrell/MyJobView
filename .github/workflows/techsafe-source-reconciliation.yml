@@ -30,6 +30,7 @@ jobs:
           node tests/techsafe/catalog-sold-scope-reader.mjs
           node tests/techsafe/catalog-removals-and-labor.mjs
           node tests/techsafe/catalog-tenant-and-threshold.mjs
+          node tests/techsafe/forward-clean-order.mjs
           node tests/techsafe/reader-sql-literals.mjs
           node tests/techsafe/effective-sold-unit-price.mjs
           node tests/techsafe/catalog-provenance-audit.mjs
