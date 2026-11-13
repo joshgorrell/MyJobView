@@ -25,6 +25,7 @@ interface BillingScheduleEntry {
   status: 'unbilled' | 'invoiced';
   invoiceId?: string;
   isSynthetic?: boolean;
+  sourcePhaseId?: string;
 }
 
 interface Invoice {
@@ -80,6 +81,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
   const menuRef = useRef<HTMLDivElement>(null);
   const [billingSchedule, setBillingSchedule] = useState<BillingScheduleEntry[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
   const [deleteScheduleConfirm, setDeleteScheduleConfirm] = useState<BillingScheduleEntry | null>(null);
   const [showTaxReport, setShowTaxReport] = useState(false);
 
@@ -155,10 +157,10 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     setScheduleLoading(true);
     try {
       const { data: phases, error } = await supabase
-        .from('proposal_billing_phases')
+        .from('sales_order_billing_rows')
         .select('*')
-        .eq('proposal_id', order.proposal_id)
-        .order('phase_order');
+        .eq('sales_order_id', order.id)
+        .order('row_order');
 
       if (error) throw error;
 
@@ -215,12 +217,10 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
       const phaseBaseline = order.proposal?.total || order.original_contract_total || order.contract_total || 0;
 
       const entries: BillingScheduleEntry[] = phases.map(phase => {
-        const resolvedAmount = phase.amount_type === 'percentage'
-          ? (phaseBaseline * phase.amount) / 100
-          : phase.amount;
+        const resolvedAmount = phase.scheduled_amount;
 
         // Primary match: billing_phase_id FK (set when invoice is created from a phase)
-        const phaseInvoice = activeInvoiceList.find(inv => inv.billing_phase_id === phase.id);
+        const phaseInvoice = activeInvoiceList.find(inv => inv.billing_phase_id === phase.source_phase_id);
 
         // Fallback: title/amount match for invoices created before billing_phase_id existed
         const fallbackInvoice = phaseInvoice ? undefined : activeInvoiceList.find(inv => {
@@ -235,11 +235,11 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
 
         return {
           id: phase.id,
-          phase_order: phase.phase_order,
-          title: phase.title,
-          amount_type: phase.amount_type,
-          amount: phase.amount,
-          notes: phase.notes,
+          phase_order: phase.row_order,
+          title: phase.description,
+          amount_type: 'fixed',
+          amount: phase.scheduled_amount,
+          sourcePhaseId: phase.source_phase_id || undefined,
           resolvedAmount,
           status: linkedInvoice ? 'invoiced' : 'unbilled',
           invoiceId: linkedInvoice?.id,
@@ -254,11 +254,39 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     }
   }
 
+  async function saveScheduleEntry(entry: BillingScheduleEntry, title: string, amount: number) {
+    if (entry.isSynthetic || !title.trim() || !Number.isFinite(amount) || amount < 0) return;
+    setScheduleSaving(true);
+    try {
+      const { error } = await supabase.from('sales_order_billing_rows')
+        .update({ description: title.trim(), scheduled_amount: Math.round(amount * 100) / 100 })
+        .eq('id', entry.id).eq('sales_order_id', order.id);
+      if (error) throw error;
+      await loadInvoices();
+    } catch (err) {
+      console.error('Unable to update Sales Order billing row:', err);
+    } finally { setScheduleSaving(false); }
+  }
+
+  async function addScheduleEntry() {
+    setScheduleSaving(true);
+    try {
+      const nextOrder = Math.max(0, ...billingSchedule.filter(e => !e.isSynthetic).map(e => e.phase_order)) + 1;
+      const { error } = await supabase.from('sales_order_billing_rows').insert({
+        sales_order_id: order.id, row_order: nextOrder, description: 'New Payment',
+        scheduled_amount: 0, source_type: 'manual',
+      });
+      if (error) throw error;
+      await loadInvoices();
+    } catch (err) { console.error('Unable to add Sales Order billing row:', err); }
+    finally { setScheduleSaving(false); }
+  }
+
   async function handleDeleteScheduleEntry(entry: BillingScheduleEntry) {
     setActionLoading(true);
     try {
       const { error } = await supabase
-        .from('proposal_billing_phases')
+        .from('sales_order_billing_rows')
         .delete()
         .eq('id', entry.id);
       if (error) throw error;
@@ -426,7 +454,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
     setPreSelectedIds(['contract']);
     setBillingScheduleAmount(entry.resolvedAmount);
     setBillingScheduleTitle(entry.title);
-    setBillingSchedulePhaseId(entry.isSynthetic ? undefined : entry.id);
+    setBillingSchedulePhaseId(entry.sourcePhaseId);
     setShowCreateModal(true);
   }
 
@@ -667,12 +695,13 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
       </div>
 
       {/* ─── Billing Schedule ─── */}
-      {billingSchedule.length > 0 && (
+      {(billingSchedule.length > 0 || !scheduleLoading) && (
         <div className="bg-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-700/50">
             <div className="flex items-center gap-2">
               <CalendarDays className="w-4 h-4 text-blue-400" />
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Billing Schedule</h3>
+              <button type="button" disabled={scheduleSaving} onClick={addScheduleEntry} className="ml-auto px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs disabled:opacity-50">+ Add payment</button>
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
                 {billingSchedule.filter(e => e.status === 'unbilled').length} remaining
               </span>
@@ -701,9 +730,11 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`text-sm font-semibold ${isInvoiced ? 'text-gray-400' : 'text-white'}`}>
-                              {entry.title || `Schedule Entry ${idx + 1}`}
-                            </span>
+                            {isInvoiced || entry.isSynthetic ? (
+                              <span className="text-sm font-semibold text-gray-400">{entry.title || `Schedule Entry ${idx + 1}`}</span>
+                            ) : (
+                              <input aria-label="Payment description" disabled={scheduleSaving} defaultValue={entry.title} key={`${entry.id}-title`} onBlur={e => { if (e.target.value.trim() !== entry.title) saveScheduleEntry(entry, e.target.value, entry.resolvedAmount); }} className="w-full min-w-0 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white" />
+                            )}
                             {isInvoiced ? (
                               <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-500/15 text-green-400 border border-green-500/25 flex items-center gap-1">
                                 <CheckCircle className="w-3 h-3" />
@@ -720,7 +751,7 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
                           )}
                         </div>
                         <div className="shrink-0 w-28 text-right">
-                          <span className="text-base font-bold text-white">${fmt(entry.resolvedAmount)}</span>
+                          {isInvoiced || entry.isSynthetic ? <span className="text-base font-bold text-white">${fmt(entry.resolvedAmount)}</span> : <input aria-label="Scheduled amount" type="number" min="0" step="0.01" disabled={scheduleSaving} key={`${entry.id}-amount`} defaultValue={entry.resolvedAmount} onBlur={e => { const n = Number(e.target.value); if (Number.isFinite(n) && n >= 0 && n !== entry.resolvedAmount) saveScheduleEntry(entry, entry.title, n); }} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white text-right" />}
                           {entry.amount_type === 'percentage' && (
                             <span className="text-xs text-gray-500 block">{entry.amount}%</span>
                           )}
