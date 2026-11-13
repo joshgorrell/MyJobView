@@ -7,6 +7,7 @@ import {createTechsafeSalesOrderSender} from './techsafe-sales-order-sender.mjs'
 import {createPrivateTechsafeCredentialReader} from './techsafe-private-receiver-credentials.mjs';
 const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(x);
 const held=reason=>({accepted:false,reason});
+/** @param {{pool: {connect: () => Promise<{query: (sql: string, parameters?: any[]) => Promise<{rows: any[]}>, release: () => void}>}, readSecret: (scope: {connectionId: string, organizationId: string, generation: number}) => Promise<unknown>, sourceInstanceId: string, environment?: string, minimumUnitValueCents?: number, enabled?: boolean, fetchImpl?: typeof fetch}} options */
 export function createNativeTechsafeOrderSender({pool,readSecret,sourceInstanceId,
  environment='sandbox',minimumUnitValueCents=0,enabled=false,fetchImpl}={}){
  const credentials=createPrivateTechsafeCredentialReader({readSecret});

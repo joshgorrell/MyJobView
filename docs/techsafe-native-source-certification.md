@@ -4,8 +4,11 @@ The new private path is `createNativeTechsafeOrderSender` in
 `supabase/functions/_shared/techsafe-native-order-sender.mjs`. It composes real
 PostgreSQL approval verification, certificate/export persistence, the existing
 Sales Order sender, immediate delivery reauthorization, and generation-bound
-private receiver credentials. It is disabled by default. It does not create a
-public endpoint or activate an existing connection.
+private receiver credentials. It is disabled by default. It does not activate an existing connection. The authenticated
+`techsafe-send-sales-order` Edge Function independently verifies dealer-admin
+identity and organization before invoking the composed sender. It is disabled
+unless `TECHSAFE_NATIVE_SENDER_ENABLED=true` and a private
+`TECHSAFE_SOURCE_DATABASE_URL` is configured; receiver secrets remain separate.
 
 Apply `20261113152226_techsafe_native_approval_basis.sql` before using this path.
 The deferred native proposal-approval trigger records sold facts only when the
@@ -33,7 +36,7 @@ none of his equipment is restored by this change.
 
 - Provision a restricted private SQL connection and generation-matched receiver
   secrets in the runtime. Never store them in Git, chat, logs, or browser data.
-- Host the composed sender behind a trusted internal invocation boundary.
+- Verify authenticated runtime invocation after private configuration.
 - Pair a clean native-approved test Sales Order and perform the first controlled
   receiver import with checkout disabled.
 - Extend source commitment to approved CO updates, then verify actual receiver

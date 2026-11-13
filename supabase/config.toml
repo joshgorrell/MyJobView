@@ -321,3 +321,7 @@ verify_jwt = true
 
 [functions.phone-voicemail-permissions]
 verify_jwt = true
+
+# Dealer-admin-only native approval sender; body independently verifies the user.
+[functions.techsafe-send-sales-order]
+verify_jwt = true
