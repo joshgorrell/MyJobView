@@ -23,3 +23,5 @@ for(const price of ['0','0.00','1','1.2','100.00','129.99',100]){
 for(const price of ['100x00','1e2','-1.00','NaN','Infinity','1.001','01.00',null]){
  assert.equal((await fingerprintCurrentSalesOrder({...base,lines:[{...base.lines[0],unit_price:price}]},hash)).valid,false,`invalid price ${price}`);
 }
+
+assert.notEqual(a.fingerprint,(await fingerprintCurrentSalesOrder({...base,lines:[{...base.lines[0],approved_removed:true}]},hash)).fingerprint);

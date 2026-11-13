@@ -23,7 +23,7 @@ export async function fingerprintCurrentSalesOrder({binding,lines,changes}={},di
   // a removed source line from a line that never existed.
   selected.push({sourceLineId:l.id,productRef:l.product_id,quantity:Number(l.quantity),
    unitPrice:money(l.unit_price),hidden:l.is_hidden===true,customerSupplied:l.is_customer_supplied===true,
-   itemType:l.item_type??null,parentItemId:l.parent_item_id??null,displayMode:l.display_mode??null});
+   approvedRemoved:l.approved_removed??null,itemType:l.item_type??null,parentItemId:l.parent_item_id??null,displayMode:l.display_mode??null});
  }
  const approved=[];
  for(const c of changes){

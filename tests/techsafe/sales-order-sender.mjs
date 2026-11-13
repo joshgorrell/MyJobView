@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createTechsafeSalesOrderSender} from '../../supabase/functions/_shared/techsafe-sales-order-sender.mjs';
 const c='11111111-1111-4111-8111-111111111111',o='22222222-2222-4222-8222-222222222222',org='33333333-3333-4333-8333-333333333333',p='44444444-4444-4444-8444-444444444444',l='55555555-5555-4555-8555-555555555555',e='66666666-6666-4666-8666-666666666666';
-const row={binding:{connection_id:c,organization_id:org,sales_order_id:o,proposal_id:p,connection_generation:1,proposal_status:'approved',approved_at:'2026-11-10',full_name:'Customer'},lines:[{id:l,product_id:l,product_organization_id:org,quantity:1,unit_price:'100.00',item_type:'material',catalog_item_type:'material'}],changes:[],line_count:1,change_count:0};
+const row={binding:{connection_id:c,organization_id:org,sales_order_id:o,proposal_id:p,connection_generation:1,proposal_status:'approved',approved_at:'2026-11-10',full_name:'Customer'},lines:[{id:l,product_id:l,product_organization_id:org,quantity:1,unit_price:'100.00',approved_removed:false,item_type:'material',catalog_item_type:'material'}],changes:[],line_count:1,change_count:0};
 const digest=s=>createHash('sha256').update(s).digest('hex');
 let read=0,sent=0,certifications=0;
 const client={query:async()=>{read++;return {rows:[row]};}};

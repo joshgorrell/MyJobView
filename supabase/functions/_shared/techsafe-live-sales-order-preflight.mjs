@@ -15,6 +15,16 @@ const sql = `WITH binding AS (
 ), lines AS (
  SELECT li.id,li.product_id,li.item_type,li.quantity,li.unit_price,li.is_hidden,
         li.is_customer_supplied,li.parent_item_id,li.display_mode,li.description,
+        EXISTS (SELECT 1 FROM public.change_order_line_items removed
+          JOIN public.change_orders applied ON applied.id=removed.change_order_id
+            AND applied.organization_id=removed.organization_id
+          WHERE removed.proposal_line_item_id=li.id
+            AND removed.organization_id=b.organization_id
+            AND applied.sales_order_id=b.sales_order_id
+            AND applied.status='approved' AND applied.is_locked=true
+            AND applied.is_active=false AND applied.approval_date IS NOT NULL
+            AND (applied.requires_customer_approval IS NOT TRUE OR applied.customer_approved=true)
+            AND removed.action_type='remove') AS approved_removed,
         pr.name AS product_name,pr.manufacturer,pr.model_number,pr.sku,pr.item_type AS catalog_item_type,
         pr.organization_id AS product_organization_id
  FROM public.proposal_line_items li
@@ -58,6 +68,9 @@ export function createLiveSalesOrderPreflight(client){
   if(lines.some(l=>l.quantity===null||!Number.isInteger(Number(l.quantity))||Number(l.quantity)<0||
       Number(l.quantity)>10000||l.unit_price===null||Number(l.unit_price)<0))
    return hold('line_price_or_quantity_unresolved');
+  if(lines.some(l=>typeof l.approved_removed!=='boolean'||
+      (l.approved_removed&&l.is_hidden!==true)))
+   return hold('approved_removal_evidence_unverified');
   // This is only a source observation; never emit verified/snapshotReady or send it.
   return {ready:false,reason:'source_certificate_and_revision_required',source:{binding:b,lines,changes}};
  };
