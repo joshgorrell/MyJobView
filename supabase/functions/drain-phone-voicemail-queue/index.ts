@@ -14,11 +14,15 @@ Deno.serve(async (request: Request) => {
   });
   if (request.method !== 'POST') return json(405, { error: 'method_not_allowed' });
   const schedulerSecret = Deno.env.get('PHONE_DISPATCHER_SCHEDULER_SECRET');
-  if (!schedulerSecret || request.headers.get('authorization') !== 'Bearer ' + schedulerSecret) {
-    return json(401, { error: 'unauthorized' });
-  }
   const url = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  // Existing scheduler-secret callers remain supported; Supabase cron uses the
+  // service-role bearer token, like other scheduled functions in this project.
+  const bearer = request.headers.get('authorization');
+  if (!bearer || !((schedulerSecret && bearer === 'Bearer ' + schedulerSecret) ||
+      (serviceKey && bearer === 'Bearer ' + serviceKey))) {
+    return json(401, { error: 'unauthorized' });
+  }
   const workerSecret = Deno.env.get('PHONE_DISPATCHER_WORKER_SECRET');
   if (!url || !serviceKey || !workerSecret) return json(503, { error: 'not_configured' });
   const db = createClient(url, serviceKey, { auth: { persistSession: false } });
