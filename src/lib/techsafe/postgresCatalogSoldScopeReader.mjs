@@ -31,7 +31,10 @@ export function createTechsafeCatalogSoldScopeReader(client){
     ORDER BY co.created_at,li.sort_order,li.id`,[orderId,c.organization_id]);
    if(changes.rows.some(row=>row.locked!==true||row.active!==false))return held('approved_change_not_committed');
    const result=await client.query(`SELECT pli.id,pli.product_id AS "productId",
-     pli.description,pli.quantity,pli.unit_price AS "unitPrice",
+     pli.description,pli.quantity,
+     CASE WHEN COALESCE(pli.item_type,'part')='labor' THEN 0
+       WHEN pli.quantity>0 THEN pli.line_total / pli.quantity
+       ELSE NULL END AS "unitPrice",
      CASE WHEN COALESCE(pli.item_type,'part')='labor'\n       THEN COALESCE(pli.labor_total,pli.line_total,0)\n       ELSE COALESCE(pli.labor_total,0) END AS "soldLabor",
      pli.committed_change_order_line_id AS "committedChangeLineId",
      COALESCE(pli.is_customer_supplied,false) AS "customerSupplied",
@@ -43,6 +46,12 @@ export function createTechsafeCatalogSoldScopeReader(client){
      LEFT JOIN public.products pr ON pr.id=pli.product_id
      WHERE pli.proposal_id=$1 AND pli.organization_id=$2
      ORDER BY pli.id`,[c.proposal_id,c.organization_id]);
+   // The committed extended amount determines the actual sold unit value.
+   // Reject prices that cannot be divided into whole cents per unit.
+   if(result.rows.some(row=>!row.laborOnly && (!Number.isSafeInteger(Number(row.quantity))
+      || Number(row.quantity)<=0 || !Number.isFinite(Number(row.unitPrice))
+      || Math.abs(Number(row.unitPrice)*100-Math.round(Number(row.unitPrice)*100))>0.00001)))
+     return held('sold_line_unit_price_requires_reconciliation');
    const sourceLines=result.rows;
    const scope=reconcileTechsafeApprovedScope({sourceLines,approvedChanges:changes.rows,
      minimumEligibleUnitPrice});
