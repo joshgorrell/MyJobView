@@ -214,7 +214,6 @@ export function SalesOrderBillingTab({ order, changeOrders, onRefresh }: SalesOr
 
       // Use proposal total (tax-inclusive) as the baseline for percentage phases,
       // matching how DepositConfiguration sets them up.
-      const phaseBaseline = order.proposal?.total || order.original_contract_total || order.contract_total || 0;
 
       const entries: BillingScheduleEntry[] = phases.map(phase => {
         const resolvedAmount = phase.scheduled_amount;

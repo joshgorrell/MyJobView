@@ -217,7 +217,7 @@ export function CreateSOInvoiceModal({
         .select('billing_row_id, scheduled_remaining')
         .eq('sales_order_id', order.id);
       if (!active) return;
-      if (error) { console.error('Unable to load billing row balances:', error); return; }
+      if (error) { console.error('Unable to load billing row balances:', error); notify('Unable to verify remaining billing balances. Invoice creation is disabled.', { theme: 'violet', tone: 'error' }); return; }
       const remaining = new Map((data || []).map(r => [r.billing_row_id, Number(r.scheduled_remaining)]));
       setRows(prev => prev.map(r => {
         if (r.type !== 'schedule') return r;
