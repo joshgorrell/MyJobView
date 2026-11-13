@@ -201,7 +201,6 @@ export function CreateSOInvoiceModal({
   const [dueDate, setDueDate] = useState(() => calcDueDate(today, initialTerms));
   const [paymentTerms, setPaymentTerms] = useState(initialTerms);
   const [notes, setNotes] = useState('');
-  const [overBillingConfirmed, setOverBillingConfirmed] = useState(false);
   const [creditMemoAccountConfirmed, setCreditMemoAccountConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showTaxConfirmation, setShowTaxConfirmation] = useState(false);
@@ -333,7 +332,7 @@ export function CreateSOInvoiceModal({
     : null;
 
   const rowsWithOverMax = rows.filter(r => r.isSelected && !r.isNegative && r.selectedAmount > r.remainingAmount + 0.01);
-  const hasRowOverMax = rowsWithOverMax.length > 0 && !overBillingConfirmed;
+  const hasRowOverMax = rowsWithOverMax.length > 0;
 
   const allAvailableSelected = rows.every(r => r.remainingAmount === 0 || r.isSelected);
   const anyAvailable = rows.some(r => r.remainingAmount !== 0);
@@ -394,7 +393,7 @@ export function CreateSOInvoiceModal({
 
   async function handleCreateClick() {
     if (selectedRows.length === 0) return;
-    if (isOverBilling && !overBillingConfirmed) return;
+    if (isOverBilling) return;
     if (creditMemoType === 'account_credit' && !creditMemoAccountConfirmed) return;
 
     setCheckingFirstInvoice(true);
@@ -418,7 +417,7 @@ export function CreateSOInvoiceModal({
 
   async function handleSubmit() {
     if (selectedRows.length === 0) return;
-    if (isOverBilling && !overBillingConfirmed) return;
+    if (isOverBilling) return;
     setSubmitting(true);
 
     try {
@@ -636,7 +635,7 @@ export function CreateSOInvoiceModal({
 
   const needsAccountCreditAck = isCreditMemoInvoice && creditMemoType === 'account_credit' && !creditMemoAccountConfirmed;
   const canSubmit = selectedRows.length > 0
-    && (!isOverBilling || overBillingConfirmed)
+    && !isOverBilling
     && !hasRowOverMax
     && !needsAccountCreditAck
     && !submitting
@@ -963,19 +962,11 @@ export function CreateSOInvoiceModal({
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-300">Over-billing warning</p>
+                  <p className="text-sm font-medium text-amber-300">Invoice exceeds Sales Order balance</p>
                   <p className="text-xs text-amber-400/80 mt-1">
                     This invoice exceeds the remaining contract balance by ${fmt(Math.abs(remainingAfterInvoice))}.
                   </p>
-                  <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={overBillingConfirmed}
-                      onChange={e => setOverBillingConfirmed(e.target.checked)}
-                      className="w-4 h-4 rounded border-amber-500 text-amber-500 focus:ring-amber-500"
-                    />
-                    <span className="text-xs text-amber-300">I understand this exceeds the contract balance</span>
-                  </label>
+                  <p className="text-xs text-amber-300 mt-2">Reduce the invoice amount before continuing. Billing beyond the approved Sales Order total is not permitted.</p>
                 </div>
               </div>
             </div>
