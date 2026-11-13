@@ -32,7 +32,7 @@ export function createTechsafeCatalogSoldScopeReader(client){
    if(changes.rows.some(row=>row.locked!==true||row.active!==false))return held('approved_change_not_committed');
    const result=await client.query(`SELECT pli.id,pli.product_id AS "productId",
      pli.description,pli.quantity,pli.unit_price AS "unitPrice",
-     COALESCE(pli.labor_total,0) AS "soldLabor",
+     CASE WHEN COALESCE(pli.item_type,'part')='labor'\n       THEN COALESCE(pli.labor_total,pli.line_total,0)\n       ELSE COALESCE(pli.labor_total,0) END AS "soldLabor",
      pli.committed_change_order_line_id AS "committedChangeLineId",
      COALESCE(pli.is_customer_supplied,false) AS "customerSupplied",
      (COALESCE(pli.item_type,'part')='labor') AS "laborOnly",
@@ -43,9 +43,7 @@ export function createTechsafeCatalogSoldScopeReader(client){
      LEFT JOIN public.products pr ON pr.id=pli.product_id
      WHERE pli.proposal_id=$1 AND pli.organization_id=$2
      ORDER BY pli.id`,[c.proposal_id,c.organization_id]);
-   const sourceLines=result.rows.map(row=>({...row,
-     // Labor-only rows store labor in labor_total, or in line_total on older records.
-     soldLabor:row.soldLabor}));
+   const sourceLines=result.rows;
    const scope=reconcileTechsafeApprovedScope({sourceLines,approvedChanges:changes.rows,
      minimumEligibleUnitPrice});
    if(!scope.certifiable)return held(scope.reason);
