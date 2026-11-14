@@ -40,8 +40,8 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   return held('snapshot_contract_unverified');
  if(!['production','sandbox'].includes(snapshot.environment)||!id(snapshot.sourceInstanceId)||
   !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
-  (snapshot.orderStatus==='completed' && (typeof snapshot.completedOn!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.completedOn)||!Number.isFinite(Date.parse(snapshot.completedOn+'T00:00:00Z'))||new Date(snapshot.completedOn+'T00:00:00Z').toISOString().slice(0,10)!==snapshot.completedOn))||
-  (snapshot.orderStatus!=='completed'&&snapshot.completedOn!==undefined)||
+  ((snapshot.orderStatus==='completed'||snapshot.completedOn!==undefined) && (typeof snapshot.completedOn!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.completedOn)||!Number.isFinite(Date.parse(snapshot.completedOn+'T00:00:00Z'))||new Date(snapshot.completedOn+'T00:00:00Z').toISOString().slice(0,10)!==snapshot.completedOn))||
+  (!['open','completed'].includes(snapshot.orderStatus)&&snapshot.completedOn!==undefined)||
   !nonnegative(snapshot.minimumUnitValueCents)||
   (snapshot.soldLaborCents!==undefined&&!nonnegative(snapshot.soldLaborCents))||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
   typeof snapshot.customerName!=='string'||!snapshot.customerName.trim()||snapshot.customerName.length>256||
@@ -68,3 +68,4 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
  result.lines=snapshot.lines.map(l=>{const row={};for(const k of lineKeys)if(Object.hasOwn(l,k))row[k]=l[k];return row;});
  return {ready:true,reason:null,snapshot:result};
 }
+

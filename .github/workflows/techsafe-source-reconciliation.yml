@@ -2,12 +2,16 @@ name: Techsafe source reconciliation
 on:
   pull_request:
     paths:
+      - 'supabase/migrations/*techsafe_sales_order_completion_clock.sql'
+      - 'supabase/functions/_shared/techsafe-*'
       - 'src/lib/techsafe/**'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source-reconciliation.yml'
   push:
     branches: [main]
     paths:
+      - 'supabase/migrations/*techsafe_sales_order_completion_clock.sql'
+      - 'supabase/functions/_shared/techsafe-*'
       - 'src/lib/techsafe/**'
       - 'tests/techsafe/**'
       - '.github/workflows/techsafe-source-reconciliation.yml'
@@ -30,7 +34,24 @@ jobs:
           node tests/techsafe/catalog-sold-scope-reader.mjs
           node tests/techsafe/catalog-removals-and-labor.mjs
           node tests/techsafe/catalog-tenant-and-threshold.mjs
+          node tests/techsafe/sales-order-completion.mjs
+          node tests/techsafe/current-order-snapshot.mjs
+          node tests/techsafe/transport-contract.mjs
+          node tests/techsafe/current-order-fingerprint.mjs
           node tests/techsafe/forward-clean-order.mjs
           node tests/techsafe/reader-sql-literals.mjs
           node tests/techsafe/effective-sold-unit-price.mjs
           node tests/techsafe/catalog-provenance-audit.mjs
+
+
+  completion-clock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node tests/techsafe/sales-order-completion-clock.mjs

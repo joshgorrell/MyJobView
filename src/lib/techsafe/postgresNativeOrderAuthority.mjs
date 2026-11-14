@@ -4,7 +4,7 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {createNativeApprovalBasisVerifier} from './postgresNativeApprovalBasis.mjs';
-import {normalizeTechsafeCompletionDate} from './normalizeCompletionDate.mjs';
+import {inspectSalesOrderCompletion} from './salesOrderCompletion.mjs';
 import {createCurrentSalesOrderSourceReader} from './postgresCurrentSalesOrderSource.mjs';
 import {buildCompleteEquipmentContentEvidence} from './completeEquipmentContentEvidence.mjs';
 import {persistSerializableEquipmentCertificate} from './postgresCertificateWriter.mjs';
@@ -55,10 +55,10 @@ export function createNativeOrderAuthority(pool,{sourceInstanceId,environment='s
   requireFact(source.ok===true&&source.issues.length===0,'native_sold_components_unresolved');
   const status=observed.source.binding.order_status;
   requireFact(!['cancelled','canceled','deleted'].includes(status),'native_order_not_active');
+  const completion=inspectSalesOrderCompletion(observed.source.binding);
+  requireFact(completion.ok,completion.reason);
+  const {completedOn}=completion;
   const completed=['complete','completed'].includes(status);
-  const completion=observed.source.binding.first_completion_date;
-  const completedOn=completed?normalizeTechsafeCompletionDate(completion):undefined;
-  requireFact(!completed||completedOn!==null,'sales_order_completion_date_unverified');
   return {source,basis,observedFingerprint:fingerprint.fingerprint,
    sourceFingerprint:hash(JSON.stringify([basis.basisHash,fingerprint.fingerprint])),
    orderStatus:completed?'completed':'open',completedOn,
@@ -146,3 +146,4 @@ export function createNativeOrderAuthority(pool,{sourceInstanceId,environment='s
   })
  });
 }
+

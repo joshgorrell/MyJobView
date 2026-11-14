@@ -46,4 +46,5 @@ assert.equal(completed.ready,true);
 assert.equal(completed.snapshot.completedOn,'2026-01-15');
 assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,orderStatus:'completed'}).ready,false);
 assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,orderStatus:'completed',completedOn:'2026-02-30'}).ready,false);
-assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,completedOn:'2026-01-15'}).ready,false);
+assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,completedOn:'2026-01-15'}).ready,true);
+
