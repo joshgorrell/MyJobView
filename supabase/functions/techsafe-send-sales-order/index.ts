@@ -54,7 +54,7 @@ const handler=createNativeTechsafeSendHandler({enabled:configured,
 // Read-only diagnostics: authenticated dealer admins only. Never return secrets.
 const diagnosticClient=supabaseUrl&&serviceKey
  ?createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}}):null;
-Deno.serve(withTechsafeBrowserCors(async request=>{
+Deno.serve(withTechsafeBrowserCors(async (request: Request)=>{
  if(request.method==='GET'&&new URL(request.url).pathname.endsWith('/readiness')){
   const authorization=request.headers.get('authorization');
   if(!diagnosticClient||!authorization?.startsWith('Bearer '))
