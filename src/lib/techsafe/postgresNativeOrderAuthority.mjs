@@ -54,15 +54,15 @@ export function createNativeOrderAuthority(pool,{sourceInstanceId,environment='s
   requireFact(source.ok===true&&source.issues.length===0,'native_sold_components_unresolved');
   const status=observed.source.binding.order_status;
   requireFact(!['cancelled','canceled','deleted'].includes(status),'native_order_not_active');
-  return {source,basis,observedFingerprint:fingerprint.fingerprint,
+  const completed=['complete','completed'].includes(status);\n  const completion=observed.source.binding.first_completion_date;\n  requireFact(!completed||typeof completion==='string'&&Number.isFinite(Date.parse(completion)),\n   'sales_order_completion_date_unverified');\n  const completedOn=completed?completion.slice(0,10):undefined;\n  return {source,basis,observedFingerprint:fingerprint.fingerprint,
    sourceFingerprint:hash(JSON.stringify([basis.basisHash,fingerprint.fingerprint])),
-   orderStatus:['complete','completed'].includes(status)?'completed':'open',
+   orderStatus:completed?'completed':'open',completedOn,
    customerName:observed.source.binding.full_name||observed.source.binding.contact_name};
  };
  const snapshotFor=(ctx,binding,generation,revision,eventId)=>{
   const result=prepareCurrentSalesOrderTechsafeSnapshot({source:ctx.source,
    connection:{...binding,generation},revision,eventId,sourceInstanceId,environment,
-   orderStatus:ctx.orderStatus,customerName:ctx.customerName,siteRef:binding.orderId,minimumUnitValueCents});
+   orderStatus:ctx.orderStatus,completedOn:ctx.completedOn,customerName:ctx.customerName,siteRef:binding.orderId,minimumUnitValueCents});
   requireFact(result.ready===true,result.reason||'native_export_snapshot_invalid');return result.snapshot;
  };
  const evidenceFor=(ctx,binding,generation,revision,snapshot)=>{
