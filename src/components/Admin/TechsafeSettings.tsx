@@ -3,6 +3,24 @@ import { AlertTriangle, RefreshCw, ShieldCheck } from 'lucide-react';
 import { TechsafeOrderSync } from './TechsafeOrderSync';
 import { supabase } from '../../lib/supabase';
 
+type SenderReadiness = {
+  senderEnabled: boolean;
+  environment: 'sandbox' | 'production' | 'unconfigured';
+  privateDatabaseConfigured: boolean;
+  receiverCredentialsPresent: boolean;
+  senderReady: boolean;
+};
+
+function isSenderReadiness(value: unknown): value is SenderReadiness {
+  if (!value || typeof value !== 'object') return false;
+  const s = value as Record<string, unknown>;
+  return typeof s.senderEnabled === 'boolean' &&
+    ['sandbox', 'production', 'unconfigured'].includes(String(s.environment)) &&
+    typeof s.privateDatabaseConfigured === 'boolean' &&
+    typeof s.receiverCredentialsPresent === 'boolean' &&
+    typeof s.senderReady === 'boolean';
+}
+
 type Status = {
   registeredConnections: number;
   activeConnections: number;
@@ -27,6 +45,23 @@ function isStatus(value: unknown): value is Status {
 
 export function TechsafeSettings() {
   const [status, setStatus] = useState<Status | null>(null);
+  const [senderReadiness, setSenderReadiness] = useState<SenderReadiness | null>(null);
+  const [checkingSender, setCheckingSender] = useState(false);
+  const [senderError, setSenderError] = useState('');
+  const checkConnection = useCallback(async () => {
+    setCheckingSender(true);
+    setSenderError('');
+    setSenderReadiness(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('techsafe-send-sales-order/readiness', { method: 'GET' });
+      if (error || !isSenderReadiness(data)) throw new Error('readiness_unverified');
+      setSenderReadiness(data);
+    } catch {
+      setSenderError('Unable to verify live sender readiness. Check administrator access and the deployed function.');
+    } finally {
+      setCheckingSender(false);
+    }
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
@@ -90,6 +125,27 @@ export function TechsafeSettings() {
         <p>Trusted source reader: <strong>{certified ? 'Certified' : 'Not certified'}</strong></p>
         <p>Live draft sync: <strong>{enabled ? 'Enabled' : 'Disabled'}</strong></p>
       </> : null}
+    </div>
+    <div className="border-t pt-5 space-y-3" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h5 className="font-semibold text-gray-900">Live sender readiness</h5>
+          <p className="text-sm text-gray-600">Read-only check of the deployed Edge Function. No credentials are displayed or changed.</p>
+        </div>
+        <button type="button" onClick={() => void checkConnection()} disabled={checkingSender}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium disabled:opacity-50">
+          {checkingSender ? 'Checking…' : 'Check Connection'}
+        </button>
+      </div>
+      {senderError && <p className="text-sm text-red-700" role="alert">{senderError}</p>}
+      {senderReadiness && <div className="rounded-md border border-gray-200 p-3 text-sm space-y-1">
+        <p>Sender: <strong>{senderReadiness.senderEnabled ? 'Enabled' : 'Disabled'}</strong></p>
+        <p>Environment: <strong>{senderReadiness.environment}</strong></p>
+        <p>Private database: <strong>{senderReadiness.privateDatabaseConfigured ? 'Configured' : 'Not configured'}</strong></p>
+        <p>Receiver credentials: <strong>{senderReadiness.receiverCredentialsPresent ? 'Present' : 'Missing'}</strong></p>
+        <p>Sender runtime: <strong>{senderReadiness.senderReady ? 'Configured' : 'Not ready'}</strong></p>
+        <p className="text-xs text-gray-500">This does not confirm an active pairing, valid receiver token, or successful import.</p>
+      </div>}
     </div>
     <TechsafeOrderSync />
     <p className="text-xs text-gray-500">Organization-scoped diagnostics. A connection record alone does not certify a source reader or enable customer data transfer. No credentials or customer data are shown.</p>
