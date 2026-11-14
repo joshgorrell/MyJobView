@@ -71,7 +71,7 @@ export function createPostgresBaseEquipmentScanner(client){
        JOIN public.change_orders co ON co.id=coli.change_order_id
          AND co.organization_id=coli.organization_id
       WHERE co.sales_order_id=$1 AND co.organization_id=$2
-        AND co.status='approved' AND co.is_locked=true
+        AND co.status IN ('approved','completed') AND co.is_locked=true
         AND co.is_active=false AND coli.action_type='remove'
       ORDER BY coli.proposal_line_item_id FOR SHARE OF co,coli`,
     [orderId,organizationId]);
@@ -96,3 +96,4 @@ export function createPostgresBaseEquipmentScanner(client){
    baseLineCount:baseLines.length,removedLineIds:Object.freeze([...removedLineIds]),approvedRemovalEvidenceRead:true,approvalVerified:false,sourceManifestComplete:false});
  };
 }
+

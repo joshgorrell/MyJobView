@@ -1,5 +1,5 @@
 // Server-owned source certification for NEW native-approved Sales Orders.
-// Legacy and applied-change orders remain held until independently reconciled.
+// Legacy and unverified applied-change orders remain held until reconciled.
 // No request can supply approval evidence, source rows, SQL or a certificate.
 import {createHash,randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
@@ -146,4 +146,5 @@ export function createNativeOrderAuthority(pool,{sourceInstanceId,environment='s
   })
  });
 }
+
 
