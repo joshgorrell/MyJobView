@@ -5,7 +5,7 @@ const uuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}
 const hold = reason => ({ready:false,reason,source:null});
 const sql = `WITH binding AS (
  SELECT c.connection_id,c.organization_id,c.sales_order_id,c.proposal_id,c.connection_generation,
-        so.contact_id,so.status AS order_status,p.status AS proposal_status,
+        so.contact_id,so.status AS order_status,so.first_completion_date,p.status AS proposal_status,
         p.approved_at,p.approval_completed_at,ct.full_name,ct.contact_name
  FROM techsafe_source.integration_connections c
  JOIN public.sales_orders so ON so.id=c.sales_order_id AND so.organization_id=c.organization_id AND so.proposal_id=c.proposal_id
