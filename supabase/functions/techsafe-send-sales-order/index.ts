@@ -51,4 +51,27 @@ const handler=createNativeTechsafeSendHandler({enabled:configured,
    return result.rows.length===1?result.rows[0].organization_id:null;
   }finally{client.release();}
  },sendOrder:sender});
-Deno.serve(withTechsafeBrowserCors(handler));
+// Read-only diagnostics: authenticated dealer admins only. Never return secrets.
+const diagnosticClient=supabaseUrl&&serviceKey
+ ?createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}}):null;
+Deno.serve(withTechsafeBrowserCors(async (request: Request)=>{
+ if(request.method==='GET'&&new URL(request.url).pathname.endsWith('/readiness')){
+  const authorization=request.headers.get('authorization');
+  if(!diagnosticClient||!authorization?.startsWith('Bearer '))
+   return new Response(null,{status:403});
+  const {data,error}=await diagnosticClient.auth.getUser(authorization.slice(7));
+  if(error||!data.user)return new Response(null,{status:403});
+  const profile=await diagnosticClient.from('profiles').select('role')
+   .eq('id',data.user.id).maybeSingle();
+  if(profile.error||profile.data?.role!=='admin')
+   return new Response(null,{status:403});
+  return new Response(JSON.stringify({
+   senderEnabled:enabled,
+   environment:environment??'unconfigured',
+   privateDatabaseConfigured:sql!==null,
+   receiverCredentialsPresent:Boolean(Deno.env.get('TECHSAFE_RECEIVER_CREDENTIALS')),
+   senderReady:configured
+  }),{headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+ }
+ return handler(request);
+}));
