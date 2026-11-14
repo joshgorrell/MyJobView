@@ -134,10 +134,8 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch =
-      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.contact?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.proposal?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.proposal?.proposal_number?.toLowerCase().includes(searchTerm.toLowerCase());
+      order.proposal?.title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesRep = !selectedRepId || order.sales_rep_id === selectedRepId;
     const matchesOffice = !officeIdFilter || (order as any).office_id === officeIdFilter;
@@ -225,7 +223,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
           <input
             type="text"
-            placeholder="Search sales orders, proposal numbers, customers..."
+            placeholder="Search customer or proposal name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 bg-surface border border-subtle rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px]"
@@ -337,7 +335,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                             {order.proposal?.title && (
                               <div className="text-muted text-xs truncate mt-0.5">{order.proposal.title}</div>
                             )}
-                            <div className="text-muted text-xs font-mono mt-0.5">SO-{order.order_number}{order.proposal?.proposal_number ? ` · ${order.proposal.proposal_number}` : ''} </div>
+                            <div className="text-muted text-xs font-mono mt-0.5">SO-{order.order_number}</div>
                           </div>
                           <div className="flex-shrink-0 text-right">
                             <div className="font-bold text-primary text-sm">${(order.contract_total ?? 0).toLocaleString()}</div>
@@ -425,7 +423,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
                                   {order.proposal.title}
                                 </div>
                               )}
-                              <div className="text-muted text-xs font-mono mt-0.5">SO-{order.order_number}{order.proposal?.proposal_number ? ` · ${order.proposal.proposal_number}` : ''} </div>
+                              <div className="text-muted text-xs font-mono mt-0.5">SO-{order.order_number}</div>
                             </div>
                           </div>
                         </td>
