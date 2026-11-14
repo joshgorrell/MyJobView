@@ -10,7 +10,7 @@ try{
  await db.exec(`CREATE SCHEMA techsafe_source;
  CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN;
  CREATE TABLE public.proposals(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid,contact_id uuid,status text,approved_at timestamptz,approval_completed_at timestamptz);
- CREATE TABLE public.sales_orders(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,contact_id uuid,created_at timestamptz DEFAULT now());
+ CREATE TABLE public.sales_orders(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,contact_id uuid,created_at timestamptz DEFAULT now(),first_completion_date timestamptz);
  CREATE TABLE public.proposal_line_items(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,product_id uuid,description text,item_type text,quantity numeric,unit_price numeric,line_total numeric,labor_total numeric,is_customer_supplied boolean,internal_cost numeric);
  CREATE TABLE public.change_orders(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid,status text);`);
  await db.exec(readFileSync(new URL('../../supabase/migrations/20261109183000_techsafe_equipment_certificate_storage.sql',import.meta.url),'utf8'));
