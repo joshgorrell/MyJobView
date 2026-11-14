@@ -9,7 +9,7 @@ const nonnegative=v=>Number.isSafeInteger(v)&&v>=0;
 const kinds=new Set(['equipment','miscellaneous','labor','fee','tax','consumable','subscription','unclassified']);
 const held=reason=>({ready:false,reason,snapshot:null});
 const lineKeys=new Set(['sourceLineId','productRef','productKind','scope','customerSupplied','techsafeExcluded','quantity','unitEquipmentValueCents','manufacturer','model','sku','description','room','serialNumber','productCategory','originalPurchaseDate']);
-const allowed=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','soldLaborCents','customerRef','customerName','siteRef','lines']);
+const allowed=new Set(['schemaVersion','environment','connectionId','sourceInstanceId','organizationId','orderId','eventId','generation','revision','complete','scopeState','orderStatus','currency','minimumUnitValueCents','soldLaborCents','customerRef','customerName','siteRef','completedOn','lines']);
 export function prepareTechsafeTransportSnapshot({source,authority,binding,revision,eventId}={}){
  if(!object(binding)||!['connectionId','organizationId','orderId','proposalId'].every(k=>id(binding[k])))
   return held('binding_unverified');
@@ -40,6 +40,8 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   return held('snapshot_contract_unverified');
  if(!['production','sandbox'].includes(snapshot.environment)||!id(snapshot.sourceInstanceId)||
   !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
+  (snapshot.orderStatus==='completed' && (typeof snapshot.completedOn!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(snapshot.completedOn)||!Number.isFinite(Date.parse(snapshot.completedOn+'T00:00:00Z'))||new Date(snapshot.completedOn+'T00:00:00Z').toISOString().slice(0,10)!==snapshot.completedOn))||
+  (snapshot.orderStatus!=='completed'&&snapshot.completedOn!==undefined)||
   !nonnegative(snapshot.minimumUnitValueCents)||
   (snapshot.soldLaborCents!==undefined&&!nonnegative(snapshot.soldLaborCents))||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
   typeof snapshot.customerName!=='string'||!snapshot.customerName.trim()||snapshot.customerName.length>256||
