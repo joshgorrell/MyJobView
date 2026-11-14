@@ -92,7 +92,7 @@ jobs:
           mkdir -p node_modules/@electric-sql
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
       - name: Verify native approval capture and real persisted sender authority
-        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs
+        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs
 
   native-sender-runtime:
     runs-on: ubuntu-latest
@@ -112,3 +112,4 @@ jobs:
       - name: Typecheck the exact native sender deployment source
         working-directory: ${{ runner.temp }}/techsafe-native-runtime
         run: deno check --no-lock --node-modules-dir=manual supabase/functions/techsafe-send-sales-order/index.ts
+

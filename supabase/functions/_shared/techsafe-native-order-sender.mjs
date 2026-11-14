@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {createNativeOrderAuthority} from '../../../src/lib/techsafe/postgresNativeOrderAuthority.mjs';
 import {createTechsafeSalesOrderSender} from './techsafe-sales-order-sender.mjs';
 import {createPrivateTechsafeCredentialReader} from './techsafe-private-receiver-credentials.mjs';
+import {createNativeCancellationSender} from './techsafe-native-cancellation-sender.mjs';
 const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(x);
 const held=reason=>({accepted:false,reason});
 /** @param {{pool: {connect: () => Promise<{query: (sql: string, parameters?: any[]) => Promise<{rows: any[]}>, release: () => void}>}, readSecret: (scope: {connectionId: string, organizationId: string, generation: number}) => Promise<unknown>, sourceInstanceId: string, environment?: string, minimumUnitValueCents?: number, enabled?: boolean, fetchImpl?: typeof fetch}} options */
@@ -12,6 +13,7 @@ export function createNativeTechsafeOrderSender({pool,readSecret,sourceInstanceI
  environment='sandbox',minimumUnitValueCents=0,enabled=false,fetchImpl}={}){
  const credentials=createPrivateTechsafeCredentialReader({readSecret});
  const gate=createNativeOrderAuthority(pool,{sourceInstanceId,environment,minimumUnitValueCents});
+ const sendCancellation=createNativeCancellationSender({pool,sourceInstanceId,environment,...(fetchImpl?{fetchImpl}:{})});
  // Return every preflight connection BEFORE opening the owned certification
  // transaction, so a one-connection pool cannot deadlock on itself.
  const client={query:async(query,parameters)=>{
@@ -31,8 +33,11 @@ export function createNativeTechsafeOrderSender({pool,readSecret,sourceInstanceI
    const row=result.rows[0],generation=Number(row.connection_generation);
    const secret=await credentials({connectionId,organizationId:row.organization_id,generation});
    if(secret.ok!==true)return held('credentials_unavailable');
+   const negative=await sendCancellation({connectionId,orderId,endpoint:secret.endpoint,token:secret.token});
+   if(negative.applicable)return negative;
    return await send({connectionId,orderId,enabled:true,endpoint:secret.endpoint,
     allowedOrigin:'https://ywvrmjfhixgzdyfuhdpv.supabase.co',token:secret.token});
   }catch{return held('native_sender_unavailable');}
  };
 }
+
