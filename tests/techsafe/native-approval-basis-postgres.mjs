@@ -164,5 +164,26 @@ try{
  await db.query('UPDATE public.proposal_line_items SET labor_total=125 WHERE id=$1',[line]);
  await db.query(`UPDATE techsafe_source.integration_connections SET enabled=false,status='held' WHERE connection_id=$1`,[connection]);
  assert.equal((await gate.authorizeForDelivery(delivery)).authorized,false);
+ // A native cancellation takes the negative path through the SAME composed
+ // sender without minting positive equipment approval or another certificate.
+ await db.exec(readFileSync(new URL('../../supabase/migrations/20261114145831_techsafe_negative_order_exports.sql',import.meta.url),'utf8'));
+ await db.query(`UPDATE techsafe_source.integration_connections SET enabled=true,status='active' WHERE connection_id=$1`,[connection]);
+ await db.query(`UPDATE public.sales_orders SET status='cancelled' WHERE id=$1`,[order]);
+ let heldEvent;
+ const cancellationSender=createNativeTechsafeOrderSender({...privateOptions,enabled:true,fetchImpl:async(url,options)=>{
+  const body=JSON.parse(options.body);heldEvent=body;
+  assert.equal(body.messageType,'hold');assert.equal(body.reason,'source_unavailable');
+  assert.equal(body.lines,undefined);assert.equal(body.customerName,undefined);
+  return {status:200,json:async()=>({accepted:true,connectionId:connection,orderId:order,
+   sourceRevision:String(body.revision),generation:body.generation,eventId:body.eventId})};
+ }});
+ assert.equal((await cancellationSender({connectionId:connection,orderId:order})).accepted,true);
+ assert.equal(heldEvent.revision,2);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.equipment_snapshot_certificates')).rows[0].n,1);
+ await db.query(`UPDATE public.sales_orders SET status='planning' WHERE id=$1`,[order]);
+ assert.equal((await composed({connectionId:connection,orderId:order})).accepted,true,'reopening requires a new positive certificate');
+ assert.equal(Number((await db.query('SELECT revision FROM techsafe_source.order_revision_ledger')).rows[0].revision),3);
+ assert.equal((await gate.authorizeForDelivery(delivery)).authorized,false,'pre-cancellation certificate must remain unusable');
  console.log('PASS: real PostgreSQL native approval -> certificate/export persistence -> composed private sender; stable retry, changed scope, forged delivery, held connection, secret isolation and rollback');
 }finally{await db.close();}
+
