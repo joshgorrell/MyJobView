@@ -56,9 +56,13 @@ export function createNativeOrderAuthority(pool,{sourceInstanceId,environment='s
   requireFact(!['cancelled','canceled','deleted'].includes(status),'native_order_not_active');
   const completed=['complete','completed'].includes(status);
   const completion=observed.source.binding.first_completion_date;
-  requireFact(!completed||typeof completion==='string'&&Number.isFinite(Date.parse(completion)),
+  // pg returns timestamptz values as Date objects by default. Normalize
+  // server-side to the canonical UTC calendar date; never trust caller input.
+  const timestamp=completion instanceof Date?completion:
+   typeof completion==='string'?new Date(completion):null;
+  requireFact(!completed||(timestamp instanceof Date&&!Number.isNaN(timestamp.getTime())),
    'sales_order_completion_date_unverified');
-  const completedOn=completed?completion.slice(0,10):undefined;
+  const completedOn=completed?timestamp.toISOString().slice(0,10):undefined;
   return {source,basis,observedFingerprint:fingerprint.fingerprint,
    sourceFingerprint:hash(JSON.stringify([basis.basisHash,fingerprint.fingerprint])),
    orderStatus:completed?'completed':'open',completedOn,
