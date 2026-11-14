@@ -54,7 +54,12 @@ export function createNativeOrderAuthority(pool,{sourceInstanceId,environment='s
   requireFact(source.ok===true&&source.issues.length===0,'native_sold_components_unresolved');
   const status=observed.source.binding.order_status;
   requireFact(!['cancelled','canceled','deleted'].includes(status),'native_order_not_active');
-  const completed=['complete','completed'].includes(status);\n  const completion=observed.source.binding.first_completion_date;\n  requireFact(!completed||typeof completion==='string'&&Number.isFinite(Date.parse(completion)),\n   'sales_order_completion_date_unverified');\n  const completedOn=completed?completion.slice(0,10):undefined;\n  return {source,basis,observedFingerprint:fingerprint.fingerprint,
+  const completed=['complete','completed'].includes(status);
+  const completion=observed.source.binding.first_completion_date;
+  requireFact(!completed||typeof completion==='string'&&Number.isFinite(Date.parse(completion)),
+   'sales_order_completion_date_unverified');
+  const completedOn=completed?completion.slice(0,10):undefined;
+  return {source,basis,observedFingerprint:fingerprint.fingerprint,
    sourceFingerprint:hash(JSON.stringify([basis.basisHash,fingerprint.fingerprint])),
    orderStatus:completed?'completed':'open',completedOn,
    customerName:observed.source.binding.full_name||observed.source.binding.contact_name};
