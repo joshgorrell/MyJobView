@@ -76,6 +76,8 @@ try{
  assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.native_approval_equipment_basis')).rows[0].n,1);
  // Exercise the REAL owned certification and delivery gate, not mocked proof.
  await db.exec(readFileSync(new URL('../../supabase/migrations/20261108150000_techsafe_private_order_revision_ledger.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../../supabase/migrations/20261108160000_techsafe_exact_sales_order_binding_fks.sql',import.meta.url),'utf8'));
+ await db.exec(readFileSync(new URL('../../supabase/migrations/20261114152636_techsafe_preserve_native_sales_order_deletion.sql',import.meta.url),'utf8'));
  await db.exec(`ALTER TABLE public.proposals ADD COLUMN accepted_via_method text,ADD COLUMN approved_by uuid;
 
  ALTER TABLE public.proposal_line_items ADD COLUMN is_hidden boolean DEFAULT false,
@@ -184,6 +186,58 @@ try{
  assert.equal((await composed({connectionId:connection,orderId:order})).accepted,true,'reopening requires a new positive certificate');
  assert.equal(Number((await db.query('SELECT revision FROM techsafe_source.order_revision_ledger')).rows[0].revision),3);
  assert.equal((await gate.authorizeForDelivery(delivery)).authorized,false,'pre-cancellation certificate must remain unusable');
+ // Native deletion remains possible despite a connection, ledger, certificate
+ // and immutable approval basis. Independent business records are preserved.
+ const otherOrder=ids[14],otherConnection=ids[13];
+ await db.query(`INSERT INTO public.sales_orders(id,organization_id,proposal_id,contact_id) VALUES($1,$2,$3,$4)`,[otherOrder,otherOrg,oldProposal,contact]);
+ await db.query(`INSERT INTO techsafe_source.integration_connections(connection_id,organization_id,sales_order_id,proposal_id,status,enabled)
+  VALUES($1,$2,$3,$4,'held',false)`,[otherConnection,otherOrg,otherOrder,oldProposal]);
+ await assert.rejects(db.query(`INSERT INTO techsafe_source.integration_connections(connection_id,organization_id,sales_order_id,proposal_id)
+  VALUES($1,$2,$3,$4)`,[ids[12],otherOrg,order,proposal]),/exact native Sales Order scope/);
+ await assert.rejects(db.query('UPDATE public.sales_orders SET organization_id=$1 WHERE id=$2',[otherOrg,order]),/identity cannot be reassigned/);
+ await assert.rejects(db.query('DELETE FROM techsafe_source.native_approval_equipment_basis WHERE sales_order_id=$1',[order]),/immutable/);
+ // An existing native deletion restriction wins; the tombstone and cleanup
+ // roll back with the native DELETE. This fixture models a restricting child.
+ await db.exec('CREATE TABLE public.native_delete_restriction(sales_order_id uuid REFERENCES public.sales_orders(id) ON DELETE RESTRICT)');
+ await db.query('INSERT INTO public.native_delete_restriction VALUES($1)',[order]);
+ await assert.rejects(db.query('DELETE FROM public.sales_orders WHERE id=$1',[order]),/foreign key constraint/);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.deleted_sales_orders')).rows[0].n,0);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.native_approval_equipment_basis WHERE sales_order_id=$1',[order])).rows[0].n,1);
+ await db.exec('DELETE FROM public.native_delete_restriction');
+ await db.exec('BEGIN');
+ await db.query('DELETE FROM public.sales_orders WHERE id=$1',[order]);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.native_approval_equipment_basis WHERE sales_order_id=$1',[order])).rows[0].n,0);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.deleted_sales_orders')).rows[0].n,1);
+ await db.exec('ROLLBACK');
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.native_approval_equipment_basis WHERE sales_order_id=$1',[order])).rows[0].n,1);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.deleted_sales_orders')).rows[0].n,0);
+ // Deletion between cancellation preparation and HTTP must invalidate the
+ // older prepared event; the next invocation publishes a later deletion hold.
+ await db.query("UPDATE public.sales_orders SET status='cancelled' WHERE id=$1",[order]);
+ let deletionOpens=0;
+ const {createNativeCancellationSender}=await import('../../supabase/functions/_shared/techsafe-native-cancellation-sender.mjs');
+ const deletionRace=createNativeCancellationSender({...privateOptions,pool:{connect:async()=>{
+  if(++deletionOpens===2)await db.query('DELETE FROM public.sales_orders WHERE id=$1',[order]);
+  return privatePool.connect();
+ }},fetchImpl:async()=>{throw Error('stale cancellation must not reach HTTP');}});
+ assert.equal((await deletionRace({connectionId:connection,orderId:order,
+  endpoint:'https://ywvrmjfhixgzdyfuhdpv.supabase.co/functions/v1/mjv-import',token:'a'.repeat(48)})).reason,'cancellation_delivery_not_authorized');
+ const tombstone=(await db.query('SELECT * FROM techsafe_source.deleted_sales_orders')).rows;
+ assert.equal(tombstone.length,1);assert.equal(tombstone[0].sales_order_id,order);assert.equal(tombstone[0].organization_id,org);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.integration_connections')).rows[0].n,2);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM public.sales_orders WHERE id=$1',[otherOrder])).rows[0].n,1);
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM public.proposals WHERE id=$1',[proposal])).rows[0].n,1);
+ assert.equal((await gate.authorizeForDelivery(delivery)).authorized,false);
+ assert.equal((await cancellationSender({connectionId:connection,orderId:order})).accepted,true);
+ const deletedEvent=structuredClone(heldEvent);
+ assert.ok(deletedEvent.revision>3);assert.equal(deletedEvent.reason,'source_unavailable');
+ assert.equal((await cancellationSender({connectionId:connection,orderId:order})).accepted,true);
+ assert.deepEqual(heldEvent,deletedEvent,'deleted source retries reuse event and revision');
+ assert.equal((await db.query('SELECT hold_reason FROM techsafe_source.order_revision_ledger WHERE connection_id=$1',[connection])).rows[0].hold_reason,'source_deleted');
+ await assert.rejects(db.query(`INSERT INTO public.sales_orders(id,organization_id,proposal_id,contact_id) VALUES($1,$2,$3,$4)`,[order,org,proposal,contact]),/identity cannot be reused/);
+ await db.exec('SET ROLE authenticated');
+ await assert.rejects(db.query('SELECT * FROM techsafe_source.deleted_sales_orders'),/permission denied/);
+ await db.exec('RESET ROLE');
  console.log('PASS: real PostgreSQL native approval -> certificate/export persistence -> composed private sender; stable retry, changed scope, forged delivery, held connection, secret isolation and rollback');
 }finally{await db.close();}
 

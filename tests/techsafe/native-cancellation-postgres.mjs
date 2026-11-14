@@ -25,6 +25,8 @@ try{
  await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;
   CREATE TABLE public.sales_orders(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,status text);
   CREATE TABLE public.proposals(id uuid PRIMARY KEY,organization_id uuid,status text);`);
+ // The full native deletion migration is exercised by native-approval-basis-postgres.
+ await db.exec('CREATE SCHEMA techsafe_source; CREATE TABLE techsafe_source.deleted_sales_orders(sales_order_id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,deleted_at timestamptz)');
  await db.exec(await readFile(new URL('../../supabase/migrations/20261108150000_techsafe_private_order_revision_ledger.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../supabase/migrations/20261114145831_techsafe_negative_order_exports.sql',import.meta.url),'utf8'));
  await db.query("INSERT INTO public.proposals VALUES($1,$2,'approved')",[proposal,org]);
