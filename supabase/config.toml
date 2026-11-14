@@ -330,3 +330,7 @@ verify_jwt = true
 [functions.techsafe-run-sandbox-check]
 verify_jwt = false
 
+# Private one-use queue capabilities; the handler validates environment/lease.
+[functions.techsafe-dispatch-order]
+verify_jwt = false
+

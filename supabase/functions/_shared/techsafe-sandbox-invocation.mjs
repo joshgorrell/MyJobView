@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(v);
 const json=(status,body)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
-async function body(request){
+export async function readBoundedTechsafeInvocation(request){
  const reader=request.body?.getReader();if(!reader)throw Error('missing_body');
  let size=0;const chunks=[];
  try{while(true){const {done,value}=await reader.read();if(done)break;
@@ -24,7 +24,7 @@ export function createSandboxInvocationHandler({pool,sendOrder,environment,enabl
    return json(403,{accepted:false,reason:'sandbox_ticket_required'});
   if(!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type')??''))
    return json(415,{accepted:false,reason:'unsupported_media_type'});
-  let input;try{input=await body(request);}catch{return json(400,{accepted:false,reason:'invalid_request'});}
+  let input;try{input=await readBoundedTechsafeInvocation(request);}catch{return json(400,{accepted:false,reason:'invalid_request'});}
   if(!input||typeof input!=='object'||Array.isArray(input)||
      Object.keys(input).some(k=>!['connectionId','orderId'].includes(k))||!uuid(input.connectionId)||!uuid(input.orderId))
    return json(400,{accepted:false,reason:'invalid_request'});

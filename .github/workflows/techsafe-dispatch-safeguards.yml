@@ -6,6 +6,7 @@ on:
       - 'supabase/functions/_shared/techsafe-*.mjs'
       - 'supabase/functions/techsafe-send-sales-order/**'
       - 'supabase/functions/techsafe-run-sandbox-check/**'
+      - 'supabase/functions/techsafe-dispatch-order/**'
       - 'supabase/config.toml'
       - 'tools/techsafe/prepare-native-runtime.mjs'
       - 'src/lib/techsafe/**'
@@ -17,6 +18,7 @@ on:
       - 'supabase/functions/_shared/techsafe-*.mjs'
       - 'supabase/functions/techsafe-send-sales-order/**'
       - 'supabase/functions/techsafe-run-sandbox-check/**'
+      - 'supabase/functions/techsafe-dispatch-order/**'
       - 'tests/techsafe/**'
       - 'supabase/functions/_shared/change-order-*.mjs'
       - 'supabase/config.toml'
@@ -108,7 +110,7 @@ jobs:
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/pg" node_modules/pg
       - name: Verify native approval capture and real persisted sender authority
-        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs && node tests/techsafe/sandbox-invocation-postgres.mjs && node tests/techsafe/native-committed-basis-postgres.mjs
+        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs && node tests/techsafe/sandbox-invocation-postgres.mjs && node tests/techsafe/native-committed-basis-postgres.mjs && node tests/techsafe/native-delivery-queue-postgres.mjs
       - name: Verify native commit and concurrent line-write exclusion on PostgreSQL 16
         env:
           TECHSAFE_NATIVE_COMMIT_TEST_DATABASE_URL: postgres://postgres:test_only_password@127.0.0.1:5432/techsafe_native_commit_test
@@ -131,7 +133,40 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/techsafe-native-runtime" --ignore-scripts --no-audit --no-fund postgres@3.4.7 @supabase/supabase-js@2.94.0 @types/node@22.13.10
       - name: Typecheck the exact native sender deployment source
         working-directory: ${{ runner.temp }}/techsafe-native-runtime
-        run: deno check --no-lock --node-modules-dir=manual supabase/functions/techsafe-send-sales-order/index.ts supabase/functions/techsafe-run-sandbox-check/index.ts
+        run: deno check --no-lock --node-modules-dir=manual supabase/functions/techsafe-send-sales-order/index.ts supabase/functions/techsafe-run-sandbox-check/index.ts supabase/functions/techsafe-dispatch-order/index.ts
 
 
+
+
+  native-delivery-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_only_password
+          POSTGRES_DB: techsafe_native_delivery_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d techsafe_native_delivery_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated pinned PostgreSQL test clients
+        run: |
+          npm install --prefix "$RUNNER_TEMP/techsafe-delivery-db" --no-audit --no-fund --ignore-scripts @electric-sql/pglite@0.3.14 pg@8.16.3
+          mkdir -p node_modules/@electric-sql
+          ln -s "$RUNNER_TEMP/techsafe-delivery-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
+          ln -s "$RUNNER_TEMP/techsafe-delivery-db/node_modules/pg" node_modules/pg
+      - name: Verify delivery claims, retries and concurrent scheduler exclusion
+        env:
+          TECHSAFE_NATIVE_DELIVERY_TEST_DATABASE_URL: postgres://postgres:test_only_password@127.0.0.1:5432/techsafe_native_delivery_test
+        run: node tests/techsafe/native-delivery-queue-postgres.mjs
 
