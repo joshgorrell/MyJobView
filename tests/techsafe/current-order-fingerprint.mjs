@@ -26,9 +26,10 @@ for(const price of ['100x00','1e2','-1.00','NaN','Infinity','1.001','01.00',null
 
 assert.notEqual(a.fingerprint,(await fingerprintCurrentSalesOrder({...base,lines:[{...base.lines[0],approved_removed:true}]},hash)).fingerprint);
 
-const completed={...base,binding:{...binding,order_status:'completed',first_completion_date:'2026-01-15T17:00:00+00:00'}};
+const completed={...base,binding:{...binding,order_status:'completed',techsafe_completed_at:'2026-01-15T17:00:00+00:00'}};
 const completedFingerprint=await fingerprintCurrentSalesOrder(completed,hash);
 assert.equal(completedFingerprint.valid,true);
 assert.notEqual(a.fingerprint,completedFingerprint.fingerprint,'completion must invalidate earlier certificate');
-assert.notEqual(completedFingerprint.fingerprint,(await fingerprintCurrentSalesOrder({...completed,binding:{...completed.binding,first_completion_date:'2026-01-16T17:00:00+00:00'}},hash)).fingerprint,'changed completion date must invalidate certificate');
+assert.notEqual(completedFingerprint.fingerprint,(await fingerprintCurrentSalesOrder({...completed,binding:{...completed.binding,techsafe_completed_at:'2026-01-16T17:00:00+00:00'}},hash)).fingerprint,'changed completion date must invalidate certificate');
 assert.notEqual(completedFingerprint.fingerprint,(await fingerprintCurrentSalesOrder({...completed,binding:{...completed.binding,order_status:'planning'}},hash)).fingerprint,'reopened Sales Order must invalidate certificate');
+

@@ -42,9 +42,11 @@ export async function fingerprintCurrentSalesOrder({binding,lines,changes}={},di
   // Completion changes the warranty purchase deadline, even when no sold
   // equipment or labor line changes. Force a new source revision/certificate.
   orderStatus:binding.order_status??null,
-  firstCompletionDate:binding.first_completion_date??null};
+  salesOrderCompletedAt:binding.techsafe_completed_at??null,
+  completionHistoryVerified:binding.techsafe_completion_history_verified===true};
  let fingerprint;
  try{fingerprint=await digest(JSON.stringify(projection));}catch{return hold('digest_unavailable');}
  if(typeof fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(fingerprint))return hold('digest_invalid');
  return {valid:true,reason:null,fingerprint,projection};
 }
+

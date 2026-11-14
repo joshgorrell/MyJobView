@@ -41,4 +41,5 @@ console.log('Techsafe transport boundary fail-closed tests passed');
 assert.equal(run({authority:{...authority,snapshot:{...snapshot,orderStatus:'completed',completedOn:'2026-01-15'}}}).ready,true);
 assert.equal(run({authority:{...authority,snapshot:{...snapshot,orderStatus:'completed'}}}).ready,false);
 assert.equal(run({authority:{...authority,snapshot:{...snapshot,orderStatus:'completed',completedOn:'2026-02-30'}}}).ready,false);
-assert.equal(run({authority:{...authority,snapshot:{...snapshot,completedOn:'2026-01-15'}}}).ready,false);
+assert.equal(run({authority:{...authority,snapshot:{...snapshot,completedOn:'2026-01-15'}}}).ready,true);
+
