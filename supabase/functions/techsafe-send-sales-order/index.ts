@@ -5,6 +5,7 @@ import {createNativeTechsafeSendHandler} from '../_shared/techsafe-native-send-h
 import {createNativeTechsafeOrderSender} from '../_shared/techsafe-native-order-sender.mjs';
 import {createTechsafeServiceAuthenticator} from '../_shared/techsafe-service-auth.mjs';
 import {createDenoTechsafeSecretReader} from '../_shared/techsafe-environment-secret-reader.mjs';
+import {createVaultTechsafeSecretReader} from '../_shared/techsafe-vault-secret-reader.mjs';
 
 // Opt-in backend runtime. SQL credentials must be private SQL credentials,
 // never an anon/service-role API key or a request-supplied value.
@@ -33,7 +34,7 @@ const pool={connect:async()=>{
   release:()=>session.release()};
 }};
 const sender=configured?createNativeTechsafeOrderSender({pool,sourceInstanceId:new URL(supabaseUrl!).hostname.split('.')[0],
- environment:environment!,readSecret:createDenoTechsafeSecretReader(),enabled:true}):undefined;
+ environment:environment!,readSecret:createVaultTechsafeSecretReader({pool,environment:environment!,readEnvironmentSecret:createDenoTechsafeSecretReader()}),enabled:true}):undefined;
 const handler=createNativeTechsafeSendHandler({enabled:configured,
  authenticateService:createTechsafeServiceAuthenticator(serviceKey),
  authenticateAdmin:async(authorization:string|null)=>{
@@ -61,17 +62,30 @@ Deno.serve(withTechsafeBrowserCors(async (request: Request)=>{
    return new Response(null,{status:403});
   const {data,error}=await diagnosticClient.auth.getUser(authorization.slice(7));
   if(error||!data.user)return new Response(null,{status:403});
-  const profile=await diagnosticClient.from('profiles').select('role')
+  const profile=await diagnosticClient.from('profiles').select('role,organization_id')
    .eq('id',data.user.id).maybeSingle();
   if(profile.error||profile.data?.role!=='admin')
    return new Response(null,{status:403});
+  let sandboxVaultCredentialsPresent=false;
+  if(environment==='sandbox'&&sql&&profile.data.organization_id){
+   let client;
+   try{client=await pool.connect();
+    const rows=(await client.query(`SELECT EXISTS(SELECT 1 FROM techsafe_source.sandbox_receiver_credentials b
+     JOIN techsafe_source.integration_connections c ON c.connection_id=b.connection_id AND c.organization_id=b.organization_id
+     AND c.connection_generation=b.generation WHERE b.organization_id=$1 AND b.status='active'
+     AND c.dispatch_environment='sandbox' AND c.enabled=true AND c.status='active') AS present`,[profile.data.organization_id])).rows;
+    sandboxVaultCredentialsPresent=rows[0]?.present===true;
+   }catch{/* Readiness reveals no SQL errors or secret material. */}finally{if(client)client.release();}
+  }
   return new Response(JSON.stringify({
    senderEnabled:enabled,
    environment:environment??'unconfigured',
    privateDatabaseConfigured:sql!==null,
-   receiverCredentialsPresent:Boolean(Deno.env.get('TECHSAFE_RECEIVER_CREDENTIALS')),
+   receiverCredentialsPresent:Boolean(Deno.env.get('TECHSAFE_RECEIVER_CREDENTIALS'))||sandboxVaultCredentialsPresent,
+   sandboxVaultCredentialsPresent,
    senderReady:configured
   }),{headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
  }
  return handler(request);
 }));
+

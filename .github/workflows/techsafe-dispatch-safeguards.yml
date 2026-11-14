@@ -110,7 +110,7 @@ jobs:
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/pg" node_modules/pg
       - name: Verify native approval capture and real persisted sender authority
-        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs && node tests/techsafe/sandbox-invocation-postgres.mjs && node tests/techsafe/native-committed-basis-postgres.mjs && node tests/techsafe/native-delivery-queue-postgres.mjs
+        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs && node tests/techsafe/sandbox-invocation-postgres.mjs && node tests/techsafe/native-committed-basis-postgres.mjs && node tests/techsafe/native-delivery-queue-postgres.mjs && node tests/techsafe/vault-credentials-postgres.mjs
       - name: Verify native commit and concurrent line-write exclusion on PostgreSQL 16
         env:
           TECHSAFE_NATIVE_COMMIT_TEST_DATABASE_URL: postgres://postgres:test_only_password@127.0.0.1:5432/techsafe_native_commit_test
@@ -169,4 +169,5 @@ jobs:
         env:
           TECHSAFE_NATIVE_DELIVERY_TEST_DATABASE_URL: postgres://postgres:test_only_password@127.0.0.1:5432/techsafe_native_delivery_test
         run: node tests/techsafe/native-delivery-queue-postgres.mjs
+
 
