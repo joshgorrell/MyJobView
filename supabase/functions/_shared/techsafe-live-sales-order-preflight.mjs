@@ -21,7 +21,7 @@ const sql = `WITH binding AS (
           WHERE removed.proposal_line_item_id=li.id
             AND removed.organization_id=b.organization_id
             AND applied.sales_order_id=b.sales_order_id
-            AND applied.status='approved' AND applied.is_locked=true
+            AND applied.status IN ('approved','completed') AND applied.is_locked=true
             AND applied.is_active=false AND applied.approval_date IS NOT NULL
             AND (applied.requires_customer_approval IS NOT TRUE OR applied.customer_approved=true)
             AND removed.action_type='remove') AS approved_removed,
@@ -75,4 +75,5 @@ export function createLiveSalesOrderPreflight(client){
   return {ready:false,reason:'source_certificate_and_revision_required',source:{binding:b,lines,changes}};
  };
 }
+
 

@@ -24,9 +24,28 @@ export function createNativeApprovalBasisVerifier(client){
    if(row.sales_order_id!==orderId||row.organization_id!==organizationId||row.proposal_id!==proposalId||
       !row.approved_at||row.hash_matches!==true||typeof row.basis_hash!=='string'||!/^[a-f0-9]{64}$/.test(row.basis_hash))
     return held('native_approval_basis_invalid');
-   // Later approved changes need their own native committed boundary. Do not
-   // replay a CO over current rows or substitute an original pre-change basis.
-   if(row.has_applied_changes!==false)return held('committed_change_basis_required');
+   // Prospective CO checkpoints extend the original immutable approval. Read
+   // current native commit heads; never reconstruct equipment by replaying COs.
+   const installed=(await client.query("SELECT to_regclass('techsafe_source.native_committed_order_basis') AS checkpoint_table")).rows?.[0]?.checkpoint_table;
+   if(installed){
+    const heads=(await client.query('SELECT techsafe_source.current_native_commit_heads($1,$2) AS heads',[orderId,organizationId])).rows?.[0]?.heads;
+    if(!Array.isArray(heads))return held('native_committed_change_source_unverified');
+    if(row.has_applied_changes!==false||heads.length){
+     const checkpoints=(await client.query(`SELECT c.basis_hash,
+      c.basis=techsafe_source.current_approval_equipment_basis($1) AS current_matches,
+      c.committed_heads=$4::jsonb AS heads_match,
+      c.root_basis_hash=$5 AND c.basis_hash=encode(pg_catalog.sha256(pg_catalog.convert_to(c.basis::text,'UTF8')),'hex') AS hash_matches
+      FROM techsafe_source.native_committed_order_basis c
+      WHERE c.sales_order_id=$1 AND c.organization_id=$2 AND c.proposal_id=$3
+      ORDER BY c.order_sequence DESC LIMIT 1 FOR SHARE OF c`,[orderId,organizationId,proposalId,JSON.stringify(heads),row.basis_hash])).rows;
+     if(checkpoints.length!==1)return held('committed_change_basis_required');
+     const c=checkpoints[0];
+     if(c.current_matches!==true||c.heads_match!==true||c.hash_matches!==true||
+        typeof c.basis_hash!=='string'||!/^[a-f0-9]{64}$/.test(c.basis_hash))return held('current_rows_differ_from_native_commit');
+     return {ok:true,authorized:false,snapshotReady:false,reason:'native_committed_basis_matches_current_order',
+      orderId,organizationId,proposalId,originalScopeVerified:true,pendingEditExclusionVerified:true,basisHash:c.basis_hash};
+    }
+   }else if(row.has_applied_changes!==false)return held('committed_change_basis_required');
    if(row.current_matches!==true)return held('current_rows_differ_from_native_approval');
    return {ok:true,authorized:false,snapshotReady:false,
     reason:'native_approval_basis_matches_current_order',orderId,organizationId,proposalId,
@@ -34,3 +53,4 @@ export function createNativeApprovalBasisVerifier(client){
   }catch{return held('native_approval_basis_read_failed');}
  };
 }
+
