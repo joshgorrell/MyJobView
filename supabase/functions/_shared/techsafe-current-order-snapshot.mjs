@@ -18,7 +18,7 @@ export function prepareCurrentSalesOrderTechsafeSnapshot({source,connection,revi
     !['open','completed','cancelled','deleted'].includes(orderStatus)||
     typeof customerName!=='string'||!customerName.trim()||customerName.length>256)
   return held('current_sales_order_snapshot_identity_unverified');
- if(orderStatus==='completed' && (typeof completedOn!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(completedOn)||!Number.isFinite(Date.parse(completedOn+'T00:00:00Z'))||new Date(completedOn+'T00:00:00Z').toISOString().slice(0,10)!==completedOn)) 
+ if(orderStatus==='completed' && (typeof completedOn!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(completedOn)||!Number.isFinite(Date.parse(completedOn+'T00:00:00Z'))||new Date(completedOn+'T00:00:00Z').toISOString().slice(0,10)!==completedOn)) 
   return held('sales_order_completion_date_unverified');
  if(orderStatus!=='completed'&&completedOn!==undefined)return held('completion_date_status_mismatch');
  if(['cancelled','deleted'].includes(orderStatus)&&projection.lines.length)
