@@ -149,6 +149,21 @@ try{
  assert.equal(sends,2);
  assert.equal((await createNativeTechsafeOrderSender({...privateOptions,enabled:true,readSecret:async()=>null})({connectionId:connection,orderId:order})).reason,'credentials_unavailable');
  assert.equal(sends,2);
+ // Server-only sandbox invocation composes the actual native source authority
+ // and sender, not a replacement approval or HTTP-only fake sender.
+ await db.exec(readFileSync(new URL('../../supabase/migrations/20261114155257_techsafe_sandbox_invocation_scope.sql',import.meta.url),'utf8'));
+ const {createSandboxInvocationHandler}=await import('../../supabase/functions/_shared/techsafe-sandbox-invocation.mjs');
+ const capability='c'.repeat(64);
+ await db.query(`INSERT INTO techsafe_source.native_invocation_tickets
+  (token_hash,connection_id,sales_order_id,connection_generation,expires_at,purpose)
+  VALUES($1,$2,$3,1,clock_timestamp()+interval '2 minutes','sandbox_send')`,[digest(capability),connection,order]);
+ const sandbox=createSandboxInvocationHandler({pool:privatePool,sendOrder:composed,environment:'sandbox',enabled:true});
+ const invocation=()=>new Request('https://sandbox.test/check',{method:'POST',
+  headers:{authorization:'Bearer '+capability,'content-type':'application/json'},
+  body:JSON.stringify({connectionId:connection,orderId:order})});
+ assert.equal((await sandbox(invocation())).status,200);
+ assert.equal((await sandbox(invocation())).status,403);
+ assert.equal(sends,3);
  // A failure after revision/certificate writes must roll back both.
  await db.query(`UPDATE public.contacts SET full_name='Changed Test Name' WHERE id=$1`,[contact]);
  const brokenClient={query:(q,p)=>q.startsWith('UPDATE techsafe_source.equipment_snapshot_certificates SET export_snapshot')?

@@ -7,7 +7,7 @@ const root=fileURLToPath(new URL('../../',import.meta.url));
 const out=process.argv[2];
 if(!out||!path.isAbsolute(out))throw Error('absolute_staging_directory_required');
 const entry='supabase/functions/techsafe-send-sales-order/index.ts';
-const todo=[entry],seen=new Set(),files=[];
+const todo=[entry,'supabase/functions/techsafe-run-sandbox-check/index.ts'],seen=new Set(),files=[];
 while(todo.length){
  const rel=todo.pop();if(seen.has(rel))continue;seen.add(rel);
  const absolute=path.resolve(root,rel);
@@ -21,3 +21,4 @@ files.push({name:config,content:await readFile(path.join(root,config),'utf8')});
 for(const file of files){const dest=path.join(out,file.name);await mkdir(path.dirname(dest),{recursive:true});await writeFile(dest,file.content);}
 await writeFile(path.join(out,'runtime-files.json'),JSON.stringify(files));
 console.log(`Staged ${files.length} native sender source files`);
+
