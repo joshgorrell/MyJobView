@@ -2,6 +2,7 @@ import postgres from 'npm:postgres@3.4.7';
 import {createSandboxInvocationHandler} from '../_shared/techsafe-sandbox-invocation.mjs';
 import {createNativeTechsafeOrderSender} from '../_shared/techsafe-native-order-sender.mjs';
 import {createDenoTechsafeSecretReader} from '../_shared/techsafe-environment-secret-reader.mjs';
+import {createVaultTechsafeSecretReader} from '../_shared/techsafe-vault-secret-reader.mjs';
 
 // Custom one-use capability authentication, never anonymous sender authority.
 // The normal JWT-authenticated sender remains unchanged.
@@ -26,5 +27,5 @@ const pool={connect:async()=>{
   release:()=>session.release()};
 }};
 const sendOrder=sql&&sourceInstanceId?createNativeTechsafeOrderSender({pool,sourceInstanceId,
- environment:'sandbox',enabled:true,readSecret:createDenoTechsafeSecretReader()}):undefined;
+ environment:'sandbox',enabled:true,readSecret:createVaultTechsafeSecretReader({pool,environment:environment!,readEnvironmentSecret:createDenoTechsafeSecretReader()})}):undefined;
 Deno.serve(createSandboxInvocationHandler({pool,sendOrder,environment,enabled:enabled&&Boolean(sql&&sendOrder)}));

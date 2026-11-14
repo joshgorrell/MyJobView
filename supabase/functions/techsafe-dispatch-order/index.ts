@@ -2,6 +2,7 @@ import postgres from 'npm:postgres@3.4.7';
 import {createNativeDispatchHandler} from '../_shared/techsafe-native-dispatch-handler.mjs';
 import {createNativeTechsafeOrderSender} from '../_shared/techsafe-native-order-sender.mjs';
 import {createDenoTechsafeSecretReader} from '../_shared/techsafe-environment-secret-reader.mjs';
+import {createVaultTechsafeSecretReader} from '../_shared/techsafe-vault-secret-reader.mjs';
 const environment=Deno.env.get('TECHSAFE_NATIVE_SENDER_ENVIRONMENT');
 const enabled=Deno.env.get('TECHSAFE_NATIVE_SENDER_ENABLED')==='true'&&['sandbox','production'].includes(environment??'');
 const databaseUrl=Deno.env.get('TECHSAFE_SOURCE_DATABASE_URL')??Deno.env.get('SUPABASE_DB_URL');
@@ -19,5 +20,5 @@ const pool={connect:async()=>{
  return {query:async(query:string,parameters:unknown[]=[])=>({rows:Array.from(await session.unsafe(query,parameters as never[]))}),release:()=>session.release()};
 }};
 const sendOrder=sql&&sourceInstanceId?createNativeTechsafeOrderSender({pool,sourceInstanceId,environment:environment!,
- enabled:true,readSecret:createDenoTechsafeSecretReader()}):undefined;
+ enabled:true,readSecret:createVaultTechsafeSecretReader({pool,environment:environment!,readEnvironmentSecret:createDenoTechsafeSecretReader()})}):undefined;
 Deno.serve(createNativeDispatchHandler({pool,sendOrder,environment,enabled:enabled&&Boolean(sql&&sendOrder)}));
