@@ -23,6 +23,19 @@ assert.equal((await read({changes:[{...removal,locked:false}]})).reason,'approve
 assert.equal((await read({source:[{...lines[0],catalogOwned:false},...lines.slice(1)]})).reason,'invalid_source_line');
 assert.equal((await read({binding:{...base,enabled:false}})).reason,'connection_not_active');
 const added={...lines[1],id:'22222222-2222-4222-8222-222222222222',committedChangeLineId:ids.add};
+// A catalog item that was validly sold must remain eligible for historical
+// warranty imports after its catalog entry is deactivated. Inactive products
+// must not be re-enabled merely to send an already-approved Sales Order.
+const inactiveSold=await read({changes:[],source:[{
+  id:ids.kept,productId:'397ad80d-69ac-43f4-8f5a-818fcf8e397c',
+  catalogOwned:true,catalogActive:false,description:'Internal receiver fixture',
+  quantity:1,unitPrice:500,soldLabor:125,isMisc:false
+}]});
+assert.equal(inactiveSold.ready,true);
+assert.equal(inactiveSold.eligibleItems.length,1);
+assert.equal(inactiveSold.equipmentCents,50000);
+assert.equal(inactiveSold.soldLaborTotalCents,12500);
+
 const applied=await read({changes:[removal,addition],source:[...lines,added]});
 assert.equal(applied.ready,true);assert.equal(applied.items.length,2);
 console.log('PASS: reader approved change reconciliation, sold labor, eligibility, and holds');
