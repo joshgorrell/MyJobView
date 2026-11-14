@@ -325,3 +325,8 @@ verify_jwt = true
 # Dealer-admin-only native approval sender; body independently verifies the user.
 [functions.techsafe-send-sales-order]
 verify_jwt = true
+
+# Private SQL-issued one-use sandbox capability; handler independently authenticates it.
+[functions.techsafe-run-sandbox-check]
+verify_jwt = false
+

@@ -5,6 +5,7 @@ on:
     paths:
       - 'supabase/functions/_shared/techsafe-*.mjs'
       - 'supabase/functions/techsafe-send-sales-order/**'
+      - 'supabase/functions/techsafe-run-sandbox-check/**'
       - 'supabase/config.toml'
       - 'tools/techsafe/prepare-native-runtime.mjs'
       - 'src/lib/techsafe/**'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'supabase/functions/_shared/techsafe-*.mjs'
       - 'supabase/functions/techsafe-send-sales-order/**'
+      - 'supabase/functions/techsafe-run-sandbox-check/**'
       - 'tests/techsafe/**'
       - 'supabase/functions/_shared/change-order-*.mjs'
       - 'supabase/config.toml'
@@ -92,7 +94,7 @@ jobs:
           mkdir -p node_modules/@electric-sql
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
       - name: Verify native approval capture and real persisted sender authority
-        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs
+        run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs && node tests/techsafe/sandbox-invocation-postgres.mjs
 
   native-sender-runtime:
     runs-on: ubuntu-latest
@@ -111,5 +113,6 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/techsafe-native-runtime" --ignore-scripts --no-audit --no-fund postgres@3.4.7 @supabase/supabase-js@2.94.0 @types/node@22.13.10
       - name: Typecheck the exact native sender deployment source
         working-directory: ${{ runner.temp }}/techsafe-native-runtime
-        run: deno check --no-lock --node-modules-dir=manual supabase/functions/techsafe-send-sales-order/index.ts
+        run: deno check --no-lock --node-modules-dir=manual supabase/functions/techsafe-send-sales-order/index.ts supabase/functions/techsafe-run-sandbox-check/index.ts
+
 
