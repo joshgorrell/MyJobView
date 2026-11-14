@@ -38,7 +38,7 @@ export async function fingerprintCurrentSalesOrder({binding,lines,changes}={},di
  approved.sort((a,b)=>a.id.localeCompare(b.id));
  const projection={version:1,connectionId:binding.connection_id,organizationId:binding.organization_id,
   orderId:binding.sales_order_id,proposalId:binding.proposal_id,generation:Number(binding.connection_generation),
-  lines:selected,appliedChanges:approved};
+  lines:selected,appliedChanges:approved,\n  // Completion changes the warranty purchase deadline, even when no sold\n  // equipment or labor line changes. Force a new source revision/certificate.\n  orderStatus:binding.order_status??null,\n  firstCompletionDate:binding.first_completion_date??null};
  let fingerprint;
  try{fingerprint=await digest(JSON.stringify(projection));}catch{return hold('digest_unavailable');}
  if(typeof fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(fingerprint))return hold('digest_invalid');
