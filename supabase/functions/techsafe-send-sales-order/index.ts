@@ -9,6 +9,9 @@ import {createDenoTechsafeSecretReader} from '../_shared/techsafe-environment-se
 // Opt-in backend runtime. SQL credentials must be private SQL credentials,
 // never an anon/service-role API key or a request-supplied value.
 const enabled=Deno.env.get('TECHSAFE_NATIVE_SENDER_ENABLED')==='true';
+// Sandbox must be explicitly selected; never silently switch a live sender.
+const requestedEnvironment=Deno.env.get('TECHSAFE_NATIVE_SENDER_ENVIRONMENT');
+const environment=requestedEnvironment==='sandbox'||requestedEnvironment==='production'?requestedEnvironment:null;
 // Supabase's built-in SQL URL stays on the server; no password copy is needed.
 const databaseUrl=Deno.env.get('TECHSAFE_SOURCE_DATABASE_URL')??Deno.env.get('SUPABASE_DB_URL');
 const supabaseUrl=Deno.env.get('SUPABASE_URL');
@@ -21,7 +24,7 @@ try{
    ssl:'require',prepare:false,max:2,connect_timeout:10,idle_timeout:20,onnotice:()=>{}});
  }
 }catch{/* Keep disabled without logging secrets. */}
-const configured=enabled&&sql!==null&&Boolean(supabaseUrl&&serviceKey);
+const configured=enabled&&sql!==null&&environment!==null&&Boolean(supabaseUrl&&serviceKey);
 const admin=configured?createClient(supabaseUrl!,serviceKey!,{auth:{persistSession:false,autoRefreshToken:false}}):null;
 const pool={connect:async()=>{
  if(!sql)throw Error('source_database_unavailable');
@@ -30,7 +33,7 @@ const pool={connect:async()=>{
   release:()=>session.release()};
 }};
 const sender=configured?createNativeTechsafeOrderSender({pool,sourceInstanceId:new URL(supabaseUrl!).hostname.split('.')[0],
- environment:'production',readSecret:createDenoTechsafeSecretReader(),enabled:true}):undefined;
+ environment:environment!,readSecret:createDenoTechsafeSecretReader(),enabled:true}):undefined;
 const handler=createNativeTechsafeSendHandler({enabled:configured,
  authenticateService:createTechsafeServiceAuthenticator(serviceKey),
  authenticateAdmin:async(authorization:string|null)=>{
