@@ -10,7 +10,7 @@ try{
  await db.exec(`CREATE SCHEMA techsafe_source;
  CREATE ROLE anon NOLOGIN;CREATE ROLE authenticated NOLOGIN;CREATE ROLE service_role NOLOGIN;
  CREATE TABLE public.proposals(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid,contact_id uuid,status text,approved_at timestamptz,approval_completed_at timestamptz);
- CREATE TABLE public.sales_orders(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,contact_id uuid,created_at timestamptz DEFAULT now(),first_completion_date timestamptz);
+ CREATE TABLE public.sales_orders(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,contact_id uuid,created_at timestamptz DEFAULT now(),first_completion_date timestamptz,status text DEFAULT 'planning');
  CREATE TABLE public.proposal_line_items(id uuid PRIMARY KEY,organization_id uuid,proposal_id uuid,product_id uuid,description text,item_type text,quantity numeric,unit_price numeric,line_total numeric,labor_total numeric,is_customer_supplied boolean,internal_cost numeric);
  CREATE TABLE public.change_orders(id uuid PRIMARY KEY,organization_id uuid,sales_order_id uuid,status text);`);
  await db.exec(readFileSync(new URL('../../supabase/migrations/20261109183000_techsafe_equipment_certificate_storage.sql',import.meta.url),'utf8'));
@@ -24,6 +24,7 @@ try{
  await db.query(`UPDATE public.proposals SET status='approved',approved_at=now() WHERE id=$1`,[oldProposal]);
  await db.exec('COMMIT');
  assert.equal((await db.query('SELECT count(*)::int AS n FROM techsafe_source.native_approval_equipment_basis')).rows[0].n,0);
+ await db.exec(readFileSync(new URL('../../supabase/migrations/20261114115511_techsafe_sales_order_completion_clock.sql',import.meta.url),'utf8'));
  // Native transaction: approval may precede order/line creation; deferred
  // capture must see the final committed rows rather than the partial state.
  await db.exec('BEGIN');
@@ -76,7 +77,7 @@ try{
  // Exercise the REAL owned certification and delivery gate, not mocked proof.
  await db.exec(readFileSync(new URL('../../supabase/migrations/20261108150000_techsafe_private_order_revision_ledger.sql',import.meta.url),'utf8'));
  await db.exec(`ALTER TABLE public.proposals ADD COLUMN accepted_via_method text,ADD COLUMN approved_by uuid;
- ALTER TABLE public.sales_orders ADD COLUMN status text DEFAULT 'planning';
+
  ALTER TABLE public.proposal_line_items ADD COLUMN is_hidden boolean DEFAULT false,
  ADD COLUMN committed_change_order_line_id uuid,ADD COLUMN parent_item_id uuid,ADD COLUMN display_mode text;
  ALTER TABLE public.change_orders ADD COLUMN is_active boolean DEFAULT true,
