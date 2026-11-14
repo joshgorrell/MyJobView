@@ -133,10 +133,21 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
   })();
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch =
-      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.contact?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.proposal?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const search = searchTerm.trim().toLowerCase();
+    const searchableValues = [
+      order.contact?.full_name,
+      order.contact?.email,
+      order.contact?.phone,
+      order.proposal?.title,
+      order.proposal?.proposal_number,
+      order.order_number,
+      order.sales_rep?.full_name,
+      order.created_by_name,
+      order.status,
+    ];
+    const matchesSearch = !search || searchableValues.some(value =>
+      value != null && String(value).toLowerCase().includes(search)
+    );
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     const matchesRep = !selectedRepId || order.sales_rep_id === selectedRepId;
     const matchesOffice = !officeIdFilter || (order as any).office_id === officeIdFilter;
@@ -224,7 +235,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted w-4 h-4" />
           <input
             type="text"
-            placeholder="Search orders, customers..."
+            placeholder="Search sales orders..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 bg-surface border border-subtle rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px]"
