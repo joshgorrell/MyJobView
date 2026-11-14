@@ -1,7 +1,8 @@
 # Native cancellation delivery
 
 The existing private native sender first checks the locked Sales Order and its
-owning proposal. If either is natively cancelled, it sends the receiver's existing
+owning proposal. If either is natively cancelled, or a transactionally captured
+native deletion tombstone exists for the exact connection scope, it sends the receiver's existing
 negative `hold` contract with reason `source_unavailable`. It sends no equipment,
 customer details, completion claims, pricing or coverage authorization.
 
@@ -19,8 +20,8 @@ migration and deploy the MJV sender. Missing storage or a held/paused/revoked
 connection fails closed. No connection is activated by this batch.
 
 This wires cancellation into explicit native sender invocations. Automatic
-event scheduling/retry and physical-deletion delivery remain outstanding. A
-cancelled order must still be dispatched; local invalidation alone is not remote
+event scheduling/retry remains outstanding. A cancelled or deleted order must
+still be dispatched; local invalidation alone is not remote
 delivery. Positive approved-change certification remains separate.
 
 The receiver holds new imported-flow pricing/checkout and retains the last
@@ -37,3 +38,31 @@ references, notes, attachments or credentials for this new private record type.
 Independent native orders, customers, proposals and remote receipts keep their
 existing lifecycle and deletion restrictions. Database tests cover scoped cleanup,
 rollback and preservation of the native order.
+
+## Permitted native Sales Order deletion
+
+Techsafe does not decide whether MJV permits deletion. Native billing,
+procurement and other business restrictions remain unchanged. The integration's
+two Sales Order foreign keys previously added an unintended blanket restriction;
+the deletion migration replaces those keys with exact live-scope validation on
+connection creation/rebinding and preserves the existing identity-update guard.
+
+A permitted native DELETE captures only order/organization/proposal identity and
+deletion time in a private tombstone, in the same transaction. Native approval
+evidence is an exclusively owned child and cascades; direct mutation of evidence
+for a live order still fails. The connection, revision stream, export receipts and
+independent native proposal remain independent records. There are no Flow,
+notification, note or attachment children of this tombstone. No native invoice,
+purchase order, customer or remote purchased coverage is deleted by Techsafe.
+
+The tombstone authorizes negative delivery only. Missing source rows without a
+tombstone do not qualify. A reused deleted UUID cannot revive a connection. A
+deletion between preparation and delivery invalidates the older cancellation
+event; retry produces a later stable deletion hold. Paused/revoked connections
+still fail closed. Native failure/rollback restores evidence and removes the
+uncommitted tombstone. Tests exercise deletion, rollback, restricting native
+children, organization isolation, preserved provenance and stale-event denial.
+
+Deploy the migration before the matching sender (the sender reads the new
+tombstone table), after the compatible receiver is already deployed. No
+connection is activated and no historical deletion is inferred or backfilled.

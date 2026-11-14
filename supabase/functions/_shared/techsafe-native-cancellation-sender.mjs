@@ -1,5 +1,6 @@
 // Negative source authority only: suppress new checkout for a natively
-// cancelled order. This can never authorize equipment, pricing or coverage.
+// cancelled or natively deleted order. This can never authorize equipment,
+// pricing or coverage. Missing rows alone are never deletion evidence.
 import {createHash,randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(v);
@@ -29,6 +30,16 @@ export function createNativeCancellationSender({pool,sourceInstanceId,environmen
   requireFact(c.length===1&&c[0].enabled===true&&c[0].status==='active');
   const row=c[0],generation=Number(row.connection_generation);
   requireFact(Number.isSafeInteger(generation)&&generation>0);
+  const deleted=(await client.query(`SELECT organization_id,proposal_id,deleted_at
+   FROM techsafe_source.deleted_sales_orders WHERE sales_order_id=$1 FOR SHARE`,[orderId])).rows;
+  if(deleted.length){
+   requireFact(deleted.length===1&&deleted[0].organization_id===row.organization_id&&
+    deleted[0].proposal_id===row.proposal_id);
+   requireFact((await client.query('SELECT id FROM public.sales_orders WHERE id=$1',[orderId])).rows.length===0);
+   return {cancelled:true,holdReason:'source_deleted',organizationId:row.organization_id,
+    proposalId:row.proposal_id,generation,
+    fingerprint:hash([connectionId,orderId,row.organization_id,row.proposal_id,generation,deleted[0]])};
+  }
   const orders=(await client.query(`SELECT so.status AS order_status,p.status AS proposal_status
    FROM public.sales_orders so JOIN public.proposals p
     ON p.id=so.proposal_id AND p.organization_id=so.organization_id
@@ -37,7 +48,7 @@ export function createNativeCancellationSender({pool,sourceInstanceId,environmen
   requireFact(orders.length===1);
   const cancelled=['cancelled','canceled'].includes(orders[0].order_status)||
    ['cancelled','canceled'].includes(orders[0].proposal_status);
-  return {cancelled,organizationId:row.organization_id,proposalId:row.proposal_id,generation,
+  return {cancelled,holdReason:'source_cancelled',organizationId:row.organization_id,proposalId:row.proposal_id,generation,
    fingerprint:hash([connectionId,orderId,row.organization_id,row.proposal_id,generation,orders[0]])};
  };
  const payload=(scope,revision,eventId)=>({schemaVersion:1,messageType:'hold',environment,
@@ -55,7 +66,7 @@ export function createNativeCancellationSender({pool,sourceInstanceId,environmen
    if(prior)requireFact(prior.organization_id===ctx.organizationId&&prior.proposal_id===ctx.proposalId);
    const existing=(await client.query(`SELECT event_payload FROM techsafe_source.negative_order_exports
     WHERE connection_id=$1 AND sales_order_id=$2 FOR UPDATE`,[connectionId,orderId])).rows[0];
-   if(prior?.state==='held'&&prior.hold_reason==='source_cancelled'&&
+   if(prior?.state==='held'&&prior.hold_reason===ctx.holdReason&&
       Number(prior.connection_generation)===ctx.generation&&prior.source_fingerprint===ctx.fingerprint&&
       uuid(existing?.event_payload?.eventId)&&Number.isSafeInteger(Number(prior.revision))){
     const event=payload(scope,Number(prior.revision),existing.event_payload.eventId);
@@ -67,11 +78,11 @@ export function createNativeCancellationSender({pool,sourceInstanceId,environmen
    const event=payload(scope,revision,randomUUID());
    await client.query(`INSERT INTO techsafe_source.order_revision_ledger
     (connection_id,organization_id,sales_order_id,proposal_id,revision,connection_generation,source_fingerprint,state,hold_reason)
-    VALUES($1,$2,$3,$4,$5,$6,$7,'held','source_cancelled')
+    VALUES($1,$2,$3,$4,$5,$6,$7,'held',$8)
     ON CONFLICT(connection_id,sales_order_id) DO UPDATE SET revision=EXCLUDED.revision,
      connection_generation=EXCLUDED.connection_generation,source_fingerprint=EXCLUDED.source_fingerprint,
-     state='held',hold_reason='source_cancelled',updated_at=clock_timestamp()`,
-    [connectionId,ctx.organizationId,orderId,ctx.proposalId,revision,ctx.generation,ctx.fingerprint]);
+     state='held',hold_reason=EXCLUDED.hold_reason,updated_at=clock_timestamp()`,
+    [connectionId,ctx.organizationId,orderId,ctx.proposalId,revision,ctx.generation,ctx.fingerprint,ctx.holdReason]);
    await client.query(`INSERT INTO techsafe_source.negative_order_exports(connection_id,sales_order_id,event_payload)
     VALUES($1,$2,$3::jsonb) ON CONFLICT(connection_id,sales_order_id)
     DO UPDATE SET event_payload=EXCLUDED.event_payload`,[connectionId,orderId,JSON.stringify(event)]);
@@ -94,7 +105,7 @@ export function createNativeCancellationSender({pool,sourceInstanceId,environmen
       ON e.connection_id=l.connection_id AND e.sales_order_id=l.sales_order_id
      WHERE l.connection_id=$1 AND l.sales_order_id=$2 FOR SHARE OF l,e`,[connectionId,orderId])).rows;
     requireFact(rows.length===1&&Number(rows[0].revision)===event.revision&&rows[0].state==='held'&&
-     rows[0].hold_reason==='source_cancelled'&&rows[0].source_fingerprint===ctx.fingerprint&&
+     rows[0].hold_reason===ctx.holdReason&&rows[0].source_fingerprint===ctx.fingerprint&&
      isDeepStrictEqual(rows[0].event_payload,event));
    });
   }catch{return held('cancellation_delivery_not_authorized');}
@@ -111,3 +122,4 @@ export function createNativeCancellationSender({pool,sourceInstanceId,environmen
   }catch{return held('transport_failed');}
  };
 }
+
