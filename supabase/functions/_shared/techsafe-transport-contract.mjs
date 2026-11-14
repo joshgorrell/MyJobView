@@ -40,7 +40,7 @@ export function prepareTechsafeTransportSnapshot({source,authority,binding,revis
   return held('snapshot_contract_unverified');
  if(!['production','sandbox'].includes(snapshot.environment)||!id(snapshot.sourceInstanceId)||
   !['open','completed','cancelled','deleted'].includes(snapshot.orderStatus)||snapshot.currency!=='USD'||
-  (snapshot.orderStatus==='completed' && (typeof snapshot.completedOn!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(snapshot.completedOn)||!Number.isFinite(Date.parse(snapshot.completedOn+'T00:00:00Z'))||new Date(snapshot.completedOn+'T00:00:00Z').toISOString().slice(0,10)!==snapshot.completedOn))||
+  (snapshot.orderStatus==='completed' && (typeof snapshot.completedOn!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.completedOn)||!Number.isFinite(Date.parse(snapshot.completedOn+'T00:00:00Z'))||new Date(snapshot.completedOn+'T00:00:00Z').toISOString().slice(0,10)!==snapshot.completedOn))||
   (snapshot.orderStatus!=='completed'&&snapshot.completedOn!==undefined)||
   !nonnegative(snapshot.minimumUnitValueCents)||
   (snapshot.soldLaborCents!==undefined&&!nonnegative(snapshot.soldLaborCents))||!id(snapshot.customerRef)||!id(snapshot.siteRef)||
