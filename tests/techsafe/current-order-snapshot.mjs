@@ -40,3 +40,10 @@ for(const invalid of [
  {...args,minimumUnitValueCents:-1}
 ])assert.equal(prepareCurrentSalesOrderTechsafeSnapshot(invalid).ready,false);
 console.log('PASS: direct current Sales Order creates valid Techsafe v2 equipment/labor payload without granting authority');
+
+const completed=prepareCurrentSalesOrderTechsafeSnapshot({...args,orderStatus:'completed',completedOn:'2026-01-15'});
+assert.equal(completed.ready,true);
+assert.equal(completed.snapshot.completedOn,'2026-01-15');
+assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,orderStatus:'completed'}).ready,false);
+assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,orderStatus:'completed',completedOn:'2026-02-30'}).ready,false);
+assert.equal(prepareCurrentSalesOrderTechsafeSnapshot({...args,completedOn:'2026-01-15'}).ready,false);
