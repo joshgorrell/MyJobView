@@ -1,3 +1,4 @@
+import {techsafePostgresJsonTypes} from '../_shared/techsafe-postgres-json.mjs';
 import postgres from 'npm:postgres@3.4.7';
 import {createSandboxInvocationHandler} from '../_shared/techsafe-sandbox-invocation.mjs';
 import {createNativeTechsafeOrderSender} from '../_shared/techsafe-native-order-sender.mjs';
@@ -16,7 +17,7 @@ try{
   const db=new URL(databaseUrl),project=new URL(projectUrl);
   if(['postgres:','postgresql:'].includes(db.protocol)&&project.protocol==='https:'){
    sourceInstanceId=project.hostname.split('.')[0];
-   sql=postgres(databaseUrl,{ssl:'require',prepare:false,max:2,connect_timeout:10,idle_timeout:20,onnotice:()=>{}});
+   sql=postgres(databaseUrl,{types:techsafePostgresJsonTypes,ssl:'require',prepare:false,max:2,connect_timeout:10,idle_timeout:20,onnotice:()=>{}});
   }
  }
 }catch{/* Disabled without logging private configuration. */}

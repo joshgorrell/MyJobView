@@ -1,3 +1,4 @@
+import {techsafePostgresJsonTypes} from '../_shared/techsafe-postgres-json.mjs';
 import {withTechsafeBrowserCors} from '../_shared/techsafe-browser-handler.mjs';
 import postgres from 'npm:postgres@3.4.7';
 import {createClient} from 'npm:@supabase/supabase-js@2.94.0';
@@ -22,7 +23,7 @@ try{
  if(enabled&&databaseUrl&&supabaseUrl&&serviceKey){
   const url=new URL(databaseUrl);
   if(['postgres:','postgresql:'].includes(url.protocol))sql=postgres(databaseUrl,{
-   ssl:'require',prepare:false,max:2,connect_timeout:10,idle_timeout:20,onnotice:()=>{}});
+   types:techsafePostgresJsonTypes,ssl:'require',prepare:false,max:2,connect_timeout:10,idle_timeout:20,onnotice:()=>{}});
  }
 }catch{/* Keep disabled without logging secrets. */}
 const configured=enabled&&sql!==null&&environment!==null&&Boolean(supabaseUrl&&serviceKey);

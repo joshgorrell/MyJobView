@@ -105,10 +105,15 @@ jobs:
           node-version: '22'
       - name: Install isolated pinned PostgreSQL test engine
         run: |
-          npm install --prefix "$RUNNER_TEMP/techsafe-native-db" --no-audit --no-fund --ignore-scripts @electric-sql/pglite@0.3.14 pg@8.16.3
+          npm install --prefix "$RUNNER_TEMP/techsafe-native-db" --no-audit --no-fund --ignore-scripts @electric-sql/pglite@0.3.14 pg@8.16.3 postgres@3.4.7
           mkdir -p node_modules/@electric-sql
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
           ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/pg" node_modules/pg
+          ln -s "$RUNNER_TEMP/techsafe-native-db/node_modules/postgres" node_modules/postgres
+      - name: Verify actual deployment driver JSON serialization over PostgreSQL 16
+        env:
+          TECHSAFE_POSTGRES_JSON_TEST_DATABASE_URL: postgres://postgres:test_only_password@127.0.0.1:5432/techsafe_native_commit_test
+        run: node tests/techsafe/postgres-json-wire.mjs
       - name: Verify native approval capture and real persisted sender authority
         run: node tests/techsafe/native-approval-basis-postgres.mjs && node tests/techsafe/admin-connected-orders.mjs && node tests/techsafe/native-cancellation-postgres.mjs && node tests/techsafe/sandbox-invocation-postgres.mjs && node tests/techsafe/native-committed-basis-postgres.mjs && node tests/techsafe/native-delivery-queue-postgres.mjs && node tests/techsafe/vault-credentials-postgres.mjs
       - name: Verify native commit and concurrent line-write exclusion on PostgreSQL 16
@@ -161,7 +166,7 @@ jobs:
           node-version: '22'
       - name: Install isolated pinned PostgreSQL test clients
         run: |
-          npm install --prefix "$RUNNER_TEMP/techsafe-delivery-db" --no-audit --no-fund --ignore-scripts @electric-sql/pglite@0.3.14 pg@8.16.3
+          npm install --prefix "$RUNNER_TEMP/techsafe-delivery-db" --no-audit --no-fund --ignore-scripts @electric-sql/pglite@0.3.14 pg@8.16.3 postgres@3.4.7
           mkdir -p node_modules/@electric-sql
           ln -s "$RUNNER_TEMP/techsafe-delivery-db/node_modules/@electric-sql/pglite" node_modules/@electric-sql/pglite
           ln -s "$RUNNER_TEMP/techsafe-delivery-db/node_modules/pg" node_modules/pg
