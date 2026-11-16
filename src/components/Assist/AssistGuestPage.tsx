@@ -67,7 +67,7 @@ export default function AssistGuestPage({ initialCode = '' }: { initialCode?: st
         <p className="mt-4 text-xs text-muted">No MJV account or password needed. Only continue with someone you know and trust.</p>
       </form> : <>
         <h2 className="text-lg font-semibold text-primary">Let’s connect your computer</h2>
-        <ol className="my-5 list-inside list-decimal space-y-4 text-primary"><li>Download the support app below.</li><li>Open the downloaded file and choose <strong>Connect</strong>.</li><li>When asked, choose <strong>Allow</strong> to let your support person help.</li></ol>
+        <ol className="my-5 list-inside list-decimal space-y-4 text-primary"><li>Download the support app below.</li><li>Open the downloaded file and choose <strong>Connect</strong>.</li><li>Approve the request to let your support person help.</li></ol>
         {!ending && <a href={claim.download_url} rel="noreferrer" referrerPolicy="no-referrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 font-semibold text-white"><Download size={18} />Download support app</a>}
         <p className="mt-3 text-xs text-muted">For Windows 64-bit. Keep this page and the support app open. You can close the app at any time to disconnect.</p>
         <p className="mt-5 text-sm text-primary" role="status">{claim.state === 'support_window_ready' ? 'Your support person has opened support. Approve the request on your computer.' : claim.state === 'computer_ready' ? 'Your computer is ready. Waiting for your support person…' : 'Waiting for you to open the app and choose Connect…'}</p>

@@ -191,6 +191,7 @@ function PortalModuleGuard({ moduleKey, children }: { moduleKey: string; childre
 
 function AppContent() {
   const { user, profile, loading, isPasswordRecovery, isPortalUser, signOut } = useAuth();
+  const [assistGuestCode, setAssistGuestCode] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('code'));
   const { starredModules, hasModuleAccess: checkModuleAccess, modules: departmentModules, loading: departmentsLoading } = useDepartments();
   const [directoryEnabled, setDirectoryEnabled] = useState(false);
   useEffect(() => { if (!profile?.id) return; let active=true; const refresh=()=>{void supabase.rpc('company_directory_enabled').then(({data,error})=>{if(active)setDirectoryEnabled(!error && Boolean(data));});};refresh();window.addEventListener('company-directory-changed',refresh);return()=>{active=false;window.removeEventListener('company-directory-changed',refresh)};},[profile?.id]);
@@ -242,6 +243,7 @@ function AppContent() {
     return pageFromLocation(window.location, 'feed');
   });
   const setActiveTab = React.useCallback((tab: string) => {
+    setAssistGuestCode(null);
     const page = resolveLegacyPage(tab);
     const current = new URL(window.location.href);
     if (profile && !isPortalUser && (current.pathname === '/' || workspacePage(current.pathname))) {
@@ -273,8 +275,8 @@ function AppContent() {
       return !current;
     });
   };
-  const [assistGuestCode] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('code'));
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const isGuestAssist = currentPath === '/assist' && (assistGuestCode !== null || !user || isPortalUser);
   const [_currentHash, setCurrentHash] = useState(window.location.hash);
 
   // Record a visit only when the logical workspace page changes, not on each render.
@@ -369,6 +371,7 @@ function AppContent() {
   activeTabRef.current = activeTab;
 
   useEffect(() => {
+    if (isGuestAssist) return;
     if (profile && !departmentsLoading && departmentModules.length > 0) {
       const currentTab = activeTabRef.current;
       if (!currentTab || currentTab === 'feed') return;
@@ -383,11 +386,12 @@ function AppContent() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, departmentsLoading, departmentModules]);
+  }, [profile, departmentsLoading, departmentModules, isGuestAssist]);
 
   useEffect(() => {
     const handlePopState = () => {
       setCurrentPath(window.location.pathname);
+      setAssistGuestCode(new URLSearchParams(window.location.hash.slice(1)).get('code'));
       setCurrentHash(window.location.hash);
 
       // Restore state from URL when using browser back/forward
@@ -412,6 +416,8 @@ function AppContent() {
     };
 
     const handleHashChange = () => {
+      const code = new URLSearchParams(window.location.hash.slice(1)).get('code');
+      if (window.location.pathname === '/assist' && code !== null) setAssistGuestCode(code);
       setCurrentHash(window.location.hash);
     };
 
@@ -425,7 +431,7 @@ function AppContent() {
 
   // Save active tab to localStorage and update URL whenever state changes
   useEffect(() => {
-    if (!profile || isPortalUser || isPasswordRecovery || loading) return;
+    if (isGuestAssist || !profile || isPortalUser || isPasswordRecovery || loading) return;
     if (isPortalProposalRoute(currentPath, window.location.search, isPortalUser, !!localStorage.getItem('admin_impersonating_contact'))) return;
     if (currentPath !== '/' && !workspacePage(currentPath)) return;
     const urlParams = new URLSearchParams(window.location.search);
@@ -482,7 +488,7 @@ function AppContent() {
       window.history.replaceState({}, '', newUrl);
       setCurrentPath(window.location.pathname);
     }
-  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath, profile, isPortalUser, isPasswordRecovery, loading]);
+  }, [activeTab, openProposalId, selectedLeadId, openTaskId, openFlowThreadId, openChangeOrderId, openSalesOrderId, selectedWorkOrderId, currentPath, profile, isPortalUser, isPasswordRecovery, loading, isGuestAssist]);
 
   // Close all modals when switching tabs to prevent overlay issues
   useEffect(() => {
@@ -494,8 +500,8 @@ function AppContent() {
     setShowJobMediaUpload(false);
   }, [activeTab]);
 
-  if (currentPath === '/assist' && (assistGuestCode !== null || !user || isPortalUser)) {
-    return <Suspense fallback={<LoadingFallback />}><AssistGuestPage initialCode={assistGuestCode || ''} /></Suspense>;
+  if (isGuestAssist) {
+    return <Suspense fallback={<LoadingFallback />}><AssistGuestPage key={assistGuestCode ?? 'manual'} initialCode={assistGuestCode || ''} /></Suspense>;
   }
 
   if (currentPath === '/shared/proposal') {

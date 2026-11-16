@@ -20,7 +20,7 @@ const server=createServer(async(req,res)=>{
  res.end(await readFile(join(dir,file)));
 });
 try{
- await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import AssistPage from './src/components/Assist/AssistPage';import AssistGuestPage from './src/components/Assist/AssistGuestPage';import{AssistSettings}from'./src/components/Admin/AssistSettings';createRoot(document.getElementById('root')).render(location.search.includes('guest')?<AssistGuestPage initialCode={new URLSearchParams(location.hash.slice(1)).get('code')||''}/>:location.search.includes('settings')?<AssistSettings/>:<AssistPage/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(dir,'app.js'),plugins:[{name:'fixture',setup(b){b.onResolve({filter:/(lib\/supabase|contexts\/(AuthContext|TenantContext))$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture}));}}]});
+ await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import AssistPage from './src/components/Assist/AssistPage';import AssistGuestPage from './src/components/Assist/AssistGuestPage';import{AssistSettings}from'./src/components/Admin/AssistSettings';function GuestEntry(){const[code,setCode]=React.useState(new URLSearchParams(location.hash.slice(1)).get('code')||'');React.useEffect(()=>{const update=()=>{const next=new URLSearchParams(location.hash.slice(1)).get('code');if(next!==null)setCode(next)};window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update)},[]);return <AssistGuestPage key={code} initialCode={code}/>;}createRoot(document.getElementById('root')).render(location.search.includes('guest')?<GuestEntry/>:location.search.includes('settings')?<AssistSettings/>:<AssistPage/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,format:'iife',jsx:'automatic',outfile:join(dir,'app.js'),plugins:[{name:'fixture',setup(b){b.onResolve({filter:/(lib\/supabase|contexts\/(AuthContext|TenantContext))$/},()=>({path:'fixture',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture}));}}]});
  const css=(await readdir('dist/assets')).find(x=>x.startsWith('index-')&&x.endsWith('.css'));
  await writeFile(join(dir,'style.css'),await readFile('dist/assets/'+css));
  await writeFile(join(dir,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><main class="theme-workspace bg-workspace"><div id="root"></div></main><script src="/app.js"></script></body></html>');
@@ -76,7 +76,7 @@ try{
  await page.getByRole('button',{name:'Create invitation',exact:true}).waitFor();
  for(const width of [1280,390]){
   await page.setViewportSize({width,height:900});
-  await page.goto(url+'?mode=guest#code=ABCD-EFGH-JKLM');
+  await page.goto(url+'?mode=guest&width='+width+'#code=ABCD-EFGH-JKLM');
   await page.getByLabel('Support code').waitFor();
   assert.equal(await page.getByLabel('Support code').inputValue(),'ABCD-EFGH-JKLM');
   assert.equal(await page.evaluate(()=>location.hash),'');
@@ -88,6 +88,9 @@ try{
   assert.equal((await page.locator('body').innerText()).includes('test-claim-token'),false);
   await page.getByRole('button',{name:'End session',exact:true}).click();
   await page.getByRole('heading',{name:'Session ended',exact:true}).waitFor();
+  await page.evaluate(()=>{location.hash='code=NPQR-STUV-WXYZ';});
+  await page.getByLabel('Support code').waitFor();
+  assert.equal(await page.getByLabel('Support code').inputValue(),'NPQR-STUV-WXYZ');
  }
  await page.goto(url+'?mode=settings');await page.getByRole('checkbox',{name:'Josh Paul',exact:true}).check();
  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='manage_assist_operators'&&c.args.p_user_id==='jp'&&c.args.p_granted===true).length),1);

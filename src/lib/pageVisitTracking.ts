@@ -1,5 +1,9 @@
 import { supabase } from './supabase';
 
+// If the optional tracking table is absent from this deployment, stop retrying
+// until the next page load. Tracking must never interfere with navigation.
+let pageVisitTrackingUnavailable = false;
+
 // Only logical route labels are stored. Never persist raw paths or query strings.
 export function pageKeyFromPath(pathname: string): string | null {
   const segments = pathname.toLowerCase().split('/').filter(Boolean);
@@ -9,8 +13,12 @@ export function pageKeyFromPath(pathname: string): string | null {
 }
 
 export async function recordPageVisit(userId: string, organizationId: string, pathname: string): Promise<void> {
+  if (pageVisitTrackingUnavailable) return;
   const page_key = pageKeyFromPath(pathname);
   if (!page_key) return;
   const { error } = await supabase.from('user_page_visits').insert({ user_id: userId, organization_id: organizationId, page_key });
+  if (error?.code === '42P01' || error?.code === 'PGRST205') {
+    pageVisitTrackingUnavailable = true;
+  }
   if (error && import.meta.env.DEV) console.warn('Page visit tracking unavailable:', error.message);
 }
