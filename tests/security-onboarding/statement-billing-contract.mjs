@@ -44,4 +44,17 @@ assert.match(recurring, /\*v_months \+ v_fee/);
 assert.match(recurring, /statement fee \(\$5 per statement\)/);
 assert.match(recurring, /v_end,1,5,v_fee/);
 assert.doesNotMatch(recurring, /v_months,7,v_fee/);
+// Numeric scenarios mirror the SQL invoice calculation: annual billing
+// charges for 12 months of monitoring but only one mailed statement.
+function invoiceTotal(monthlyPrice, existingPaperFee, paperSelected, months, annualDiscountPercent = 0) {
+  const monitoring = (monthlyPrice - existingPaperFee) * months;
+  const statementFee = paperSelected ? 5 : 0;
+  const discount = months === 12 ? Math.round(monitoring * annualDiscountPercent) / 100 : 0;
+  return { statementFee, total: monitoring + statementFee - discount };
+}
+assert.deepEqual(invoiceTotal(42, 0, false, 1), { statementFee: 0, total: 42 });
+assert.deepEqual(invoiceTotal(42, 0, true, 1), { statementFee: 5, total: 47 });
+assert.deepEqual(invoiceTotal(42, 0, false, 12, 10), { statementFee: 0, total: 453.6 });
+assert.deepEqual(invoiceTotal(42, 0, true, 12, 10), { statementFee: 5, total: 458.6 });
+assert.deepEqual(invoiceTotal(47, 5, true, 12, 10), { statementFee: 5, total: 458.6 });
 console.log('Statement billing source contract checks passed');
