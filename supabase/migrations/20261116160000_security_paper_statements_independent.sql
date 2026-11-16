@@ -76,3 +76,34 @@ RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   );
 $$;
 REVOKE ALL ON FUNCTION private.security_safe_draft(jsonb) FROM PUBLIC, anon, authenticated;
+
+-- Reconcile the existing mode-based billing trigger with the independent
+-- delivery preference. The existing trigger runs first (alphabetical trigger
+-- ordering); this trigger then replaces its mode-derived fee with the fee
+-- actually selected. Preserve monitoring-only price across edits.
+CREATE OR REPLACE FUNCTION private.reconcile_security_paper_statement_fee()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_desired_fee numeric := CASE WHEN NEW.mailed_paper_statements THEN 5 ELSE 0 END;
+  v_prior_applied_fee numeric;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    -- The legacy trigger already adds $5 for Admin-approved manual billing.
+    v_prior_applied_fee := CASE WHEN NEW.security_billing_mode = 'mail' THEN 5 ELSE 0 END;
+  ELSIF NEW.security_billing_mode IS DISTINCT FROM OLD.security_billing_mode THEN
+    -- The legacy trigger has already adjusted price by (new mode fee - old fee).
+    v_prior_applied_fee := CASE WHEN NEW.security_billing_mode = 'mail' THEN 5 ELSE 0 END;
+  ELSE
+    -- No mode change: legacy trigger rewrites fee, but leaves price unchanged.
+    v_prior_applied_fee := OLD.mail_invoice_fee;
+  END IF;
+  NEW.monthly_price := NEW.monthly_price + v_desired_fee - v_prior_applied_fee;
+  NEW.mail_invoice_fee := v_desired_fee;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.reconcile_security_paper_statement_fee() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS zzz_reconcile_security_paper_statement_fee ON public.security_contracts;
+CREATE TRIGGER zzz_reconcile_security_paper_statement_fee
+  BEFORE INSERT OR UPDATE ON public.security_contracts
+  FOR EACH ROW EXECUTE FUNCTION private.reconcile_security_paper_statement_fee();
