@@ -46,9 +46,9 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     <h2>Services and billing</h2><table><thead><tr><th>Included services</th></tr></thead><tbody>
     ${(document.services || []).map(s => `<tr><td>${esc(s.name)}</td></tr>`).join('')}
     <tr><td><strong>Overall account price: ${money(document.monthly_price)}/month</strong></td></tr></tbody></table>
-    <p>Initial term: ${esc(document.term_months)} months.<br>Billing preference: ${billing === 'annual' ? 'Annual' : 'Monthly'}.
+    <p>Initial term: ${esc(document.term_months)} months.<br>Payment frequency: ${billing === 'annual' ? 'Annual' : 'Monthly'}. Payments are collected in advance for the upcoming ${billing === 'annual' ? '12 months' : 'month'} of monitoring service, not for the prior service period.
     ${billing === 'annual' ? `<br>Annual subtotal: ${money(annualSubtotal)}. Discount: ${money(annualDiscount)}. Annual billing amount: ${money(annualSubtotal - annualDiscount)}.` : ''}</p>
-    <p>${document.billing_mode === 'mail' ? 'Admin-approved mailed invoices, included in the overall account price.' : 'Automatic recurring payments are required for security monitoring.'}
+    <p>${document.billing_mode === 'mail' ? 'Admin-approved mailed paper invoices. The monthly mailing fee is separately itemized on invoices and included in the overall account price.' : 'Automatic recurring payments are required for security monitoring.'}
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
     <p>Review the terms below for renewal, cancellation and payment obligations.${document.dealer?.company_email ? ` Contact: ${esc(document.dealer.company_email)}.` : ''}</p>
