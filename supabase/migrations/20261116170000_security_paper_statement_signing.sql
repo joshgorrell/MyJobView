@@ -48,9 +48,7 @@ BEGIN
   SELECT jsonb_build_object('name',t.name,'contract_terms',t.contract_terms) INTO v_template
     FROM public.security_contract_templates t WHERE t.id=v_contract.template_id AND t.organization_id=v_contract.organization_id;
   SELECT jsonb_build_object('company_name',cs.company_name,'company_email',cs.company_email,
-    'annual_billing_enabled',cs.annual_billing_enabled,'default_billing_preference',cs.default_billing_preference,
-    'annual_discount_type',cs.annual_discount_type,'annual_discount_percentage',cs.annual_discount_percentage,
-    'annual_discount_flat_amount',cs.annual_discount_flat_amount) INTO v_settings
+    'annual_billing_enabled',cs.annual_billing_enabled,'default_billing_preference',cs.default_billing_preference) INTO v_settings
     FROM public.company_settings cs WHERE cs.organization_id=v_contract.organization_id LIMIT 1;
   SELECT coalesce(jsonb_agg(jsonb_build_object('service_id',ms.id,'name',ms.name,'monthly_price',s.monthly_price) ORDER BY ms.name,s.id),'[]'::jsonb)
     INTO v_services FROM public.security_contract_services s JOIN public.monitoring_services ms ON ms.id=s.service_id
