@@ -403,11 +403,11 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
 
         <div className="border border-blue-200 bg-blue-50 rounded-xl p-4 space-y-3 print-hide">
           <p className="font-semibold text-blue-900">Security billing: {contractData.security_billing_mode === 'mail' ? 'Admin-approved mailed invoices' : 'Required AutoPay'}</p>
-          <p className="text-sm text-blue-900">{contractData.security_billing_mode === 'mail' ? 'The monthly price includes the $7 mailed-invoice fee.' : 'The customer must add or select a verified payment method and authorize recurring automatic payments.'}</p>
+          <p className="text-sm text-blue-900">{contractData.security_billing_mode === 'mail' ? 'The monthly price includes the separately itemized mailed-invoice fee shown on this agreement.' : 'The customer must add or select a verified payment method and authorize recurring automatic payments.'}</p>
           {profile?.role === 'admin' && !contractData.customer_completed_at && ['draft','pending_customer'].includes(contractData.status) &&
             <button disabled={billingUpdating} onClick={()=>void setSecurityBilling(contractData.security_billing_mode === 'mail' ? 'autopay' : 'mail')}
               className="px-4 py-2 bg-blue-900 text-white rounded-lg disabled:opacity-50">
-              {contractData.security_billing_mode === 'mail' ? 'Require AutoPay (remove $7/month fee)' : 'Authorize mailed invoices (+$7/month)'}
+              {contractData.security_billing_mode === 'mail' ? 'Require AutoPay (remove mailing fee)' : 'Authorize mailed invoices (add mailing fee)'}
             </button>}
           {billingError && <p role="alert" className="text-red-700">{billingError}</p>}
         </div>
