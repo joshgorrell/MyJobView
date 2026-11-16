@@ -1,0 +1,30 @@
+name: Service request creator updates
+on:
+  pull_request:
+    paths:
+      - 'src/components/Flow/**'
+      - 'src/components/Dispatch/ServiceRequestConsole.tsx'
+      - 'src/components/Sales/SalesServiceRequestsView.tsx'
+      - 'src/components/Shared/ContactLogHistory.tsx'
+      - 'src/hooks/useServiceRequestUpdates.ts'
+      - 'supabase/migrations/*service_request_creator_flow.sql'
+      - 'tests/service-requests/creator-*'
+      - '.github/workflows/service-request-creator-updates.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  creator-updates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false @electric-sql/pglite@0.3.14
+      - run: node tests/service-requests/creator-flow-database.mjs
+      - run: node tests/service-requests/creator-updates-runtime.mjs
+      - run: npm run build

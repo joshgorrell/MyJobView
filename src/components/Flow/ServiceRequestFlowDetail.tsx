@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { useServiceRequestUpdates } from '../../hooks/useServiceRequestUpdates';
 
 type ContactActivity = { id: string; notes: string; logged_by_name: string; created_at: string };
 type RequestDetail = { id: string; contact_id: string | null; customer_name: string; job_description: string; notes: string | null; priority: string; status: string; created_at: string; customer_contact_confirmed_at: string | null; requested_date: string | null; earliest_date: string | null; requested_tech_ids: string[] | null; work_order_id: string | null; work_order: { id: string; work_order_number: string; status: string; scheduled_date: string | null; scheduled_start_time?: string | null } | null };
 
 export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
+  const { profile } = useAuth();
+  const [revision, setRevision] = useState(0);
+  useServiceRequestUpdates(profile?.organization_id, () => setRevision(value => value + 1));
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [activities, setActivities] = useState<ContactActivity[]>([]);
   const [preferredTechNames, setPreferredTechNames] = useState<string[]>([]);
@@ -23,6 +28,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     ]).then(([details, log]) => {
       if (!active) return;
       if (details.error || log.error) { setError('Service request details are unavailable.'); return; }
+      setError('');
       const record = details.data as unknown as RequestDetail | null;
       setRequest(record);
       if (record?.requested_tech_ids?.length) {
@@ -37,7 +43,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
       setActivities((log.data || []) as ContactActivity[]);
     }).catch(() => { if (active) setError('Service request details are unavailable.'); });
     return () => { active = false; };
-  }, [requestId]);
+  }, [requestId, revision]);
   if (error) return <p>{error}</p>;
   if (!request) return <p>Loading service request details…</p>;
   const scheduled = request.work_order && !['cancelled'].includes(request.work_order.status) && !!request.work_order.scheduled_date;
@@ -45,7 +51,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     <p><strong>Customer:</strong> {request.contact_id ? <a className="text-info hover:underline" href={`?tab=contacts&contactId=${encodeURIComponent(request.contact_id)}`} aria-label={`Open ${request.customer_name} customer record`}>{request.customer_name} ↗</a> : request.customer_name}</p>
     <p><strong>Priority:</strong> {request.priority}</p>
     <p className="sm:col-span-2"><strong>Work requested:</strong> {request.job_description}</p>
-    <p><strong>Request:</strong> {request.status.replace(/_/g, ' ')} · Opened {new Date(request.created_at).toLocaleDateString()}</p>
+    <p><strong>Request:</strong> {request.status === 'pending_customer' ? 'Waiting on customer' : request.status === 'closed' ? 'Done' : request.status.replace(/_/g, ' ')} · Opened {new Date(request.created_at).toLocaleDateString()}</p>
     <p><strong>Customer contact:</strong> {request.customer_contact_confirmed_at ? 'Spoke with customer' : activities.length ? 'Contact attempted / response not confirmed' : 'No attempts logged'}</p>
     {request.work_order && <p><strong>Work order:</strong> <a href={`?tab=work_orders&workOrderId=${request.work_order.id}`}>#{request.work_order.work_order_number}</a> · {request.work_order.status}{scheduled && <> · {request.work_order.scheduled_date} </>}</p>}
     {!request.work_order && <p>Not yet scheduled</p>}
@@ -62,3 +68,4 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {activities.length ? <div className="sm:col-span-2 space-y-1">{activities.map(activity => <p key={activity.id}><small>{new Date(activity.created_at).toLocaleString()} · {activity.logged_by_name}</small> — {activity.notes}</p>)}</div> : <p>No contact notes recorded yet.</p>}
   </div>;
 }
+

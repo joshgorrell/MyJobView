@@ -6,11 +6,13 @@ const ServiceRequestQueue = lazy(() => import('./ServiceRequestQueue').then(m =>
 const ManualIntake = lazy(() => import('./ManualIntake').then(m => ({ default: m.ManualIntake })));
 const SmartIntakeHistory = lazy(() => import('./SmartIntakeHistory').then(m => ({ default: m.SmartIntakeHistory })));
 const ServiceRequestAnalytics = lazy(() => import('./ServiceRequestAnalytics').then(m => ({ default: m.ServiceRequestAnalytics })));
+const SalesServiceRequestsView = lazy(() => import('../Sales/SalesServiceRequestsView').then(m => ({ default: m.SalesServiceRequestsView })));
 
-type TabKey = 'queue' | 'analytics' | 'intake';
+type TabKey = 'queue' | 'mine' | 'analytics' | 'intake';
 
 const TABS = [
   { key: 'queue' as TabKey, label: 'Queue', icon: ListTodo },
+  { key: 'mine' as TabKey, label: 'My Requests', icon: Inbox },
   { key: 'analytics' as TabKey, label: 'Analytics', icon: BarChart3 },
   ...(import.meta.env.VITE_SMART_INTAKE_UI_ENABLED === 'true' || import.meta.env.VITE_SMART_INTAKE_MANUAL_TEST_ENABLED === 'true' ? [{ key: 'intake' as TabKey, label: 'Smart Intake', icon: Inbox }] : []),
 ];
@@ -72,9 +74,11 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
         {activeTab === 'intake' && manualOpen && <ManualIntake serviceOnly={manualTestOnly} onClose={() => setManualOpen(false)} onCreated={() => { setManualOpen(false); setQueueRevision(value => value + 1); setActiveTab('queue'); }} />}
         {activeTab === 'queue' && <ServiceRequestQueue key={`${queueRevision}:${requestId || 'queue'}`} requestId={requestId} canViewTestTune={hasModuleAccess('punchlist')} />}
         {activeTab === 'analytics' && <ServiceRequestAnalytics />}
+        {activeTab === 'mine' && <SalesServiceRequestsView ownOnly />}
         {activeTab === 'intake' && !manualTestOnly && <SmartIntakeHistory />}
         {activeTab === 'intake' && manualTestOnly && <p className="text-sm text-gray-400">Manual Service Request testing is enabled. Automated email and SMS intake are not active.</p>}
       </Suspense>
     </div>
   );
 }
+

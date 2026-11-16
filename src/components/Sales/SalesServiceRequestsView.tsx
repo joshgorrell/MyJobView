@@ -1,6 +1,7 @@
 import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
 import type { ServiceApprovalFields } from '../../lib/serviceApproval';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useServiceRequestUpdates } from '../../hooks/useServiceRequestUpdates';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -133,10 +134,12 @@ function getSourceIcon(source: string) {
   }
 }
 
-export function SalesServiceRequestsView() {
+export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolean }) {
   const { profile } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const loadVersion = useRef(0);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterContact, setFilterContact] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -148,12 +151,16 @@ export function SalesServiceRequestsView() {
   const isManager = profile?.role === 'admin' || profile?.role === 'manager';
 
   useEffect(() => {
-    if (profile) loadRequests();
-  }, [profile, filterStatus, filterContact]);
+    if (profile) void loadRequests();
+    return () => { loadVersion.current++; };
+  }, [profile, filterStatus, filterContact, ownOnly]);
+
+  useServiceRequestUpdates(profile?.organization_id, () => { void loadRequests(); });
 
   async function loadRequests() {
+    if (!profile?.organization_id) return;
+    const version = ++loadVersion.current;
     try {
-      setLoading(true);
       let query = supabase
         .from('service_requests')
         .select(`
@@ -174,9 +181,12 @@ export function SalesServiceRequestsView() {
             technician:profiles!work_orders_assigned_to_fkey (full_name)
           )
         `)
+        .eq('organization_id', profile.organization_id)
         .order('created_at', { ascending: false });
 
-      if (!isManager) {
+      if (ownOnly) {
+        query = query.eq('created_by', profile.id);
+      } else if (!isManager) {
         const { data: ownedContacts, error: ownershipError } = await supabase.from('contacts').select('id').eq('assigned_to', profile!.id).eq('organization_id', profile!.organization_id);
         if (ownershipError) throw ownershipError;
         const ownedIds = (ownedContacts || []).map(contact => contact.id);
@@ -197,11 +207,14 @@ export function SalesServiceRequestsView() {
 
       const { data, error } = await query.overrideTypes<ServiceRequest[], { merge: false }>();
       if (error) throw error;
+      if (version !== loadVersion.current) return;
       setRequests(data || []);
+      setLoadError('');
     } catch (error) {
       console.error('Error loading service requests:', error);
+      if (version === loadVersion.current) setLoadError('Unable to refresh requests. The displayed information may be out of date.');
     } finally {
-      setLoading(false);
+      if (version === loadVersion.current) setLoading(false);
     }
   }
 
@@ -223,6 +236,7 @@ export function SalesServiceRequestsView() {
 
   return (
     <div className="space-y-5">
+      {loadError && <p role="alert" className="text-sm text-red-600">{loadError} <button type="button" onClick={() => void loadRequests()} className="underline">Retry</button></p>}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-primary">My Service Requests</h2>
@@ -248,7 +262,7 @@ export function SalesServiceRequestsView() {
         </div>
         <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
           <div className="text-2xl font-bold text-amber-700">{pendingContactCount}</div>
-          <div className="text-xs text-amber-600 mt-0.5">Awaiting Contact</div>
+          <div className="text-xs text-amber-600 mt-0.5">Response Unconfirmed</div>
         </div>
         <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4">
           <div className="text-2xl font-bold text-emerald-700">{confirmedCount}</div>
@@ -404,7 +418,7 @@ export function SalesServiceRequestsView() {
                       ) : (
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
                           <Clock className="w-3.5 h-3.5" />
-                          Awaiting Contact
+                          Response Not Confirmed
                         </div>
                       )}
                       {request.work_order && (
@@ -441,7 +455,7 @@ export function SalesServiceRequestsView() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-3 flex-wrap">
                           <div className={`text-sm font-semibold ${contactConfirmed ? 'text-emerald-800' : 'text-amber-800'}`}>
-                            {contactConfirmed ? 'Customer Has Been Contacted' : 'Customer Not Yet Contacted'}
+                            {contactConfirmed ? 'Customer Has Been Contacted' : 'Customer Response Not Confirmed'}
                           </div>
                           <button
                             onClick={(e) => {
@@ -468,7 +482,7 @@ export function SalesServiceRequestsView() {
                           </div>
                         ) : (
                           <div className="text-sm text-amber-700 mt-1">
-                            No contact logged yet. Use "Log Contact" to record a call or voicemail.
+                            A conversation with the customer has not been confirmed. Contact attempts are shown below.
                           </div>
                         )}
                       </div>
@@ -587,3 +601,4 @@ export function SalesServiceRequestsView() {
     </div>
   );
 }
+
