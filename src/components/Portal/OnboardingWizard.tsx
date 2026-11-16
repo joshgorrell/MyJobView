@@ -691,9 +691,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                           <span className="text-sm font-semibold text-gray-900">Annual Billing</span>
                           {(() => {
                             const monthlyTotal = Number(contract.monthly_price) || 0;
-                            const annualSubtotal = monthlyTotal * 12;
+                            const paperFee = Number(contract.mail_invoice_fee) || 0;
+                            const annualSubtotal = (monthlyTotal - paperFee) * 12 + paperFee;
                             const discount = calculateAnnualDiscount(
-                              annualSubtotal - (Number(contract.mail_invoice_fee) || 0) * 12,
+                              annualSubtotal - paperFee,
                               billingConfig.annual_discount_type,
                               billingConfig.annual_discount_percentage,
                               billingConfig.annual_discount_flat_amount
@@ -709,9 +710,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                         <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service and receive a discount.</p>
                         {billingPreference === 'annual' && (() => {
                           const monthlyTotal = Number(contract.monthly_price) || 0;
-                          const annualSubtotal = monthlyTotal * 12;
+                          const paperFee = Number(contract.mail_invoice_fee) || 0;
+                            const annualSubtotal = (monthlyTotal - paperFee) * 12 + paperFee;
                           const discount = calculateAnnualDiscount(
-                            annualSubtotal - (Number(contract.mail_invoice_fee) || 0) * 12,
+                            annualSubtotal - paperFee,
                             billingConfig.annual_discount_type,
                             billingConfig.annual_discount_percentage,
                             billingConfig.annual_discount_flat_amount
