@@ -124,7 +124,7 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   IF coalesce(p_payload->>'signed_agreement_path','') !~ ('^'||c.organization_id::text||'/'||c.id::text||'/[0-9a-f-]{36}\\.(pdf|png|jpg)$') THEN
    RAISE EXCEPTION 'Signed agreement upload is required';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id='security-signed-agreements' AND o.name=p_payload->>'signed_agreement_path' AND o.owner_id=auth.uid()::text AND o.metadata->>'mimetype' IN ('application/pdf','image/jpeg','image/png')) THEN
+  IF NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id='security-signed-agreements' AND o.name=p_payload->>'signed_agreement_path' AND o.owner_id=auth.uid()::text AND o.metadata->>'mimetype' IN ('application/pdf','image/jpeg','image/png') AND (o.metadata->>'size')::bigint BETWEEN 1 AND 15728640) THEN
    RAISE EXCEPTION 'Signed agreement must be uploaded by the submitting employee';
   END IF;
   d:=private.security_staff_document(c.id);
