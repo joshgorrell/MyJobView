@@ -45,6 +45,14 @@ Deno.serve(async(req:Request)=>{
           if(contract.mailed_paper_statements) {
             if(Number(contract.mail_invoice_fee)!==5 || paperLines.length!==1)
               throw new Error('Paper statement fee itemization requires reconciliation before QuickBooks sync');
+            const feeLine=paperLines[0];
+            const feeAmount=Number(feeLine.amount);
+            const feeQuantity=Number(feeLine.quantity);
+            const feeUnitPrice=Number(feeLine.unit_price);
+            const annualFee=feeAmount===60 && feeQuantity===12 && feeUnitPrice===5;
+            const monthlyFee=feeAmount===5 && feeQuantity===1 && feeUnitPrice===5;
+            if(!annualFee && !monthlyFee)
+              throw new Error('Paper statement invoice fee must be $5 monthly or $60 annually, with no discount');
           } else if(paperLines.length!==0 || Number(contract.mail_invoice_fee)!==0) {
             throw new Error('Unexpected paper statement fee; review billing before QuickBooks sync');
           }
