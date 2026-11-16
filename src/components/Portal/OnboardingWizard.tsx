@@ -56,6 +56,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     emergencyContacts: contract.draft?.form_data?.emergencyContacts || [],
     paymentMethod: contract.draft?.form_data?.paymentMethod || '',
     paymentMethodId: contract.draft?.form_data?.paymentMethodId || '',
+    mailedPaperStatements: contract.billing_mode === 'mail' || Boolean(contract.draft?.form_data?.mailedPaperStatements ?? contract.document?.mailed_paper_statements),
     signature: ''
   }));
 
@@ -395,6 +396,16 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               </div>
             </div>
 
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={Boolean(formData.mailedPaperStatements)}
+                disabled={contract.billing_mode === 'mail'}
+                onChange={(event) => setFormData({ ...formData, mailedPaperStatements: event.target.checked })} />
+              <span className="text-sm text-gray-800">
+                <strong>Add Mailed Paper Statements — +$5 per statement</strong>
+                <span className="block text-xs text-gray-500 mt-1">Electronic statements are always included free. AutoPay enrollment is still required. Mailed statements do not replace automatic payments.</span>
+              </span>
+            </label>
+
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-sm text-blue-800 leading-relaxed">
                 All fields are required. This information will be used to set up your security monitoring account.
@@ -691,8 +702,9 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                           <span className="text-sm font-semibold text-gray-900">Annual Billing</span>
                           {(() => {
                             const monthlyTotal = Number(contract.monthly_price) || 0;
-                            const paperFee = Number(contract.mail_invoice_fee) || 0;
-                            const annualSubtotal = (monthlyTotal - paperFee) * 12 + paperFee;
+                            const paperFee = formData.mailedPaperStatements ? 5 : 0;
+                            const previousPaperFee = Number(contract.mail_invoice_fee) || 0;
+                            const annualSubtotal = (monthlyTotal - previousPaperFee) * 12 + paperFee;
                             const discount = calculateAnnualDiscount(
                               annualSubtotal - paperFee,
                               billingConfig.annual_discount_type,
@@ -710,8 +722,9 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                         <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service and receive a discount.</p>
                         {billingPreference === 'annual' && (() => {
                           const monthlyTotal = Number(contract.monthly_price) || 0;
-                          const paperFee = Number(contract.mail_invoice_fee) || 0;
-                            const annualSubtotal = (monthlyTotal - paperFee) * 12 + paperFee;
+                          const paperFee = formData.mailedPaperStatements ? 5 : 0;
+                            const previousPaperFee = Number(contract.mail_invoice_fee) || 0;
+                            const annualSubtotal = (monthlyTotal - previousPaperFee) * 12 + paperFee;
                           const discount = calculateAnnualDiscount(
                             annualSubtotal - paperFee,
                             billingConfig.annual_discount_type,
