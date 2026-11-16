@@ -54,3 +54,19 @@ JOIN public.service_requests s ON s.id = l.service_request_id AND s.organization
 JOIN public.profiles p ON p.id = s.created_by AND p.organization_id = s.organization_id
 WHERE e.source_table = 'customer_contact_log' AND e.source_id = l.id
   AND e.organization_id = l.organization_id;
+
+-- Stream committed changes through existing table RLS. Keep local databases
+-- without Supabase's publication usable, and avoid duplicate membership.
+DO $$
+DECLARE table_name text;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime' AND NOT puballtables) THEN
+    FOREACH table_name IN ARRAY ARRAY['service_requests', 'customer_contact_log', 'work_orders'] LOOP
+      IF NOT EXISTS (SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = table_name) THEN
+        EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', table_name);
+      END IF;
+    END LOOP;
+  END IF;
+END;
+$$;

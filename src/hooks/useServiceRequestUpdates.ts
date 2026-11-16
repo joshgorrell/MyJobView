@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 
 // Realtime for normal delivery, polling/focus recovery for missed messages.
 // Keep callbacks fresh without reconnecting whenever a component renders.
-export function useServiceRequestUpdates(organizationId: string | undefined, refresh: () => void) {
+export function useServiceRequestUpdates(organizationId: string | null | undefined, refresh: () => void) {
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
   useEffect(() => {
