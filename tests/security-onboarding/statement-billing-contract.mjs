@@ -26,4 +26,6 @@ assert.match(worker, /contract\.mailed_paper_statements/);
 assert.match(worker, /paperLines\.length!==1/);
 assert.match(worker, /paperLines\.length!==0/);
 assert.match(worker, /Paper statement fee itemization requires reconciliation/);
+assert.match(worker, /feeAmount===60 && feeQuantity===12 && feeUnitPrice===5/);
+assert.match(worker, /feeAmount===5 && feeQuantity===1 && feeUnitPrice===5/);
 console.log('Statement billing source contract checks passed');
