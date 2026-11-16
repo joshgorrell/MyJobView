@@ -10,6 +10,7 @@ export interface SecurityDraftForm {
   emergencyContacts: { name: string; phone: string; password: string; canAuthorize: boolean }[];
   paymentMethod: string;
   paymentMethodId: string;
+  mailedPaperStatements?: boolean;
   signature: string;
 }
 
