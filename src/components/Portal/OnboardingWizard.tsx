@@ -140,7 +140,12 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   }, []);
 
   function agreementHtml() {
-    return securityAgreementHtml(contract.document, terms, formData, null, null, billingPreference);
+    return securityAgreementHtml({
+      ...contract.document,
+      mailed_paper_statements: Boolean(formData.mailedPaperStatements),
+      mail_invoice_fee: formData.mailedPaperStatements ? 5 : 0,
+      monthly_price: Number(contract.document.monthly_price) - Number(contract.document.mail_invoice_fee || 0) + (formData.mailedPaperStatements ? 5 : 0),
+    }, terms, formData, null, null, billingPreference);
   }
 
   function isStepComplete(): boolean {
