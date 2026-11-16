@@ -401,16 +401,6 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               </div>
             </div>
 
-            <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4">
-              <input type="checkbox" className="mt-1 h-4 w-4" checked={Boolean(formData.mailedPaperStatements)}
-                disabled={contract.billing_mode === 'mail'}
-                onChange={(event) => setFormData({ ...formData, mailedPaperStatements: event.target.checked })} />
-              <span className="text-sm text-gray-800">
-                <strong>Add Mailed Paper Statements — +$5 per statement</strong>
-                <span className="block text-xs text-gray-500 mt-1">Electronic statements are always included free. AutoPay enrollment is still required. Mailed statements do not replace automatic payments.</span>
-              </span>
-            </label>
-
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-sm text-blue-800 leading-relaxed">
                 All fields are required. This information will be used to set up your security monitoring account.
@@ -639,7 +629,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(Number(contract.monthly_price) || 0)}/month
+                    {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0))}/month
                   </span>
                 </div>
               </div>
@@ -650,7 +640,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700">Monthly Services Total</span>
                 <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(Number(contract.monthly_price) || 0)}/month
+                  {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0))}/month
                 </span>
               </div>
             </div>
@@ -678,10 +668,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">Monthly Billing</span>
                         <span className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(Number(contract.monthly_price) || 0)}/month
+                          {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0))}/month
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(Number(contract.monthly_price) || 0)} in advance for the upcoming month of monitoring service.</p>
+                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0) + (formData.mailedPaperStatements ? 5 : 0))} in advance for the upcoming month of monitoring service.</p>
                     </div>
                   </div>
                 </button>
@@ -766,6 +756,16 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                 )}
               </div>
             </div>
+
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={Boolean(formData.mailedPaperStatements)}
+                disabled={contract.billing_mode === 'mail'}
+                onChange={(event) => setFormData({ ...formData, mailedPaperStatements: event.target.checked })} />
+              <span className="text-sm text-gray-800">
+                <strong>Add Mailed Paper Statements — +$5 per statement</strong>
+                <span className="block text-xs text-gray-500 mt-1">Electronic statements are always included free. AutoPay enrollment is still required. Mailed statements do not replace automatic payments.</span>
+              </span>
+            </label>
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-sm text-blue-800 leading-relaxed">
