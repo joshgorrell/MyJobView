@@ -17,3 +17,30 @@ ALTER TABLE public.security_contracts
 
 COMMENT ON COLUMN public.security_contracts.mailed_paper_statements IS
   'Optional mailed paper statements in addition to always-included electronic statements; independent of AutoPay authorization.';
+
+-- Until a token-scoped onboarding RPC implements customer choice, only an
+-- authenticated organization Admin may change this preference. This blocks
+-- ordinary sales/staff writes from silently adding recurring paper charges.
+CREATE OR REPLACE FUNCTION private.enforce_security_paper_statement_authorization()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF NEW.mailed_paper_statements IS DISTINCT FROM OLD.mailed_paper_statements THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid() AND organization_id = NEW.organization_id AND role = 'admin'
+    ) THEN
+      RAISE EXCEPTION 'Only an Admin may change mailed paper statements'
+        USING ERRCODE = '42501';
+    END IF;
+    IF OLD.customer_completed_at IS NOT NULL THEN
+      RAISE EXCEPTION 'Update statement delivery before signing and send a new agreement';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION private.enforce_security_paper_statement_authorization() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS enforce_security_paper_statement_authorization ON public.security_contracts;
+CREATE TRIGGER enforce_security_paper_statement_authorization
+  BEFORE UPDATE ON public.security_contracts
+  FOR EACH ROW EXECUTE FUNCTION private.enforce_security_paper_statement_authorization();
