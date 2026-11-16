@@ -339,7 +339,8 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           <div className="space-y-5">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Personal Information</h2>
-              <p className="text-sm text-gray-600 mt-2">Statement delivery: {contract.billing_mode === 'mail' ? 'Mailed paper invoices (includes a separately itemized monthly mailing fee in your account total)' : 'Electronic billing (no mailing fee)'}. To request a different delivery method, contact our office before signing. Mailed invoices require administrator approval.</p>
+              <p className="text-sm text-gray-600 mt-2">Electronic statements are always included at no additional charge. Mailed paper statements are an optional $5/month add-on; contact our office to request them before signing.</p>
+              <p className="text-xs text-gray-500 mt-1">AutoPay enrollment is still required. Mailed statements do not replace automatic payments. Traditional invoice billing is available only by administrator-approved exception.</p>
               <p className="text-gray-500 text-sm mt-1">Please verify and complete your contact details.</p>
             </div>
 
@@ -637,6 +638,31 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                   {formatCurrency(Number(contract.monthly_price) || 0)}/month
                 </span>
               </div>
+            </div>
+
+            {/* Electronic statements are included for every account. The existing mail billing
+                mode is an Admin-authorized payment exception, not a customer paper preference. */}
+            <div className="border border-gray-200 rounded-2xl p-4 bg-white space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-gray-900">Electronic Statements</span>
+                <span className="text-sm font-medium text-gray-600">Included</span>
+              </div>
+              <p className="text-xs text-gray-500">Electronic statements are provided automatically at no additional charge.</p>
+              {contract.billing_mode === 'mail' ? (
+                <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-2">
+                  <span className="text-sm text-gray-700">Admin-approved mailed invoices</span>
+                  <span className="text-sm font-semibold text-gray-900">{formatCurrency(Number(contract.mail_invoice_fee) || 0)}/month</span>
+                </div>
+              ) : (
+                <div className="border-t border-gray-100 pt-2 space-y-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-gray-900">Optional Mailed Paper Statements</span>
+                    <span className="text-sm font-semibold text-gray-900">+$5/month</span>
+                  </div>
+                  <p className="text-xs text-gray-500">Contact our office before signing to request mailed statements in addition to your electronic statements.</p>
+                  <p className="text-xs text-gray-500">AutoPay enrollment is still required. Mailed statements do not replace automatic payments.</p>
+                </div>
+              )}
             </div>
 
             {/* Payment Frequency Selection */}
