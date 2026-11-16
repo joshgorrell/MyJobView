@@ -40,6 +40,8 @@ const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposal
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
+const AssistPage = lazy(() => import('./components/Assist/AssistPage'));
+
 // Lazy load components
 const ContactForm = lazy(() => import('./components/Contacts/ContactForm').then(m => ({ default: m.ContactForm })));
 const ContactsView = lazy(() => import('./components/Contacts/ContactsView').then(m => ({ default: m.ContactsView })));
@@ -968,6 +970,7 @@ function AppContent() {
               autoThreadId={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('threadId') : null}
             />
           )}
+          {activeTab === 'assist' && <AssistPage key={profile.organization_id} />}
           {activeTab === 'projects' && checkModuleAccess('projects') && <ProjectsView key={activeTab} />}
           {activeTab === 'labor_dashboard' && profile.role==='admin' && <TechStats key={activeTab}/>}
           {['payroll', 'time_approval'].includes(activeTab) && <WorkspaceTabs key={activeTab} title="Time & Payroll" onSelect={setActiveTab} initial={activeTab} tabs={[

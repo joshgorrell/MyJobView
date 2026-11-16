@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, ChevronRight } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
 import { RingCentralSettings } from './RingCentralSettings';
+import { AssistSettings } from './AssistSettings';
 import { TechsafeSettings } from './TechsafeSettings';
 
 interface CompanySettings {
@@ -34,7 +35,7 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
-const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe'] as const;
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe', 'assist'] as const;
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
@@ -425,6 +426,10 @@ export function IntegrationsSettings() {
             Google Maps
           </button>
 
+          <button type="button" onClick={() => selectIntegration('assist')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+            Remote Support
+          </button>
           <button
             onClick={() => selectIntegration('techsafe')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'techsafe' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
@@ -479,6 +484,7 @@ export function IntegrationsSettings() {
         </nav>
       </div>
 
+      {activeIntegration === 'assist' && <AssistSettings />}
       {activeIntegration === 'ringcentral' && <RingCentralSettings />}
       {activeIntegration === 'techsafe' && <TechsafeSettings />}
 

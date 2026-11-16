@@ -2,6 +2,7 @@ import { resolveLegacyPage } from './permissionCatalog';
 
 // Explicit workspace routes keep public pages and portal aliases separate.
 const pages = [
+  "assist",
   "bonus_approvals",
   "bug_management",
   "calendar",
