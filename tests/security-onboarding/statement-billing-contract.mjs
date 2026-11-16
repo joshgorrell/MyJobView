@@ -10,7 +10,7 @@ assert.match(source, /PAPER_STATEMENT_FEE_PER_MAILING = 5/);
 assert.match(source, /Manual billing requires mailed paper statements/);
 assert.match(source, /autopayRequired: input.paymentMode === 'autopay'/);
 assert.match(source, /paperFeeAnnual: paperFeeMonthly,/);
-assert.match(source, /monitoringAnnual - savings \+ billing.paperFeeAnnual/);
+assert.match(source, /monitoringAnnual \+ billing.paperFeeAnnual/);
 assert.match(migration, /mailed_paper_statements boolean NOT NULL DEFAULT false/);
 assert.match(migration, /security_billing_mode <> 'mail' OR mailed_paper_statements = true/);
 assert.match(migration, /Only an Admin may change mailed paper statements/);
@@ -46,15 +46,16 @@ assert.match(recurring, /v_end,1,5,v_fee/);
 assert.doesNotMatch(recurring, /v_months,7,v_fee/);
 // Numeric scenarios mirror the SQL invoice calculation: annual billing
 // charges for 12 months of monitoring but only one mailed statement.
-function invoiceTotal(monthlyPrice, existingPaperFee, paperSelected, months, annualDiscountPercent = 0) {
+function invoiceTotal(monthlyPrice, existingPaperFee, paperSelected, months) {
   const monitoring = (monthlyPrice - existingPaperFee) * months;
   const statementFee = paperSelected ? 5 : 0;
-  const discount = months === 12 ? Math.round(monitoring * annualDiscountPercent) / 100 : 0;
-  return { statementFee, total: monitoring + statementFee - discount };
+  return { statementFee, total: monitoring + statementFee };
 }
 assert.deepEqual(invoiceTotal(42, 0, false, 1), { statementFee: 0, total: 42 });
 assert.deepEqual(invoiceTotal(42, 0, true, 1), { statementFee: 5, total: 47 });
-assert.deepEqual(invoiceTotal(42, 0, false, 12, 10), { statementFee: 0, total: 453.6 });
-assert.deepEqual(invoiceTotal(42, 0, true, 12, 10), { statementFee: 5, total: 458.6 });
-assert.deepEqual(invoiceTotal(47, 5, true, 12, 10), { statementFee: 5, total: 458.6 });
+assert.deepEqual(invoiceTotal(42, 0, false, 12), { statementFee: 0, total: 504 });
+assert.deepEqual(invoiceTotal(42, 0, true, 12), { statementFee: 5, total: 509 });
+assert.deepEqual(invoiceTotal(47, 5, true, 12), { statementFee: 5, total: 509 });
+assert.doesNotMatch(recurring, /annual_discount_type|annual_discount_percentage|annual_discount_flat_amount/);
+assert.doesNotMatch(wizard, /calculateAnnualDiscount|receive a discount/);
 console.log('Statement billing source contract checks passed');
