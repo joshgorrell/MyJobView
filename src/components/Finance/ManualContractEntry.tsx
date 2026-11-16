@@ -19,6 +19,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   const [saving, setSaving] = useState(false);
   const [paperSigned, setPaperSigned] = useState(false);
   const [signedAgreementFile, setSignedAgreementFile] = useState<File | null>(null);
+  const [paperSignatureDate, setPaperSignatureDate] = useState('');
   const [mailedPaperStatements, setMailedPaperStatements] = useState(false);
   const [autopayAccepted, setAutopayAccepted] = useState(false);
   const [documentVersion, setDocumentVersion] = useState('');
@@ -122,6 +123,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   async function handleSave() {
     if (saving || loading || loadError || !documentVersion) return;
     if (!signedAgreementFile) { notify('Upload the signed agreement first.', { theme: 'emerald', tone: 'warning' }); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(paperSignatureDate)) { notify('Enter the date the customer signed the paper agreement.', { theme: 'emerald', tone: 'warning' }); return; }
     if (!paperSigned) {
       notify('Confirm that the customer signed the paper agreement before completing onboarding.', { theme: 'emerald', tone: 'info' });
       return;
@@ -160,6 +162,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
       if (uploadError) throw uploadError;
       await staffSecurityOnboarding('paper', contract.id, {
         signed_agreement_path: documentPath,
+        paper_signature_date: paperSignatureDate,
         mailed_paper_statements: mailedPaperStatements,
         paper_signed: paperSigned, autopay_accepted: autopayAccepted, document_version: documentVersion,
         account_type: formData.accountType, account_services: formData.accountServices,
@@ -535,7 +538,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             </div>
           </fieldset>
 
-          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 space-y-3"><label className="block text-sm">Upload signed agreement (PDF, JPG or PNG, max 15 MB)<input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setSignedAgreementFile(e.target.files?.[0] || null)} className="block mt-2" /></label>
+          <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 space-y-3"><label className="block text-sm">Customer paper signature date<input type="date" value={paperSignatureDate} onChange={e => setPaperSignatureDate(e.target.value)} className="block mt-2 border rounded-lg p-2" required /></label><label className="block text-sm">Upload signed agreement (PDF, JPG or PNG, max 15 MB)<input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setSignedAgreementFile(e.target.files?.[0] || null)} className="block mt-2" /></label>
             <label className="flex items-start gap-2 text-sm text-gray-800">
               <input type="checkbox" checked={paperSigned} onChange={e => setPaperSigned(e.target.checked)} className="mt-1" />
               I have reviewed the signed paper agreement and uploaded all signed pages.
