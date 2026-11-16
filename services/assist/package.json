@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node control-server.mjs",
-    "worker": "node activation-worker.mjs"
+    "worker": "node activation-worker.mjs",
+    "preflight": "node preflight.mjs"
   },
   "dependencies": {
     "https-proxy-agent": "7.0.6",
