@@ -17,6 +17,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   const baseline = useRef('');
   const [saving, setSaving] = useState(false);
   const [paperSigned, setPaperSigned] = useState(false);
+  const [mailedPaperStatements, setMailedPaperStatements] = useState(false);
   const [autopayAccepted, setAutopayAccepted] = useState(false);
   const [documentVersion, setDocumentVersion] = useState('');
   const [annualAvailable,setAnnualAvailable] = useState(false);
@@ -70,6 +71,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
       setAnnualAvailable(annual);
       setFormData(next);
       setPaperSigned(false); setAutopayAccepted(false);
+      setMailedPaperStatements(data.security_billing_mode === 'mail' || Boolean(data.mailed_paper_statements));
       baseline.current = JSON.stringify(next);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Failed to load contract data');
@@ -78,17 +80,17 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
 
   useEffect(() => {
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
-      if (JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted) {
+      if (JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted || mailedPaperStatements) {
         event.preventDefault(); event.returnValue = '';
       }
     };
     if (!loading && !loadError) window.addEventListener('beforeunload', warnBeforeLeaving);
     return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
-  }, [formData, paperSigned, autopayAccepted, loading, loadError]);
+  }, [formData, paperSigned, autopayAccepted, mailedPaperStatements, loading, loadError]);
 
   async function closeEntry() {
     if (saving) return;
-    if ((JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted) &&
+    if ((JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted || mailedPaperStatements) &&
         !(await requestConfirmation('Discard this unsaved manual entry? This information has not been submitted.', { theme: 'emerald' }))) return;
     onClose();
   }
@@ -506,7 +508,11 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="font-semibold text-gray-900 mb-4">Payment Method</h3>
               <label className="block text-sm font-medium mb-4">Billing preference<select value={formData.billingPreference} onChange={e=>setFormData(prev=>({...prev,billingPreference:e.target.value}))} className="block w-full border rounded-lg px-4 py-2 mt-1"><option value="monthly">Monthly</option>{annualAvailable && <option value="annual">Annual</option>}</select></label>
-              {billingMode === 'mail' ? <p>Admin-approved mailed invoices apply, including the monthly mailing fee.</p> : <>
+              <label className="flex items-start gap-2 mb-4 text-sm text-gray-800">
+                <input type="checkbox" checked={mailedPaperStatements} disabled={billingMode === 'mail'} onChange={e => setMailedPaperStatements(e.target.checked)} />
+                <span><strong>Mail paper billing statements (+$5 per statement)</strong><span className="block text-xs text-gray-500">Electronic statements are free. This is separate from signing a paper agreement; AutoPay remains required unless an administrator approved manual billing.</span></span>
+              </label>
+              {billingMode === 'mail' ? <p>Admin-approved manual invoice billing requires mailed statements.</p> : <>
                 <SecurityPaymentEnrollment contractId={contract.id} token="" selectedId={formData.paymentMethodId}
                   onSelect={method => { setAutopayAccepted(false); setFormData(prev => ({ ...prev, paymentMethodId: method.id, paymentMethod: method.payment_type === 'card' ? 'credit_card' : 'ach' })); }} />
                 <label className="flex items-start gap-2 mt-4 text-sm text-gray-800">
