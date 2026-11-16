@@ -11,6 +11,8 @@ on:
       - 'src/components/Help/HowItWorks.tsx'
       - 'supabase/migrations/*assist*'
       - 'supabase/functions/assist-support/**'
+      - 'supabase/functions/assist-guest/**'
+      - 'supabase/functions/_shared/assist-guest-handler.mjs'
       - 'supabase/functions/_shared/assist-support-handler.mjs'
       - 'supabase/config.toml'
       - 'tests/assist/**'

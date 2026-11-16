@@ -1,3 +1,5 @@
+import {guestStatus} from './assist-guest-handler.mjs';
+const inviteOperations=['invite_capability','invite_create','invite_status','invite_connect','invite_end'];
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function sessionClaimsAfterVerification(bearer,userId){
  const token=bearer.replace(/^Bearer /,'');const parts=token.split('.');if(parts.length!==3)throw new Error('invalid_session');
@@ -19,20 +21,28 @@ export function createAssistSupportHandler({authenticate,control,publicOrigin}){
    if(origin && origin!==`https://${actor.subdomain}.myjobview.com`)return reply(403,{error:'wrong_dealer'});
    const text=await request.text();if(text.length>4096)return reply(400,{error:'invalid_request'});
    let body;try{body=JSON.parse(text);}catch{return reply(400,{error:'invalid_request'});}
-   if(!body||body.organizationId!==actor.organization_id||!['devices','connect','touch','end'].includes(body.operation))return reply(403,{error:'support_access_required'});
+   if(!body||body.organizationId!==actor.organization_id||!['devices','connect','touch','end',...inviteOperations].includes(body.operation))return reply(403,{error:'support_access_required'});
    const context={organization_id:actor.organization_id,actor_id:actor.actor_id,auth_session_id:actor.auth_session_id,token_exp:actor.token_exp,operation:body.operation};
    if(body.operation==='connect'){
     if(typeof body.deviceId!=='string'||body.deviceId.length>256)return reply(400,{error:'invalid_device'});context.device_id=body.deviceId;
    }
    if(['touch','end'].includes(body.operation)){if(!uuid.test(body.sessionId))return reply(400,{error:'invalid_session'});context.session_id=body.sessionId;}
+   if(inviteOperations.includes(body.operation)&&!['invite_create','invite_capability'].includes(body.operation)){if(!uuid.test(body.inviteId))return reply(400,{error:'invalid_invite'});context.invite_id=body.inviteId;}
    const data=await control(context);const domain='mjv-'+actor.organization_id.replaceAll('-','');
    if(body.operation==='devices'){
     if(!Array.isArray(data?.devices)||data.devices.length>500||data.devices.some(d=>typeof d.id!=='string'||!d.id.startsWith(`node/${domain}/`)))throw new Error('invalid_response');
     return reply(200,{devices:data.devices.map(d=>({id:d.id,name:String(d.name||'Windows laptop').slice(0,120),os:String(d.os||'').slice(0,160),online:d.online===true}))});
    }
-   if(body.operation==='connect'){
+   if(body.operation==='invite_capability')return reply(200,{available:data?.available===true});
+   if(['invite_create','invite_status'].includes(body.operation)){
+    const result=guestStatus(data);
+    if(body.operation==='invite_create'){if(!/^[2-9A-HJ-NP-Z]{4}(-[2-9A-HJ-NP-Z]{4}){2}$/.test(data.code||''))throw new Error('invalid_response');result.code=data.code;result.join_url=`https://${actor.subdomain}.myjobview.com/assist#code=${data.code}`;}
+    return reply(200,result);
+   }
+   if(body.operation==='invite_end')return reply(200,{ended:data?.ended===true});
+   if(['connect','invite_connect'].includes(body.operation)){
     const url=new URL(data.viewer_url);if(url.origin!==publicOrigin||url.username||url.password||url.pathname!==`/${domain}/`||!url.searchParams.get('login')||!url.searchParams.get('node')||url.searchParams.get('viewmode')!=='11'||url.searchParams.get('hide')!=='15'||[...url.searchParams.keys()].some(k=>!['login','node','viewmode','hide'].includes(k))||[...url.searchParams.keys()].some(k=>url.searchParams.getAll(k).length!==1)||!uuid.test(data.session_id))throw new Error('invalid_response');
-    return reply(200,{session_id:data.session_id,viewer_url:url.href,viewer_origin:publicOrigin,expires_at:data.expires_at});
+    return reply(200,{session_id:data.session_id,viewer_url:url.href,viewer_origin:publicOrigin,expires_at:data.expires_at,...(body.operation==='invite_connect'?guestStatus(data):{})});
    }
    return reply(200,body.operation==='end'?{ended:data?.ended===true}:{active:data?.active===true,expires_at:data?.expires_at});
   }catch(error){return reply(error?.message==='forbidden'?403:503,{error:error?.message==='forbidden'?'support_access_required':'support_unavailable'});}

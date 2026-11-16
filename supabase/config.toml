@@ -341,3 +341,7 @@ verify_jwt = true
 
 [functions.ringcentral-mailbox-mapping]
 verify_jwt = true
+
+# Public guest capability API: validates canonical dealer Origin and single-use invite/claim at the private host.
+[functions.assist-guest]
+verify_jwt = false

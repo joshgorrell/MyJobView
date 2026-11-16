@@ -35,9 +35,19 @@ try{
  await runtime.revokeViewer(org,temporary);
  assert.equal((await meshCommand(management,{action:'users'})).users.some(u=>u._id===temporaryUser._id),false,'Native temporary account is actually deleted');
  await assert.rejects(meshCommand({port:a.port,domain:'mjv-00000000000000000000000000000001',keyHex:b.keyHex},{action:'meshes'},{timeout:1000}));
+ const guest=await runtime.createGuestGroup(org,'00000000000000000000000000000007');
+ assert.match(guest.download_url,/installflags=1/);
+ assert.notEqual(guest.meshId,result.meshId,'Guest is isolated from permanent technician enrollment');
+ await assert.rejects(runtime.deleteGuestGroup(other,guest.meshId),/invalid_guest_group/);
+ await assert.rejects(runtime.deleteGuestGroup(org,result.meshId),/invalid_guest_group/);
+ await runtime.deleteGuestGroup(org,guest.meshId);
+ assert.ok(!(await meshCommand(management,{action:'meshes'})).meshes.some(m=>m._id===guest.meshId&&!m.deleted));
+ const orphan=await runtime.createGuestGroup(org,'00000000000000000000000000000008');
  await runtime.stop(org);assert.equal(await runtime.isStopped(org),true);
  assert.equal(runtime.target('mjv-00000000000000000000000000000001'),null);
  assert.ok(runtime.target('mjv-00000000000000000000000000000002'),'Stopping one dealer leaves the other running');
  const again=await runtime.ensure({organization_id:org,generation:2},async()=>{});assert.equal(again.meshId,result.meshId,'Re-enable retains native device ownership');
+ const fresh=await store.read(org);const restarted={port:fresh.port,domain:management.domain,keyHex:fresh.keyHex};
+ assert.ok(!(await meshCommand(restarted,{action:'meshes'})).meshes.some(m=>m._id===orphan.meshId&&!m.deleted),'Orphaned guest groups are removed before restart ingress');
  console.log('Real MeshCentral smoke: bootstrap, isolated management login, native group/consent, idempotence, stop and re-enable pass');
 }catch(error){console.error(diagnostics.replace(/auth=[^&\s]+/g,'auth=[redacted]'));throw error;}finally{await runtime.stopAll();await rm(dir,{recursive:true,force:true});}

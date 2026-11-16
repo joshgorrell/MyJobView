@@ -40,6 +40,7 @@ const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposal
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
+const AssistGuestPage = lazy(() => import('./components/Assist/AssistGuestPage'));
 const AssistPage = lazy(() => import('./components/Assist/AssistPage'));
 
 // Lazy load components
@@ -272,6 +273,7 @@ function AppContent() {
       return !current;
     });
   };
+  const [assistGuestCode] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('code'));
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [_currentHash, setCurrentHash] = useState(window.location.hash);
 
@@ -491,6 +493,10 @@ function AppContent() {
     setShowTaskForm(false);
     setShowJobMediaUpload(false);
   }, [activeTab]);
+
+  if (currentPath === '/assist' && (assistGuestCode !== null || !user || isPortalUser)) {
+    return <Suspense fallback={<LoadingFallback />}><AssistGuestPage initialCode={assistGuestCode || ''} /></Suspense>;
+  }
 
   if (currentPath === '/shared/proposal') {
     return <Suspense fallback={<LoadingFallback />}><SharedProposalPage /></Suspense>;
