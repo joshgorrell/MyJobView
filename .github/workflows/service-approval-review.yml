@@ -37,7 +37,6 @@ jobs:
       - run: npm run test:security-onboarding
       - run: npm run typecheck
       - run: npm run build
-      - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --only-shell chromium
       - run: node tests/service-approval/browser.mjs
       - run: node tests/service-requests/intake-browser.mjs

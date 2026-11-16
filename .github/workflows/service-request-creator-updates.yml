@@ -30,6 +30,5 @@ jobs:
       - run: node tests/service-requests/creator-flow-database.mjs
       - run: node tests/service-requests/creator-updates-runtime.mjs
       - run: npm run build
-      - run: npm install --no-save --package-lock=false playwright@1.55.1
       - run: npx playwright install --with-deps chromium
       - run: node tests/service-requests/compact-rows-browser.mjs

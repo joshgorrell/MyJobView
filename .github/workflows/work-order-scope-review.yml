@@ -52,7 +52,6 @@ jobs:
       - run: npm run test:program-access
       - run: npx eslint src/components/Shared/QuickActionModal.tsx
       # Ubuntu 24.04 provides Chromium system libraries; avoid unbounded apt downloads.
-      - run: npm install --no-save --package-lock=false playwright@1.55.1
       - name: Install and verify headless Chromium
         timeout-minutes: 5
         run: |
