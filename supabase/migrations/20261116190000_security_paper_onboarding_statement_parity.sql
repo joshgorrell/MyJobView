@@ -121,9 +121,9 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   IF c.customer_completed_at IS NOT NULL OR c.status NOT IN ('draft','pending_customer','rejected') THEN RAISE EXCEPTION 'This agreement is no longer available for paper completion'; END IF;
   f:=private.security_safe_draft(p_payload->'form_data'); PERFORM private.security_validate_form(f);
   IF coalesce(p_payload->>'paper_signed','false')<>'true' THEN RAISE EXCEPTION 'Confirm the customer signed the agreement'; END IF;
-  IF nullif(p_payload->>'paper_signature_date','') IS NULL OR (p_payload->>'paper_signature_date') !~ '^\\d{4}-\\d{2}-\\d{2} ('^'||c.organization_id::text||'/'||c.id::text||'/[0-9a-f-]{36}\\.(pdf|png|jpg)$') THEN
-   RAISE EXCEPTION 'Signed agreement upload is required';
-  END IF;
+  IF coalesce(p_payload->>'paper_signature_date','') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN RAISE EXCEPTION 'Enter a valid paper signature date'; END IF;
+  IF (p_payload->>'paper_signature_date')::date > current_date THEN RAISE EXCEPTION 'Paper signature date cannot be in the future'; END IF;
+  IF coalesce(p_payload->>'signed_agreement_path','') !~ ('^'||c.organization_id::text||'/'||c.id::text||'/[0-9a-f-]{36}[.](pdf|png|jpg)$') THEN RAISE EXCEPTION 'Signed agreement upload is required'; END IF;
   IF NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id='security-signed-agreements' AND o.name=p_payload->>'signed_agreement_path' AND o.owner_id=auth.uid()::text AND o.metadata->>'mimetype' IN ('application/pdf','image/jpeg','image/png') AND (o.metadata->>'size')::bigint BETWEEN 1 AND 15728640) THEN
    RAISE EXCEPTION 'Signed agreement must be uploaded by the submitting employee';
   END IF;
@@ -138,40 +138,6 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   IF jsonb_typeof(p_payload->'mailed_paper_statements') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'Select a valid statement delivery preference'; END IF;
   IF f->>'billingPreference'='annual' AND coalesce(d->'dealer'->>'annual_billing_enabled','false')<>'true' THEN RAISE EXCEPTION 'Annual billing is unavailable'; END IF;
   d:=d||jsonb_build_object('personalInfo',f->'personalInfo','propertyInfo',f->'propertyInfo','billingPreference',f->>'billingPreference','accepted_at',now(),'document_version',md5(d::text),'payment_display',CASE WHEN m.id IS NULL THEN 'Admin-approved mailed invoices' ELSE m.display_brand||' ending '||m.display_last4 END,'paper_autopay_authorization_retained',m.id IS NOT NULL,'mailed_paper_statements',(p_payload->>'mailed_paper_statements')::boolean,'mail_invoice_fee',CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'monthly_price',c.monthly_price-c.mail_invoice_fee+CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'paper_signature_date',p_payload->>'paper_signature_date','paper_entered_by',auth.uid(),'paper_entered_at',now(),'signed_agreement_path',p_payload->>'signed_agreement_path');
-  DELETE FROM public.security_contract_emergency_contacts WHERE contract_id=c.id;
-  FOR e,ord IN SELECT x.v,x.ordinality FROM jsonb_array_elements(f->'emergencyContacts') WITH ORDINALITY x(v,ordinality) LOOP
-   INSERT INTO public.security_contract_emergency_contacts(contract_id,organization_id,contact_name,phone_number,password_codeword,can_authorize_entry,priority_order) VALUES(c.id,c.organization_id,e->>'name',e->>'phone',e->>'password',(e->>'canAuthorize')::boolean,ord);
-  END LOOP;
-  PERFORM set_config('mjv.security_signing','true',true);
-  UPDATE public.security_contracts SET status='pending_approval',customer_completed_at=now(),completed_by_staff=true,
-   property_address=f->'propertyInfo'->>'address_line1',property_city=f->'propertyInfo'->>'city',property_state=upper(f->'propertyInfo'->>'state'),property_zip=f->'propertyInfo'->>'zip_code',account_type=p_payload->>'account_type',account_services=ARRAY(SELECT jsonb_array_elements_text(coalesce(p_payload->'account_services','[]'))),
-   payment_method=CASE WHEN m.payment_type='card' THEN 'credit_card' WHEN m.payment_type='ach' THEN 'ach' END,security_payment_method_id=m.id,autopay_authorized_at=CASE WHEN m.id IS NOT NULL THEN now() END,
-   billing_frequency_override=CASE WHEN f->>'billingPreference'='annual' THEN 'yearly' ELSE 'monthly' END,mailed_paper_statements=(p_payload->>'mailed_paper_statements')::boolean,onboarding_agreement_snapshot=d,updated_at=now() WHERE id=c.id;
-  PERFORM set_config('mjv.security_signing','false',true);
-  DELETE FROM public.security_onboarding_drafts WHERE contract_id=c.id;
-  RETURN jsonb_build_object('success',true);
- END IF;
- RAISE EXCEPTION 'Unsupported staff operation';
-END $function$
-;
- OR (p_payload->>'paper_signature_date')::date > current_date THEN RAISE EXCEPTION 'Enter a valid paper signature date that is not in the future'; END IF;
-  IF coalesce(p_payload->>'signed_agreement_path','') !~ ('^'||c.organization_id::text||'/'||c.id::text||'/[0-9a-f-]{36}\\.(pdf|png|jpg)$') THEN
-   RAISE EXCEPTION 'Signed agreement upload is required';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id='security-signed-agreements' AND o.name=p_payload->>'signed_agreement_path' AND o.owner_id=auth.uid()::text AND o.metadata->>'mimetype' IN ('application/pdf','image/jpeg','image/png') AND (o.metadata->>'size')::bigint BETWEEN 1 AND 15728640) THEN
-   RAISE EXCEPTION 'Signed agreement must be uploaded by the submitting employee';
-  END IF;
-  d:=private.security_staff_document(c.id);
-  IF p_payload->>'document_version' IS DISTINCT FROM md5(d::text) THEN RAISE EXCEPTION 'Agreement terms changed. Review the signed paper against the current agreement before recording it'; END IF;
-  IF coalesce(d->'template'->>'contract_terms','')='' OR d->'template'->>'contract_terms' LIKE '%[LEGAL REVIEW:%' THEN RAISE EXCEPTION 'Reviewed agreement terms are required'; END IF;
-  IF c.security_billing_mode='autopay' THEN
-   SELECT * INTO m FROM public.security_payment_methods WHERE id=nullif(f->>'paymentMethodId','')::uuid AND organization_id=c.organization_id AND contact_id=c.contact_id AND is_active AND verified_at>now()-interval '5 minutes' AND (payment_type='ach' OR make_date(exp_year,exp_month,1)+interval '1 month'>now());
-   IF m.id IS NULL OR coalesce(p_payload->>'autopay_accepted','false')<>'true' THEN RAISE EXCEPTION 'Verify the saved payment method and retain the customer-signed AutoPay authorization with the paper agreement'; END IF;
-  END IF;
-  IF c.security_billing_mode='mail' AND coalesce(p_payload->>'mailed_paper_statements','false')<>'true' THEN RAISE EXCEPTION 'Manual billing requires mailed paper statements'; END IF;
-  IF jsonb_typeof(p_payload->'mailed_paper_statements') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'Select a valid statement delivery preference'; END IF;
-  IF f->>'billingPreference'='annual' AND coalesce(d->'dealer'->>'annual_billing_enabled','false')<>'true' THEN RAISE EXCEPTION 'Annual billing is unavailable'; END IF;
-  d:=d||jsonb_build_object('personalInfo',f->'personalInfo','propertyInfo',f->'propertyInfo','billingPreference',f->>'billingPreference','accepted_at',now(),'document_version',md5(d::text),'payment_display',CASE WHEN m.id IS NULL THEN 'Admin-approved mailed invoices' ELSE m.display_brand||' ending '||m.display_last4 END,'paper_autopay_authorization_retained',m.id IS NOT NULL,'mailed_paper_statements',(p_payload->>'mailed_paper_statements')::boolean,'mail_invoice_fee',CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'monthly_price',c.monthly_price-c.mail_invoice_fee+CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'paper_entered_by',auth.uid(),'paper_entered_at',now(),'signed_agreement_path',p_payload->>'signed_agreement_path');
   DELETE FROM public.security_contract_emergency_contacts WHERE contract_id=c.id;
   FOR e,ord IN SELECT x.v,x.ordinality FROM jsonb_array_elements(f->'emergencyContacts') WITH ORDINALITY x(v,ordinality) LOOP
    INSERT INTO public.security_contract_emergency_contacts(contract_id,organization_id,contact_name,phone_number,password_codeword,can_authorize_entry,priority_order) VALUES(c.id,c.organization_id,e->>'name',e->>'phone',e->>'password',(e->>'canAuthorize')::boolean,ord);
