@@ -26,7 +26,7 @@ Deno.serve(async(req:Request)=>{
       processed++;
       try {
         if(cycle.state==='preparing'){await rpc('prepare',cycle);continue;}
-        const {data:contract}=await admin.from('security_contracts').select('contact_id,email_override,security_payment_method_id,contract_number').eq('id',cycle.contract_id).single();
+        const {data:contract}=await admin.from('security_contracts').select('contact_id,email_override,security_payment_method_id,contract_number,mailed_paper_statements,mail_invoice_fee').eq('id',cycle.contract_id).single();
         const {data:invoice}=await admin.from('invoices').select('*,invoice_line_items(*)').eq('id',cycle.invoice_id).eq('organization_id',cycle.organization_id).single();
         const {data:contact}=await admin.from('contacts').select('qbo_customer_id,email,full_name').eq('id',contract?.contact_id).eq('organization_id',cycle.organization_id).single();
         const {data:settings}=await admin.from('company_settings').select('company_name,company_email,from_email,from_name').eq('organization_id',cycle.organization_id).single();
@@ -37,6 +37,17 @@ Deno.serve(async(req:Request)=>{
         const accessToken=await getValidAccessToken(admin,connection);if(!accessToken) throw new Error('QuickBooks credentials are unavailable');
         // Stable Accounting API requestid prevents duplicate invoices on a retry.
         if(!invoice.qbo_invoice_id) {
+          // Never send a QBO invoice that silently omits or invents the
+          // customer-selected paper statement surcharge. Annual quantity and
+          // total are generated upstream; validate itemization here.
+          const paperLines=(invoice.invoice_line_items||[]).filter(
+            (line:Record<string,unknown>)=>line.security_service_name==='Mailed invoice fee');
+          if(contract.mailed_paper_statements) {
+            if(Number(contract.mail_invoice_fee)!==5 || paperLines.length!==1)
+              throw new Error('Paper statement fee itemization requires reconciliation before QuickBooks sync');
+          } else if(paperLines.length!==0 || Number(contract.mail_invoice_fee)!==0) {
+            throw new Error('Unexpected paper statement fee; review billing before QuickBooks sync');
+          }
           const itemized=await resolveSecurityInvoiceItems(admin,connection,invoice.invoice_line_items,qboRequest);
           const response=await qboRequest(admin,connection,'POST',`invoice?requestid=sec-${cycle.id}`,{
             AllowOnlineCreditCardPayment:false,AllowOnlineACHPayment:false,CustomerRef:{value:contact.qbo_customer_id},DocNumber:invoice.invoice_number,TxnDate:invoice.invoice_date,DueDate:invoice.due_date,
