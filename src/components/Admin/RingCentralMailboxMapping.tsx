@@ -55,6 +55,7 @@ async function invoke(
   return data;
 }
 export function RingCentralMailboxMapping() {
+  const [showHelp, setShowHelp] = useState(false);
   const [emailHealth, setEmailHealth] = useState({ failed: 0, unknown: 0 });
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]),
     [people, setPeople] = useState<Person[]>([]),
@@ -175,6 +176,15 @@ export function RingCentralMailboxMapping() {
           <p className="text-sm text-gray-600">
             Choose who handles each RingCentral voicemail destination.
           </p>
+          <button
+            type="button"
+            aria-expanded={showHelp}
+            aria-controls="ringcentral-mailbox-how-it-works"
+            onClick={() => setShowHelp((open) => !open)}
+            className="mt-1 text-sm font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+          >
+            {showHelp ? "Hide instructions" : "How it works"}
+          </button>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -204,6 +214,21 @@ export function RingCentralMailboxMapping() {
           </button>
         </div>
       </div>
+      {showHelp && (
+        <div id="ringcentral-mailbox-how-it-works" className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-gray-800">
+          <h6 className="font-semibold text-gray-900">Set up voicemail routing in MyJobView</h6>
+          <ol className="mt-2 list-decimal space-y-2 pl-5">
+            <li><strong>Connect RingCentral</strong> using the integration above. Your account must have permission to read the mailboxes you want to monitor.</li>
+            <li><strong>Discover RingCentral destinations</strong> to list available extensions. Discovery does not change your phone system or turn on monitoring.</li>
+            <li><strong>Open an actual voicemail mailbox</strong> and select Monitor this mailbox. An IVR or announcement extension may not have its own voicemail.</li>
+            <li><strong>Choose the default department and primary owner.</strong> The mailbox's department determines where its messages go in Flow, even when AI suggests another department.</li>
+            <li><strong>Assign responsible and backup employees.</strong> Responsible employees receive Flow alerts; backups are alerted after the specified delay if the voicemail still needs attention. Select Email for anyone who should also get an email notification.</li>
+            <li><strong>Save mapping</strong> to check mailbox access and synchronize monitored mailboxes. If subscription synchronization fails, correct the provider permissions and use Sync monitored mailboxes.</li>
+            <li><strong>Leave a real test voicemail.</strong> Verify the correct department, owner, Flow alert, email (if enabled), recording and transcript. Use Import last 14 days to recover earlier messages if needed.</li>
+          </ol>
+          <p className="mt-3 text-xs text-gray-600">Only enabled mailboxes are monitored. Employees must have active MJV access. Email alerts link to authenticated Flow; they do not include caller details, recordings or transcripts. These settings do not change RingCentral call routing.</p>
+        </div>
+      )}
       <p className="text-xs text-gray-600">
         Discovery preserves your phone routing. Only enabled mailboxes are
         monitored. Saving assigns department access to selected recipients.
