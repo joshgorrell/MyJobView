@@ -81,7 +81,6 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'integrations', label: 'Integrations', group: 'system' },
     { id: 'products', label: 'Products', group: 'system', visible: jobModuleEnabled },
     { id: 'catalog', label: 'Catalog Setup', group: 'system' },
-    { id: 'classes', label: 'Proposal Classes', group: 'sales' },
     { id: 'contact_import', label: 'Contact Import', group: 'sales', visible: profile?.role === 'admin' },
     { id: 'orphaned', label: 'System Maintenance', group: 'system' },
   ];
