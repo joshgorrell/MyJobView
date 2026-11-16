@@ -10,6 +10,7 @@ export function safeSecurityDraft(form: SecurityDraftForm, billingPreference: 'm
       password: c.password, canAuthorize: Boolean(c.canAuthorize) })),
     paymentMethod: form.paymentMethod,
     paymentMethodId: form.paymentMethodId,
+    mailedPaperStatements: Boolean(form.mailedPaperStatements),
     billingPreference,
   };
 }
