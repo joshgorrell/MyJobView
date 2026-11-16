@@ -11,7 +11,7 @@ type Connection = {
   mailboxes: { extensionId: string; enabled: boolean }[];
 };
 /** Credentials are never returned to the browser. */
-export function RingCentralSettings() {
+export function RingCentralSettings({ onConnectionChange }: { onConnectionChange?: (connected: boolean) => void } = {}) {
   const [busy, setBusy] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState('');
@@ -150,6 +150,7 @@ export function RingCentralSettings() {
     }
   }
   const hasConnectedAccount = connections.some(connection => connection.status === 'connected');
+  useEffect(() => { if (!loading) onConnectionChange?.(hasConnectedAccount); }, [loading, hasConnectedAccount, onConnectionChange]);
   const current = diagnostics?.connections.find(c => c.status === 'connected');
   const subscriptionActive = current?.subscription_check === 'active';
   const mailboxReady = current?.registered_mailbox && current?.mailbox_enabled;
