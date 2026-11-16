@@ -339,6 +339,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           <div className="space-y-5">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Personal Information</h2>
+              <p className="text-sm text-gray-600 mt-2">Statement delivery: {contract.billing_mode === 'mail' ? 'Mailed paper invoices (includes a separately itemized monthly mailing fee in your account total)' : 'Electronic billing (no mailing fee)'}. To request a different delivery method, contact our office before signing. Mailed invoices require administrator approval.</p>
               <p className="text-gray-500 text-sm mt-1">Please verify and complete your contact details.</p>
             </div>
 
