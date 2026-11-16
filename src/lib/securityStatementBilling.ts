@@ -1,5 +1,5 @@
 /** Statement delivery is separate from the method used to collect payment. */
-export const PAPER_STATEMENT_MONTHLY_FEE = 5;
+export const PAPER_STATEMENT_FEE_PER_MAILING = 5;
 
 export interface SecurityStatementBilling {
   mailedPaperStatements: boolean;
@@ -14,7 +14,7 @@ export function securityStatementBilling(input: SecurityStatementBilling) {
   if (!Number.isFinite(input.monitoringMonthly) || input.monitoringMonthly < 0) {
     throw new Error('Invalid monitoring amount');
   }
-  const paperFeeMonthly = input.mailedPaperStatements ? PAPER_STATEMENT_MONTHLY_FEE : 0;
+  const paperFeeMonthly = input.mailedPaperStatements ? PAPER_STATEMENT_FEE_PER_MAILING : 0;
   return {
     electronicStatementsIncluded: true,
     autopayRequired: input.paymentMode === 'autopay',
