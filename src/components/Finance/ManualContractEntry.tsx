@@ -15,6 +15,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const baseline = useRef('');
+  const initialMailedPaperStatements = useRef(false);
   const [saving, setSaving] = useState(false);
   const [paperSigned, setPaperSigned] = useState(false);
   const [signedAgreementFile, setSignedAgreementFile] = useState<File | null>(null);
@@ -72,7 +73,9 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
       setAnnualAvailable(annual);
       setFormData(next);
       setPaperSigned(false); setAutopayAccepted(false);
-      setMailedPaperStatements(data.security_billing_mode === 'mail' || Boolean(data.mailed_paper_statements));
+      const initialStatementChoice = data.security_billing_mode === 'mail' || Boolean(data.mailed_paper_statements);
+      setMailedPaperStatements(initialStatementChoice);
+      initialMailedPaperStatements.current = initialStatementChoice;
       baseline.current = JSON.stringify(next);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Failed to load contract data');
@@ -81,7 +84,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
 
   useEffect(() => {
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
-      if (JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted || mailedPaperStatements) {
+      if (JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted || mailedPaperStatements !== initialMailedPaperStatements.current) {
         event.preventDefault(); event.returnValue = '';
       }
     };
@@ -91,7 +94,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
 
   async function closeEntry() {
     if (saving) return;
-    if ((JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted || mailedPaperStatements) &&
+    if ((JSON.stringify(formData) !== baseline.current || paperSigned || autopayAccepted || mailedPaperStatements !== initialMailedPaperStatements.current) &&
         !(await requestConfirmation('Discard this unsaved manual entry? This information has not been submitted.', { theme: 'emerald' }))) return;
     onClose();
   }
