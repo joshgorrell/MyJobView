@@ -640,6 +640,31 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               </div>
             </div>
 
+            {/* Electronic statements are included for every account. The existing mail billing
+                mode is an Admin-authorized payment exception, not a customer paper preference. */}
+            <div className="border border-gray-200 rounded-2xl p-4 bg-white space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-gray-900">Electronic Statements</span>
+                <span className="text-sm font-medium text-gray-600">Included</span>
+              </div>
+              <p className="text-xs text-gray-500">Electronic statements are provided automatically at no additional charge.</p>
+              {contract.billing_mode === 'mail' ? (
+                <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-2">
+                  <span className="text-sm text-gray-700">Admin-approved mailed invoices</span>
+                  <span className="text-sm font-semibold text-gray-900">{formatCurrency(Number(contract.mail_invoice_fee) || 0)}/month</span>
+                </div>
+              ) : (
+                <div className="border-t border-gray-100 pt-2 space-y-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-gray-900">Optional Mailed Paper Statements</span>
+                    <span className="text-sm font-semibold text-gray-900">+$5/month</span>
+                  </div>
+                  <p className="text-xs text-gray-500">Contact our office before signing to request mailed statements in addition to your electronic statements.</p>
+                  <p className="text-xs text-gray-500">AutoPay enrollment is still required. Mailed statements do not replace automatic payments.</p>
+                </div>
+              )}
+            </div>
+
             {/* Payment Frequency Selection */}
             <div>
               <h3 className="text-base font-semibold text-gray-900 mb-3">Choose Your Payment Frequency</h3>
