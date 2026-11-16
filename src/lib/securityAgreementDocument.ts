@@ -29,10 +29,6 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
   const billing = document.billingPreference || billingPreference || 'monthly';
   const paperFee = Number(document.mail_invoice_fee) || 0;
   const annualSubtotal = (Number(document.monthly_price) - paperFee) * 12 + paperFee;
-  const discountableSubtotal = annualSubtotal - paperFee;
-  const annualDiscount = document.dealer?.annual_discount_type === 'percentage'
-    ? Math.round(discountableSubtotal * (Number(document.dealer.annual_discount_percentage) / 100) * 100) / 100
-    : Math.min(Number(document.dealer?.annual_discount_flat_amount) || 0, discountableSubtotal);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>${esc(document.contract_number)} — Security agreement</title><style>
     @page{size:letter;margin:0.7in}body{font-family:Arial,sans-serif;color:#111;line-height:1.5;max-width:800px;margin:30px auto;padding:0 20px}
@@ -48,7 +44,7 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     ${(document.services || []).map(s => `<tr><td>${esc(s.name)}</td></tr>`).join('')}
     <tr><td><strong>Overall account price: ${money(document.monthly_price)}/month</strong></td></tr></tbody></table>
     <p>Initial term: ${esc(document.term_months)} months.<br>Payment frequency: ${billing === 'annual' ? 'Annual' : 'Monthly'}. Payments are collected in advance for the upcoming ${billing === 'annual' ? '12 months' : 'month'} of monitoring service, not for the prior service period.
-    ${billing === 'annual' ? `<br>Annual subtotal: ${money(annualSubtotal)}. Discount: ${money(annualDiscount)}. Annual billing amount: ${money(annualSubtotal - annualDiscount)}.` : ''}</p>
+    ${billing === 'annual' ? `<br>Annual subtotal: ${money(annualSubtotal)}. Annual billing amount: ${money(annualSubtotal)}.` : ''}</p>
     <p>Electronic statements are included for every account at no additional charge.<br>${document.billing_mode === 'mail' ? 'Admin-approved manual billing with mailed paper invoices.' : 'Automatic recurring payments are required for security monitoring.'}${document.mailed_paper_statements ? ` Mailed paper statements are an additional ${Number(document.mail_invoice_fee ?? 0).toFixed(2)} per mailed statement and do not replace electronic statements.${document.billing_mode !== 'mail' ? ' AutoPay remains required.' : ''}` : ''}
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
