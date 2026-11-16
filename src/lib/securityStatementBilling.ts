@@ -24,22 +24,9 @@ export function securityStatementBilling(input: SecurityStatementBilling) {
   };
 }
 
-/** Apply annual discount only to monitoring, never the paper delivery add-on. */
-export function securityAnnualStatementTotal(
-  monitoringMonthly: number,
-  mailedPaperStatements: boolean,
-  discount: { type: 'percentage' | 'flat'; value: number },
-) {
+/** Annual billing is a payment frequency, not a discounted plan. */
+export function securityAnnualStatementTotal(monitoringMonthly: number, mailedPaperStatements: boolean) {
   const billing = securityStatementBilling({ monitoringMonthly, mailedPaperStatements, paymentMode: 'autopay' });
-  if (!Number.isFinite(discount.value) || discount.value < 0) throw new Error('Invalid discount');
   const monitoringAnnual = Math.round(monitoringMonthly * 1200) / 100;
-  const savings = discount.type === 'percentage'
-    ? Math.round(monitoringAnnual * Math.min(discount.value, 100)) / 100
-    : Math.min(discount.value, monitoringAnnual);
-  return {
-    monitoringAnnual,
-    savings,
-    paperFeeAnnual: billing.paperFeeAnnual,
-    total: Math.round((monitoringAnnual - savings + billing.paperFeeAnnual) * 100) / 100,
-  };
+  return { monitoringAnnual, paperFeeAnnual: billing.paperFeeAnnual, total: Math.round((monitoringAnnual + billing.paperFeeAnnual) * 100) / 100 };
 }
