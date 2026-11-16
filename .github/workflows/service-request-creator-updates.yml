@@ -26,7 +26,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm install --no-save --package-lock=false @electric-sql/pglite@0.3.14
       - run: node tests/service-requests/creator-flow-database.mjs
       - run: node tests/service-requests/creator-updates-runtime.mjs
       - run: npm run build
