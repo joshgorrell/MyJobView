@@ -5,6 +5,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import net from 'node:net';
 import {ensureLaptopGroup,meshCommand,viewerCookie,nativeUsers} from './meshcentral-client.mjs';
 import {dealerDomain} from './control-core.mjs';
+import {verifyRuntimeSecurity} from './runtime-security.mjs';
 
 export function runtimeConfig({domain,port,keyHex},origin){
  const host=new URL(origin);if(host.protocol!=='https:'||host.origin!==origin)throw new Error('invalid_public_origin');
@@ -39,7 +40,7 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
   finally{release();}
  }
  const api={
-  async verifyVersion(){const pkg=JSON.parse(await readFile(join(dirname(binary),'package.json'),'utf8'));if(pkg.name!=='meshcentral'||pkg.version!==approvedVersion)throw new Error('unapproved_meshcentral_version');},
+  async verifyVersion(){const pkg=JSON.parse(await readFile(join(dirname(binary),'package.json'),'utf8'));if(pkg.name!=='meshcentral'||pkg.version!==approvedVersion)throw new Error('unapproved_meshcentral_version');await verifyRuntimeSecurity(binary);},
   async ensure(job,check){
    if(shuttingDown)throw new Error('runtime_shutting_down');
    const id=job.organization_id;let state=await allocate(id);const domain=dealerDomain(id);

@@ -20,10 +20,23 @@ on:
       - 'package-lock.json'
       - '.github/workflows/assist-review.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
 permissions:
   contents: read
 jobs:
+  assist-dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --prefix services/assist
+      - run: npm audit --omit=dev --audit-level=moderate --prefix services/assist
   assist-enrollment:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,6 +47,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm ci --ignore-scripts --prefix services/assist
+      - run: node services/assist/runtime-security.mjs
+      - run: node tests/assist/runtime-security.mjs
       - run: node tests/assist/native-smoke.mjs
       - run: npm run typecheck
       - run: npm run build
