@@ -1,8 +1,10 @@
+import {inviteOperations} from './guest-broker.mjs';
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function validateSupportRequest(body){
- if(!body||!['devices','connect','touch','end'].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
+ if(!body||!['devices','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
  if(body.operation==='connect'&&(typeof body.device_id!=='string'||body.device_id.length>256))throw new Error('invalid_device');
  if(['touch','end'].includes(body.operation)&&!uuid.test(body.session_id))throw new Error('invalid_session');
+ if(inviteOperations.includes(body.operation)&&!['invite_create','invite_capability'].includes(body.operation)&&!uuid.test(body.invite_id))throw new Error('invalid_invite');
  return body;
 }
 export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)=>fn()}){

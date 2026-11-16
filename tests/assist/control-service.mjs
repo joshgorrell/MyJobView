@@ -80,8 +80,10 @@ try{
 const token='t'.repeat(40);let applied=0;
 const upstream=http.createServer((request,response)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify({url:request.url,authorization:request.headers.authorization||null,meshAuth:request.headers['x-meshauth']||null,proto:request.headers['x-forwarded-proto']}));});
 await new Promise(r=>upstream.listen(0,'127.0.0.1',r));let serving=true;const sockets=new Set();
-const server=createControlServer({token,plane:{reconcile:async()=>{applied++;return {status:'applied'};}},runtime:{target:d=>serving&&d===domain?{port:upstream.address().port,sockets}:null}});
+const server=createControlServer({token,plane:{reconcile:async()=>{applied++;return {status:'applied'};}},runtime:{target:d=>serving&&d===domain?{port:upstream.address().port,sockets}:null},guests:{guest:async()=>({ended:true})}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
+assert.equal((await fetch(url+'/v1/guest',{method:'POST',body:'{}'})).status,401);
+assert.equal((await fetch(url+'/v1/guest',{method:'POST',headers:{authorization:'Bearer '+token},body:JSON.stringify({organization_id:org,operation:'end',invite_id:org,claim_token:'0'.repeat(64)})})).status,200);
 try{
  assert.equal((await fetch(url+'/v1/dealers/reconcile',{method:'POST',body:JSON.stringify(job)})).status,401);
  assert.equal((await fetch(url+'/v1/dealers/reconcile',{method:'POST',headers:{authorization:'Bearer '+token,'idempotency-key':org+':1'},body:JSON.stringify(job)})).status,200);

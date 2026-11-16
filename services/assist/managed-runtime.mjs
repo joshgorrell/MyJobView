@@ -77,6 +77,13 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
        if(user.siteadmin)throw new Error('unexpected_privileged_viewer');
        await check();await command(identity,{action:'deleteuser',userid:user._id});
       }
+      // No guest invitation survives a process restart. Native metadata is the durable cleanup journal.
+      const groups=(await command(identity,{action:'meshes'})).meshes;
+      if(!Array.isArray(groups))throw new Error('invalid_groups');
+      for(const mesh of groups.filter(m=>m.name?.startsWith('MJV guest '))){
+       if(!mesh._id?.startsWith(`mesh/${domain}/`))throw new Error('foreign_guest_group');
+       await check();await command(identity,{action:'deletemesh',meshid:mesh._id});
+      }
       record.cleaned=true;
      }
      record.meshId=group.meshId;record.generation=job.generation;record.serving=true;const url=new URL(`/${domain}/meshagents`,publicOrigin);url.searchParams.set('meshid',group.meshHash);url.searchParams.set('id','4');
@@ -85,12 +92,12 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
    }
    throw new Error(lastError?.message||'runtime_not_ready');
   },
-  async inventory(id){
+  async inventory(id,guestMeshId=null){
    const r=runtimes.get(id);if(!r?.serving)throw new Error('runtime_unavailable');
    const data=await command(r,{action:'nodes'});const devices=[];
    for(const [group,nodes]of Object.entries(data.nodes||{})){
     if(!group.startsWith(`mesh/${r.domain}/`)||!Array.isArray(nodes))throw new Error('foreign_device_group');
-    if(group!==r.meshId)continue;
+    if(group!==(guestMeshId||r.meshId))continue;
     for(const node of nodes){
      if(typeof node._id!=='string'||!node._id.startsWith(`node/${r.domain}/`)||node.meshid!==group)throw new Error('foreign_device');
      devices.push({id:node._id,name:String(node.name||node.rname||'Windows laptop').slice(0,120),online:!!(node.conn&1),os:String(node.osdesc||'').slice(0,160)});
@@ -98,9 +105,28 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
    }
    return devices.sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name)).slice(0,500);
   },
-  async createViewer(id,deviceId,username){
+  async createGuestGroup(id,inviteId){
+   const r=runtimes.get(id);if(!r?.serving||!/^[a-f0-9]{32}$/.test(inviteId))throw new Error('guest_unavailable');
+   const name='MJV guest '+inviteId;
+   const created=await command(r,{action:'createmesh',meshname:name,meshtype:2,consent:9});
+   const group=(await command(r,{action:'meshes'})).meshes?.find(m=>m._id===created.meshid);
+   if(!group||!group._id.startsWith(`mesh/${r.domain}/`)||group.mtype!==2||(group.consent&9)!==9||group.name!==name)throw new Error('invalid_guest_group');
+   const url=new URL(`/${r.domain}/meshagents`,publicOrigin);url.searchParams.set('meshid',group._id.split('/')[2]);url.searchParams.set('id','4');url.searchParams.set('installflags','1');
+   return {meshId:group._id,download_url:url.href};
+  },
+  async deleteGuestGroup(id,meshId){
+   const r=runtimes.get(id);if(!r){if(await api.isStopped(id))return;throw new Error('revocation_unconfirmed');}
+   if(!meshId?.startsWith(`mesh/${r.domain}/`)||meshId===r.meshId)throw new Error('invalid_guest_group');
+   const groups=(await command(r,{action:'meshes'})).meshes;
+   if(!Array.isArray(groups))throw new Error('invalid_groups');
+   const group=groups.find(m=>m._id===meshId);
+   if(group){if(!/^MJV guest [a-f0-9]{32}$/.test(group.name))throw new Error('invalid_guest_group');await command(r,{action:'deletemesh',meshid:meshId});}
+   if((await command(r,{action:'meshes'})).meshes?.some(m=>m._id===meshId&&!m.deleted))throw new Error('revocation_unconfirmed');
+  },
+  async createViewer(id,deviceId,username,guestMeshId=null){
    const r=runtimes.get(id);if(!r?.serving||!/^mjv-session-[a-f0-9]{32}$/.test(username))throw new Error('viewer_unavailable');
-   const device=(await api.inventory(id)).find(d=>d.id===deviceId);if(!device?.online)throw new Error('device_offline');
+   if(guestMeshId && (!guestMeshId.startsWith(`mesh/${r.domain}/`)||guestMeshId===r.meshId))throw new Error('invalid_guest_group');
+   const device=(await api.inventory(id,guestMeshId)).find(d=>d.id===deviceId);if(!device?.online)throw new Error('device_offline');
    const userId=`user/${r.domain}/${username}`;
    try{
     await command(r,{action:'adduser',username,pass:'Aa1!'+randomBytes(48).toString('base64'),siteadmin:0});
@@ -133,6 +159,7 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
    if(await api.isStopped(id)!==true)throw new Error('stop_unconfirmed');
   },
   async isStopped(id){const runtime=runtimes.get(id);if(runtime)return false;const state=await store.read(id);return !state?.port||await closedPort(state.port);},
+  generation(id){const r=runtimes.get(id);return r?.serving?r.generation:null;},
   target(domain){for(const [id,r]of runtimes){if(r.domain===domain&&r.serving)return {organizationId:id,port:r.port,sockets:r.sockets};}return null;},
   async stopAll(){shuttingDown=true;for(const id of [...runtimes.keys()])await api.stop(id);},
  };

@@ -1,3 +1,5 @@
+import {dirname} from 'node:path';
+import {prepareGuestRuntime,verifyGuestRuntime} from './guest-runtime-security.mjs';
 import {readFile, writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
@@ -28,6 +30,7 @@ export function patchRuntimeSource(bytes) {
 
 export async function verifyRuntimeSecurity(entry) {
   if (digest(await readFile(entry)) !== patchedHash) throw new Error('runtime_security_preparation_required');
+  await verifyGuestRuntime(dirname(entry));
   const require = createRequire(entry);
   for (const [name, version] of [['compression', '1.8.2'], ['node-forge', '1.4.3']]) {
     if (require(name + '/package.json').version !== version) throw new Error('unexpected_runtime_dependency');
@@ -39,6 +42,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const entry = fileURLToPath(new URL('./node_modules/meshcentral/meshcentral.js', import.meta.url));
     if (process.argv.length !== 2) throw new Error('invalid_arguments');
     await writeFile(entry, patchRuntimeSource(await readFile(entry)));
+    await prepareGuestRuntime(dirname(entry));
     await verifyRuntimeSecurity(entry);
     console.log('Assist runtime dependency pins prepared; runtime package installation disabled');
   } catch {

@@ -3,11 +3,17 @@ import {readFile, mkdtemp, writeFile, rm} from 'node:fs/promises';
 import {resolve, join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createRequire} from 'node:module';
+import {prepareGuestRuntime,verifyGuestRuntime} from '../../services/assist/guest-runtime-security.mjs';
 import {patchRuntimeSource, verifyRuntimeSecurity} from '../../services/assist/runtime-security.mjs';
 
 const entry=resolve('services/assist/node_modules/meshcentral/meshcentral.js');
 const source=await readFile(entry);
 await verifyRuntimeSecurity(entry);
+await prepareGuestRuntime(resolve('services/assist/node_modules/meshcentral'));
+await verifyGuestRuntime(resolve('services/assist/node_modules/meshcentral'));
+const agentSource=await readFile(resolve('services/assist/node_modules/meshcentral/meshagent.js'),'utf8');
+assert.ok(agentSource.includes("mesh.name.startsWith('MJV guest ')"));
+assert.ok(agentSource.includes('obj.close(1); return null;'));
 assert.deepEqual(patchRuntimeSource(source),source,'Preparation is idempotent');
 const original=Buffer.from(source.toString('utf8')
  .replace("'compression@1.8.2'","'compression@1.8.1'")
@@ -24,6 +30,12 @@ assert.equal(typeof require('glob').glob,'function');
 assert.equal(require('qs').parse('dealer=one').dealer,'one');
 const dir=await mkdtemp(join(tmpdir(),'mjv-runtime-security-'));
 try{
+ const agent=await readFile(resolve('services/assist/node_modules/meshcentral/meshagent.js'));
+ const user=await readFile(resolve('services/assist/node_modules/meshcentral/meshuser.js'));
+ await writeFile(join(dir,'meshagent.js'),agent);await writeFile(join(dir,'meshuser.js'),user);await verifyGuestRuntime(dir);
+ await writeFile(join(dir,'meshagent.js'),Buffer.concat([agent,Buffer.from('tampered')]));
+ await assert.rejects(verifyGuestRuntime(dir),/guest_runtime_preparation_required/);
+ await assert.rejects(prepareGuestRuntime(dir),/unexpected_guest_runtime_source/);
  const unprepared=join(dir,'original.js');await writeFile(unprepared,original);
  await assert.rejects(verifyRuntimeSecurity(unprepared),/runtime_security_preparation_required/);
  const changed=join(dir,'meshcentral.js');await writeFile(changed,Buffer.concat([source,Buffer.from('\n')]));
