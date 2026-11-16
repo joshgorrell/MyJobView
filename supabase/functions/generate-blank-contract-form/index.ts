@@ -75,10 +75,7 @@ Deno.serve(async (req: Request) => {
     const termsText = (contract.template?.contract_terms || 'Terms and conditions unavailable.').replaceAll('[term]', `${contract.term_months || ''} months`);
 
     const annualBase = Math.max(0, Number(contract.monthly_price || 0) - Number(contract.mail_invoice_fee || 0)) * 12;
-    const annualDiscount = contract.dealer?.annual_discount_type === 'percentage'
-      ? Math.round(annualBase * Number(contract.dealer.annual_discount_percentage || 0)) / 100
-      : Math.min(annualBase, Number(contract.dealer?.annual_discount_flat_amount || 0));
-    const annualTotal = annualBase - annualDiscount + Number(contract.mail_invoice_fee || 0) * 12;
+    const annualTotal = annualBase + (Number(contract.mail_invoice_fee || 0) > 0 ? 5 : 0);
     const branding = securityAgreementBranding(contract.dealer);
     const html = `<!DOCTYPE html>
 <html lang="en">
