@@ -78,7 +78,6 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'emails', label: 'Email Templates', group: 'communications' },
     { id: 'email_config', label: 'Email Settings', group: 'communications' },
     { id: 'messages', label: 'Company Messages', group: 'communications' },
-    { id: 'suggestions', label: 'Suggestions', group: 'communications' },
     { id: 'integrations', label: 'Integrations', group: 'system' },
     { id: 'products', label: 'Products', group: 'system', visible: jobModuleEnabled },
     { id: 'catalog', label: 'Catalog', group: 'system' },
