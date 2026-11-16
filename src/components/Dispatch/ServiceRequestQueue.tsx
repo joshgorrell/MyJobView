@@ -1,3 +1,4 @@
+import { CompactRequestRow } from '../Shared/CompactRequestRow';
 import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
 import { serviceApprovalPending, type ServiceApprovalFields } from '../../lib/serviceApproval';
 import { SupportRequestItems } from '../Shared/SupportRequestItems';
@@ -579,8 +580,9 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                   : 'border-strong hover:border-strong'
               }`}
             >
+              <CompactRequestRow customer={request.customer_name} description={request.job_description} status={getStatusLabel(request.status)} creator={request.profiles?.full_name} createdAt={request.created_at} expanded={expandedRequest === request.id} onToggle={() => toggleReviewedRequest(request.id)} />
               {/* Kickback warning banner */}
-              {request.status === 'needs_more_info' && request.kickback_reason && (
+              {request.status === 'needs_more_info' && request.kickback_reason && expandedRequest === request.id && (
                 <div className="flex flex-wrap items-start gap-2 px-3 py-3 bg-amber-500/10 border-b border-amber-500/30 rounded-t-lg">
                   <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -614,7 +616,7 @@ export function ServiceRequestQueue({ requestId, canViewTestTune = false }: { re
                 </div>
               )}
 
-              <div className="px-3 py-2">
+              <div className={`${expandedRequest === request.id ? 'block' : 'hidden sm:block'} px-3 py-2`}>
                 <div className="flex items-start gap-2">
                   {/* Multi-select checkbox — only shown on open status queue tab */}
                   {activeTab === 'queue' && (

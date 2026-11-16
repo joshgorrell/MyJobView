@@ -9,13 +9,15 @@ on:
       - 'src/hooks/useServiceRequestUpdates.ts'
       - 'supabase/migrations/*service_request_creator_flow.sql'
       - 'tests/service-requests/creator-*'
+      - 'tests/service-requests/compact-rows-browser.mjs'
+      - 'src/components/Shared/CompactRequestRow.tsx'
       - '.github/workflows/service-request-creator-updates.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   creator-updates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -28,3 +30,6 @@ jobs:
       - run: node tests/service-requests/creator-flow-database.mjs
       - run: node tests/service-requests/creator-updates-runtime.mjs
       - run: npm run build
+      - run: npm install --no-save --package-lock=false playwright@1.55.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/service-requests/compact-rows-browser.mjs

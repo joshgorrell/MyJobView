@@ -46,7 +46,7 @@ export function ServiceRequestConsole({ initialTab }: ServiceRequestConsoleProps
   return (
     <div className="w-full max-w-full min-w-0 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 min-w-0 max-w-full">
-      <div className="flex flex-wrap items-center gap-1 min-w-0">
+      <div className="flex flex-nowrap items-center gap-1 min-w-0 max-w-full overflow-x-auto">
         {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
