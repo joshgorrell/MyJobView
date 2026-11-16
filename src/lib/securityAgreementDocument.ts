@@ -48,7 +48,7 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     <tr><td><strong>Overall account price: ${money(document.monthly_price)}/month</strong></td></tr></tbody></table>
     <p>Initial term: ${esc(document.term_months)} months.<br>Billing preference: ${billing === 'annual' ? 'Annual' : 'Monthly'}.
     ${billing === 'annual' ? `<br>Annual subtotal: ${money(annualSubtotal)}. Discount: ${money(annualDiscount)}. Annual billing amount: ${money(annualSubtotal - annualDiscount)}.` : ''}</p>
-    <p>${document.billing_mode === 'mail' ? 'Admin-approved mailed invoices, included in the overall account price.' : 'Automatic recurring payments are required for security monitoring.'}
+    <p>${document.billing_mode === 'mail' ? 'Admin-approved mailed paper invoices. The monthly mailing fee is separately itemized on invoices and included in the overall account price.' : 'Automatic recurring payments are required for security monitoring.'}
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
     <p>Review the terms below for renewal, cancellation and payment obligations.${document.dealer?.company_email ? ` Contact: ${esc(document.dealer.company_email)}.` : ''}</p>
