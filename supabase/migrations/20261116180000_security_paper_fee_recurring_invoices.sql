@@ -30,12 +30,7 @@ BEGIN
         THEN 5 ELSE 0 END;
       v_subtotal := ((c.onboarding_agreement_snapshot->>'monthly_price')::numeric -
         coalesce((c.onboarding_agreement_snapshot->>'mail_invoice_fee')::numeric,0))*v_months + v_fee;
-      v_discount := 0;
-      IF v_months=12 THEN
-        IF c.onboarding_agreement_snapshot->'dealer'->>'annual_discount_type'='percentage' THEN
-          v_discount := round((v_subtotal-v_fee)*coalesce((c.onboarding_agreement_snapshot->'dealer'->>'annual_discount_percentage')::numeric,0)/100,2);
-        ELSE v_discount := least(v_subtotal-v_fee,coalesce((c.onboarding_agreement_snapshot->'dealer'->>'annual_discount_flat_amount')::numeric,0)); END IF;
-      END IF;
+      v_discount := 0; -- Annual billing has no discount.
       IF v_subtotal-v_discount<=0 THEN CONTINUE; END IF;
       INSERT INTO public.invoices(invoice_number,created_by,company_id,organization_id,contact_id,invoice_date,due_date,invoice_type,source_type,
         status,subtotal,total,amount_due,billing_name,billing_address_line1,billing_city,billing_state,billing_zip,
@@ -48,7 +43,7 @@ BEGIN
         'Security monitoring '||coalesce(c.contract_number,c.id::text)||' · '||v_start||' through '||v_end
       FROM public.contacts ct WHERE ct.id=c.contact_id AND ct.organization_id=c.organization_id RETURNING id INTO v_invoice;
       -- Retain the accepted service names/rates rather than reading today's catalog.
-      -- Allocate agreed price overrides and annual discounts proportionally, with the
+      -- Allocate agreed price overrides proportionally, with the
       -- final line absorbing cent rounding so line amounts always equal the invoice.
       v_services:=coalesce(c.onboarding_agreement_snapshot->'services','[]'::jsonb);
       IF jsonb_typeof(v_services)<>'array' THEN RAISE EXCEPTION 'Accepted monitoring services are invalid'; END IF;
