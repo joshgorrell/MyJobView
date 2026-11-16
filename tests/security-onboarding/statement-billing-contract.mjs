@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../../src/lib/securityStatementBilling.ts', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../../supabase/migrations/20261116160000_security_paper_statements_independent.sql', import.meta.url), 'utf8');
 
-assert.match(source, /PAPER_STATEMENT_MONTHLY_FEE = 5/);
+assert.match(source, /PAPER_STATEMENT_FEE_PER_MAILING = 5/);
 assert.match(source, /Manual billing requires mailed paper statements/);
 assert.match(source, /autopayRequired: input.paymentMode === 'autopay'/);
 assert.match(source, /paperFeeAnnual: paperFeeMonthly,/);
