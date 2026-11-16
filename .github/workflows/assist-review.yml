@@ -29,6 +29,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm ci --ignore-scripts --prefix services/assist
+      - run: node tests/assist/native-smoke.mjs
       - run: npm run typecheck
       - run: npm run build
       - run: npx playwright install --with-deps chromium

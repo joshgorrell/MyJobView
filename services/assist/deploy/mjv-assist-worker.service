@@ -1,0 +1,24 @@
+[Unit]
+Description=MJV remote support activation worker
+After=network-online.target mjv-assist-control.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mjv-assist
+Group=mjv-assist
+WorkingDirectory=/opt/myjobview/services/assist
+EnvironmentFile=/etc/mjv-assist.env
+ExecStart=/usr/bin/node /opt/myjobview/services/assist/activation-worker.mjs
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

@@ -8,7 +8,7 @@ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_ro
  CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid REFERENCES organizations,role text,is_active boolean DEFAULT true);
  INSERT INTO organizations(id) VALUES('${id(1)}'),('${id(2)}');
  INSERT INTO profiles VALUES('${id(10)}','${id(1)}','admin',true),('${id(11)}','${id(1)}','tech',true),('${id(20)}','${id(2)}','admin',true);`);
-for(const f of ['20261116153609_assist_windows_enrollment.sql','20261116155804_assist_activation_lifecycle.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+for(const f of ['20261116153609_assist_windows_enrollment.sql','20261116155804_assist_activation_lifecycle.sql','20261116162538_assist_runtime_recovery.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
 const actor=async(n,sql)=>{await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SET ROLE authenticated;`);return db.query(sql);};
 const service=async(sql,args)=>{await db.exec('RESET ROLE;SET ROLE service_role');return db.query(sql,args);};
 const toggle=(org,value)=>`SELECT set_assist_enabled('${id(org)}',${value}) AS v`;
@@ -40,10 +40,16 @@ assert.equal(await finish(retry,ready(1)),true);
 assert.equal(await finish(retry,ready(1)),false,'Duplicate completion rejected');
 assert.equal((await actor(10,status(1))).rows[0].v.activation_state,'enrollment_ready');
 await actor(10,toggle(1,true));assert.equal(await claim(),null,'Repeated enable is idempotent');
+assert.equal((await service('SELECT requeue_assist_runtime($1,$2) AS v',[id(1),retry.generation-1])).rows[0].v,false,'Stale incident cannot invalidate a newer runtime');
+assert.equal((await service('SELECT requeue_assist_runtime($1,$2) AS v',[id(1),retry.generation])).rows[0].v,true);
+assert.equal((await actor(10,status(1))).rows[0].v.windows_download_ready,false,'Crash invalidates ready downloads');
+assert.equal((await service('SELECT requeue_assist_runtime($1,$2) AS v',[id(1),retry.generation])).rows[0].v,false,'Duplicate crash report is idempotent');
+const afterCrash=await claim();assert.ok(afterCrash.generation>retry.generation);await finish(afterCrash,ready(1));
 await assert.rejects(actor(20,status(1)),/Active employee/);
 for(const role of ['authenticated','anon']){
  await db.exec('RESET ROLE;SET ROLE '+role);
  await assert.rejects(db.query('SELECT claim_assist_activation()'),/permission denied/);
+ await assert.rejects(db.query(`SELECT requeue_assist_runtime('${id(1)}',1)`),/permission denied/);
  await assert.rejects(db.query(`SELECT validate_assist_activation_lease('${id(1)}',1,'${id(99)}')`),/permission denied/);
  await assert.rejects(db.query(`SELECT finish_assist_activation('${id(1)}',1,'${id(99)}','{}')`),/permission denied/);
 }
