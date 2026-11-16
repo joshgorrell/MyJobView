@@ -21,6 +21,7 @@ assert.match(migration, /ELSE false END/);
 assert.match(migration, /Signed billing terms cannot be changed without a new agreement/);
 assert.match(migration, /NEW\.monthly_price := NEW\.monthly_price \+ v_desired_fee - v_prior_applied_fee/);
 assert.match(migration, /NEW\.mail_invoice_fee := v_desired_fee/);
+assert.match(migration, /v_prior_applied_fee := CASE WHEN NEW\.security_billing_mode = 'mail' THEN 5 ELSE 0 END/);
 const worker = await readFile(new URL('../../supabase/functions/security-recurring-billing/index.ts', import.meta.url), 'utf8');
 assert.match(worker, /contract\.mailed_paper_statements/);
 assert.match(worker, /paperLines\.length!==1/);
