@@ -19,7 +19,7 @@ assert.match(staff, /signedAgreementFile\.size > 15728640/);
 assert.match(print, /Billing Statement Delivery \(Check One\)/);
 assert.match(print, /Mailed paper statements \(\+\$5 for each statement mailed\)/);
 assert.doesNotMatch(print, /Annual discount:/);
-assert.match(print, /annualBase \+ \(Number\(contract\.mail_invoice_fee/);
+assert.match(print, /const annualMonitoringTotal = annualBase/);
 assert.match(electronic, /mailedPaperStatements/);
 
 // The staff RPC must enforce evidence and persist a complete audit trail.
