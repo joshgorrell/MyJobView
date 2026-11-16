@@ -668,7 +668,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">Monthly Billing</span>
                         <span className="text-sm font-semibold text-gray-900">
-                          {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0))}/month
+                          {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0) + (formData.mailedPaperStatements ? 5 : 0))}/month
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0) + (formData.mailedPaperStatements ? 5 : 0))} in advance for the upcoming month of monitoring service.</p>
