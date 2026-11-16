@@ -37,4 +37,11 @@ assert.match(signing, /'mail_invoice_fee',CASE WHEN v_form->>'mailedPaperStateme
 assert.match(migration, /NEW\.onboarding_agreement_snapshot->>'mailed_paper_statements'/);
 assert.match(wizard, /checked=\{Boolean\(formData\.mailedPaperStatements\)\}/);
 assert.match(wizard, /AutoPay enrollment is still required/);
+const recurring = await readFile(new URL('../../supabase/migrations/20261116180000_security_paper_fee_recurring_invoices.sql', import.meta.url), 'utf8');
+assert.match(recurring, /THEN 5 ELSE 0 END/);
+assert.match(recurring, /mailed_paper_statements/);
+assert.match(recurring, /\*v_months \+ v_fee/);
+assert.match(recurring, /statement fee \(\$5 per statement\)/);
+assert.match(recurring, /v_end,1,5,v_fee/);
+assert.doesNotMatch(recurring, /v_months,7,v_fee/);
 console.log('Statement billing source contract checks passed');
