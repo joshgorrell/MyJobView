@@ -1,16 +1,17 @@
--- Recreate the validated token-scoped signing RPC with paper preference in the
--- signed snapshot and the contract update. Based on the existing onboarding RPC;
--- review against any subsequent function overrides before deployment.
-CREATE OR REPLACE FUNCTION private.portal_security_onboarding(
-  p_action text, p_contract_id uuid, p_token text, p_payload jsonb
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+-- Based on deployed onboarding core; retain existing portal wrapper.
+CREATE OR REPLACE FUNCTION private.security_onboarding_core(p_action text, p_contract_id uuid, p_token text, p_payload jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
 DECLARE
   v_contract public.security_contracts%ROWTYPE;
   v_draft public.security_onboarding_drafts%ROWTYPE;
   v_contact jsonb; v_template jsonb; v_settings jsonb; v_services jsonb;
   v_document jsonb; v_form jsonb; v_version text; v_ec jsonb; v_ord bigint;
   v_method public.security_payment_methods%ROWTYPE;
-  v_authorization text := 'I authorize MyJobView to initiate recurring automatic charges or ACH debits through QuickBooks Payments to my selected payment method for security monitoring, at the billing frequency and amounts shown in this agreement, plus applicable taxes disclosed on invoices. Billing begins when monitoring is activated. Invoices identify the payment amount and scheduled debit date and are sent at least 10 days before an automatic debit. Monthly or annual billing periods recur from the activation date; short months use the last day of the month. This authorization continues until revoked. Contact the provider using the contact information in this agreement to revoke or change payment authorization before the next scheduled payment. Revoking AutoPay does not cancel the monitoring agreement or amounts owed.';
+  v_authorization text := private.security_autopay_authorization();
 BEGIN
   IF p_action = 'list' THEN
     IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Please sign in to view your agreements' USING ERRCODE='42501'; END IF;
@@ -20,7 +21,7 @@ BEGIN
       'saved_at', d.saved_at, 'current_step', coalesce(d.current_step,1)) ORDER BY sc.created_at DESC)
       FROM public.security_contracts sc LEFT JOIN public.security_onboarding_drafts d ON d.contract_id=sc.id
       WHERE private.security_customer_owns(sc.contact_id)
-        AND sc.status IN ('pending_customer','customer_completed','pending_approval','approved','active','cancelled')
+        AND sc.status IN ('pending_customer','customer_completed','pending_approval','approved','active','cancelled','rejected')
     ), '[]'::jsonb);
   END IF;
   IF coalesce(p_action,'') NOT IN ('get','save','submit') THEN RAISE EXCEPTION 'Unsupported operation'; END IF;
@@ -38,7 +39,7 @@ BEGIN
       WHERE id=p_contract_id AND private.security_customer_owns(contact_id) FOR UPDATE;
   END IF;
   IF v_contract.id IS NULL OR v_contract.status NOT IN
-    ('pending_customer','customer_completed','pending_approval','approved','active','cancelled') THEN
+    ('pending_customer','customer_completed','pending_approval','approved','active','cancelled','rejected') THEN
     RAISE EXCEPTION 'Invalid or expired invitation link. Sign in to your portal or request a new invitation.' USING ERRCODE='42501';
   END IF;
   SELECT jsonb_build_object('full_name',c.full_name,'email',c.email,'phone',c.phone,
@@ -51,7 +52,7 @@ BEGIN
     'annual_discount_type',cs.annual_discount_type,'annual_discount_percentage',cs.annual_discount_percentage,
     'annual_discount_flat_amount',cs.annual_discount_flat_amount) INTO v_settings
     FROM public.company_settings cs WHERE cs.organization_id=v_contract.organization_id LIMIT 1;
-  SELECT coalesce(jsonb_agg(jsonb_build_object('name',ms.name,'monthly_price',s.monthly_price) ORDER BY ms.name,s.id),'[]'::jsonb)
+  SELECT coalesce(jsonb_agg(jsonb_build_object('service_id',ms.id,'name',ms.name,'monthly_price',s.monthly_price) ORDER BY ms.name,s.id),'[]'::jsonb)
     INTO v_services FROM public.security_contract_services s JOIN public.monitoring_services ms ON ms.id=s.service_id
     WHERE s.contract_id=v_contract.id;
   v_document := jsonb_build_object('contract_number',v_contract.contract_number,'monthly_price',v_contract.monthly_price,
@@ -132,13 +133,10 @@ BEGIN
       v_ec->>'name',v_ec->>'phone',v_ec->>'password',(v_ec->>'canAuthorize')::boolean,v_ord);
   END LOOP;
   -- Preserve what the signer accepted, independently of later template/contact edits.
-  -- The selected delivery option and resulting price are part of the immutable
-  -- signed snapshot; the pre-signing document version still guards base terms.
   v_document := v_document || jsonb_build_object(
     'mailed_paper_statements',(v_form->>'mailedPaperStatements')::boolean,
     'mail_invoice_fee',CASE WHEN v_form->>'mailedPaperStatements'='true' THEN 5 ELSE 0 END,
-    'monthly_price',v_contract.monthly_price +
-      (CASE WHEN v_form->>'mailedPaperStatements'='true' THEN 5 ELSE 0 END) - v_contract.mail_invoice_fee,
+    'monthly_price',v_contract.monthly_price + (CASE WHEN v_form->>'mailedPaperStatements'='true' THEN 5 ELSE 0 END) - v_contract.mail_invoice_fee,
     'personalInfo',v_form->'personalInfo',
     'propertyInfo',v_form->'propertyInfo','paymentMethod',v_form->>'paymentMethod',
     'payment_display',CASE WHEN v_method.id IS NOT NULL THEN v_method.display_brand || ' ending ' || v_method.display_last4 ELSE 'Admin-approved mailed invoices' END,
@@ -154,4 +152,5 @@ BEGIN
   DELETE FROM public.security_onboarding_drafts WHERE contract_id=v_contract.id;
   RETURN jsonb_build_object('success',true);
 END;
-$$;
+$function$
+;
