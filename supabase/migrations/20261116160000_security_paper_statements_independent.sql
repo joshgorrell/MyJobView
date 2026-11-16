@@ -97,6 +97,13 @@ BEGIN
     -- No mode change: legacy trigger rewrites fee, but leaves price unchanged.
     v_prior_applied_fee := OLD.mail_invoice_fee;
   END IF;
+  -- Signed agreements are immutable: prevent either a fee change or a mode
+  -- change from silently rewriting the price the customer accepted.
+  IF TG_OP = 'UPDATE' AND OLD.onboarding_agreement_snapshot IS NOT NULL
+    AND (NEW.mailed_paper_statements IS DISTINCT FROM OLD.mailed_paper_statements
+      OR NEW.security_billing_mode IS DISTINCT FROM OLD.security_billing_mode) THEN
+    RAISE EXCEPTION 'Signed billing terms cannot be changed without a new agreement';
+  END IF;
   NEW.monthly_price := NEW.monthly_price + v_desired_fee - v_prior_applied_fee;
   NEW.mail_invoice_fee := v_desired_fee;
   RETURN NEW;
