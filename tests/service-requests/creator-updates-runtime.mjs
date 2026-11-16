@@ -28,7 +28,7 @@ let refresh, source=[{id:'r1',customer_name:'Jones',status:'pending_customer',pr
 const queries=[];
 const supabase={from(table) {
   const filters=[]; queries.push({table,filters});
-  const q={select:()=>q,eq:(...args)=>{filters.push(args);return q;},order:()=>q,not:()=>q,is:()=>q,
+  const q={select:()=>q,eq:(...args)=>{filters.push(args);return q;},order:()=>q,not:(...args)=>{filters.push(['not',...args]);return q;},is:()=>q,
     overrideTypes:()=>Promise.resolve({data:source,error:null})};
   return q;
 }};
@@ -43,7 +43,16 @@ await new Promise(resolve=>setImmediate(resolve));
 let tree=view.run('SalesServiceRequestsView',{ownOnly:true});
 assert.ok(queries[0].filters.some(([k,v])=>k==='created_by'&&v==='creator'),'My Requests filters by actual creator, including admins');
 assert.ok(queries[0].filters.some(([k,v])=>k==='organization_id'&&v==='org'),'Organization is explicit');
+assert.ok(queries[0].filters.some(([op,key,operator,value])=>op==='not'&&key==='status'&&operator==='in'&&value==='(closed,cancelled)'),'Default excludes closed and cancelled requests');
 assert.match(text(tree),/Waiting on Customer/);
+nodes(tree).find(n=>n.type==='button'&&text(n).includes('Filters')).props.onClick();
+tree=view.run('SalesServiceRequestsView',{ownOnly:true});
+nodes(tree).find(n=>n.type==='select'&&n.props.value==='active').props.onChange({target:{value:'all'}});
+view.run('SalesServiceRequestsView',{ownOnly:true});
+for(const effect of view.effects.splice(0)) effect();
+await new Promise(resolve=>setImmediate(resolve));
+tree=view.run('SalesServiceRequestsView',{ownOnly:true});
+assert.ok(!queries.at(-1).filters.some(([op])=>op==='not'),'All Statuses restores history');
 nodes(tree).find(n=>n.type==='CompactRequestRow').props.onToggle();
 tree=view.run('SalesServiceRequestsView',{ownOnly:true});
 assert.ok(nodes(tree).some(n=>n.type==='ContactLogHistory'),'Creator can read contact notes');
