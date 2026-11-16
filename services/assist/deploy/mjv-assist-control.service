@@ -1,0 +1,25 @@
+[Unit]
+Description=MJV remote support control service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mjv-assist
+Group=mjv-assist
+WorkingDirectory=/opt/myjobview/services/assist
+EnvironmentFile=/etc/mjv-assist.env
+ExecStart=/usr/bin/node /opt/myjobview/services/assist/control-server.mjs
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mjv-assist
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,41 @@
+name: Assist enrollment review
+on:
+  pull_request:
+    paths:
+      - 'src/components/Assist/**'
+      - 'src/components/Admin/AssistSettings.tsx'
+      - 'src/components/Admin/AssistOperatorAccess.tsx'
+      - 'src/components/Admin/IntegrationsSettings.tsx'
+      - 'src/App.tsx'
+      - 'src/lib/workspaceRoutes.ts'
+      - 'src/components/Help/HowItWorks.tsx'
+      - 'supabase/migrations/*assist*'
+      - 'supabase/functions/assist-support/**'
+      - 'supabase/functions/_shared/assist-support-handler.mjs'
+      - 'supabase/config.toml'
+      - 'tests/assist/**'
+      - 'services/assist/**'
+      - 'tests/navigation/workspace-routes.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/assist-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  assist-enrollment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm ci --ignore-scripts --prefix services/assist
+      - run: node tests/assist/native-smoke.mjs
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:assist

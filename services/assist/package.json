@@ -1,0 +1,17 @@
+{
+  "name": "mjv-assist-control",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node control-server.mjs",
+    "worker": "node activation-worker.mjs"
+  },
+  "dependencies": {
+    "https-proxy-agent": "7.0.6",
+    "meshcentral": "1.3.1"
+  }
+}
