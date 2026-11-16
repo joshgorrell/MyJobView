@@ -10,7 +10,7 @@ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_ro
  INSERT INTO organizations(id) VALUES('${id(1)}'),('${id(2)}');
  INSERT INTO profiles(id,organization_id,role,full_name) VALUES('${id(10)}','${id(1)}','admin','Admin'),('${id(11)}','${id(1)}','tech','Engineer'),('${id(20)}','${id(2)}','admin','Other dealer');
  INSERT INTO auth.sessions VALUES('${id(100)}','${id(10)}'),('${id(101)}','${id(11)}'),('${id(200)}','${id(20)}');`);
-for(const f of ['20261116153609_assist_windows_enrollment.sql','20261116155804_assist_activation_lifecycle.sql','20261116162538_assist_runtime_recovery.sql','20261116165144_assist_engineer_sessions.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+for(const f of ['20261116192118_assist_windows_enrollment.sql','20261116192146_assist_activation_lifecycle.sql','20261116192148_assist_runtime_recovery.sql','20261116192149_assist_engineer_sessions.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
 await db.exec(`INSERT INTO user_sessions(id,user_id,organization_id,auth_session_id) VALUES('${id(1000)}','${id(10)}','${id(1)}','${id(100)}'),('${id(1001)}','${id(11)}','${id(1)}','${id(101)}'),('${id(2000)}','${id(20)}','${id(2)}','${id(200)}')`);
 const actor=async(n,sql,args)=>{await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SELECT set_config('test.sid','${id(n===10?100:n===11?101:200)}',false);SET ROLE authenticated;`);return db.query(sql,args);};
 const service=async(action,actorId=11,sessionId=101,params={},org=1)=>{await db.exec('RESET ROLE;SET ROLE service_role');return(await db.query('SELECT assist_support_service($1,$2,$3,$4,$5) v',[action,id(org),actorId?id(actorId):null,sessionId?id(sessionId):null,params])).rows[0].v;};
