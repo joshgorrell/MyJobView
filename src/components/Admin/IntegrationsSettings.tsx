@@ -421,7 +421,7 @@ export function IntegrationsSettings() {
 
       {/* Checks describe saved configuration/connection, not verified delivery. */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-1 flex-wrap -mb-px" aria-label="Third-party integrations">
+        <nav className="flex flex-nowrap gap-0 -mb-px overflow-x-auto lg:overflow-x-visible" aria-label="Third-party integrations">
           {([
             { id: 'payment_processor', label: 'Payment Processor', icon: CreditCard,
               used: originalPaymentSettings.payment_processor === 'quickbooks' ? quickbooksPayments :
@@ -435,10 +435,10 @@ export function IntegrationsSettings() {
             { id: 'twilio', label: 'Twilio SMS', icon: MessageSquare,
               used: !!(originalSettings.twilio_account_sid?.trim() && originalSettings.twilio_phone_number?.trim() && originalSettings.has_twilio_auth_token), status: 'SMS credentials saved' },
             { id: 'resend', label: 'Email / Resend', icon: Mail, used: !!originalSettings.from_email?.trim(), status: 'Sender settings saved; domain verification managed in Resend' },
-            { id: 'openai', label: 'OpenAI / ChatGPT', icon: Sparkles, used: originalSettings.has_openai_api_key === true, status: 'API key saved' },
+            { id: 'openai', label: 'ChatGPT', icon: Sparkles, used: originalSettings.has_openai_api_key === true, status: 'API key saved' },
           ] satisfies Array<{ id: IntegrationId; label: string; icon: typeof CreditCard; used: boolean; status: string }>).map(({ id, label, icon: Icon, used, status }) => (
             <button key={id} type="button" onClick={() => selectIntegration(id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 px-2 lg:px-2.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeIntegration === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}>
               <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -450,8 +450,8 @@ export function IntegrationsSettings() {
             </button>
           ))}
           <button type="button" onClick={() => selectIntegration('assist')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
-            Remote Support
+            className={`flex shrink-0 items-center gap-1.5 px-2 lg:px-2.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+            Assist
           </button>
         </nav>
       </div>
