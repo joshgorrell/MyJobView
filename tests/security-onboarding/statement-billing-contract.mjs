@@ -13,4 +13,7 @@ assert.match(source, /paperFeeAnnual: paperFeeMonthly \* 12/);
 assert.match(source, /monitoringAnnual - savings \+ billing.paperFeeAnnual/);
 assert.match(migration, /mailed_paper_statements boolean NOT NULL DEFAULT false/);
 assert.match(migration, /security_billing_mode <> 'mail' OR mailed_paper_statements = true/);
+assert.match(migration, /Only an Admin may change mailed paper statements/);
+assert.match(migration, /OLD.customer_completed_at IS NOT NULL/);
+assert.match(migration, /organization_id = NEW.organization_id AND role = 'admin'/);
 console.log('Statement billing source contract checks passed');
