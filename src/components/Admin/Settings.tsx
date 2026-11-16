@@ -80,8 +80,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'messages', label: 'Company Messages', group: 'communications' },
     { id: 'integrations', label: 'Integrations', group: 'system' },
     { id: 'products', label: 'Products', group: 'system', visible: jobModuleEnabled },
-    { id: 'catalog', label: 'Catalog', group: 'system' },
-    { id: 'classes', label: 'Classes', group: 'system' },
+    { id: 'catalog', label: 'Catalog Setup', group: 'system' },
     { id: 'contact_import', label: 'Contact Import', group: 'sales', visible: profile?.role === 'admin' },
     { id: 'orphaned', label: 'System Maintenance', group: 'system' },
   ];
