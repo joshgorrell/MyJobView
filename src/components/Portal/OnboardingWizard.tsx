@@ -182,7 +182,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           ? 'Please add at least 2 emergency contacts.'
           : 'Enter a name, phone with 10–15 digits, and codeword for each of 2–10 emergency contacts.',
         4: 'Please add or select a saved payment method for AutoPay.',
-        5: 'Please select a billing preference.',
+        5: 'Please select a payment frequency.',
         6: 'Please review the terms, acknowledge your agreement, and provide your signature.'
       };
       notify(messages[currentStep] || 'Please complete all required fields.', { theme: 'blue', tone: 'warning' });
@@ -603,7 +603,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
           </div>
         )}
 
-        {/* Step 5: Billing Preference */}
+        {/* Step 5: Payment Frequency */}
         {currentStep === 5 && (
           <div className="space-y-5">
             <div>
@@ -639,9 +639,9 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               </div>
             </div>
 
-            {/* Billing Preference Selection */}
+            {/* Payment Frequency Selection */}
             <div>
-              <h3 className="text-base font-semibold text-gray-900 mb-3">Choose Your Billing Preference</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-3">Choose Your Payment Frequency</h3>
               <div className="space-y-3">
                 {/* Monthly Option */}
                 <button
@@ -665,7 +665,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                           {formatCurrency(Number(contract.monthly_price) || 0)}/month
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(Number(contract.monthly_price) || 0)} each month.</p>
+                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(Number(contract.monthly_price) || 0)} in advance for the upcoming month of monitoring service.</p>
                     </div>
                   </div>
                 </button>
@@ -706,7 +706,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                             );
                           })()}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Pay one year in advance and receive a discount.</p>
+                        <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service and receive a discount.</p>
                         {billingPreference === 'annual' && (() => {
                           const monthlyTotal = Number(contract.monthly_price) || 0;
                           const annualSubtotal = monthlyTotal * 12;
@@ -749,7 +749,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-sm text-blue-800 leading-relaxed">
-                This is your billing preference for this agreement. Our team will confirm your payment setup and billing start date before activation.
+                Payments cover the upcoming service period, not the previous month or year. Our team will confirm your payment setup and billing start date before activation.
               </p>
             </div>
           </div>
