@@ -54,7 +54,7 @@ Still required: real Windows canary implementation/host; actual platform deploym
 
 ## Engineer sessions
 
-Dealer Admin → Integrations → Remote Support includes Engineer access checkboxes. Active dealer administrators have access; other employees need an explicit grant. The Assist page lists the dealer's enrolled laptops and opens an online laptop in a separate support window. Keep the Assist page open: navigation/unmount closes the window and requests revocation. Existing MJV inactivity/logout rules remain in effect; test a long support session as part of the Windows pilot.
+Dealer Admin → Integrations → Remote Support includes User access checkboxes. Active dealer administrators have access; other employees need an explicit grant. The Assist page lists the dealer's enrolled laptops and opens an online laptop in a separate support window. Keep the Assist page open: navigation/unmount closes the window and requests revocation. Existing MJV inactivity/logout rules remain in effect; test a long support session as part of the Windows pilot.
 
 Deploy the `assist-support` Edge Function with platform `ASSIST_CONTROL_ORIGIN`, `ASSIST_CONTROL_TOKEN`, and `ASSIST_PUBLIC_ORIGIN` secrets. It verifies the staff JWT with Supabase, resolves the actor/dealer from database records, binds the signed Auth session claim, and requires the request Origin to match the canonical dealer subdomain. It passes only verified actor context to the private control endpoint; browser-supplied actor/session/dealer overrides are not trusted.
 
