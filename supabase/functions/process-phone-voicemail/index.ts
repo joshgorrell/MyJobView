@@ -45,7 +45,7 @@ Deno.serve(async (request: Request) => {
   if (readError) return respond(503, { error: 'lookup_failed' });
   if (!item) return respond(202, { status: 'not_pending' });
   const { data: mailbox, error: mailboxError } = await db.from('ringcentral_mailboxes')
-    .select('id').eq('organization_id', item.organization_id)
+    .select('id,default_department,primary_user_id').eq('organization_id', item.organization_id)
     .eq('ringcentral_account_id', item.ringcentral_account_id)
     .eq('ringcentral_extension_id', item.ringcentral_extension_id)
     .eq('enabled', true).maybeSingle();
@@ -64,6 +64,8 @@ Deno.serve(async (request: Request) => {
     );
     const api = new RingCentralVoicemailAPI(accessToken);
     const message = await api.getVoicemail(item.ringcentral_extension_id, item.ringcentral_message_id);
+    const {data:matchedContact,error:matchError}=await db.rpc('match_phone_voicemail_contact',{p_organization_id:item.organization_id,p_phone:message.from?.phoneNumber??null});
+    if(matchError)throw Error('caller_match_failed');
     const audio = await api.downloadRecording(message);
     // The supported RingCentral voicemail audio format must be confirmed
     // in sandbox before enabling live processing.
@@ -74,8 +76,9 @@ Deno.serve(async (request: Request) => {
     const spam = classification.spamConfidence;
     const confidence = classification.departmentConfidence;
     const quarantined = !urgent && spam !== null && spam >= 0.98;
-    const ready = !quarantined && classification.department !== null &&
-      confidence !== null && confidence >= 0.95 && spam !== null && spam < 0.98;
+    const ready = !quarantined && (mailbox.default_department !== null || (classification.department !== null &&
+      confidence !== null && confidence >= 0.95)) && spam !== null && spam < 0.98;
+    const department = mailbox.default_department || classification.department;
     const state = quarantined ? 'quarantined' : ready ? 'ready' : 'review';
     // Recordings live only in a PRIVATE storage bucket. Never return public URLs.
     const path = [item.organization_id, item.ringcentral_account_id,
@@ -84,8 +87,12 @@ Deno.serve(async (request: Request) => {
       .upload(path, audio, { contentType: mime, upsert: false });
     if (uploadError && uploadError.message !== 'The resource already exists') throw Error('recording_storage_failed');
     const { data: updated, error: updateError } = await db.from('voicemail_messages').update({
+      contact_id: matchedContact,
+      caller_number: message.from?.phoneNumber ?? null,
+      received_at: message.creationTime && Number.isFinite(Date.parse(message.creationTime)) ? message.creationTime : undefined,
+      assigned_user_id: mailbox.primary_user_id, workflow_status: mailbox.primary_user_id ? 'assigned' : 'new',
       state, transcript, summary: classification.summary,
-      department: classification.department,
+      department, ai_department: classification.department,
       department_confidence: confidence,
       spam_confidence: spam,
       urgent, callback_requested: classification.callbackRequested,
@@ -99,7 +106,7 @@ Deno.serve(async (request: Request) => {
     try {
       await publishVoicemailToFlow(db, {
         id: item.id, organizationId: item.organization_id,
-        department: classification.department, summary: classification.summary,
+        department, summary: classification.summary,
         state, urgent,
       });
     } catch (handoffError) {
@@ -117,3 +124,4 @@ Deno.serve(async (request: Request) => {
     return respond(503, { error: 'processing_failed' });
   }
 });
+

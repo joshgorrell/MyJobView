@@ -83,7 +83,7 @@ Deno.serve(async (request: Request) => {
   const batchSize = 100;
   const baseQuery = () => db.from('voicemail_messages')
     .select('id,organization_id,department,summary,state,urgent,updated_at')
-    .in('state', ['ready', 'review'])
+    .in('state', ['ready', 'review']).neq('workflow_status','completed').is('service_request_id',null)
     .order('updated_at', { ascending: true })
     .order('id', { ascending: true }).limit(batchSize);
   const cursorFilter = checkpoint?.last_updated_at && checkpoint?.last_id
@@ -125,3 +125,4 @@ Deno.serve(async (request: Request) => {
     handoffsChecked: (processed ?? []).length, handoffsSucceeded: repaired, handoffsFailed: handoffFailed,
   });
 });
+

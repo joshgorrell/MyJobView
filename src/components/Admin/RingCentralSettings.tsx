@@ -1,3 +1,4 @@
+import { RingCentralMailboxMapping } from './RingCentralMailboxMapping';
 import { PhoneVoicemailPermissions } from './PhoneVoicemailPermissions';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -15,6 +16,7 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState('');
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [connectionStatusKnown, setConnectionStatusKnown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
   }
   async function loadConnections() {
     // A refresh or disconnect invalidates the previous diagnostic snapshot.
-    setDiagnostics(null);
+    // Keep the last successful snapshot while a refresh is pending.
     setDiagnosticsError('');
     setError('');
     setLoading(true);
@@ -95,9 +97,10 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
         'ringcentral-connection-management', { method: 'GET' },
       );
       if (invokeError) throw invokeError;
-      setConnections(Array.isArray(data?.connections) ? data.connections : []);
+      if (!Array.isArray(data?.connections)) throw new Error('Invalid connection status response');
+      setConnections(data.connections);
+      setConnectionStatusKnown(true);
     } catch {
-      setConnections([]);
       setError('Connection status is unavailable. Check the RingCentral integration configuration.');
     } finally {
       setLoading(false);
@@ -115,6 +118,7 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
         },
       );
       if (invokeError || data?.disconnected !== true) throw new Error('Disconnect failed');
+      setDiagnostics(null);
       setConfirmAccountId(null);
       await loadConnections();
     } catch {
@@ -150,7 +154,8 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
   const current = diagnostics?.connections.find(c => c.status === 'connected');
   const subscriptionActive = current?.subscription_check === 'active';
   const mailboxReady = current?.registered_mailbox && current?.mailbox_enabled;
-  const status = !hasConnectedAccount ? 'Not connected' :
+  const status = error || diagnosticsError || !connectionStatusKnown ? 'Connection status unavailable' :
+    !hasConnectedAccount ? 'Not connected' :
     !subscriptionActive ? 'Setup needs attention' :
     !mailboxReady ? 'Mailbox needs attention' : 'Connected — delivery not yet verified';
   return (
@@ -171,19 +176,20 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
           {loading || diagnosticsBusy ? 'Checking RingCentral…' : status}
         </div>
         <p className="mt-1 text-xs text-gray-600">An active subscription and enabled mailbox do not guarantee voicemail transcription or Flow delivery until a test succeeds.</p>
+        {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
         {diagnosticsError && <p role="alert" className="mt-2 text-sm text-red-700">{diagnosticsError}</p>}
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-gray-200 p-4">
           <h5 className="font-semibold text-gray-900">1. Connection</h5>
-          <p className="mt-1 text-sm text-gray-600">{current ? `${current.extension_name || 'Connected account'}${current.extension_number ? ' · Ext. ' + current.extension_number : ''}` : hasConnectedAccount ? 'Connected' : 'Not connected'}</p>
+          <p className="mt-1 text-sm text-gray-600">{current ? `${current.extension_name || 'Connected account'}${current.extension_number ? ' · Ext. ' + current.extension_number : ''}` : !connectionStatusKnown || error ? 'Status could not be loaded' : hasConnectedAccount ? 'Connected' : 'Not connected'}</p>
           <p className="mt-1 text-xs text-gray-500">Authorization only; phone routing is unchanged.</p>
         </div>
         <div className="rounded-lg border border-gray-200 p-4">
           <h5 className="font-semibold text-gray-900">2. Voicemail subscription</h5>
           <p className="mt-1 text-sm font-medium">{current?.subscription_check || 'Not checked'}</p>
           {current?.subscription_expiration && <p className="mt-1 text-xs text-gray-600">Expires {new Date(current.subscription_expiration).toLocaleString()}</p>}
-          <p className="mt-1 text-xs text-gray-500">Renewal is manual until automatic renewal is configured.</p>
+          <p className="mt-1 text-xs text-gray-500">Scheduled renewal maintains the monitored mailbox subscription.</p>
         </div>
         <div className="rounded-lg border border-gray-200 p-4">
           <h5 className="font-semibold text-gray-900">3. Mailboxes</h5>
@@ -192,7 +198,7 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {!hasConnectedAccount && <button type="button" disabled={busy} onClick={() => void connect()}
+        {connectionStatusKnown && !error && !hasConnectedAccount && <button type="button" disabled={busy} onClick={() => void connect()}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
           <ExternalLink className="h-4 w-4" />{busy ? 'Connecting…' : 'Connect RingCentral'}
         </button>}
@@ -213,6 +219,7 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
         </div>
       </div>}
       {subscriptionResult && <p role="status" className="text-sm text-gray-700">{subscriptionResult}</p>}
+      <RingCentralMailboxMapping />
       <PhoneVoicemailPermissions />
       <div className="border-t border-gray-200 pt-4">
         <button type="button" onClick={() => setShowAdvanced(v => !v)} aria-expanded={showAdvanced}
@@ -240,3 +247,4 @@ export function RingCentralSettings({ onConnectionChange }: { onConnectionChange
     </section>
   );
 }
+

@@ -65,6 +65,14 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
   }, [scoped, profile?.id]);
   const focusUpdateId = !scoped ? new URLSearchParams(window.location.search).get('flowUpdateId') : null;
   const [view, setView] = useState<FlowView>(initialTaskView || (!hasModuleAccess('feed') && !hasModuleAccess('messages') && !!tasksContent) ? 'tasks' : conversationProps.openThreadId ? 'messages' : 'all');
+  const voicemailLinkOpened = useRef(false);
+  useEffect(() => {
+    if (!scoped && canViewVoicemail && !voicemailLinkOpened.current &&
+        new URLSearchParams(window.location.search).get('flowTab') === 'voicemails') {
+      voicemailLinkOpened.current = true;
+      setView('voicemails');
+    }
+  }, [scoped, canViewVoicemail]);
   const workspaceSize = useConversationHeight(view === 'messages' && !scoped);
   // Preserve the outer workspace position while the tab body changes.
   const scrollHost = useRef<HTMLElement | null>(null);
@@ -383,4 +391,5 @@ export default function Flow({ contactId, projectId, workOrderId, dark = false, 
     </div>
   </section></div>;
 }
+
 

@@ -18,7 +18,7 @@ export interface WebhookRequest {
   json(): Promise<unknown>;
 }
 export interface WebhookTenantResolver {
-  resolve(accountId: string, extensionId: string): Promise<{ organizationId: string } | null>;
+  resolve(accountId: string, extensionId: string): Promise<{ organizationId: string; accountId?: string } | null>;
 }
 export interface VerifiedVoicemail {
   organizationId: string;
@@ -49,7 +49,7 @@ function parseEvent(value: unknown): VoicemailEvent | null {
     ? String(body.id) : match[3];
   if (!messageId || !MESSAGE_ID.test(messageId)) return null;
   const [ , accountId, extensionId ] = match;
-  if (!MESSAGE_ID.test(accountId) || !MESSAGE_ID.test(extensionId)) return null;
+  if ((accountId !== '~' && !MESSAGE_ID.test(accountId)) || !MESSAGE_ID.test(extensionId)) return null;
   // Message store notifications can include non-voicemail messages.
   // Dedicated /voicemail events may omit the message-store type field.
   if (!input.event.includes('/voicemail') && body?.type !== 'VoiceMail') return null;
@@ -77,5 +77,6 @@ export async function validateRingCentralWebhook(
   if (!event) return { status: 202, reason: 'ignored_event' };
   const tenant = await resolver.resolve(event.accountId, event.extensionId);
   if (!tenant?.organizationId) return { status: 403, reason: 'unknown_mailbox' };
-  return { status: 202, voicemail: { ...event, organizationId: tenant.organizationId } };
+  return { status: 202, voicemail: { ...event, accountId: tenant.accountId ?? event.accountId, organizationId: tenant.organizationId } };
 }
+
