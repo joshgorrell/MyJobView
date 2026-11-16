@@ -18,4 +18,7 @@ assert.match(migration, /OLD.customer_completed_at IS NOT NULL/);
 assert.match(migration, /organization_id = NEW.organization_id AND role = 'admin'/);
 assert.match(migration, /'mailedPaperStatements', CASE WHEN jsonb_typeof\(p_form->'mailedPaperStatements'\) = 'boolean'/);
 assert.match(migration, /ELSE false END/);
+assert.match(migration, /Signed billing terms cannot be changed without a new agreement/);
+assert.match(migration, /NEW\.monthly_price := NEW\.monthly_price \+ v_desired_fee - v_prior_applied_fee/);
+assert.match(migration, /NEW\.mail_invoice_fee := v_desired_fee/);
 console.log('Statement billing source contract checks passed');
