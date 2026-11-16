@@ -9,8 +9,8 @@ const dir=await mkdtemp(join(tmpdir(),'mjv-assist-'));
 const fixture=`const mode=new URLSearchParams(location.search).get('mode');
 export function useAuth(){return {profile:{organization_id:'org-one',role:mode?.startsWith('settings')?'admin':'tech',is_active:true},isPortalUser:false};}
 export function useTenant(){return {tenant:{organizationId:mode==='mismatch'?'org-two':'org-one',organizationName:'Electronic Life'},loading:false,error:null};}
-window.calls=[];let enabled=false;
-export const supabase={rpc:async(name,args)=>{window.calls.push({name,args});if(name==='set_assist_enabled'){enabled=args.p_enabled;return {data:{enabled,provisioned:false,windows_download_ready:false}};}if(mode==='error')return {error:new Error('failed')};if(name==='get_assist_setup'&&mode?.startsWith('settings'))return {data:{enabled,provisioned:false,windows_download_ready:false}};if(name==='get_assist_setup')return {data:{enabled:true,provisioned:mode!=='pending',windows_download_ready:mode!=='pending'}};if(mode==='disabled')return {error:new Error('disabled')};return {data:{url:'https://assist.example.com/elife/meshagents?meshid=one&id=4'}};}};
+window.calls=[];let enabled=mode==='settings-failed';let activation=mode==='settings-failed'?'needs_attention':'off';
+export const supabase={rpc:async(name,args)=>{window.calls.push({name,args});if(name==='retry_assist_activation'){activation='activation_pending';return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};}if(name==='set_assist_enabled'){enabled=args.p_enabled;activation=enabled?'activation_pending':'deactivation_pending';return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};}if(mode==='error')return {error:new Error('failed')};if(name==='get_assist_setup'&&mode?.startsWith('settings'))return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};if(name==='get_assist_setup')return {data:{enabled:true,provisioned:mode!=='pending',windows_download_ready:mode!=='pending'}};if(mode==='disabled')return {error:new Error('disabled')};return {data:{url:'https://assist.example.com/elife/meshagents?meshid=one&id=4'}};}};
 `;
 let browser;
 const server=createServer(async(req,res)=>{
@@ -55,7 +55,11 @@ try{
  await toggle.check();await page.getByRole('status').filter({hasText:'activation is pending'}).waitFor();
  assert.equal(await toggle.isChecked(),true);
  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='set_assist_enabled'&&c.args.p_organization_id==='org-one'&&c.args.p_enabled===true).length),1);
- await toggle.uncheck();await page.getByRole('status').filter({hasText:'Remote Support is off.'}).waitFor();
+ await toggle.uncheck();await page.getByRole('status').filter({hasText:'Turning off'}).waitFor();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.goto(url+'?mode=settings-failed');
+ await page.getByRole('button',{name:'Retry setup',exact:true}).click();
+ await page.getByRole('status').filter({hasText:'activation is pending'}).waitFor();
+ assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='retry_assist_activation'&&c.args.p_organization_id==='org-one').length),1);
  assert.deepEqual(errors,[]);console.log('Assist browser: availability, download, disable, error, dealer mismatch and desktop/mobile layout pass');
 }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));await rm(dir,{recursive:true,force:true});}
