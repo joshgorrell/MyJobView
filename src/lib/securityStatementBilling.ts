@@ -20,7 +20,7 @@ export function securityStatementBilling(input: SecurityStatementBilling) {
     autopayRequired: input.paymentMode === 'autopay',
     paperFeeMonthly,
     monthlyTotal: Math.round((input.monitoringMonthly + paperFeeMonthly) * 100) / 100,
-    paperFeeAnnual: paperFeeMonthly * 12,
+    paperFeeAnnual: paperFeeMonthly,
   };
 }
 
