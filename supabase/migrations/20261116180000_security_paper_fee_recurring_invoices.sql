@@ -11,7 +11,7 @@ DECLARE
   m public.security_payment_methods%ROWTYPE;
   v_today date := (now() AT TIME ZONE 'America/Chicago')::date;
   v_start date; v_end date; v_months integer; v_invoice uuid; v_cycle uuid;
-  v_subtotal numeric; v_fee numeric; v_discount numeric; v_calc jsonb; v_submit jsonb;
+  v_subtotal numeric; v_fee numeric; v_calc jsonb; v_submit jsonb;
   v_services jsonb; v_service record; v_service_total numeric; v_allocated numeric; v_line integer; v_amount numeric; v_service_count integer;
   v_count integer := 0; v_state text; v_number text;
 BEGIN
@@ -26,16 +26,15 @@ BEGIN
       -- Paper delivery is charged once per generated invoice, not per service month.
       -- Preserve the existing $5 monthly service-price component only for
       -- agreements that explicitly include paper statements.
-      v_fee := CASE WHEN coalesce((c.onboarding_agreement_snapshot->>'mailed_paper_statements')::boolean,false)
+      v_fee := CASE WHEN coalesce((c.onboarding_agreement_snapshot->>'mailed_paper_statements')::boolean,c.mailed_paper_statements,false)
         THEN 5 ELSE 0 END;
       v_subtotal := ((c.onboarding_agreement_snapshot->>'monthly_price')::numeric -
         coalesce((c.onboarding_agreement_snapshot->>'mail_invoice_fee')::numeric,0))*v_months + v_fee;
-      v_discount := 0; -- Annual billing has no discount.
-      IF v_subtotal-v_discount<=0 THEN CONTINUE; END IF;
+      IF v_subtotal<=0 THEN CONTINUE; END IF;
       INSERT INTO public.invoices(invoice_number,created_by,company_id,organization_id,contact_id,invoice_date,due_date,invoice_type,source_type,
         status,subtotal,total,amount_due,billing_name,billing_address_line1,billing_city,billing_state,billing_zip,
         jobsite_address,jobsite_city,jobsite_state,jobsite_zip,tax_environment,tax_project_type,notes)
-      SELECT public.generate_invoice_number(),coalesce(c.approved_by_user_id,c.created_by_user_id),c.organization_id,c.organization_id,c.contact_id,v_start,private.security_period_date(coalesce(c.first_payment_date,c.security_billing_anchor+10),c.security_billing_period,v_months),'recurring','manual','draft',v_subtotal-v_discount,v_subtotal-v_discount,v_subtotal-v_discount,
+      SELECT public.generate_invoice_number(),coalesce(c.approved_by_user_id,c.created_by_user_id),c.organization_id,c.organization_id,c.contact_id,v_start,private.security_period_date(coalesce(c.first_payment_date,c.security_billing_anchor+10),c.security_billing_period,v_months),'recurring','manual','draft',v_subtotal,v_subtotal,v_subtotal,
         ct.full_name,ct.street_address,ct.city,ct.state,ct.zip_code,
         c.onboarding_agreement_snapshot->'propertyInfo'->>'address_line1',c.onboarding_agreement_snapshot->'propertyInfo'->>'city',
         c.onboarding_agreement_snapshot->'propertyInfo'->>'state',c.onboarding_agreement_snapshot->'propertyInfo'->>'zip_code',
@@ -56,10 +55,10 @@ BEGIN
       v_allocated:=0;v_line:=0;
       FOR v_service IN SELECT value,ordinality FROM jsonb_array_elements(v_services) WITH ORDINALITY LOOP
         v_line:=v_line+1;
-        v_amount:=CASE WHEN v_line=v_service_count THEN v_subtotal-v_fee-v_discount-v_allocated
-          WHEN v_service_total>0 THEN round((v_subtotal-v_fee-v_discount)*greatest(coalesce((v_service.value->>'monthly_price')::numeric,0),0)/v_service_total,2)
-          ELSE round((v_subtotal-v_fee-v_discount)/v_service_count,2) END;
-        v_amount:=greatest(0,least(v_subtotal-v_fee-v_discount-v_allocated,v_amount));
+        v_amount:=CASE WHEN v_line=v_service_count THEN v_subtotal-v_fee-v_allocated
+          WHEN v_service_total>0 THEN round((v_subtotal-v_fee)*greatest(coalesce((v_service.value->>'monthly_price')::numeric,0),0)/v_service_total,2)
+          ELSE round((v_subtotal-v_fee)/v_service_count,2) END;
+        v_amount:=greatest(0,least(v_subtotal-v_fee-v_allocated,v_amount));
         v_allocated:=v_allocated+v_amount;
         INSERT INTO public.invoice_line_items(invoice_id,organization_id,description,quantity,unit_price,amount,sort_order,item_type,is_taxable,tax_classification_id,security_service_id,security_service_name)
           VALUES(v_invoice,c.organization_id,coalesce(nullif(btrim(v_service.value->>'name'),''),'Security monitoring')||' — '||CASE WHEN v_months=12 THEN 'annual' ELSE 'monthly' END||' monitoring, '||v_start||' through '||v_end||' (agreement '||coalesce(c.contract_number,c.id::text)||')',
