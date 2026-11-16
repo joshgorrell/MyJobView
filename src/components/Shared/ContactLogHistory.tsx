@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useServiceRequestUpdates } from '../../hooks/useServiceRequestUpdates';
 import { supabase } from '../../lib/supabase';
 import { Phone, Clock, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 
@@ -16,6 +18,7 @@ interface ContactLogHistoryProps {
 }
 
 export function ContactLogHistory({ workOrderId, serviceRequestId, refreshKey }: ContactLogHistoryProps) {
+  const { profile } = useAuth();
   const [entries, setEntries] = useState<ContactLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -23,9 +26,10 @@ export function ContactLogHistory({ workOrderId, serviceRequestId, refreshKey }:
   useEffect(() => {
     loadEntries();
   }, [workOrderId, serviceRequestId, refreshKey]);
+  useServiceRequestUpdates(profile?.organization_id, () => { void loadEntries(false); });
 
-  async function loadEntries() {
-    setLoading(true);
+  async function loadEntries(showLoading = true) {
+    if (showLoading) setLoading(true);
     try {
       let query = supabase
         .from('customer_contact_log')
@@ -129,3 +133,4 @@ function ContactLogEntryRow({ entry, isLatest }: { entry: ContactLogEntry; isLat
     </div>
   );
 }
+
