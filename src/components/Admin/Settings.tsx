@@ -58,14 +58,14 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'cards', label: 'Business Cards', group: 'company' },
     { id: 'portal', label: 'Customer Portal', group: 'company' },
     { id: 'billing', label: 'Billing & Payments', group: 'sales' },
-    { id: 'automation', label: 'Operational Automation', group: 'operations' },
+    { id: 'automation', label: 'Automation', group: 'operations' },
     { id: 'users', label: 'Users', group: 'people' },
     { id: 'sessions', label: 'Sessions', group: 'people' },
     { id: 'roles', label: 'Roles', group: 'people' },
     { id: 'permissions', label: 'Permissions', group: 'people' },
     { id: 'departments', label: 'Departments', group: 'people' },
-    { id: 'rewards', label: 'Points & Rewards', group: 'people' },
-    { id: 'kiosk', label: 'Kiosk', group: 'people', visible: isAdminOrManager },
+    { id: 'rewards', label: 'Points & Rewards', group: 'operations' },
+    { id: 'kiosk', label: 'Kiosk', group: 'sales', visible: isAdminOrManager },
     { id: 'proposals', label: 'Proposal Templates', group: 'sales' },
     { id: 'salestax', label: 'Sales Tax', group: 'sales' },
     { id: 'salestargets', label: 'Sales Targets', group: 'sales' },
@@ -76,15 +76,15 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'travel', label: 'Travel Bonus', group: 'operations' },
     { id: 'priorities', label: 'Priorities', group: 'operations' },
     { id: 'emails', label: 'Email Templates', group: 'communications' },
-    { id: 'email_config', label: 'Email Configuration', group: 'communications' },
+    { id: 'email_config', label: 'Email Settings', group: 'communications' },
     { id: 'messages', label: 'Company Messages', group: 'communications' },
     { id: 'suggestions', label: 'Suggestions', group: 'communications' },
     { id: 'integrations', label: 'Integrations', group: 'system' },
     { id: 'products', label: 'Products', group: 'system', visible: jobModuleEnabled },
     { id: 'catalog', label: 'Catalog', group: 'system' },
     { id: 'classes', label: 'Classes', group: 'system' },
-    { id: 'contact_import', label: 'Contact Import', group: 'system', visible: profile?.role === 'admin' },
-    { id: 'orphaned', label: 'Orphaned Records', group: 'system' },
+    { id: 'contact_import', label: 'Contact Import', group: 'sales', visible: profile?.role === 'admin' },
+    { id: 'orphaned', label: 'System Maintenance', group: 'system' },
   ];
   const getTabFromUrl = (): SettingsTab => {
     const tab = new URLSearchParams(window.location.search).get('settingsTab') as SettingsTab | null;
@@ -123,7 +123,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
           <SettingsIcon className="w-6 h-6" />
           Dealer Admin
         </h2>
-        <p className="text-muted">Manage users, business cards, and company information</p>
+        <p className="text-muted">Manage company settings, people, sales, operations, communications, and integrations</p>
       </div>
 
       <div className="bg-canvas rounded-lg shadow-sm border-2 border-subtle">
