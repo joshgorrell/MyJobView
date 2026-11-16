@@ -24,11 +24,18 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const bearer = request.headers.get('authorization');
   if (!url || !anon || !service) return respond(503, { error: 'not_configured' });
-  if (!bearer?.startsWith('Bearer ')) return respond(401, { error: 'unauthorized' });
+  if (!bearer?.startsWith('Bearer ')) {
+    console.warn('phone-voicemail-inbox: missing bearer token');
+    return respond(401, { error: 'unauthorized' });
+  }
   const auth = createClient(url, anon, { auth: { persistSession: false },
     global: { headers: { Authorization: bearer } } });
   const { data: { user }, error: authError } = await auth.auth.getUser();
-  if (authError || !user) return respond(401, { error: 'unauthorized' });
+  if (authError || !user) {
+    // Diagnostic category only: never log tokens, identities, or auth error details.
+    console.warn('phone-voicemail-inbox: bearer rejected by auth.getUser');
+    return respond(401, { error: 'unauthorized' });
+  }
   const { data: profile, error: profileError } = await auth.from('profiles')
     .select('organization_id,role').eq('id', user.id).maybeSingle();
   if (profileError || !profile?.organization_id) return respond(403, { error: 'access_denied' });
