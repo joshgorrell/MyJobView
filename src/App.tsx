@@ -378,7 +378,9 @@ function AppContent() {
 
       if ((currentTab === 'settings' || currentTab.startsWith('settings_')) && profile.role === 'admin') return;
       if (currentTab === 'daily_sales_report_import' && profile.role === 'admin') return;
-      if (currentTab === 'preferences' || currentTab === 'company_directory') return;
+      // Assist enforces dealer enrollment and operator grants through its own RPCs.
+      // It is a Help workspace, not a department_modules entry.
+      if (currentTab === 'assist' || currentTab === 'preferences' || currentTab === 'company_directory') return;
 
       const hasAccess = checkModuleAccessRef.current(currentTab);
       if (!hasAccess) {
