@@ -334,3 +334,7 @@ verify_jwt = false
 [functions.techsafe-dispatch-order]
 verify_jwt = false
 
+
+
+[functions.ringcentral-mailbox-mapping]
+verify_jwt = true

@@ -89,13 +89,14 @@ interface ServiceRequestFormProps {
   onClose: () => void;
   onSuccess?: () => void;
   prefilledContactId?: string;
+  sourcePhoneVoicemailId?: string;
   editingRequest?: EditingRequest;
   aiPrefill?: AIPrefill | null;
 }
 
 const MAX_PHOTOS = 3;
 
-export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, editingRequest, aiPrefill }: ServiceRequestFormProps) {
+export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, editingRequest, aiPrefill, sourcePhoneVoicemailId }: ServiceRequestFormProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const submittingRef = useRef(false);
@@ -718,6 +719,7 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
           offline_created: !navigator.onLine,
           synced_at: navigator.onLine ? new Date().toISOString() : null,
           source_type: 'staff_form',
+          ...(sourcePhoneVoicemailId ? { source_phone_voicemail_id: sourcePhoneVoicemailId } : {}),
           request_type: requestType,
           project_id: isProject ? selectedProjectId : null,
           attachments: [] as any[]
@@ -1417,3 +1419,4 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
     </>
   );
 }
+

@@ -6,7 +6,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 Deno.serve(async (request: Request): Promise<Response> => {
   const origin = request.headers.get('origin');
   const allowed = Deno.env.get('PHONE_DISPATCHER_APP_ORIGIN');
-  const cors = allowed && origin === allowed ? {
+  const cors: Record<string,string> = allowed && origin === allowed ? {
     'access-control-allow-origin': allowed, vary: 'Origin',
     'access-control-allow-headers': 'authorization,apikey,content-type,x-client-info',
     'access-control-allow-methods': 'GET,POST,OPTIONS',
@@ -55,7 +55,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return respond(200, { ok: true });
   }
   let query = db.from('voicemail_messages')
-    .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested,assigned_user_id,workflow_status,completed_at')
+    .select('id,received_at,caller_number,contact_id,state,summary,transcript,department,urgent,callback_requested,assigned_user_id,workflow_status,completed_at,ringcentral_extension_id,ringcentral_account_id,service_request_id')
     .eq('organization_id', profile.organization_id)
     .in('state', ['ready', 'review']);
   if (profile.role !== 'admin') query = query.in('department', permittedDepartments);
@@ -68,6 +68,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
     .eq('user_id', user.id).in('voicemail_id', ids);
   if (viewError) return respond(503, { error: 'read_state_unavailable' });
   const viewed = new Set((views ?? []).map(view => view.voicemail_id));
-  const messages = (data ?? []).map(message => ({ ...message, is_read: viewed.has(message.id) }));
+  const {data:mailboxes,error:mailboxError}=await db.from('ringcentral_mailboxes').select('ringcentral_account_id,ringcentral_extension_id,display_name,extension_number').eq('organization_id',profile.organization_id);
+  if(mailboxError)return respond(503,{error:'mailbox_labels_unavailable'});
+  const messages = (data ?? []).map(message => { const mailbox=(mailboxes??[]).find(m=>m.ringcentral_account_id===message.ringcentral_account_id&&m.ringcentral_extension_id===message.ringcentral_extension_id); const {ringcentral_account_id,ringcentral_extension_id,...safe}=message; return {...safe,mailbox_name:mailbox?.display_name??null,extension_number:mailbox?.extension_number??null,is_read:viewed.has(message.id)}; });
   return respond(200, { messages, unread_count: messages.filter(message => !message.is_read).length });
 });
+

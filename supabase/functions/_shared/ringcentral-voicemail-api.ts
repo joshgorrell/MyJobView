@@ -2,6 +2,8 @@
 export interface RingCentralMessage {
   id: string;
   type?: string;
+  from?: { phoneNumber?: string; name?: string };
+  creationTime?: string;
   attachments?: Array<{ type?: string; uri?: string }>;
 }
 export interface RingCentralTransport {
@@ -66,3 +68,4 @@ export class RingCentralVoicemailAPI {
     return bytes;
   }
 }
+

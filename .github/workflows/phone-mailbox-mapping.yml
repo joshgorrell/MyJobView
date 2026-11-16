@@ -1,0 +1,32 @@
+name: Phone mailbox mapping
+on:
+  pull_request:
+    paths:
+      - 'src/components/Admin/RingCentral*.tsx'
+      - 'src/components/Flow/**'
+      - 'src/components/Service/ServiceRequestForm.tsx'
+      - 'supabase/functions/**phone**'
+      - 'supabase/functions/**ringcentral**'
+      - 'supabase/functions/_shared/**'
+      - 'supabase/migrations/**ringcentral**'
+      - 'tests/phone-dispatcher/**'
+      - '.github/workflows/phone-mailbox-mapping.yml'
+permissions:
+  contents: read
+jobs:
+  mailbox-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Phone dispatcher and mapping regressions
+        run: node --test tests/phone-dispatcher/*.mjs
+      - run: npx playwright install --with-deps chromium
+      - name: Mailbox mapping on mobile and desktop
+        run: node tests/phone-dispatcher/browser/mailbox-mapping.mjs

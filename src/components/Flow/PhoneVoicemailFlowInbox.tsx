@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
+import { ServiceRequestForm } from '../Service/ServiceRequestForm';
 import { PhoneIncoming } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 type Voicemail = {
+  contact_id: string | null; mailbox_name: string | null; extension_number: string | null; service_request_id: string | null;
   id: string; received_at: string; caller_number: string | null;
   state: 'ready' | 'review'; is_read: boolean; summary: string | null; transcript: string | null;
   department: string | null; urgent: boolean; callback_requested: boolean;
   assigned_user_id: string | null; workflow_status: 'new' | 'assigned' | 'in_progress' | 'completed';
 };
 export function PhoneVoicemailFlowInbox() {
+  const [requestMessage,setRequestMessage]=useState<Voicemail|null>(null);
+  const [refresh,setRefresh]=useState(0);
   const [messages, setMessages] = useState<Voicemail[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -96,7 +100,7 @@ export function PhoneVoicemailFlowInbox() {
     };
     void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [refresh]);
   if (!authorized) return null;
   if (loading) return <p className="text-sm text-gray-500">Loading voicemail…</p>;
   return (
@@ -106,6 +110,8 @@ export function PhoneVoicemailFlowInbox() {
       </h3>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {!error && messages.length === 0 && <p className="text-sm text-gray-500">No voicemail messages to review.</p>}
+      <button type="button" onClick={()=>setRefresh(v=>v+1)} className="text-sm text-blue-700 underline">Refresh voicemail</button>
+      {requestMessage && <ServiceRequestForm onClose={()=>setRequestMessage(null)} sourcePhoneVoicemailId={requestMessage.id} prefilledContactId={requestMessage.contact_id || undefined} aiPrefill={{customerPhone:requestMessage.caller_number||'',jobDescription:requestMessage.summary||requestMessage.transcript||'',priority:requestMessage.urgent?'urgent':'normal',notes:'Created from RingCentral voicemail.'}} onSuccess={()=>{setRequestMessage(null);setRefresh(v=>v+1);}} />}
       {messages.map(message => (
         <article key={message.id} className="rounded-lg border border-gray-200 p-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -116,7 +122,9 @@ export function PhoneVoicemailFlowInbox() {
             {message.state === 'review' && <span>Needs review</span>}
             {!message.is_read && <span className="font-semibold text-blue-700">Unread</span>}
           </div>
+          <p className="text-xs text-gray-500">Received by {message.mailbox_name || 'RingCentral mailbox'}{message.extension_number ? ` · Ext. ${message.extension_number}` : ''}</p>
           <p className="text-sm">{message.summary || 'No summary available'}</p>
+          {message.service_request_id ? <p className="text-xs text-green-700">Linked to a service request</p> : <button type="button" className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-medium text-white" onClick={()=>setRequestMessage(message)}>Create service request</button>}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <label className="text-xs text-gray-600">Department
               <select aria-label="Voicemail department" className="mt-1 block w-full rounded border p-2 text-sm"
@@ -176,3 +184,4 @@ export function PhoneVoicemailFlowInbox() {
     </section>
   );
 }
+
