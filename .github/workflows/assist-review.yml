@@ -10,6 +10,7 @@ on:
       - 'src/components/Help/HowItWorks.tsx'
       - 'supabase/migrations/*assist*'
       - 'tests/assist/**'
+      - 'services/assist/**'
       - 'tests/navigation/workspace-routes.mjs'
       - 'package.json'
       - 'package-lock.json'
