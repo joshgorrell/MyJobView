@@ -56,6 +56,7 @@ assert.deepEqual(invoiceTotal(42, 0, true, 1), { statementFee: 5, total: 47 });
 assert.deepEqual(invoiceTotal(42, 0, false, 12), { statementFee: 0, total: 504 });
 assert.deepEqual(invoiceTotal(42, 0, true, 12), { statementFee: 5, total: 509 });
 assert.deepEqual(invoiceTotal(47, 5, true, 12), { statementFee: 5, total: 509 });
-assert.doesNotMatch(recurring, /annual_discount_type|annual_discount_percentage|annual_discount_flat_amount/);
+assert.doesNotMatch(recurring, /annual_discount_type|annual_discount_percentage|annual_discount_flat_amount|v_discount/);
+assert.match(recurring, /c\.mailed_paper_statements,false/);
 assert.doesNotMatch(wizard, /calculateAnnualDiscount|receive a discount/);
 console.log('Statement billing source contract checks passed');
