@@ -4,6 +4,7 @@ import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye
 import { QuickBooksSettings } from './QuickBooksSettings';
 import { RingCentralSettings } from './RingCentralSettings';
 import { TechsafeSettings } from './TechsafeSettings';
+import { AssistSettings } from './AssistSettings';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface CompanySettings {
@@ -35,7 +36,7 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
-const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe'] as const;
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe', 'assist'] as const;
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
@@ -448,11 +449,16 @@ export function IntegrationsSettings() {
               </span>}
             </button>
           ))}
+          <button type="button" onClick={() => selectIntegration('assist')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+            Remote Support
+          </button>
         </nav>
       </div>
 
       {activeIntegration === 'ringcentral' && <RingCentralSettings onConnectionChange={setRingcentralConnected} />}
       {activeIntegration === 'techsafe' && <TechsafeSettings onConnectionChange={setTechsafeConnected} />}
+      {activeIntegration === 'assist' && <AssistSettings />}
 
       {/* Payment Processor Integration */}
       {activeIntegration === 'payment_processor' && (
