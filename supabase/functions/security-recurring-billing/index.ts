@@ -49,9 +49,8 @@ Deno.serve(async(req:Request)=>{
             const feeAmount=Number(feeLine.amount);
             const feeQuantity=Number(feeLine.quantity);
             const feeUnitPrice=Number(feeLine.unit_price);
-            const annualFee=feeAmount===5 && feeQuantity===1 && feeUnitPrice===5;
-            const monthlyFee=feeAmount===5 && feeQuantity===1 && feeUnitPrice===5;
-            if(!annualFee && !monthlyFee)
+            const validStatementFee=feeAmount===5 && feeQuantity===1 && feeUnitPrice===5;
+            if(!validStatementFee)
               throw new Error('Paper statement invoice fee must be $5 per statement, regardless of billing frequency');
           } else if(paperLines.length!==0 || Number(contract.mail_invoice_fee)!==0) {
             throw new Error('Unexpected paper statement fee; review billing before QuickBooks sync');
