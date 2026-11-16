@@ -335,6 +335,9 @@ verify_jwt = false
 verify_jwt = false
 
 
+# Verified staff JWT plus independent active-session/operator checks in the host/database.
+[functions.assist-support]
+verify_jwt = true
 
 [functions.ringcentral-mailbox-mapping]
 verify_jwt = true
