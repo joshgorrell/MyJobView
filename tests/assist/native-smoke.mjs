@@ -22,6 +22,11 @@ try{
  const second=await runtime.ensure({organization_id:other,generation:1},async()=>{});
  assert.notEqual(second.meshId,result.meshId);
  const a=await store.read(org),b=await store.read(other);assert.notEqual(a.port,b.port);assert.notEqual(a.keyHex,b.keyHex);
+ // Exercise the real Express/Handlebars login renderer after dependency updates.
+ for(const state of [a,b]){
+  const page=await fetch(`http://127.0.0.1:${state.port}/mjv-${state.organization_id.replaceAll('-','')}/`);
+  assert.equal(page.status,200);assert.match(await page.text(),/<!DOCTYPE html>/i);
+ }
  const management={port:a.port,domain:'mjv-00000000000000000000000000000001',keyHex:a.keyHex};
  const temporary='mjv-session-00000000000000000000000000000009';
  await meshCommand(management,{action:'adduser',username:temporary,pass:'NativeSmokeOnly!Aa123456789',siteadmin:0});
