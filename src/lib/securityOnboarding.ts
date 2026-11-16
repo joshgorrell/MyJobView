@@ -10,6 +10,7 @@ export interface SecurityDraftForm {
   emergencyContacts: { name: string; phone: string; password: string; canAuthorize: boolean }[];
   paymentMethod: string;
   paymentMethodId: string;
+  mailedPaperStatements?: boolean;
   signature: string;
 }
 
@@ -35,6 +36,7 @@ export interface SecurityAgreementDocument {
   staff_corrected_at?: string;
   billing_mode: 'autopay' | 'mail';
   mail_invoice_fee: number;
+  mailed_paper_statements?: boolean;
   payment_display?: string;
   autopay_authorization?: string;
 }

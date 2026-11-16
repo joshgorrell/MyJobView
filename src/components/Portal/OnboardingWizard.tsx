@@ -11,7 +11,7 @@ import {
   Loader2, AlertCircle, Receipt, Printer, Download, Save, MoreHorizontal
 } from 'lucide-react';
 import { SignaturePad } from '../Production/SignaturePad';
-import { calculateAnnualDiscount, type BillingPreference } from '../../lib/types';
+import { type BillingPreference } from '../../lib/types';
 
 interface OnboardingWizardProps {
   contract: PortalSecurityAgreement & SecurityAgreementDocument;
@@ -56,6 +56,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
     emergencyContacts: contract.draft?.form_data?.emergencyContacts || [],
     paymentMethod: contract.draft?.form_data?.paymentMethod || '',
     paymentMethodId: contract.draft?.form_data?.paymentMethodId || '',
+    mailedPaperStatements: contract.billing_mode === 'mail' || Boolean(contract.draft?.form_data?.mailedPaperStatements ?? contract.document?.mailed_paper_statements),
     signature: ''
   }));
 
@@ -139,7 +140,12 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
   }, []);
 
   function agreementHtml() {
-    return securityAgreementHtml(contract.document, terms, formData, null, null, billingPreference);
+    return securityAgreementHtml({
+      ...contract.document,
+      mailed_paper_statements: Boolean(formData.mailedPaperStatements),
+      mail_invoice_fee: formData.mailedPaperStatements ? 5 : 0,
+      monthly_price: Number(contract.document.monthly_price) - Number(contract.document.mail_invoice_fee || 0) + (formData.mailedPaperStatements ? 5 : 0),
+    }, terms, formData, null, null, billingPreference);
   }
 
   function isStepComplete(): boolean {
@@ -624,7 +630,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(Number(contract.monthly_price) || 0)}/month
+                    {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0))}/month
                   </span>
                 </div>
               </div>
@@ -635,7 +641,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-700">Monthly Services Total</span>
                 <span className="text-lg font-bold text-gray-900">
-                  {formatCurrency(Number(contract.monthly_price) || 0)}/month
+                  {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0))}/month
                 </span>
               </div>
             </div>
@@ -688,10 +694,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">Monthly Billing</span>
                         <span className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(Number(contract.monthly_price) || 0)}/month
+                          {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0) + (formData.mailedPaperStatements ? 5 : 0))}/month
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency(Number(contract.monthly_price) || 0)} in advance for the upcoming month of monitoring service.</p>
+                      <p className="text-xs text-gray-500 mt-1">Pay {formatCurrency((Number(contract.monthly_price) || 0) - (Number(contract.mail_invoice_fee) || 0) + (formData.mailedPaperStatements ? 5 : 0))} in advance for the upcoming month of monitoring service.</p>
                     </div>
                   </div>
                 </button>
@@ -717,14 +723,10 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                           <span className="text-sm font-semibold text-gray-900">Annual Billing</span>
                           {(() => {
                             const monthlyTotal = Number(contract.monthly_price) || 0;
-                            const annualSubtotal = monthlyTotal * 12;
-                            const discount = calculateAnnualDiscount(
-                              annualSubtotal - (Number(contract.mail_invoice_fee) || 0) * 12,
-                              billingConfig.annual_discount_type,
-                              billingConfig.annual_discount_percentage,
-                              billingConfig.annual_discount_flat_amount
-                            );
-                            const amountDue = annualSubtotal - discount;
+                            const paperFee = formData.mailedPaperStatements ? 5 : 0;
+                            const previousPaperFee = Number(contract.mail_invoice_fee) || 0;
+                            const annualSubtotal = (monthlyTotal - previousPaperFee) * 12 + paperFee;
+                            const amountDue = annualSubtotal;
                             return (
                               <span className="text-sm font-semibold text-gray-900">
                                 {formatCurrency(amountDue)}/year
@@ -732,33 +734,19 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                             );
                           })()}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service and receive a discount.</p>
+                        <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service at the regular rate.</p>
                         {billingPreference === 'annual' && (() => {
                           const monthlyTotal = Number(contract.monthly_price) || 0;
-                          const annualSubtotal = monthlyTotal * 12;
-                          const discount = calculateAnnualDiscount(
-                            annualSubtotal - (Number(contract.mail_invoice_fee) || 0) * 12,
-                            billingConfig.annual_discount_type,
-                            billingConfig.annual_discount_percentage,
-                            billingConfig.annual_discount_flat_amount
-                          );
-                          const amountDue = annualSubtotal - discount;
+                          const paperFee = formData.mailedPaperStatements ? 5 : 0;
+                            const previousPaperFee = Number(contract.mail_invoice_fee) || 0;
+                            const annualSubtotal = (monthlyTotal - previousPaperFee) * 12 + paperFee;
+                          const amountDue = annualSubtotal;
                           return (
                             <div className="mt-3 bg-white border border-gray-200 rounded-xl p-3 space-y-1.5">
                               <div className="flex justify-between text-xs text-gray-600">
                                 <span>Annual Subtotal</span>
                                 <span>{formatCurrency(annualSubtotal)}</span>
                               </div>
-                              {discount > 0 && (
-                                <div className="flex justify-between text-xs text-green-600">
-                                  <span>Annual Discount
-                                    {billingConfig.annual_discount_type === 'percentage'
-                                      ? ` (${billingConfig.annual_discount_percentage}%)`
-                                      : ''}
-                                  </span>
-                                  <span>-{formatCurrency(discount)}</span>
-                                </div>
-                              )}
                               <div className="flex justify-between text-sm font-bold text-gray-900 pt-1.5 border-t border-gray-100">
                                 <span>Annual Billing Amount</span>
                                 <span>{formatCurrency(amountDue)}</span>
@@ -772,6 +760,16 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                 )}
               </div>
             </div>
+
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4">
+              <input type="checkbox" className="mt-1 h-4 w-4" checked={Boolean(formData.mailedPaperStatements)}
+                disabled={contract.billing_mode === 'mail'}
+                onChange={(event) => setFormData({ ...formData, mailedPaperStatements: event.target.checked })} />
+              <span className="text-sm text-gray-800">
+                <strong>Add Mailed Paper Statements — +$5 per statement</strong>
+                <span className="block text-xs text-gray-500 mt-1">Electronic statements are always included free. AutoPay enrollment is still required. Mailed statements do not replace automatic payments.</span>
+              </span>
+            </label>
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <p className="text-sm text-blue-800 leading-relaxed">

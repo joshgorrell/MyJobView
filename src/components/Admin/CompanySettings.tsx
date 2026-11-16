@@ -67,9 +67,6 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
   // Billing Preference Settings
   const [annualBillingEnabled, setAnnualBillingEnabled] = useState(false);
   const [defaultBillingPreference, setDefaultBillingPreference] = useState<'monthly' | 'annual'>('monthly');
-  const [annualDiscountType, setAnnualDiscountType] = useState<'percentage' | 'flat' | 'none'>('none');
-  const [annualDiscountPercentage, setAnnualDiscountPercentage] = useState(5);
-  const [annualDiscountFlatAmount, setAnnualDiscountFlatAmount] = useState(50);
   const [customerCanChangePref, setCustomerCanChangePref] = useState(true);
   const [staffCanOverridePref, setStaffCanOverridePref] = useState(true);
   const [billingProrationRule, setBillingProrationRule] = useState<'full_period' | 'prorate_partial' | 'next_cycle'>('next_cycle');
@@ -152,9 +149,6 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
         setLostFollowupDays(data.lost_review_followup_days??14);
         setAnnualBillingEnabled(data.annual_billing_enabled ?? false);
         setDefaultBillingPreference(data.default_billing_preference ?? 'monthly');
-        setAnnualDiscountType(data.annual_discount_type ?? 'none');
-        setAnnualDiscountPercentage(data.annual_discount_percentage ? Number(data.annual_discount_percentage) : 5);
-        setAnnualDiscountFlatAmount(data.annual_discount_flat_amount ? Number(data.annual_discount_flat_amount) : 50);
         setCustomerCanChangePref(data.customer_can_change_billing_preference ?? true);
         setStaffCanOverridePref(data.staff_can_override_billing_preference ?? true);
         setBillingProrationRule(data.billing_proration_rule ?? 'next_cycle');
@@ -442,9 +436,9 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
         cc_convenience_fee_label: ccFeeLabel,
         annual_billing_enabled: annualBillingEnabled,
         default_billing_preference: defaultBillingPreference,
-        annual_discount_type: annualDiscountType,
-        annual_discount_percentage: annualDiscountType === 'percentage' ? annualDiscountPercentage : 0,
-        annual_discount_flat_amount: annualDiscountType === 'flat' ? annualDiscountFlatAmount : 0,
+        annual_discount_type: 'none',
+        annual_discount_percentage: 0,
+        annual_discount_flat_amount: 0,
         customer_can_change_billing_preference: customerCanChangePref,
         staff_can_override_billing_preference: staffCanOverridePref,
         billing_proration_rule: billingProrationRule,
@@ -1346,7 +1340,7 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
               />
               <div>
                 <span className="text-sm font-medium text-gray-900">Enable Annual Billing</span>
-                <p className="text-xs text-gray-500">Allow customers to choose annual prepay billing with a discount.</p>
+                <p className="text-xs text-gray-500">Allow customers to pay for 12 months of monitoring in advance at the regular rate.</p>
               </div>
             </label>
 
@@ -1362,63 +1356,7 @@ export function CompanySettings({ section = 'company' }: { section?: 'company' |
                   <option value="annual" disabled={!annualBillingEnabled}>Annual (requires annual billing enabled)</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Discount Type</label>
-                <select
-                  value={annualDiscountType}
-                  onChange={(e) => setAnnualDiscountType(e.target.value as 'percentage' | 'flat' | 'none')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  disabled={!annualBillingEnabled}
-                >
-                  <option value="none">No Discount</option>
-                  <option value="percentage">Percentage Off</option>
-                  <option value="flat">Flat Dollar Amount Off</option>
-                </select>
-              </div>
             </div>
-
-            {annualDiscountType === 'percentage' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Discount Percentage (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="100"
-                  value={annualDiscountPercentage}
-                  onChange={(e) => setAnnualDiscountPercentage(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  disabled={!annualBillingEnabled}
-                />
-              </div>
-            )}
-            {annualDiscountType === 'flat' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Annual Discount Amount ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={annualDiscountFlatAmount}
-                  onChange={(e) => setAnnualDiscountFlatAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  disabled={!annualBillingEnabled}
-                />
-              </div>
-            )}
-
-            {annualBillingEnabled && annualDiscountType !== 'none' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-900">
-                  <strong>Preview:</strong> A customer paying $76.85/month annually would pay{' '}
-                  {annualDiscountType === 'percentage'
-                    ? `${formatCurrency(76.85 * 12 * (1 - annualDiscountPercentage / 100))} (saved ${formatCurrency(76.85 * 12 * (annualDiscountPercentage / 100))})`
-                    : `${formatCurrency(76.85 * 12 - annualDiscountFlatAmount)} (saved ${formatCurrency(annualDiscountFlatAmount)})`
-                  } per year.
-                </p>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input

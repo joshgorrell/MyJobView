@@ -14,7 +14,7 @@ assert.equal(await authorizeSecurityWorker(req(),undefined,async()=>{throw new E
 assert.equal(checks,0);
 let queue=[],calls=[],chargeCalls=[],qboCalls=[],connected=true,noticeOk=true,balance=35;
 const invoice={id:'invoice',qbo_invoice_id:'qb-invoice',invoice_number:'INV-1',total:35,tax_amount:0,due_date:'2026-11-25',invoice_line_items:[]};
-const rows={security_contracts:{contact_id:'contact',security_payment_method_id:'method',contract_number:'SC-1'},invoices:invoice,
+const rows={security_contracts:{contact_id:'contact',security_payment_method_id:'method',contract_number:'SC-1',mailed_paper_statements:false,mail_invoice_fee:0},invoices:invoice,
  contacts:{qbo_customer_id:'qb-customer',email:'test@example.com'},company_settings:{from_email:'billing@example.com',company_email:'support@example.com'},organizations:{subdomain:'test'},security_payment_methods:{payment_type:'ach',qbo_method_id:'vault-bank'}};
 const admin={rpc:async(name,args)=>{
  calls.push({name,args});if(name==='security_billing_worker_authorized')return {data:args.p_secret===token,error:null};
@@ -38,12 +38,12 @@ try {
  reset(['preparing','notice']);assert.equal((await globalThis.__workerHandler(req())).status,200);
  assert.deepEqual(calls.filter(c=>c.name==='security_recurring_billing').map(c=>c.args.p_action),['generate','lease','prepare','lease','notice','lease']);assert.equal(chargeCalls.length,0,'Notice never initiates a charge');
  // QB accounting receives the exact itemized customer invoice, including
- // annual discounts and the separately itemized mailed-invoice fee.
+ // annual monitoring at regular price and one $5 mailed-statement fee.
  for (const example of [
   {total:50,tax:0,lines:[{description:'Central station monitoring — monthly monitoring, 2026-11-10 through 2026-12-10 (agreement SC-1)',quantity:1,unit_price:35,amount:35},{description:'Alarm.com cellular service — monthly monitoring, 2026-11-10 through 2026-12-10 (agreement SC-1)',quantity:1,unit_price:15,amount:15}]},
-  {total:686.4,tax:62.4,lines:[{description:'Central station monitoring — annual monitoring, 2026-11-10 through 2027-11-10 (agreement SC-1)',quantity:1,unit_price:378,amount:378},{description:'Alarm.com cellular service — annual monitoring, 2026-11-10 through 2027-11-10 (agreement SC-1)',quantity:1,unit_price:162,amount:162},{description:'Mailed invoice fee ($7 per month), 2026-11-10 through 2027-11-10',quantity:12,unit_price:7,amount:84}]},
+  {total:599.4,tax:54.4,lines:[{description:'Central station monitoring — annual monitoring, 2026-11-10 through 2027-11-10 (agreement SC-1)',quantity:1,unit_price:378,amount:378},{description:'Alarm.com cellular service — annual monitoring, 2026-11-10 through 2027-11-10 (agreement SC-1)',quantity:1,unit_price:162,amount:162},{description:'Mailed paper statement fee ($5 per statement), 2026-11-10 through 2027-11-10',quantity:1,unit_price:5,amount:5}]},
  ]) {
-  reset(['notice']);Object.assign(invoice,{qbo_invoice_id:null,total:example.total,tax_amount:example.tax,invoice_line_items:example.lines.map((line,n)=>({...line,sort_order:n+1,security_service_name:line.description.startsWith('Mailed')?'Mailed invoice fee':line.description.split(' — ')[0],security_service_id:line.description.startsWith('Mailed')?null:'service-'+n}))});
+  reset(['notice']);rows.security_contracts.mailed_paper_statements=example.lines.some(line=>line.description.startsWith('Mailed'));rows.security_contracts.mail_invoice_fee=rows.security_contracts.mailed_paper_statements?5:0;Object.assign(invoice,{qbo_invoice_id:null,total:example.total,tax_amount:example.tax,invoice_line_items:example.lines.map((line,n)=>({...line,sort_order:n+1,security_service_name:line.description.startsWith('Mailed')?'Mailed invoice fee':line.description.split(' — ')[0],security_service_id:line.description.startsWith('Mailed')?null:'service-'+n}))});
   await globalThis.__workerHandler(req());
   const synced=qboCalls.find(c=>c.path.startsWith('invoice?'));
   assert.ok(synced,'Recurring invoice is sent to QuickBooks before the notice');
@@ -54,7 +54,7 @@ try {
   assert.equal(new Set(synced.body.Line.map(l=>l.SalesItemLineDetail.ItemRef.value)).size,example.lines.length,'Every selected service and fee uses its own QuickBooks item');
   assert.equal(chargeCalls.length,0,'Invoice synchronization cannot itself charge the customer');
  }
- Object.assign(invoice,{qbo_invoice_id:'qb-invoice',total:35,tax_amount:0,invoice_line_items:[]});
+ rows.security_contracts.mailed_paper_statements=false;rows.security_contracts.mail_invoice_fee=0;Object.assign(invoice,{qbo_invoice_id:'qb-invoice',total:35,tax_amount:0,invoice_line_items:[]});
  reset(['notice']);noticeOk=false;await globalThis.__workerHandler(req());assert.ok(calls.some(c=>c.args?.p_action==='defer'));assert.ok(!calls.some(c=>c.args?.p_action==='notice'));
  reset(['mail']);connected=false;await globalThis.__workerHandler(req());assert.ok(calls.some(c=>c.args?.p_action==='mail_accounting'));assert.equal(chargeCalls.length,0,'Mailed invoices sync to accounting without Payments consent or an automatic debit');
  reset(['ready']);rows.invoices=null;await globalThis.__workerHandler(req());assert.equal(chargeCalls.length,0,'Missing invoice prevents an automatic debit');rows.invoices=invoice;
