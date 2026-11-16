@@ -44,3 +44,35 @@ DROP TRIGGER IF EXISTS enforce_security_paper_statement_authorization ON public.
 CREATE TRIGGER enforce_security_paper_statement_authorization
   BEFORE UPDATE ON public.security_contracts
   FOR EACH ROW EXECUTE FUNCTION private.enforce_security_paper_statement_authorization();
+
+-- Persist only a strict boolean customer preference in the private draft.
+-- This does not authorize charges or alter a signed contract: the signing RPC
+-- must separately validate and apply the preference before enabling the UI.
+CREATE OR REPLACE FUNCTION private.security_safe_draft(p_form jsonb)
+RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
+  SELECT jsonb_build_object(
+    'personalInfo', jsonb_build_object(
+      'full_name', left(coalesce(p_form->'personalInfo'->>'full_name', ''), 200),
+      'email', left(coalesce(p_form->'personalInfo'->>'email', ''), 254),
+      'phone', left(coalesce(p_form->'personalInfo'->>'phone', ''), 40)),
+    'propertyInfo', jsonb_build_object(
+      'address_line1', left(coalesce(p_form->'propertyInfo'->>'address_line1', ''), 300),
+      'city', left(coalesce(p_form->'propertyInfo'->>'city', ''), 100),
+      'state', left(coalesce(p_form->'propertyInfo'->>'state', ''), 2),
+      'zip_code', left(coalesce(p_form->'propertyInfo'->>'zip_code', ''), 20)),
+    'emergencyContacts', coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'name', left(coalesce(e->>'name', ''), 200),
+      'phone', left(coalesce(e->>'phone', ''), 40),
+      'password', left(coalesce(e->>'password', ''), 100),
+      'canAuthorize', coalesce(e->>'canAuthorize', 'false') = 'true') ORDER BY ord)
+      FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p_form->'emergencyContacts') = 'array'
+        THEN p_form->'emergencyContacts' ELSE '[]'::jsonb END) WITH ORDINALITY AS x(e,ord)
+      WHERE ord <= 10), '[]'::jsonb),
+    'paymentMethodId', CASE WHEN coalesce(p_form->>'paymentMethodId','') ~ '^[0-9a-fA-F-]{36}$' THEN p_form->>'paymentMethodId' ELSE '' END,
+    'paymentMethod', CASE WHEN p_form->>'paymentMethod' IN ('credit_card','ach')
+      THEN p_form->>'paymentMethod' ELSE '' END,
+    'billingPreference', CASE WHEN p_form->>'billingPreference' = 'annual' THEN 'annual' ELSE 'monthly' END,
+    'mailedPaperStatements', CASE WHEN jsonb_typeof(p_form->'mailedPaperStatements') = 'boolean' THEN (p_form->>'mailedPaperStatements')::boolean ELSE false END
+  );
+$$;
+REVOKE ALL ON FUNCTION private.security_safe_draft(jsonb) FROM PUBLIC, anon, authenticated;
