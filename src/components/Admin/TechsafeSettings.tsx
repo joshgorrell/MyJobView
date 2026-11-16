@@ -43,7 +43,7 @@ function isStatus(value: unknown): value is Status {
     typeof s.sourceReaderCertified === 'boolean';
 }
 
-export function TechsafeSettings() {
+export function TechsafeSettings({ onConnectionChange }: { onConnectionChange?: (connected: boolean) => void } = {}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [senderReadiness, setSenderReadiness] = useState<SenderReadiness | null>(null);
   const [checkingSender, setCheckingSender] = useState(false);
@@ -81,6 +81,7 @@ export function TechsafeSettings() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const hasConnection = status !== null && status.activeConnections > 0;
+  useEffect(() => { if (!loading) onConnectionChange?.(hasConnection); }, [loading, hasConnection, onConnectionChange]);
   const certified = status?.sourceReaderCertified === true;
   const enabled = status?.liveSyncEnabled === true;
   const ready = hasConnection && certified && enabled;

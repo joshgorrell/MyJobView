@@ -8,7 +8,7 @@ import { QuickBooksCustomerBrowser } from './QuickBooksCustomerBrowser';
 import ConfirmModal from '../ui/ConfirmModal';
 
 
-export function QuickBooksSettings() {
+export function QuickBooksSettings({ onConnectionChange, onPaymentsChange }: { onConnectionChange?: (connected: boolean) => void; onPaymentsChange?: (enabled: boolean) => void } = {}) {
   const { profile } = useAuth();
   const [settings, setSettings] = useState<Omit<QBSettings, 'access_token' | 'refresh_token' | 'token_expires_at'> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,6 +38,13 @@ export function QuickBooksSettings() {
     loadSyncStats();
 
   }, [profile?.organization_id]);
+
+  useEffect(() => {
+    if (loading) return;
+    const connected = !settingsError && settings?.is_connected === true;
+    onConnectionChange?.(connected);
+    onPaymentsChange?.(connected && settings?.payments_enabled === true);
+  }, [loading, settingsError, settings?.is_connected, settings?.payments_enabled, onConnectionChange, onPaymentsChange]);
 
   async function loadSettings(organizationId: string) {
     setSettingsError(false);
