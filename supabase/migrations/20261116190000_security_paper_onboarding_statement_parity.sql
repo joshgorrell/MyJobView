@@ -1,3 +1,22 @@
+
+-- Signed agreement evidence is private; staff may only upload to their own organization's draft contract.
+INSERT INTO storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+VALUES ('security-signed-agreements','security-signed-agreements',false,15728640,ARRAY['application/pdf','image/jpeg','image/png'])
+ON CONFLICT(id) DO UPDATE SET public=false,file_size_limit=15728640,allowed_mime_types=EXCLUDED.allowed_mime_types;
+CREATE POLICY "Security staff upload signed paper agreements" ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (bucket_id='security-signed-agreements' AND EXISTS (
+ SELECT 1 FROM public.security_contracts c JOIN public.profiles p ON p.organization_id=c.organization_id
+ WHERE p.id=auth.uid() AND c.organization_id::text=split_part(name,'/',1)
+ AND c.id::text=split_part(name,'/',2) AND c.status IN ('draft','pending_customer','rejected')
+ AND c.customer_completed_at IS NULL AND private.security_staff_access(c.organization_id,false)
+));
+CREATE POLICY "Security staff read signed paper agreements" ON storage.objects FOR SELECT TO authenticated
+USING (bucket_id='security-signed-agreements' AND EXISTS (
+ SELECT 1 FROM public.security_contracts c JOIN public.profiles p ON p.organization_id=c.organization_id
+ WHERE p.id=auth.uid() AND c.organization_id::text=split_part(name,'/',1)
+ AND c.id::text=split_part(name,'/',2) AND private.security_staff_access(c.organization_id,true)
+));
+
 -- Align staff-entered paper agreements with electronic statement delivery choices.
 -- Preserve the existing staff authorization, agreement validation, and approval gates.
 CREATE OR REPLACE FUNCTION private.staff_security_onboarding(p_action text, p_id uuid, p_payload jsonb)
@@ -102,6 +121,12 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   IF c.customer_completed_at IS NOT NULL OR c.status NOT IN ('draft','pending_customer','rejected') THEN RAISE EXCEPTION 'This agreement is no longer available for paper completion'; END IF;
   f:=private.security_safe_draft(p_payload->'form_data'); PERFORM private.security_validate_form(f);
   IF coalesce(p_payload->>'paper_signed','false')<>'true' THEN RAISE EXCEPTION 'Confirm the customer signed the agreement'; END IF;
+  IF coalesce(p_payload->>'signed_agreement_path','') !~ ('^'||c.organization_id::text||'/'||c.id::text||'/[0-9a-f-]{36}\\.(pdf|png|jpg)$') THEN
+   RAISE EXCEPTION 'Signed agreement upload is required';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM storage.objects o WHERE o.bucket_id='security-signed-agreements' AND o.name=p_payload->>'signed_agreement_path' AND o.owner_id=auth.uid()::text AND o.metadata->>'mimetype' IN ('application/pdf','image/jpeg','image/png')) THEN
+   RAISE EXCEPTION 'Signed agreement must be uploaded by the submitting employee';
+  END IF;
   d:=private.security_staff_document(c.id);
   IF p_payload->>'document_version' IS DISTINCT FROM md5(d::text) THEN RAISE EXCEPTION 'Agreement terms changed. Review the signed paper against the current agreement before recording it'; END IF;
   IF coalesce(d->'template'->>'contract_terms','')='' OR d->'template'->>'contract_terms' LIKE '%[LEGAL REVIEW:%' THEN RAISE EXCEPTION 'Reviewed agreement terms are required'; END IF;
@@ -112,7 +137,7 @@ DECLARE c public.security_contracts%ROWTYPE; actor public.profiles%ROWTYPE; cid 
   IF c.security_billing_mode='mail' AND coalesce(p_payload->>'mailed_paper_statements','false')<>'true' THEN RAISE EXCEPTION 'Manual billing requires mailed paper statements'; END IF;
   IF jsonb_typeof(p_payload->'mailed_paper_statements') IS DISTINCT FROM 'boolean' THEN RAISE EXCEPTION 'Select a valid statement delivery preference'; END IF;
   IF f->>'billingPreference'='annual' AND coalesce(d->'dealer'->>'annual_billing_enabled','false')<>'true' THEN RAISE EXCEPTION 'Annual billing is unavailable'; END IF;
-  d:=d||jsonb_build_object('personalInfo',f->'personalInfo','propertyInfo',f->'propertyInfo','billingPreference',f->>'billingPreference','accepted_at',now(),'document_version',md5(d::text),'payment_display',CASE WHEN m.id IS NULL THEN 'Admin-approved mailed invoices' ELSE m.display_brand||' ending '||m.display_last4 END,'paper_autopay_authorization_retained',m.id IS NOT NULL,'mailed_paper_statements',(p_payload->>'mailed_paper_statements')::boolean,'mail_invoice_fee',CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'monthly_price',c.monthly_price-c.mail_invoice_fee+CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'paper_entered_by',auth.uid(),'paper_entered_at',now());
+  d:=d||jsonb_build_object('personalInfo',f->'personalInfo','propertyInfo',f->'propertyInfo','billingPreference',f->>'billingPreference','accepted_at',now(),'document_version',md5(d::text),'payment_display',CASE WHEN m.id IS NULL THEN 'Admin-approved mailed invoices' ELSE m.display_brand||' ending '||m.display_last4 END,'paper_autopay_authorization_retained',m.id IS NOT NULL,'mailed_paper_statements',(p_payload->>'mailed_paper_statements')::boolean,'mail_invoice_fee',CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'monthly_price',c.monthly_price-c.mail_invoice_fee+CASE WHEN (p_payload->>'mailed_paper_statements')::boolean THEN 5 ELSE 0 END,'paper_entered_by',auth.uid(),'paper_entered_at',now(),'signed_agreement_path',p_payload->>'signed_agreement_path');
   DELETE FROM public.security_contract_emergency_contacts WHERE contract_id=c.id;
   FOR e,ord IN SELECT x.v,x.ordinality FROM jsonb_array_elements(f->'emergencyContacts') WITH ORDINALITY x(v,ordinality) LOOP
    INSERT INTO public.security_contract_emergency_contacts(contract_id,organization_id,contact_name,phone_number,password_codeword,can_authorize_entry,priority_order) VALUES(c.id,c.organization_id,e->>'name',e->>'phone',e->>'password',(e->>'canAuthorize')::boolean,ord);
