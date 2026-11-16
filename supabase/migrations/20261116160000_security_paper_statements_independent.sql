@@ -88,8 +88,8 @@ DECLARE
   v_prior_applied_fee numeric;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    -- The legacy trigger already adds $5 for Admin-approved manual billing.
-    v_prior_applied_fee := CASE WHEN NEW.security_billing_mode = 'mail' THEN 5 ELSE 0 END;
+    -- On insert the legacy trigger sets the fee but does not adjust price.
+    v_prior_applied_fee := 0;
   ELSIF NEW.security_billing_mode IS DISTINCT FROM OLD.security_billing_mode THEN
     -- The legacy trigger has already adjusted price by (new mode fee - old fee).
     v_prior_applied_fee := CASE WHEN NEW.security_billing_mode = 'mail' THEN 5 ELSE 0 END;
