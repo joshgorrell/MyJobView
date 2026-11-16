@@ -25,7 +25,17 @@ CREATE OR REPLACE FUNCTION private.enforce_security_paper_statement_authorizatio
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   IF NEW.mailed_paper_statements IS DISTINCT FROM OLD.mailed_paper_statements THEN
-    IF NOT EXISTS (
+    -- The trusted onboarding RPC may apply the customer's explicit choice
+    -- atomically with the signed agreement. Ordinary direct updates still
+    -- require organization Admin authorization.
+    IF NOT (
+      current_setting('mjv.security_signing', true) = 'true'
+      AND OLD.customer_completed_at IS NULL
+      AND NEW.customer_completed_at IS NOT NULL
+      AND NEW.onboarding_agreement_snapshot IS NOT NULL
+      AND (NEW.onboarding_agreement_snapshot->>'mailed_paper_statements')::boolean
+          IS NOT DISTINCT FROM NEW.mailed_paper_statements
+    ) AND NOT EXISTS (
       SELECT 1 FROM public.profiles
       WHERE id = auth.uid() AND organization_id = NEW.organization_id AND role = 'admin'
     ) THEN
