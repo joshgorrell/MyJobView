@@ -181,7 +181,7 @@ export function RingCentralSettings() {
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-gray-200 p-4">
           <h5 className="font-semibold text-gray-900">1. Connection</h5>
-          <p className="mt-1 text-sm text-gray-600">{current ? `${current.extension_name || 'Connected account'}${current.extension_number ? ' · Ext. ' + current.extension_number : ''}` : hasConnectedAccount ? 'Connected' : 'Not connected'}</p>
+          <p className="mt-1 text-sm text-gray-600">{current ? `${current.extension_name || 'Connected account'}${current.extension_number ? ' · Ext. ' + current.extension_number : ''}` : !connectionStatusKnown || error ? 'Status could not be loaded' : hasConnectedAccount ? 'Connected' : 'Not connected'}</p>
           <p className="mt-1 text-xs text-gray-500">Authorization only; phone routing is unchanged.</p>
         </div>
         <div className="rounded-lg border border-gray-200 p-4">
