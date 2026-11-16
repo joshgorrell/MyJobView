@@ -521,6 +521,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Resolve public IP + approximate city/state/country server-side.
         // This intentionally does not request browser GPS/location permission.
         setTimeout(() => {
+          // Session tracking can be superseded between scheduling and execution.
+          // Never enrich a session that a newer login/tab transition has replaced.
+          if (trackingGeneration !== sessionTrackingGenerationRef.current) return;
           supabase.functions.invoke('session-location', {
             body: { session_id: data },
           }).catch(() => {});
