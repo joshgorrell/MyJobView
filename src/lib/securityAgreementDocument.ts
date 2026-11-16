@@ -27,8 +27,9 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
   const signed = !!signedAt && !!signature;
   const safeSignature = signature && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(signature) ? signature : null;
   const billing = document.billingPreference || billingPreference || 'monthly';
-  const annualSubtotal = Number(document.monthly_price) * 12;
-  const discountableSubtotal = annualSubtotal - (Number(document.mail_invoice_fee) || 0) * 12;
+  const paperFee = Number(document.mail_invoice_fee) || 0;
+  const annualSubtotal = (Number(document.monthly_price) - paperFee) * 12 + paperFee;
+  const discountableSubtotal = annualSubtotal - paperFee;
   const annualDiscount = document.dealer?.annual_discount_type === 'percentage'
     ? Math.round(discountableSubtotal * (Number(document.dealer.annual_discount_percentage) / 100) * 100) / 100
     : Math.min(Number(document.dealer?.annual_discount_flat_amount) || 0, discountableSubtotal);
@@ -48,7 +49,7 @@ export function securityAgreementHtml(document: SecurityAgreementDocument, terms
     <tr><td><strong>Overall account price: ${money(document.monthly_price)}/month</strong></td></tr></tbody></table>
     <p>Initial term: ${esc(document.term_months)} months.<br>Payment frequency: ${billing === 'annual' ? 'Annual' : 'Monthly'}. Payments are collected in advance for the upcoming ${billing === 'annual' ? '12 months' : 'month'} of monitoring service, not for the prior service period.
     ${billing === 'annual' ? `<br>Annual subtotal: ${money(annualSubtotal)}. Discount: ${money(annualDiscount)}. Annual billing amount: ${money(annualSubtotal - annualDiscount)}.` : ''}</p>
-    <p>Electronic statements are included for every account at no additional charge.<br>${document.billing_mode === 'mail' ? 'Admin-approved manual billing with mailed paper invoices.' : 'Automatic recurring payments are required for security monitoring.'}${document.mailed_paper_statements ? ` Mailed paper statements are an additional ${Number(document.mail_invoice_fee ?? 0).toFixed(2)}/month and do not replace electronic statements.${document.billing_mode !== 'mail' ? ' AutoPay remains required.' : ''}` : ''}
+    <p>Electronic statements are included for every account at no additional charge.<br>${document.billing_mode === 'mail' ? 'Admin-approved manual billing with mailed paper invoices.' : 'Automatic recurring payments are required for security monitoring.'}${document.mailed_paper_statements ? ` Mailed paper statements are an additional ${Number(document.mail_invoice_fee ?? 0).toFixed(2)} per mailed statement and do not replace electronic statements.${document.billing_mode !== 'mail' ? ' AutoPay remains required.' : ''}` : ''}
     ${document.payment_display ? `<br>Payment method: ${esc(document.payment_display)}.` : ''}</p>
     ${document.autopay_authorization ? `<h2>Recurring payment authorization</h2><p>${esc(document.autopay_authorization)}</p>` : ''}
     <p>Review the terms below for renewal, cancellation and payment obligations.${document.dealer?.company_email ? ` Contact: ${esc(document.dealer.company_email)}.` : ''}</p>
