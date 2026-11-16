@@ -11,7 +11,7 @@ import {
   Loader2, AlertCircle, Receipt, Printer, Download, Save, MoreHorizontal
 } from 'lucide-react';
 import { SignaturePad } from '../Production/SignaturePad';
-import { calculateAnnualDiscount, type BillingPreference } from '../../lib/types';
+import { type BillingPreference } from '../../lib/types';
 
 interface OnboardingWizardProps {
   contract: PortalSecurityAgreement & SecurityAgreementDocument;
@@ -700,13 +700,7 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                             const paperFee = formData.mailedPaperStatements ? 5 : 0;
                             const previousPaperFee = Number(contract.mail_invoice_fee) || 0;
                             const annualSubtotal = (monthlyTotal - previousPaperFee) * 12 + paperFee;
-                            const discount = calculateAnnualDiscount(
-                              annualSubtotal - paperFee,
-                              billingConfig.annual_discount_type,
-                              billingConfig.annual_discount_percentage,
-                              billingConfig.annual_discount_flat_amount
-                            );
-                            const amountDue = annualSubtotal - discount;
+                            const amountDue = annualSubtotal;
                             return (
                               <span className="text-sm font-semibold text-gray-900">
                                 {formatCurrency(amountDue)}/year
@@ -714,35 +708,19 @@ export default function OnboardingWizard({ contract, token, onComplete }: Onboar
                             );
                           })()}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service and receive a discount.</p>
+                        <p className="text-xs text-gray-500 mt-1">Pay in advance for the upcoming 12 months of monitoring service at the regular rate.</p>
                         {billingPreference === 'annual' && (() => {
                           const monthlyTotal = Number(contract.monthly_price) || 0;
                           const paperFee = formData.mailedPaperStatements ? 5 : 0;
                             const previousPaperFee = Number(contract.mail_invoice_fee) || 0;
                             const annualSubtotal = (monthlyTotal - previousPaperFee) * 12 + paperFee;
-                          const discount = calculateAnnualDiscount(
-                            annualSubtotal - paperFee,
-                            billingConfig.annual_discount_type,
-                            billingConfig.annual_discount_percentage,
-                            billingConfig.annual_discount_flat_amount
-                          );
-                          const amountDue = annualSubtotal - discount;
+                          const amountDue = annualSubtotal;
                           return (
                             <div className="mt-3 bg-white border border-gray-200 rounded-xl p-3 space-y-1.5">
                               <div className="flex justify-between text-xs text-gray-600">
                                 <span>Annual Subtotal</span>
                                 <span>{formatCurrency(annualSubtotal)}</span>
                               </div>
-                              {discount > 0 && (
-                                <div className="flex justify-between text-xs text-green-600">
-                                  <span>Annual Discount
-                                    {billingConfig.annual_discount_type === 'percentage'
-                                      ? ` (${billingConfig.annual_discount_percentage}%)`
-                                      : ''}
-                                  </span>
-                                  <span>-{formatCurrency(discount)}</span>
-                                </div>
-                              )}
                               <div className="flex justify-between text-sm font-bold text-gray-900 pt-1.5 border-t border-gray-100">
                                 <span>Annual Billing Amount</span>
                                 <span>{formatCurrency(amountDue)}</span>
