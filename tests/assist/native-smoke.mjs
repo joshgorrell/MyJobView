@@ -22,6 +22,13 @@ try{
  const second=await runtime.ensure({organization_id:other,generation:1},async()=>{});
  assert.notEqual(second.meshId,result.meshId);
  const a=await store.read(org),b=await store.read(other);assert.notEqual(a.port,b.port);assert.notEqual(a.keyHex,b.keyHex);
+ const management={port:a.port,domain:'mjv-00000000000000000000000000000001',keyHex:a.keyHex};
+ const temporary='mjv-session-00000000000000000000000000000009';
+ await meshCommand(management,{action:'adduser',username:temporary,pass:'NativeSmokeOnly!Aa123456789',siteadmin:0});
+ const users=(await meshCommand(management,{action:'users'})).users;
+ const temporaryUser=users.find(u=>u._id===`user/${management.domain}/${temporary}`);assert.ok(temporaryUser);assert.ok(!temporaryUser.siteadmin);assert.equal(Object.keys(temporaryUser.links||{}).length,0);
+ await runtime.revokeViewer(org,temporary);
+ assert.equal((await meshCommand(management,{action:'users'})).users.some(u=>u._id===temporaryUser._id),false,'Native temporary account is actually deleted');
  await assert.rejects(meshCommand({port:a.port,domain:'mjv-00000000000000000000000000000001',keyHex:b.keyHex},{action:'meshes'},{timeout:1000}));
  await runtime.stop(org);assert.equal(await runtime.isStopped(org),true);
  assert.equal(runtime.target('mjv-00000000000000000000000000000001'),null);

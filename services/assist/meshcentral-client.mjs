@@ -10,7 +10,7 @@ export function managementCookie(domain, keyHex, now = Date.now()) {
 }
 export async function meshCommand({port,domain,keyHex}, command, {WebSocketImpl = WebSocket, timeout = 8000} = {}) {
   if (!Number.isInteger(port) || port<1024 || port>65535) throw new Error('invalid_port');
-  if (!['meshes','createmesh','users','nodes'].includes(command.action)) throw new Error('unsupported_command');
+  if (!['meshes','createmesh','users','nodes','adduser','adddeviceuser','deleteuser'].includes(command.action)) throw new Error('unsupported_command');
   const correlation = randomUUID();
   const url = new URL(`ws://127.0.0.1:${port}/${domain}/control.ashx`);
   url.searchParams.set('auth',managementCookie(domain,keyHex));
@@ -57,4 +57,17 @@ export async function ensureLaptopGroup(identity, request = meshCommand) {
   const hash=group._id.slice(prefix.length);
   if(!/^[a-zA-Z0-9@$+=_-]{32,128}$/.test(hash))throw new Error('invalid_mesh_id');
   return {meshId:group._id,meshHash:hash};
+}
+
+export function viewerCookie(domain,username,keyHex){
+ if(!/^mjv-[a-f0-9]{32}$/.test(domain)||!/^mjv-session-[a-f0-9]{32}$/.test(username)||!/^[a-f0-9]{160}$/.test(keyHex))throw new Error('invalid_viewer_identity');
+ const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',Buffer.from(keyHex,'hex').subarray(0,32),iv);
+ const body=JSON.stringify({u:`user/${domain}/${username}`,a:3,time:Math.floor(Date.now()/1000)});
+ const payload=Buffer.concat([cipher.update(body,'utf8'),cipher.final()]);
+ return Buffer.concat([iv,cipher.getAuthTag(),payload]).toString('base64').replaceAll('+','@').replaceAll('/','$');
+}
+export function nativeUsers(data,domain){
+ const users=Array.isArray(data.users)?data.users:Object.values(data.users||{});
+ if(users.some(u=>typeof u._id!=='string'||!u._id.startsWith(`user/${domain}/`)))throw new Error('foreign_user');
+ return users;
 }

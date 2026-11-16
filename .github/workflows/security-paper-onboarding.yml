@@ -1,0 +1,31 @@
+name: Security paper onboarding contract tests
+on:
+  push:
+    branches:
+      - fix/security-paper-onboarding-parity-20261116
+    paths:
+      - 'src/components/Finance/ManualContractEntry.tsx'
+      - 'src/components/Finance/SecurityContractDetail.tsx'
+      - 'supabase/functions/generate-blank-contract-form/index.ts'
+      - 'supabase/migrations/20261116190000_security_paper_onboarding_statement_parity.sql'
+      - 'tests/security-onboarding/paper-parity.mjs'
+      - '.github/workflows/security-paper-onboarding.yml'
+  pull_request:
+    paths:
+      - 'src/components/Finance/ManualContractEntry.tsx'
+      - 'src/components/Finance/SecurityContractDetail.tsx'
+      - 'supabase/functions/generate-blank-contract-form/index.ts'
+      - 'supabase/migrations/20261116190000_security_paper_onboarding_statement_parity.sql'
+      - 'tests/security-onboarding/paper-parity.mjs'
+permissions:
+  contents: read
+jobs:
+  paper-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate paper onboarding source contracts
+        run: node tests/security-onboarding/paper-parity.mjs

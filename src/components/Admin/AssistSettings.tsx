@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Monitor } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
+import { AssistOperatorAccess } from './AssistOperatorAccess';
 import { supabase } from '../../lib/supabase';
 
 type Status = { enabled: boolean; provisioned: boolean; windows_download_ready: boolean; activation_state?: 'off' | 'activation_pending' | 'deactivation_pending' | 'needs_attention' | 'enrollment_ready' };
@@ -60,6 +61,7 @@ export function AssistSettings() {
     {status?.activation_state === 'needs_attention' && <button type="button" disabled={busy} onClick={() => void toggle(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-50">Retry setup</button>}
     <a href="/assist" className="inline-flex min-h-11 items-center text-sm font-semibold text-info">Open Remote Support</a>
     <p className="text-xs text-muted">Turning this off blocks new MJV downloads immediately and requests provider access revocation. Keep your current support tool until the pilot is approved.</p>
+    {organizationId && <AssistOperatorAccess organizationId={organizationId} />}
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
   </section>;
 }

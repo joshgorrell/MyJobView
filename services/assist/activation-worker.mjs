@@ -90,7 +90,7 @@ export function createHttpDependencies(env, fetchImpl = fetch) {
   }
   return {
     rpc: (name, body) => {
-      if (!['claim_assist_activation','finish_assist_activation','validate_assist_activation_lease','requeue_assist_runtime'].includes(name)) throw new Error('Unexpected RPC');
+      if (!['claim_assist_activation','finish_assist_activation','validate_assist_activation_lease','requeue_assist_runtime','assist_support_service'].includes(name)) throw new Error('Unexpected RPC');
       return request(`${database.origin}/rest/v1/rpc/${name}`, body,
         { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` });
     },

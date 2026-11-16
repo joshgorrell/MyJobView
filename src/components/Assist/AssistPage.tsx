@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Monitor, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Download, Monitor, RefreshCw } from 'lucide-react';
+import { EngineerConsole } from './EngineerConsole';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
 import { supabase } from '../../lib/supabase';
@@ -88,10 +89,7 @@ export default function AssistPage() {
         <button type="button" onClick={() => setRefresh(n => n + 1)} disabled={loading || busy}
           className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-info disabled:opacity-50"><RefreshCw size={16} />Refresh availability</button>
       </section>
-      <section className="rounded-xl border border-subtle bg-surface p-5 sm:p-6">
-        <h2 className="flex items-center gap-2 font-semibold text-primary"><ShieldCheck size={20} />Office engineers</h2>
-        <p className="mt-2 text-sm text-muted">Computer connections are not available here yet. Continue using your current support tool until the remote support pilot is approved.</p>
-      </section>
+      <EngineerConsole organizationId={organizationId!} />
     </div>
   );
 }

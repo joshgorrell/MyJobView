@@ -22,6 +22,7 @@ export function createControlPlane({store,runtime,validateLease,probe}){
   queues.set(id,result);void result.finally(()=>{if(queues.get(id)===result)queues.delete(id);}).catch(()=>{});return result;
  };
  return {
+  runExclusive:serialize,
   checkHealth(id){return serialize(id,async()=>{
    const state=await store.read(id);if(!state||!state.desired_enabled||state.phase!=='verified')return null;
    const domain=dealerDomain(id);

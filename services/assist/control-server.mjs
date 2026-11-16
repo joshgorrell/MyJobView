@@ -1,6 +1,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import {pathToFileURL} from 'node:url';
+import {createSupportBroker,validateSupportRequest} from './support-broker.mjs';
 import {createStateStore} from './state-store.mjs';
 import {createManagedRuntime} from './managed-runtime.mjs';
 import {createControlPlane,validControlToken,validateControlJob} from './control-core.mjs';
@@ -8,7 +9,7 @@ import {createHttpDependencies} from './activation-worker.mjs';
 
 async function readBody(request){let text='';for await(const chunk of request){text+=chunk;if(Buffer.byteLength(text)>8192)throw new Error('oversized_request');}return JSON.parse(text);}
 function respond(response,status,value){response.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(value));}
-export function createControlServer({plane,runtime,token}){
+export function createControlServer({plane,runtime,token,broker}){
  if(typeof token!=='string'||token.length<32)throw new Error('weak_control_token');
  const target=request=>{
   if(!request.url.startsWith('/'))return null;
@@ -17,6 +18,14 @@ export function createControlServer({plane,runtime,token}){
   const match=path.match(/^\/(mjv-[a-f0-9]{32})\//);return match?runtime.target(match[1]):null;
  };
  const server=http.createServer(async(request,response)=>{
+  if(request.url==='/v1/support'){
+   if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
+   if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
+   if(!broker)return respond(response,503,{error:'unavailable'});
+   let body;try{body=validateSupportRequest(await readBody(request));}catch{return respond(response,400,{error:'invalid_request'});}
+   try{return respond(response,200,await broker.handle(body));}
+   catch(error){return respond(response,error.message==='forbidden'?403:503,{error:'support_unavailable'});}
+  }
   if(request.url==='/v1/dealers/reconcile'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
@@ -60,7 +69,7 @@ export function createCanaryProbe(env,fetchImpl=fetch){
  };
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- let server,runtime,release,monitor;
+ let server,runtime,release,monitor,sessionMonitor;
  try{
   const env=process.env;const dependencies=createHttpDependencies(env);
   const store=createStateStore(env.ASSIST_STATE_DIRECTORY||'/var/lib/mjv-assist');release=await store.lock();
@@ -71,7 +80,10 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   await runtime.verifyVersion();
   const plane=createControlPlane({store,runtime,probe:createCanaryProbe(env),validateLease:job=>dependencies.rpc('validate_assist_activation_lease',{
    p_organization_id:job.organization_id,p_generation:job.generation,p_lease_token:job.lease_token})});
-  server=createControlServer({plane,runtime,token:env.ASSIST_CONTROL_TOKEN});
+  const broker=createSupportBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive});
+  server=createControlServer({plane,runtime,token:env.ASSIST_CONTROL_TOKEN,broker});
+  let sweeping=false;
+  sessionMonitor=setInterval(async()=>{if(sweeping)return;sweeping=true;try{await broker.sweep();}catch{console.error('Assist session revocation requires attention');}finally{sweeping=false;}},5000);
   const port=Number(env.ASSIST_CONTROL_PORT||8443);if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('invalid_control_port');
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   // On restart, old 'verified' journals do not imply a running or healthy child process.
@@ -85,10 +97,10 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    }}catch{console.error('Assist health check failed; operator attention required');}finally{checking=false;}
   },15*60*1000);
   console.log('MJV Assist control service listening on loopback');
-  const stop=async()=>{clearInterval(monitor);const closed=new Promise(r=>server.close(r));server.closeAllConnections();await runtime.stopAll();await closed;await release();process.exit(0);};
+  const stop=async()=>{clearInterval(monitor);clearInterval(sessionMonitor);const closed=new Promise(r=>server.close(r));server.closeAllConnections();await runtime.stopAll();await closed;await release();process.exit(0);};
   process.once('SIGTERM',()=>{void stop();});process.once('SIGINT',()=>{void stop();});
  }catch{
-  clearInterval(monitor);if(server)server.close();if(runtime)await runtime.stopAll().catch(()=>{});if(release)await release();
+  clearInterval(monitor);clearInterval(sessionMonitor);if(server)server.close();if(runtime)await runtime.stopAll().catch(()=>{});if(release)await release();
   console.error('MJV Assist control service could not start; verify platform configuration');process.exitCode=1;
  }
 }
