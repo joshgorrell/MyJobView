@@ -9,7 +9,7 @@ const migration = await readFile(new URL('../../supabase/migrations/202611161600
 assert.match(source, /PAPER_STATEMENT_MONTHLY_FEE = 5/);
 assert.match(source, /Manual billing requires mailed paper statements/);
 assert.match(source, /autopayRequired: input.paymentMode === 'autopay'/);
-assert.match(source, /paperFeeAnnual: paperFeeMonthly \* 12/);
+assert.match(source, /paperFeeAnnual: paperFeeMonthly,/);
 assert.match(source, /monitoringAnnual - savings \+ billing.paperFeeAnnual/);
 assert.match(migration, /mailed_paper_statements boolean NOT NULL DEFAULT false/);
 assert.match(migration, /security_billing_mode <> 'mail' OR mailed_paper_statements = true/);
@@ -27,5 +27,5 @@ assert.match(worker, /paperLines\.length!==1/);
 assert.match(worker, /paperLines\.length!==0/);
 assert.match(worker, /Paper statement fee itemization requires reconciliation/);
 assert.match(worker, /feeAmount===5 && feeQuantity===1 && feeUnitPrice===5/);
-assert.match(worker, /feeAmount===5 && feeQuantity===1 && feeUnitPrice===5/);
+assert.doesNotMatch(worker, /feeAmount===60/);
 console.log('Statement billing source contract checks passed');
