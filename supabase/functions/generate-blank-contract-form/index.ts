@@ -490,7 +490,12 @@ ${branding.css}
       <div class="checkbox-field"><span class="checkbox"></span><span>Monthly</span></div>
       ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual monitoring total before tax at the regular rate: ${annualTotal.toFixed(2)}.</p>` : ''}
     </div>
-    ${contract.billing_mode === 'mail' ? `<p class="note">Admin-approved mailed invoices. Mailed billing is included in the overall account price above.</p>` : `
+    <div class="field-group"><div class="field-label">Billing Statement Delivery (Check One)</div>
+      <div class="checkbox-field"><span class="checkbox"></span><span>Electronic statements (included free)</span></div>
+      <div class="checkbox-field"><span class="checkbox"></span><span>Mailed paper statements (+$5 for each statement mailed)</span></div>
+      <p class="note">Statement delivery is separate from signing this paper agreement. Mailed statements do not replace AutoPay.</p>
+    </div>
+    ${contract.billing_mode === 'mail' ? `<p class="note">Administrator-approved manual invoice billing; mailed statements required.</p>` : `
     <div class="field-group" style="margin-top: 16px;">
       <div class="field-label">Payment Method (Check One)</div>
       <div class="checkbox-field">
