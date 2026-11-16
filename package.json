@@ -84,7 +84,8 @@
     "test:tech-stats:browser": "npm run build && node tests/labor-dashboard/production-browser.mjs",
     "test:techsafe:dispatch": "node tests/techsafe/draft-dispatch.mjs && node tests/techsafe/source-reread-canonical.mjs && node tests/techsafe/draft-http-transport.mjs",
     "test:lead-proposal-conversion": "node tests/leads/proposal-conversion-contract.mjs && node tests/leads/pipeline-stage-contract.mjs && node tests/leads/proposal-conversion-database.mjs",
-    "test:pipeline-stages": "node tests/leads/pipeline-stage-contract.mjs && node tests/leads/proposal-conversion-database.mjs"
+    "test:pipeline-stages": "node tests/leads/pipeline-stage-contract.mjs && node tests/leads/proposal-conversion-database.mjs",
+    "test:assist": "node tests/assist/database.mjs && node tests/assist/activation-database.mjs && node tests/assist/activation-worker.mjs && node tests/assist/control-service.mjs && node tests/assist/engineer-database.mjs && node tests/assist/support-broker.mjs && node tests/navigation/workspace-routes.mjs && node tests/assist/browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

@@ -69,6 +69,7 @@ interface ServiceRequest extends ServiceApprovalFields {
 }
 
 const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active Requests' },
   { value: 'all', label: 'All Statuses' },
   { value: 'open', label: 'Ready to Schedule' },
   { value: 'pending_customer', label: 'Pending – Waiting on Customer' },
@@ -142,7 +143,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const loadVersion = useRef(0);
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('active');
   const [filterContact, setFilterContact] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -198,7 +199,9 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
           : query.eq('created_by', profile!.id);
       }
 
-      if (filterStatus !== 'all') {
+      if (filterStatus === 'active') {
+        query = query.not('status', 'in', '(closed,cancelled)');
+      } else if (filterStatus !== 'all') {
         query = query.eq('status', filterStatus);
       }
 

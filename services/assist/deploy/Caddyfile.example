@@ -1,0 +1,11 @@
+# Replace these two platform hostnames once; no per-dealer DNS is needed.
+assist.myjobview.com {
+    @platformControl path /v1/*
+    respond @platformControl 404
+    reverse_proxy 127.0.0.1:8443
+}
+assist-control.myjobview.com {
+    @otherPaths not path /v1/dealers/reconcile /v1/support
+    respond @otherPaths 404
+    reverse_proxy 127.0.0.1:8443
+}

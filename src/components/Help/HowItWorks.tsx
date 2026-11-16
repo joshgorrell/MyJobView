@@ -12,6 +12,11 @@ export function HowItWorks() {
           </div>
 
           <div className="space-y-6 sm:space-y-12">
+            <section className="rounded-xl bg-blue-50 p-4">
+              <h2 className="text-lg font-semibold text-gray-900">Remote Support</h2>
+              <p className="mt-1 text-sm text-gray-700">Set up a Windows laptop for help from your office engineers.</p>
+              <a href="/assist" className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Open Remote Support</a>
+            </section>
             <section>
               <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-6">
                 <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 flex-shrink-0" />

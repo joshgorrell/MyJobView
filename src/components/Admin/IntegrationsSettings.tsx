@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, ChevronRight } from 'lucide-react';
+import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, CheckCircle2, ShieldCheck, ChevronRight } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
 import { RingCentralSettings } from './RingCentralSettings';
 import { TechsafeSettings } from './TechsafeSettings';
+import { AssistSettings } from './AssistSettings';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CompanySettings {
   google_maps_api_key?: string;
@@ -34,7 +36,7 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
-const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe'] as const;
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe', 'assist'] as const;
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
@@ -43,6 +45,11 @@ function integrationFromUrl(): IntegrationId {
 }
 
 export function IntegrationsSettings() {
+  const { profile } = useAuth();
+  const [quickbooksConnected, setQuickbooksConnected] = useState(false);
+  const [quickbooksPayments, setQuickbooksPayments] = useState(false);
+  const [ringcentralConnected, setRingcentralConnected] = useState(false);
+  const [techsafeConnected, setTechsafeConnected] = useState(false);
   const [activeIntegration, setActiveIntegration] = useState<IntegrationId>(integrationFromUrl);
   function selectIntegration(id: IntegrationId) {
     setActiveIntegration(id);
@@ -95,6 +102,33 @@ export function IntegrationsSettings() {
     loadSettings();
     loadPaymentSettings();
   }, []);
+
+  // Load connection summaries even for panels that have never been opened.
+  // Only read public status metadata, never OAuth tokens or private credentials.
+  useEffect(() => {
+    let cancelled = false;
+    const organizationId = profile?.organization_id;
+    if (!organizationId) return;
+    async function refreshConnections() {
+      const results = await Promise.allSettled([
+        supabase.from('quickbooks_settings').select('is_connected, payments_enabled')
+          .eq('organization_id', organizationId!).maybeSingle(),
+        supabase.functions.invoke('ringcentral-connection-management', { method: 'GET' }),
+        supabase.rpc('get_techsafe_integration_status'),
+      ]);
+      if (cancelled) return;
+      const [qbo, ringcentral, techsafe] = results.map(result =>
+        result.status === 'fulfilled' && !result.value.error ? result.value.data : null);
+      setQuickbooksConnected(qbo?.is_connected === true);
+      setQuickbooksPayments(qbo?.is_connected === true && qbo?.payments_enabled === true);
+      setRingcentralConnected(Array.isArray(ringcentral?.connections) &&
+        ringcentral.connections.some((connection: { status?: string }) => connection.status === 'connected'));
+      setTechsafeConnected(typeof techsafe?.activeConnections === 'number' && techsafe.activeConnections > 0);
+    }
+    void refreshConnections();
+    window.addEventListener('focus', refreshConnections);
+    return () => { cancelled = true; window.removeEventListener('focus', refreshConnections); };
+  }, [profile?.organization_id, activeIntegration]);
 
   async function loadSettings() {
     try {
@@ -385,102 +419,46 @@ export function IntegrationsSettings() {
         </div>
       )}
 
-      {/* Integration Tabs */}
+      {/* Checks describe saved configuration/connection, not verified delivery. */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-1 flex-wrap -mb-px">
-          <button
-            onClick={() => selectIntegration('payment_processor')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'payment_processor'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            Payment Processor
-            {paymentSettings.payment_processor && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-medium">Active</span>
-            )}
-          </button>
-          <button
-            onClick={() => selectIntegration('quickbooks')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'quickbooks'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            QuickBooks
-          </button>
-          <button
-            onClick={() => selectIntegration('google_maps')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'google_maps'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Map className="w-4 h-4" />
-            Google Maps
-          </button>
-
-          <button
-            onClick={() => selectIntegration('techsafe')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'techsafe' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
-          >
-            <Check className="w-4 h-4" />
-            Techsafe
-          </button>
-          <button
-            onClick={() => selectIntegration('ringcentral')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'ringcentral'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            RingCentral
-          </button>
-          <button
-            onClick={() => selectIntegration('twilio')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'twilio'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4" />
-            Twilio SMS
-          </button>
-          <button
-            onClick={() => selectIntegration('resend')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'resend'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Mail className="w-4 h-4" />
-            Email / Resend
-          </button>
-          <button
-            onClick={() => selectIntegration('openai')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeIntegration === 'openai'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            OpenAI / ChatGPT
+        <nav className="flex gap-1 flex-wrap -mb-px" aria-label="Third-party integrations">
+          {([
+            { id: 'payment_processor', label: 'Payment Processor', icon: CreditCard,
+              used: originalPaymentSettings.payment_processor === 'quickbooks' ? quickbooksPayments :
+                originalPaymentSettings.payment_processor === 'stripe' ? !!(originalPaymentSettings.stripe_invoice_publishable_key && originalPaymentSettings.has_stripe_invoice_secret_key) :
+                originalPaymentSettings.payment_processor === 'bill_com' ? !!(originalPaymentSettings.bill_com_org_id && originalPaymentSettings.has_bill_com_api_key) : false,
+              status: 'Payment processor configured' },
+            { id: 'quickbooks', label: 'QuickBooks', icon: DollarSign, used: quickbooksConnected, status: 'Connected' },
+            { id: 'google_maps', label: 'Google Maps', icon: Map, used: !!originalSettings.google_maps_api_key?.trim(), status: 'API key saved' },
+            { id: 'techsafe', label: 'Techsafe', icon: ShieldCheck, used: techsafeConnected, status: 'Active connection registered' },
+            { id: 'ringcentral', label: 'RingCentral', icon: MessageSquare, used: ringcentralConnected, status: 'Connected' },
+            { id: 'twilio', label: 'Twilio SMS', icon: MessageSquare,
+              used: !!(originalSettings.twilio_account_sid?.trim() && originalSettings.twilio_phone_number?.trim() && originalSettings.has_twilio_auth_token), status: 'SMS credentials saved' },
+            { id: 'resend', label: 'Email / Resend', icon: Mail, used: !!originalSettings.from_email?.trim(), status: 'Sender settings saved; domain verification managed in Resend' },
+            { id: 'openai', label: 'OpenAI / ChatGPT', icon: Sparkles, used: originalSettings.has_openai_api_key === true, status: 'API key saved' },
+          ] satisfies Array<{ id: IntegrationId; label: string; icon: typeof CreditCard; used: boolean; status: string }>).map(({ id, label, icon: Icon, used, status }) => (
+            <button key={id} type="button" onClick={() => selectIntegration(id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeIntegration === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}>
+              <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {label}
+              {used && <span title={status} className="inline-flex shrink-0">
+                <CheckCircle2 className="w-4 h-4 text-green-500" aria-hidden="true" />
+                <span className="sr-only">{status}</span>
+              </span>}
+            </button>
+          ))}
+          <button type="button" onClick={() => selectIntegration('assist')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
+            Remote Support
           </button>
         </nav>
       </div>
 
-      {activeIntegration === 'ringcentral' && <RingCentralSettings />}
-      {activeIntegration === 'techsafe' && <TechsafeSettings />}
+      {activeIntegration === 'ringcentral' && <RingCentralSettings onConnectionChange={setRingcentralConnected} />}
+      {activeIntegration === 'techsafe' && <TechsafeSettings onConnectionChange={setTechsafeConnected} />}
+      {activeIntegration === 'assist' && <AssistSettings />}
 
       {/* Payment Processor Integration */}
       {activeIntegration === 'payment_processor' && (
@@ -722,7 +700,7 @@ export function IntegrationsSettings() {
       {/* QuickBooks Integration */}
       {activeIntegration === 'quickbooks' && (
         <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
-          <QuickBooksSettings />
+          <QuickBooksSettings onConnectionChange={setQuickbooksConnected} onPaymentsChange={setQuickbooksPayments} />
         </div>
       )}
 
