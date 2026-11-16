@@ -75,10 +75,7 @@ Deno.serve(async (req: Request) => {
     const termsText = (contract.template?.contract_terms || 'Terms and conditions unavailable.').replaceAll('[term]', `${contract.term_months || ''} months`);
 
     const annualBase = Math.max(0, Number(contract.monthly_price || 0) - Number(contract.mail_invoice_fee || 0)) * 12;
-    const annualDiscount = contract.dealer?.annual_discount_type === 'percentage'
-      ? Math.round(annualBase * Number(contract.dealer.annual_discount_percentage || 0)) / 100
-      : Math.min(annualBase, Number(contract.dealer?.annual_discount_flat_amount || 0));
-    const annualTotal = annualBase - annualDiscount + Number(contract.mail_invoice_fee || 0) * 12;
+    const annualMonitoringTotal = annualBase;
     const branding = securityAgreementBranding(contract.dealer);
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -491,9 +488,14 @@ ${branding.css}
     </div>
     <div class="field-group"><div class="field-label">Billing Frequency (Check One)</div>
       <div class="checkbox-field"><span class="checkbox"></span><span>Monthly</span></div>
-      ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual discount: ${escapeHtml(contract.dealer.annual_discount_type === 'percentage' ? `${contract.dealer.annual_discount_percentage || 0}%` : `$${Number(contract.dealer.annual_discount_flat_amount || 0).toFixed(2)}`)}. Annual monitoring total before tax: $${annualTotal.toFixed(2)}.</p>` : ''}
+      ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual monitoring before tax: ${annualMonitoringTotal.toFixed(2)} per year. If mailed statements are selected, add $5 per annual mailing (or $5 for each monthly mailing).</p>` : ''}
     </div>
-    ${contract.billing_mode === 'mail' ? `<p class="note">Admin-approved mailed invoices. Mailed billing is included in the overall account price above.</p>` : `
+    <div class="field-group"><div class="field-label">Billing Statement Delivery (Check One)</div>
+      <div class="checkbox-field"><span class="checkbox"></span><span>Electronic statements (included free)</span></div>
+      <div class="checkbox-field"><span class="checkbox"></span><span>Mailed paper statements (+$5 for each statement mailed)</span></div>
+      <p class="note">Statement delivery is separate from signing this paper agreement. Mailed statements do not replace AutoPay.</p>
+    </div>
+    ${contract.billing_mode === 'mail' ? `<p class="note">Administrator-approved manual invoice billing; mailed statements required.</p>` : `
     <div class="field-group" style="margin-top: 16px;">
       <div class="field-label">Payment Method (Check One)</div>
       <div class="checkbox-field">

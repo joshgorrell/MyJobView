@@ -201,6 +201,17 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
     }
   }
 
+  async function handleViewSignedPaper() {
+    const path = contractData?.onboarding_agreement_snapshot?.signed_agreement_path;
+    if (!path || !canManage) return;
+    const { data, error } = await supabase.storage.from('security-signed-agreements').createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) {
+      notify(error?.message || 'Unable to open signed paper agreement', { theme: 'emerald', tone: 'error' });
+      return;
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  }
+
   function handlePrint() {
     const d = contractData;
     if (d?.onboarding_agreement_snapshot) {
@@ -374,6 +385,11 @@ export default function SecurityContractDetail({ contract, contractId, onClose, 
                   <Printer className="w-4 h-4" />
                   Print Contract
                 </button>
+                {canManage && contractData.onboarding_agreement_snapshot?.signed_agreement_path && (
+                  <button type="button" onClick={handleViewSignedPaper} className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+                    View Signed Paper Original
+                  </button>
+                )}
                 {contractData.onboarding_original_snapshot?.document && <button type="button" onClick={() => {
                   const original = contractData.onboarding_original_snapshot;
                   const terms = readableAgreementTerms(original.document.template?.contract_terms || '').replace(/\[term\]/g, `${original.document.term_months} months`);
