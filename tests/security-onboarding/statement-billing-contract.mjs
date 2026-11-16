@@ -16,4 +16,6 @@ assert.match(migration, /security_billing_mode <> 'mail' OR mailed_paper_stateme
 assert.match(migration, /Only an Admin may change mailed paper statements/);
 assert.match(migration, /OLD.customer_completed_at IS NOT NULL/);
 assert.match(migration, /organization_id = NEW.organization_id AND role = 'admin'/);
+assert.match(migration, /'mailedPaperStatements', CASE WHEN jsonb_typeof\(p_form->'mailedPaperStatements'\) = 'boolean'/);
+assert.match(migration, /ELSE false END/);
 console.log('Statement billing source contract checks passed');
