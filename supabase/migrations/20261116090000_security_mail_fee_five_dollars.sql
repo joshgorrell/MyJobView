@@ -1,5 +1,5 @@
 -- All security accounts are new to MJV: standardize the mailed-invoice fee
--- to $5/month. No historical $7 account grandfathering is necessary.
+-- to $5/month. No customer accounts require grandfathering.
 ALTER TABLE public.security_contracts
   DROP CONSTRAINT IF EXISTS security_contracts_mail_invoice_fee_check;
 ALTER TABLE public.security_contracts
