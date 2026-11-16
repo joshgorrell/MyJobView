@@ -44,7 +44,7 @@ let tree=view.run('SalesServiceRequestsView',{ownOnly:true});
 assert.ok(queries[0].filters.some(([k,v])=>k==='created_by'&&v==='creator'),'My Requests filters by actual creator, including admins');
 assert.ok(queries[0].filters.some(([k,v])=>k==='organization_id'&&v==='org'),'Organization is explicit');
 assert.match(text(tree),/Waiting on Customer/);
-nodes(tree).find(n=>n.props?.onClick&&n.type==='div'&&n.props.className==='p-4 cursor-pointer').props.onClick();
+nodes(tree).find(n=>n.type==='CompactRequestRow').props.onToggle();
 tree=view.run('SalesServiceRequestsView',{ownOnly:true});
 assert.ok(nodes(tree).some(n=>n.type==='ContactLogHistory'),'Creator can read contact notes');
 source=[{...source[0],status:'closed'}];

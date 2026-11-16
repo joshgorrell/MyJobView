@@ -1,3 +1,4 @@
+import { CompactRequestRow } from '../Shared/CompactRequestRow';
 import { ServiceApprovalPanel } from '../Service/ServiceApprovalPanel';
 import type { ServiceApprovalFields } from '../../lib/serviceApproval';
 import { useState, useEffect, useRef } from 'react';
@@ -26,6 +27,7 @@ import { ContactLogHistory } from '../Shared/ContactLogHistory';
 import { ContactQuickViewModal } from '../Shared/ContactQuickViewModal';
 
 interface ServiceRequest extends ServiceApprovalFields {
+  created_by_profile?: { full_name: string } | null;
   id: string;
   created_at: string;
   customer_name: string;
@@ -172,6 +174,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
           work_order_id, service_approval_required, service_terms, service_accepted_at, service_accepted_by, service_payment_method_id, service_waived_at, service_waived_by, service_waiver_reason,
           service_waived_by_profile:profiles!service_requests_service_waived_by_fkey (full_name),
           contacts (id, company_name, full_name),
+          created_by_profile:profiles!service_requests_created_by_fkey (full_name),
           contact_confirmed_by_profile:profiles!service_requests_customer_contact_confirmed_by_fkey (
             id, full_name
           ),
@@ -240,7 +243,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-primary">My Service Requests</h2>
-          <p className="text-sm text-muted mt-0.5">
+          <p className="hidden sm:block text-sm text-muted mt-0.5">
             Track your submitted service requests and customer contact status
           </p>
         </div>
@@ -255,7 +258,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="hidden sm:grid grid-cols-4 gap-3">
         <div className="bg-canvas rounded-xl border border-subtle p-4 shadow-sm">
           <div className="text-2xl font-bold text-primary">{requests.length}</div>
           <div className="text-xs text-muted mt-0.5">Total Requests</div>
@@ -320,7 +323,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-0 sm:space-y-2">
           {requests.map((request) => {
             const isExpanded = expandedId === request.id;
             const contactConfirmed = !!(request.customer_contact_confirmed_at || request.work_order?.customer_contact_confirmed_at);
@@ -338,8 +341,9 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
                     : 'border-subtle'
                 }`}
               >
+                <CompactRequestRow customer={request.customer_name} description={request.job_description} status={getStatusLabel(request.status)} creator={request.created_by_profile?.full_name} createdAt={request.created_at} expanded={isExpanded} onToggle={() => setExpandedId(isExpanded ? null : request.id)} />
                 {/* Kickback banner */}
-                {request.status === 'needs_more_info' && request.kickback_reason && (
+                {request.status === 'needs_more_info' && request.kickback_reason && isExpanded && (
                   <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border-b border-amber-200 rounded-t-xl">
                     <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                     <div>
@@ -357,7 +361,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
                 )}
 
                 <div
-                  className="p-4 cursor-pointer"
+                  className="hidden sm:block p-4 cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : request.id)}
                 >
                   <div className="flex flex-col sm:flex-row items-start gap-3">

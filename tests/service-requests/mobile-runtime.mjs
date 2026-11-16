@@ -22,6 +22,7 @@ function harness(path, globals = {}, imports = {}) {
       if (name.endsWith('/serviceApproval')) return {sendServiceApproval:async()=>{},serviceApprovalPending:r=>!!r.service_approval_required&&!r.service_waived_at&&(!r.service_accepted_at||!r.service_payment_method_id)};
       if (name.endsWith('/ContactLogModal')) return {ContactLogModal:'ContactLogModal'};
       if (name.endsWith('/ContactLogHistory')) return {ContactLogHistory:'ContactLogHistory'};
+      if (name.endsWith('/CompactRequestRow')) return {CompactRequestRow:'CompactRequestRow'};
       if (name.endsWith('/SupportPhotos')) return {SupportPhotos:'SupportPhotos'};
       if (name.endsWith('/SupportRequestItems')) return {SupportRequestItems:'SupportRequestItems'};
       if (name.endsWith('.css')) return {};
@@ -63,3 +64,4 @@ const checkboxes=()=>nodes(tree).filter(n=>n.type==='input'&&n.props.type==='che
 button('Filters').props.onClick();render();assert.equal(nodes(tree).filter(n=>n.type==='select').length,2);
 requests[1].contact_id='c1';requests[1].billable_type=requests[0].billable_type;requests[1].job_location_address='Different location';render();assert.equal(checkboxes().length,1,'Different service locations cannot be combined');requests[1].job_location_address=requests[0].job_location_address;render();assert.equal(checkboxes().length,2,'Compatible requests can be combined');
 console.log('Queue expansion, direct scheduling handoff, filters, and single-customer selection preserved.');
+
