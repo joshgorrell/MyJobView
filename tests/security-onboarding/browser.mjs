@@ -325,7 +325,7 @@ manualFail=false;await manualPage.getByRole('button',{name:'Retry',exact:true}).
 await manualPage.getByRole('heading',{name:'Manual Contract Entry'}).waitFor();
 assert.equal(await manualPage.getByRole('combobox',{name:'Billing preference'}).inputValue(),'annual');
 assert.equal(await manualPage.getByPlaceholder('Full name',{exact:true}).count(),2);
-assert.ok((await manualPage.locator('body').innerText()).includes('Admin-approved mailed invoices'));
+await manualPage.getByText('Admin-approved manual invoice billing requires mailed statements.',{exact:true}).waitFor();
 manualPage.once('dialog',dialog=>dialog.dismiss());await manualPage.getByPlaceholder('Full name',{exact:true}).first().fill('First Contact');
 await manualPage.getByRole('button',{name:'Cancel',exact:true}).click();assert.notEqual(await manualPage.title(),'Manual entry closed');
 for(let n=0;n<2;n++){
