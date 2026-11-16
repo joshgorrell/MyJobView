@@ -13,7 +13,7 @@ await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_
  ('${id(10)}','${id(1)}','tech',true),('${id(11)}','${id(1)}','admin',true),
  ('${id(12)}','${id(1)}','portal_user',true),('${id(13)}','${id(1)}','admin',false),
  ('${id(20)}','${id(2)}','admin',true);`);
-await db.exec(await readFile('supabase/migrations/20261116153609_assist_windows_enrollment.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261116192118_assist_windows_enrollment.sql','utf8'));
 const as = async (n, sql) => {
  await db.exec(`RESET ROLE; SELECT set_config('test.uid','${n ? id(n) : ''}',false); SET ROLE authenticated;`);
  return db.query(sql);

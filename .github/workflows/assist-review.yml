@@ -49,6 +49,7 @@ jobs:
       - run: npm ci --ignore-scripts --prefix services/assist
       - run: node services/assist/runtime-security.mjs
       - run: node tests/assist/runtime-security.mjs
+      - run: node tests/assist/configure-backend.mjs
       - run: node tests/assist/native-smoke.mjs
       - run: npm run typecheck
       - run: npm run build

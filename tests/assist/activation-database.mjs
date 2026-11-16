@@ -8,7 +8,7 @@ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_ro
  CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid REFERENCES organizations,role text,is_active boolean DEFAULT true);
  INSERT INTO organizations(id) VALUES('${id(1)}'),('${id(2)}');
  INSERT INTO profiles VALUES('${id(10)}','${id(1)}','admin',true),('${id(11)}','${id(1)}','tech',true),('${id(20)}','${id(2)}','admin',true);`);
-for(const f of ['20261116153609_assist_windows_enrollment.sql','20261116155804_assist_activation_lifecycle.sql','20261116162538_assist_runtime_recovery.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+for(const f of ['20261116192118_assist_windows_enrollment.sql','20261116192146_assist_activation_lifecycle.sql','20261116192148_assist_runtime_recovery.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
 const actor=async(n,sql)=>{await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SET ROLE authenticated;`);return db.query(sql);};
 const service=async(sql,args)=>{await db.exec('RESET ROLE;SET ROLE service_role');return db.query(sql,args);};
 const toggle=(org,value)=>`SELECT set_assist_enabled('${id(org)}',${value}) AS v`;
