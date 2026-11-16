@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
     const termsText = (contract.template?.contract_terms || 'Terms and conditions unavailable.').replaceAll('[term]', `${contract.term_months || ''} months`);
 
     const annualBase = Math.max(0, Number(contract.monthly_price || 0) - Number(contract.mail_invoice_fee || 0)) * 12;
-    const annualTotal = annualBase + (Number(contract.mail_invoice_fee || 0) > 0 ? 5 : 0);
+    const annualMonitoringTotal = annualBase;
     const branding = securityAgreementBranding(contract.dealer);
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -488,7 +488,7 @@ ${branding.css}
     </div>
     <div class="field-group"><div class="field-label">Billing Frequency (Check One)</div>
       <div class="checkbox-field"><span class="checkbox"></span><span>Monthly</span></div>
-      ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual monitoring total before tax at the regular rate: ${annualTotal.toFixed(2)}.</p>` : ''}
+      ${contract.dealer?.annual_billing_enabled ? `<div class="checkbox-field"><span class="checkbox"></span><span>Annual</span></div><p>Annual monitoring before tax: ${annualMonitoringTotal.toFixed(2)} per year. If mailed statements are selected, add $5 per annual mailing (or $5 for each monthly mailing).</p>` : ''}
     </div>
     <div class="field-group"><div class="field-label">Billing Statement Delivery (Check One)</div>
       <div class="checkbox-field"><span class="checkbox"></span><span>Electronic statements (included free)</span></div>
