@@ -47,7 +47,7 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
   if (error) return <p>{error}</p>;
   if (!request) return <p>Loading service request details…</p>;
   const scheduled = request.work_order && !['cancelled'].includes(request.work_order.status) && !!request.work_order.scheduled_date;
-  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm leading-snug">
+  return <div className="grid grid-cols-1 sm:grid-cols-2 min-w-0 gap-x-4 gap-y-2 text-sm leading-snug [overflow-wrap:anywhere]">
     <p><strong>Customer:</strong> {request.contact_id ? <a className="text-info hover:underline" href={`?tab=contacts&contactId=${encodeURIComponent(request.contact_id)}`} aria-label={`Open ${request.customer_name} customer record`}>{request.customer_name} ↗</a> : request.customer_name}</p>
     <p><strong>Priority:</strong> {request.priority}</p>
     <p className="sm:col-span-2"><strong>Work requested:</strong> {request.job_description}</p>
@@ -57,9 +57,9 @@ export function ServiceRequestFlowDetail({ requestId }: { requestId: string }) {
     {!request.work_order && <p>Not yet scheduled</p>}
     <div className="sm:col-span-2 flex flex-wrap gap-2 py-1">
       {(['Edit', 'Assign', 'Schedule', 'Close', 'Cancel'] as const).map(action => (
-        <a key={action} className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=service_requests&serviceRequestId=${encodeURIComponent(request.id)}&serviceRequestAction=${action.toLowerCase()}`}>{action} ↗</a>
+        <a key={action} className="inline-flex min-h-11 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=service_requests&serviceRequestId=${encodeURIComponent(request.id)}&serviceRequestAction=${action.toLowerCase()}`}>{action} ↗</a>
       ))}
-      {request.work_order && <a className="inline-flex min-h-10 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=work_orders&workOrderId=${encodeURIComponent(request.work_order.id)}`}>Open work order ↗</a>}
+      {request.work_order && <a className="inline-flex min-h-11 items-center rounded-lg border border-strong px-3 text-primary" href={`?tab=work_orders&workOrderId=${encodeURIComponent(request.work_order.id)}`}>Open work order ↗</a>}
     </div>
     {(request.earliest_date || request.requested_date) && <p><strong>Requested dates:</strong> {[request.earliest_date, request.requested_date].filter(Boolean).join(" – ")} (not guaranteed)</p>}
     {request.requested_tech_ids?.length ? <p><strong>Preferred technicians:</strong> {preferredTechNames.length ? preferredTechNames.join(', ') : `${request.requested_tech_ids.length} requested`}</p> : null}

@@ -235,7 +235,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-4 [overflow-wrap:anywhere]">
       {loadError && <p role="alert" className="text-sm text-red-600">{loadError} <button type="button" onClick={() => void loadRequests()} className="underline">Retry</button></p>}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -285,7 +285,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-canvas border border-subtle rounded-lg text-sm text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-canvas border border-subtle rounded-lg text-base sm:text-sm text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {STATUS_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -297,7 +297,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
               <select
                 value={filterContact}
                 onChange={(e) => setFilterContact(e.target.value)}
-                className="w-full px-3 py-2 bg-canvas border border-subtle rounded-lg text-sm text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-canvas border border-subtle rounded-lg text-base sm:text-sm text-primary focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 {CONTACT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -360,7 +360,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
                   className="p-4 cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : request.id)}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex flex-col sm:flex-row items-start gap-3">
                     <div className="flex-1 min-w-0">
                       {/* Badge row */}
                       <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -409,7 +409,7 @@ export function SalesServiceRequestsView({ ownOnly = false }: { ownOnly?: boolea
                     </div>
 
                     {/* Contact status badge — right side */}
-                    <div className="shrink-0 flex flex-col items-end gap-2">
+                    <div className="flex w-full sm:w-auto shrink-0 flex-row flex-wrap sm:flex-col items-start sm:items-end gap-2">
                       {contactConfirmed ? (
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
                           <PhoneCall className="w-3.5 h-3.5" />
