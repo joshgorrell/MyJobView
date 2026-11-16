@@ -309,13 +309,15 @@ await summaryPage.close();
 const manualContext=await browser.newContext({viewport:{width:390,height:844}});
 let manualFail=true,manualSubmitted=false;
 await manualContext.route('https://security-test.supabase.co/**',async route=>{
- const req=route.request(),body=req.postData()?req.postDataJSON():null;
- if(req.url().includes('/rest/v1/security_contracts')) return route.fulfill({json:{id:'manual-contract',contact:{full_name:'Paper Customer',email:'paper@example.com',phone:'5551112222',street_address:'10 Paper Lane',city:'Anytown',state:'IL',zip_code:'60001'},account_type:'residential',emergency_contacts:[]}});
+ const req=route.request();
+ if(req.url().includes('/storage/v1/object/security-signed-agreements/')) return route.fulfill({json:{Key:'org-1/manual-contract/test.pdf'}});
+ const body=req.postData()?req.postDataJSON():null;
+ if(req.url().includes('/rest/v1/security_contracts')) return route.fulfill({json:{id:'manual-contract',organization_id:'org-1',contact:{full_name:'Paper Customer',email:'paper@example.com',phone:'5551112222',street_address:'10 Paper Lane',city:'Anytown',state:'IL',zip_code:'60001'},account_type:'residential',emergency_contacts:[]}});
  if(body?.p_action==='get') {
   if(manualFail)return route.fulfill({status:500,json:{message:'Unable to load agreement terms'}});
   return route.fulfill({json:{status:'draft',document_version:'paper-version',document:{billing_mode:'mail',billingPreference:'annual',dealer:{annual_billing_enabled:true}}}});
  }
- if(body?.p_action==='paper'){manualSubmitted=true;assert.equal(body.p_payload.form_data.billingPreference,'annual');assert.equal(body.p_payload.paper_signed,true);return route.fulfill({json:{success:true}});}
+ if(body?.p_action==='paper'){manualSubmitted=true;assert.equal(body.p_payload.form_data.billingPreference,'annual');assert.equal(body.p_payload.paper_signed,true);assert.equal(body.p_payload.paper_signature_date,'2026-11-16');assert.ok(body.p_payload.signed_agreement_path.startsWith('org-1/manual-contract/'));return route.fulfill({json:{success:true}});}
  return route.fulfill({json:[]});
 });
 const manualPage=await manualContext.newPage();await manualPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?manual');
@@ -333,7 +335,9 @@ for(let n=0;n<2;n++){
  await manualPage.getByPlaceholder('Phone number',{exact:true}).nth(n).fill('555111222'+n);
  await manualPage.getByPlaceholder('Unique password',{exact:true}).nth(n).fill('word-'+n);
 }
-await manualPage.getByRole('checkbox',{name:/I have the customer's signed paper/}).check();
+await manualPage.getByLabel('Customer paper signature date').fill('2026-11-16');
+await manualPage.getByLabel('Upload signed agreement (PDF, JPG or PNG, max 15 MB)').setInputFiles({name:'signed-test.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\nSynthetic browser-test agreement\n%%EOF')});
+await manualPage.getByRole('checkbox',{name:/I have reviewed the signed paper agreement/}).check();
 manualPage.once('dialog',dialog=>dialog.accept());await manualPage.getByRole('button',{name:'Save Contract Information'}).click();
 await manualPage.waitForFunction(()=>document.title==='Manual entry submitted');assert.equal(manualSubmitted,true);
 await manualContext.close();
