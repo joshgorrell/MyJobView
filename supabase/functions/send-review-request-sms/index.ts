@@ -73,7 +73,7 @@ Deno.serve(async (req: Request) => {
     // The caller must be permitted to read this contact under RLS.
     const { data: contact, error: contactError } = await callerDb
       .from("contacts")
-      .select("phone, mobile_phone, contact_name, full_name, sms_opt_in")
+      .select("phone, contact_name, full_name, sms_opt_in")
       .eq("id", contactId)
       .single();
 
@@ -87,7 +87,7 @@ Deno.serve(async (req: Request) => {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const recipientPhone = contact.mobile_phone || contact.phone;
+    const recipientPhone = contact.phone;
     const recipientName = contact.full_name || contact.contact_name || "Customer";
     if (!recipientPhone) {
       return new Response(JSON.stringify({ error: "Contact has no phone number" }), {
