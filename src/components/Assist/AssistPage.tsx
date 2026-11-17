@@ -61,7 +61,7 @@ export default function AssistPage() {
     }
   }
 
-  if (tenantLoading) return <div className="p-6 text-muted" role="status">Loading dealer…</div>;
+  if (tenantLoading) return <div className="p-6 text-muted" role="status">Loading Assist…</div>;
   if (!allowed) return <div className="p-6 text-primary" role="alert">Remote support is available only to active employees in their own dealer workspace.</div>;
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 p-4 lg:px-6">
@@ -76,22 +76,21 @@ export default function AssistPage() {
             className="block h-auto w-full"
           />
         </div>
-        <p className="text-sm text-muted">{tenant?.organizationName || 'Your dealer'} · Help for your on-site laptop</p>
       </header>
       <div className="grid items-start gap-4 lg:grid-cols-2">
       <section className="min-w-0 rounded-xl border border-subtle bg-surface p-4">
-        <h2 className="text-lg font-semibold text-primary">Set up this Windows laptop</h2>
-        <p className="mt-1 text-sm text-muted">Install the support app once so your office engineers can help with your computer.</p>
+        <h2 className="text-lg font-semibold text-primary">Set up remote support</h2>
+        <p className="mt-1 text-sm text-muted">Assist lets someone connect to your computer to help troubleshoot problems. Install the app once, then approve access when a support session starts.</p>
         <ol className="my-3 list-inside list-decimal space-y-2 text-sm text-primary">
           <li>Download the Windows support app.</li>
           <li>Open the file and choose <strong>Install</strong>.</li>
-          <li>Approve the Windows administrator prompt. Contact your office if credentials are required.</li>
+          <li>Approve the Windows administrator prompt. Ask your administrator for help if credentials are required.</li>
         </ol>
         <button type="button" onClick={() => void download()} disabled={loading || busy || !ready}
           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
           <Download size={18} />{loading ? 'Checking availability…' : busy ? 'Preparing download…' : 'Download for Windows (64-bit)'}
         </button>
-        {!loading && !ready && !error && <p className="mt-3 text-sm text-muted" role="status">{enabled ? 'Remote support is being set up for your dealer. Downloads will be available when setup is complete.' : 'Remote Support is off. Your dealer administrator can enable it in Integrations.'}</p>}
+        {!loading && !ready && !error && <p className="mt-3 text-sm text-muted" role="status">{enabled ? 'Remote support is being set up. Downloads will be available when setup is complete.' : 'Remote Support is off. An administrator can enable it in Integrations.'}</p>}
         <p className="mt-3 text-xs text-muted">Administrator access and a working internet connection are required. First-time setup may take longer if Windows requests additional approval.</p>
         {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
         {message && <p className="mt-3 text-sm text-primary" role="status">{message}</p>}
