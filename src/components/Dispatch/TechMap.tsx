@@ -652,7 +652,11 @@ export function TechMap() {
     } catch (error) {
       if (isCurrent()) {
         console.error('Error loading tech locations:', error);
-        setLocationError('Employee locations could not be refreshed. Displayed positions may be outdated.');
+        // Never retain a previously authorized map after permissions change
+        // or an authorization lookup failure.
+        setTechLocations([]);
+        setClockedInCount(0);
+        setLocationError('Employee locations could not be refreshed. Please try again.');
       }
     } finally {
       if (isCurrent()) setLoading(false);
