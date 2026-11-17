@@ -140,6 +140,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [roles, setRoles] = useState<Role[]>([]);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
+  const [visibilityScope, setVisibilityScope] = useState<'all_offices' | 'selected_offices' | 'own_only' | 'office_only'>('all_offices');
+  const [visibilitySettingExists, setVisibilitySettingExists] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [formData, setFormData] = useState({
@@ -263,6 +265,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       loadRoles(),
       loadOffices(),
       loadUserOffices(),
+      loadOfficeVisibility(),
       loadPaySchedules(),
       loadEmployeeData(),
       loadSalesCompensation(),
@@ -313,6 +316,20 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       setDataLoadFailed(true);
       setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading offices:', error);
+    }
+  }
+
+  async function loadOfficeVisibility() {
+    try {
+      const { data, error } = await supabase.from('user_visibility_settings')
+        .select('visibility_scope').eq('user_id', user.id).maybeSingle();
+      if (error) throw error;
+      setVisibilitySettingExists(Boolean(data));
+      setVisibilityScope((data?.visibility_scope as typeof visibilityScope) || 'all_offices');
+    } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load office visibility. Close and reopen before saving.');
+      console.error('Error loading office visibility:', error);
     }
   }
 
@@ -737,6 +754,23 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         if (officeError) throw new Error(`Office assignment failed: ${officeError.message}`);
       }
 
+      // Office membership and report visibility are separate controls.
+      // A restricted selection with no offices must never silently grant broad access.
+      if (visibilityScope === 'selected_offices' && selectedOffices.length === 0) {
+        throw new Error('Select at least one assigned office before restricting visibility to selected offices.');
+      }
+      if (visibilitySettingExists) {
+        const { error: visibilityError } = await supabase.from('user_visibility_settings')
+          .update({ visibility_scope: visibilityScope, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+        if (visibilityError) throw new Error(`Office visibility update failed: ${visibilityError.message}`);
+      } else {
+        const { error: visibilityError } = await supabase.from('user_visibility_settings')
+          .insert({ user_id: user.id, organization_id: user.organization_id, visibility_scope: visibilityScope });
+        if (visibilityError) throw new Error(`Office visibility creation failed: ${visibilityError.message}`);
+        setVisibilitySettingExists(true);
+      }
+
       const {
         data: { user: currentUser2 },
       } = await supabase.auth.getUser();
@@ -1155,6 +1189,20 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </div>
                   </div>
                 )}
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Office Visibility</h3>
+                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3">
+                    <p className="text-xs text-gray-400">Controls which offices this user can see in office-aware reports, independently of module permissions. Selected Offices uses the Office Assignments above.</p>
+                    <select aria-label="Office Visibility" value={visibilityScope} onChange={(e) => setVisibilityScope(e.target.value as typeof visibilityScope)} className="w-full rounded-lg bg-gray-900 border border-gray-600 text-white p-2">
+                      <option value="all_offices">All Offices</option>
+                      <option value="selected_offices">Selected Offices (assigned above)</option>
+                      <option value="own_only">Own Records Only</option>
+                      <option value="office_only">Primary Office Only</option>
+                    </select>
+                    {visibilityScope === 'selected_offices' && selectedOffices.length === 0 && <p className="text-xs text-orange-300">Select at least one Office Assignment before saving.</p>}
+                    {visibilityScope === 'office_only' && <p className="text-xs text-gray-400">Primary Office is maintained separately from office memberships.</p>}
+                  </div>
+                </div>
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Password</h3>
                   {!showPasswordReset ? (
