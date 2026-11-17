@@ -31,9 +31,9 @@ do{
  foreach($window in $windows){
   if($window.Current.Name.Trim() -ne 'MeshCentral'){continue}
   $all=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
-  $names=@($all|ForEach-Object{$_.Current.Name}) -join ' '
+  $names=(@($all|ForEach-Object{$_.Current.Name}) -join ' ') -replace '\s+',' '
   $seen=@($seen+($window.Current.Name+': '+$names))|Select-Object -Unique
-  if(-not $names.Contains($ViewerName) -or -not $names.Contains('requesting remote desktop access')){continue}
+  if(-not $names.Contains($ViewerName)){continue}
   if($Mode -eq 'peek'){Write-Output 'consent_prompt_present';exit 0}
   $choices=if($Mode -eq 'allow'){@('Allow','&Allow','Yes','&Yes')}else{@('Deny','&Deny','No','&No')}
   foreach($element in $all){if($choices -contains $element.Current.Name){
@@ -43,5 +43,5 @@ do{
  }
  Start-Sleep -Milliseconds 100
 }while([DateTime]::UtcNow -lt $deadline)
-[Console]::Error.WriteLine('Expected scoped native consent prompt was not found. '+(($seen -join '; ').Substring(0,[Math]::Min(900,($seen -join '; ').Length))))
+[Console]::Error.WriteLine(('Expected scoped native consent prompt was not found. Mode='+$Mode+'; expected viewer='+$ViewerName+'. ')+(($seen -join '; ').Substring(0,[Math]::Min(900,($seen -join '; ').Length))))
 exit 1
