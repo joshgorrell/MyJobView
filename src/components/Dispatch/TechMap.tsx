@@ -247,16 +247,9 @@ export function TechMap() {
   }, [historyPoints, mapReady, historyMode]);
 
   async function loadHistoryTechnicians() {
-    // The server applies the viewer's Office Visibility scope before returning
-    // selectable technicians. The GPS history RLS must enforce the same scope.
-    const { data, error } = await supabase.rpc('get_visible_dispatch_technicians');
-    if (error) {
-      console.error('Unable to load authorized technician history selector', error);
-      setHistoryTechnicians([]);
-      setHistoryError('Technician history access could not be verified');
-      return;
-    }
-    setHistoryTechnicians((data || []).filter((p: { id: string; full_name: string }) => p.id && p.full_name));
+    const { data, error } = await supabase.from('profiles').select('id,full_name').order('full_name');
+    if (error) { console.error('Unable to load technician history selector', error); return; }
+    setHistoryTechnicians((data || []).filter(p => p.id && p.full_name));
   }
 
   async function loadApiKey() {
