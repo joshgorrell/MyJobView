@@ -9,6 +9,7 @@ import { OfflineProvider } from './src/contexts/OfflineContext';
 
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import CalendarScreen from './src/screens/CalendarScreen';
 import TimeClockScreen from './src/screens/TimeClockScreen';
 import WorkOrdersScreen from './src/screens/WorkOrdersScreen';
 import WorkOrderDetailScreen from './src/screens/WorkOrderDetailScreen';
@@ -27,6 +28,7 @@ function AppNavigation() {
       <Stack.Navigator>
         {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
           <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Calendar" component={CalendarScreen} options={{ title: "My Calendar" }} />
           <Stack.Screen name="TimeClock" component={TimeClockScreen} />
           <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} />
           <Stack.Screen name="WorkOrderDetail" component={WorkOrderDetailScreen} />
