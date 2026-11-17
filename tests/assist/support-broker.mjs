@@ -63,12 +63,18 @@ try {
   shouldFail=true;
   await assert.rejects(removing.handle({...context,operation:'device_remove',device_id:device}),/removal_unconfirmed/);
   assert.equal(viewerRevokes,1);
-  assert.equal((await removing.handle({...context,operation:'devices'})).devices[0].name,'Saved label');
-  shouldFail=false;
-  assert.equal((await removing.handle({...context,operation:'device_remove',device_id:device})).removed,true);
+  // A failed native deletion must leave a persistent denylist entry. A soft-deleted
+  // native node can reappear; it must not regain enrolled support privileges.
   assert.equal((await removing.handle({...context,operation:'devices'})).devices.length,0);
+  await assert.rejects(removing.handle({...context,operation:'device_label',device_id:device,label:'Reconnected'}),/device_unavailable/);
+  await assert.rejects(removing.handle({...context,operation:'device_remove',device_id:device}),/device_unavailable/);
+  const afterRestart=createSupportBroker({rpc,runtime:removableRuntime,requeue:async()=>{},labelDirectory:directory});
+  assert.equal((await afterRestart.handle({...context,operation:'devices'})).devices.length,0);
+  shouldFail=false;
+  // A fresh guest invitation uses an isolated guest group, not this enrolled-device identity.
+  // The permanent device tombstone must not be applied to guest support operations.
   await assert.rejects(removing.handle({...context,operation:'connect',device_id:device}),/device_unavailable/);
-  assert.equal(removeCalls,2);
+  assert.equal(removeCalls,1);
   assert.equal(active.session_id,sid);
  } finally {await rm(directory,{recursive:true,force:true});}
 }
