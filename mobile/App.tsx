@@ -77,13 +77,13 @@ function AppNavigation() {
       <Stack.Navigator>
         {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
           <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Calendar" component={CalendarScreen} options={{ title: "My Calendar" }} />
-          <Stack.Screen name="TimeClock" component={TimeClockScreen} />
-          <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} />
+          <Stack.Screen name="Calendar" component={CalendarScreen}  options={{ headerShown: false }} />
+          <Stack.Screen name="TimeClock" component={TimeClockScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} options={{ headerShown: false }} />
           <Stack.Screen name="WorkOrderDetail" component={WorkOrderDetailScreen} />
           <Stack.Screen name="LocationHistory" component={LocationHistoryScreen} />
           <Stack.Screen name="TimeHistory" component={TimeHistoryScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
         </>}
       </Stack.Navigator>
       {session && <MobileTabBar activeRoute={activeRoute} />}
