@@ -28,6 +28,38 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class AssistConsentInput {
+ public delegate bool EnumProc(IntPtr hwnd, IntPtr data);
+ [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left,Top,Right,Bottom; }
+ [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr data);
+ [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr data);
+ [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr hwnd, System.Text.StringBuilder text, int size);
+ [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr parent, int id);
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+ [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+ [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(System.Drawing.Point point);
+ [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+ static string Text(IntPtr hwnd) { var text=new System.Text.StringBuilder(2048); GetWindowText(hwnd,text,text.Capacity); return text.ToString(); }
+ public static bool SelectConsent(string viewer, bool allow) {
+  bool selected=false;
+  EnumWindows((window,unused)=>{
+   if(Text(window).Trim()!="MeshCentral") return true;
+   bool scoped=false;
+   EnumChildWindows(window,(child,data)=>{if(Text(child).Contains(viewer))scoped=true;return true;},IntPtr.Zero);
+   if(!scoped)return true;
+   var button=GetDlgItem(window,allow?0xFFF2:0xFFF3);
+   if(button==IntPtr.Zero || Text(button).Trim()!=(allow?"Allow":"Deny"))return true;
+   SetForegroundWindow(window);
+   Rect rect;if(!GetWindowRect(button,out rect))return true;
+   var point=new System.Drawing.Point((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
+   var hit=WindowFromPoint(point);
+   if(hit!=button || GetAncestor(hit,2)!=window)return true;
+   if(!SetCursorPos(point.X,point.Y))return true;
+   mouse_event(2,0,0,0,UIntPtr.Zero);mouse_event(4,0,0,0,UIntPtr.Zero);
+   selected=true;return false;
+  },IntPtr.Zero);
+  return selected;
+ }
+
  [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, UIntPtr wparam, IntPtr lparam, uint flags, uint timeout, out UIntPtr result);
  [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
@@ -39,6 +71,7 @@ $seen=@()
 $buttonInfo=''
 $clickError=''
 do{
+ if($Mode -ne 'peek' -and [AssistConsentInput]::SelectConsent($ViewerName,($Mode -eq 'allow'))){Write-Output 'consent_selection_applied';exit 0}
  $windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
  foreach($window in $windows){
   if($window.Current.Name.Trim() -ne 'MeshCentral'){continue}
