@@ -87,7 +87,10 @@ export default function CalendarScreen({ navigation }: any) {
     try {
       const [jobs, appointments, internal, timeOff] = await Promise.all([
         supabase.from('work_orders')
-          .select('id, work_order_number, title, scheduled_date, scheduled_start_time, scheduled_end_time, status')
+          .select(`id, work_order_number, scheduled_date, scheduled_start_time, scheduled_end_time, status,
+            project:projects!work_orders_project_id_fkey (
+              contact:contacts!projects_contact_id_fkey (first_name, last_name)
+            )`)
           .eq('assigned_to', profile.id).gte('scheduled_date', rangeStart).lte('scheduled_date', rangeEnd).limit(300),
         // Match the web calendar's privacy-aware appointment access path.
         // The RPC controls whether details may be exposed to this employee.
@@ -116,7 +119,8 @@ export default function CalendarScreen({ navigation }: any) {
       const result: Event[] = [
         ...(jobs.data || []).filter(j => j.status !== 'cancelled').map(j => ({
           id: `job-${j.id}`, date: j.scheduled_date, start: j.scheduled_start_time, end: j.scheduled_end_time,
-          title: j.title || j.work_order_number || 'Work order', subtitle: j.work_order_number || 'Work order',
+          title: j.work_order_number ? `WO-${j.work_order_number}` : 'Work order',
+          subtitle: (() => { const project = j.project?.[0]; const contact = project?.contact?.[0]; return contact ? [contact.first_name, contact.last_name].filter(Boolean).join(' ') || 'Work order' : 'Work order'; })(),
           kind: 'job' as const, workOrderId: j.id,
         })),
         ...(appointments.data || [])
