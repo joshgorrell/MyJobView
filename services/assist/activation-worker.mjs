@@ -80,8 +80,8 @@ export function createHttpDependencies(env, fetchImpl = fetch) {
       control.username || control.password || database.origin !== env.SUPABASE_URL || control.origin !== env.ASSIST_CONTROL_ORIGIN) {
     throw new Error('Assist host endpoints must be HTTPS origins');
   }
-  async function request(url, body, headers) {
-    const response = await fetchImpl(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+  async function request(url, body, headers, timeout=30_000) {
+    const response = await fetchImpl(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(timeout),
       headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
     if (!response.ok) throw new Error('Assist host request failed');
     const text = await response.text();
@@ -97,7 +97,7 @@ export function createHttpDependencies(env, fetchImpl = fetch) {
     reconcile: job => request(`${control.origin}/v1/dealers/reconcile`, {
       organization_id: job.organization_id, generation: job.generation, desired_enabled: job.desired_enabled,
       mesh_domain: `mjv-${job.organization_id.replaceAll('-', '')}`, lease_token: job.lease_token, lease_until: job.lease_until,
-    }, { authorization: `Bearer ${env.ASSIST_CONTROL_TOKEN}`, 'idempotency-key': `${job.organization_id}:${job.generation}` }),
+    }, { authorization: `Bearer ${env.ASSIST_CONTROL_TOKEN}`, 'idempotency-key': `${job.organization_id}:${job.generation}` }, 90_000),
   };
 }
 

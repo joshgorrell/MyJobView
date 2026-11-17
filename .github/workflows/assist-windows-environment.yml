@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'tests/assist/windows/**'
+      - 'services/assist/**'
       - '.github/workflows/assist-windows-environment.yml'
   workflow_dispatch:
     inputs:

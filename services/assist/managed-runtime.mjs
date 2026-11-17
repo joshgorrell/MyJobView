@@ -68,7 +68,8 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
     child.once('exit',()=>{record.serving=false;for(const socket of record.sockets)socket.destroy();runtimes.delete(id);if(!record.stopping)void onExit(id,record.generation).catch(()=>{});});
    }
    let lastError;
-   for(let attempt=0;attempt<40;attempt++){
+   // First startup signs the approved agent set; keep retries bounded by the job lease.
+   for(let attempt=0;attempt<120;attempt++){
     await check();try{
      const group=await ensureLaptopGroup(identity,command);const record=runtimes.get(id);if(!record||record.child.exitCode!==null)throw new Error('runtime_exited');
      if(!record.cleaned){

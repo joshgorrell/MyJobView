@@ -27,7 +27,7 @@ const ps=(mode,username)=>run('pwsh',['-NoProfile','-STA','-File',resolve('tests
 async function freePort(){const s=net.createServer();await new Promise(r=>s.listen(0,'127.0.0.1',r));const p=s.address().port;await new Promise(r=>s.close(r));return p;}
 async function targetState(){return JSON.parse(await readFile(stateFile,'utf8'));}
 try{
- const publicPort=await freePort(),origin=`https://localhost:${publicPort}`;
+ const publicPort=await freePort(),origin=`https://127.0.0.1:${publicPort}`;
  for(const id of [org,other])await store.write(id,{organization_id:id,generation:1,desired_enabled:true,phase:'applying'});
  runtime=createManagedRuntime({store,entry:resolve('services/assist/node_modules/meshcentral/meshcentral.js'),approvedVersion:'1.3.1',publicOrigin:origin,agentCacheDirectory:resolve(process.env.ASSIST_TEST_AGENT_CACHE),diagnostic:s=>{diagnostics=(diagnostics+s).slice(-8192);}});
  await runtime.verifyVersion();const provision=await runtime.ensure({organization_id:org,generation:1},async()=>{});await runtime.ensure({organization_id:other,generation:1},async()=>{});
