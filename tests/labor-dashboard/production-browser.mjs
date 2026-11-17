@@ -168,7 +168,7 @@ try {
       );
       const detailText=await page.locator("body").innerText();
       assert.ok(detailText.includes("7h 25m"));
-      assert.ok(detailText.includes("Payroll Clock Hours"));
+      assert.ok(detailText.includes("Payroll Work Hours"));
       assert.ok(detailText.includes("Shop Time"));
       assert.ok(detailText.includes("Training Time"));
       assert.ok(detailText.includes("Unaccounted Time"));

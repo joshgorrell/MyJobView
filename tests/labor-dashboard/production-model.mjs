@@ -158,3 +158,25 @@ nativeBundle.native_jobs=[{profile_id:'a',day:'2026-10-20',hours:6,shop_hours:1,
 nativeBundle.native_payroll=[{profile_id:'a',day:'2026-10-20',hours:8,leave_hours:0,needs_review:false},{profile_id:'a',day:'2026-10-21',hours:8,leave_hours:0,needs_review:false}];
 const twoDays=model.productionReport(nativeBundle,'2026-10-20','2026-10-21','2026-10-22').rows[0];
 assert.equal(twoDays.unaccounted,1);assert.equal(twoDays.excess,1,'excess on one date must not cancel an unaccounted gap on another');
+
+// A verified imported salary row without punches uses the approved 40-hour model,
+// while measured positive or native salary clocks remain actuals.
+const salaryImported = {...bundle,configs:[{profile_id:'a',compensation_type:'salary',expected_weekly_hours:40,effective_from:'2026-01-01'}],
+  snapshots:bundle.snapshots.map(s=>s.kind==='payroll'?{...s,payload:{records:s.payload.records.map(r=>({...r,salaried:true,worked_hours:0}))}}:s)};
+let salaryResult=model.productionReport(salaryImported,'2026-10-20','2026-10-20','2026-10-22').rows[0];
+assert.equal(salaryResult.payroll,8,'Imported salary capacity is not shown as zero payroll');
+assert.equal(salaryResult.assumedDays,1);assert.equal(salaryResult.clockDays,0);
+assert.equal(salaryResult.unaccounted,null,'Salary capacity must not create unaccounted clock time');
+assert.equal(salaryResult.history[0].payrollSource,'Salary assumption');
+salaryImported.holidays=['2026-10-20'];assert.equal(model.productionReport(salaryImported,'2026-10-20','2026-10-20','2026-10-22').rows[0].payroll,0);
+// Employee records remain available through the cutoff; later job time is MJV-only.
+const contractor={...bundle,roster:bundle.roster.map(r=>({...r,employment_classification:'non_employee',employee_until:'2026-10-19'})),native_jobs:[{profile_id:'a',day:'2026-10-20',hours:2,shop_hours:0,training_hours:0}]};
+const contractorResult=model.productionReport(contractor,'2026-10-20','2026-10-20','2026-10-22').rows[0];
+assert.equal(contractorResult.job,2);assert.equal(contractorResult.payroll,null);assert.equal(contractorResult.utilization,null);
+assert.equal(contractorResult.history[0].jobSource,'MJV');assert.equal(contractorResult.history[0].flags.some(f=>f.includes('Payroll/leave')),false);
+const legacyContractor=model.productionReport({...contractor,native_jobs:[]},'2026-10-20','2026-10-20','2026-10-22').rows[0];
+assert.equal(legacyContractor.job,bundle.snapshots.find(s=>s.kind==='technician').payload.records[0].job_hours,'Preserved iPoint history is not erased by subcontractor classification');
+assert.equal(legacyContractor.payroll,null);
+contractor.roster=contractor.roster.map(r=>({...r,employee_until:'2026-10-20'}));
+assert.equal(model.productionReport(contractor,'2026-10-20','2026-10-20','2026-10-22').rows[0].payroll,4,'Cutoff day retains employee payroll');
+console.log('Imported salary model and employee/subcontractor cutover passed.');

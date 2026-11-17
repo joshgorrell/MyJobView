@@ -7,7 +7,7 @@ export type LaborSource = {
 };
 export type LaborBundle = {
   timezone: string;
-  roster: { id: string; name: string; hire_date?: string | null }[];
+  roster: { id: string; name: string; hire_date?: string | null; employment_classification?: string; employee_until?: string | null }[];
   configs: {
     profile_id: string;
     compensation_type: string;
@@ -132,7 +132,10 @@ export function laborHistory(
   ) {
     const day = new Date(t).toISOString().slice(0, 10),
       flags: string[] = [];
-    const hire = b.roster.find((r) => r.id === id)?.hire_date;
+    const person = b.roster.find((r) => r.id === id);
+    const hire = person?.hire_date;
+    const subcontractor = person?.employment_classification === 'non_employee'
+      && !!person.employee_until && day > person.employee_until;
     if (hire && day < hire) continue;
     const cfg = b.configs
       .filter(
@@ -142,13 +145,14 @@ export function laborHistory(
           (!c.effective_to || c.effective_to >= day),
       )
       .sort((a, c) => c.effective_from.localeCompare(a.effective_from))[0];
-    const jobNative = native("ipoint", day),
+    // Prefer MJV for new subcontractor job entries without hiding preserved legacy imports.
+    const jobNative = (subcontractor && jobs.has(day)) || native("ipoint", day),
       payNative = native("quickbooks_time", day);
     const j = jobNative
       ? jobs.get(day)
       : snapshots.get("technician:" + day)
           ?.payload.records.find((r) => r.technician === mapping("ipoint"));
-    const p = payNative
+    const p = subcontractor ? undefined : payNative
       ? clocks.get(day)
       : snapshots.get("payroll:" + day)
           ?.payload.records.find(
@@ -159,7 +163,10 @@ export function laborHistory(
       unknown = p ? n(payNative ? 0 : p.unknown_hours) : null;
     flags.push(...(j?.review_flags ?? []), ...(p?.flags ?? []));
     if (p?.needs_review) flags.push("Open or unreviewed payroll clock entry");
-    const assumed = !actualPayroll && cfg?.compensation_type === "salary";
+    // Imported salary rows with no worked punches carry the approved salary model.
+    // Native clocks and positive imported punches remain measured actuals.
+    const assumed = !subcontractor && cfg?.compensation_type === "salary" &&
+      (!actualPayroll || (!payNative && p?.salaried === true && n(p.worked_hours) === 0));
     const workdays = cfg?.work_days?.length
       ? cfg.work_days
       : ["monday", "tuesday", "wednesday", "thursday", "friday"];
@@ -179,11 +186,11 @@ export function laborHistory(
       : p
         ? n(payNative ? p.hours : p.worked_hours)
         : null;
-    if (!actualPayroll && !cfg)
+    if (!subcontractor && !actualPayroll && !cfg)
       flags.push("Employee payroll configuration missing for this date");
     if (job === null && ((payroll ?? 0) > 0 || (!p && workday)))
       flags.push("Job report or entry missing");
-    if (!p && (workday || (job ?? 0) > 0))
+    if (!subcontractor && !p && (workday || (job ?? 0) > 0))
       flags.push("Payroll/leave coverage missing");
     if (unknown && unknown > 0) flags.push("Unclassified payroll hours");
     if (payroll === 0 && job !== null && job > 0 && !assumed)
@@ -224,14 +231,14 @@ export function laborHistory(
       unknown,
       assumed,
       jobSource: jobNative ? "MJV" : "iPoint",
-      payrollSource: assumed
+      payrollSource: subcontractor ? "Not applicable · subcontractor" : assumed
         ? "Salary assumption"
         : payNative
           ? "MJV"
           : "QuickBooks Time",
       flags: [...new Set(flags)],
       matched,
-      clockDataComplete: sourceClean,
+      clockDataComplete: sourceClean && !assumed,
       matchedJob: matched ? job! : 0,
       matchedPayroll: matched ? payroll! : 0,
       efficiency: matched && payroll! > 0 ? (job! / payroll!) * 100 : null,

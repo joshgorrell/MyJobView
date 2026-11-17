@@ -583,17 +583,17 @@ export default function TechProductionStats() {
                   note="Recorded production for the selected dates"
                 />
                 <Metric
-                  label="Payroll Clock Hours"
+                  label="Payroll Work Hours"
                   value={duration(report.payroll)}
                   icon={Users}
-                  note="Actual daily clock time, excluding leave"
+                  note="Actual clocks or labelled salary-model hours, excluding leave"
                 />
                 <Metric
                   wide
                   label="Team utilization"
                   value={percentage(report.utilization)}
                   icon={TrendingUp}
-                  note="Job hours ÷ payroll clock hours on matched dates"
+                  note="Job hours ÷ payroll work hours on matched dates"
                 />
               </div>
               <section
@@ -665,8 +665,10 @@ export default function TechProductionStats() {
                           />
                         </div>
                         <span className="text-xs text-secondary block mt-1">
-                          Payroll clock: {duration(row.payroll)}
+                          Payroll work: {duration(row.payroll)}
+                          {row.assumedDays > 0 ? ' · includes salary-model hours' : ''}
                         </span>
+                        {(row.missingPayrollDays > 0 || row.missingJobDays > 0) && <span className="text-xs text-amber-600 block mt-1">Partial coverage: {row.missingPayrollDays} dates missing payroll; {row.missingJobDays} missing job time.</span>}
                         <span className="sm:hidden text-xs text-secondary block mt-1">
                           {duration(row.job)} on jobs ·{" "}
                           {percentage(row.utilization)} utilized
@@ -720,10 +722,11 @@ export default function TechProductionStats() {
             </>
           )}
           <p className="text-xs text-secondary leading-relaxed">
-            Utilization compares recorded job hours with actual payroll clock
-            hours, including salaried technicians. Leave is excluded; schedules
-            are never substituted. {duration(report.matchedPayroll)} of{" "}
-            {duration(report.payroll)} payroll clock hours have comparable job
+            Utilization compares job hours with payroll work hours on matched dates.
+            Hourly technicians use actual QuickBooks Time clocks. Imported salary
+            rows without worked punches use the approved salary model, reduced
+            by leave and holidays; those hours are labelled and are not clock punches. {duration(report.matchedPayroll)} of{" "}
+            {duration(report.payroll)} payroll work hours have comparable job
             data. Shop and training use recorded entries only. Missing category
             data stays missing; overlapping or excess entries are flagged for
             reconciliation.
@@ -845,12 +848,13 @@ function TechnicianDetail({
         />
         <Metric
           wide
-          label="Payroll Clock Hours"
+          label="Payroll Work Hours"
           value={duration(person.payroll)}
           icon={Users}
-          note="Actual daily clock time, excluding leave"
+          note="Actual clocks or labelled salary-model hours, excluding leave"
         />
       </div>
+      {(person.missingPayrollDays > 0 || person.missingJobDays > 0) && <p role="status" className="text-sm text-amber-600">Partial coverage: {person.missingPayrollDays} dates have no imported payroll/leave record; {person.missingJobDays} have no job-time record. Missing hours remain unavailable.</p>}
       <ClockBreakdown summary={person} />
       <div className={`${panel} p-4 sm:p-6`}>
         <h2 className="font-semibold text-lg mb-2">Production trend</h2>
@@ -866,7 +870,7 @@ function TechnicianDetail({
           <h2 className="font-semibold text-xl">Daily activity</h2>
           <p className="text-sm text-secondary mt-2">
             Expand a day to see its recorded jobs, shop time and training.
-            Payroll clock hours use actual records for everyone.
+            Payroll work hours use actual clocks or the explicitly labelled salary model. Subcontractors have job time only after their employee cutoff.
           </p>
           {loading && (
             <p role="status" className="text-xs text-secondary mt-2">
@@ -922,7 +926,7 @@ function TechnicianDetail({
               </summary>
               <div className="px-4 sm:px-6 pb-5 space-y-3">
                 <p className="text-xs text-secondary">
-                  Payroll clock: {duration(day.payroll)} · Shop:{" "}
+                  Payroll work: {duration(day.payroll)} ({day.payrollSource}) · Shop:{" "}
                   {duration(day.shop)} · Training: {duration(day.training)} ·
                   Unaccounted: {duration(day.unaccounted)}.{" "}
                   {day.efficiency === null
@@ -1066,7 +1070,7 @@ function ClockBreakdown({
 }) {
   return (
     <div className={`${panel} p-4 sm:p-6 space-y-4`}>
-      <h2 className="text-lg font-semibold">Payroll clock breakdown</h2>
+      <h2 className="text-lg font-semibold">Payroll work breakdown</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {(
           [
@@ -1092,6 +1096,7 @@ function ClockBreakdown({
         ))}
       </div>
       <p className="text-xs text-secondary">
+        {summary.assumedDays > 0 && <>{summary.assumedDays} dates use salary-model hours; they do not create payroll punches or unaccounted clock time. </>}
         Shop/training recorded on {summary.categoryDays} technician dates;
         unaccounted time covers {summary.reconciliationDays} of{" "}
         {summary.clockDays} payroll clock dates. Missing categories show —.
@@ -1197,7 +1202,7 @@ function ProductionPrintReport({
         </tbody>
       </table>
       <p>
-        Utilization = job hours ÷ actual payroll clock hours on matched dates.
+        Utilization = job hours ÷ payroll work hours on matched dates. Salary-model hours are labelled separately.
         Leave excluded. — means missing data. Shop/training and unaccounted
         totals cover recorded, comparable dates only. * Recorded categories
         exceed payroll clock hours; reconciliation needed.
