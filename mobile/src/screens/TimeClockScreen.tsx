@@ -862,13 +862,13 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   infoCard: {
-    margin: Spacing.lg, padding: Spacing.xxl, backgroundColor: Colors.primary[50],
+    marginHorizontal: Spacing.md, marginTop: Spacing.md, marginBottom: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.primary[50],
     borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.primary[200],
   },
-  infoTitle: { ...Typography.title, marginBottom: Spacing.sm },
-  infoText: { ...Typography.body, color: Colors.gray[600], lineHeight: 22 },
-  linkButton: { padding: Spacing.md, marginTop: Spacing.md },
+  infoTitle: { ...Typography.heading, marginBottom: 4 },
+  infoText: { ...Typography.body, color: Colors.gray[600], lineHeight: 19, fontSize: 13 },
+  linkButton: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, marginTop: 4 },
   linkText: { color: Colors.primary[600], textAlign: 'center', fontWeight: '600', fontSize: 14 },
-  primaryButton: { padding: Spacing.lg + 2, backgroundColor: Colors.primary[600], borderRadius: Radius.md, marginTop: Spacing.sm },
+  primaryButton: { minHeight: 44, justifyContent: 'center', paddingVertical: Spacing.sm, backgroundColor: Colors.primary[600], borderRadius: Radius.md, marginTop: 4 },
   primaryButtonText: { color: Colors.white, textAlign: 'center', fontWeight: '700', fontSize: 15 },
 });
