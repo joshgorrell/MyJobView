@@ -617,6 +617,9 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         throw new Error('Enter a full name and valid email.');
       if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
+      if (visibilityScope === 'selected_offices' && selectedOffices.length === 0) {
+        throw new Error('Select at least one Office Assignment for Selected Offices visibility.');
+      }
       // Existing incomplete payroll records must not block unrelated profile or permission edits.
       // Never silently discard an attempted payroll change: require the missing setup first.
       const salesArrangementChanged = salesCompensation.arrangement !== savedSalesCompensation.arrangement ||
@@ -741,23 +744,25 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         });
       }
 
-      const { error: deleteError } = await supabase.from('user_offices').delete().eq('user_id', user.id);
-      if (deleteError) throw new Error(`Office assignment update failed: ${deleteError.message}`);
-
-      if (selectedOffices.length > 0) {
+      // Only change memberships that were actually edited. A full delete/reinsert
+      // briefly removes report access and can erase memberships on partial failure.
+      const { data: currentMemberships, error: membershipReadError } = await supabase
+        .from('user_offices').select('office_id').eq('user_id', user.id);
+      if (membershipReadError) throw new Error(`Unable to verify office assignments: ${membershipReadError.message}`);
+      const previous = new Set((currentMemberships || []).map((entry) => entry.office_id));
+      const desired = new Set(selectedOffices);
+      const removed = [...previous].filter((id) => !desired.has(id));
+      const added = [...desired].filter((id) => !previous.has(id));
+      if (removed.length > 0) {
+        const { error: deleteError } = await supabase.from('user_offices')
+          .delete().eq('user_id', user.id).in('office_id', removed);
+        if (deleteError) throw new Error(`Office assignment update failed: ${deleteError.message}`);
+      }
+      if (added.length > 0) {
         const { error: officeError } = await supabase.from('user_offices').insert(
-          selectedOffices.map((officeId) => ({
-            user_id: user.id,
-            office_id: officeId,
-          })),
+          added.map((officeId) => ({ user_id: user.id, office_id: officeId })),
         );
         if (officeError) throw new Error(`Office assignment failed: ${officeError.message}`);
-      }
-
-      // Office membership and report visibility are separate controls.
-      // A restricted selection with no offices must never silently grant broad access.
-      if (visibilityScope === 'selected_offices' && selectedOffices.length === 0) {
-        throw new Error('Select at least one assigned office before restricting visibility to selected offices.');
       }
       if (visibilitySettingExists) {
         const { error: visibilityError } = await supabase.from('user_visibility_settings')
