@@ -73,8 +73,13 @@ Deno.serve(async (req: Request) => {
       if (quiet) {
         await result("suppressed", "quiet_hours_changed"); skipped++; continue;
       }
+      const callbackUrl = Deno.env.get("SMS_TWILIO_STATUS_CALLBACK_URL");
+      if (!callbackUrl || !callbackUrl.startsWith("https://")) {
+        await result("failed", "status_callback_not_configured"); failed++; continue;
+      }
       const body = new URLSearchParams({
         To: job.to_phone, From: from, Body: job.body,
+        StatusCallback: callbackUrl,
       });
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,

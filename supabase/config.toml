@@ -349,3 +349,7 @@ verify_jwt = false
 # Server-to-server worker; authenticates with X-SMS-Worker-Secret.
 [functions.process-sms-dispatch]
 verify_jwt = false
+
+# Twilio authenticates callbacks with X-Twilio-Signature; no JWT is sent.
+[functions.sms-status-callback]
+verify_jwt = false
