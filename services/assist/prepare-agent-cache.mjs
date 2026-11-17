@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import {mkdtemp,mkdir,readFile,writeFile,rename,rm,lstat} from 'node:fs/promises';
 import {join,dirname,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 export async function stageAgentCache({manifest,source,destination,runtimeVersion}){
  if(manifest?.schemaVersion!==1||!Array.isArray(manifest.releases)||!manifest.releases.length)throw new Error('invalid_manifest');
  const final=resolve(destination);await mkdir(dirname(final),{recursive:true});
@@ -30,7 +30,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  let temporary;
  try{
   if(process.argv.length!==3)throw new Error('usage');
-  const root=new URL('./node_modules/meshcentral/',import.meta.url).pathname;
+  const root=fileURLToPath(new URL('./node_modules/meshcentral/',import.meta.url));
   const pkg=JSON.parse(await readFile(join(root,'package.json'),'utf8'));const manifest=JSON.parse(await readFile(join(root,'agents/agent-defaults.json'),'utf8'));
   temporary=await mkdtemp(join(tmpdir(),'mjv-agents-'));
   await new Promise((resolve,reject)=>{
