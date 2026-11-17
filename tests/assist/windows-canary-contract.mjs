@@ -9,6 +9,7 @@ for(const patch of [{mesh_domain:'mjv-foreign'},{server_origin:'http://assist.ex
 const proof={...body,checked_at:Date.now(),desktop_control:true,consent_enforced:true,cross_tenant_denied:true,windows_host_verified:true,actual_input_observed:true,denied_consent_observed:true,second_dealer_denied_observed:true};
 const run=createWindowsCanaryHandler({verify:async()=>proof});
 assert.equal((await run(body)).desktop_control,true);
+await assert.rejects(run(body),/duplicate_probe/);
 for(const field of ['windows_host_verified','actual_input_observed','denied_consent_observed','second_dealer_denied_observed','cross_tenant_denied']){
  const rejected=createWindowsCanaryHandler({verify:async()=>({...proof,[field]:false})});
  await assert.rejects(rejected(body),/canary_proof_rejected/);
@@ -19,4 +20,14 @@ const pending=createWindowsCanaryHandler({verify:async()=>{await gate;return pro
 const first=pending(body);
 await assert.rejects(pending(body),/duplicate_probe/);
 unblock();await first;
+await assert.rejects(pending(body),/duplicate_probe/);
+const failed=createWindowsCanaryHandler({verify:async()=>{throw new Error('real_test_failed');}});
+await assert.rejects(failed(body),/real_test_failed/);
+await assert.rejects(failed(body),/duplicate_probe/);
+let clock=Date.now();
+const expiry=createWindowsCanaryHandler({now:()=>clock,verify:async request=>({...proof,probe_nonce:request.probe_nonce,checked_at:clock})});
+await expiry(body);
+clock+=31000;
+const renewed={...body,probe_requested_at:clock};
+assert.equal((await expiry(renewed)).desktop_control,true);
 console.log('Windows canary contract: missing verifier, spoofed evidence, stale requests and duplicate in-flight probes rejected');
