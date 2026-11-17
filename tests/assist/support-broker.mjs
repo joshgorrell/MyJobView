@@ -10,7 +10,8 @@ const context={organization_id:org,actor_id:actor,auth_session_id:auth,token_exp
 let allowed=true,live=true,revokes=0,creates=0;const calls=[];
 const runtime={inventory:async()=>[{id:device,name:'Field laptop',online:true,os:'Windows'}],createViewer:async()=>{creates++;return {viewer_url:`https://assist.example.com/${domain}/?login=private-viewer-token&node=${'A'.repeat(64)}&viewmode=11&hide=15`,viewer_origin:'https://assist.example.com'};},revokeViewer:async()=>{revokes++;},stop:async()=>{}};
 const rpc=async(_name,args)=>{calls.push(args);if(args.p_action==='access')return {allowed};if(args.p_action==='open')return {valid:true,id:sid,native_username:'mjv-session-'+sid.replaceAll('-',''),generation:1,expires_at:new Date(Date.now()+180000).toISOString()};if(args.p_action==='check')return {valid:live};if(['touch','activate'].includes(args.p_action))return {valid:allowed,expires_at:new Date(Date.now()+180000).toISOString()};return {valid:false};};
-const broker=createSupportBroker({rpc,runtime,requeue:async()=>{}});
+const initialDirectory=await mkdtemp(join(tmpdir(),'mjv-assist-support-test-'));
+const broker=createSupportBroker({rpc,runtime,requeue:async()=>{},labelDirectory:initialDirectory});
 assert.equal((await broker.handle({...context,operation:'devices'})).devices.length,1);
 await assert.rejects(broker.handle({...context,operation:'connect',device_id:'node/foreign/device'}),/unavailable/);assert.equal(creates,0);
 const started=await broker.handle({...context,operation:'connect',device_id:device});assert.equal(started.session_id,sid);assert.equal(creates,1);
@@ -97,3 +98,5 @@ assert.throws(()=>sessionClaimsAfterVerification(jwt({sub:sid,session_id:auth,ex
 const bad=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>actorInfo,control:async()=>({...started,viewer_url:'https://evil.example/phish'})});
 assert.equal((await bad(request({operation:'connect',organizationId:org,deviceId:device}))).status,503);
 console.log('Assist broker/edge: persisted and isolated device labels, validation, verified actor binding, device ownership, temporary viewer lifecycle, logout sweep, CORS/dealer isolation, safe URLs and secret-free responses pass');
+
+await rm(initialDirectory,{recursive:true,force:true});
