@@ -876,8 +876,6 @@ export function IntegrationsSettings() {
                 Your Twilio phone number in E.164 format (e.g., +1234567890)
               </p>
             </div>
-          </div>
-
           </div>}
           {twilioTab === 'templates' && <div className="border-t border-gray-200 pt-6 mt-6">
             <h5 className="text-sm font-semibold text-gray-900 mb-3">SMS Templates</h5>
@@ -905,7 +903,7 @@ export function IntegrationsSettings() {
                 </p>
               </div>
             </div>
-          </div>
+          </div>}
 
           <div className="bg-gray-50 rounded-lg p-4">
             <p className="text-sm text-gray-700 mb-2">
