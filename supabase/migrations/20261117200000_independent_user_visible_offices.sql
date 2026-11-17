@@ -36,12 +36,12 @@ DO $patch$
 DECLARE definition text;
 BEGIN
   SELECT pg_get_functiondef('public.get_tech_production(date,date)'::regprocedure) INTO definition;
-  IF position('JOIN public.user_visible_offices a ON a.office_id=b.office_id' IN definition)>0 THEN RETURN; END IF;
-  IF position('JOIN public.user_offices a JOIN public.user_offices b ON b.office_id=a.office_id WHERE a.user_id=auth.uid() AND b.user_id=p.id' IN definition)=0 THEN
+  IF position('FROM public.user_visible_offices a JOIN public.user_offices b ON b.office_id=a.office_id' IN definition)>0 THEN RETURN; END IF;
+  IF position('FROM public.user_offices a JOIN public.user_offices b ON b.office_id=a.office_id WHERE a.user_id=auth.uid() AND b.user_id=p.id' IN definition)=0 THEN
     RAISE EXCEPTION 'Unexpected Tech Stats office filter; refusing unsafe migration';
   END IF;
   definition := replace(definition,
-    'JOIN public.user_offices a JOIN public.user_offices b ON b.office_id=a.office_id WHERE a.user_id=auth.uid() AND b.user_id=p.id',
-    'JOIN public.user_visible_offices a JOIN public.user_offices b ON b.office_id=a.office_id WHERE a.user_id=auth.uid() AND b.user_id=p.id');
+    'FROM public.user_offices a JOIN public.user_offices b ON b.office_id=a.office_id WHERE a.user_id=auth.uid() AND b.user_id=p.id',
+    'FROM public.user_visible_offices a JOIN public.user_offices b ON b.office_id=a.office_id WHERE a.user_id=auth.uid() AND b.user_id=p.id');
   EXECUTE definition;
 END $patch$;
