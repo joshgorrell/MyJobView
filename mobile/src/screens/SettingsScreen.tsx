@@ -102,11 +102,6 @@ export default function SettingsScreen({ navigation }: any) {
           <Text style={styles.historyLabel}>My Time History</Text>
           <Text style={styles.historyArrow}>›</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.historyLink} accessibilityRole="button"
-          onPress={() => navigation.navigate('LocationHistory')}>
-          <Text style={styles.historyLabel}>Location History</Text>
-          <Text style={styles.historyArrow}>›</Text>
-        </TouchableOpacity>
       </View>
 
       {/* App Settings */}

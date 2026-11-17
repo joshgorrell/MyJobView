@@ -589,9 +589,6 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
           <TouchableOpacity onPress={openCommandCenter} style={styles.linkButton}>
             <Text style={styles.linkText}>Daily Calendar, My Time & Requests</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Open My Work Orders</Text>
-          </TouchableOpacity>
         </View>
         <InternalTimeCard key={profile?.id} />
         <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('TimeHistory')} style={styles.historyLink}>
