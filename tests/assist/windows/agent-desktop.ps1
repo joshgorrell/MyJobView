@@ -47,11 +47,15 @@ do{
   foreach($element in $all){if($choices -contains $element.Current.Name){
    $pattern=$null
    if($element.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)){$pattern.Invoke();Write-Output 'consent_selection_applied';exit 0}
-   if($element.TryGetCurrentPattern([Windows.Automation.LegacyIAccessiblePattern]::Pattern,[ref]$pattern) -and $pattern.Current.DefaultAction){$pattern.DoDefaultAction();Write-Output 'consent_selection_applied';exit 0}
    try{
     $point=$element.GetClickablePoint()
     $hit=[Windows.Automation.AutomationElement]::FromPoint($point)
-    if(($hit.GetRuntimeId() -join '.') -ne ($element.GetRuntimeId() -join '.')){continue}
+    $verifiedHit=$false
+    for($depth=0;$hit -and $depth -lt 12;$depth++){
+     if(($hit.GetRuntimeId() -join '.') -eq ($window.GetRuntimeId() -join '.')){$verifiedHit=$true;break}
+     $hit=[Windows.Automation.TreeWalker]::RawViewWalker.GetParent($hit)
+    }
+    if(-not $verifiedHit){continue}
     if(-not [AssistConsentInput]::SetCursorPos([int]$point.X,[int]$point.Y)){continue}
     [AssistConsentInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
     [AssistConsentInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
