@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {assessPilotEvidence,pilotCases} from '../../services/assist/windows-pilot-evidence.mjs';
+const make=id=>({id,status:'PASS',tester:'Windows pilot tester',checked_at:'2026-11-17T18:00:00Z',environment:'Windows 11 x64 staging',observed:'Actual Windows test completed with recorded evidence'});
+const report={cases:pilotCases.map(make)};
+const complete=assessPilotEvidence(report);
+assert.equal(complete.status,'EVIDENCE_REVIEW_REQUIRED');
+assert.equal(complete.canary_approved,false);
+assert.equal(complete.production_approved,false);
+assert.equal(complete.arm64_case_passed,true);
+assert.equal(assessPilotEvidence({cases:report.cases.filter(x=>x.id!=='G02')}).status,'BLOCKED');
+assert.equal(assessPilotEvidence({cases:report.cases.map(x=>x.id==='S03'?{...x,status:'FAIL'}:x)}).status,'BLOCKED');
+assert.equal(assessPilotEvidence({cases:report.cases.map(x=>x.id==='G03'?{...x,observed:'too short'}:x)}).status,'BLOCKED');
+assert.equal(assessPilotEvidence({cases:[...report.cases,make('G01')]}).status,'BLOCKED');
+assert.equal(assessPilotEvidence({cases:report.cases.map(x=>x.id==='G01'?{...x,notes:'Bearer abc'}:x)}).status,'BLOCKED');
+assert.equal(assessPilotEvidence({cases:report.cases.filter(x=>x.id!=='A01')}).status,'EVIDENCE_REVIEW_REQUIRED');
+assert.throws(()=>assessPilotEvidence({cases:null}));
+console.log('Pilot evidence gate: missing, failed, duplicate, weak and secret-bearing evidence rejected');
