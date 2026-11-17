@@ -1136,7 +1136,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                     </h3>
                     <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
                       <p className="text-xs text-gray-400 mb-3">
-                        Select which offices this user has access to. Leave empty for access to all offices.
+                        Select the offices this user belongs to. These assignments do not by themselves restrict report visibility or grant module access.
                       </p>
                       {offices.map((office) => (
                         <label key={office.id} className="flex items-center gap-2 cursor-pointer">
