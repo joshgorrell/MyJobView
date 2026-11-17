@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {assessWindowsPilot,standardAgentPresent} from '../../services/assist/windows-pilot-preflight.mjs';
+const ready=assessWindowsPilot({os:'win32',cpu:'arm64',operatorReady:true});
+assert.equal(ready.status,'READY_FOR_MANUAL_PILOT');
+assert.equal(ready.canary_approved,false);
+assert.equal(ready.production_approved,false);
+for(const c of [{os:'linux',cpu:'x64',operatorReady:true},{os:'win32',cpu:'ia32',operatorReady:true},{os:'win32',cpu:'x64',hasAgent:true,operatorReady:true},{os:'win32',cpu:'x64',operatorReady:false}])assert.equal(assessWindowsPilot(c).status,'BLOCKED');
+assert.equal(standardAgentPresent({programFiles:'C:/Program Files',exists:p=>p.endsWith('MeshAgent.exe')}),true);
+assert.equal(standardAgentPresent({programFiles:'C:/Program Files',exists:()=>false}),false);
+console.log('Windows pilot preflight: OS/architecture/clean baseline/operator checks and no approval bypass pass');
