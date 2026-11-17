@@ -65,6 +65,7 @@ export default function CalendarScreen({ navigation }: any) {
     const employeeId = profile.id;
     setLoadedRange('');
     setCachedAt(null);
+    if (isConnected) return;
     readCalendarRange(employeeId, rangeStart, rangeEnd).then(snapshot => {
       if (cancelled || !snapshot) return;
       setEvents(snapshot.events);
@@ -72,7 +73,7 @@ export default function CalendarScreen({ navigation }: any) {
       setCachedAt(snapshot.fetchedAt);
     }).catch(error => console.warn('Calendar cache unavailable', error));
     return () => { cancelled = true; };
-  }, [profile?.id, rangeStart, rangeEnd]);
+  }, [profile?.id, rangeStart, rangeEnd, isConnected]);
 
   const load = useCallback(async () => {
     if (!profile?.id || !isConnected) { setRefreshing(false); return; }
