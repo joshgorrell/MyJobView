@@ -6,11 +6,8 @@ import {
   MapPin,
   Users,
   ClipboardList,
-  CheckSquare,
-  Award,
   BarChart3,
   CalendarDays,
-  AlertTriangle,
 } from 'lucide-react';
 
 const DispatchDashboard = lazy(() => import('./DispatchDashboard').then(m => ({ default: m.DispatchDashboard })));
@@ -31,17 +28,18 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { key: 'communications', label: 'Customer Communications', icon: Users },
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { key: 'attention', label: 'Needs attention', icon: AlertTriangle },
   { key: 'schedule', label: 'Schedule', icon: CalendarDays },
   { key: 'map', label: 'Live Map', icon: MapPin },
-  { key: 'tech_status', label: 'Tech Status', icon: Users },
-  { key: 'job_status', label: 'Job Status', icon: ClipboardList },
-  { key: 'job_acceptance', label: 'Acceptance Queue', icon: CheckSquare },
-  { key: 'tech_skills', label: 'Tech Skills', icon: Award },
   { key: 'tech_stats', label: 'Tech Stats', icon: BarChart3 },
 ];
+
+const PRIMARY_TABS: TabKey[] = TABS.map(tab => tab.key);
+const normalizeTab = (tab: TabKey): TabKey => {
+  if (tab === 'tech_status') return 'map';
+  if (tab === 'attention' || tab === 'job_status' || tab === 'job_acceptance' || tab === 'tech_skills' || tab === 'communications') return 'overview';
+  return tab;
+};
 
 function TabFallback() {
   return (
@@ -57,13 +55,15 @@ interface DispatchConsoleProps {
 }
 
 export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab || 'overview');
+  const [activeTab, setActiveTab] = useState<TabKey>(normalizeTab(initialTab || 'overview'));
+  const [showOperations, setShowOperations] = useState(false);
+  const [operationTab, setOperationTab] = useState<TabKey>('attention');
 
   useEffect(() => {
-    if (initialTab) { setActiveTab(initialTab); return; }
+    if (initialTab) { setActiveTab(normalizeTab(initialTab)); if (!PRIMARY_TABS.includes(initialTab)) { setOperationTab(initialTab); setShowOperations(true); } return; }
     const stored = localStorage.getItem('dispatch_console_tab') as TabKey | null;
-    if (!initialTab && stored && TABS.some(t => t.key === stored)) {
-      setActiveTab(stored);
+    if (!initialTab && stored) {
+      setActiveTab(normalizeTab(stored));
     }
   }, [initialTab]);
 
@@ -74,7 +74,7 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
   return (
     <div className="space-y-4">
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1" aria-label="Dispatch sections">
+      <div className="flex flex-wrap items-center gap-1 pb-1" aria-label="Dispatch sections">
         {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -95,17 +95,53 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
         })}
       </div>
 
-      {/* Tab Content */}
+      {/* Core operational views remain distinct; secondary queues are accessible on demand. */}
       <Suspense fallback={<TabFallback />}>
-        {activeTab === 'communications' && <DispatchCustomerComms />}
-        {activeTab === 'overview' && <><WorkOrdersAttentionBanner onOpen={() => setActiveTab('attention')} /><DispatchDashboard onNavigate={onNavigate} /></>}
-        {activeTab === 'attention' && <WorkOrdersAttention />}
+        {activeTab === 'overview' && (
+          <div className="space-y-3">
+            <WorkOrdersAttentionBanner onOpen={() => { setOperationTab('attention'); setShowOperations(true); }} />
+            <DispatchDashboard onNavigate={onNavigate} />
+            <div className="rounded-lg border border-subtle bg-surface p-3">
+              <button type="button" className="text-sm font-medium text-primary hover:underline" aria-expanded={showOperations} onClick={() => setShowOperations(!showOperations)}>
+                {showOperations ? 'Hide additional operations' : 'Additional operations and queues'}
+              </button>
+              {showOperations && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ['attention', 'Needs Attention'],
+                      ['job_status', 'Job Status'],
+                      ['job_acceptance', 'Acceptance Queue'],
+                      ['tech_skills', 'Tech Skills'],
+                      ['communications', 'Customer Communications'],
+                    ] as const).map(([key, label]) => (
+                      <button key={key} type="button" onClick={() => setOperationTab(key)}
+                        aria-pressed={operationTab === key}
+                        className={`rounded-md px-3 py-1.5 text-sm ${operationTab === key ? 'bg-blue-600 text-white' : 'bg-elevated text-primary'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {operationTab === 'attention' && <WorkOrdersAttention />}
+                  {operationTab === 'job_status' && <JobStatusPanel />}
+                  {operationTab === 'job_acceptance' && <JobAcceptanceQueue />}
+                  {operationTab === 'tech_skills' && <TechSkillsFilter onTechnicianSelect={() => {}} />}
+                  {operationTab === 'communications' && <DispatchCustomerComms />}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'schedule' && <ResourceDayView onNavigate={onNavigate} />}
-        {activeTab === 'map' && <TechMap />}
-        {activeTab === 'tech_status' && <TechStatusDashboard />}
-        {activeTab === 'job_status' && <JobStatusPanel />}
-        {activeTab === 'job_acceptance' && <JobAcceptanceQueue />}
-        {activeTab === 'tech_skills' && <TechSkillsFilter onTechnicianSelect={() => {}} />}
+        {activeTab === 'map' && (
+          <div className="space-y-3">
+            <TechMap />
+            <details className="rounded-lg border border-subtle bg-surface p-3">
+              <summary className="cursor-pointer text-sm font-medium">Technician status details</summary>
+              <div className="mt-3"><TechStatusDashboard /></div>
+            </details>
+          </div>
+        )}
         {activeTab === 'tech_stats' && <TechStats onNavigate={onNavigate} />}
       </Suspense>
     </div>
