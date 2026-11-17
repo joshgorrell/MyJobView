@@ -254,7 +254,7 @@ export function TechMap() {
       setHistoryError('Unable to verify technician visibility');
       return;
     }
-    setHistoryTechnicians((data || []).filter(p => p.id && p.full_name));
+    setHistoryTechnicians((data || []).filter((p: { id: string; full_name: string }) => p.id && p.full_name));
   }
 
   async function loadApiKey() {
@@ -499,7 +499,7 @@ export function TechMap() {
       const { data: allowedTechnicians, error: visibilityError } = await supabase.rpc('get_visible_dispatch_technicians');
       if (visibilityError) throw visibilityError;
       if (!isCurrent()) return;
-      const allowedIds = new Set((allowedTechnicians || []).map(tech => tech.id));
+      const allowedIds = new Set((allowedTechnicians || []).map((tech: { id: string }) => tech.id));
       const { data: unfilteredDailyClocks, error: clockError } = await supabase
         .from('daily_clock_entries')
         .select('id, technician_id, status, clock_in, clock_in_latitude, clock_in_longitude, profiles!technician_id(full_name, role, primary_office_id)')
