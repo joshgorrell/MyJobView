@@ -25,8 +25,8 @@ try {
  const context=await browser.newContext();const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));const url='http://127.0.0.1:'+server.address().port;
  const fits=async height=>{await page.waitForFunction(()=>{const d=document.querySelector('.qam-sheet');return d&&d.getBoundingClientRect().bottom<=innerHeight+1;});const box=await page.getByRole('dialog').boundingBox();assert.ok(box.y>=-1&&box.y+box.height<=height+1);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);const submit=page.locator('button[type=submit]').last();const bounds=await submit.boundingBox();assert.ok(bounds.y>=0&&bounds.y+bounds.height<=height+1,'Footer must stay visible');};
  for(const theme of ['dark','light'])for(const width of [320,390,768,1280])for(const support of [false,true]){
-  await page.setViewportSize({width,height:900});await page.goto(url+(support?'?support':''));await page.getByPlaceholder('Follow up with customer').waitFor();await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(350);
-  const title=page.getByPlaceholder('Follow up with customer');const assignee=page.getByRole('combobox',{name:'Assign To',exact:true});const t=await title.boundingBox(),a=await assignee.boundingBox();if(width>=640)assert.ok(Math.abs(t.y-a.y)<2,'Title and assignee share a row');else assert.ok(a.y>t.y,'Phone fields stack');
+  await page.setViewportSize({width,height:900});await page.goto(url+(support?'?support':''));await page.getByPlaceholder('What needs to be done?').waitFor();await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.waitForTimeout(350);
+  const title=page.getByPlaceholder('What needs to be done?');const assignee=page.getByRole('combobox',{name:'Assign To',exact:true});const t=await title.boundingBox(),a=await assignee.boundingBox();if(width>=640)assert.ok(Math.abs(t.y-a.y)<2,'Title and assignee share a row');else assert.ok(a.y>t.y,'Phone fields stack');
   await fits(900);if(width===1280){assert.ok((await page.getByRole('dialog').boundingBox()).height<750,'Short form should size to content');if(process.env.ASSIGNMENT_SCREENSHOT_DIR)await page.screenshot({path:join(process.env.ASSIGNMENT_SCREENSHOT_DIR,theme+'-'+(support?'support':'assignment')+'.png')});}
   await title.fill(support?'Support: Restore remote access':'Call customer');
   if(support){await page.getByRole('button',{name:'Create Support Request',exact:true}).click();await page.getByText('Select a customer contact for this support request.',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.calls.length),0);}
@@ -38,7 +38,7 @@ try {
   const request=await page.evaluate(()=>window.calls.find(c=>c.table==='tasks').value);assert.equal(request.title,support?'Support: Restore remote access':'Call customer');assert.equal(request.contact_id,'customer');assert.equal(request.assigned_to,support?null:'tech');assert.equal(request.assigned_department_id,support?'service':null);assert.ok(request.due_date.startsWith('2026-10-24'));assert.equal(request.points,10);
   console.log(theme+' '+width+'px '+(support?'support':'assignment')+': content sizing, layout, contact validation, expanded form, keyboard footer and save passed');
  }
- await page.setViewportSize({width:1280,height:900});await page.goto(url+'?edit');await page.getByPlaceholder('Follow up with customer').waitFor();assert.equal(await page.getByPlaceholder('Follow up with customer').inputValue(),'Existing assignment');assert.equal(await page.getByRole('combobox',{name:'Assign To',exact:true}).inputValue(),'Technician');await page.getByPlaceholder('Follow up with customer').fill('Updated assignment');await page.getByRole('button',{name:'Update Assignment',exact:true}).click();await page.waitForFunction(()=>window.saved===1);const update=await page.evaluate(()=>window.calls.find(c=>c.table==='tasks'));assert.equal(update.id,'existing');assert.equal(update.value.title,'Updated assignment');assert.equal(update.value.contact_id,'customer');
+ await page.setViewportSize({width:1280,height:900});await page.goto(url+'?edit');await page.getByPlaceholder('What needs to be done?').waitFor();assert.equal(await page.getByPlaceholder('What needs to be done?').inputValue(),'Existing assignment');assert.equal(await page.getByRole('combobox',{name:'Assign To',exact:true}).inputValue(),'Technician');await page.getByPlaceholder('What needs to be done?').fill('Updated assignment');await page.getByRole('button',{name:'Update Assignment',exact:true}).click();await page.waitForFunction(()=>window.saved===1);const update=await page.evaluate(()=>window.calls.find(c=>c.table==='tasks'));assert.equal(update.id,'existing');assert.equal(update.value.title,'Updated assignment');assert.equal(update.value.contact_id,'customer');
  // Cover the real close/confirmation stacking, debounce and unmount behavior.
  for(const width of [320,1280]) {
   await page.setViewportSize({width,height:900});
@@ -53,18 +53,18 @@ try {
   await assignee.fill('serv');await assignee.press('Enter');assert.equal(await assignee.inputValue(),'Service');
   await assignee.fill('anyone');await assignee.press('Enter');assert.equal(await assignee.inputValue(),'Anyone — open to the team');
   await assignee.fill('me (');await assignee.press('Enter');assert.equal(await assignee.inputValue(),'Me (Staff Member)');
-  await page.getByPlaceholder('Follow up with customer').fill('Support: Needs insurance certificate');
+  await page.getByPlaceholder('What needs to be done?').fill('Support: Needs insurance certificate');
   await page.getByRole('button',{name:'Close dialog',exact:true}).click();
   const confirmation=page.getByRole('dialog',{name:'Discard Draft?',exact:true});await confirmation.waitFor();
   await page.getByRole('button',{name:'Keep Draft',exact:true}).click();await page.getByRole('button',{name:'Reopen',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('autosave_task_new_support')).data.title),'Support: Needs insurance certificate');
-  await page.getByRole('button',{name:'Reopen',exact:true}).click();await page.waitForFunction(()=>document.querySelector('input[placeholder="Follow up with customer"]')?.value==='Support: Needs insurance certificate');
+  await page.getByRole('button',{name:'Reopen',exact:true}).click();await page.waitForFunction(()=>document.querySelector('input[placeholder="What needs to be done?"]')?.value==='Support: Needs insurance certificate');
   await page.waitForFunction(()=>document.querySelector('input[role="combobox"]')?.value==='Me (Staff Member)');
   await page.getByRole('button',{name:'Cancel',exact:true}).click();await confirmation.waitFor();
   await page.getByRole('button',{name:'Discard',exact:true}).click();await page.getByRole('button',{name:'Reopen',exact:true}).waitFor();
   await page.waitForTimeout(1100);assert.equal(await page.evaluate(()=>localStorage.getItem('autosave_task_new_support')),null,'Discard must cancel pending autosave');
   assert.equal(await page.evaluate(()=>window.calls.length),0);
-  await page.getByRole('button',{name:'Reopen',exact:true}).click();assert.equal(await page.getByPlaceholder('Follow up with customer').inputValue(),'Support: ');
+  await page.getByRole('button',{name:'Reopen',exact:true}).click();assert.equal(await page.getByPlaceholder('What needs to be done?').inputValue(),'Support: ');
   console.log(width+'px searchable people/department/team/self, keyboard, visible close confirmation, keep/restore and discard passed');
  }
  assert.deepEqual(errors,[]);console.log('Existing assignment updates and cancel-without-write passed; no browser errors');
