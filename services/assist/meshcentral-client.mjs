@@ -10,7 +10,7 @@ export function managementCookie(domain, keyHex, now = Date.now()) {
 }
 export async function meshCommand({port,domain,keyHex}, command, {WebSocketImpl = WebSocket, timeout = 8000} = {}) {
   if (!Number.isInteger(port) || port<1024 || port>65535) throw new Error('invalid_port');
-  if (!['meshes','createmesh','users','nodes','adduser','adddeviceuser','deleteuser','deletemesh'].includes(command.action)) throw new Error('unsupported_command');
+  if (!['meshes','createmesh','users','nodes','adduser','adddeviceuser','deleteuser','deletemesh','removedevices'].includes(command.action)) throw new Error('unsupported_command');
   const correlation = randomUUID();
   const url = new URL(`ws://127.0.0.1:${port}/${domain}/control.ashx`);
   url.searchParams.set('auth',managementCookie(domain,keyHex));

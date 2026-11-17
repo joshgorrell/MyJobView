@@ -86,6 +86,16 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
     } catch { if (epoch.current === version) setError('Unable to rename this device. Try again.'); }
     finally { if (epoch.current === version) setBusy(''); }
   }
+  async function removeDevice(device: Device) {
+    if (busy || !window.confirm(`Remove enrollment for ${device.name}? This revokes the registered computer's remote-support access. To support it again, reinstall/re-enroll the agent.`)) return;
+    const version=epoch.current;setBusy(device.id);setError('');
+    try {
+      const result=await invoke('device_remove',{deviceId:device.id});
+      if(result?.removed!==true)throw new Error('Unconfirmed');
+      if(epoch.current===version){setDevices(current=>current.filter(d=>d.id!==device.id));await refresh();}
+    } catch {if(epoch.current===version)setError('Enrollment removal could not be confirmed. Please retry or contact an administrator.');}
+    finally {if(epoch.current===version)setBusy('');}
+  }
   async function connect(device: Device) {
     if (starting.current || session.current || !ready || !canOperate || !device.online) return;
     const version = epoch.current;
@@ -119,7 +129,7 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
       <label htmlFor="assist-device-search" className="mt-4 block text-sm font-medium text-primary">Find enrolled device</label>
       <input id="assist-device-search" type="search" value={deviceQuery} onChange={event => setDeviceQuery(event.target.value)} placeholder="Search device name or operating system" className="mt-2 w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-primary" />
       <div className="mt-4 divide-y divide-gray-200">
-        {filteredDevices.map(device => <div key={device.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-medium text-primary">{device.name}</p>{editingId === device.id ? <div className="mt-2 flex flex-wrap gap-2"><input aria-label="Device name" maxLength={120} value={draftLabel} onChange={event => setDraftLabel(event.target.value)} className="min-w-0 rounded-lg border border-subtle bg-surface px-2 py-2 text-primary" /><button type="button" disabled={!!busy || !draftLabel.trim()} onClick={() => void saveLabel(device)} className="text-sm font-semibold text-info">Save</button><button type="button" onClick={() => setEditingId('')} className="text-sm text-muted">Cancel</button></div> : <button type="button" disabled={!!busy} onClick={() => { setEditingId(device.id); setDraftLabel(device.name); }} className="text-xs text-info">Rename</button>}<p className="break-words text-xs text-muted">{device.online ? 'Online' : 'Offline'}{device.os ? ` · ${device.os}` : ''}</p></div><button type="button" onClick={() => void connect(device)} disabled={!device.online || !!busy || !!sessionName} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={16} />{busy === device.id ? 'Opening…' : 'Connect'}</button></div>)}
+        {filteredDevices.map(device => <div key={device.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-medium text-primary">{device.name}</p>{editingId === device.id ? <div className="mt-2 flex flex-wrap gap-2"><input aria-label="Device name" maxLength={120} value={draftLabel} onChange={event => setDraftLabel(event.target.value)} className="min-w-0 rounded-lg border border-subtle bg-surface px-2 py-2 text-primary" /><button type="button" disabled={!!busy || !draftLabel.trim()} onClick={() => void saveLabel(device)} className="text-sm font-semibold text-info">Save</button><button type="button" onClick={() => setEditingId('')} className="text-sm text-muted">Cancel</button></div> : <button type="button" disabled={!!busy} onClick={() => { setEditingId(device.id); setDraftLabel(device.name); }} className="text-xs text-info">Rename</button>}<p className="break-words text-xs text-muted">{device.online ? 'Online' : 'Offline'}{device.os ? ` · ${device.os}` : ''}</p></div><div className="flex shrink-0 flex-wrap items-center gap-3"><button type="button" disabled={!!busy || !!sessionName} onClick={() => void removeDevice(device)} className="text-xs text-red-600 disabled:opacity-50">Remove</button><button type="button" onClick={() => void connect(device)} disabled={!device.online || !!busy || !!sessionName} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={16} />{busy === device.id ? 'Working…' : 'Connect'}</button></div></div>)}
         {!devices.length && !error && <p className="py-4 text-sm text-muted">No devices are enrolled yet. Install the Windows support app on a supported computer to get started.</p>}
         {!!devices.length && !filteredDevices.length && <p className="py-4 text-sm text-muted">No enrolled devices match your search.</p>}
       </div>

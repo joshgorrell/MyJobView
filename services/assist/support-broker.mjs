@@ -5,8 +5,9 @@ import {inviteOperations} from './guest-broker.mjs';
 const safeLabel=value=>typeof value==='string'&&value.trim().length>0&&value.trim().length<=120&&!/[\x00-\x1f\x7f]/.test(value);
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function validateSupportRequest(body){
- if(!body||!['devices','device_label','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
+ if(!body||!['devices','device_label','device_remove','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
  if(body.operation==='device_label'&&(typeof body.device_id!=='string'||body.device_id.length>256||!safeLabel(body.label)))throw new Error('invalid_device');
+ if(body.operation==='device_remove'&&(typeof body.device_id!=='string'||body.device_id.length>256))throw new Error('invalid_device');
  if(body.operation==='connect'&&(typeof body.device_id!=='string'||body.device_id.length>256))throw new Error('invalid_device');
  if(['touch','end'].includes(body.operation)&&!uuid.test(body.session_id))throw new Error('invalid_session');
  if(inviteOperations.includes(body.operation)&&!['invite_create','invite_capability'].includes(body.operation)&&!uuid.test(body.invite_id))throw new Error('invalid_invite');
@@ -39,13 +40,25 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
      const labels=await readLabels(c.organization_id);labels[c.device_id]=c.label.trim();await writeLabels(c.organization_id,labels);
      return {saved:true};
     }
+    if(c.operation==='device_remove'){
+     if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
+     const devices=await runtime.inventory(c.organization_id);
+     if(!devices.some(d=>d.id===c.device_id))throw new Error('device_unavailable');
+     // End existing viewers before revoking enrollment. Failure must block removal confirmation.
+     for(const active of [...sessions.values()].filter(s=>s.organization_id===c.organization_id&&s.device_id===c.device_id))await revoke(active,'device_removed');
+     const result=await runtime.removeEnrollment(c.organization_id,c.device_id);
+     if(result?.removed!==true)throw new Error('removal_unconfirmed');
+     const labels=await readLabels(c.organization_id);
+     if(Object.hasOwn(labels,c.device_id)){delete labels[c.device_id];await writeLabels(c.organization_id,labels);}
+     return {removed:true};
+    }
     if(c.operation==='connect'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
      const device=(await runtime.inventory(c.organization_id)).find(d=>d.id===c.device_id);
      if(!device?.online)throw new Error('device_unavailable');
      const row=await call('open',c,{device_id:c.device_id,token_exp:c.token_exp});
      if(!row?.valid)throw new Error('forbidden');
-     const context={...row,organization_id:c.organization_id,actor_id:c.actor_id,auth_session_id:c.auth_session_id};
+     const context={...row,device_id:c.device_id,organization_id:c.organization_id,actor_id:c.actor_id,auth_session_id:c.auth_session_id};
      try{
       const viewer=await runtime.createViewer(c.organization_id,c.device_id,row.native_username);
       const active=await call('activate',c,{session_id:row.id,token_exp:c.token_exp});

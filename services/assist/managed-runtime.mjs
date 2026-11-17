@@ -105,6 +105,14 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
    }
    return devices.sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name)).slice(0,500);
   },
+  async removeEnrollment(id,deviceId){
+   const r=runtimes.get(id);if(!r?.serving)throw new Error('runtime_unavailable');
+   if(typeof deviceId!=='string'||!deviceId.startsWith('node/'+r.domain+'/'))throw new Error('foreign_device');
+   if(!(await api.inventory(id)).some(d=>d.id===deviceId))throw new Error('device_unavailable');
+   await command(r,{action:'removedevices',nodeids:[deviceId]});
+   if((await api.inventory(id)).some(d=>d.id===deviceId))throw new Error('removal_unconfirmed');
+   return {removed:true};
+  },
   async createGuestGroup(id,inviteId){
    const r=runtimes.get(id);if(!r?.serving||!/^[a-f0-9]{32}$/.test(inviteId))throw new Error('guest_unavailable');
    const name='MJV guest '+inviteId;
