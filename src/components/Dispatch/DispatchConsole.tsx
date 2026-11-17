@@ -4,8 +4,6 @@ import { useState, useEffect, Suspense, lazy } from 'react';
 import {
   LayoutDashboard,
   MapPin,
-  Users,
-  ClipboardList,
   BarChart3,
   CalendarDays,
 } from 'lucide-react';
