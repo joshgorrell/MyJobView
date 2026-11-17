@@ -7,7 +7,7 @@ import { Colors } from '../theme/colors';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
-type Mode = 'day' | 'week' | 'month';
+type Mode = 'day' | 'week' | 'month' | 'agenda';
 type Event = { id: string; date: string; start: string | null; end: string | null; title: string; subtitle: string; kind: 'job' | 'appointment'; workOrderId?: string };
 const pad = (n: number) => String(n).padStart(2, '0');
 const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -31,9 +31,11 @@ export default function CalendarScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadedRange, setLoadedRange] = useState('');
   const date = fromKey(selected);
-  const first = mode === 'month' ? new Date(date.getFullYear(), date.getMonth(), 1, 12) : mode === 'week' ? weekStart(date) : date;
-  const last = mode === 'month' ? new Date(date.getFullYear(), date.getMonth() + 1, 0, 12) : mode === 'week' ? shift(first, 6) : date;
+  const first = mode === 'month' ? weekStart(new Date(date.getFullYear(), date.getMonth(), 1, 12)) : mode === 'week' ? weekStart(date) : date;
+  const last = mode === 'month' ? shift(first, Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7 - 1) : mode === 'week' ? shift(first, 6) : mode === 'agenda' ? shift(date, 29) : date;
   const rangeStart = key(first), rangeEnd = key(last);
 
   useEffect(() => {
@@ -74,6 +76,8 @@ export default function CalendarScreen({ navigation }: any) {
         })),
       ];
       setEvents(result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || '')));
+      setHasLoaded(true);
+      setLoadedRange(rangeStart + ':' + rangeEnd);
     } catch (e) {
       console.error('Calendar load failed', e);
       setError('Could not load your schedule. Pull down to retry.');
@@ -91,15 +95,16 @@ export default function CalendarScreen({ navigation }: any) {
   }, [profile?.id, isConnected, load]);
 
   const visibleDays = useMemo(() => {
-    if (mode === 'day') return [date];
+    if (mode === 'day' || mode === 'agenda') return [date];
     const start = mode === 'week' ? weekStart(date) : weekStart(new Date(date.getFullYear(), date.getMonth(), 1, 12));
     const count = mode === 'week' ? 7 : Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7;
     return Array.from({ length: count }, (_, i) => shift(start, i));
   }, [selected, mode]);
-  const selectedEvents = events.filter(e => e.date === selected);
+  const selectedEvents = loadedRange === rangeStart + ':' + rangeEnd ? (mode === 'agenda' ? events : events.filter(e => e.date === selected)) : [];
   const eventDates = new Set(events.map(e => e.date));
   const move = (direction: number) => {
     if (mode === 'day') setSelected(key(shift(date, direction)));
+    else if (mode === 'agenda') setSelected(key(shift(date, 30 * direction)));
     else if (mode === 'week') setSelected(key(shift(date, 7 * direction)));
     else setSelected(key(new Date(date.getFullYear(), date.getMonth() + direction, Math.min(date.getDate(), 28), 12)));
   };
@@ -113,7 +118,7 @@ export default function CalendarScreen({ navigation }: any) {
           <TouchableOpacity accessibilityRole="button" onPress={() => setSelected(workDate(new Date(), timezone))} style={styles.today}><Text style={styles.todayText}>Today</Text></TouchableOpacity>
         </View>
         <View style={styles.modeRow}>
-          {(['day', 'week', 'month'] as Mode[]).map(value =>
+          {(['day', 'week', 'month', 'agenda'] as Mode[]).map(value =>
             <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }}
               style={[styles.mode, mode === value && styles.modeActive]} onPress={() => setMode(value)}>
               <Text style={[styles.modeText, mode === value && styles.modeTextActive]}>{value[0].toUpperCase() + value.slice(1)}</Text>
@@ -124,7 +129,7 @@ export default function CalendarScreen({ navigation }: any) {
           <Text style={styles.periodText}>{date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next period" style={styles.arrow} onPress={() => move(1)}><Text style={styles.arrowText}>›</Text></TouchableOpacity>
         </View>
-        {mode !== 'day' && <View style={styles.grid}>
+        {mode !== 'day' && mode !== 'agenda' && <View style={styles.grid}>
           {['S','M','T','W','T','F','S'].map((name, i) => <Text key={i} style={styles.weekday}>{name}</Text>)}
           {visibleDays.map(day => {
             const dateKey = key(day), chosen = dateKey === selected;
@@ -137,11 +142,11 @@ export default function CalendarScreen({ navigation }: any) {
             </TouchableOpacity>;
           })}
         </View>}
-        <Text style={styles.dayHeading}>{date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
-        {!isConnected && <Text style={styles.notice}>Offline — showing the last schedule loaded in this session.</Text>}
+        <Text style={styles.dayHeading}>{mode === 'agenda' ? 'Upcoming 30 days' : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+        {!isConnected && <Text style={styles.notice}>{hasLoaded && loadedRange === rangeStart + ':' + rangeEnd ? 'Offline — showing the last schedule loaded in this session.' : 'Offline — calendar data is unavailable for this period.'}</Text>}
         {!!error && <Text style={styles.error}>{error}</Text>}
         {loading && <ActivityIndicator color={Colors.primary[600]} />}
-        {!loading && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this day.</Text>}
+        {!loading && !error && (isConnected || (hasLoaded && loadedRange === rangeStart + ':' + rangeEnd)) && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
         {selectedEvents.map(event =>
           <TouchableOpacity key={event.id} accessibilityRole="button"
             disabled={!event.workOrderId}
@@ -149,7 +154,7 @@ export default function CalendarScreen({ navigation }: any) {
             style={styles.event}>
             <View style={[styles.eventStripe, { backgroundColor: event.kind === 'job' ? Colors.primary[600] : Colors.green[600] }]} />
             <View style={styles.eventContent}>
-              <Text style={styles.eventTime}>{formatClock(event.start)}{event.end ? ` – ${formatClock(event.end)}` : ''}</Text>
+              <Text style={styles.eventTime}>{mode === 'agenda' ? fromKey(event.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' : ''}{formatClock(event.start)}{event.end ? ` – ${formatClock(event.end)}` : ''}</Text>
               <Text style={styles.eventTitle}>{event.title}</Text>
               <Text style={styles.eventSubtitle}>{event.subtitle}</Text>
             </View>
