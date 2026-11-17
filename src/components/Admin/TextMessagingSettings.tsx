@@ -7,7 +7,7 @@ type SmsHistoryItem = {
   last_error_code: string | null; created_at: string;
   accepted_at: string | null; delivered_at: string | null;
 };
-const formatCategory = (category: string) => category.replaceAll('_', ' ');
+const formatCategory = (category: string) => category.replace(/_/g, ' ');
 
 type SmsSettings = {
   organization_id: string;
