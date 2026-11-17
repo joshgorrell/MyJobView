@@ -108,12 +108,12 @@ await assert.rejects(broker.guest({organization_id:org,operation:'redeem',code:f
 const fallbackClaim=await broker.guest({organization_id:org,operation:'redeem',code:fallbackInvite.code,architecture:'x64'});assert.equal(new URL(fallbackClaim.download_url).searchParams.get('id'),'4','Unapproved ARM request does not consume code');
 const armBroker=createGuestBroker({...options,arm64Enabled:true});
 const arm=await armBroker.staff({...context,operation:'invite_create'});
-const armClaim=await armBroker.guest({organization_id:org,operation:'redeem',code:arm.code,architecture:'arm64'});
-assert.equal(new URL(armClaim.download_url).searchParams.get('id'),'43');assert.equal(new URL(armClaim.download_url).searchParams.get('installflags'),'1');
-assert.equal(new URL(armClaim.download_url).searchParams.get('meshid'),new URL(download).searchParams.get('meshid'));
+const armEnabledClaim=await armBroker.guest({organization_id:org,operation:'redeem',code:arm.code,architecture:'arm64'});
+assert.equal(new URL(armEnabledClaim.download_url).searchParams.get('id'),'43');assert.equal(new URL(armEnabledClaim.download_url).searchParams.get('installflags'),'1');
+assert.equal(new URL(armEnabledClaim.download_url).searchParams.get('meshid'),new URL(download).searchParams.get('meshid'));
 assert.throws(()=>validateGuestRequest({organization_id:org,operation:'redeem',code:arm.code,architecture:'linux'}));
-const armHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async c=>{assert.equal(c.architecture,'arm64');return armClaim;}});
+const armHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async c=>{assert.equal(c.architecture,'arm64');return armEnabledClaim;}});
 assert.equal((await armHandler(request({operation:'redeem',code:arm.code,architecture:'arm64'}))).status,200);
-const wrongArmHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...armClaim,download_url:download})});
+const wrongArmHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...armEnabledClaim,download_url:download})});
 assert.equal((await wrongArmHandler(request({operation:'redeem',code:arm.code,architecture:'arm64'}))).status,503);
 console.log('Assist guest invitations: one-time claim, tenant/actor/session binding, temporary scope, expiry, revocation, generation fences, cleanup fallback, restart and Edge validation pass');
