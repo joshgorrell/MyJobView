@@ -20,11 +20,11 @@ const sampleValues: Record<string, string> = {
   proposal_link: 'https://example.com/proposal',
 };
 function unknownTokens(body: string, category: Category): string[] {
-  const found = Array.from(body.matchAll(/\\{([^{}]+)\\}/g), match => match[1]);
+  const found = Array.from(body.matchAll(/\{([^{}]+)\}/g), match => match[1]);
   return Array.from(new Set(found.filter(token => !allowedTokens[category].includes(token))));
 }
 function preview(body: string, category: Category): string {
-  return body.replace(/\\{([^{}]+)\\}/g, (full, token: string) =>
+  return body.replace(/\{([^{}]+)\}/g, (full, token: string) =>
     allowedTokens[category].includes(token) ? sampleValues[token] : full);
 }
 export function SmsTemplateDrafts() {
