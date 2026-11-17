@@ -24,6 +24,14 @@ if($Mode -eq 'target'){
 if($ViewerName -notmatch '^mjv-session-[a-f0-9]{32}$'){throw 'Scoped test viewer required'}
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class AssistConsentInput {
+ [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+ [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+}
+'@
 $deadline=[DateTime]::UtcNow.AddSeconds(25)
 $seen=@()
 do{
@@ -39,6 +47,16 @@ do{
   foreach($element in $all){if($choices -contains $element.Current.Name){
    $pattern=$null
    if($element.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)){$pattern.Invoke();Write-Output 'consent_selection_applied';exit 0}
+   if($element.TryGetCurrentPattern([Windows.Automation.LegacyIAccessiblePattern]::Pattern,[ref]$pattern) -and $pattern.Current.DefaultAction){$pattern.DoDefaultAction();Write-Output 'consent_selection_applied';exit 0}
+   try{
+    $point=$element.GetClickablePoint()
+    $hit=[Windows.Automation.AutomationElement]::FromPoint($point)
+    if(($hit.GetRuntimeId() -join '.') -ne ($element.GetRuntimeId() -join '.')){continue}
+    if(-not [AssistConsentInput]::SetCursorPos([int]$point.X,[int]$point.Y)){continue}
+    [AssistConsentInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+    [AssistConsentInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+    Write-Output 'consent_selection_applied';exit 0
+   }catch{continue}
   }}
  }
  Start-Sleep -Milliseconds 100

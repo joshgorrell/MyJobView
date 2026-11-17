@@ -66,12 +66,12 @@ try{
   },20000);
   return {page,viewer};}
  const denyUser='mjv-session-'+randomBytes(16).toString('hex');
- const denied=await openViewer(denyUser);await ps('peek',denyUser);
+ const denied=await openViewer(denyUser);await ps('peek',denyUser);console.log('Scoped native consent prompt detected for denial test');
  assert.equal(await denied.page.evaluate(()=>!!globalThis.desktop?.m?.FirstDraw),false,'No desktop frames before local consent');
- await ps('deny',denyUser);await until(async()=>denied.page.evaluate(()=>!globalThis.desktop||globalThis.desktop.State===0));
+ await ps('deny',denyUser);console.log('Native Deny selected');await until(async()=>denied.page.evaluate(()=>!globalThis.desktop||globalThis.desktop.State===0));
  assert.equal(await denied.page.evaluate(()=>!!globalThis.desktop?.m?.FirstDraw),false,'Deny never reveals desktop');await runtime.revokeViewer(org,denyUser);await denied.page.close();
- const username='mjv-session-'+randomBytes(16).toString('hex');const allowed=await openViewer(username);await ps('peek',username);
- assert.equal(await allowed.page.evaluate(()=>!!globalThis.desktop?.m?.FirstDraw),false);await ps('allow',username);
+ const username='mjv-session-'+randomBytes(16).toString('hex');const allowed=await openViewer(username);await ps('peek',username);console.log('Scoped native consent prompt detected for approval test');
+ assert.equal(await allowed.page.evaluate(()=>!!globalThis.desktop?.m?.FirstDraw),false);await ps('allow',username);console.log('Native Allow selected');
  await allowed.page.waitForFunction(()=>globalThis.desktop?.m?.FirstDraw===true,{},{timeout:60000});
  const sample=await targetState();
  await until(async()=>allowed.page.evaluate(({panel,rgb})=>{const c=document.getElementById('Desk');if(!c)return false;const p=c.getContext('2d').getImageData(panel.x,panel.y,1,1).data;return rgb.every((v,i)=>Math.abs(p[i]-v)<15);},sample));
