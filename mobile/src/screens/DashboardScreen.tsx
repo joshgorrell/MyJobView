@@ -160,6 +160,7 @@ export default function DashboardScreen({ navigation }: any) {
   }
 
   const menuItems: { title: string; screen: string; color: string; icon: string; description: string }[] = [
+    { title: 'My Calendar', screen: 'Calendar', color: Colors.primary[500], icon: 'calendar', description: 'Day, week and month schedule' },
     { title: 'Time Clock', screen: 'TimeClock', color: Colors.primary[600], icon: 'clock', description: 'Clock in/out with GPS' },
     { title: 'My Time History', screen: 'TimeHistory', color: Colors.primary[400], icon: 'history', description: 'View past shifts' },
     { title: 'Work Orders', screen: 'WorkOrders', color: Colors.green[600], icon: 'wrench', description: 'View assigned jobs' },
@@ -293,6 +294,8 @@ export default function DashboardScreen({ navigation }: any) {
 function MenuIcon({ name, size, color }: { name: string; size: number; color: string }) {
   const iconStyle: ViewStyle = { width: size, height: size };
   switch (name) {
+    case 'calendar':
+      return <View style={[iconStyle, { borderWidth: 2, borderColor: color, borderRadius: 3, borderTopWidth: 5 }]} />;
     case 'clock':
       return (
         <View style={[iconStyle, { alignItems: 'center', justifyContent: 'center' }]}>
