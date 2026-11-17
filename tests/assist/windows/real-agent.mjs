@@ -30,7 +30,9 @@ try{
  const publicPort=await freePort(),origin=`https://127.0.0.1:${publicPort}`;
  for(const id of [org,other])await store.write(id,{organization_id:id,generation:1,desired_enabled:true,phase:'applying'});
  runtime=createManagedRuntime({store,entry:resolve('services/assist/node_modules/meshcentral/meshcentral.js'),approvedVersion:'1.3.1',publicOrigin:origin,agentCacheDirectory:resolve(process.env.ASSIST_TEST_AGENT_CACHE),diagnostic:s=>{diagnostics=(diagnostics+s).slice(-8192);}});
- await runtime.verifyVersion();const provision=await runtime.ensure({organization_id:org,generation:1},async()=>{});await runtime.ensure({organization_id:other,generation:1},async()=>{});
+ await runtime.verifyVersion();
+ async function boot(id){const deadline=Date.now()+90000;console.log('Starting isolated dealer runtime');const result=await runtime.ensure({organization_id:id,generation:1},async()=>{if(Date.now()>=deadline)throw Error('Native runtime startup deadline exceeded');});console.log('Isolated dealer runtime ready');return result;}
+ const provision=await boot(org);await boot(other);
  app=createControlServer({runtime,plane:{reconcile:async()=>{throw Error('Not a production control plane');}},token:randomBytes(32).toString('hex')});
  await new Promise(r=>app.listen(0,'127.0.0.1',r));
  const certPath=join(store.root,'instances',org);

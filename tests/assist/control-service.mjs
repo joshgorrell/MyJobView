@@ -7,7 +7,7 @@ import http from 'node:http';
 import {createControlPlane,dealerDomain,validControlToken,validateControlJob} from '../../services/assist/control-core.mjs';
 import {stageAgentCache} from '../../services/assist/prepare-agent-cache.mjs';
 import {createStateStore} from '../../services/assist/state-store.mjs';
-import {managementCookie,ensureLaptopGroup} from '../../services/assist/meshcentral-client.mjs';
+import {managementCookie,ensureLaptopGroup,nativeInventory} from '../../services/assist/meshcentral-client.mjs';
 import {runtimeConfig} from '../../services/assist/managed-runtime.mjs';
 import {createControlServer,createCanaryProbe} from '../../services/assist/control-server.mjs';
 const org='00000000-0000-0000-0000-000000000001',other='00000000-0000-0000-0000-000000000002';
@@ -20,6 +20,14 @@ const decipher=createDecipheriv('aes-256-gcm',Buffer.from(key,'hex').subarray(0,
 const identity=JSON.parse(Buffer.concat([decipher.update(cookie.subarray(28)),decipher.final()]).toString());
 assert.equal(identity.userid,`user/${domain}/mjv-platform`);assert.equal(identity.domainid,domain);
 assert.throws(()=>managementCookie('other',key));
+
+const inventoryGroup=`mesh/${domain}/${'A'.repeat(64)}`,inventoryId=`node/${domain}/${'B'.repeat(64)}`;
+const compactNode={_id:inventoryId,name:'Canary laptop',conn:1,osdesc:'Windows',secret:'filtered'};
+assert.deepEqual(nativeInventory({nodes:{[inventoryGroup]:[compactNode]}},domain,inventoryGroup),[{id:inventoryId,name:'Canary laptop',online:true,os:'Windows'}]);
+assert.throws(()=>nativeInventory({nodes:{[inventoryGroup]:[{...compactNode,meshid:'mesh/foreign/group'}]}},domain,inventoryGroup),/foreign_device/);
+assert.throws(()=>nativeInventory({nodes:{[inventoryGroup]:[{...compactNode,_id:'node/foreign/id'}]}},domain,inventoryGroup),/foreign_device/);
+assert.throws(()=>nativeInventory({nodes:{'mesh/foreign/group':[]}},domain,inventoryGroup),/foreign_device_group/);
+assert.deepEqual(nativeInventory({nodes:{[`mesh/${domain}/other`]:[compactNode]}},domain,inventoryGroup),[]);
 const hash='A'.repeat(64);let groups=[],creates=0;
 const request=async(_identity,cmd)=>{if(cmd.action==='meshes')return {meshes:groups};creates++;groups=[{_id:`mesh/${domain}/${hash}`,name:cmd.meshname,mtype:2,consent:cmd.consent,links:{[`user/${domain}/mjv-platform`]:{rights:0xffffffff}}}];return {meshid:groups[0]._id};};
 await ensureLaptopGroup({domain},request);await ensureLaptopGroup({domain},request);assert.equal(creates,1);
