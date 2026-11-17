@@ -682,7 +682,7 @@ export function TechMap() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white">Live Map</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-white">Live Map</h2>
           <p className="hidden sm:block text-gray-300">Clocked-in employee locations</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -703,7 +703,7 @@ export function TechMap() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 sm:p-4 text-gray-900">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 text-gray-900">
         {!historyMode && <label className="text-sm">Employee role
           <select aria-label="Filter employees by role" className="block max-w-[180px] rounded border px-2 py-1.5 text-sm" value={roleFilter} onChange={e => { setRoleFilter(e.target.value); hasFittedMap.current = false; }}>
             <option value="all">All employees</option>
@@ -749,7 +749,7 @@ export function TechMap() {
                 <div
                   ref={mapRef}
                   className="rounded-lg overflow-hidden"
-                  style={{ width: '100%', height: 'min(65dvh, 500px)', minHeight: '320px', backgroundColor: '#e5e7eb' }}
+                  style={{ width: '100%', height: 'clamp(300px, 48dvh, 520px)', backgroundColor: '#e5e7eb' }}
                 />
                 {!mapReady && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
@@ -784,9 +784,9 @@ export function TechMap() {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-600">
-                  {visibleLocations.filter(t => t.status?.status === 'off_duty').length}
+                  {visibleLocations.length}
                 </div>
-                <div className="text-xs text-gray-600">Off Duty</div>
+                <div className="text-xs text-gray-600">Located</div>
               </div>
             </div>
           </div>
@@ -800,7 +800,7 @@ export function TechMap() {
                 Active Employees ({visibleLocations.length})
               </h3>
             </div>
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-gray-200 lg:max-h-[clamp(300px,48dvh,520px)] lg:overflow-y-auto">
               {visibleLocations.map(tech => (
                 <div
                   key={tech.id}
@@ -866,12 +866,12 @@ export function TechMap() {
                 </div>
               ))}
 
-              {techLocations.length === 0 && (
+              {visibleLocations.length === 0 && (
                 <div className="p-8 text-center text-gray-500">
                   <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p>No active technicians</p>
+                  <p>{techLocations.length === 0 ? "No active technicians with locations" : "No employees match these filters"}</p>
                   <p className="text-sm mt-1">
-                    Technicians will appear here when they clock in
+                    Technicians with usable location data appear here after clock-in
                   </p>
                 </div>
               )}
