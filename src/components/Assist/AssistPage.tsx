@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Monitor, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { EngineerConsole } from './EngineerConsole';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
@@ -65,10 +65,18 @@ export default function AssistPage() {
   if (!allowed) return <div className="p-6 text-primary" role="alert">Remote support is available only to active employees in their own dealer workspace.</div>;
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6">
-      <header className="flex items-start gap-3">
-        <div className="rounded-xl bg-blue-500/10 p-3 text-info"><Monitor size={28} /></div>
-        <div><h1 className="text-2xl font-bold text-primary">Remote Support</h1>
-          <p className="mt-1 text-sm text-muted">{tenant?.organizationName || 'Your dealer'} · Help for your on-site laptop</p></div>
+      <header className="space-y-3">
+        <h1 className="sr-only">MyJobView Assist — Remote Support</h1>
+        <div className="w-full max-w-sm rounded-xl border border-subtle bg-white p-3 sm:p-4">
+          <img
+            src="/images/myjobview-assist.png"
+            alt="MyJobView Assist"
+            width={2172}
+            height={724}
+            className="block h-auto w-full"
+          />
+        </div>
+        <p className="text-sm text-muted">{tenant?.organizationName || 'Your dealer'} · Help for your on-site laptop</p>
       </header>
       <section className="rounded-xl border border-subtle bg-surface p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-primary">Set up this Windows laptop</h2>
