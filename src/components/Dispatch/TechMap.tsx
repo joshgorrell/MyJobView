@@ -17,6 +17,8 @@ interface TechLocation {
   heartbeat_at?: string | null;
   location_source: 'gps' | 'clock_in';
   is_active: boolean;
+  clock_in_at?: string;
+  current_job_title?: string | null;
   technician: {
     full_name: string;
     role: string;
@@ -619,6 +621,8 @@ export function TechMap() {
             location_source: breadcrumb ? 'gps' : 'clock_in',
             heartbeat_at: heartbeatByTech.get(techId)?.daily_clock_entry_id === clock.id ? heartbeatByTech.get(techId)?.last_seen_at : null,
             is_active: true,
+            clock_in_at: clock.clock_in,
+            current_job_title: onJob?.work_order?.title || null,
             technician: clock.profiles,
             status: {
               status: status,
@@ -724,10 +728,10 @@ export function TechMap() {
       </div>
       {locationError && <div role="alert" className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">{locationError}</div>}
       {!loading && !locationError && clockedInCount > visibleLocations.length && roleFilter === 'all' && officeFilter === 'all' && <p className="text-xs text-gray-300">{clockedInCount - visibleLocations.length} clocked-in employee(s) have no usable GPS or clock-in coordinates.</p>}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
         {/* Map Area */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 sm:p-6">
+        <div className="lg:col-span-3">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 sm:p-3">
             {mapError ? <div role="alert" className="rounded-lg bg-red-50 p-5 text-red-800">{mapError}</div> : !apiKey ? (
               <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
                 <div className="text-center">
@@ -759,7 +763,7 @@ export function TechMap() {
             )}
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-4 gap-2 sm:gap-4 mt-3 sm:mt-6">
+            <div className="grid grid-cols-4 gap-2 mt-2">
               <div className="text-center">
                 <div className="text-lg sm:text-2xl font-bold text-green-600">
                   {visibleLocations.filter(t => t.status?.status === 'available').length}
@@ -789,10 +793,10 @@ export function TechMap() {
         </div>
 
         {/* Technician List */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
+            <div className="px-3 py-2 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">
                 Active Employees ({visibleLocations.length})
               </h3>
             </div>
@@ -800,7 +804,7 @@ export function TechMap() {
               {visibleLocations.map(tech => (
                 <div
                   key={tech.id}
-                  className={`p-4 cursor-pointer transition-colors ${
+                  className={`px-3 py-2 cursor-pointer transition-colors ${
                     selectedTech === tech.technician_id
                       ? 'bg-blue-50'
                       : 'hover:bg-gray-50'
@@ -828,11 +832,9 @@ export function TechMap() {
                     )}
                   </div>
 
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <MapPin className="w-3 h-3" />
-                      {tech.latitude.toFixed(6)}, {tech.longitude.toFixed(6)}
-                    </div>
+                  {tech.current_job_title && <div className="mt-1 text-xs font-medium text-blue-700 truncate" title={tech.current_job_title}>Job: {tech.current_job_title}</div>}
+                  <div className="mt-1 space-y-0.5">
+                    <div className="text-xs text-gray-600">{tech.clock_in_at ? `Clocked in ${new Date(tech.clock_in_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Clocked in"}</div>
                     {tech.speed !== null && tech.speed > 0 && (
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <Navigation className="w-3 h-3" />
@@ -842,7 +844,7 @@ export function TechMap() {
                     <div className="text-xs text-gray-600">{tech.location_source === 'clock_in' ? 'Clock-in position only' : isStale(tech.timestamp) ? 'Stale GPS — last known position' : 'Recent GPS position'}</div>
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Clock className="w-3 h-3" />
-                      Last GPS: {getTimeSince(tech.timestamp)}
+                      Location updated {getTimeSince(tech.timestamp)}
                       {Date.now() - Date.parse(tech.timestamp) > 5 * 60 * 1000 && (
                         <span className="ml-2 font-semibold text-amber-700">Last GPS is older than 5 minutes; connection status unknown</span>
                       )}
