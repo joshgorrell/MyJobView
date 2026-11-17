@@ -3,7 +3,7 @@ import {createHealthMonitor} from '../../services/assist/health-monitor.mjs';
 const org='00000000-0000-0000-0000-000000000001',other='00000000-0000-0000-0000-000000000002';
 let states=[{organization_id:org,generation:2,desired_enabled:true},{organization_id:other,generation:3,desired_enabled:false}];
 let healthy=true,queued=[],logs=[];
-const monitor=createHealthMonitor({store:{list:async()=>states},plane:{checkHealth:async id=>id===org?{healthy}:null},
+const monitor=createHealthMonitor({store:{list:async()=>states},plane:{checkHealth:async id=>id===org?{healthy,organization_id:org,generation:2}:null},
  requeue:async(id,generation)=>{queued.push([id,generation]);},now:()=>1780000000000,logger:event=>logs.push(event)});
 assert.deepEqual(await monitor.runOnce(),{status:'healthy',checked:1,failed:0});
 assert.equal(monitor.snapshot().dealers[0].status,'healthy');
