@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -8,6 +9,8 @@ import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
 type Mode = 'day' | 'week' | 'month' | 'agenda';
+type PrivateAppointment = { id: string; appointment_date: string; start_time: string | null; end_time: string | null; title: string | null; status: string; assigned_technician: string | null; can_view_details: boolean | null };
+type TeamLeaveDay = { request_id: string; employee_id: string; leave_date: string; full_day: boolean; start_time: string | null; end_time: string | null };
 type Event = { id: string; date: string; start: string | null; end: string | null; title: string; subtitle: string; kind: 'job' | 'appointment' | 'internal' | 'time_off'; workOrderId?: string };
 const pad = (n: number) => String(n).padStart(2, '0');
 const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -33,6 +36,8 @@ export default function CalendarScreen({ navigation }: any) {
   const [error, setError] = useState('');
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadedRange, setLoadedRange] = useState('');
+  const requestId = useRef(0);
+  const activeRef = useRef(true);
   const date = fromKey(selected);
   const first = mode === 'month' ? weekStart(new Date(date.getFullYear(), date.getMonth(), 1, 12)) : mode === 'week' ? weekStart(date) : date;
   const last = mode === 'month' ? shift(first, Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7 - 1) : mode === 'week' ? shift(first, 6) : mode === 'agenda' ? shift(date, 29) : date;
@@ -51,6 +56,7 @@ export default function CalendarScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     if (!profile?.id || !isConnected) { setRefreshing(false); return; }
+    const request = ++requestId.current;
     setLoading(true);
     setError('');
     try {
@@ -83,8 +89,8 @@ export default function CalendarScreen({ navigation }: any) {
           kind: 'job' as const, workOrderId: j.id,
         })),
         ...(appointments.data || [])
-          .filter(a => a.status !== 'cancelled' && a.assigned_technician === profile.id)
-          .map(a => ({
+          .filter((a: PrivateAppointment) => a.status !== 'cancelled' && a.assigned_technician === profile.id)
+          .map((a: PrivateAppointment) => ({
             id: `appointment-${a.id}`, date: a.appointment_date, start: a.start_time, end: a.end_time,
             title: a.can_view_details === false ? 'Busy' : (a.title || 'Appointment'),
             subtitle: a.can_view_details === false ? 'Private appointment' : 'Appointment',
@@ -94,28 +100,53 @@ export default function CalendarScreen({ navigation }: any) {
           id: `internal-${item.id}`, date: item.session_date, start: item.start_time, end: item.end_time,
           title: item.title || 'Internal session', subtitle: 'Internal time', kind: 'internal' as const,
         })),
-        ...(timeOff.data || []).filter(item => item.employee_id === profile.id).map(item => ({
+        ...(timeOff.data || []).filter((item: TeamLeaveDay) => item.employee_id === profile.id).map((item: TeamLeaveDay) => ({
           id: `leave-${item.request_id}-${item.leave_date}`, date: item.leave_date,
           start: item.full_day ? null : item.start_time, end: item.full_day ? null : item.end_time,
           title: item.full_day ? 'Approved time off' : 'Approved time off (partial day)',
           subtitle: 'Time off', kind: 'time_off' as const,
         })),
       ];
+      if (!activeRef.current || request !== requestId.current) return;
       setEvents(result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || '')));
       setHasLoaded(true);
       setLoadedRange(rangeStart + ':' + rangeEnd);
     } catch (e) {
       console.error('Calendar load failed', e);
+      if (!activeRef.current || request !== requestId.current) return;
       setError('Could not load your schedule. Pull down to retry.');
-    } finally { setLoading(false); setRefreshing(false); }
+    } finally {
+      if (activeRef.current && request === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, [profile?.id, isConnected, rangeStart, rangeEnd]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; requestId.current += 1; };
+  }, []);
+
+  // Refresh when returning to the calendar tab.
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { requestId.current += 1; };
+  }, [load]));
+
+  // Recheck PTO and internal sessions after returning from background.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void load();
+    });
+    return () => subscription.remove();
+  }, [load]);
   useEffect(() => {
     if (!profile?.id || !isConnected) return;
     const channel = supabase.channel('native-calendar')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders', filter: `assigned_to=eq.${profile.id}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `assigned_technician=eq.${profile.id}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'internal_time_sessions', filter: `assigned_to=eq.${profile.id}` }, () => load())
       .subscribe();
     return () => { channel.unsubscribe(); };
   }, [profile?.id, isConnected, load]);
