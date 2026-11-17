@@ -172,9 +172,9 @@ export function InternalTimeCard() {
   );
 }
 const styles = StyleSheet.create({
-  card: { marginVertical: Spacing.lg },
-  heading: { ...Typography.heading, marginBottom: Spacing.sm },
-  body: { ...Typography.body, color: Colors.gray[600], marginBottom: Spacing.sm, lineHeight: 21 },
+  card: { marginVertical: Spacing.sm, marginHorizontal: Spacing.md, padding: Spacing.md },
+  heading: { ...Typography.subheading, marginBottom: 4 },
+  body: { ...Typography.body, color: Colors.gray[600], marginBottom: 6, lineHeight: 18, fontSize: 13 },
   warning: { ...Typography.body, color: Colors.amber[700], marginVertical: Spacing.sm },
   session: { borderTopWidth: 1, borderColor: Colors.gray[200], paddingTop: Spacing.lg, marginTop: Spacing.lg },
   sessionType: { ...Typography.caption, color: Colors.primary[600], fontWeight: '700', marginBottom: Spacing.xs },
@@ -182,11 +182,11 @@ const styles = StyleSheet.create({
   status: { ...Typography.caption, color: Colors.gray[600], fontWeight: '600', marginBottom: Spacing.sm },
   elapsed: { fontSize: 32, fontWeight: '700', fontVariant: ['tabular-nums'], color: Colors.primary[700], marginBottom: Spacing.sm },
   input: { borderWidth: 1, borderColor: Colors.gray[300], borderRadius: Radius.md, padding: Spacing.md, minHeight: 70, textAlignVertical: 'top', color: Colors.gray[900], marginVertical: Spacing.sm },
-  button: { backgroundColor: Colors.primary[600], borderRadius: Radius.md, minHeight: 46, justifyContent: 'center', padding: Spacing.md, marginTop: Spacing.sm },
+  button: { backgroundColor: Colors.primary[600], borderRadius: Radius.md, minHeight: 44, justifyContent: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, marginTop: 6 },
   buttonText: { color: Colors.white, textAlign: 'center', fontWeight: '600', fontSize: 14 },
   stop: { backgroundColor: Colors.red[500] },
   disabled: { opacity: 0.45 },
-  requests: { marginTop: Spacing.sm },
+  requests: { marginTop: 4 },
   durations: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginVertical: Spacing.sm },
   duration: { padding: Spacing.md, minHeight: 44, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.gray[300] },
   selected: { backgroundColor: Colors.primary[100], borderColor: Colors.primary[600] },
