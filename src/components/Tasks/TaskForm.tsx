@@ -376,7 +376,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <QuickActionModal
       scrollBody={false}
       title={task ? 'Edit Assignment' : supportMode ? 'New Support Request' : 'New Assignment'}
-      subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Assign and track a follow-up'}
+      subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Get something done. Assign a task, question, issue, or follow-up.'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
@@ -397,7 +397,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Task Title */}
             <div>
               <label htmlFor="assignment-title" className="block text-sm font-medium text-secondary mb-1.5">
-                Assignment Title <span className="text-red-400">*</span>
+                What needs to be done? <span className="text-red-400">*</span>
               </label>
               <input
                 id="assignment-title"
@@ -406,7 +406,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2.5 bg-surface border border-subtle text-primary text-sm rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                placeholder="Follow up with customer"
+                placeholder="What needs to be done?"
               />
             </div>
 
@@ -428,7 +428,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
                 }}
               />
               <p className="text-xs text-muted mt-1">
-                Anyone is the default. Department tasks notify that department; the first person to complete one earns the points.
+                Choose a person or department. Leave as Anyone if no owner is needed yet.
               </p>
             </div>
 
@@ -451,7 +451,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             {/* Contact - always visible */}
             <div>
               <label className="block text-sm font-medium text-secondary mb-1.5">
-                Contact <span className="text-muted font-normal">{supportMode ? '(required for support)' : '(optional)'}</span>
+                Related customer <span className="text-muted font-normal">{supportMode ? '(required for support)' : '(optional)'}</span>
               </label>
               <div className="flex gap-2">
                 <ContactSearchSelect
