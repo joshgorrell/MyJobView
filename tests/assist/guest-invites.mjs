@@ -103,9 +103,9 @@ let checked=0;const outages=createGuestBroker({...options,rpc:async(name,args)=>
 await outages.staff({...context,operation:'invite_create'});checked=0; // A second independent invitation must also be swept on auth failure.
 await outages.staff({...context,operation:'invite_create'});checked=2;
 const beforeDeletes=deletes;await outages.sweep();assert.equal(deletes,beforeDeletes+2);
-const armInvite=await staff('invite_create');
-await assert.rejects(broker.guest({organization_id:org,operation:'redeem',code:armInvite.code,architecture:'arm64'}),/unavailable/);
-const fallbackClaim=await broker.guest({organization_id:org,operation:'redeem',code:armInvite.code,architecture:'x64'});assert.equal(new URL(fallbackClaim.download_url).searchParams.get('id'),'4','Unapproved ARM request does not consume code');
+const fallbackInvite=await staff('invite_create');
+await assert.rejects(broker.guest({organization_id:org,operation:'redeem',code:fallbackInvite.code,architecture:'arm64'}),/unavailable/);
+const fallbackClaim=await broker.guest({organization_id:org,operation:'redeem',code:fallbackInvite.code,architecture:'x64'});assert.equal(new URL(fallbackClaim.download_url).searchParams.get('id'),'4','Unapproved ARM request does not consume code');
 const armBroker=createGuestBroker({...options,arm64Enabled:true});
 const arm=await armBroker.staff({...context,operation:'invite_create'});
 const armClaim=await armBroker.guest({organization_id:org,operation:'redeem',code:arm.code,architecture:'arm64'});
