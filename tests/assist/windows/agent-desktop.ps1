@@ -46,7 +46,12 @@ public static class AssistConsentInput {
    bool scoped=false;
    EnumChildWindows(window,(child,data)=>{if(Text(child).Contains(viewer))scoped=true;return true;},IntPtr.Zero);
    if(!scoped)return true;
-   var button=GetDlgItem(window,allow?0xFFF2:0xFFF3);
+   IntPtr button=IntPtr.Zero;
+   // Vendor reuses these child IDs for STATIC labels; require the button caption too.
+   EnumChildWindows(window,(child,data)=>{
+    if(GetDlgCtrlID(child)==(allow?0xFFF2:0xFFF3) && Text(child).Trim()==(allow?"Allow":"Deny"))button=child;
+    return true;
+   },IntPtr.Zero);
    if(button==IntPtr.Zero || Text(button).Trim()!=(allow?"Allow":"Deny"))return true;
    SetForegroundWindow(window);
    Rect rect;if(!GetWindowRect(button,out rect))return true;
@@ -74,7 +79,7 @@ do{
  if($Mode -ne 'peek' -and [AssistConsentInput]::SelectConsent($ViewerName,($Mode -eq 'allow'))){Write-Output 'consent_selection_applied';exit 0}
  $windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
  foreach($window in $windows){
-  if($window.Current.Name.Trim() -ne 'MeshCentral'){continue}
+  if(([string]$window.Current.Name).Trim() -ne 'MeshCentral'){continue}
   $all=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
   $names=(@($all|ForEach-Object{$_.Current.Name}) -join ' ') -replace '\s+',' '
   $buttonInfo=(@($all|Where-Object{$_.Current.Name -match 'Allow|Deny'}|Select-Object -First 8|ForEach-Object{@{name=$_.Current.Name;type=$_.Current.ControlType.ProgrammaticName;enabled=$_.Current.IsEnabled;offscreen=$_.Current.IsOffscreen}})|ConvertTo-Json -Compress)
@@ -82,7 +87,7 @@ do{
   if(-not $names.Contains($ViewerName)){continue}
   if($Mode -eq 'peek'){Write-Output 'consent_prompt_present';exit 0}
   $choices=if($Mode -eq 'allow'){@('Allow','&Allow','Yes','&Yes')}else{@('Deny','&Deny','No','&No')}
-  foreach($element in $all){if($choices -contains $element.Current.Name.Trim()){
+  foreach($element in $all){if($choices -contains ([string]$element.Current.Name).Trim()){
    # Invoke the actual native BUTTON only after matching this viewer's dialog.
    # Upstream win-userconsent assigns Allow=0xFFF2 and Deny=0xFFF3.
    $handle=[IntPtr]$element.Current.NativeWindowHandle
