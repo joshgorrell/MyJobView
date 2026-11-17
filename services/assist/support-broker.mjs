@@ -17,6 +17,9 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
  const labelPath=id=>join(labelDirectory,id+'.json');
  const readLabels=async id=>{if(!labelDirectory)return {};try{const data=JSON.parse(await readFile(labelPath(id),'utf8'));return data&&typeof data==='object'&&!Array.isArray(data)?data:{};}catch(e){if(e.code==='ENOENT')return {};throw e;}};
  const writeLabels=async(id,labels)=>{if(!labelDirectory)throw new Error('labels_unavailable');await mkdir(labelDirectory,{recursive:true,mode:0o700});const target=labelPath(id),temp=target+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(labels),{mode:0o600,flag:'wx'});await rename(temp,target);};
+ const removedPath=id=>join(labelDirectory,id+'.removed.json');
+ const readRemoved=async id=>{if(!labelDirectory)throw new Error('device_management_unavailable');try{const data=JSON.parse(await readFile(removedPath(id),'utf8'));if(!Array.isArray(data)||data.some(v=>typeof v!=='string'))throw new Error('invalid_removed_devices');return data;}catch(e){if(e.code==='ENOENT')return [];throw e;}};
+ const writeRemoved=async(id,ids)=>{if(!labelDirectory)throw new Error('device_management_unavailable');await mkdir(labelDirectory,{recursive:true,mode:0o700});const target=removedPath(id),temp=target+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(ids),{mode:0o600,flag:'wx'});await rename(temp,target);};
  const sessions=new Map();
  const call=(action,c,params={})=>rpc('assist_support_service',{p_action:action,p_organization_id:c.organization_id,p_actor_id:c.actor_id||null,p_auth_session_id:c.auth_session_id||null,p_params:params});
  const revoke=async(c,reason)=>{
@@ -30,20 +33,23 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
    return exclusive(c.organization_id,async()=>{
     if(c.operation==='devices'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
-     const devices=await runtime.inventory(c.organization_id),labels=await readLabels(c.organization_id);
-     return {devices:devices.map(device=>({...device,name:safeLabel(labels[device.id])?labels[device.id]:device.name}))};
+     const devices=await runtime.inventory(c.organization_id),labels=await readLabels(c.organization_id),removed=await readRemoved(c.organization_id);
+     return {devices:devices.filter(device=>!removed.includes(device.id)).map(device=>({...device,name:safeLabel(labels[device.id])?labels[device.id]:device.name}))};
     }
     if(c.operation==='device_label'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
      const devices=await runtime.inventory(c.organization_id);
-     if(!devices.some(device=>device.id===c.device_id))throw new Error('device_unavailable');
+     if(!devices.some(device=>device.id===c.device_id)||(await readRemoved(c.organization_id)).includes(c.device_id))throw new Error('device_unavailable');
      const labels=await readLabels(c.organization_id);labels[c.device_id]=c.label.trim();await writeLabels(c.organization_id,labels);
      return {saved:true};
     }
     if(c.operation==='device_remove'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
      const devices=await runtime.inventory(c.organization_id);
-     if(!devices.some(d=>d.id===c.device_id))throw new Error('device_unavailable');
+     if(!devices.some(d=>d.id===c.device_id)||(await readRemoved(c.organization_id)).includes(c.device_id))throw new Error('device_unavailable');
+     // Persist a fail-closed tombstone before the native command: soft-deleted nodes may reconnect.
+     const removed=await readRemoved(c.organization_id);
+     await writeRemoved(c.organization_id,[...removed,c.device_id]);
      // End existing viewers before revoking enrollment. Failure must block removal confirmation.
      for(const active of [...sessions.values()].filter(s=>s.organization_id===c.organization_id&&s.device_id===c.device_id))await revoke(active,'device_removed');
      const result=await runtime.removeEnrollment(c.organization_id,c.device_id);
@@ -55,7 +61,7 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
     if(c.operation==='connect'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
      const device=(await runtime.inventory(c.organization_id)).find(d=>d.id===c.device_id);
-     if(!device?.online)throw new Error('device_unavailable');
+     if(!device?.online||(await readRemoved(c.organization_id)).includes(c.device_id))throw new Error('device_unavailable');
      const row=await call('open',c,{device_id:c.device_id,token_exp:c.token_exp});
      if(!row?.valid)throw new Error('forbidden');
      const context={...row,device_id:c.device_id,organization_id:c.organization_id,actor_id:c.actor_id,auth_session_id:c.auth_session_id};
