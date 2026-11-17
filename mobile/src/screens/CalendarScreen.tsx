@@ -10,7 +10,7 @@ import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContex
 import { readCalendarRange, saveCalendarRange } from '../services/CalendarCache';
 
 type Mode = 'day' | 'week' | 'month' | 'agenda';
-type PrivateAppointment = { id: string; appointment_date: string; start_time: string | null; end_time: string | null; title: string | null; status: string; assigned_technician: string | null; can_view_details: boolean | null };
+type PrivateAppointment = { id: string; appointment_date: string; start_time: string | null; end_time: string | null; title: string | null; status: string; assigned_technician: string | null; can_view_details: boolean | null; all_day?: boolean | null; is_blocked?: boolean | null };
 type TeamLeaveDay = { request_id: string; employee_id: string; leave_date: string; full_day: boolean; start_time: string | null; end_time: string | null };
 type Event = { id: string; date: string; start: string | null; end: string | null; title: string; subtitle: string; kind: 'job' | 'appointment' | 'internal' | 'time_off'; workOrderId?: string };
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -125,9 +125,10 @@ export default function CalendarScreen({ navigation }: any) {
         ...(appointments.data || [])
           .filter((a: PrivateAppointment) => a.status !== 'cancelled' && a.assigned_technician === profile.id)
           .map((a: PrivateAppointment) => ({
-            id: `appointment-${a.id}`, date: a.appointment_date, start: a.start_time, end: a.end_time,
-            title: a.can_view_details === false ? 'Busy' : (a.title || 'Appointment'),
-            subtitle: a.can_view_details === false ? 'Private appointment' : 'Appointment',
+            id: `appointment-${a.id}`, date: a.appointment_date,
+            start: a.all_day ? null : a.start_time, end: a.all_day ? null : a.end_time,
+            title: a.can_view_details === false ? 'Busy' : a.is_blocked ? 'Blocked time' : (a.title || 'Appointment'),
+            subtitle: a.can_view_details === false ? 'Private appointment' : a.is_blocked ? 'Unavailable' : 'Appointment',
             kind: 'appointment' as const,
           })),
         ...(internal.data || []).map(item => ({
