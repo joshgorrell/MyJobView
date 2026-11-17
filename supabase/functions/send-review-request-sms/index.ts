@@ -9,8 +9,6 @@ const corsHeaders = {
 
 interface SMSReviewRequest {
   contactId?: string;
-  phone?: string;
-  name?: string;
   reviewUrl: string;
 }
 
@@ -39,34 +37,62 @@ Deno.serve(async (req: Request) => {
       throw new Error("Invalid authentication token");
     }
 
-    const { contactId, phone, name, reviewUrl }: SMSReviewRequest = await req.json();
+    const { contactId, reviewUrl }: SMSReviewRequest = await req.json();
+    // Review requests must be tied to an authorized, opted-in contact.
+    if (!contactId || typeof contactId !== "string") {
+      return new Response(JSON.stringify({ error: "Contact is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    let reviewHost: string;
+    try {
+      const parsed = new URL(reviewUrl);
+      if (parsed.protocol !== "https:") throw new Error("HTTPS required");
+      reviewHost = parsed.hostname.toLowerCase();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid review link" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const allowedReviewHosts = new Set([
+      "g.page", "maps.app.goo.gl", "search.google.com", "www.google.com",
+      "google.com", "maps.google.com",
+    ]);
+    if (!allowedReviewHosts.has(reviewHost)) {
+      return new Response(JSON.stringify({ error: "Unsupported review link" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerDb = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     let recipientPhone: string;
     let recipientName: string;
 
-    // Get recipient details
-    if (contactId) {
-      const { data: contact, error: contactError } = await supabase
-        .from("contacts")
-        .select("phone, contact_name, full_name")
-        .eq("id", contactId)
-        .single();
+    // The caller must be permitted to read this contact under RLS.
+    const { data: contact, error: contactError } = await callerDb
+      .from("contacts")
+      .select("phone, mobile_phone, contact_name, full_name, sms_opt_in")
+      .eq("id", contactId)
+      .single();
 
-      if (contactError || !contact) {
-        throw new Error("Contact not found");
-      }
-
-      if (!contact.phone) {
-        throw new Error("Contact does not have a phone number");
-      }
-
-      recipientPhone = contact.phone;
-      recipientName = contact.full_name || contact.contact_name || "Customer";
-    } else if (phone) {
-      recipientPhone = phone;
-      recipientName = name || "Customer";
-    } else {
-      throw new Error("Either contactId or phone number must be provided");
+    if (contactError || !contact) {
+      return new Response(JSON.stringify({ error: "Contact not found or not accessible" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (contact.sms_opt_in !== true) {
+      return new Response(JSON.stringify({ error: "Contact has not opted in to SMS" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const recipientPhone = contact.mobile_phone || contact.phone;
+    const recipientName = contact.full_name || contact.contact_name || "Customer";
+    if (!recipientPhone) {
+      return new Response(JSON.stringify({ error: "Contact has no phone number" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get company Twilio settings
@@ -105,7 +131,7 @@ Deno.serve(async (req: Request) => {
 
     if (!twilioResponse.ok) {
       const errorData = await twilioResponse.json();
-      console.error("Twilio error:", errorData);
+      console.error("Twilio rejected review SMS", twilioResponse.status);
       throw new Error(`Failed to send SMS: ${errorData.message || twilioResponse.statusText}`);
     }
 
@@ -115,7 +141,6 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         messageId: twilioData.sid,
-        to: recipientPhone,
         sentAt: new Date().toISOString(),
       }),
       {
@@ -129,7 +154,6 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         error: error.message || "Failed to send review request SMS",
-        details: error.toString(),
       }),
       {
         status: 500,
