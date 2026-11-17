@@ -24,13 +24,15 @@ if($ViewerName -notmatch '^mjv-session-[a-f0-9]{32}$'){throw 'Scoped test viewer
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 $deadline=[DateTime]::UtcNow.AddSeconds(25)
+$seen=@()
 do{
  $windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)
  foreach($window in $windows){
-  if($window.Current.Name -ne 'MeshCentral'){continue}
+  if($window.Current.Name -notmatch 'Mesh|MJV'){continue}
   $all=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
   $names=@($all|ForEach-Object{$_.Current.Name}) -join ' '
-  if(-not $names.Contains($ViewerName)){continue}
+  $seen=@($seen+($window.Current.Name+': '+$names))|Select-Object -Unique
+  if($window.Current.Name -ne 'MeshCentral' -or -not $names.Contains($ViewerName)){continue}
   if($Mode -eq 'peek'){Write-Output 'consent_prompt_present';exit 0}
   $choices=if($Mode -eq 'allow'){@('Allow','Yes','&Yes')}else{@('Deny','No','&No')}
   foreach($element in $all){if($choices -contains $element.Current.Name){
@@ -40,4 +42,4 @@ do{
  }
  Start-Sleep -Milliseconds 100
 }while([DateTime]::UtcNow -lt $deadline)
-throw 'Expected scoped native consent prompt was not found'
+throw ('Expected scoped native consent prompt was not found. Related window labels: '+(($seen -join '; ').Substring(0,[Math]::Min(1600,($seen -join '; ').Length))))
