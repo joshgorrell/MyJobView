@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const script=readFileSync(new URL('../../services/assist/windows-agent-download-check.ps1',import.meta.url),'utf8');
 for(const item of ['ValidateSet("x64","arm64")','https','HttpCompletionOption','150MB','0xAA64','0x8664','Get-FileHash','Remove-Item','production_approval=$false'])assert.ok(script.includes(item),item);
+assert.ok(script.includes("^[A-Za-z0-9_-]{16,128}$"),'Accept MeshCentral base64url-style mesh IDs');
 assert.ok(!script.includes('System.Web.HttpUtility'),'Compatible with PowerShell 7 and Windows PowerShell');
 assert.equal((script.match(/param\(/g)||[]).length,1,'Single script parameter block');
 assert.equal((script.match(/if\(\$report.status -ne "PASS"\)\{exit 1\}/g)||[]).length,1,'Single final exit gate');
