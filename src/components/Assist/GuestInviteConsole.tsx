@@ -26,15 +26,15 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       setSearching(true); setDirectoryError(false);
       const term = recipientQuery.trim().replace(/[%,()]/g, '');
       try {
-        // Search only records in this dealer. RLS provides an additional access boundary.
+        // Contacts use MyJobView's existing RLS tenant boundary; profiles are explicitly organization-scoped.
         const [customers, users] = await Promise.all([
-          supabase.from('customers').select('id,name,email').eq('organization_id', organizationId).or(`name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
+          supabase.from('contacts').select('id,full_name,company_name,contact_name,email,contact_type').in('contact_type', ['person', 'business']).or(`full_name.ilike.%${term}%,company_name.ilike.%${term}%,contact_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
           supabase.from('profiles').select('id,full_name,email').eq('organization_id', organizationId).or(`full_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
         ]);
         if (cancelled) return;
         if (customers.error || users.error) setDirectoryError(true);
         const found: Recipient[] = [
-          ...(customers.data || []).map(row => ({ id: String(row.id), name: String(row.name || row.email || 'Customer'), email: String(row.email || ''), type: 'Customer' as const })),
+          ...(customers.data || []).map(row => ({ id: String(row.id), name: String(row.company_name || row.full_name || row.contact_name || row.email || 'Customer'), email: String(row.email || ''), type: 'Customer' as const })),
           ...(users.data || []).map(row => ({ id: String(row.id), name: String(row.full_name || row.email || 'User'), email: String(row.email || ''), type: 'User' as const })),
         ].filter(row => validEmail(row.email));
         setMatches(found);
