@@ -44,7 +44,7 @@ assert.ok(html.includes('Lead tools'));assert.ok(!html.includes('Claim tools'));
 html=renderToString(<WorkspaceTabs title="Time & Payroll" initial="payroll" tabs={[{key:'time_approval',label:'Review',content:<div>Review only</div>}]}/>);
 assert.ok(html.includes('Review only'));
 console.log('Flow task permission boundaries, legacy initial task view, and workspace initial/fallback tabs pass');
-` }, bundle:true, platform:'node', format:'cjs', jsx:'automatic', outfile:join(dir,'test.cjs'), plugins:[{name:'fixtures',setup(b){
+` }, bundle:true, platform:'node', format:'cjs', define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('https://example.supabase.co'),'import.meta.env.VITE_SUPABASE_ANON_KEY':JSON.stringify('test-anon-key')}, jsx:'automatic', outfile:join(dir,'test.cjs'), plugins:[{name:'fixtures',setup(b){
  b.onResolve({filter:/contexts\/(AuthContext|DepartmentContext)$|lib\/flow\/useFlow$|lib\/supabase(?:\.ts)?$/},()=>({path:'fixture',namespace:'fixture'}));
  b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const useAuth=()=>({profile:{id:'user'}});export const useDepartments=()=>({hasModuleAccess:k=>globalThis.allowed.has(k)});export const useFlow=()=>{globalThis.flowLoads=(globalThis.flowLoads||0)+1;return {events:[],loading:false,connected:true};};export const supabase={};`}));
  b.onResolve({filter:/WeeklyProposalActivity$|FlowCreateModal$|FlowFollowUps$|FlowTargetPicker$|CustomerConversations$|DiscussionFeed$|DiscussionPostForm$/},a=>({path:a.path,namespace:'child'}));
