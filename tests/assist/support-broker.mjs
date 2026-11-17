@@ -43,6 +43,35 @@ try {
  const otherBroker=createSupportBroker({rpc,runtime:otherRuntime,requeue:async()=>{},labelDirectory});
  assert.equal((await otherBroker.handle({...context,organization_id:otherOrg,operation:'devices'})).devices[0].name,'Other office');
 } finally { await rm(labelDirectory,{recursive:true,force:true}); }
+// Enrolled-device removal must revoke active viewers, reject foreign IDs, and never confirm an unverified deletion.
+{
+ const directory=await mkdtemp(join(tmpdir(),'mjv-assist-removal-'));
+ try {
+  let present=true,removeCalls=0,viewerRevokes=0,shouldFail=false;
+  const removableRuntime={
+   ...runtime,
+   inventory:async()=>present?[{id:device,name:'Test laptop',online:true,os:'Windows'}]:[],
+   removeEnrollment:async(_org,id)=>{removeCalls++;assert.equal(id,device);if(shouldFail)throw new Error('removal_unconfirmed');present=false;return {removed:true};},
+   revokeViewer:async()=>{viewerRevokes++;}
+  };
+  const removing=createSupportBroker({rpc,runtime:removableRuntime,requeue:async()=>{},labelDirectory:directory});
+  allowed=true;
+  await assert.rejects(removing.handle({...context,operation:'device_remove',device_id:'node/foreign/device'}),/device_unavailable/);
+  assert.equal(removeCalls,0);
+  await removing.handle({...context,operation:'device_label',device_id:device,label:'Saved label'});
+  const active=await removing.handle({...context,operation:'connect',device_id:device});
+  shouldFail=true;
+  await assert.rejects(removing.handle({...context,operation:'device_remove',device_id:device}),/removal_unconfirmed/);
+  assert.equal(viewerRevokes,1);
+  assert.equal((await removing.handle({...context,operation:'devices'})).devices[0].name,'Saved label');
+  shouldFail=false;
+  assert.equal((await removing.handle({...context,operation:'device_remove',device_id:device})).removed,true);
+  assert.equal((await removing.handle({...context,operation:'devices'})).devices.length,0);
+  await assert.rejects(removing.handle({...context,operation:'connect',device_id:device}),/device_unavailable/);
+  assert.equal(removeCalls,2);
+  assert.equal(active.session_id,sid);
+ } finally {await rm(directory,{recursive:true,force:true});}
+}
 const actorInfo={...context,subdomain:'elife'};
 let controlled=0;const handler=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>actorInfo,control:async body=>{controlled++;if(body.operation==='devices')return {devices:[{id:device,name:'Laptop',online:true,secret:'must-not-leak'}]};return started;}});
 const request=(body,origin='https://elife.myjobview.com')=>new Request('https://backend.example/functions/v1/assist-support',{method:'POST',headers:{origin,authorization:'Bearer verified-by-auth-test'},body:JSON.stringify(body)});
