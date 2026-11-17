@@ -39,6 +39,7 @@ assert.equal(armDownload.searchParams.get('id'),'43','ARM64 must request its own
 assert.equal(armDownload.searchParams.get('installflags'),'1','ARM64 guest must remain temporary');
 assert.equal(armDownload.searchParams.get('meshid'),new URL(download).searchParams.get('meshid'),'Architecture must not change dealer group');
 await archEnabled.guest({organization_id:org,operation:'end',invite_id:armInvite.invite_id,claim_token:armClaim.claim_token});
+const baselineRevokes=revokes,baselineDeletes=deletes;
 const invite=await staff('invite_create');assert.match(invite.code,/^[2-9A-HJ-NP-Z]{4}(-[2-9A-HJ-NP-Z]{4}){2}$/);
 await assert.rejects(broker.guest({organization_id:other,operation:'redeem',code:invite.code}),/unavailable/);
 const claims=await Promise.allSettled([1,2].map(()=>broker.guest({organization_id:org,operation:'redeem',code:invite.code.toLowerCase()})));
@@ -52,7 +53,7 @@ await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unava
 online=[{id:device,online:true}];assert.equal((await staff('invite_status',{invite_id:invite.invite_id})).state,'computer_ready');
 const connected=await staff('invite_connect',{invite_id:invite.invite_id});assert.equal(connected.state,'support_window_ready');assert.equal(opens,1);
 await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unavailable/);assert.equal(opens,1,'Only one desktop viewer is issued');
-assert.equal((await guest('end')).ended,true);assert.equal(revokes,1);assert.equal(deletes,1);assert.equal(endReasons.at(-1),'user_ended');
+assert.equal((await guest('end')).ended,true);assert.equal(revokes,baselineRevokes+1);assert.equal(deletes,baselineDeletes+1);assert.equal(endReasons.at(-1),'user_ended');
 await assert.rejects(guest('status'),/unavailable/);
 // A guest that closes the temporary Windows client without clicking End must
 // lose the native viewer on the next short session sweep.
