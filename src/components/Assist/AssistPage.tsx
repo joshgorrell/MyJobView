@@ -76,7 +76,6 @@ export default function AssistPage() {
             className="block h-auto w-full"
           />
         </div>
-        <p className="text-sm text-muted">{tenant?.organizationName || 'Your dealer'} · Help for your on-site laptop</p>
       </header>
       <div className="grid items-start gap-4 lg:grid-cols-2">
       <section className="min-w-0 rounded-xl border border-subtle bg-surface p-4">
