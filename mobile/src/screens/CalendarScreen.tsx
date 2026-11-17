@@ -72,7 +72,7 @@ export default function CalendarScreen({ navigation }: any) {
     readCalendarRange(employeeId, rangeStart, rangeEnd).then(snapshot => {
       if (cancelled || !snapshot || latestRangeRef.current !== expectedRange || requestId.current !== requestAtStart) return;
       setEvents(snapshot.events);
-      setLoadedRange(rangeStart + ':' + rangeEnd);
+      setLoadedRange(employeeId + ':' + rangeStart + ':' + rangeEnd);
       setCachedAt(snapshot.fetchedAt);
     }).catch(error => console.warn('Calendar cache unavailable', error));
     return () => { cancelled = true; };
@@ -152,7 +152,7 @@ export default function CalendarScreen({ navigation }: any) {
         void saveCalendarRange(profile.id, rangeStart, rangeEnd, sorted)
           .catch(cacheError => console.warn('Calendar cache write failed', cacheError));
       }
-      setLoadedRange(rangeStart + ':' + rangeEnd);
+      setLoadedRange(profile.id + ':' + rangeStart + ':' + rangeEnd);
     } catch (e) {
       console.error('Calendar load failed', e);
       if (!activeRef.current || request !== requestId.current) return;
@@ -199,8 +199,8 @@ export default function CalendarScreen({ navigation }: any) {
     const count = mode === 'week' ? 7 : Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7;
     return Array.from({ length: count }, (_, i) => shift(start, i));
   }, [selected, mode]);
-  const selectedEvents = loadedRange === rangeStart + ':' + rangeEnd ? (mode === 'agenda' ? events : events.filter(e => e.date === selected)) : [];
-  const eventDates = new Set((loadedRange === rangeStart + ':' + rangeEnd ? events : []).map(e => e.date));
+  const selectedEvents = loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd ? (mode === 'agenda' ? events : events.filter(e => e.date === selected)) : [];
+  const eventDates = new Set((loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd ? events : []).map(e => e.date));
   const move = (direction: number) => {
     if (mode === 'day') setSelected(key(shift(date, direction)));
     else if (mode === 'agenda') setSelected(key(shift(date, 30 * direction)));
@@ -242,14 +242,14 @@ export default function CalendarScreen({ navigation }: any) {
           })}
         </View>}
         <Text style={styles.dayHeading}>{mode === 'agenda' ? 'Upcoming 30 days' : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
-        {!isConnected && <Text style={styles.notice}>{loadedRange === rangeStart + ':' + rangeEnd
+        {!isConnected && <Text style={styles.notice}>{loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd
           ? 'Offline — saved schedule from ' + (cachedAt ? new Date(cachedAt).toLocaleString() : 'this session') + '. Changes may not be shown.'
           : 'Offline — no saved schedule for this period.'}</Text>}
-        {isConnected && cachedAt && loadedRange === rangeStart + ':' + rangeEnd && <Text style={styles.notice}>Showing saved schedule from {new Date(cachedAt).toLocaleString()} while refreshing.</Text>}
+        {isConnected && cachedAt && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && <Text style={styles.notice}>Showing saved schedule from {new Date(cachedAt).toLocaleString()} while refreshing.</Text>}
         {!!error && <Text style={styles.error}>{error}</Text>}
         {loading && <ActivityIndicator color={Colors.primary[600]} />}
-        {!loading && !error && loadedRange === rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
-        {!loading && !!error && loadedRange === rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>No events were returned from the available calendar sources.</Text>}
+        {!loading && !error && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
+        {!loading && !!error && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>No events were returned from the available calendar sources.</Text>}
         {selectedEvents.map(event =>
           <TouchableOpacity key={event.id} accessibilityRole="button"
             disabled={!event.workOrderId}
