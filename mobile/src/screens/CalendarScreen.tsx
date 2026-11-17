@@ -103,10 +103,16 @@ export default function CalendarScreen({ navigation }: any) {
           .gte('session_date', rangeStart).lte('session_date', rangeEnd).limit(300),
         supabase.rpc('team_time_off', { p_from: rangeStart, p_to: rangeEnd }),
       ]);
-      if (jobs.error) throw jobs.error;
-      if (appointments.error) throw appointments.error;
-      if (internal.error) throw internal.error;
-      if (timeOff.error) throw timeOff.error;
+      const failures = [
+        jobs.error && 'jobs',
+        appointments.error && 'appointments',
+        internal.error && 'internal sessions',
+        timeOff.error && 'approved time off',
+      ].filter((name): name is string => Boolean(name));
+      if (failures.length === 4) throw new Error('All calendar sources failed');
+      if (failures.length) {
+        console.warn('Calendar sources unavailable', failures);
+      }
       const result: Event[] = [
         ...(jobs.data || []).filter(j => j.status !== 'cancelled').map(j => ({
           id: `job-${j.id}`, date: j.scheduled_date, start: j.scheduled_start_time, end: j.scheduled_end_time,
@@ -136,8 +142,12 @@ export default function CalendarScreen({ navigation }: any) {
       const sorted = result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || ''));
       setEvents(sorted);
       setCachedAt(null);
-      void saveCalendarRange(profile.id, rangeStart, rangeEnd, sorted)
-        .catch(cacheError => console.warn('Calendar cache write failed', cacheError));
+      setError(failures.length ? 'Some calendar information is unavailable (' + failures.join(', ') + '). Pull down to retry.' : '');
+      // Never replace a complete offline snapshot with an incomplete response.
+      if (!failures.length) {
+        void saveCalendarRange(profile.id, rangeStart, rangeEnd, sorted)
+          .catch(cacheError => console.warn('Calendar cache write failed', cacheError));
+      }
       setHasLoaded(true);
       setLoadedRange(rangeStart + ':' + rangeEnd);
     } catch (e) {
