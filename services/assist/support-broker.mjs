@@ -2,7 +2,7 @@ import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {inviteOperations} from './guest-broker.mjs';
-const safeLabel=value=>typeof value==='string'&&value.trim().length>0&&value.trim().length<=120&&!/[\\x00-\\x1f\\x7f]/.test(value);
+const safeLabel=value=>typeof value==='string'&&value.trim().length>0&&value.trim().length<=120&&!/[\x00-\x1f\x7f]/.test(value);
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function validateSupportRequest(body){
  if(!body||!['devices','device_label','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');

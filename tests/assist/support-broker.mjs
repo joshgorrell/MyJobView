@@ -29,7 +29,10 @@ try {
  const restarted=createSupportBroker({rpc,runtime,requeue:async()=>{},labelDirectory});
  assert.equal((await restarted.handle({...context,operation:'devices'})).devices[0].name,'Justin – Field Laptop');
  await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:'node/foreign/device',label:'Bad'}),/unavailable/);
- await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Bad\\nName'}),/invalid_device/);
+ await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Bad\nName'}),/invalid_device/);
+ assert.equal((await restarted.handle({...context,operation:'device_label',device_id:device,label:'Alex – Windows 11 x64'})).saved,true);
+ await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Tab\tName'}),/invalid_device/);
+ await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Delete\u007fName'}),/invalid_device/);
  allowed=false;
  await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Unauthorized'}),/forbidden/);
  allowed=true;
