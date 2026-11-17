@@ -38,3 +38,7 @@ For each ID record: PASS / FAIL / BLOCKED, date/time, tester, environment/build,
 
 ## Release decision
 Production approval requires all relevant G/E/S cases passing on actual Windows, a working canary runner, reviewed dependency security, successful rollback/recovery, and explicit operator sign-off. The guest support code is a new temporary identity; removing permanent enrollment must not ban the physical computer.
+
+## Independent Windows harness integration (not yet deployed)
+
+The Windows-only canary host can load the verifier module using `ASSIST_WINDOWS_CANARY_VERIFIER=file:///.../services/assist/windows-canary-verifier.mjs` and an absolute path in `ASSIST_WINDOWS_CANARY_HARNESS_EXE` to a separately installed, audited Windows .exe test harness. The module starts that executable with no shell, sends the canary request as JSON on stdin and accepts a single JSON result on stdout. A nonzero exit, invalid output, missing executable, timeout or cancellation must fail the canary. The host validates the resulting proof fields. Never set these variables to a script that merely echoes success: the external harness must operate disposable Windows machines and independently observe real desktop/input, denied consent and cross-dealer rejection. No harness executable is bundled, and no canary or production activation is authorized by this integration.
