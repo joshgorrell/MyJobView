@@ -128,11 +128,6 @@ Deno.serve(async (req: Request) => {
     const settings = await getCompanySettings(supabaseUrl, supabaseServiceKey);
     const template = await getEmailTemplate('work_order_assigned', supabaseUrl, supabaseServiceKey);
 
-    const { data: companySettings } = await supabase
-      .from("company_settings")
-      .select("twilio_account_sid, twilio_auth_token, twilio_phone_number")
-      .maybeSingle();
-
     const results = [];
 
     for (const wo of workOrders) {
@@ -223,47 +218,13 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      if (wo.reminder_sms && wo.contact?.phone) {
-        try {
-          const message = `Hi ${wo.contact.full_name || "there"}! Reminder: Your ${wo.type === 'vip_program' ? 'VIP service' : 'service'} appointment (WO ${wo.work_order_number}) is scheduled for ${appointmentDate} at ${appointmentTime}. ${settings.company_name}`;
-
-          if (
-            companySettings?.twilio_account_sid &&
-            companySettings?.twilio_auth_token &&
-            companySettings?.twilio_phone_number
-          ) {
-            const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${companySettings.twilio_account_sid}/Messages.json`;
-
-            const formData = new URLSearchParams();
-            formData.append("To", wo.contact.phone);
-            formData.append("From", companySettings.twilio_phone_number);
-            formData.append("Body", message);
-
-            const twilioResponse = await fetch(twilioUrl, {
-              method: "POST",
-              headers: {
-                "Authorization": `Basic ${btoa(`${companySettings.twilio_account_sid}:${companySettings.twilio_auth_token}`)}`,
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: formData.toString(),
-            });
-
-            if (twilioResponse.ok) {
-              result.smsSent = true;
-            } else {
-              const errorData = await twilioResponse.json();
-              result.errors.push(`SMS error: ${errorData.message}`);
-            }
-          } else {
-            console.log(`[SIMULATED] SMS to ${wo.contact.phone}: ${message}`);
-            result.smsSent = true;
-          }
-        } catch (error) {
-          result.errors.push(`SMS error: ${error.message}`);
-        }
+      // Legacy direct Twilio and simulated-success paths are intentionally disabled.
+      // Appointment SMS must be queued through the dealer-scoped, consent-aware dispatcher.
+      if (wo.reminder_sms) {
+        result.errors.push('SMS not queued: appointment SMS dispatch is not yet enabled. No text was sent.');
       }
 
-      if (result.emailSent || result.smsSent) {
+      if (result.emailSent) {
         await supabase
           .from("work_orders")
           .update({
