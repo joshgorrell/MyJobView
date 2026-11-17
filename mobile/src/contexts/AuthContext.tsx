@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { NotificationService } from '../services/NotificationService';
 import { locationTrackingService } from '../services/LocationTrackingService';
+import { clearCalendarCache } from '../services/CalendarCache';
 
 interface Profile {
   id: string;
@@ -94,6 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await locationTrackingService.stopTracking();
     await NotificationService.unregisterToken().catch(() => {});
     await supabase.auth.signOut();
+    // Schedule snapshots may contain customer details: purge on successful sign-out.
+    await clearCalendarCache();
     setSession(null);
     setProfile(null);
   }
