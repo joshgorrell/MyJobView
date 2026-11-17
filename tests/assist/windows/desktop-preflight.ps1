@@ -13,6 +13,10 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class AssistDesktopProbe {
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; public POINT(int x, int y) { X=x; Y=y; } }
+    [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 }
@@ -46,7 +50,7 @@ try {
         if ([AssistDesktopProbe]::GetForegroundWindow() -eq $form.Handle) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    if ([AssistDesktopProbe]::GetForegroundWindow() -ne $form.Handle) { throw 'Cannot acquire disposable test-window focus.' }
+    # Foreground restrictions differ on Windows 11. Verify the screen before any native click.
     # Verify actual desktop pixels, not merely an off-screen control renderer.
     $point = $panel.PointToScreen((New-Object Drawing.Point(40, 40)))
     $bitmap = New-Object Drawing.Bitmap(1, 1)
@@ -54,6 +58,14 @@ try {
     $graphics.CopyFromScreen($point.X, $point.Y, 0, 0, $bitmap.Size)
     $pixel = $bitmap.GetPixel(0, 0)
     if ($pixel.ToArgb() -ne $panel.BackColor.ToArgb()) { throw 'Desktop capture did not show the test window.' }
+    $target = $textbox.PointToScreen((New-Object Drawing.Point(30, 10)))
+    $nativePoint = [AssistDesktopProbe+POINT]::new($target.X, $target.Y)
+    if ([AssistDesktopProbe]::WindowFromPoint($nativePoint) -ne $textbox.Handle) { throw 'The test textbox is not exposed on the actual desktop.' }
+    if (-not [AssistDesktopProbe]::SetCursorPos($target.X, $target.Y)) { throw 'Cannot position test cursor.' }
+    [AssistDesktopProbe]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+    [AssistDesktopProbe]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+    [Windows.Forms.Application]::DoEvents()
+    if ([AssistDesktopProbe]::GetForegroundWindow() -ne $form.Handle -or -not $textbox.Focused) { throw 'Native click did not activate the disposable textbox.' }
     # Send OS keyboard input, then observe the resulting control state.
     $challenge = 'mjv' + [Guid]::NewGuid().ToString('N')
     [Windows.Forms.SendKeys]::SendWait($challenge)
