@@ -36,6 +36,10 @@ Deno.serve(async (req: Request) => {
       throw new Error("Unauthorized");
     }
 
+    // Apply caller RLS to work-order and customer data.
+    const callerDb = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const { workOrderId }: OnMyWayRequest = await req.json();
 
     if (!workOrderId) {
@@ -48,7 +52,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: workOrder, error: woError } = await supabase
+    const { data: workOrder, error: woError } = await callerDb
       .from("work_orders")
       .select(`
         id,
@@ -157,8 +161,15 @@ Deno.serve(async (req: Request) => {
         smsResult.error = error.message;
       }
     } else {
-      console.log(`[SIMULATED] SMS to ${customerPhone}: ${message}`);
-      smsResult.success = true;
+      return new Response(JSON.stringify({ error: "Twilio is not configured" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!smsResult.success) {
+      return new Response(JSON.stringify({ error: "Twilio did not accept the SMS" }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { error: updateError } = await supabase
@@ -176,8 +187,9 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: "On my way notification sent",
-        smsDelivered: smsResult.success,
+        message: "On my way notification accepted by Twilio",
+        smsDelivered: false,
+        smsAccepted: true,
         smsError: smsResult.error,
         previewMessage: message,
       }),
