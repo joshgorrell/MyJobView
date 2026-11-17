@@ -58,10 +58,21 @@ export function IntegrationsSettings() {
   useEffect(() => {
     const nav = integrationNavigation.current;
     const selected = nav?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (nav && selected) {
-      // Reveal deep-linked selections without moving the page vertically.
-      nav.scrollLeft = selected.offsetLeft - nav.offsetLeft - (nav.clientWidth - selected.offsetWidth) / 2;
-    }
+    if (!nav || !selected) return;
+    const reveal = () => {
+      // Use the tab's position within this scroll container, independent of
+      // surrounding positioned elements and async connection status badges.
+      const tabBounds = selected.getBoundingClientRect();
+      const navBounds = nav.getBoundingClientRect();
+      if (tabBounds.left < navBounds.left || tabBounds.right > navBounds.right) {
+        nav.scrollLeft += tabBounds.left - navBounds.left - (nav.clientWidth - tabBounds.width) / 2;
+      }
+    };
+    reveal();
+    const observer = new ResizeObserver(reveal);
+    observer.observe(nav);
+    nav.querySelectorAll('button').forEach(button => observer.observe(button));
+    return () => observer.disconnect();
   }, [activeIntegration]);
   function selectIntegration(id: IntegrationId) {
     setActiveIntegration(id);

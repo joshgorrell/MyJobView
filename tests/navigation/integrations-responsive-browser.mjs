@@ -21,7 +21,7 @@ try {
  for(const [width,height] of [[320,640],[390,844],[430,932],[844,390],[768,1024],[820,1180],[1024,768],[1194,834],[1366,1024],[1440,900]]){
   await page.setViewportSize({width,height});await page.goto('http://127.0.0.1:'+server.address().port+'/?integration=openai');
   const nav=page.getByRole('navigation',{name:'Third-party integrations'});await nav.getByRole('button',{name:/ChatGPT/}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('nav [aria-current="page"]')?.getBoundingClientRect().right<=innerWidth);
+  await page.waitForFunction(()=>document.querySelector('nav [aria-current="page"]')?.getBoundingClientRect().right<=innerWidth+1);
   assert.equal(await page.evaluate(()=>document.querySelector('main').scrollWidth>document.querySelector('main').clientWidth),false,`${width}: content overflow`);
   assert.equal(await nav.evaluate(el=>getComputedStyle(el).overflowX),'auto');
   const selected=await nav.locator('[aria-current="page"]').boundingBox();const bounds=await nav.boundingBox();assert.ok(selected.x>=bounds.x-1&&selected.x+selected.width<=bounds.x+bounds.width+1,`${width}: deep-linked tab visible`);
