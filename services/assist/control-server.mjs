@@ -88,7 +88,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const plane=createControlPlane({store,runtime,probe:createCanaryProbe(env),validateLease:job=>dependencies.rpc('validate_assist_activation_lease',{
    p_organization_id:job.organization_id,p_generation:job.generation,p_lease_token:job.lease_token})});
   const broker=createSupportBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive});
-  const guests=createGuestBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,enabled:env.ASSIST_GUEST_PILOT_APPROVED==='1'});
+  const guests=createGuestBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,enabled:env.ASSIST_GUEST_PILOT_APPROVED==='1',arm64Enabled:env.ASSIST_ARM64_PILOT_APPROVED==='1'});
   server=createControlServer({plane,runtime,token:env.ASSIST_CONTROL_TOKEN,broker,guests});
   let sweeping=false;
   sessionMonitor=setInterval(async()=>{if(sweeping)return;sweeping=true;try{await broker.sweep();await guests.sweep();}catch{console.error('Assist session revocation requires attention');}finally{sweeping=false;}},5000);

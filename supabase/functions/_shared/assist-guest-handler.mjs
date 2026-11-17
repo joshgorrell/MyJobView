@@ -20,6 +20,7 @@ export function createAssistGuestHandler({resolveDealer,control,publicOrigin}){
    const context={organization_id:organization,operation:body.operation};
    if(body.operation==='redeem'){
     if(typeof body.code!=='string'||body.code.length>24)throw new Error('invalid_request');context.code=body.code;
+    if(body.architecture!==undefined&&!['x64','arm64'].includes(body.architecture))throw new Error('invalid_request');context.architecture=body.architecture||'x64';
    }else{
     if(!uuid.test(body.inviteId)||!/^[a-f0-9]{64}$/.test(body.claimToken||''))throw new Error('invalid_request');context.invite_id=body.inviteId;context.claim_token=body.claimToken;
    }
@@ -29,7 +30,7 @@ export function createAssistGuestHandler({resolveDealer,control,publicOrigin}){
    if(body.operation==='redeem'){
     if(!/^[a-f0-9]{64}$/.test(data.claim_token||''))throw new Error('invalid_response');
     const url=new URL(data.download_url),domain='mjv-'+organization.replaceAll('-','');
-    if(url.origin!==publicOrigin||url.pathname!==`/${domain}/meshagents`||url.username||url.password||url.hash||url.searchParams.get('installflags')!=='1'||url.searchParams.get('id')!=='4'||!/^[a-zA-Z0-9@$+=_-]{32,128}$/.test(url.searchParams.get('meshid')||'')||[...url.searchParams.keys()].some(k=>!['meshid','id','installflags'].includes(k)||url.searchParams.getAll(k).length!==1))throw new Error('invalid_response');
+    if(url.origin!==publicOrigin||url.pathname!==`/${domain}/meshagents`||url.username||url.password||url.hash||url.searchParams.get('installflags')!=='1'||url.searchParams.get('id')!==(context.architecture==='arm64'?'43':'4')||!/^[a-zA-Z0-9@$+=_-]{32,128}$/.test(url.searchParams.get('meshid')||'')||[...url.searchParams.keys()].some(k=>!['meshid','id','installflags'].includes(k)||url.searchParams.getAll(k).length!==1))throw new Error('invalid_response');
     result.claim_token=data.claim_token;result.download_url=url.href;
    }
    return reply(200,result);

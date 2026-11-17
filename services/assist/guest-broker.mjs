@@ -6,6 +6,7 @@ export const inviteOperations=['invite_capability','invite_create','invite_statu
 export function validateGuestRequest(input){
  if(!input||!uuid.test(input.organization_id)||!['redeem','status','end'].includes(input.operation))throw new Error('guest_unavailable');
  if(input.operation==='redeem'){
+  if(input.architecture!==undefined&&!['x64','arm64'].includes(input.architecture))throw new Error('guest_unavailable');
   if(typeof input.code!=='string'||input.code.length>24)throw new Error('guest_unavailable');
   input={...input,code:input.code.replaceAll('-','').replaceAll(' ','').toUpperCase()};
   if(!/^[2-9A-HJ-NP-Z]{12}$/.test(input.code))throw new Error('guest_unavailable');
@@ -13,7 +14,7 @@ export function validateGuestRequest(input){
  return input;
 }
 // In-memory capabilities deliberately die on restart. Native guest groups are cleaned before ingress reopens.
-export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,now=Date.now}){
+export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,arm64Enabled=false,now=Date.now}){
  const invites=new Map(),rate=new Map();
  const call=(action,c,params={})=>rpc('assist_support_service',{p_action:action,p_organization_id:c.organization_id,p_actor_id:c.actor_id||null,p_auth_session_id:c.auth_session_id||null,p_params:params});
  const live=async row=>enabled&&now()<row.expires&&now()<row.hardDeadline&&now()<row.token_exp*1000&&runtime.generation(row.organization_id)===row.generation&&(await call('access',row))?.allowed===true;
@@ -85,8 +86,11 @@ export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,n
     await requireLive(row);
     if(c.operation==='redeem'){
      if(row.claimHash||now()>=row.joinDeadline)throw new Error('guest_unavailable');
+     const architecture=c.architecture||'x64';
+     if(architecture==='arm64'&&!arm64Enabled)throw new Error('guest_unavailable');
+     const download=new URL(row.downloadUrl);download.searchParams.set('id',architecture==='arm64'?'43':'4');
      const token=randomBytes(32).toString('hex');row.claimHash=hash(token);
-     return {...status(row),claim_token:token,download_url:row.downloadUrl};
+     return {...status(row),claim_token:token,download_url:download.href};
     }
     if(c.operation==='end'){await close(row,'guest_ended');return {ended:true};}
     return status(row);
