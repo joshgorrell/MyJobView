@@ -120,7 +120,7 @@ export default function CalendarScreen({ navigation }: any) {
         ...(jobs.data || []).filter(j => j.status !== 'cancelled').map(j => ({
           id: `job-${j.id}`, date: j.scheduled_date, start: j.scheduled_start_time, end: j.scheduled_end_time,
           title: j.work_order_number ? `WO-${j.work_order_number}` : 'Work order',
-          subtitle: j.project?.contact ? [j.project.contact.first_name, j.project.contact.last_name].filter(Boolean).join(' ') || 'Work order' : 'Work order',
+          subtitle: (() => { const project = j.project?.[0]; const contact = project?.contact?.[0]; return contact ? [contact.first_name, contact.last_name].filter(Boolean).join(' ') || 'Work order' : 'Work order'; })(),
           kind: 'job' as const, workOrderId: j.id,
         })),
         ...(appointments.data || [])
