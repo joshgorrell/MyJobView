@@ -54,3 +54,7 @@ The Windows harness bridge additionally requires `ASSIST_WINDOWS_CANARY_HARNESS_
 5. Execute the G/E/S/P matrix on real machines and capture sanitized results using `node services/assist/windows-pilot-runner.mjs`. Only after real acceptance, canary evidence and explicit approval should a separate controlled production rollout be considered.
 
 Do not commit generated JSON reports containing computer names, screenshots, credentials, or device identifiers. This script does not install software, open firewall ports, enroll machines or change service flags.
+
+## Agent download verification before the first Windows connection
+
+On a disposable Windows test computer, run `powershell -NoProfile -ExecutionPolicy Bypass -File services/assist/windows-agent-download-check.ps1 -Architecture x64 -DownloadUrl '<staging agent download URL>'` (use `arm64` only for the separate ARM64 pilot). The script downloads the candidate agent into a temporary file, verifies HTTPS, the requested MeshCentral agent architecture, a bounded size, the PE header and machine architecture, records SHA-256 and byte count, then deletes the file. It **does not execute or install** the downloaded binary. Do not share the URL or generated report if it contains sensitive local details. A PASS confirms only download integrity and architecture, not Windows compatibility, code signing, consent, desktop control, or production readiness. The real two-computer pilot remains mandatory.
