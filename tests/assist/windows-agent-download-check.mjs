@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const script=readFileSync(new URL('../../services/assist/windows-agent-download-check.ps1',import.meta.url),'utf8');
+for(const item of ['ValidateSet("x64","arm64")','https','HttpCompletionOption','150MB','0xAA64','0x8664','Get-FileHash','Remove-Item','production_approval=$false'])assert.ok(script.includes(item),item);
+assert.ok(!/Start-Process|Invoke-Expression|Install-Service|New-Service/.test(script),'No installer or execution');
+assert.ok(script.includes('if($report.status -ne "PASS"){exit 1}'));
+console.log('Windows agent download preflight contract: architecture, HTTPS, size, PE signature and no execution');
