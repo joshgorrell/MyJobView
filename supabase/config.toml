@@ -353,3 +353,7 @@ verify_jwt = false
 # Twilio authenticates callbacks with X-Twilio-Signature; no JWT is sent.
 [functions.sms-status-callback]
 verify_jwt = false
+
+# Twilio inbound SMS webhook validates provider signature and account SID.
+[functions.sms-inbound-webhook]
+verify_jwt = false
