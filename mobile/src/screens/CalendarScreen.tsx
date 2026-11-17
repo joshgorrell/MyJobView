@@ -41,11 +41,11 @@ export default function CalendarScreen({ navigation }: any) {
   const requestId = useRef(0);
   const activeRef = useRef(true);
   const latestRangeRef = useRef('');
-  latestRangeRef.current = (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd;
   const date = fromKey(selected);
   const first = mode === 'month' ? weekStart(new Date(date.getFullYear(), date.getMonth(), 1, 12)) : mode === 'week' ? weekStart(date) : date;
   const last = mode === 'month' ? shift(first, Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7 - 1) : mode === 'week' ? shift(first, 6) : mode === 'agenda' ? shift(date, 29) : date;
   const rangeStart = key(first), rangeEnd = key(last);
+  latestRangeRef.current = (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd;
 
   useEffect(() => {
     if (!profile?.id) return;
