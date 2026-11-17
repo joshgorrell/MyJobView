@@ -95,6 +95,31 @@ try{
  assert.equal((await fetch(url+'/'+domain+'/meshagents?meshid=old&id=4')).status,404);
  assert.equal((await fetch(url+'/')).status,404);
 }finally{server.closeAllConnections();upstream.closeAllConnections();await new Promise(r=>server.close(r));await new Promise(r=>upstream.close(r));}
+// Exercise authenticated support API routing independently of the Edge Function.
+{
+ const context={organization_id:org,actor_id:other,auth_session_id:org,token_exp:Date.now()/1000+3600};
+ const seen=[];let supportResult={devices:[]},staffResult={available:true};
+ const api=createControlServer({token,plane:{reconcile:async()=>({})},runtime:{target:()=>null},
+  broker:{handle:async body=>{seen.push(['broker',body]);return supportResult;}},
+  guests:{guest:async()=>({}),staff:async body=>{seen.push(['staff',body]);return staffResult;}}
+ });
+ await new Promise(r=>api.listen(0,'127.0.0.1',r));const endpoint='http://127.0.0.1:'+api.address().port+'/v1/support';
+ const post=(body,authorization='Bearer '+token)=>fetch(endpoint,{method:'POST',headers:{authorization,'content-type':'application/json'},body:JSON.stringify(body)});
+ try{
+  assert.equal((await post({operation:'devices',...context},'Bearer wrong')).status,401);
+  assert.equal((await post({operation:'devices',...context})).status,200);
+  assert.equal(seen.at(-1)[0],'broker');
+  assert.equal((await post({operation:'device_remove',...context,device_id:'x'})).status,200);
+  assert.equal((await post({operation:'connect',...context,device_id:'x'})).status,200);
+  assert.equal((await post({operation:'touch',...context,session_id:org})).status,200);
+  assert.equal((await post({operation:'end',...context,session_id:org})).status,200);
+  assert.equal((await post({operation:'invite_capability',...context})).status,200);
+  assert.equal(seen.at(-1)[0],'staff');
+  assert.equal((await fetch(endpoint,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'not json'})).status,400);
+  assert.equal((await post({operation:'devices',...context,token_exp:1})).status,400);
+  assert.equal((await fetch(endpoint,{method:'GET'})).status,405);
+ }finally{api.closeAllConnections();await new Promise(r=>api.close(r));}
+}
 const canaryEnv={ASSIST_CANARY_ORIGIN:'https://canary.example.com',ASSIST_CANARY_TOKEN:'c'.repeat(40)};
 const canary=createCanaryProbe(canaryEnv,async(_url,options)=>{assert.equal(options.redirect,'error');return new Response(JSON.stringify(await probe(job)));});
 assert.equal((await canary(job)).desktop_control,true);
