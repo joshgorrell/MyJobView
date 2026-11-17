@@ -45,7 +45,7 @@ import {
 
 const panel = "rounded-2xl border border-subtle bg-surface";
 const input =
-  "min-h-11 rounded-xl border border-subtle bg-surface px-3 text-sm text-primary";
+  "min-h-10 rounded-lg border border-subtle bg-surface px-3 text-sm text-primary";
 function companyDay(zone: string) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: zone,
@@ -102,13 +102,13 @@ function Metric({
 }) {
   return (
     <div
-      className={`${panel} p-4 sm:p-6 min-w-0 ${wide ? "col-span-2 lg:col-span-1" : ""}`}
+      className={`${panel} p-3 sm:p-4 min-w-0 ${wide ? "col-span-2 lg:col-span-1" : ""}`}
     >
       <div className="flex justify-between gap-3 text-secondary">
         <span className="text-sm font-medium">{label}</span>
         <Icon size={19} className="text-teal-600" />
       </div>
-      <strong className="block my-3 text-2xl sm:text-3xl xl:text-4xl font-semibold tracking-tight text-primary tabular-nums break-words">
+      <strong className="block my-1 text-xl sm:text-2xl xl:text-3xl font-semibold tracking-tight text-primary tabular-nums break-words">
         {value}
       </strong>
       <p className="text-xs text-secondary">{note}</p>
@@ -410,8 +410,8 @@ export default function TechProductionStats() {
       </p>
     );
   return (
-    <section className="mx-auto max-w-7xl space-y-6 p-3 sm:p-6 text-primary">
-      <header className="flex flex-wrap justify-between items-start gap-4">
+    <section className="w-full space-y-3 p-2 sm:p-3 text-primary">
+      <header className="flex flex-wrap justify-between items-center gap-2">
         <div>
           <div className="flex items-center gap-2 text-teal-600 text-xs font-semibold uppercase tracking-widest">
             <BarChart3 size={15} /> Production & utilization
@@ -419,11 +419,11 @@ export default function TechProductionStats() {
           <h1
             ref={heading}
             tabIndex={-1}
-            className="text-3xl sm:text-4xl font-semibold tracking-tight mt-2 outline-none"
+            className="text-xl sm:text-2xl font-semibold tracking-tight mt-0.5 outline-none"
           >
             {person ? person.name : "Tech Stats"}
           </h1>
-          <p className="text-secondary text-sm mt-2">
+          <p className="text-secondary text-xs mt-1">
             {person
               ? "A closer look at the work behind the numbers."
               : "See who’s producing, how time is used, and how your team is trending."}
@@ -471,7 +471,7 @@ export default function TechProductionStats() {
               key={key}
               aria-pressed={preset === key}
               onClick={() => setPreset(key)}
-              className={`min-h-11 rounded-xl px-3 sm:px-4 text-sm font-medium transition-colors ${preset === key ? "bg-teal-600 text-white shadow-sm" : "text-secondary hover:bg-elevated"}`}
+              className={`min-h-9 rounded-lg px-2 sm:px-3 text-sm font-medium transition-colors ${preset === key ? "bg-teal-600 text-white shadow-sm" : "text-secondary hover:bg-elevated"}`}
             >
               {label}
             </button>
@@ -535,7 +535,7 @@ export default function TechProductionStats() {
         <div
           role="status"
           aria-label="Loading production report"
-          className="grid grid-cols-2 lg:grid-cols-3 gap-4"
+          className="grid grid-cols-2 lg:grid-cols-3 gap-2"
         >
           {[1, 2, 3].map((i) => (
             <div
@@ -575,7 +575,7 @@ export default function TechProductionStats() {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                 <Metric
                   label="Job Hours"
                   value={duration(report.job)}
@@ -596,23 +596,13 @@ export default function TechProductionStats() {
                   note="Job hours ÷ payroll clock hours on matched dates"
                 />
               </div>
-              <ClockBreakdown summary={report} />
-              <div className={`${panel} p-4 sm:p-6`}>
-                <div className="flex gap-2 items-center mb-5">
-                  <TrendingUp size={19} className="text-teal-600" />
-                  <h2 className="text-lg font-semibold">
-                    Production over time
-                  </h2>
-                </div>
-                <ProductionTrend data={report.trend} />
-              </div>
               <section
                 className={`${panel} overflow-hidden`}
                 aria-label="Technician rankings"
               >
-                <div className="p-4 sm:p-6 flex flex-wrap items-center justify-between gap-4 border-b border-subtle">
+                <div className="p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2 border-b border-subtle">
                   <div>
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <h2 className="text-base font-semibold flex items-center gap-2">
                       <Trophy size={21} className="text-amber-500" /> Technician
                       rankings
                     </h2>
@@ -656,7 +646,7 @@ export default function TechProductionStats() {
                     <button
                       key={row.id}
                       onClick={() => select(row.id)}
-                      className="w-full p-4 sm:px-6 sm:py-5 text-left grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_9rem_9rem_auto] gap-3 sm:gap-5 items-center hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500"
+                      className="w-full p-2 sm:px-4 sm:py-2 text-left grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_9rem_9rem_auto] gap-3 sm:gap-5 items-center hover:bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500"
                     >
                       <span
                         className={`h-8 w-8 rounded-xl flex items-center justify-center text-sm font-semibold ${row.rank === 1 ? "bg-amber-500/15 text-amber-600" : "bg-elevated text-secondary"}`}
@@ -716,6 +706,17 @@ export default function TechProductionStats() {
                   immediately before this range.
                 </p>
               </section>
+              <ClockBreakdown summary={report} />
+              <div className={`${panel} p-4 sm:p-6`}>
+                <div className="flex gap-2 items-center mb-5">
+                  <TrendingUp size={19} className="text-teal-600" />
+                  <h2 className="text-lg font-semibold">
+                    Production over time
+                  </h2>
+                </div>
+                <ProductionTrend data={report.trend} />
+              </div>
+              
             </>
           )}
           <p className="text-xs text-secondary leading-relaxed">
@@ -829,7 +830,7 @@ function TechnicianDetail({
   }));
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
         <Metric
           label="Job Hours"
           value={duration(person.job)}
