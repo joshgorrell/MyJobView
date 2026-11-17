@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, UserPlus, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+type Recipient = { id: string; name: string; email: string; type: 'Customer' | 'User' };
+const validEmail = (value: string) => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value.trim());
 type Invite = { invite_id: string; code: string; join_url: string; state: string };
 export function GuestInviteConsole({ organizationId }: { organizationId: string }) {
   const [available, setAvailable] = useState(false);
+  const [recipientQuery, setRecipientQuery] = useState('');
+  const [matches, setMatches] = useState<Recipient[]>([]);
+  const [recipient, setRecipient] = useState<Recipient | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [directoryError, setDirectoryError] = useState(false);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -12,7 +19,33 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
   const viewer = useRef<Window | null>(null);
   const epoch = useRef(0);
   const working = useRef(false);
-  async function invoke(operation: string, inviteId?: string) {
+  useEffect(() => {
+    if (recipient || recipientQuery.trim().length < 2) { setMatches([]); setSearching(false); return; }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setSearching(true); setDirectoryError(false);
+      const term = recipientQuery.trim().replace(/[%,()]/g, '');
+      try {
+        // Search only records in this dealer. RLS provides an additional access boundary.
+        const [customers, users] = await Promise.all([
+          supabase.from('customers').select('id,name,email').eq('organization_id', organizationId).or(`name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
+          supabase.from('profiles').select('id,full_name,email').eq('organization_id', organizationId).or(`full_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
+        ]);
+        if (cancelled) return;
+        if (customers.error || users.error) setDirectoryError(true);
+        const found: Recipient[] = [
+          ...(customers.data || []).map(row => ({ id: String(row.id), name: String(row.name || row.email || 'Customer'), email: String(row.email || ''), type: 'Customer' as const })),
+          ...(users.data || []).map(row => ({ id: String(row.id), name: String(row.full_name || row.email || 'User'), email: String(row.email || ''), type: 'User' as const })),
+        ].filter(row => validEmail(row.email));
+        setMatches(found);
+      } catch { if (!cancelled) { setMatches([]); setDirectoryError(true); } }
+      finally { if (!cancelled) setSearching(false); }
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [organizationId, recipientQuery, recipient]);
+  const selectedEmail = recipient?.email || (validEmail(recipientQuery) ? recipientQuery.trim() : '');
+  const inviteText = invite ? `Remote support invitation\\n\\nVisit: ${new URL(invite.join_url).origin}/assist\\nCode: ${invite.code}\\nOr open: ${invite.join_url}\\n\\nThis is a one-time support session. You will be asked to approve remote access.` : '';
+    async function invoke(operation: string, inviteId?: string) {
     const { data, error: failure } = await supabase.functions.invoke('assist-support', { body: { operation, organizationId, ...(inviteId ? { inviteId } : {}) } });
     if (failure || data?.error) throw new Error('Invitation unavailable'); return data;
   }
@@ -46,7 +79,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     };
   }, [organizationId]);
   async function create() {
-    if (working.current || current.current || !available) return;
+    if (working.current || current.current || !available || !selectedEmail) return;
     const version = epoch.current; working.current = true; setBusy(true); setError(''); setCopied(false);
     try {
       const row = await invoke('invite_create');
@@ -75,13 +108,26 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     try { await navigator.clipboard.writeText(invite.join_url); setCopied(true); } catch { setError('Copy the invitation link shown below.'); }
   }
   return <div className="my-5 rounded-lg border border-subtle p-4">
-    <h3 className="flex items-center gap-2 font-semibold text-primary"><UserPlus size={18} />Invite a customer or technician</h3>
+    <h3 className="flex items-center gap-2 font-semibold text-primary"><UserPlus size={18} />Start Support Session</h3>
+    {!invite && <div className="relative mt-3">
+      <label htmlFor="assist-recipient" className="block text-sm font-medium text-primary">Customer, user, or email</label>
+      <input id="assist-recipient" type="search" autoComplete="off" value={recipient?.name ? `${recipient.name} (${recipient.email})` : recipientQuery} onChange={event => { setRecipient(null); setRecipientQuery(event.target.value); }} placeholder="Search customers, users, or enter an email…" className="mt-2 w-full rounded-lg border border-subtle bg-surface px-3 py-3 text-primary" />
+      {!recipient && matches.length > 0 && <div role="listbox" aria-label="Matching recipients" className="mt-1 max-h-52 overflow-auto rounded-lg border border-subtle bg-surface">
+        {matches.map(match => <button type="button" role="option" aria-selected={false} key={match.type + match.id} onClick={() => { setRecipient(match); setRecipientQuery(match.email); setMatches([]); }} className="flex w-full items-center justify-between gap-3 border-b border-subtle px-3 py-2 text-left text-sm text-primary hover:bg-blue-500/10"><span className="min-w-0 truncate">{match.name} · {match.email}</span><span className="shrink-0 text-xs text-muted">{match.type}</span></button>)}
+      </div>}
+      {!recipient && searching && <p className="mt-1 text-xs text-muted">Searching…</p>}
+      {!recipient && directoryError && <p className="mt-1 text-xs text-muted">Directory search is unavailable. You can still enter an email address.</p>}
+    </div>}
     {!available ? <p className="mt-2 text-sm text-muted">Guest invitations will be available after the temporary Windows connection passes its pilot.</p> : !invite ? <>
       <p className="mt-2 text-sm text-muted">Create a one-time code or link. They won’t need an MJV account.</p>
-      <button type="button" disabled={busy} onClick={() => void create()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create invitation'}</button>
+      <button type="button" disabled={busy || !selectedEmail} onClick={() => void create()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create invitation'}</button>
     </> : <>
       <p className="mt-3 text-sm text-muted">Ask them to visit <strong>{new URL(invite.join_url).origin}/assist</strong> and enter:</p>
       <p className="my-3 break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Prepare invitation email</a>
+        <button type="button" onClick={() => void navigator.clipboard.writeText(inviteText).then(() => setCopied(true)).catch(() => setError('Unable to copy invitation.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />Copy invitation</button>
+      </div>
       <div className="flex flex-wrap gap-3"><button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{copied ? 'Link copied' : 'Copy invitation link'}</button>
         <button type="button" disabled={busy} onClick={() => void end()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><X size={16} />End invitation</button></div>
       <p className="break-all text-xs text-muted">{invite.join_url}</p>
