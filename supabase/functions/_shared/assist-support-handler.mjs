@@ -1,5 +1,6 @@
 import {guestStatus} from './assist-guest-handler.mjs';
 const inviteOperations=['invite_capability','invite_create','invite_status','invite_connect','invite_end'];
+const safeLabel=value=>typeof value==='string'&&value.trim().length>0&&value.trim().length<=120&&!/[\x00-\x1f\x7f]/.test(value);
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function sessionClaimsAfterVerification(bearer,userId){
  const token=bearer.replace(/^Bearer /,'');const parts=token.split('.');if(parts.length!==3)throw new Error('invalid_session');
@@ -24,7 +25,7 @@ export function createAssistSupportHandler({authenticate,control,publicOrigin}){
    if(!body||body.organizationId!==actor.organization_id||!['devices','device_label','connect','touch','end',...inviteOperations].includes(body.operation))return reply(403,{error:'support_access_required'});
    const context={organization_id:actor.organization_id,actor_id:actor.actor_id,auth_session_id:actor.auth_session_id,token_exp:actor.token_exp,operation:body.operation};
    if(body.operation==='device_label'){
-    if(typeof body.deviceId!=='string'||body.deviceId.length>256||typeof body.label!=='string'||body.label.trim().length<1||body.label.length>120)return reply(400,{error:'invalid_device'});
+    if(typeof body.deviceId!=='string'||body.deviceId.length>256||!safeLabel(body.label))return reply(400,{error:'invalid_device'});
     context.device_id=body.deviceId;context.label=body.label;
    }
    if(body.operation==='connect'){
