@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Invalid worker configuration" }, 503);
   }
   const db = createClient(url, key, { auth: { persistSession: false } });
-  const { data, error } = await db.rpc("claim_sms_dispatch_for_org", {
+  // Fail abandoned claims without re-sending potentially accepted Twilio messages.\n  const { error: reconcileError } = await db.rpc("reconcile_stale_sms_dispatch", {\n    p_organization_id: org, p_stale_minutes: 30, p_limit: 50,\n  });\n  if (reconcileError) return json({ error: "Could not reconcile SMS claims" }, 503);\n  const { data, error } = await db.rpc("claim_sms_dispatch_for_org", {
     p_organization_id: org, p_limit: 10,
   });
   if (error) return json({ error: "Could not claim SMS batch" }, 503);
