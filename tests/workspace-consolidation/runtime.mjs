@@ -44,7 +44,7 @@ assert.ok(html.includes('Lead tools'));assert.ok(!html.includes('Claim tools'));
 html=renderToString(<WorkspaceTabs title="Time & Payroll" initial="payroll" tabs={[{key:'time_approval',label:'Review',content:<div>Review only</div>}]}/>);
 assert.ok(html.includes('Review only'));
 console.log('Flow task permission boundaries, legacy initial task view, and workspace initial/fallback tabs pass');
-` }, bundle:true, platform:'node', format:'cjs', define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('https://example.supabase.co'),'import.meta.env.VITE_SUPABASE_ANON_KEY':JSON.stringify('test-anon-key')}, jsx:'automatic', outfile:join(dir,'test.cjs'), plugins:[{name:'fixtures',setup(b){
+` }, bundle:true, platform:'node', format:'cjs', banner:{js:"globalThis.window={location:{href:'http://localhost/',search:''}};"}, define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('https://example.supabase.co'),'import.meta.env.VITE_SUPABASE_ANON_KEY':JSON.stringify('test-anon-key')}, jsx:'automatic', outfile:join(dir,'test.cjs'), plugins:[{name:'fixtures',setup(b){
  // Stub resolved modules as well as direct import specifiers; otherwise browser-only
  // authentication initialization runs during Node server-side rendering tests.
  b.onLoad({filter:/[\\/]src[\\/]contexts[\\/]AuthContext\\.tsx$/},()=>({contents:`export const useAuth=()=>({profile:{id:'user'},loading:false});export const AuthProvider=({children})=>children;`,loader:'tsx'}));
