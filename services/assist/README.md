@@ -53,6 +53,26 @@ Back up the complete private state volume, including per-dealer databases/certif
 
 Still required: real Windows canary implementation/host; host startup and monitoring/alerts; live verification of the staff API and live confirmation of the device list/browser support window; staged automated updates/rollback; live Windows UAC/reboot/reconnect and under-one-minute setup acceptance. Zoho Assist remains in use until those checks pass.
 
+## Enrolled device management and fast repeat support (product requirements)
+
+Assist supports **any person receiving help**, whether a customer, coworker, subcontractor or field technician. Receiving support does not require an MJV login. Authorized MJV staff can initiate support. One-time guest codes and enrolled devices are complementary, not separate customer-versus-employee products.
+
+**Enrolled devices** are the preferred repeat-support path for company-managed Windows computers. Install and approve the persistent agent once during computer setup; subsequently the operator searches the enrolled list and requests a desktop session without making the recipient download another agent or enter a one-time code. Enrollment alone must never bypass existing operator authorization, dealer isolation, session auditing or required consent. Attended and any future unattended access must be explicit, separately permissioned policies; do not silently enable unattended control.
+
+The enrolled device list should display and support:
+
+- **Friendly device label**, editable without changing the underlying Windows hostname, native node ID, group membership, agent certificate or reinstalling the agent. Default to a recognizable hostname until renamed. Treat labels as presentation metadata, never authentication or access-control identifiers.
+- **Assigned employee/user**, optional and editable, without making the recipient an MJV account holder; employee removal must not orphan or silently grant device access.
+- **Office**, optional and editable, using existing MJV office records and established office-visibility permissions rather than inventing a parallel office permission model. Do not assume office visibility alone authorizes remote control.
+- **Status** (online/offline), last seen, Windows version and hostname when provided by the agent, clearly distinguishing live values from cached values.
+- **Search/filter** by friendly label, assigned user and office; device details and actions for Rename/Edit, Connect, and authorized Remove/Disable. Removing a device must revoke its persistent access according to a defined enrollment-key/agent revocation policy, not merely hide it from the UI.
+
+Do not introduce a second device identity, duplicate enrollment records, or a new source of truth if MeshCentral already supplies the stable native node identity. Any new MJV metadata must be dealer-scoped, validated, and subject to the existing staff authorization and office-visibility rules. Never let a browser-supplied dealer, node, office or employee ID grant access. Preserve existing one-time guest invitation behavior and keep guest devices out of the permanent enrolled list.
+
+**Fast field-support acceptance:** on an already-enrolled online Windows computer, the operator should find the device by employee or friendly name, click Connect, and reach the existing consent/desktop workflow without any fresh download, installer, plugin, or support-code entry. Verify actual Windows agent startup after reboot, online/offline transitions, reconnection, rename persistence, access revocation, and a realistic low-bandwidth field connection. Record measured connection times rather than promising instant access. Windows ARM64 permanent enrollment remains unapproved until separately tested.
+
+**Rollout gate:** This section is a target specification, **not evidence that editing/assignment/search or fast enrolled-device connection already works**. Implement and test these behaviors against the actual frontend, backend, and native agent before claiming availability. Keep all activation and guest/ARM pilot gates off until the live Windows canary and end-to-end security tests pass.
+
 ## User support sessions
 
 Dealer Admin → Integrations → Remote Support includes User access checkboxes. Active dealer administrators have access; other employees need an explicit grant. The Assist page lists the dealer's enrolled laptops and opens an online laptop in a separate support window. Keep the Assist page open: navigation/unmount closes the window and requests revocation. Existing MJV inactivity/logout rules remain in effect; test a long support session as part of the Windows pilot.
