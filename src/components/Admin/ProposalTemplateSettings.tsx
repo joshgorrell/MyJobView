@@ -186,7 +186,7 @@ export function ProposalTemplateSettings() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-4">
+        <nav className="responsive-tabs flex gap-4">
           <button
             onClick={() => setActiveTab('pdftemplates')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${

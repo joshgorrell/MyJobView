@@ -134,7 +134,7 @@ export function PortalVIPServices({ isEmbedded = false }: { isEmbedded?: boolean
 
   const filterTabs = (
     <div className="mb-6 border-b border-gray-200">
-      <nav className="flex gap-4">
+      <nav className="responsive-tabs flex gap-4">
         <button
           onClick={() => setFilter('upcoming')}
           className={`px-4 py-3 border-b-2 font-medium transition-colors ${

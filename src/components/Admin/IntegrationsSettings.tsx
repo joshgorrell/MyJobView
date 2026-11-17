@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, CheckCircle2, ShieldCheck, ChevronRight } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
@@ -49,11 +49,20 @@ function integrationFromUrl(): IntegrationId {
 
 export function IntegrationsSettings() {
   const { profile } = useAuth();
+  const integrationNavigation = useRef<HTMLElement>(null);
   const [quickbooksConnected, setQuickbooksConnected] = useState(false);
   const [quickbooksPayments, setQuickbooksPayments] = useState(false);
   const [ringcentralConnected, setRingcentralConnected] = useState(false);
   const [techsafeConnected, setTechsafeConnected] = useState(false);
   const [activeIntegration, setActiveIntegration] = useState<IntegrationId>(integrationFromUrl);
+  useEffect(() => {
+    const nav = integrationNavigation.current;
+    const selected = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && selected) {
+      // Reveal deep-linked selections without moving the page vertically.
+      nav.scrollLeft = selected.offsetLeft - nav.offsetLeft - (nav.clientWidth - selected.offsetWidth) / 2;
+    }
+  }, [activeIntegration]);
   function selectIntegration(id: IntegrationId) {
     setActiveIntegration(id);
     const url = new URL(window.location.href);
@@ -327,7 +336,7 @@ export function IntegrationsSettings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-1">Third-Party Integrations</h3>
         <p className="text-sm text-gray-600">Connect and configure external services</p>
@@ -425,7 +434,7 @@ export function IntegrationsSettings() {
 
       {/* Checks describe saved configuration/connection, not verified delivery. */}
       <div className="border-b border-gray-200">
-        <nav className="flex flex-nowrap gap-0 -mb-px overflow-x-auto lg:overflow-x-visible" aria-label="Third-party integrations">
+        <nav ref={integrationNavigation} className="responsive-tabs flex flex-nowrap gap-0 -mb-px" aria-label="Third-party integrations">
           {([
             { id: 'payment_processor', label: 'Payment Processor', icon: CreditCard,
               used: originalPaymentSettings.payment_processor === 'quickbooks' ? quickbooksPayments :
@@ -441,7 +450,7 @@ export function IntegrationsSettings() {
             { id: 'resend', label: 'Email / Resend', icon: Mail, used: !!originalSettings.from_email?.trim(), status: 'Sender settings saved; domain verification managed in Resend' },
             { id: 'openai', label: 'ChatGPT', icon: Sparkles, used: originalSettings.has_openai_api_key === true, status: 'API key saved' },
           ] satisfies Array<{ id: IntegrationId; label: string; icon: typeof CreditCard; used: boolean; status: string }>).map(({ id, label, icon: Icon, used, status }) => (
-            <button key={id} type="button" onClick={() => selectIntegration(id)}
+            <button key={id} aria-current={activeIntegration === id ? 'page' : undefined} type="button" onClick={() => selectIntegration(id)}
               className={`flex shrink-0 items-center gap-1.5 px-2 lg:px-2.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeIntegration === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}>
@@ -453,7 +462,7 @@ export function IntegrationsSettings() {
               </span>}
             </button>
           ))}
-          <button type="button" onClick={() => selectIntegration('assist')}
+          <button type="button" aria-current={activeIntegration === 'assist' ? 'page' : undefined} onClick={() => selectIntegration('assist')}
             className={`flex shrink-0 items-center gap-1.5 px-2 lg:px-2.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
             Assist
           </button>
@@ -749,7 +758,7 @@ export function IntegrationsSettings() {
                 )}
               </button>
             </div>
-            <div className="mt-2 flex items-center justify-between text-xs">
+            <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between text-xs">
               <p className="text-gray-500">
                 Get your API key from the{' '}
                 <a
@@ -1114,7 +1123,7 @@ export function IntegrationsSettings() {
                 )}
               </button>
             </div>
-            <div className="mt-2 flex items-center justify-between text-xs">
+            <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between text-xs">
               <p className="text-gray-500">
                 Get your API key from{' '}
                 <a
