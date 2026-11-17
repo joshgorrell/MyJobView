@@ -24,7 +24,7 @@ try {
   $params[$key]=if($pair.Count -eq 2){[Uri]::UnescapeDataString($pair[1])}else{""}
  }
  Check "Agent architecture request" ($params["id"] -eq $expectedId) "Expected agent type $expectedId"
- Check "Mesh group specified" ($params["meshid"] -match '^[a-fA-F0-9]{64}$') "64-character mesh group hash required"
+ Check "Mesh group specified" ($params["meshid"] -match '^[A-Za-z0-9_-]{16,128}$') "Bounded URL-safe MeshCentral group identifier required"
  $temp=[IO.Path]::GetTempFileName()
  $handler=[System.Net.Http.HttpClientHandler]::new()
  $handler.AllowAutoRedirect=$false
