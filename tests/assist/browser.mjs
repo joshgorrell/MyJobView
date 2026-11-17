@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 const dir=await mkdtemp(join(tmpdir(),'mjv-assist-'));
 const fixture=`const mode=new URLSearchParams(location.search).get('mode');
 export function useAuth(){return {profile:{organization_id:'org-one',role:mode?.startsWith('settings')?'admin':'tech',is_active:true},isPortalUser:false};}
-export function useTenant(){return {tenant:{organizationId:mode==='mismatch'?'org-two':'org-one',organizationName:'Electronic Life'},loading:false,error:null};}
+export function useTenant(){return {tenant:{organizationId:mode==='mismatch'?'org-two':'org-one',organizationName:'Electronic Life',logoUrl:mode==='guest-no-logo'?null:'https://assets.example.test/dealer-logo.png'},loading:false,error:null};}
 window.calls=[];let enabled=mode==='settings-failed';let activation=mode==='settings-failed'?'needs_attention':'off';
 export const supabase={rpc:async(name,args)=>{window.calls.push({name,args});if(name==='get_assist_access')return {data:{can_operate:mode==='engineer',windows_download_ready:mode==='engineer'}};if(name==='manage_assist_operators')return {data:{people:[{id:'admin',name:'Administrator',admin:true,granted:true},{id:'jp',name:'Josh Paul',admin:false,granted:args.p_granted===true}]}};if(name==='retry_assist_activation'){activation='activation_pending';return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};}if(name==='set_assist_enabled'){enabled=args.p_enabled;activation=enabled?'activation_pending':'deactivation_pending';return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};}if(mode==='error')return {error:new Error('failed')};if(name==='get_assist_setup'&&mode?.startsWith('settings'))return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};if(name==='get_assist_setup')return {data:{enabled:true,provisioned:mode!=='pending',windows_download_ready:mode!=='pending'}};if(mode==='disabled')return {error:new Error('disabled')};return {data:{url:'https://assist.example.com/elife/meshagents?meshid=one&id=4'}};} ,functions:{invoke:async(name,options)=>{window.edgeCalls.push({name,body:options.body});if(name==='assist-guest'){if(options.body.operation==='redeem')return {data:{invite_id:'guest-invite',claim_token:'test-claim-token',download_url:'https://assist.example.com/mjv-orgone/meshagents?meshid=guest&id='+(options.body.architecture==='arm64'&&mode!=='guest-wrong-architecture'?'43':'4')+'&installflags=1',state:'waiting_for_computer',expires_at:new Date(Date.now()+180000).toISOString()}};return {data:{ended:true,state:'waiting_for_computer',expires_at:new Date(Date.now()+180000).toISOString()}};}if(options.body.operation==='invite_capability')return {data:{available:mode==='engineer'}};if(options.body.operation==='invite_create')return {data:{invite_id:'guest-invite',code:'ABCD-EFGH-JKLM',join_url:'https://elife.myjobview.com/assist#code=ABCD-EFGH-JKLM',state:'waiting_for_guest'}};if(options.body.operation==='invite_status')return {data:{state:'waiting_for_computer'}};if(options.body.operation==='devices')return {data:{devices:[{id:'node/mjv-orgone/online',name:'Jesse laptop',online:true,os:'Windows'},{id:'node/mjv-orgone/offline',name:'Offline laptop',online:false,os:'Windows'}]}};if(options.body.operation==='connect')return {data:{session_id:'viewer-session',viewer_origin:'https://assist.example.com',viewer_url:'https://assist.example.com/mjv-orgone/?login=private-viewer-token',expires_at:new Date(Date.now()+180000).toISOString()}};return {data:{ended:true,active:true}};}}};
 window.edgeCalls=[];window.open=()=>({opener:null,closed:false,document:{title:'',body:{textContent:''},createElement:()=>({}),head:{appendChild:()=>{}}},location:{replace:url=>{window.viewerUrl=url}},close(){this.closed=true;}});
@@ -78,6 +78,12 @@ try{
   await page.setViewportSize({width,height:900});
   await page.goto(url+'?mode=guest&width='+width+'#code=ABCD-EFGH-JKLM');
   await page.getByLabel('Support code').waitFor();
+  const dealerLogo=page.getByRole('img',{name:'Electronic Life'});
+  await dealerLogo.waitFor();
+  assert.equal(await dealerLogo.getAttribute('src'),'https://assets.example.test/dealer-logo.png');
+  assert.equal(await dealerLogo.evaluate(el=>getComputedStyle(el).objectFit),'contain');
+  await page.getByRole('img',{name:'MyJobView Assist'}).waitFor();
+  assert.equal(await page.getByRole('img',{name:'MyJobView Assist'}).getAttribute('src'),'/images/myjobview-assist.png');
   assert.equal(await page.getByLabel('Support code').inputValue(),'ABCD-EFGH-JKLM');
   assert.equal(await page.evaluate(()=>location.hash),'');
   assert.equal(await page.evaluate(()=>window.calls.length),0,'Guest entry requires no staff RPC');
@@ -103,6 +109,10 @@ try{
   await page.getByText('For Windows ARM64.',{exact:false}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  }
+ await page.goto(url+'?mode=guest-no-logo');
+ await page.getByRole('heading',{name:'Electronic Life',exact:true}).waitFor();
+ await page.getByRole('img',{name:'MyJobView Assist'}).waitFor();
+ assert.equal(await page.getByRole('img',{name:'Electronic Life'}).count(),0,'No broken dealer image when logo is missing');
  await page.goto(url+'?mode=guest-wrong-architecture#code=ABCD-EFGH-JKLM');
  await page.getByLabel('Computer type').selectOption('arm64');
  await page.getByRole('button',{name:'Continue',exact:true}).click();
