@@ -15,6 +15,8 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
   const current = useRef<Invite | null>(null);
   const viewer = useRef<Window | null>(null);
   const epoch = useRef(0);
@@ -79,9 +81,16 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       const row = current.current; current.current = null; if (row) void invoke('invite_end', row.invite_id).catch(() => {});
     };
   }, [organizationId]);
+  async function recheckAvailability() {
+    if (checkingAvailability || busy) return;
+    setCheckingAvailability(true);
+    try { const data = await invoke('invite_capability'); setAvailable(data?.available === true); }
+    catch { setAvailable(false); }
+    finally { setCheckingAvailability(false); }
+  }
   async function create() {
     if (working.current || current.current || !available || !selectedEmail) return;
-    const version = epoch.current; working.current = true; setBusy(true); setError(''); setCopied(false);
+    const version = epoch.current; working.current = true; setBusy(true); setError(''); setCopied(false); setCodeCopied(false);
     try {
       const row = await invoke('invite_create');
       if (version !== epoch.current) { void invoke('invite_end', row.invite_id).catch(() => {}); return; }
@@ -119,12 +128,13 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       {!recipient && searching && <p className="mt-1 text-xs text-muted">Searching…</p>}
       {!recipient && directoryError && <p className="mt-1 text-xs text-muted">Some directory results could not be loaded. You can still enter an email address.</p>}
     </div>}
-    {!available ? <p className="mt-2 text-sm text-muted">Guest invitations will be available after the temporary Windows connection passes its pilot.</p> : !invite ? <>
+    {!available ? <div className="mt-2"><p className="text-sm text-muted">Invitation codes are not active yet. Remote support must pass the Windows pilot before sessions can be started.</p><button type="button" disabled={checkingAvailability || busy} onClick={() => void recheckAvailability()} className="mt-2 min-h-11 text-sm font-medium text-info disabled:opacity-50">{checkingAvailability ? 'Checking…' : 'Check availability again'}</button></div> : !invite ? <>
       <p className="mt-2 text-sm text-muted">Create a one-time code or link. They won’t need an MJV account.</p>
       <button type="button" disabled={busy || !selectedEmail} onClick={() => void create()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create invitation'}</button>
     </> : <>
       <p className="mt-3 text-sm text-muted">Ask them to visit <strong>{new URL(invite.join_url).origin}/assist</strong> and enter:</p>
-      <p className="my-3 break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p>
+      <div className="my-3 flex flex-wrap items-center gap-3"><p className="break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code).then(() => setCodeCopied(true)).catch(() => setError('Unable to copy code.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{codeCopied ? 'Code copied' : 'Copy code'}</button></div>
+      <p className="mb-2 text-sm text-muted">Invitation for <strong>{selectedEmail}</strong>. Email opens your mail app; it is not sent automatically.</p>
       <div className="mb-3 flex flex-wrap gap-2">
         <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Prepare invitation email</a>
         <button type="button" onClick={() => void navigator.clipboard.writeText(inviteText).then(() => setCopied(true)).catch(() => setError('Unable to copy invitation.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />Copy invitation</button>
