@@ -247,8 +247,13 @@ export function TechMap() {
   }, [historyPoints, mapReady, historyMode]);
 
   async function loadHistoryTechnicians() {
-    const { data, error } = await supabase.from('profiles').select('id,full_name').order('full_name');
-    if (error) { console.error('Unable to load technician history selector', error); return; }
+    const { data, error } = await supabase.rpc('get_visible_dispatch_technicians');
+    if (error) {
+      console.error('Unable to load authorized technician history selector', error);
+      setHistoryTechnicians([]);
+      setHistoryError('Unable to verify technician visibility');
+      return;
+    }
     setHistoryTechnicians((data || []).filter(p => p.id && p.full_name));
   }
 
@@ -489,7 +494,13 @@ export function TechMap() {
       // would make an employee disappear from the map at midnight.
       // Scope by organization, not by the shift's start date.
       if (!profile?.organization_id) return;
-      const { data: dailyClocks, error: clockError } = await supabase
+      // The database authorization helper is the source of truth for both
+      // live and historical technician selection. Never fall back to all users.
+      const { data: allowedTechnicians, error: visibilityError } = await supabase.rpc('get_visible_dispatch_technicians');
+      if (visibilityError) throw visibilityError;
+      if (!isCurrent()) return;
+      const allowedIds = new Set((allowedTechnicians || []).map(tech => tech.id));
+      const { data: unfilteredDailyClocks, error: clockError } = await supabase
         .from('daily_clock_entries')
         .select('id, technician_id, status, clock_in, clock_in_latitude, clock_in_longitude, profiles!technician_id(full_name, role, primary_office_id)')
         .eq('organization_id', profile.organization_id)
@@ -497,6 +508,7 @@ export function TechMap() {
         .is('clock_out', null);
       if (clockError) throw clockError;
       if (!isCurrent()) return;
+      const dailyClocks = (unfilteredDailyClocks || []).filter(clock => allowedIds.has(clock.technician_id));
       setClockedInCount((dailyClocks || []).filter(c => c.status === 'clocked_in').length);
 
       // Restrict ancillary lookups to the active shifts and employees in this dealer.
