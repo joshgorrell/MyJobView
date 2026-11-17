@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, UserPlus, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 type Recipient = { id: string; name: string; email: string; type: 'Customer' | 'User' };
-const validEmail = (value: string) => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value.trim());
+const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 type Invite = { invite_id: string; code: string; join_url: string; state: string };
 export function GuestInviteConsole({ organizationId }: { organizationId: string }) {
   const [available, setAvailable] = useState(false);
@@ -44,8 +44,8 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [organizationId, recipientQuery, recipient]);
   const selectedEmail = recipient?.email || (validEmail(recipientQuery) ? recipientQuery.trim() : '');
-  const inviteText = invite ? `Remote support invitation\\n\\nVisit: ${new URL(invite.join_url).origin}/assist\\nCode: ${invite.code}\\nOr open: ${invite.join_url}\\n\\nThis is a one-time support session. You will be asked to approve remote access.` : '';
-    async function invoke(operation: string, inviteId?: string) {
+  const inviteText = invite ? `Remote support invitation\n\nVisit: ${new URL(invite.join_url).origin}/assist\nCode: ${invite.code}\nOr open: ${invite.join_url}\n\nThis is a one-time support session. You will be asked to approve remote access.` : '';
+  async function invoke(operation: string, inviteId?: string) {
     const { data, error: failure } = await supabase.functions.invoke('assist-support', { body: { operation, organizationId, ...(inviteId ? { inviteId } : {}) } });
     if (failure || data?.error) throw new Error('Invitation unavailable'); return data;
   }
