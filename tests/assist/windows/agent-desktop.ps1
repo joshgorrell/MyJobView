@@ -39,13 +39,14 @@ public static class AssistConsentInput {
  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(System.Drawing.Point point);
  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
  static string Text(IntPtr hwnd) { var text=new System.Text.StringBuilder(2048); GetWindowText(hwnd,text,text.Capacity); return text.ToString(); }
- public static bool SelectConsent(string viewer, bool allow) {
-  bool selected=false;
+ public static bool SelectConsent(string viewer, string mode) {
+  bool selected=false; bool allow=mode=="allow";
   EnumWindows((window,unused)=>{
    if(Text(window).Trim()!="MeshCentral") return true;
    bool scoped=false;
    EnumChildWindows(window,(child,data)=>{if(Text(child).Contains(viewer))scoped=true;return true;},IntPtr.Zero);
    if(!scoped)return true;
+   if(mode=="peek"){selected=true;return false;}
    IntPtr button=IntPtr.Zero;
    // Vendor reuses these child IDs for STATIC labels; require the button caption too.
    EnumChildWindows(window,(child,data)=>{
@@ -76,7 +77,7 @@ $seen=@()
 $buttonInfo=''
 $clickError=''
 do{
- if($Mode -ne 'peek' -and [AssistConsentInput]::SelectConsent($ViewerName,($Mode -eq 'allow'))){Write-Output 'consent_selection_applied';exit 0}
+ if([AssistConsentInput]::SelectConsent($ViewerName,$Mode)){Write-Output 'scoped_native_consent_action';exit 0}
  $windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
  foreach($window in $windows){
   if(([string]$window.Current.Name).Trim() -ne 'MeshCentral'){continue}
