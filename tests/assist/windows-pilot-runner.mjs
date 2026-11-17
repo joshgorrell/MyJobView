@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {buildPilotReport} from '../../services/assist/windows-pilot-runner.mjs';
+import {assessPilotEvidence,pilotCases} from '../../services/assist/windows-pilot-evidence.mjs';
+const tester='Pilot tester',environment='Windows 11 x64 staging';
+const answers=Object.fromEntries(pilotCases.map(id=>[id,{status:'PASS',observed:'Verified actual behavior on a Windows staging test computer'}]));
+const report=buildPilotReport({tester,environment,answers});
+assert.equal(report.cases.length,pilotCases.length);
+assert.equal(assessPilotEvidence(report).status,'EVIDENCE_REVIEW_REQUIRED');
+assert.equal(assessPilotEvidence(report).canary_approved,false);
+assert.equal(assessPilotEvidence(buildPilotReport({tester,environment,answers:{}})).status,'BLOCKED');
+assert.throws(()=>buildPilotReport({tester,environment,answers:{G01:{status:'PASS',observed:'short'}}}));
+assert.throws(()=>buildPilotReport({tester,environment,answers:{G01:{status:'PASS',observed:'Bearer secret accidentally pasted here'}}}));
+console.log('Guided Windows pilot reports remain fail-closed and never authorize canary activation');
