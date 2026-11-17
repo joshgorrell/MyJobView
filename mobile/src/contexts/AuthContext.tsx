@@ -94,9 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     await locationTrackingService.stopTracking();
     await NotificationService.unregisterToken().catch(() => {});
-    await supabase.auth.signOut();
-    // Schedule snapshots may contain customer details: purge on successful sign-out.
+    // Clear sensitive local snapshots before ending the session. If deletion
+    // fails, don't report a successful logout while customer data remains.
     await clearCalendarCache();
+    await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
   }
