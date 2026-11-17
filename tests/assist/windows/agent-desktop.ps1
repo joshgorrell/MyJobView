@@ -28,23 +28,36 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class AssistConsentInput {
+ [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, UIntPtr wparam, IntPtr lparam, uint flags, uint timeout, out UIntPtr result);
+ [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
  [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
 }
 '@
 $deadline=[DateTime]::UtcNow.AddSeconds(25)
 $seen=@()
+$buttonInfo=''
+$clickError=''
 do{
  $windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
  foreach($window in $windows){
   if($window.Current.Name.Trim() -ne 'MeshCentral'){continue}
   $all=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
   $names=(@($all|ForEach-Object{$_.Current.Name}) -join ' ') -replace '\s+',' '
+  $buttonInfo=(@($all|Where-Object{$_.Current.Name -match 'Allow|Deny'}|Select-Object -First 8|ForEach-Object{@{name=$_.Current.Name;type=$_.Current.ControlType.ProgrammaticName;enabled=$_.Current.IsEnabled;offscreen=$_.Current.IsOffscreen}})|ConvertTo-Json -Compress)
   $seen=@($seen+($window.Current.Name+': '+$names))|Select-Object -Unique
   if(-not $names.Contains($ViewerName)){continue}
   if($Mode -eq 'peek'){Write-Output 'consent_prompt_present';exit 0}
   $choices=if($Mode -eq 'allow'){@('Allow','&Allow','Yes','&Yes')}else{@('Deny','&Deny','No','&No')}
-  foreach($element in $all){if($choices -contains $element.Current.Name){
+  foreach($element in $all){if($choices -contains $element.Current.Name.Trim()){
+   # Invoke the actual native BUTTON only after matching this viewer's dialog.
+   # Upstream win-userconsent assigns Allow=0xFFF2 and Deny=0xFFF3.
+   $handle=[IntPtr]$element.Current.NativeWindowHandle
+   $expectedId=if($Mode -eq 'allow'){0xFFF2}else{0xFFF3}
+   if($handle -ne [IntPtr]::Zero -and [AssistConsentInput]::GetDlgCtrlID($handle) -eq $expectedId){
+    $result=[UIntPtr]::Zero
+    if([AssistConsentInput]::SendMessageTimeout($handle,0x00F5,[UIntPtr]::Zero,[IntPtr]::Zero,2,2000,[ref]$result) -ne [IntPtr]::Zero){Write-Output 'consent_selection_applied';exit 0}
+   }
    $pattern=$null
    if($element.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)){$pattern.Invoke();Write-Output 'consent_selection_applied';exit 0}
    try{
@@ -55,15 +68,15 @@ do{
      if(($hit.GetRuntimeId() -join '.') -eq ($window.GetRuntimeId() -join '.')){$verifiedHit=$true;break}
      $hit=[Windows.Automation.TreeWalker]::RawViewWalker.GetParent($hit)
     }
-    if(-not $verifiedHit){continue}
+    if(-not $verifiedHit){$clickError='Point was outside scoped consent element';continue}
     if(-not [AssistConsentInput]::SetCursorPos([int]$point.X,[int]$point.Y)){continue}
     [AssistConsentInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
     [AssistConsentInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
     Write-Output 'consent_selection_applied';exit 0
-   }catch{continue}
+   }catch{$clickError=$_.Exception.Message;continue}
   }}
  }
  Start-Sleep -Milliseconds 100
 }while([DateTime]::UtcNow -lt $deadline)
-[Console]::Error.WriteLine(('Expected scoped native consent prompt was not found. Mode='+$Mode+'; expected viewer='+$ViewerName+'. ')+(($seen -join '; ').Substring(0,[Math]::Min(900,($seen -join '; ').Length))))
+[Console]::Error.WriteLine(('Expected scoped native consent prompt was not found. Mode='+$Mode+'; expected viewer='+$ViewerName+'; buttons='+$buttonInfo+'; click='+$clickError+'. ')+(($seen -join '; ').Substring(0,[Math]::Min(900,($seen -join '; ').Length))))
 exit 1
