@@ -20,11 +20,12 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
   const epoch = useRef(0);
   const working = useRef(false);
   useEffect(() => {
-    if (recipient || recipientQuery.trim().length < 2) { setMatches([]); setSearching(false); return; }
+    if (recipient || recipientQuery.trim().length < 2) { setMatches([]); setSearching(false); setDirectoryError(false); return; }
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setSearching(true); setDirectoryError(false);
-      const term = recipientQuery.trim().replace(/[%,()]/g, '');
+      const term = recipientQuery.trim().replace(/[%,()\\]/g, '').slice(0,100);
+      if (!term) { setMatches([]); setSearching(false); return; }
       try {
         // Contacts use MyJobView's existing RLS tenant boundary; profiles are explicitly organization-scoped.
         const [customers, users] = await Promise.all([
@@ -37,7 +38,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
           ...(customers.data || []).map(row => ({ id: String(row.id), name: String(row.company_name || row.full_name || row.contact_name || row.email || 'Customer'), email: String(row.email || ''), type: 'Customer' as const })),
           ...(users.data || []).map(row => ({ id: String(row.id), name: String(row.full_name || row.email || 'User'), email: String(row.email || ''), type: 'User' as const })),
         ].filter(row => validEmail(row.email));
-        setMatches(found);
+        setMatches(found.filter((row, index, rows) => rows.findIndex(other => other.email.toLowerCase() === row.email.toLowerCase()) === index));
       } catch { if (!cancelled) { setMatches([]); setDirectoryError(true); } }
       finally { if (!cancelled) setSearching(false); }
     }, 250);
@@ -116,7 +117,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
         {matches.map(match => <button type="button" role="option" aria-selected={false} key={match.type + match.id} onClick={() => { setRecipient(match); setRecipientQuery(match.email); setMatches([]); }} className="flex w-full items-center justify-between gap-3 border-b border-subtle px-3 py-2 text-left text-sm text-primary hover:bg-blue-500/10"><span className="min-w-0 truncate">{match.name} · {match.email}</span><span className="shrink-0 text-xs text-muted">{match.type}</span></button>)}
       </div>}
       {!recipient && searching && <p className="mt-1 text-xs text-muted">Searching…</p>}
-      {!recipient && directoryError && <p className="mt-1 text-xs text-muted">Directory search is unavailable. You can still enter an email address.</p>}
+      {!recipient && directoryError && <p className="mt-1 text-xs text-muted">Some directory results could not be loaded. You can still enter an email address.</p>}
     </div>}
     {!available ? <p className="mt-2 text-sm text-muted">Guest invitations will be available after the temporary Windows connection passes its pilot.</p> : !invite ? <>
       <p className="mt-2 text-sm text-muted">Create a one-time code or link. They won’t need an MJV account.</p>
