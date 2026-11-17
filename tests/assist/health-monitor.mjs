@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {createHealthMonitor} from '../../services/assist/health-monitor.mjs';
+const org='00000000-0000-0000-0000-000000000001',other='00000000-0000-0000-0000-000000000002';
+let states=[{organization_id:org,generation:2,desired_enabled:true},{organization_id:other,generation:3,desired_enabled:false}];
+let healthy=true,queued=[],logs=[];
+const monitor=createHealthMonitor({store:{list:async()=>states},plane:{checkHealth:async id=>id===org?{healthy}:null},
+ requeue:async(id,generation)=>{queued.push([id,generation]);},now:()=>1780000000000,logger:event=>logs.push(event)});
+assert.deepEqual(await monitor.runOnce(),{status:'healthy',checked:1,failed:0});
+assert.equal(monitor.snapshot().dealers[0].status,'healthy');
+healthy=false;
+assert.deepEqual(await monitor.runOnce(),{status:'degraded',checked:1,failed:1});
+assert.deepEqual(queued,[[org,2]]);
+assert.equal(monitor.snapshot().dealers[0].recovery,'queued');
+assert.equal(JSON.stringify(monitor.snapshot()).includes('secret'),false);
+const broken=createHealthMonitor({store:{list:async()=>{throw new Error('private error');}},plane:{},requeue:async()=>{},logger:e=>logs.push(e)});
+assert.equal((await broken.runOnce()).status,'monitor_failed');
+assert.equal(broken.snapshot().lastErrorCode,'state_list_failed');
+const recoveryFailure=createHealthMonitor({store:{list:async()=>[{organization_id:org,generation:4,desired_enabled:true}]},plane:{checkHealth:async()=>({healthy:false})},requeue:async()=>{throw Error('sensitive');}});
+await recoveryFailure.runOnce();
+assert.equal(recoveryFailure.snapshot().dealers[0].recovery,'queue_failed');
+console.log('Assist health monitor: per-dealer status, recovery reporting, sanitized errors and failure isolation pass');
