@@ -16,11 +16,17 @@ export function validateCanaryRequest(body,{now=Date.now()}={}){
 }
 export function createWindowsCanaryHandler({verify,now=Date.now}={}){
  if(typeof verify!=='function')throw new Error('independent_windows_verifier_required');
- const pending=new Set();
+ const used=new Map();
+ const replayWindowMs=30000;
+ const maxNonces=4096;
  return async body=>{
   const request=validateCanaryRequest(body,{now:now()});
-  if(pending.has(request.probe_nonce))throw new Error('duplicate_probe');
-  pending.add(request.probe_nonce);
+  // Retain nonces after completion (including failure): a completed probe must
+  // not be replayable while its timestamp is still within the accepted window.
+  for(const [key,expires] of used)if(expires<=now())used.delete(key);
+  if(used.has(request.probe_nonce))throw new Error('duplicate_probe');
+  if(used.size>=maxNonces)throw new Error('canary_busy');
+  used.set(request.probe_nonce,now()+replayWindowMs);
   try{
    // The verifier must operate real Windows endpoints and produce independent
    // observations. It must not derive success from request flags or mocks.
@@ -34,6 +40,8 @@ export function createWindowsCanaryHandler({verify,now=Date.now}={}){
     proof.second_dealer_denied_observed!==true)throw new Error('canary_proof_rejected');
    return {organization_id:request.organization_id,generation:request.generation,probe_nonce:request.probe_nonce,
     checked_at:proof.checked_at,desktop_control:true,consent_enforced:true,cross_tenant_denied:true};
-  }finally{pending.delete(request.probe_nonce);}
+  }finally{
+   // Never release the nonce early, even when verification fails.
+  }
  };
 }
