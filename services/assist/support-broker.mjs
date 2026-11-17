@@ -46,10 +46,13 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
     if(c.operation==='device_remove'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
      const devices=await runtime.inventory(c.organization_id);
-     if(!devices.some(d=>d.id===c.device_id)||(await readRemoved(c.organization_id)).includes(c.device_id))throw new Error('device_unavailable');
-     // Persist a fail-closed tombstone before the native command: soft-deleted nodes may reconnect.
      const removed=await readRemoved(c.organization_id);
-     await writeRemoved(c.organization_id,[...removed,c.device_id]);
+     const tombstoned=removed.includes(c.device_id);
+     // Only retry an already tombstoned identity that is still present in this
+     // dealer's native inventory. Never allow a foreign or unknown node.
+     if(!devices.some(d=>d.id===c.device_id))throw new Error('device_unavailable');
+     // Persist a fail-closed tombstone before the native command: soft-deleted nodes may reconnect.
+     if(!tombstoned)await writeRemoved(c.organization_id,[...removed,c.device_id]);
      // End existing viewers before revoking enrollment. Failure must block removal confirmation.
      for(const active of [...sessions.values()].filter(s=>s.organization_id===c.organization_id&&s.device_id===c.device_id))await revoke(active,'device_removed');
      const result=await runtime.removeEnrollment(c.organization_id,c.device_id);
