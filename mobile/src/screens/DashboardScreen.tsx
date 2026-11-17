@@ -15,14 +15,6 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
-interface RecentDay {
-  entry_date: string;
-  clock_in: string;
-  clock_out: string | null;
-  total_hours: number;
-  status: string;
-}
-
 export default function DashboardScreen({ navigation }: any) {
   const { profile } = useAuth();
   const { isConnected, pendingSync } = useOffline();
@@ -33,7 +25,6 @@ export default function DashboardScreen({ navigation }: any) {
   const [usesDailyClock, setUsesDailyClock] = useState<boolean | null>(null);
   const [jobTimerActive, setJobTimerActive] = useState(false);
   const [clockInTime, setClockInTime] = useState<string | null>(null);
-  const [recentDays, setRecentDays] = useState<RecentDay[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -111,18 +102,7 @@ export default function DashboardScreen({ navigation }: any) {
         .not('work_order_id', 'is', null);
       setJobsToday(count || 0);
 
-      if (context.dailyClock) {
-        const { data: recent, error: recentError } = await supabase
-          .from('daily_clock_entries')
-          .select('entry_date, clock_in, clock_out, total_hours, status')
-          .eq('technician_id', profile.id)
-          .order('clock_in', { ascending: false })
-          .limit(5);
-        if (recentError) throw recentError;
-        setRecentDays(recent || []);
-      } else {
-        setRecentDays([]);
-      }
+
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
@@ -216,31 +196,6 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={styles.statLabel}>Today</Text>
         </View>
       </View>
-
-      {/* Recent Shifts */}
-      {recentDays.length > 0 && (
-        <View style={styles.recentSection}>
-          <Text style={styles.sectionTitle}>RECENT SHIFTS</Text>
-          <View style={styles.recentCard}>
-            {recentDays.map((day, index) => (
-              <View key={day.entry_date + index} style={[styles.recentRow, index < recentDays.length - 1 && styles.recentRowBorder]}>
-                <View style={styles.recentLeft}>
-                  <Text style={styles.recentDate}>{formatDate(day.clock_in)}</Text>
-                  <Text style={styles.recentTime}>
-                    {formatTime(day.clock_in)}{day.clock_out ? ` - ${formatTime(day.clock_out)}` : ' - Active'}
-                  </Text>
-                </View>
-                <View style={styles.recentRight}>
-                  <Text style={styles.recentHours}>{day.total_hours ? day.total_hours.toFixed(2) : '0.00'}h</Text>
-                  <Text style={[styles.recentStatus, { color: day.clock_out ? Colors.gray[400] : Colors.green[600] }]}>
-                    {day.clock_out ? 'Completed' : 'Active'}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
 
     </ScreenContainer>
   );
