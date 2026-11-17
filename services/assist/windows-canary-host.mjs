@@ -15,6 +15,7 @@ function authorized(header,secret){
 export function createWindowsCanaryServer({verify,token,os=platform(),maxBody=8192,verifyTimeoutMs=12000}={}){
  if(os!=='win32')throw new Error('windows_host_required');
  if(typeof token!=='string'||token.length<32)throw new Error('canary_token_required');
+ if(typeof verify!=='function')throw new Error('independent_windows_verifier_required');
  if(!Number.isSafeInteger(verifyTimeoutMs)||verifyTimeoutMs<1||verifyTimeoutMs>14000)throw new Error('invalid_canary_timeout');
  let active=false;
  const handle=createWindowsCanaryHandler({verify:async request=>{
