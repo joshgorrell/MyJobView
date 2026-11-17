@@ -345,3 +345,7 @@ verify_jwt = true
 # Public guest capability API: validates canonical dealer Origin and single-use invite/claim at the private host.
 [functions.assist-guest]
 verify_jwt = false
+
+# Server-to-server worker; authenticates with X-SMS-Worker-Secret.
+[functions.process-sms-dispatch]
+verify_jwt = false
