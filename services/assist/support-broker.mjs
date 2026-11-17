@@ -1,13 +1,20 @@
+import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
 import {inviteOperations} from './guest-broker.mjs';
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function validateSupportRequest(body){
- if(!body||!['devices','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
+ if(!body||!['devices','device_label','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
+ if(body.operation==='device_label'&&(typeof body.device_id!=='string'||body.device_id.length>256||typeof body.label!=='string'||body.label.length>120||body.label.trim().length<1))throw new Error('invalid_device');
  if(body.operation==='connect'&&(typeof body.device_id!=='string'||body.device_id.length>256))throw new Error('invalid_device');
  if(['touch','end'].includes(body.operation)&&!uuid.test(body.session_id))throw new Error('invalid_session');
  if(inviteOperations.includes(body.operation)&&!['invite_create','invite_capability'].includes(body.operation)&&!uuid.test(body.invite_id))throw new Error('invalid_invite');
  return body;
 }
-export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)=>fn()}){
+export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)=>fn(),labelDirectory=null}){
+ const labelPath=id=>join(labelDirectory,id+'.json');
+ const readLabels=async id=>{if(!labelDirectory)return {};try{const data=JSON.parse(await readFile(labelPath(id),'utf8'));return data&&typeof data==='object'&&!Array.isArray(data)?data:{};}catch(e){if(e.code==='ENOENT')return {};throw e;}};
+ const writeLabels=async(id,labels)=>{if(!labelDirectory)throw new Error('labels_unavailable');await mkdir(labelDirectory,{recursive:true,mode:0o700});const target=labelPath(id),temp=target+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(labels),{mode:0o600,flag:'wx'});await rename(temp,target);};
  const sessions=new Map();
  const call=(action,c,params={})=>rpc('assist_support_service',{p_action:action,p_organization_id:c.organization_id,p_actor_id:c.actor_id||null,p_auth_session_id:c.auth_session_id||null,p_params:params});
  const revoke=async(c,reason)=>{
@@ -21,7 +28,15 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
    return exclusive(c.organization_id,async()=>{
     if(c.operation==='devices'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
-     return {devices:await runtime.inventory(c.organization_id)};
+     const devices=await runtime.inventory(c.organization_id),labels=await readLabels(c.organization_id);
+     return {devices:devices.map(device=>({...device,name:typeof labels[device.id]==='string'?labels[device.id]:device.name}))};
+    }
+    if(c.operation==='device_label'){
+     if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
+     const devices=await runtime.inventory(c.organization_id);
+     if(!devices.some(device=>device.id===c.device_id))throw new Error('device_unavailable');
+     const labels=await readLabels(c.organization_id);labels[c.device_id]=c.label.trim();await writeLabels(c.organization_id,labels);
+     return {saved:true};
     }
     if(c.operation==='connect'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
