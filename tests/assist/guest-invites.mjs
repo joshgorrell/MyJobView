@@ -82,6 +82,18 @@ const request=(body,origin='https://elife.myjobview.com')=>new Request('https://
 assert.equal((await publicHandler(request({operation:'redeem',code:invite.code},'https://evil.example'))).status,403);assert.equal(called,0);
 assert.equal((await publicHandler(request({operation:'redeem',code:invite.code},'https://other.myjobview.com'))).status,503);assert.equal(called,0);
 const response=await publicHandler(request({operation:'redeem',code:invite.code,organization_id:other,actor_id:other}));assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('access-control-allow-origin'),'https://elife.myjobview.com');
+// Public guest endpoint must preserve the architecture gate all the way to the browser.
+const armPublicHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async subdomain=>subdomain==='elife'?org:null,control:async c=>{
+ assert.equal(c.architecture,'arm64');
+ return {...claim,download_url:download.replace('id=4','id=43')};
+}});
+const armResponse=await armPublicHandler(request({operation:'redeem',code:invite.code,architecture:'arm64'}));
+assert.equal(armResponse.status,200);
+assert.equal(new URL((await armResponse.json()).download_url).searchParams.get('id'),'43');
+const mismatchHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>claim});
+assert.equal((await mismatchHandler(request({operation:'redeem',code:invite.code,architecture:'arm64'}))).status,503,'Never return an x64 executable for an ARM64 request');
+const redirectHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...claim,download_url:download.replace('assist.example.com','untrusted.example.com')})});
+assert.equal((await redirectHandler(request({operation:'redeem',code:invite.code}))).status,503,'Never expose a foreign download host');
 const badHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...claim,download_url:download.replace('installflags=1','installflags=0')})});assert.equal((await badHandler(request({operation:'redeem',code:invite.code}))).status,503);
 const staffHandler=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>({...context,subdomain:'elife'}),control:async()=>({...invite,secret:'never return'})});
 const staffResponse=await staffHandler(new Request('https://backend.example/functions/v1/assist-support',{method:'POST',headers:{origin:'https://elife.myjobview.com',authorization:'Bearer verified'},body:JSON.stringify({operation:'invite_create',organizationId:org})}));assert.equal(staffResponse.status,200);const data=await staffResponse.json();assert.equal(data.join_url,`https://elife.myjobview.com/assist#code=${invite.code}`);assert.equal(data.secret,undefined);
