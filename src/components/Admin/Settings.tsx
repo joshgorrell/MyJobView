@@ -87,7 +87,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   const getTabFromUrl = (): SettingsTab => {
     const tab = new URLSearchParams(window.location.search).get('settingsTab');
     if (tab === 'text_messaging') return 'integrations';
-    if (tab && validTabs.includes(tab)) return tab;
+    if (tab && validTabs.some(validTab => validTab === tab)) return tab as SettingsTab;
     // A direct integration link must open the parent Integrations settings page.
     const integration = new URLSearchParams(window.location.search).get('integration');
     if (integration || new URLSearchParams(window.location.search).has('qbo')) return 'integrations';
