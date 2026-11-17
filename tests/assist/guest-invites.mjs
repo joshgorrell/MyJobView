@@ -52,7 +52,8 @@ await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unava
 online=[{id:device,online:true}];assert.equal((await staff('invite_status',{invite_id:invite.invite_id})).state,'computer_ready');
 const connected=await staff('invite_connect',{invite_id:invite.invite_id});assert.equal(connected.state,'support_window_ready');assert.equal(opens,1);
 await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unavailable/);assert.equal(opens,1,'Only one desktop viewer is issued');
-assert.equal((await guest('end')).ended,true);assert.equal(revokes,1);assert.equal(deletes,1);assert.equal(endReasons.at(-1),'user_ended');
+const beforeGuestEndRevokes=revokes,beforeGuestEndDeletes=deletes;
+assert.equal((await guest('end')).ended,true);assert.equal(revokes,beforeGuestEndRevokes+1);assert.equal(deletes,beforeGuestEndDeletes+1);assert.equal(endReasons.at(-1),'user_ended');
 await assert.rejects(guest('status'),/unavailable/);
 // A guest that closes the temporary Windows client without clicking End must
 // lose the native viewer on the next short session sweep.
