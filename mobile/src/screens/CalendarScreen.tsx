@@ -8,7 +8,7 @@ import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
 type Mode = 'day' | 'week' | 'month' | 'agenda';
-type Event = { id: string; date: string; start: string | null; end: string | null; title: string; subtitle: string; kind: 'job' | 'appointment'; workOrderId?: string };
+type Event = { id: string; date: string; start: string | null; end: string | null; title: string; subtitle: string; kind: 'job' | 'appointment' | 'internal' | 'time_off'; workOrderId?: string };
 const pad = (n: number) => String(n).padStart(2, '0');
 const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const fromKey = (s: string) => new Date(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)), 12);
@@ -54,16 +54,23 @@ export default function CalendarScreen({ navigation }: any) {
     setLoading(true);
     setError('');
     try {
-      const [jobs, appointments] = await Promise.all([
+      const [jobs, appointments, internal, timeOff] = await Promise.all([
         supabase.from('work_orders')
           .select('id, work_order_number, title, customer_name, scheduled_date, scheduled_start_time, scheduled_end_time, status')
           .eq('assigned_to', profile.id).gte('scheduled_date', rangeStart).lte('scheduled_date', rangeEnd).limit(300),
         supabase.from('appointments')
           .select('id, title, appointment_date, start_time, end_time, status')
           .eq('assigned_technician', profile.id).gte('appointment_date', rangeStart).lte('appointment_date', rangeEnd).limit(300),
+        supabase.from('internal_time_sessions')
+          .select('id, title, session_date, start_time, end_time, status')
+          .eq('assigned_to', profile.id).in('status', ['scheduled', 'in_progress', 'completed'])
+          .gte('session_date', rangeStart).lte('session_date', rangeEnd).limit(300),
+        supabase.rpc('team_time_off', { p_from: rangeStart, p_to: rangeEnd }),
       ]);
       if (jobs.error) throw jobs.error;
       if (appointments.error) throw appointments.error;
+      if (internal.error) throw internal.error;
+      if (timeOff.error) throw timeOff.error;
       const result: Event[] = [
         ...(jobs.data || []).filter(j => j.status !== 'cancelled').map(j => ({
           id: `job-${j.id}`, date: j.scheduled_date, start: j.scheduled_start_time, end: j.scheduled_end_time,
@@ -73,6 +80,16 @@ export default function CalendarScreen({ navigation }: any) {
         ...(appointments.data || []).filter(a => a.status !== 'cancelled').map(a => ({
           id: `appointment-${a.id}`, date: a.appointment_date, start: a.start_time, end: a.end_time,
           title: a.title || 'Appointment', subtitle: 'Appointment', kind: 'appointment' as const,
+        })),
+        ...(internal.data || []).map(item => ({
+          id: `internal-${item.id}`, date: item.session_date, start: item.start_time, end: item.end_time,
+          title: item.title || 'Internal session', subtitle: 'Internal time', kind: 'internal' as const,
+        })),
+        ...(timeOff.data || []).filter(item => item.employee_id === profile.id).map(item => ({
+          id: `leave-${item.request_id}-${item.leave_date}`, date: item.leave_date,
+          start: item.full_day ? null : item.start_time, end: item.full_day ? null : item.end_time,
+          title: item.full_day ? 'Approved time off' : 'Approved time off (partial day)',
+          subtitle: 'Time off', kind: 'time_off' as const,
         })),
       ];
       setEvents(result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || '')));
@@ -152,14 +169,14 @@ export default function CalendarScreen({ navigation }: any) {
             disabled={!event.workOrderId}
             onPress={() => event.workOrderId && navigation.navigate('WorkOrderDetail', { workOrderId: event.workOrderId })}
             style={styles.event}>
-            <View style={[styles.eventStripe, { backgroundColor: event.kind === 'job' ? Colors.primary[600] : Colors.green[600] }]} />
+            <View style={[styles.eventStripe, { backgroundColor: event.kind === 'job' ? Colors.primary[600] : event.kind === 'appointment' ? '#8b5cf6' : event.kind === 'time_off' ? Colors.gray[400] : Colors.amber[500] }]} />
             <View style={styles.eventContent}>
               <Text style={styles.eventTime}>{mode === 'agenda' ? fromKey(event.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' : ''}{formatClock(event.start)}{event.end ? ` – ${formatClock(event.end)}` : ''}</Text>
               <Text style={styles.eventTitle}>{event.title}</Text>
               <Text style={styles.eventSubtitle}>{event.subtitle}</Text>
             </View>
           </TouchableOpacity>)}
-        <Text style={styles.note}>Read-only schedule · Work orders and assigned appointments</Text>
+        <Text style={styles.note}>Read-only schedule · Jobs, appointments, internal time and approved leave</Text>
       </ScrollView>
     </ScreenContainer>
   );
