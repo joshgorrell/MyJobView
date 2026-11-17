@@ -135,8 +135,8 @@ export function DispatchConsole({ onNavigate, initialTab }: DispatchConsoleProps
           <div className="space-y-3">
             <TechMap />
             <details className="rounded-lg border border-subtle bg-surface p-3">
-              <summary className="cursor-pointer text-sm font-medium">Technician status details</summary>
-              <div className="mt-3"><TechStatusDashboard /></div>
+              <summary className="cursor-pointer text-sm font-medium">Off duty & approved leave</summary>
+              <div className="mt-3"><TechStatusDashboard inactiveOnly /></div>
             </details>
           </div>
         )}

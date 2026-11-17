@@ -32,7 +32,7 @@ interface TechStatus {
   };
 }
 
-export function TechStatusDashboard() {
+export function TechStatusDashboard({ inactiveOnly = false }: { inactiveOnly?: boolean }) {
   const [techStatuses, setTechStatuses] = useState<TechStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
@@ -255,9 +255,10 @@ export function TechStatusDashboard() {
     return `${hours}h ${minutes}m`;
   }
 
+  const visibleStatuses = inactiveOnly ? techStatuses.filter(t => t.status === 'off_duty' || t.status === 'approved_leave') : techStatuses;
   const filteredStatuses = filter === 'all'
-    ? techStatuses
-    : techStatuses.filter(t => t.status === filter);
+    ? visibleStatuses
+    : visibleStatuses.filter(t => t.status === filter);
 
   const statusCounts = {
     all: techStatuses.length,
@@ -279,6 +280,7 @@ export function TechStatusDashboard() {
 
   return (
     <div className="space-y-4">
+      {!inactiveOnly && <>
       {/* Header */}
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-white">Technician Status</h2>
@@ -353,10 +355,12 @@ export function TechStatusDashboard() {
         </button>
       </div>
 
+      </>}
+      {inactiveOnly && <p className="text-xs text-muted">Off-duty technicians and approved leave. Active technicians are listed on the map above.</p>}
       {/* Technicians Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={inactiveOnly ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"}>
         {filteredStatuses.map(tech => (
-          <div key={tech.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+          <div key={tech.id} className={inactiveOnly ? "bg-white rounded-lg border border-gray-200 p-3" : "bg-white rounded-xl shadow-sm border border-gray-200 p-4"}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
