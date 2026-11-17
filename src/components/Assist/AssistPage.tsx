@@ -64,10 +64,10 @@ export default function AssistPage() {
   if (tenantLoading) return <div className="p-6 text-muted" role="status">Loading dealer…</div>;
   if (!allowed) return <div className="p-6 text-primary" role="alert">Remote support is available only to active employees in their own dealer workspace.</div>;
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6">
-      <header className="space-y-3">
+    <div className="mx-auto w-full max-w-7xl space-y-4 p-4 lg:px-6">
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <h1 className="sr-only">MyJobView Assist — Remote Support</h1>
-        <div className="w-full max-w-sm rounded-xl border border-subtle bg-white p-3 sm:p-4">
+        <div className="w-60 max-w-full shrink-0">
           <img
             src="/images/myjobview-assist.png"
             alt="MyJobView Assist"
@@ -78,16 +78,17 @@ export default function AssistPage() {
         </div>
         <p className="text-sm text-muted">{tenant?.organizationName || 'Your dealer'} · Help for your on-site laptop</p>
       </header>
-      <section className="rounded-xl border border-subtle bg-surface p-5 sm:p-6">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <section className="min-w-0 rounded-xl border border-subtle bg-surface p-4">
         <h2 className="text-lg font-semibold text-primary">Set up this Windows laptop</h2>
-        <p className="mt-2 text-sm text-muted">Install the support app once so your office engineers can help with your computer.</p>
-        <ol className="my-5 list-inside list-decimal space-y-3 text-sm text-primary">
+        <p className="mt-1 text-sm text-muted">Install the support app once so your office engineers can help with your computer.</p>
+        <ol className="my-3 list-inside list-decimal space-y-2 text-sm text-primary">
           <li>Download the Windows support app.</li>
           <li>Open the file and choose <strong>Install</strong>.</li>
           <li>Approve the Windows administrator prompt. Contact your office if credentials are required.</li>
         </ol>
         <button type="button" onClick={() => void download()} disabled={loading || busy || !ready}
-          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
           <Download size={18} />{loading ? 'Checking availability…' : busy ? 'Preparing download…' : 'Download for Windows (64-bit)'}
         </button>
         {!loading && !ready && !error && <p className="mt-3 text-sm text-muted" role="status">{enabled ? 'Remote support is being set up for your dealer. Downloads will be available when setup is complete.' : 'Remote Support is off. Your dealer administrator can enable it in Integrations.'}</p>}
@@ -95,9 +96,10 @@ export default function AssistPage() {
         {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
         {message && <p className="mt-3 text-sm text-primary" role="status">{message}</p>}
         <button type="button" onClick={() => setRefresh(n => n + 1)} disabled={loading || busy}
-          className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-info disabled:opacity-50"><RefreshCw size={16} />Refresh availability</button>
+          className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-info disabled:opacity-50"><RefreshCw size={16} />Refresh availability</button>
       </section>
       <EngineerConsole organizationId={organizationId!} />
+      </div>
     </div>
   );
 }
