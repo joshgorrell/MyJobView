@@ -18,3 +18,6 @@
 6. Run direct authenticated API and RPC tests with restricted users before deploying; then update Live Map and Overview in the same release.
 
 No production data or RLS policies are modified by this PR.
+
+## Confirmed existing Admin semantics (2026-11-17)
+`src/components/Admin/EditUserForm.tsx` explicitly separates Office Visibility from office memberships. Options are All Offices, Selected Offices, Own Records Only, Primary Office Only. Missing visibility setting defaults to All Offices. **Membership does not automatically restrict visibility.** The GPS SQL review was updated to match Tech Stats' Primary Office Only interpretation instead of using the viewer's membership intersection.
