@@ -57,3 +57,10 @@ export async function readCalendarRange(employeeId: string, start: string, end: 
   if (!Array.isArray(parsed)) return null;
   return { events: parsed as CachedCalendarEvent[], fetchedAt: row.fetched_at };
 }
+
+/** Remove all persisted calendar details on sign-out, including other users'
+ * snapshots left by prior sign-ins on this device. */
+export async function clearCalendarCache() {
+  const db = await database();
+  await db.runAsync('DELETE FROM cached_calendar_ranges');
+}
