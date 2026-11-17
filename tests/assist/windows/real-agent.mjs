@@ -55,7 +55,16 @@ try{
  target=spawn('pwsh',['-NoProfile','-STA','-File',resolve('tests/assist/windows/agent-desktop.ps1'),'-Mode','target','-StatePath',stateFile],{stdio:['ignore','ignore','pipe']});target.stderr.on('data',s=>{diagnostics=(diagnostics+s).slice(-8192);});
  await until(targetState);browser=await chromium.launch({headless:true});
  const context=await browser.newContext({ignoreHTTPSErrors:true});
- async function openViewer(username){const viewer=await runtime.createViewer(org,device.id,username);const page=await context.newPage();await page.goto(viewer.viewer_url);await page.locator('#connectbutton1').waitFor();await page.locator('#connectbutton1').click();return {page,viewer};}
+ async function openViewer(username){const viewer=await runtime.createViewer(org,device.id,username);const page=await context.newPage();await page.goto(viewer.viewer_url);await page.locator('#connectbutton1').waitFor();await page.locator('#connectbutton1').click();
+  const sessionId=(await targetState()).session_id;assert.ok(Number.isInteger(sessionId)&&sessionId>0);
+  let lastClick=Date.now();await until(async()=>{
+   if(await page.evaluate(()=>globalThis.desktop!=null))return true;
+   const choice=page.locator(`#p11DeskSessionSelector > div[onclick^="connectDesktop(event,1,${sessionId},"]`);
+   if(await choice.isVisible()){await choice.click();return true;}
+   if(Date.now()-lastClick>3000){await page.locator('#connectbutton1').click({timeout:1000});lastClick=Date.now();}
+   return false;
+  },20000);
+  return {page,viewer};}
  const denyUser='mjv-session-'+randomBytes(16).toString('hex');
  const denied=await openViewer(denyUser);await ps('peek',denyUser);
  assert.equal(await denied.page.evaluate(()=>!!globalThis.desktop?.m?.FirstDraw),false,'No desktop frames before local consent');
