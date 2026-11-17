@@ -6,6 +6,7 @@ import { RingCentralSettings } from './RingCentralSettings';
 import { TechsafeSettings } from './TechsafeSettings';
 import { AssistSettings } from './AssistSettings';
 import { useAuth } from '../../contexts/AuthContext';
+import { TextMessagingSettings } from './TextMessagingSettings';
 
 interface CompanySettings {
   google_maps_api_key?: string;
@@ -40,6 +41,7 @@ const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twili
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
+  if (params.get('settingsTab') === 'text_messaging') return 'twilio';
   const selected = params.get('integration');
   return integrationIds.find(id => id === selected) ?? (params.has('qbo') ? 'quickbooks' : 'payment_processor');
 }
@@ -72,6 +74,7 @@ export function IntegrationsSettings() {
   // Show/hide toggles for password fields
   const [showGoogleMapsKey, setShowGoogleMapsKey] = useState(false);
   const [showTwilioToken, setShowTwilioToken] = useState(false);
+  const [twilioTab, setTwilioTab] = useState<'overview' | 'automations' | 'templates' | 'history'>('overview');
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
 
   // Payment processor state (stored on organizations table)
@@ -795,7 +798,18 @@ export function IntegrationsSettings() {
             </p>
           </div>
 
-          <div className="space-y-4">
+          <nav aria-label="Twilio settings sections" className="flex flex-wrap gap-2">
+            {(['overview', 'automations', 'templates', 'history'] as const).map(tab => (
+              <button key={tab} type="button" onClick={() => setTwilioTab(tab)}
+                aria-current={twilioTab === tab ? 'page' : undefined}
+                className={`rounded-lg border px-3 py-2 text-sm capitalize ${twilioTab === tab ? 'border-blue-500 bg-blue-50 font-semibold' : 'border-gray-200'}`}>
+                {tab === 'overview' ? 'Overview' : tab === 'history' ? 'Message History' : tab}
+              </button>
+            ))}
+          </nav>
+          {twilioTab === 'automations' && <TextMessagingSettings section="automations" />}
+          {twilioTab === 'history' && <TextMessagingSettings section="history" />}
+          {twilioTab === 'overview' && <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Account SID
@@ -864,7 +878,8 @@ export function IntegrationsSettings() {
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-6 mt-6">
+          </div>}
+          {twilioTab === 'templates' && <div className="border-t border-gray-200 pt-6 mt-6">
             <h5 className="text-sm font-semibold text-gray-900 mb-3">SMS Templates</h5>
 
             <div>

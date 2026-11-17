@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
+type SmsHistoryItem = {
+  id: string; category: string; status: string; attempts: number;
+  last_error_code: string | null; created_at: string;
+  accepted_at: string | null; delivered_at: string | null;
+};
+const formatCategory = (category: string) => category.replaceAll('_', ' ');
+
 type SmsSettings = {
   organization_id: string;
   enabled: boolean;
@@ -26,13 +33,25 @@ const defaults = (organization_id: string): SmsSettings => ({
   quiet_hours_end: '08:00', timezone: 'America/Chicago',
 });
 
-export function TextMessagingSettings() {
+export function TextMessagingSettings({ section = 'automations' }: { section?: 'automations' | 'history' }) {
   const { profile } = useAuth();
   const org = profile?.organization_id;
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
   const [settings, setSettings] = useState<SmsSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<SmsHistoryItem[]>([]);
+  const [historyError, setHistoryError] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  async function refreshHistory() {
+    if (!canEdit || !org) return;
+    setHistoryLoading(true); setHistoryError('');
+    const { data, error: loadError } = await supabase.rpc('get_sms_dispatch_history', { p_limit: 50 });
+    if (loadError) setHistoryError(loadError.message);
+    else setHistory((data ?? []) as SmsHistoryItem[]);
+    setHistoryLoading(false);
+  }
+  useEffect(() => { setHistory([]); if (canEdit && org) void refreshHistory(); }, [canEdit, org]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
@@ -66,6 +85,7 @@ export function TextMessagingSettings() {
   const toggle = (key: keyof SmsSettings) => setSettings(previous =>
     previous ? { ...previous, [key]: !previous[key] } : previous);
   return <div className="max-w-3xl space-y-6">
+    {section === 'automations' && <>
     <div>
       <h2 className="text-xl font-semibold text-gray-900">Text Messaging</h2>
       <p className="mt-1 text-sm text-gray-600">Choose which customer notifications your dealership may send through Twilio.</p>
@@ -110,9 +130,33 @@ export function TextMessagingSettings() {
         </label>
       </div>
     </div>
-    {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-    {message && <p role="status" className="text-sm text-green-700">{message}</p>}
-    {canEdit && <button type="button" onClick={() => void save()} disabled={saving}
+    </>}
+    {section === 'history' && canEdit && <section className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div><h3 className="font-semibold">Recent message activity</h3>
+          <p className="text-sm text-gray-500">Last 50 queued messages for this dealer. Message contents and phone numbers are hidden.</p></div>
+        <button type="button" onClick={() => void refreshHistory()} disabled={historyLoading}
+          className="rounded border px-3 py-2 text-sm disabled:opacity-50">{historyLoading ? 'Loading…' : 'Refresh'}</button>
+      </div>
+      {historyError && <p role="alert" className="text-sm text-red-600">{historyError}</p>}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead><tr className="border-b"><th className="p-2">Created</th><th className="p-2">Type</th>
+            <th className="p-2">Status</th><th className="p-2">Attempts</th><th className="p-2">Error</th></tr></thead>
+          <tbody>{history.map(item => <tr key={item.id} className="border-b">
+            <td className="p-2 whitespace-nowrap">{new Date(item.created_at).toLocaleString()}</td>
+            <td className="p-2 capitalize">{formatCategory(item.category)}</td>
+            <td className="p-2 capitalize">{item.status}</td>
+            <td className="p-2">{item.attempts}</td>
+            <td className="p-2">{item.last_error_code || '—'}</td>
+          </tr>)}</tbody>
+        </table>
+        {!historyLoading && !historyError && history.length === 0 && <p className="p-3 text-sm text-gray-500">No messages recorded yet.</p>}
+      </div>
+    </section>}
+    {section === 'automations' && error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+    {section === 'automations' && message && <p role="status" className="text-sm text-green-700">{message}</p>}
+    {section === 'automations' && canEdit && <button type="button" onClick={() => void save()} disabled={saving}
       className="rounded-lg bg-blue-600 px-5 py-2.5 text-white disabled:opacity-50">
       {saving ? 'Saving…' : 'Save messaging settings'}
     </button>}
