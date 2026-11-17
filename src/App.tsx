@@ -202,11 +202,9 @@ function AppContent() {
   const [createInternalChatRequested, setCreateInternalChatRequested] = useState(false);
   const [showFlowUpdate, setShowFlowUpdate] = useState(false);
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
-  const [showServiceTypePicker, setShowServiceTypePicker] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
   const [showAiTaskForm, setShowAiTaskForm] = useState(false);
-  const [showSupportTaskForm, setShowSupportTaskForm] = useState(false);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
@@ -872,7 +870,7 @@ function AppContent() {
             onCreateLead={() => setShowLeadForm(true)}
             onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
-            onCreateServiceRequest={() => setShowServiceTypePicker(true)}
+            onCreateServiceRequest={() => setShowServiceRequestForm(true)}
             onCreateTask={() => {
               setAiTaskPrefill(null);
               setShowAiTaskForm(true);
@@ -1251,17 +1249,7 @@ function AppContent() {
         </Suspense>
       )}
 
-      {showServiceTypePicker && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowServiceTypePicker(false); }}>
-          <div role="dialog" aria-modal="true" aria-labelledby="service-type-heading" className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl border border-subtle bg-canvas p-5 text-primary shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-start justify-between gap-3"><div><h2 id="service-type-heading" className="text-xl font-semibold">New Service Request</h2><p className="mt-1 text-sm text-muted">What do you need to create?</p></div><button type="button" onClick={() => setShowServiceTypePicker(false)} className="rounded-lg p-2 text-muted hover:bg-surface" aria-label="Close">✕</button></div>
-            <div className="space-y-2">
-              <button type="button" onClick={() => { setShowServiceTypePicker(false); setShowServiceRequestForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Service</span><span className="text-sm text-muted">On-site work, repairs, troubleshooting, or dispatch</span></button>
-              <button type="button" onClick={() => { setShowServiceTypePicker(false); setAiTaskPrefill(null); setShowSupportTaskForm(true); }} className="w-full min-h-16 rounded-xl border border-subtle bg-surface p-4 text-left transition-colors hover:border-blue-500 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><span className="block font-semibold">Support</span><span className="text-sm text-muted">Customer assistance and remote support</span></button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {showServiceRequestForm && (
         <Suspense fallback={null}>
@@ -1277,16 +1265,7 @@ function AppContent() {
         </Suspense>
       )}
 
-      {showSupportTaskForm && (
-        <Suspense fallback={null}>
-          <TaskForm
-            supportMode
-            aiPrefill={aiTaskPrefill}
-            onClose={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
-            onSuccess={() => { setShowSupportTaskForm(false); setAiTaskPrefill(null); }}
-          />
-        </Suspense>
-      )}
+
 
       {showAiTaskForm && (
         <Suspense fallback={null}>
@@ -1368,7 +1347,7 @@ function AppContent() {
               setShowAiTaskForm(true);
             } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
               setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
-              setShowSupportTaskForm(true);
+              setShowAiTaskForm(true);
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);
