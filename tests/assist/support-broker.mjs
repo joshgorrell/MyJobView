@@ -112,8 +112,9 @@ try {
   assert.equal(revoked,1,'Explicit end immediately revokes native access');
   assert.equal(ended,1);
   await assert.rejects(sessions.handle({...context,operation:'touch',session_id:sid}),/session_unavailable/);
+  expiresAt=Date.now()-1000;
   await sessions.handle({...context,operation:'connect',device_id:device});
-  checksFail=true;expiresAt=Date.now()-1000;
+  checksFail=true;
   await sessions.sweep();
   assert.equal(revoked,2,'Expired session is revoked when provider is unreachable');
   assert.equal(ended,2);
