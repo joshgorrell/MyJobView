@@ -113,7 +113,10 @@ export function summarizeProduction(history: ProductionDay[]) {
     training: total("training"),
     unaccounted: total("unaccounted"),
     excess: total("excess"),
-    clockDays: history.filter((day) => day.payroll !== null).length,
+    clockDays: history.filter((day) => day.payroll !== null && !day.assumed).length,
+    assumedDays: history.filter((day) => day.payroll !== null && day.assumed).length,
+    missingPayrollDays: history.filter((day) => day.flags.includes("Payroll/leave coverage missing")).length,
+    missingJobDays: history.filter((day) => day.flags.includes("Job report or entry missing")).length,
     categoryDays: history.filter(
       (day) => day.shop !== null && day.training !== null,
     ).length,
