@@ -1,0 +1,28 @@
+name: Assist Windows test environment
+on:
+  pull_request:
+    paths:
+      - 'tests/assist/windows/**'
+      - '.github/workflows/assist-windows-environment.yml'
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: 'Desktop environment to diagnose (ARM64 is currently unsupported)'
+        type: choice
+        default: x64
+        options: [x64, arm64]
+permissions:
+  contents: read
+jobs:
+  desktop-environment:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.architecture == 'arm64' && '["windows-11-arm"]' || '["windows-2022"]') }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify isolated desktop capture and native input
+        shell: pwsh
+        run: pwsh -NoProfile -STA -File tests/assist/windows/desktop-preflight.ps1
