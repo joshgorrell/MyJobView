@@ -7,6 +7,7 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { Colors } from '../theme/colors';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
+import { readCalendarRange, saveCalendarRange } from '../services/CalendarCache';
 
 type Mode = 'day' | 'week' | 'month' | 'agenda';
 type PrivateAppointment = { id: string; appointment_date: string; start_time: string | null; end_time: string | null; title: string | null; status: string; assigned_technician: string | null; can_view_details: boolean | null };
@@ -36,6 +37,7 @@ export default function CalendarScreen({ navigation }: any) {
   const [error, setError] = useState('');
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadedRange, setLoadedRange] = useState('');
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const requestId = useRef(0);
   const activeRef = useRef(true);
   const date = fromKey(selected);
@@ -53,6 +55,24 @@ export default function CalendarScreen({ navigation }: any) {
     }).catch(() => { /* Retain a stable default until policy is available. */ });
     return () => { active = false; };
   }, [profile?.id]);
+
+  // Restore only this employee's exact requested range.
+  useEffect(() => {
+    if (!profile?.id) {
+      setEvents([]); setLoadedRange(''); setCachedAt(null); return;
+    }
+    let cancelled = false;
+    const employeeId = profile.id;
+    setLoadedRange('');
+    setCachedAt(null);
+    readCalendarRange(employeeId, rangeStart, rangeEnd).then(snapshot => {
+      if (cancelled || !snapshot) return;
+      setEvents(snapshot.events);
+      setLoadedRange(rangeStart + ':' + rangeEnd);
+      setCachedAt(snapshot.fetchedAt);
+    }).catch(error => console.warn('Calendar cache unavailable', error));
+    return () => { cancelled = true; };
+  }, [profile?.id, rangeStart, rangeEnd]);
 
   const load = useCallback(async () => {
     if (!profile?.id || !isConnected) { setRefreshing(false); return; }
@@ -108,7 +128,11 @@ export default function CalendarScreen({ navigation }: any) {
         })),
       ];
       if (!activeRef.current || request !== requestId.current) return;
-      setEvents(result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || '')));
+      const sorted = result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || ''));
+      setEvents(sorted);
+      setCachedAt(null);
+      void saveCalendarRange(profile.id, rangeStart, rangeEnd, sorted)
+        .catch(cacheError => console.warn('Calendar cache write failed', cacheError));
       setHasLoaded(true);
       setLoadedRange(rangeStart + ':' + rangeEnd);
     } catch (e) {
@@ -200,10 +224,13 @@ export default function CalendarScreen({ navigation }: any) {
           })}
         </View>}
         <Text style={styles.dayHeading}>{mode === 'agenda' ? 'Upcoming 30 days' : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
-        {!isConnected && <Text style={styles.notice}>{hasLoaded && loadedRange === rangeStart + ':' + rangeEnd ? 'Offline — showing the last schedule loaded in this session.' : 'Offline — calendar data is unavailable for this period.'}</Text>}
+        {!isConnected && <Text style={styles.notice}>{loadedRange === rangeStart + ':' + rangeEnd
+          ? 'Offline — saved schedule from ' + (cachedAt ? new Date(cachedAt).toLocaleString() : 'this session') + '. Changes may not be shown.'
+          : 'Offline — no saved schedule for this period.'}</Text>}
+        {isConnected && cachedAt && loadedRange === rangeStart + ':' + rangeEnd && <Text style={styles.notice}>Showing saved schedule from {new Date(cachedAt).toLocaleString()} while refreshing.</Text>}
         {!!error && <Text style={styles.error}>{error}</Text>}
         {loading && <ActivityIndicator color={Colors.primary[600]} />}
-        {!loading && !error && (isConnected || (hasLoaded && loadedRange === rangeStart + ':' + rangeEnd)) && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
+        {!loading && !error && (isConnected || loadedRange === rangeStart + ':' + rangeEnd) && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
         {selectedEvents.map(event =>
           <TouchableOpacity key={event.id} accessibilityRole="button"
             disabled={!event.workOrderId}
