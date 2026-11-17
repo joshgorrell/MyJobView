@@ -77,9 +77,10 @@ export default function AssistPage() {
           />
         </div>
       </header>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <EngineerConsole organizationId={organizationId!} />
       <section className="min-w-0 rounded-xl border border-subtle bg-surface p-4">
-        <h2 className="text-lg font-semibold text-primary">Set up remote support</h2>
+        <h2 className="text-lg font-semibold text-primary">Install Assist on this computer</h2>
         <p className="mt-1 text-sm text-muted">Assist lets someone connect to your computer to help troubleshoot problems. Install the app once, then approve access when a support session starts.</p>
         <ol className="my-3 list-inside list-decimal space-y-2 text-sm text-primary">
           <li>Download the Windows support app.</li>
@@ -97,7 +98,6 @@ export default function AssistPage() {
         <button type="button" onClick={() => setRefresh(n => n + 1)} disabled={loading || busy}
           className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-info disabled:opacity-50"><RefreshCw size={16} />Refresh availability</button>
       </section>
-      <EngineerConsole organizationId={organizationId!} />
       </div>
     </div>
   );
