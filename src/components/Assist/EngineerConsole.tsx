@@ -14,6 +14,7 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
   const [editingId, setEditingId] = useState('');
   const [draftLabel, setDraftLabel] = useState('');
   const [busy, setBusy] = useState('');
+  const [pendingRemoval, setPendingRemoval] = useState<Device | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState('');
@@ -53,7 +54,7 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
     finally { if (epoch.current === version) setLoading(false); }
   }
   useEffect(() => {
-    epoch.current++; setLoading(true); setDevices([]); setError(''); setSessionName(''); setEnding(false); starting.current = false; endingRequest.current = false;
+    epoch.current++; setLoading(true); setDevices([]); setPendingRemoval(null); setError(''); setSessionName(''); setEnding(false); starting.current = false; endingRequest.current = false;
     void refresh();
     const polling = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 15000);
     const heartbeat = window.setInterval(() => {
@@ -87,7 +88,8 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
     finally { if (epoch.current === version) setBusy(''); }
   }
   async function removeDevice(device: Device) {
-    if (busy || !window.confirm(`Remove enrollment for ${device.name}? This revokes the registered computer's remote-support access. To support it again, reinstall/re-enroll the agent.`)) return;
+    if (busy) return;
+    setPendingRemoval(null);
     const version=epoch.current;setBusy(device.id);setError('');
     try {
       const result=await invoke('device_remove',{deviceId:device.id});
@@ -129,11 +131,21 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
       <label htmlFor="assist-device-search" className="mt-4 block text-sm font-medium text-primary">Find enrolled device</label>
       <input id="assist-device-search" type="search" value={deviceQuery} onChange={event => setDeviceQuery(event.target.value)} placeholder="Search device name or operating system" className="mt-2 w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-primary" />
       <div className="mt-4 divide-y divide-gray-200">
-        {filteredDevices.map(device => <div key={device.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-medium text-primary">{device.name}</p>{editingId === device.id ? <div className="mt-2 flex flex-wrap gap-2"><input aria-label="Device name" maxLength={120} value={draftLabel} onChange={event => setDraftLabel(event.target.value)} className="min-w-0 rounded-lg border border-subtle bg-surface px-2 py-2 text-primary" /><button type="button" disabled={!!busy || !draftLabel.trim()} onClick={() => void saveLabel(device)} className="text-sm font-semibold text-info">Save</button><button type="button" onClick={() => setEditingId('')} className="text-sm text-muted">Cancel</button></div> : <button type="button" disabled={!!busy} onClick={() => { setEditingId(device.id); setDraftLabel(device.name); }} className="text-xs text-info">Rename</button>}<p className="break-words text-xs text-muted">{device.online ? 'Online' : 'Offline'}{device.os ? ` · ${device.os}` : ''}</p></div><div className="flex shrink-0 flex-wrap items-center gap-3"><button type="button" disabled={!!busy || !!sessionName} onClick={() => void removeDevice(device)} className="text-xs text-red-600 disabled:opacity-50">Remove</button><button type="button" onClick={() => void connect(device)} disabled={!device.online || !!busy || !!sessionName} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={16} />{busy === device.id ? 'Working…' : 'Connect'}</button></div></div>)}
+        {filteredDevices.map(device => <div key={device.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-medium text-primary">{device.name}</p>{editingId === device.id ? <div className="mt-2 flex flex-wrap gap-2"><input aria-label="Device name" maxLength={120} value={draftLabel} onChange={event => setDraftLabel(event.target.value)} className="min-w-0 rounded-lg border border-subtle bg-surface px-2 py-2 text-primary" /><button type="button" disabled={!!busy || !draftLabel.trim()} onClick={() => void saveLabel(device)} className="text-sm font-semibold text-info">Save</button><button type="button" onClick={() => setEditingId('')} className="text-sm text-muted">Cancel</button></div> : <button type="button" disabled={!!busy} onClick={() => { setEditingId(device.id); setDraftLabel(device.name); }} className="text-xs text-info">Rename</button>}<p className="break-words text-xs text-muted">{device.online ? 'Online' : 'Offline'}{device.os ? ` · ${device.os}` : ''}</p></div><div className="flex shrink-0 flex-wrap items-center gap-3"><button type="button" disabled={!!busy || !!sessionName} onClick={() => setPendingRemoval(device)} className="text-xs text-red-600 disabled:opacity-50">Remove</button><button type="button" onClick={() => void connect(device)} disabled={!device.online || !!busy || !!sessionName} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={16} />{busy === device.id ? 'Working…' : 'Connect'}</button></div></div>)}
         {!devices.length && !error && <p className="py-4 text-sm text-muted">No devices are enrolled yet. Install the Windows support app on a supported computer to get started.</p>}
         {!!devices.length && !filteredDevices.length && <p className="py-4 text-sm text-muted">No enrolled devices match your search.</p>}
       </div>
     </>}
+    {pendingRemoval && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div role="alertdialog" aria-modal="true" aria-labelledby="assist-remove-title" aria-describedby="assist-remove-description" className="w-full max-w-md rounded-xl border border-subtle bg-surface p-5 shadow-xl">
+        <h3 id="assist-remove-title" className="text-lg font-semibold text-primary">Remove enrolled device?</h3>
+        <p id="assist-remove-description" className="mt-3 text-sm text-muted">Remove enrollment for <strong>{pendingRemoval.name}</strong>? This revokes the computer's remote-support access. To support it again, reinstall and re-enroll the agent.</p>
+        <div className="mt-5 flex justify-end gap-3">
+          <button type="button" disabled={!!busy} onClick={() => setPendingRemoval(null)} className="rounded-lg border border-subtle px-4 py-2 text-sm text-primary">Cancel</button>
+          <button type="button" disabled={!!busy} onClick={() => void removeDevice(pendingRemoval)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Removing…' : 'Remove enrollment'}</button>
+        </div>
+      </div>
+    </div>}
     {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
   </section>;
 }
