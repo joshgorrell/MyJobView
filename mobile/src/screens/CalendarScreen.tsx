@@ -58,9 +58,14 @@ export default function CalendarScreen({ navigation }: any) {
         supabase.from('work_orders')
           .select('id, work_order_number, title, customer_name, scheduled_date, scheduled_start_time, scheduled_end_time, status')
           .eq('assigned_to', profile.id).gte('scheduled_date', rangeStart).lte('scheduled_date', rangeEnd).limit(300),
-        supabase.from('appointments')
-          .select('id, title, appointment_date, start_time, end_time, status')
-          .eq('assigned_technician', profile.id).gte('appointment_date', rangeStart).lte('appointment_date', rangeEnd).limit(300),
+        // Match the web calendar's privacy-aware appointment access path.
+        // The RPC controls whether details may be exposed to this employee.
+        supabase.rpc('get_appointments_with_privacy', {
+          p_user_id: profile.id,
+          p_company_id: profile.organization_id || profile.id,
+          p_start_date: rangeStart,
+          p_end_date: rangeEnd,
+        }),
         supabase.from('internal_time_sessions')
           .select('id, title, session_date, start_time, end_time, status')
           .eq('assigned_to', profile.id).in('status', ['scheduled', 'in_progress', 'completed'])
@@ -77,10 +82,14 @@ export default function CalendarScreen({ navigation }: any) {
           title: j.title || j.work_order_number || 'Work order', subtitle: j.customer_name || j.work_order_number || 'Work order',
           kind: 'job' as const, workOrderId: j.id,
         })),
-        ...(appointments.data || []).filter(a => a.status !== 'cancelled').map(a => ({
-          id: `appointment-${a.id}`, date: a.appointment_date, start: a.start_time, end: a.end_time,
-          title: a.title || 'Appointment', subtitle: 'Appointment', kind: 'appointment' as const,
-        })),
+        ...(appointments.data || [])
+          .filter(a => a.status !== 'cancelled' && a.assigned_technician === profile.id)
+          .map(a => ({
+            id: `appointment-${a.id}`, date: a.appointment_date, start: a.start_time, end: a.end_time,
+            title: a.can_view_details === false ? 'Busy' : (a.title || 'Appointment'),
+            subtitle: a.can_view_details === false ? 'Private appointment' : 'Appointment',
+            kind: 'appointment' as const,
+          })),
         ...(internal.data || []).map(item => ({
           id: `internal-${item.id}`, date: item.session_date, start: item.start_time, end: item.end_time,
           title: item.title || 'Internal session', subtitle: 'Internal time', kind: 'internal' as const,
