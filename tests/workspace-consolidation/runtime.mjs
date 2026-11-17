@@ -45,7 +45,7 @@ html=renderToString(<WorkspaceTabs title="Time & Payroll" initial="payroll" tabs
 assert.ok(html.includes('Review only'));
 console.log('Flow task permission boundaries, legacy initial task view, and workspace initial/fallback tabs pass');
 ` }, bundle:true, platform:'node', format:'cjs', jsx:'automatic', outfile:join(dir,'test.cjs'), plugins:[{name:'fixtures',setup(b){
- b.onResolve({filter:/contexts\/(AuthContext|DepartmentContext)$|lib\/flow\/useFlow$|lib\/supabase$/},()=>({path:'fixture',namespace:'fixture'}));
+ b.onResolve({filter:/contexts\/(AuthContext|DepartmentContext)$|lib\/flow\/useFlow$|lib\/supabase(?:\.ts)?$/},()=>({path:'fixture',namespace:'fixture'}));
  b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:`export const useAuth=()=>({profile:{id:'user'}});export const useDepartments=()=>({hasModuleAccess:k=>globalThis.allowed.has(k)});export const useFlow=()=>{globalThis.flowLoads=(globalThis.flowLoads||0)+1;return {events:[],loading:false,connected:true};};export const supabase={};`}));
  b.onResolve({filter:/WeeklyProposalActivity$|FlowCreateModal$|FlowFollowUps$|FlowTargetPicker$|CustomerConversations$|DiscussionFeed$|DiscussionPostForm$/},a=>({path:a.path,namespace:'child'}));
  b.onLoad({filter:/.*/,namespace:'child'},()=>({contents:`export const DiscussionFeed=()=>null;export const DiscussionPostForm=()=>null;export const WeeklyProposalActivity=()=>null;export const FlowCreateModal=()=>null;export const FlowFollowUps=()=>null;export const FlowTargetPicker=()=>null;export const CustomerConversations=()=>null;`}));
