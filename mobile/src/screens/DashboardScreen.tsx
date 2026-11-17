@@ -7,6 +7,7 @@ import {
   ScrollView,
   Platform,
   ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
@@ -28,6 +29,9 @@ interface RecentDay {
 
 export default function DashboardScreen({ navigation }: any) {
   const { profile } = useAuth();
+  const { width, height } = useWindowDimensions();
+  const isTablet = width >= 700;
+  const compact = !isTablet && height < 850;
   const { isConnected, pendingSync } = useOffline();
   const { isTracking } = useLocation();
   const [hoursToday, setHoursToday] = useState<string>('0.00');
@@ -168,9 +172,9 @@ export default function DashboardScreen({ navigation }: any) {
   ];
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll contentStyle={isTablet ? { maxWidth: 920, paddingHorizontal: 12 } : undefined}>
       {/* Status Bar */}
-      <View style={styles.statusBar}>
+      <View style={[styles.statusBar, compact && styles.compactStatusBar]}>
         <View style={styles.statusItem}>
           <View style={[styles.statusDot, isConnected ? styles.online : styles.offline]} />
           <Text style={styles.statusText}>{isConnected ? 'Online' : 'Offline'}</Text>
@@ -189,24 +193,24 @@ export default function DashboardScreen({ navigation }: any) {
       </View>
 
       {/* Header with Logo */}
-      <View style={styles.header}>
-        <Logo size={56} variant="dark" />
+      <View style={[styles.header, compact && styles.compactHeader]}>
+        <Logo size={compact ? 36 : 44} variant="dark" />
         <View style={styles.headerText}>
-          <Text style={styles.greeting}>Welcome back</Text>
-          <Text style={styles.name}>{profile?.full_name || profile?.email}</Text>
+          {!compact && <Text style={styles.greeting}>Welcome back</Text>}
+          <Text numberOfLines={1} style={[styles.name, compact && styles.compactName]}>{profile?.full_name || profile?.email}</Text>
           <Text style={styles.role}>{profile?.role?.replace(/_/g, ' ')}</Text>
         </View>
       </View>
 
       {/* Clock Status Hero Card */}
       <TouchableOpacity
-        style={styles.heroCard}
+        style={[styles.heroCard, compact && styles.compactHeroCard]}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('TimeClock')}
       >
         <View style={styles.heroLeft}>
           <Text style={styles.heroLabel}>{usesDailyClock === false ? 'JOB TIME STATUS' : isClockedIn ? 'CURRENT SHIFT' : 'CLOCK STATUS'}</Text>
-          <Text style={styles.heroValue}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No active job') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
+          <Text numberOfLines={2} style={[styles.heroValue, compact && styles.compactHeroValue]}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No active job') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
           {(isClockedIn || jobTimerActive) && clockInTime && (
             <Text style={styles.heroSubtext}>Started at {formatTime(clockInTime)}</Text>
           )}
@@ -217,9 +221,9 @@ export default function DashboardScreen({ navigation }: any) {
       </TouchableOpacity>
 
       {/* Quick Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{loadingStats ? '--' : hoursToday}</Text>
+      <View style={[styles.statsContainer, compact && styles.compactStatsContainer]}>
+        <View style={[styles.statCard, compact && styles.compactStatCard]}>
+          <Text style={[styles.statValue, compact && styles.compactStatValue]}>{loadingStats ? '--' : hoursToday}</Text>
           <Text style={styles.statUnit}>hrs</Text>
           <Text style={styles.statLabel}>{usesDailyClock === false ? 'Recorded Today' : isClockedIn ? 'Elapsed Today' : 'Today'}</Text>
         </View>
@@ -257,20 +261,20 @@ export default function DashboardScreen({ navigation }: any) {
 
       {/* Navigation Menu */}
       <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>MENU</Text>
+        {!compact && <Text style={styles.sectionTitle}>MENU</Text>}
         {menuItems.map((item) => (
           <TouchableOpacity
             key={item.screen}
-            style={styles.menuRow}
+            style={[styles.menuRow, compact && styles.compactMenuRow]}
             activeOpacity={0.7}
             onPress={() => navigation.navigate(item.screen)}
           >
-            <View style={[styles.menuIconContainer, { backgroundColor: item.color }]}>
+            <View style={[styles.menuIconContainer, compact && styles.compactMenuIcon, { backgroundColor: item.color }]}>
               <MenuIcon name={item.icon} size={22} color={Colors.white} />
             </View>
             <View style={styles.menuTextContainer}>
               <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuDescription}>{item.description}</Text>
+              {!compact && <Text style={styles.menuDescription}>{item.description}</Text>}
             </View>
             <View style={styles.menuChevron} />
           </TouchableOpacity>
@@ -345,6 +349,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
   },
+  compactStatusBar: { paddingVertical: 5, justifyContent: 'center', gap: 14 },
+  compactHeader: { paddingVertical: 7, gap: 9 },
+  compactName: { fontSize: 17, marginBottom: 0 },
+  compactHeroCard: { marginTop: 8, marginBottom: 8, paddingVertical: 10, paddingHorizontal: 12 },
+  compactHeroValue: { fontSize: 18, marginBottom: 0 },
+  compactStatsContainer: { gap: 8, marginBottom: 10 },
+  compactStatCard: { paddingVertical: 8, paddingHorizontal: 8 },
+  compactStatValue: { fontSize: 20 },
+  compactMenuRow: { marginBottom: 5, paddingVertical: 7, minHeight: 48 },
+  compactMenuIcon: { width: 30, height: 30, marginRight: 10, borderRadius: 9 },
   statusItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   online: { backgroundColor: Colors.green[500] },
