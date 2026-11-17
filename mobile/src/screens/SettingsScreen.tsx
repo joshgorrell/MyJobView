@@ -18,7 +18,7 @@ import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { Card, InfoRow } from '../components/UI';
 import { ScreenContainer } from '../components/ScreenContainer';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }: any) {
   const { profile, signOut } = useAuth();
   const { isConnected, pendingSync, syncNow } = useOffline();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -92,6 +92,21 @@ export default function SettingsScreen() {
             <Text style={styles.profileRole}>{profile?.role?.replace(/_/g, ' ')}</Text>
           </View>
         </View>
+      </View>
+
+      {/* Secondary destinations moved from the old dashboard menu. */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>History</Text>
+        <TouchableOpacity style={styles.historyLink} accessibilityRole="button"
+          onPress={() => navigation.navigate('TimeHistory')}>
+          <Text style={styles.historyLabel}>My Time History</Text>
+          <Text style={styles.historyArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.historyLink} accessibilityRole="button"
+          onPress={() => navigation.navigate('LocationHistory')}>
+          <Text style={styles.historyLabel}>Location History</Text>
+          <Text style={styles.historyArrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* App Settings */}
@@ -173,6 +188,9 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  historyLink: { minHeight: 48, backgroundColor: Colors.white, marginHorizontal: Spacing.lg, marginBottom: 1, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  historyLabel: { color: Colors.gray[900], fontSize: 15, fontWeight: '600' },
+  historyArrow: { color: Colors.gray[500], fontSize: 24 },
   container: { flex: 1, backgroundColor: Colors.gray[100] },
   section: { marginBottom: Spacing.lg },
   sectionTitle: {
