@@ -67,14 +67,20 @@ try {
   // native node can reappear; it must not regain enrolled support privileges.
   assert.equal((await removing.handle({...context,operation:'devices'})).devices.length,0);
   await assert.rejects(removing.handle({...context,operation:'device_label',device_id:device,label:'Reconnected'}),/device_unavailable/);
-  await assert.rejects(removing.handle({...context,operation:'device_remove',device_id:device}),/device_unavailable/);
+  // A retry is permitted only for the same dealer-owned native node. A failed
+  // retry must not clear the tombstone or restore viewer access.
+  await assert.rejects(removing.handle({...context,operation:'device_remove',device_id:device}),/removal_unconfirmed/);
   const afterRestart=createSupportBroker({rpc,runtime:removableRuntime,requeue:async()=>{},labelDirectory:directory});
   assert.equal((await afterRestart.handle({...context,operation:'devices'})).devices.length,0);
   shouldFail=false;
+  assert.equal((await afterRestart.handle({...context,operation:'device_remove',device_id:device})).removed,true);
+  assert.equal(removeCalls,3);
+  assert.equal((await afterRestart.handle({...context,operation:'devices'})).devices.length,0);
+  await assert.rejects(afterRestart.handle({...context,operation:'device_remove',device_id:device}),/device_unavailable/);
   // A fresh guest invitation uses an isolated guest group, not this enrolled-device identity.
   // The permanent device tombstone must not be applied to guest support operations.
   await assert.rejects(removing.handle({...context,operation:'connect',device_id:device}),/device_unavailable/);
-  assert.equal(removeCalls,1);
+  assert.equal(removeCalls,3);
   assert.equal(active.session_id,sid);
  } finally {await rm(directory,{recursive:true,force:true});}
 }
