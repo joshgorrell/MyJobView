@@ -120,6 +120,21 @@ try{
   assert.equal((await fetch(endpoint,{method:'GET'})).status,405);
  }finally{api.closeAllConnections();await new Promise(r=>api.close(r));}
 }
+// The health snapshot is internal and must never be served without the control bearer.
+{
+ const healthServer=createControlServer({token,plane:{},runtime:{target:()=>null},
+  health:{snapshot:()=>({status:'degraded',activeDealers:1,unhealthyDealers:1,dealers:[{generation:2,status:'unhealthy',recovery:'queued'}]})}});
+ await new Promise(r=>healthServer.listen(0,'127.0.0.1',r));
+ const healthUrl='http://127.0.0.1:'+healthServer.address().port+'/v1/health';
+ try{
+  assert.equal((await fetch(healthUrl)).status,401);
+  assert.equal((await fetch(healthUrl,{headers:{authorization:'Bearer wrong'}})).status,401);
+  assert.equal((await fetch(healthUrl,{method:'POST',headers:{authorization:'Bearer '+token}})).status,405);
+  const response=await fetch(healthUrl,{headers:{authorization:'Bearer '+token}});
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).dealers[0].recovery,'queued');
+ }finally{healthServer.closeAllConnections();await new Promise(r=>healthServer.close(r));}
+}
 const canaryEnv={ASSIST_CANARY_ORIGIN:'https://canary.example.com',ASSIST_CANARY_TOKEN:'c'.repeat(40)};
 const canary=createCanaryProbe(canaryEnv,async(_url,options)=>{assert.equal(options.redirect,'error');return new Response(JSON.stringify(await probe(job)));});
 assert.equal((await canary(job)).desktop_control,true);
