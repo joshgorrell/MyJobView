@@ -41,6 +41,7 @@ const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twili
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
+  if (params.get('settingsTab') === 'text_messaging') return 'twilio';
   const selected = params.get('integration');
   return integrationIds.find(id => id === selected) ?? (params.has('qbo') ? 'quickbooks' : 'payment_processor');
 }
