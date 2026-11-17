@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const source = readFileSync(new URL('../../supabase/functions/send-work-order-reminder/index.ts', import.meta.url), 'utf8');
+assert.match(source, /userClient\.auth\.getUser\(\)/);
+assert.match(source, /from\("profiles"\)\.select\("organization_id, role"\)\.eq\("id", user\.id\)/);
+assert.match(source, /\["admin", "manager"\]\.includes\(profile\.role\)/);
+assert.match(source, /\.eq\("organization_id", profile\.organization_id\)/);
+assert.match(source, /A valid work order ID is required/);
+assert.doesNotMatch(source, /const reminderDate = new Date\(\)/);
+assert.doesNotMatch(source, /api\.twilio\.com|SIMULATED/);
+assert.match(source, /if \(result\.emailSent\) \{/);
+console.log('Work order reminder: verified user, dealer scope, manager role, no bulk or SMS bypass');
