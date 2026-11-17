@@ -124,9 +124,9 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
   return <section className="min-w-0 rounded-xl border border-subtle bg-surface p-4">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-semibold text-primary"><Monitor size={20} />Support workspace</h2>
       <button type="button" onClick={() => void refresh()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><RefreshCw size={16} />Refresh devices</button></div>
+    {canOperate && <GuestInviteConsole organizationId={organizationId} />}
     {loading ? <p className="mt-3 text-sm text-muted" role="status">Checking remote support access…</p> : !canOperate ? <p className="mt-3 text-sm text-muted">An administrator can give you permission to connect to other computers.</p> : !ready ? <p className="mt-3 text-sm text-muted">Remote connections are not available yet. Contact your administrator if you need help.</p> : <>
       <p className="mt-2 text-sm text-muted">Select an online computer and choose Connect. A separate window opens, and the person using that computer must approve access. Keep this page open during the session.</p>
-      <GuestInviteConsole organizationId={organizationId} />
       {sessionName && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-500/10 p-3"><p className="min-w-0 break-words text-sm text-primary">{ending ? 'Ending support access' : 'Support window ready'}: <strong>{sessionName}</strong></p><button type="button" onClick={() => void end()} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-info"><X size={16} />{ending ? 'Retry ending' : 'End session'}</button></div>}
       <label htmlFor="assist-device-search" className="mt-4 block text-sm font-medium text-primary">Find enrolled device</label>
       <input id="assist-device-search" type="search" value={deviceQuery} onChange={event => setDeviceQuery(event.target.value)} placeholder="Search device name or operating system" className="mt-2 w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-primary" />
