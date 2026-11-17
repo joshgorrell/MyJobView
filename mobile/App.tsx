@@ -41,7 +41,7 @@ function MobileTabBar({ activeRoute }: { activeRoute: string }) {
           <TouchableOpacity key={tab.route} accessibilityRole="tab"
             accessibilityLabel={tab.label} accessibilityState={{ selected }}
             onPress={() => {
-              if (!navigationRef.isReady() || selected) return;
+              if (!navigationRef.isReady() || activeRoute === tab.route) return;
               navigationRef.navigate(tab.route);
             }}
             style={tabStyles.item} activeOpacity={0.75}>
@@ -72,7 +72,7 @@ function AppNavigation() {
       onStateChange={() => setActiveRoute(navigationRef.getCurrentRoute()?.name || 'Dashboard')}>
       <StatusBar style="auto" />
       <View style={{ flex: 1 }}>
-      <Stack.Navigator>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
           <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Calendar" component={CalendarScreen}  options={{ headerShown: false }} />
