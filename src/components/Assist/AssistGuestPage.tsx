@@ -14,12 +14,14 @@ type Claim = { invite_id: string; claim_token: string; download_url: string; sta
 export default function AssistGuestPage({ initialCode = '' }: { initialCode?: string }) {
   const { tenant, loading, error: tenantError } = useTenant();
   const [code, setCode] = useState(() => normalizeSupportCode(initialCode));
+  const [dealerLogoFailed, setDealerLogoFailed] = useState(false);
   const [architecture, setArchitecture] = useState<'x64' | 'arm64'>('x64');
   const [claim, setClaim] = useState<Claim | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [ended, setEnded] = useState(false);
   const [ending, setEnding] = useState(false);
+  useEffect(() => { setDealerLogoFailed(false); }, [tenant?.logoUrl]);
   const active = useRef<Claim | null>(null);
   const pending = useRef(false);
   const epoch = useRef(0);
@@ -67,7 +69,7 @@ export default function AssistGuestPage({ initialCode = '' }: { initialCode?: st
   return <main className="theme-workspace min-h-screen bg-workspace px-4 py-10 sm:py-16">
     <div className="mx-auto w-full max-w-lg rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
       <header className="mb-6 flex flex-col items-center text-center">
-        {tenant?.logoUrl ? <img src={tenant.logoUrl} alt={tenant.organizationName || 'Your support provider'} className="mb-4 h-auto max-h-32 w-auto max-w-full object-contain" /> : <h1 className="mb-4 text-2xl font-bold text-primary">{tenant?.organizationName || 'Remote support'}</h1>}
+        {tenant?.logoUrl && !dealerLogoFailed ? <img src={tenant.logoUrl} onError={() => setDealerLogoFailed(true)} alt={tenant.organizationName || 'Your support provider'} className="mb-4 h-auto max-h-32 w-auto max-w-full object-contain" /> : <h1 className="mb-4 text-2xl font-bold text-primary">{tenant?.organizationName || 'Remote support'}</h1>}
         <img src="/images/myjobview-assist.png" alt="MyJobView Assist" width={2172} height={724} className="h-auto w-36 max-w-full object-contain" />
         <p className="mt-3 text-sm text-muted">Secure remote support</p>
       </header>
