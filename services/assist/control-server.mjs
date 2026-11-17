@@ -7,10 +7,11 @@ import {createStateStore} from './state-store.mjs';
 import {createManagedRuntime} from './managed-runtime.mjs';
 import {createControlPlane,validControlToken,validateControlJob} from './control-core.mjs';
 import {createHttpDependencies} from './activation-worker.mjs';
+import {createHealthMonitor} from './health-monitor.mjs';
 
 async function readBody(request){let text='';for await(const chunk of request){text+=chunk;if(Buffer.byteLength(text)>8192)throw new Error('oversized_request');}return JSON.parse(text);}
 function respond(response,status,value){response.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(value));}
-export function createControlServer({plane,runtime,token,broker,guests}){
+export function createControlServer({plane,runtime,token,broker,guests,health}){
  if(typeof token!=='string'||token.length<32)throw new Error('weak_control_token');
  const target=request=>{
   if(!request.url.startsWith('/'))return null;
@@ -19,6 +20,12 @@ export function createControlServer({plane,runtime,token,broker,guests}){
   const match=path.match(/^\/(mjv-[a-f0-9]{32})\//);return match?runtime.target(match[1]):null;
  };
  const server=http.createServer(async(request,response)=>{
+  if(request.url==='/v1/health'){
+   if(request.method!=='GET')return respond(response,405,{error:'method_not_allowed'});
+   if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
+   if(!health)return respond(response,503,{error:'health_unavailable'});
+   return respond(response,200,health.snapshot());
+  }
   if(request.url==='/v1/guest'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
@@ -89,23 +96,17 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    p_organization_id:job.organization_id,p_generation:job.generation,p_lease_token:job.lease_token})});
   const broker=createSupportBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,labelDirectory:store.root+'/device-labels'});
   const guests=createGuestBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,enabled:env.ASSIST_GUEST_PILOT_APPROVED==='1',arm64Enabled:env.ASSIST_ARM64_PILOT_APPROVED==='1'});
-  server=createControlServer({plane,runtime,token:env.ASSIST_CONTROL_TOKEN,broker,guests});
+  monitor=createHealthMonitor({store,plane,requeue,logger:event=>console.error(JSON.stringify(event))});
+  server=createControlServer({plane,runtime,token:env.ASSIST_CONTROL_TOKEN,broker,guests,health:monitor});
   let sweeping=false;
   sessionMonitor=setInterval(async()=>{if(sweeping)return;sweeping=true;try{await broker.sweep();await guests.sweep();}catch{console.error('Assist session revocation requires attention');}finally{sweeping=false;}},5000);
   const port=Number(env.ASSIST_CONTROL_PORT||8443);if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('invalid_control_port');
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   // On restart, old 'verified' journals do not imply a running or healthy child process.
   for(const state of await store.list()){if(state.desired_enabled)await requeue(state.organization_id,state.generation);}
-  let checking=false;
-  monitor=setInterval(async()=>{
-   if(checking)return;checking=true;
-   try{for(const state of await store.list()){
-    const result=await plane.checkHealth(state.organization_id);
-    if(result && !result.healthy){await requeue(result.organization_id,result.generation);console.error('Assist canary failed; dealer recovery queued');}
-   }}catch{console.error('Assist health check failed; operator attention required');}finally{checking=false;}
-  },15*60*1000);
+  monitor.start();
   console.log('MJV Assist control service listening on loopback');
-  const stop=async()=>{clearInterval(monitor);clearInterval(sessionMonitor);const closed=new Promise(r=>server.close(r));server.closeAllConnections();await runtime.stopAll();await closed;await release();process.exit(0);};
+  const stop=async()=>{monitor?.stop();clearInterval(sessionMonitor);const closed=new Promise(r=>server.close(r));server.closeAllConnections();await runtime.stopAll();await closed;await release();process.exit(0);};
   process.once('SIGTERM',()=>{void stop();});process.once('SIGINT',()=>{void stop();});
  }catch{
   clearInterval(monitor);clearInterval(sessionMonitor);if(server)server.close();if(runtime)await runtime.stopAll().catch(()=>{});if(release)await release();
