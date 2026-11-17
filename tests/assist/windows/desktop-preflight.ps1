@@ -13,6 +13,7 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class AssistDesktopProbe {
+    [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; public POINT(int x, int y) { X=x; Y=y; } }
     [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT point);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
@@ -21,6 +22,9 @@ public static class AssistDesktopProbe {
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 }
 '@
+# Screen capture uses physical pixels. Match WinForms coordinate space on scaled ARM desktops.
+$previousDpiContext = [AssistDesktopProbe]::SetThreadDpiAwarenessContext([IntPtr]::new(-4))
+if ($previousDpiContext -eq [IntPtr]::Zero) { throw 'Cannot establish a physical-pixel DPI context.' }
 $form = $null
 $bitmap = $null
 $graphics = $null
@@ -57,7 +61,7 @@ try {
     $graphics = [Drawing.Graphics]::FromImage($bitmap)
     $graphics.CopyFromScreen($point.X, $point.Y, 0, 0, $bitmap.Size)
     $pixel = $bitmap.GetPixel(0, 0)
-    if ($pixel.ToArgb() -ne $panel.BackColor.ToArgb()) { throw 'Desktop capture did not show the test window.' }
+    if ($pixel.ToArgb() -ne $panel.BackColor.ToArgb()) { throw ("Desktop capture did not show the test window. DPI={0}, point={1},{2}, expected={3}, observed={4}" -f $form.DeviceDpi, $point.X, $point.Y, $panel.BackColor.ToArgb(), $pixel.ToArgb()) }
     $target = $textbox.PointToScreen((New-Object Drawing.Point(30, 10)))
     $nativePoint = [AssistDesktopProbe+POINT]::new($target.X, $target.Y)
     if ([AssistDesktopProbe]::WindowFromPoint($nativePoint) -ne $textbox.Handle) { throw 'The test textbox is not exposed on the actual desktop.' }
@@ -84,4 +88,5 @@ try {
     if ($graphics) { $graphics.Dispose() }
     if ($bitmap) { $bitmap.Dispose() }
     if ($form) { $form.Close(); $form.Dispose() }
+    [void][AssistDesktopProbe]::SetThreadDpiAwarenessContext($previousDpiContext)
 }
