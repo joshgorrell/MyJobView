@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { ScreenContainer } from '../components/ScreenContainer';
@@ -33,6 +34,8 @@ export default function CalendarScreen({ navigation }: any) {
   const [error, setError] = useState('');
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadedRange, setLoadedRange] = useState('');
+  const requestId = useRef(0);
+  const activeRef = useRef(true);
   const date = fromKey(selected);
   const first = mode === 'month' ? weekStart(new Date(date.getFullYear(), date.getMonth(), 1, 12)) : mode === 'week' ? weekStart(date) : date;
   const last = mode === 'month' ? shift(first, Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7 - 1) : mode === 'week' ? shift(first, 6) : mode === 'agenda' ? shift(date, 29) : date;
@@ -51,6 +54,7 @@ export default function CalendarScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     if (!profile?.id || !isConnected) { setRefreshing(false); return; }
+    const request = ++requestId.current;
     setLoading(true);
     setError('');
     try {
@@ -101,21 +105,46 @@ export default function CalendarScreen({ navigation }: any) {
           subtitle: 'Time off', kind: 'time_off' as const,
         })),
       ];
+      if (!activeRef.current || request !== requestId.current) return;
       setEvents(result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || '')));
       setHasLoaded(true);
       setLoadedRange(rangeStart + ':' + rangeEnd);
     } catch (e) {
       console.error('Calendar load failed', e);
+      if (!activeRef.current || request !== requestId.current) return;
       setError('Could not load your schedule. Pull down to retry.');
-    } finally { setLoading(false); setRefreshing(false); }
+    } finally {
+      if (activeRef.current && request === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, [profile?.id, isConnected, rangeStart, rangeEnd]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; requestId.current += 1; };
+  }, []);
+
+  // Refresh when returning to the calendar tab.
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { requestId.current += 1; };
+  }, [load]));
+
+  // Recheck PTO and internal sessions after returning from background.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void load();
+    });
+    return () => subscription.remove();
+  }, [load]);
   useEffect(() => {
     if (!profile?.id || !isConnected) return;
     const channel = supabase.channel('native-calendar')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders', filter: `assigned_to=eq.${profile.id}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `assigned_technician=eq.${profile.id}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'internal_time_sessions', filter: `assigned_to=eq.${profile.id}` }, () => load())
       .subscribe();
     return () => { channel.unsubscribe(); };
   }, [profile?.id, isConnected, load]);
