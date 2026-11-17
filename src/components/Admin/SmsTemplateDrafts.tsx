@@ -8,6 +8,25 @@ const templates: { category: Category; label: string; example: string }[] = [
   { category: 'review_request', label: 'Review request', example: 'Thank you for choosing us! We would appreciate your feedback about your experience.' },
   { category: 'proposal_notification', label: 'Proposal notification', example: 'Your proposal is ready for review. Please contact us if you have any questions.' },
 ];
+const allowedTokens: Record<Category, readonly string[]> = {
+  appointment_reminder: ['customer_name', 'appointment_date', 'appointment_time', 'company_name'],
+  review_request: ['customer_name', 'company_name', 'review_link'],
+  proposal_notification: ['customer_name', 'company_name', 'proposal_link'],
+};
+const sampleValues: Record<string, string> = {
+  customer_name: 'Alex', appointment_date: 'December 3',
+  appointment_time: '2:00 PM', company_name: 'Example Dealer',
+  review_link: 'https://example.com/review',
+  proposal_link: 'https://example.com/proposal',
+};
+function unknownTokens(body: string, category: Category): string[] {
+  const found = Array.from(body.matchAll(/\{([^{}]+)\}/g), match => match[1]);
+  return Array.from(new Set(found.filter(token => !allowedTokens[category].includes(token))));
+}
+function preview(body: string, category: Category): string {
+  return body.replace(/\{([^{}]+)\}/g, (full, token: string) =>
+    allowedTokens[category].includes(token) ? sampleValues[token] : full);
+}
 export function SmsTemplateDrafts() {
   const { profile } = useAuth();
   const org = profile?.organization_id;
@@ -44,6 +63,8 @@ export function SmsTemplateDrafts() {
     if (!canEdit || !org || saving) return;
     const body = drafts[category].trim();
     if (!body || body.length > 1600) { setError('Template must contain 1–1600 characters.'); return; }
+    const invalid = unknownTokens(body, category);
+    if (invalid.length) { setError(`Unsupported variables in ${category.replace(/_/g, ' ')}: ${invalid.join(', ')}`); return; }
     setSaving(category); setMessage(''); setError('');
     const { error: saveError } = await supabase.from('sms_message_templates')
       .upsert({ organization_id: org, category, body, updated_at: new Date().toISOString() },
@@ -63,9 +84,16 @@ export function SmsTemplateDrafts() {
           className="w-full rounded-lg border border-gray-300 p-3 text-sm"
           value={drafts[item.category]}
           onChange={event => setDrafts(previous => ({ ...previous, [item.category]: event.target.value }))} />
+        <p className="text-xs text-gray-500">Available variables: {allowedTokens[item.category].map(token => `{${token}}`).join(', ')}</p>
+        {unknownTokens(drafts[item.category], item.category).length > 0 &&
+          <p className="text-xs text-red-600">Unsupported variables: {unknownTokens(drafts[item.category], item.category).join(', ')}</p>}
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="mb-1 text-xs font-semibold text-gray-600">Example preview — no message is sent</p>
+          <p className="whitespace-pre-wrap break-words text-sm">{preview(drafts[item.category], item.category)}</p>
+        </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">{drafts[item.category].length}/1600 characters</span>
-          {canEdit && <button type="button" disabled={saving !== null} onClick={() => void save(item.category)}
+          {canEdit && <button type="button" disabled={saving !== null || unknownTokens(drafts[item.category], item.category).length > 0} onClick={() => void save(item.category)}
             className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white disabled:opacity-50">
             {saving === item.category ? 'Saving…' : 'Save draft'}
           </button>}
