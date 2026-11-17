@@ -40,6 +40,8 @@ export default function CalendarScreen({ navigation }: any) {
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const requestId = useRef(0);
   const activeRef = useRef(true);
+  const latestRangeRef = useRef('');
+  latestRangeRef.current = (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd;
   const date = fromKey(selected);
   const first = mode === 'month' ? weekStart(new Date(date.getFullYear(), date.getMonth(), 1, 12)) : mode === 'week' ? weekStart(date) : date;
   const last = mode === 'month' ? shift(first, Math.ceil((new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate() + new Date(date.getFullYear(), date.getMonth(), 1, 12).getDay()) / 7) * 7 - 1) : mode === 'week' ? shift(first, 6) : mode === 'agenda' ? shift(date, 29) : date;
@@ -63,11 +65,13 @@ export default function CalendarScreen({ navigation }: any) {
     }
     let cancelled = false;
     const employeeId = profile.id;
+    const expectedRange = employeeId + ':' + rangeStart + ':' + rangeEnd;
     setLoadedRange('');
     setCachedAt(null);
     if (isConnected) return;
+    const requestAtStart = requestId.current;
     readCalendarRange(employeeId, rangeStart, rangeEnd).then(snapshot => {
-      if (cancelled || !snapshot) return;
+      if (cancelled || !snapshot || latestRangeRef.current !== expectedRange || requestId.current !== requestAtStart) return;
       setEvents(snapshot.events);
       setLoadedRange(rangeStart + ':' + rangeEnd);
       setCachedAt(snapshot.fetchedAt);
@@ -128,7 +132,7 @@ export default function CalendarScreen({ navigation }: any) {
           subtitle: 'Time off', kind: 'time_off' as const,
         })),
       ];
-      if (!activeRef.current || request !== requestId.current) return;
+      if (!activeRef.current || request !== requestId.current || latestRangeRef.current !== profile.id + ':' + rangeStart + ':' + rangeEnd) return;
       const sorted = result.sort((a, b) => a.date.localeCompare(b.date) || (a.start || '').localeCompare(b.start || ''));
       setEvents(sorted);
       setCachedAt(null);
