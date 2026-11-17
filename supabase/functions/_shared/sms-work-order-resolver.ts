@@ -36,11 +36,11 @@ export async function resolveWorkOrderSmsAppointment(
       !['scheduled', 'confirmed'].includes(row.status))
     throw new Error('Work order SMS reminder not eligible');
   if (!row.contact_id || !uuid.test(row.contact_id) || !row.start_date ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(row.start_date) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(row.start_date) ||
       !row.contacts?.full_name?.trim() || !row.organizations?.name?.trim())
     throw new Error('Incomplete work order SMS reminder');
   const time = row.scheduled_start_time || row.start_time;
-  if (!time || !/^\\d{1,2}:\\d{2}(?::\\d{2})?$/.test(time))
+  if (!time || !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(time))
     throw new Error('Work order appointment time required');
   // A stable revision derived from the appointment date/time changes on rescheduling.
   const reminderRevision = (row.start_date + '_' + time).replace(/[^a-zA-Z0-9_-]/g, '_');
