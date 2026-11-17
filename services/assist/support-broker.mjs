@@ -2,10 +2,11 @@ import {readFile,writeFile,rename,mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {inviteOperations} from './guest-broker.mjs';
+const safeLabel=value=>typeof value==='string'&&value.trim().length>0&&value.trim().length<=120&&!/[\\x00-\\x1f\\x7f]/.test(value);
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 export function validateSupportRequest(body){
  if(!body||!['devices','device_label','connect','touch','end',...inviteOperations].includes(body.operation)||!uuid.test(body.organization_id)||!uuid.test(body.actor_id)||!uuid.test(body.auth_session_id)||!Number.isFinite(body.token_exp)||body.token_exp*1000<=Date.now())throw new Error('invalid_request');
- if(body.operation==='device_label'&&(typeof body.device_id!=='string'||body.device_id.length>256||typeof body.label!=='string'||body.label.length>120||body.label.trim().length<1))throw new Error('invalid_device');
+ if(body.operation==='device_label'&&(typeof body.device_id!=='string'||body.device_id.length>256||!safeLabel(body.label)))throw new Error('invalid_device');
  if(body.operation==='connect'&&(typeof body.device_id!=='string'||body.device_id.length>256))throw new Error('invalid_device');
  if(['touch','end'].includes(body.operation)&&!uuid.test(body.session_id))throw new Error('invalid_session');
  if(inviteOperations.includes(body.operation)&&!['invite_create','invite_capability'].includes(body.operation)&&!uuid.test(body.invite_id))throw new Error('invalid_invite');
@@ -29,7 +30,7 @@ export function createSupportBroker({rpc,runtime,requeue,exclusive=async(_id,fn)
     if(c.operation==='devices'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
      const devices=await runtime.inventory(c.organization_id),labels=await readLabels(c.organization_id);
-     return {devices:devices.map(device=>({...device,name:typeof labels[device.id]==='string'?labels[device.id]:device.name}))};
+     return {devices:devices.map(device=>({...device,name:safeLabel(labels[device.id])?labels[device.id]:device.name}))};
     }
     if(c.operation==='device_label'){
      if((await call('access',c))?.allowed!==true)throw new Error('forbidden');

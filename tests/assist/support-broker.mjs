@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {createSupportBroker} from '../../services/assist/support-broker.mjs';
 import {createAssistSupportHandler,sessionClaimsAfterVerification} from '../../supabase/functions/_shared/assist-support-handler.mjs';
 const org='00000000-0000-0000-0000-000000000001',actor='00000000-0000-0000-0000-000000000002',auth='00000000-0000-0000-0000-000000000003',sid='00000000-0000-0000-0000-000000000004';
@@ -15,6 +18,28 @@ await assert.rejects(broker.handle({...context,actor_id:sid,operation:'end',sess
 assert.equal((await broker.handle({...context,operation:'touch',session_id:sid})).active,true);
 live=false;await broker.sweep();assert.equal(revokes,1);assert.ok(calls.some(c=>c.p_action==='end'));
 allowed=false;await assert.rejects(broker.handle({...context,operation:'devices'}),/forbidden/);
+// Exercise persistent friendly names using the real filesystem adapter, without changing native node IDs.
+const labelDirectory=await mkdtemp(join(tmpdir(),'mjv-assist-label-test-'));
+try {
+ const labeled=createSupportBroker({rpc,runtime,requeue:async()=>{},labelDirectory});
+ allowed=true;
+ assert.equal((await labeled.handle({...context,operation:'devices'})).devices[0].name,'Field laptop');
+ assert.equal((await labeled.handle({...context,operation:'device_label',device_id:device,label:'Justin – Field Laptop'})).saved,true);
+ assert.equal((await labeled.handle({...context,operation:'devices'})).devices[0].name,'Justin – Field Laptop');
+ const restarted=createSupportBroker({rpc,runtime,requeue:async()=>{},labelDirectory});
+ assert.equal((await restarted.handle({...context,operation:'devices'})).devices[0].name,'Justin – Field Laptop');
+ await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:'node/foreign/device',label:'Bad'}),/unavailable/);
+ await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Bad\\nName'}),/invalid_device/);
+ allowed=false;
+ await assert.rejects(restarted.handle({...context,operation:'device_label',device_id:device,label:'Unauthorized'}),/forbidden/);
+ allowed=true;
+ const otherOrg='00000000-0000-0000-0000-000000000005';
+ const otherDomain='mjv-'+otherOrg.replaceAll('-','');
+ const otherDevice=`node/${otherDomain}/${'B'.repeat(64)}`;
+ const otherRuntime={...runtime,inventory:async()=>[{id:otherDevice,name:'Other office',online:true,os:'Windows'}]};
+ const otherBroker=createSupportBroker({rpc,runtime:otherRuntime,requeue:async()=>{},labelDirectory});
+ assert.equal((await otherBroker.handle({...context,organization_id:otherOrg,operation:'devices'})).devices[0].name,'Other office');
+} finally { await rm(labelDirectory,{recursive:true,force:true}); }
 const actorInfo={...context,subdomain:'elife'};
 let controlled=0;const handler=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>actorInfo,control:async body=>{controlled++;if(body.operation==='devices')return {devices:[{id:device,name:'Laptop',online:true,secret:'must-not-leak'}]};return started;}});
 const request=(body,origin='https://elife.myjobview.com')=>new Request('https://backend.example/functions/v1/assist-support',{method:'POST',headers:{origin,authorization:'Bearer verified-by-auth-test'},body:JSON.stringify(body)});
@@ -27,4 +52,4 @@ assert.equal(sessionClaimsAfterVerification(jwt({sub:actor,session_id:auth,exp:c
 assert.throws(()=>sessionClaimsAfterVerification(jwt({sub:sid,session_id:auth,exp:context.token_exp}),actor));
 const bad=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>actorInfo,control:async()=>({...started,viewer_url:'https://evil.example/phish'})});
 assert.equal((await bad(request({operation:'connect',organizationId:org,deviceId:device}))).status,503);
-console.log('Assist broker/edge: verified actor binding, device ownership, temporary viewer lifecycle, logout sweep, CORS/dealer isolation, safe URLs and secret-free responses pass');
+console.log('Assist broker/edge: persisted and isolated device labels, validation, verified actor binding, device ownership, temporary viewer lifecycle, logout sweep, CORS/dealer isolation, safe URLs and secret-free responses pass');
