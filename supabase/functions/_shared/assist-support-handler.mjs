@@ -21,11 +21,15 @@ export function createAssistSupportHandler({authenticate,control,publicOrigin}){
    if(origin && origin!==`https://${actor.subdomain}.myjobview.com`)return reply(403,{error:'wrong_dealer'});
    const text=await request.text();if(text.length>4096)return reply(400,{error:'invalid_request'});
    let body;try{body=JSON.parse(text);}catch{return reply(400,{error:'invalid_request'});}
-   if(!body||body.organizationId!==actor.organization_id||!['devices','device_label','connect','touch','end',...inviteOperations].includes(body.operation))return reply(403,{error:'support_access_required'});
+   if(!body||body.organizationId!==actor.organization_id||!['devices','device_label','device_disable','connect','touch','end',...inviteOperations].includes(body.operation))return reply(403,{error:'support_access_required'});
    const context={organization_id:actor.organization_id,actor_id:actor.actor_id,auth_session_id:actor.auth_session_id,token_exp:actor.token_exp,operation:body.operation};
    if(body.operation==='device_label'){
     if(typeof body.deviceId!=='string'||body.deviceId.length>256||typeof body.label!=='string'||body.label.trim().length<1||body.label.length>120)return reply(400,{error:'invalid_device'});
     context.device_id=body.deviceId;context.label=body.label;
+   }
+   if(body.operation==='device_disable'){
+    if(typeof body.deviceId!=='string'||body.deviceId.length>256)return reply(400,{error:'invalid_device'});
+    context.device_id=body.deviceId;
    }
    if(body.operation==='connect'){
     if(typeof body.deviceId!=='string'||body.deviceId.length>256)return reply(400,{error:'invalid_device'});context.device_id=body.deviceId;
@@ -35,8 +39,9 @@ export function createAssistSupportHandler({authenticate,control,publicOrigin}){
    const data=await control(context);const domain='mjv-'+actor.organization_id.replaceAll('-','');
    if(body.operation==='devices'){
     if(!Array.isArray(data?.devices)||data.devices.length>500||data.devices.some(d=>typeof d.id!=='string'||!d.id.startsWith(`node/${domain}/`)))throw new Error('invalid_response');
-    return reply(200,{devices:data.devices.map(d=>({id:d.id,name:String(d.name||'Windows laptop').slice(0,120),os:String(d.os||'').slice(0,160),online:d.online===true}))});
+    return reply(200,{devices:data.devices.map(d=>({id:d.id,name:String(d.name||'Windows laptop').slice(0,120),os:String(d.os||'').slice(0,160),online:d.online===true,disabled:d.disabled===true}))});
    }
+   if(body.operation==='device_disable')return reply(200,{disabled:data?.disabled===true});
    if(body.operation==='device_label')return reply(200,{saved:data?.saved===true});
    if(body.operation==='invite_capability')return reply(200,{available:data?.available===true});
    if(['invite_create','invite_status'].includes(body.operation)){
