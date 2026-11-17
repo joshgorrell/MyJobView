@@ -85,7 +85,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'orphaned', label: 'System Maintenance', group: 'system' },
   ];
   const getTabFromUrl = (): SettingsTab => {
-    const tab = new URLSearchParams(window.location.search).get('settingsTab') as SettingsTab | null;
+    const tab = new URLSearchParams(window.location.search).get('settingsTab');
     if (tab === 'text_messaging') return 'integrations';
     if (tab && validTabs.includes(tab)) return tab;
     // A direct integration link must open the parent Integrations settings page.
