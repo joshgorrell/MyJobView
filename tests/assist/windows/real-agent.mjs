@@ -52,6 +52,8 @@ try{
  console.log('Installing verified-cache Windows x64 agent on disposable VM');installed=true;await run(exe,['-fullinstall']);
  const device=await until(async()=>{const devices=await runtime.inventory(org);return devices.find(d=>d.online);},120000);
  assert.ok(device.id.startsWith(`node/${domain}/`));assert.equal((await runtime.inventory(other)).length,0);
+ // Enrollment transport can precede the agent's first core startup.
+ await sleep(5000);
  target=spawn('pwsh',['-NoProfile','-STA','-File',resolve('tests/assist/windows/agent-desktop.ps1'),'-Mode','target','-StatePath',stateFile],{stdio:['ignore','ignore','pipe']});target.stderr.on('data',s=>{diagnostics=(diagnostics+s).slice(-8192);});
  await until(targetState);browser=await chromium.launch({headless:true});
  const context=await browser.newContext({ignoreHTTPSErrors:true});
@@ -64,6 +66,7 @@ try{
    if(Date.now()-lastClick>3000){await page.locator('#connectbutton1').click({timeout:1000});lastClick=Date.now();}
    return false;
   },20000);
+  await until(async()=>page.evaluate(()=>globalThis.desktop?.State===3),20000);
   return {page,viewer};}
  const denyUser='mjv-session-'+randomBytes(16).toString('hex');
  const denied=await openViewer(denyUser);await ps('peek',denyUser);console.log('Scoped native consent prompt detected for denial test');
