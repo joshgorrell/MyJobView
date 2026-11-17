@@ -21,10 +21,16 @@ const appointment = { id, organizationId: org, contactId: contact, customerName:
   status: 'confirmed', reminderRevision: 'r1' };
 let queued = [], lookedUp = 0;
 const db = {
-  from() { return { select() { return { eq() { return { eq() { return {
-    async maybeSingle() { return { data: { body: 'Hi {customer_name}, {appointment_date} at {appointment_time}' }, error: null }; },
-  }; } }; } }; } }; },
-  async rpc(name, args) { queued.push({ name, args }); return { data: 'queued', error: null }; },
+  from: () => ({
+    select: () => ({
+      eq: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { body: 'Hi {customer_name}, {appointment_date} at {appointment_time}' }, error: null }),
+        }),
+      }),
+    }),
+  }),
+  rpc: async (name, args) => { queued.push({ name, args }); return { data: 'queued', error: null }; },
 };
 const resolve = async key => { lookedUp++; assert.equal(key, id); return appointment; };
 assert.equal(await queueAppointmentReminder(db, resolve, id, org), 'queued');
