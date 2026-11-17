@@ -10,6 +10,7 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [deviceQuery, setDeviceQuery] = useState('');
   const [busy, setBusy] = useState('');
   const [sessionName, setSessionName] = useState('');
   const [ending, setEnding] = useState(false);
@@ -46,7 +47,7 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
       if (!access?.can_operate || !access?.windows_download_ready) { setDevices([]); return; }
       const data = await invoke('devices');
       if (epoch.current === version && refreshRequest.current === request) { setDevices(data.devices || []); if (!session.current?.ending) setError(''); }
-    } catch { if (epoch.current === version && refreshRequest.current === request) { setDevices([]); setError('Unable to load technician laptops. Refresh to try again.'); } }
+    } catch { if (epoch.current === version && refreshRequest.current === request) { setDevices([]); setError('Unable to load enrolled devices. Refresh to try again.'); } }
     finally { if (epoch.current === version) setLoading(false); }
   }
   useEffect(() => {
@@ -95,16 +96,20 @@ export function EngineerConsole({ organizationId }: { organizationId: string }) 
       if (epoch.current === version) { session.current = null; setError('Unable to open remote support. The laptop may be offline or access may have changed.'); }
     } finally { if (epoch.current === version) { starting.current = false; setBusy(''); } }
   }
+  const filteredDevices = devices.filter(device => `${device.name} ${device.os}`.toLowerCase().includes(deviceQuery.trim().toLowerCase()));
   return <section className="rounded-xl border border-subtle bg-surface p-5 sm:p-6">
     <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 font-semibold text-primary"><Monitor size={20} />Support workspace</h2>
-      <button type="button" onClick={() => void refresh()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><RefreshCw size={16} />Refresh laptops</button></div>
-    {loading ? <p className="mt-3 text-sm text-muted" role="status">Checking remote support access…</p> : !canOperate ? <p className="mt-3 text-sm text-muted">Your dealer administrator can give you permission to support technician laptops.</p> : !ready ? <p className="mt-3 text-sm text-muted">Remote support is not ready for connections. Continue using your current support tool until activation and the pilot are complete.</p> : <>
-      <p className="mt-2 text-sm text-muted">Select an online laptop. Remote support opens in a separate browser window, and the technician must approve access. Keep this MJV page open during support.</p>
+      <button type="button" onClick={() => void refresh()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><RefreshCw size={16} />Refresh devices</button></div>
+    {loading ? <p className="mt-3 text-sm text-muted" role="status">Checking remote support access…</p> : !canOperate ? <p className="mt-3 text-sm text-muted">Your dealer administrator can give you permission to support enrolled devices.</p> : !ready ? <p className="mt-3 text-sm text-muted">Remote support is not ready for connections. Continue using your current support tool until activation and the pilot are complete.</p> : <>
+      <p className="mt-2 text-sm text-muted">Select an online enrolled device. Remote support opens in a separate browser window, and the technician must approve access. Keep this MJV page open during support.</p>
       <GuestInviteConsole organizationId={organizationId} />
       {sessionName && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-500/10 p-3"><p className="min-w-0 break-words text-sm text-primary">{ending ? 'Ending support access' : 'Support window ready'}: <strong>{sessionName}</strong></p><button type="button" onClick={() => void end()} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-info"><X size={16} />{ending ? 'Retry ending' : 'End session'}</button></div>}
+      <label htmlFor="assist-device-search" className="mt-4 block text-sm font-medium text-primary">Find enrolled device</label>
+      <input id="assist-device-search" type="search" value={deviceQuery} onChange={event => setDeviceQuery(event.target.value)} placeholder="Search device name or operating system" className="mt-2 w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-primary" />
       <div className="mt-4 divide-y divide-gray-200">
-        {devices.map(device => <div key={device.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-medium text-primary">{device.name}</p><p className="break-words text-xs text-muted">{device.online ? 'Online' : 'Offline'}{device.os ? ` · ${device.os}` : ''}</p></div><button type="button" onClick={() => void connect(device)} disabled={!device.online || !!busy || !!sessionName} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={16} />{busy === device.id ? 'Opening…' : 'Connect'}</button></div>)}
-        {!devices.length && !error && <p className="py-4 text-sm text-muted">No laptops are enrolled yet. Install the Windows support app to get started.</p>}
+        {filteredDevices.map(device => <div key={device.id} className="flex items-center justify-between gap-3 py-3"><div className="min-w-0"><p className="truncate font-medium text-primary">{device.name}</p><p className="break-words text-xs text-muted">{device.online ? 'Online' : 'Offline'}{device.os ? ` · ${device.os}` : ''}</p></div><button type="button" onClick={() => void connect(device)} disabled={!device.online || !!busy || !!sessionName} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={16} />{busy === device.id ? 'Opening…' : 'Connect'}</button></div>)}
+        {!devices.length && !error && <p className="py-4 text-sm text-muted">No devices are enrolled yet. Install the Windows support app on a supported computer to get started.</p>}
+        {!!devices.length && !filteredDevices.length && <p className="py-4 text-sm text-muted">No enrolled devices match your search.</p>}
       </div>
     </>}
     {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
