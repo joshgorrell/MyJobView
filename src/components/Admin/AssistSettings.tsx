@@ -44,7 +44,7 @@ export function AssistSettings() {
         p_organization_id: organizationId, p_enabled: !status.enabled,
       });
       if (failure || !data) throw new Error('Save failed');
-      if (generation.current === request) setStatus(data);
+      if (generation.current === request) { setStatus(data); window.dispatchEvent(new Event('assist-settings-changed')); }
     } catch { if (generation.current === request) setError('Unable to save remote support settings. Try again.'); }
     finally { if (generation.current === request) { saving.current = false; setBusy(false); } }
   }
