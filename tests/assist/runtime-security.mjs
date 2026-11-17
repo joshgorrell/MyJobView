@@ -18,12 +18,15 @@ assert.deepEqual(patchRuntimeSource(source),source,'Preparation is idempotent');
 const original=Buffer.from(source.toString('utf8')
  .replace("'compression@1.8.2'","'compression@1.8.1'")
  .replace("'node-forge@1.4.3'","'node-forge@1.4.0'")
+ .replace("'node-windows@1.0.0-beta.8'","'node-windows@0.1.14'")
  .replace("function InstallModuleEx(modulenames, args, func) { throw new Error('MJV runtime dependencies must be prepared offline');",'function InstallModuleEx(modulenames, args, func) {'));
 assert.deepEqual(patchRuntimeSource(original),source,'Exact upstream source is reproducibly prepared');
 assert.throws(()=>patchRuntimeSource(Buffer.concat([source,Buffer.from('\n')])),/unexpected_runtime_source/);
 // Old startup pins and enabled fallback must not reappear after an offline npm ci.
 assert(!source.includes(Buffer.from("'compression@1.8.1'")));
 assert(!source.includes(Buffer.from("'node-forge@1.4.0'")));
+assert(!source.includes(Buffer.from("'node-windows@0.1.14'")));
+assert(source.includes(Buffer.from("'node-windows@1.0.0-beta.8'")));
 assert(source.includes(Buffer.from("function InstallModuleEx(modulenames, args, func) { throw new Error('MJV runtime dependencies must be prepared offline');")));
 const require=createRequire(entry);
 assert.equal(typeof require('glob').glob,'function');

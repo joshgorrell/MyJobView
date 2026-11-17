@@ -71,3 +71,18 @@ export function nativeUsers(data,domain){
  if(users.some(u=>typeof u._id!=='string'||!u._id.startsWith(`user/${domain}/`)))throw new Error('foreign_user');
  return users;
 }
+
+// Native `nodes` responses remove each node's meshid and use it as the containing map key.
+export function nativeInventory(data,domain,meshId){
+ if(!/^mjv-[a-f0-9]{32}$/.test(domain)||!meshId?.startsWith(`mesh/${domain}/`))throw new Error('invalid_device_group');
+ const devices=[];
+ for(const [group,nodes]of Object.entries(data.nodes||{})){
+  if(!group.startsWith(`mesh/${domain}/`)||!Array.isArray(nodes))throw new Error('foreign_device_group');
+  if(group!==meshId)continue;
+  for(const node of nodes){
+   if(!node||typeof node._id!=='string'||!node._id.startsWith(`node/${domain}/`)||(node.meshid!==undefined&&node.meshid!==group))throw new Error('foreign_device');
+   devices.push({id:node._id,name:String(node.name||node.rname||'Windows laptop').slice(0,120),online:!!(node.conn&1),os:String(node.osdesc||'').slice(0,160)});
+  }
+ }
+ return devices.sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name)).slice(0,500);
+}

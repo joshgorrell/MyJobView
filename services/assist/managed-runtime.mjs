@@ -3,7 +3,7 @@ import {mkdir,readFile,writeFile,rename,symlink,realpath} from 'node:fs/promises
 import {join,dirname,resolve} from 'node:path';
 import {randomBytes,randomUUID} from 'node:crypto';
 import net from 'node:net';
-import {ensureLaptopGroup,meshCommand,viewerCookie,nativeUsers} from './meshcentral-client.mjs';
+import {ensureLaptopGroup,meshCommand,viewerCookie,nativeUsers,nativeInventory} from './meshcentral-client.mjs';
 import {dealerDomain} from './control-core.mjs';
 import {verifyRuntimeSecurity} from './runtime-security.mjs';
 
@@ -68,7 +68,8 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
     child.once('exit',()=>{record.serving=false;for(const socket of record.sockets)socket.destroy();runtimes.delete(id);if(!record.stopping)void onExit(id,record.generation).catch(()=>{});});
    }
    let lastError;
-   for(let attempt=0;attempt<40;attempt++){
+   // First startup signs the approved agent set; keep retries bounded by the job lease.
+   for(let attempt=0;attempt<120;attempt++){
     await check();try{
      const group=await ensureLaptopGroup(identity,command);const record=runtimes.get(id);if(!record||record.child.exitCode!==null)throw new Error('runtime_exited');
      if(!record.cleaned){
@@ -94,16 +95,7 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
   },
   async inventory(id,guestMeshId=null){
    const r=runtimes.get(id);if(!r?.serving)throw new Error('runtime_unavailable');
-   const data=await command(r,{action:'nodes'});const devices=[];
-   for(const [group,nodes]of Object.entries(data.nodes||{})){
-    if(!group.startsWith(`mesh/${r.domain}/`)||!Array.isArray(nodes))throw new Error('foreign_device_group');
-    if(group!==(guestMeshId||r.meshId))continue;
-    for(const node of nodes){
-     if(typeof node._id!=='string'||!node._id.startsWith(`node/${r.domain}/`)||node.meshid!==group)throw new Error('foreign_device');
-     devices.push({id:node._id,name:String(node.name||node.rname||'Windows laptop').slice(0,120),online:!!(node.conn&1),os:String(node.osdesc||'').slice(0,160)});
-    }
-   }
-   return devices.sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name)).slice(0,500);
+   return nativeInventory(await command(r,{action:'nodes'}),r.domain,guestMeshId||r.meshId);
   },
   async createGuestGroup(id,inviteId){
    const r=runtimes.get(id);if(!r?.serving||!/^[a-f0-9]{32}$/.test(inviteId))throw new Error('guest_unavailable');

@@ -6,11 +6,12 @@ import {createRequire} from 'node:module';
 import {pathToFileURL, fileURLToPath} from 'node:url';
 
 const originalHash = '19de2c8d87e8bbd12b1a7b46fe0dfa4a78c3c46a70464814b1f106af1d07eb26';
-const patchedHash = 'd90ea028097d37ba8170f9fdaf7374c96e5fe187dc5aed96fac7558122d2f880';
+const patchedHash = '2ce395856da5e5316238bc8410cd63b5e6101ec6a5f6e39da443e4012d27826e';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const replacements = [
   ["'compression@1.8.1'", "'compression@1.8.2'"],
   ["'node-forge@1.4.0'", "'node-forge@1.4.3'"],
+  ["'node-windows@0.1.14'", "'node-windows@1.0.0-beta.8'"],
   ['function InstallModuleEx(modulenames, args, func) {',
     "function InstallModuleEx(modulenames, args, func) { throw new Error('MJV runtime dependencies must be prepared offline');"],
 ];
