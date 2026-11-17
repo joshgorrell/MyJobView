@@ -22,6 +22,23 @@ const broker=createGuestBroker(options),staff=(operation,extra={})=>broker.staff
 assert.equal((await staff('invite_capability')).available,true);
 assert.equal((await createGuestBroker({...options,enabled:false}).staff({...context,operation:'invite_capability'})).available,false);
 await assert.rejects(createGuestBroker({...options,enabled:false}).staff({...context,operation:'invite_create'}),/pilot/);
+// Architecture selection is per redeemed invitation, never a global fallback.
+// ARM64 must remain disabled until its independent real-device pilot passes.
+const archRestricted=createGuestBroker({...options,arm64Enabled:false});
+const restrictedInvite=await archRestricted.staff({...context,operation:'invite_create'});
+await assert.rejects(archRestricted.guest({organization_id:org,operation:'redeem',code:restrictedInvite.code,architecture:'arm64'}),/unavailable/);
+const restrictedX64=await archRestricted.guest({organization_id:org,operation:'redeem',code:restrictedInvite.code,architecture:'x64'});
+assert.equal(new URL(restrictedX64.download_url).searchParams.get('id'),'4');
+assert.equal(new URL(restrictedX64.download_url).searchParams.get('installflags'),'1');
+await archRestricted.guest({organization_id:org,operation:'end',invite_id:restrictedInvite.invite_id,claim_token:restrictedX64.claim_token});
+const archEnabled=createGuestBroker({...options,arm64Enabled:true});
+const armInvite=await archEnabled.staff({...context,operation:'invite_create'});
+const armClaim=await archEnabled.guest({organization_id:org,operation:'redeem',code:armInvite.code,architecture:'arm64'});
+const armDownload=new URL(armClaim.download_url);
+assert.equal(armDownload.searchParams.get('id'),'43','ARM64 must request its own native agent');
+assert.equal(armDownload.searchParams.get('installflags'),'1','ARM64 guest must remain temporary');
+assert.equal(armDownload.searchParams.get('meshid'),new URL(download).searchParams.get('meshid'),'Architecture must not change dealer group');
+await archEnabled.guest({organization_id:org,operation:'end',invite_id:armInvite.invite_id,claim_token:armClaim.claim_token});
 const invite=await staff('invite_create');assert.match(invite.code,/^[2-9A-HJ-NP-Z]{4}(-[2-9A-HJ-NP-Z]{4}){2}$/);
 await assert.rejects(broker.guest({organization_id:other,operation:'redeem',code:invite.code}),/unavailable/);
 const claims=await Promise.allSettled([1,2].map(()=>broker.guest({organization_id:org,operation:'redeem',code:invite.code.toLowerCase()})));
