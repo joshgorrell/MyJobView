@@ -1,0 +1,16 @@
+{
+  "name": "mjv-assist-windows-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows-only host helpers for the disposable native-agent test; not production runtime dependencies",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "node-windows": "1.0.0-beta.8",
+    "loadavg-windows": "1.1.1"
+  },
+  "overrides": {
+    "minimist": "1.2.8"
+  }
+}

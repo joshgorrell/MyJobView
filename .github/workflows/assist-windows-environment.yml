@@ -38,6 +38,10 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm ci --ignore-scripts --prefix services/assist
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --ignore-scripts --prefix tests/assist/windows
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm audit --omit=dev --audit-level=moderate --prefix tests/assist/windows
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node services/assist/runtime-security.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npx playwright install chromium
@@ -49,5 +53,6 @@ jobs:
           $env:ASSIST_TEST_AGENT_CACHE = Join-Path $env:RUNNER_TEMP 'mjv-verified-agent-cache'
           node services/assist/prepare-agent-cache.mjs $env:ASSIST_TEST_AGENT_CACHE
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:NODE_PATH = Join-Path $env:GITHUB_WORKSPACE 'tests/assist/windows/node_modules'
           node tests/assist/windows/real-agent.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
