@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Download, Monitor, X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 const CODE_ALPHABET = /^[2-9A-HJ-NP-Z]{12}$/;
@@ -66,9 +66,11 @@ export default function AssistGuestPage({ initialCode = '' }: { initialCode?: st
   }
   return <main className="theme-workspace min-h-screen bg-workspace px-4 py-10 sm:py-16">
     <div className="mx-auto w-full max-w-lg rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
-      <header className="mb-6">{tenant?.logoUrl && <img src={tenant.logoUrl} alt={tenant.organizationName} className="mb-5 max-h-14 max-w-full object-contain" />}
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-primary"><Monitor size={26} />Remote support</h1>
-        <p className="mt-2 text-sm text-muted">{tenant?.organizationName || 'MJV Assist'}</p></header>
+      <header className="mb-6 flex flex-col items-center text-center">
+        {tenant?.logoUrl ? <img src={tenant.logoUrl} alt={tenant.organizationName || 'Your support provider'} className="mb-4 h-auto max-h-32 w-auto max-w-full object-contain" /> : <h1 className="mb-4 text-2xl font-bold text-primary">{tenant?.organizationName || 'Remote support'}</h1>}
+        <img src="/images/myjobview-assist.png" alt="MyJobView Assist" width={2172} height={724} className="h-auto w-36 max-w-full object-contain" />
+        <p className="mt-3 text-sm text-muted">Secure remote support</p>
+      </header>
       {loading ? <p className="text-muted" role="status">Loading support…</p> : tenantError || !tenant ? <p className="text-primary" role="alert">Open the support address provided by your support person.</p> : ended ? <><h2 className="font-semibold text-primary">Session ended</h2><p className="mt-3 text-muted">Close the support app. If you need more help, ask your support person for a new code.</p></> : !claim ? <form onSubmit={event => void join(event)}>
         <p className="mb-5 text-primary">Enter the code your support person gave you.</p>
         <label htmlFor="assist-code" className="mb-2 block text-sm font-medium text-primary">Support code</label>
