@@ -7,6 +7,7 @@ import { TechsafeSettings } from './TechsafeSettings';
 import { AssistSettings } from './AssistSettings';
 import { useAuth } from '../../contexts/AuthContext';
 import { TextMessagingSettings } from './TextMessagingSettings';
+import { SmsTemplateDrafts } from './SmsTemplateDrafts';
 
 interface CompanySettings {
   google_maps_api_key?: string;
@@ -904,6 +905,8 @@ export function IntegrationsSettings() {
               </div>
             </div>
           </div>}
+
+          {twilioTab === 'templates' && <SmsTemplateDrafts />}
 
           <div className="bg-gray-50 rounded-lg p-4">
             <p className="text-sm text-gray-700 mb-2">
