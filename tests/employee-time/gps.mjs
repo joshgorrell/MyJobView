@@ -124,8 +124,8 @@ assert.ok(!nativeClockUi.includes('Offline clock-out and breaks are not yet avai
 assert.ok(nativeDashboardUi.includes("setUsesDailyClock(context.dailyClock)") &&
   nativeDashboardUi.includes('No active job'),
   'Job Time employees must not be shown a false Daily Clock status');
-assert.ok(nativeDashboardUi.includes("setRecentDays([])"),
-  'Job Time employees must not be shown irrelevant Daily Clock recent shifts');
+assert.ok(!nativeDashboardUi.includes('recentDays') && !nativeDashboardUi.includes('setRecentDays') && !nativeDashboardUi.includes('Recent Shifts'),
+  'The compact native dashboard must not show Daily Clock recent shifts to Job Time employees');
 console.log('Native Time Clock audit: completed shift, pending payroll hours, offline copy and Job Time dashboard.');
 
 assert.ok(!nativeDashboardUi.includes('onPress={signOut}') &&
