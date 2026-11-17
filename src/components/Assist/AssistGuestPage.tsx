@@ -2,10 +2,18 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Download, Monitor, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
+const CODE_ALPHABET = /^[2-9A-HJ-NP-Z]{12}$/;
+function normalizeSupportCode(input: string) {
+  const compact = input.toUpperCase().replace(/[-\s]/g, '').slice(0, 12);
+  return compact.match(/.{1,4}/g)?.join('-') || '';
+}
+function validSupportCode(input: string) {
+  return CODE_ALPHABET.test(input.replace(/-/g, ''));
+}
 type Claim = { invite_id: string; claim_token: string; download_url: string; state: string; expires_at: string };
 export default function AssistGuestPage({ initialCode = '' }: { initialCode?: string }) {
   const { tenant, loading, error: tenantError } = useTenant();
-  const [code, setCode] = useState(initialCode);
+  const [code, setCode] = useState(() => normalizeSupportCode(initialCode));
   const [architecture, setArchitecture] = useState<'x64' | 'arm64'>('x64');
   const [claim, setClaim] = useState<Claim | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,7 +46,7 @@ export default function AssistGuestPage({ initialCode = '' }: { initialCode?: st
     return () => { epoch.current++; window.clearInterval(timer); const row = active.current; active.current = null; if (row) void invoke('end', row).catch(() => {}); };
   }, []);
   async function join(event: FormEvent) {
-    event.preventDefault(); if (pending.current || !tenant || tenantError) return;
+    event.preventDefault(); if (pending.current || !tenant || tenantError || !validSupportCode(code)) return;
     pending.current = true; setBusy(true); setError(''); const version = epoch.current;
     let issued: Claim | null = null;
     try { const data = await invoke('redeem'); issued = data;
@@ -64,10 +72,10 @@ export default function AssistGuestPage({ initialCode = '' }: { initialCode?: st
       {loading ? <p className="text-muted" role="status">Loading support…</p> : tenantError || !tenant ? <p className="text-primary" role="alert">Open the support address provided by your support person.</p> : ended ? <><h2 className="font-semibold text-primary">Session ended</h2><p className="mt-3 text-muted">Close the support app. If you need more help, ask your support person for a new code.</p></> : !claim ? <form onSubmit={event => void join(event)}>
         <p className="mb-5 text-primary">Enter the code your support person gave you.</p>
         <label htmlFor="assist-code" className="mb-2 block text-sm font-medium text-primary">Support code</label>
-        <input id="assist-code" autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={24} value={code} onChange={event => setCode(event.target.value)} className="min-h-12 w-full rounded-lg border border-subtle bg-workspace px-3 font-mono text-lg uppercase text-primary" placeholder="XXXX-XXXX-XXXX" required />
+        <input id="assist-code" autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={24} value={code} onChange={event => setCode(normalizeSupportCode(event.target.value))} className="min-h-12 w-full rounded-lg border border-subtle bg-workspace px-3 font-mono text-lg uppercase text-primary" placeholder="XXXX-XXXX-XXXX" required />
         <label htmlFor="assist-architecture" className="mb-2 mt-4 block text-sm font-medium text-primary">Computer type</label>
         <select id="assist-architecture" disabled={busy} value={architecture} onChange={event => setArchitecture(event.target.value as 'x64' | 'arm64')} className="min-h-12 w-full rounded-lg border border-subtle bg-workspace px-3 text-primary"><option value="x64">Windows — Intel / AMD (64-bit)</option><option value="arm64">Windows — ARM64 / Snapdragon (pilot)</option></select>
-        <button type="submit" disabled={busy || code.replace(/[-\s]/g, '').length !== 12} className="mt-4 min-h-12 w-full rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Checking…' : 'Continue'}</button>
+        <button type="submit" disabled={busy || !validSupportCode(code)} className="mt-4 min-h-12 w-full rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Checking…' : 'Continue'}</button>
         <p className="mt-4 text-xs text-muted">No MJV account or password needed. Only continue with someone you know and trust.</p>
       </form> : <>
         <h2 className="text-lg font-semibold text-primary">Let’s connect your computer</h2>
