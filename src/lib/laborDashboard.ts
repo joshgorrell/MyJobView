@@ -319,7 +319,7 @@ export function laborTiming(b:LaborBundle,id:string,start:string,end:string,asOf
   }
  }
  const history=laborHistory(b,id,start,end,asOf);
- const assumed=assumedSchedule&&b.roster.some(p=>p.id===id&&['Jesse Roth','Luis Tetuan'].includes(p.name))&&history.some(r=>r.assumed);
+ const assumed=assumedSchedule&&b.roster.some(p=>p.id===id&&p.name === 'Jesse Roth')&&history.some(r=>r.assumed);
  const avg=(pairs:number[][],i:number)=>pairs.length?pairs.reduce((n,p)=>n+p[i],0)/pairs.length:null;
  return{clockIn:assumed?480:avg(payPairs,0),clockOut:assumed?1020:avg(payPairs,1),jobIn:avg(jobPairs,0),jobOut:avg(jobPairs,1),clockDays:payPairs.length,jobDays:jobPairs.length,assumed};
 }

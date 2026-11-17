@@ -10,4 +10,6 @@ b.sources[0].native_from=day;assert.equal(laborTiming(b,'a',day,day,day).jobDays
 assert.equal(laborTiming(b,'a',day,day,'2026-10-19').jobDays,0);
 b.roster[0].name='Jesse Roth';b.configs[0].compensation_type='salary';b.mappings[0].external_employee_id='Jesse Roth';j.technician='Jesse Roth';p.first_clock_in=null;p.last_clock_out=null;
 t=laborTiming(b,'a',day,day,day,true);assert.equal(t.clockIn,480);assert.equal(t.clockOut,1020);assert.equal(t.clockDays,0);assert.equal(t.assumed,true);assert.equal(laborTiming(b,'a',day,day,day).clockIn,null);
+b.roster[0].name='Luis Tetuan';b.mappings[0].external_employee_id='Luis Tetuan';j.technician='Luis Tetuan';
+t=laborTiming(b,'a',day,day,day,true);assert.equal(t.assumed,false,'Luis must not receive a salary schedule assumption');assert.equal(t.clockIn,null);assert.equal(t.clockOut,null);
 console.log('Labor timing: verified Central pairs, overnight/open exclusions, native cutover, future dates and explicit salary schedule passed.');
