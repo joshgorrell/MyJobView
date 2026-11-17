@@ -21,17 +21,17 @@ CREATE POLICY sms_automation_settings_admin_insert ON public.sms_automation_sett
   FOR INSERT TO authenticated WITH CHECK (
     organization_id = (SELECT get_user_org_id())
     AND EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = (SELECT auth.uid())
-      AND p.organization_id = organization_id AND p.role IN ('admin','manager'))
+      AND p.organization_id = sms_automation_settings.organization_id AND p.role IN ('admin','manager'))
   );
 CREATE POLICY sms_automation_settings_admin_update ON public.sms_automation_settings
   FOR UPDATE TO authenticated USING (
     organization_id = (SELECT get_user_org_id())
     AND EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = (SELECT auth.uid())
-      AND p.organization_id = organization_id AND p.role IN ('admin','manager'))
+      AND p.organization_id = sms_automation_settings.organization_id AND p.role IN ('admin','manager'))
   ) WITH CHECK (
     organization_id = (SELECT get_user_org_id())
     AND EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = (SELECT auth.uid())
-      AND p.organization_id = organization_id AND p.role IN ('admin','manager'))
+      AND p.organization_id = sms_automation_settings.organization_id AND p.role IN ('admin','manager'))
   );
 
 -- Private dispatch ledger. Only server-side service credentials may write.
