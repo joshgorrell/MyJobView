@@ -140,6 +140,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
   const [roles, setRoles] = useState<Role[]>([]);
   const [offices, setOffices] = useState<CompanyOffice[]>([]);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
+  const [visibleOffices, setVisibleOffices] = useState<string[]>([]);
   const [visibilityScope, setVisibilityScope] = useState<'all_offices' | 'selected_offices' | 'own_only' | 'office_only'>('all_offices');
   const [visibilitySettingExists, setVisibilitySettingExists] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -266,6 +267,7 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       loadOffices(),
       loadUserOffices(),
       loadOfficeVisibility(),
+      loadVisibleOffices(),
       loadPaySchedules(),
       loadEmployeeData(),
       loadSalesCompensation(),
@@ -316,6 +318,19 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       setDataLoadFailed(true);
       setError('Unable to load user setup data. Close and reopen this form before saving.');
       console.error('Error loading offices:', error);
+    }
+  }
+
+  async function loadVisibleOffices() {
+    try {
+      const { data, error } = await supabase.from('user_visible_offices')
+        .select('office_id').eq('user_id', user.id);
+      if (error) throw error;
+      setVisibleOffices((data || []).map((row) => row.office_id));
+    } catch (error) {
+      setDataLoadFailed(true);
+      setError('Unable to load visible offices. Close and reopen before saving.');
+      console.error('Error loading visible offices:', error);
     }
   }
 
@@ -617,8 +632,8 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
       if (!formData.full_name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
         throw new Error('Enter a full name and valid email.');
       if (!formData.username.trim()) throw new Error('Enter a username on Profile before saving.');
-      if (visibilityScope === 'selected_offices' && selectedOffices.length === 0) {
-        throw new Error('Select at least one Office Assignment for Selected Offices visibility.');
+      if (visibilityScope === 'selected_offices' && visibleOffices.length === 0) {
+        throw new Error('Select at least one visible office for Selected Offices visibility.');
       }
       // Existing incomplete payroll records must not block unrelated profile or permission edits.
       // Never silently discard an attempted payroll change: require the missing setup first.
@@ -742,6 +757,26 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
         await supabase.rpc('recalculate_sales_quota_for_user', {
           p_user_id: user.id,
         });
+      }
+
+      // Visibility is independent from office membership. Update only changed rows.
+      const { data: previousVisible, error: visibleReadError } = await supabase.from('user_visible_offices')
+        .select('office_id').eq('user_id', user.id);
+      if (visibleReadError) throw new Error(`Unable to verify visible offices: ${visibleReadError.message}`);
+      const priorVisibleIds = new Set((previousVisible || []).map((row) => row.office_id));
+      const nextVisibleIds = new Set(visibleOffices);
+      const visibleRemoved = [...priorVisibleIds].filter((id) => !nextVisibleIds.has(id));
+      const visibleAdded = [...nextVisibleIds].filter((id) => !priorVisibleIds.has(id));
+      if (visibleRemoved.length) {
+        const { error: removeError } = await supabase.from('user_visible_offices')
+          .delete().eq('user_id', user.id).in('office_id', visibleRemoved);
+        if (removeError) throw new Error(`Visible office removal failed: ${removeError.message}`);
+      }
+      if (visibleAdded.length) {
+        const { error: addError } = await supabase.from('user_visible_offices').insert(
+          visibleAdded.map((office_id) => ({ user_id: user.id, office_id, organization_id: user.organization_id })),
+        );
+        if (addError) throw new Error(`Visible office assignment failed: ${addError.message}`);
       }
 
       // Only change memberships that were actually edited. A full delete/reinsert
@@ -1197,14 +1232,21 @@ export function EditUserForm({ user, onClose, onSuccess, onNavigate }: EditUserF
                 <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Office Visibility</h3>
                   <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3">
-                    <p className="text-xs text-gray-400">Controls which offices this user can see in office-aware reports, independently of module permissions. Selected Offices uses the Office Assignments above.</p>
+                    <p className="text-xs text-gray-400">Controls which offices this user can see in office-aware reports, independently of module permissions. Selected Offices uses the separate checkboxes below, not the employee's office assignments.</p>
                     <select aria-label="Office Visibility" value={visibilityScope} onChange={(e) => setVisibilityScope(e.target.value as typeof visibilityScope)} className="w-full rounded-lg bg-gray-900 border border-gray-600 text-white p-2">
                       <option value="all_offices">All Offices</option>
-                      <option value="selected_offices">Selected Offices (assigned above)</option>
+                      <option value="selected_offices">Selected Offices</option>
                       <option value="own_only">Own Records Only</option>
                       <option value="office_only">Primary Office Only</option>
                     </select>
-                    {visibilityScope === 'selected_offices' && selectedOffices.length === 0 && <p className="text-xs text-orange-300">Select at least one Office Assignment before saving.</p>}
+                    {visibilityScope === 'selected_offices' && <div className="space-y-2 pt-2 border-t border-gray-700">
+                      {offices.map((office) => <label key={office.id} className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                        <input type="checkbox" className={checkboxClass} checked={visibleOffices.includes(office.id)}
+                          onChange={(e) => setVisibleOffices((prev) => e.target.checked ? [...prev, office.id] : prev.filter((id) => id !== office.id))} />
+                        {office.office_name}
+                      </label>)}
+                      {visibleOffices.length === 0 && <p className="text-xs text-orange-300">Select at least one visible office before saving.</p>}
+                    </div>}
                     {visibilityScope === 'office_only' && <p className="text-xs text-gray-400">Primary Office is maintained separately from office memberships.</p>}
                   </div>
                 </div>
