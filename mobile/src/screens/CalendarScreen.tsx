@@ -35,7 +35,6 @@ export default function CalendarScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [hasLoaded, setHasLoaded] = useState(false);
   const [loadedRange, setLoadedRange] = useState('');
   const [cachedAt, setCachedAt] = useState<string | null>(null);
   const requestId = useRef(0);
@@ -152,7 +151,6 @@ export default function CalendarScreen({ navigation }: any) {
         void saveCalendarRange(profile.id, rangeStart, rangeEnd, sorted)
           .catch(cacheError => console.warn('Calendar cache write failed', cacheError));
       }
-      setHasLoaded(true);
       setLoadedRange(rangeStart + ':' + rangeEnd);
     } catch (e) {
       console.error('Calendar load failed', e);
@@ -201,7 +199,7 @@ export default function CalendarScreen({ navigation }: any) {
     return Array.from({ length: count }, (_, i) => shift(start, i));
   }, [selected, mode]);
   const selectedEvents = loadedRange === rangeStart + ':' + rangeEnd ? (mode === 'agenda' ? events : events.filter(e => e.date === selected)) : [];
-  const eventDates = new Set(events.map(e => e.date));
+  const eventDates = new Set((loadedRange === rangeStart + ':' + rangeEnd ? events : []).map(e => e.date));
   const move = (direction: number) => {
     if (mode === 'day') setSelected(key(shift(date, direction)));
     else if (mode === 'agenda') setSelected(key(shift(date, 30 * direction)));
@@ -249,7 +247,8 @@ export default function CalendarScreen({ navigation }: any) {
         {isConnected && cachedAt && loadedRange === rangeStart + ':' + rangeEnd && <Text style={styles.notice}>Showing saved schedule from {new Date(cachedAt).toLocaleString()} while refreshing.</Text>}
         {!!error && <Text style={styles.error}>{error}</Text>}
         {loading && <ActivityIndicator color={Colors.primary[600]} />}
-        {!loading && !error && (isConnected || loadedRange === rangeStart + ':' + rangeEnd) && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
+        {!loading && !error && loadedRange === rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
+        {!loading && !!error && loadedRange === rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>No events were returned from the available calendar sources.</Text>}
         {selectedEvents.map(event =>
           <TouchableOpacity key={event.id} accessibilityRole="button"
             disabled={!event.workOrderId}
