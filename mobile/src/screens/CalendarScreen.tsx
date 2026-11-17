@@ -209,7 +209,7 @@ export default function CalendarScreen({ navigation }: any) {
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer contentStyle={{ flex: 1 }}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
         <View style={styles.header}>

@@ -128,9 +128,13 @@ assert.ok(!nativeDashboardUi.includes('setRecentDays(') && !nativeDashboardUi.in
   'Native dashboard must not show Daily Clock recent shifts for Job Time employees');
 console.log('Native Time Clock audit: completed shift, pending payroll hours, offline copy and Job Time dashboard.');
 
+const nativeAppNavigation = fs.readFileSync('mobile/App.tsx', 'utf8');
+const nativeSettingsUi = fs.readFileSync('mobile/src/screens/SettingsScreen.tsx', 'utf8');
 assert.ok(!nativeDashboardUi.includes('onPress={signOut}') &&
-  nativeDashboardUi.includes("navigation.navigate('Settings')"),
-  'Dashboard sign-out must go through Settings workday safety verification');
+  nativeAppNavigation.includes("route: 'Settings'") &&
+  nativeSettingsUi.includes('async function handleSignOut()') &&
+  nativeSettingsUi.includes(".is('clock_out', null)"),
+  'Dashboard sign-out must go through the Settings tab with workday safety verification');
 assert.ok(nativeClockUi.includes("PENDING SYNC / REVIEW") &&
   nativeClockUi.includes("disabled={clockStateUnverified}"),
   'Unverified shifts must be visually distinct and unverified starts disabled');
