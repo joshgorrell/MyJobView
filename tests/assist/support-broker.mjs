@@ -85,6 +85,42 @@ try {
   assert.equal(active.session_id,sid);
  } finally {await rm(directory,{recursive:true,force:true});}
 }
+// Short-lived remote support: reject offline devices before creating a viewer,
+// revoke immediately on explicit end, and fail closed when a session expires.
+{
+ const directory=await mkdtemp(join(tmpdir(),'mjv-assist-session-lifecycle-'));
+ let online=false,created=0,revoked=0,ended=0,checksFail=false,expiresAt=Date.now()+180000;
+ const localRuntime={inventory:async()=>[{id:device,name:'Test PC',online,os:'Windows'}],
+  createViewer:async()=>{created++;return {viewer_url:'https://assist.example.com/viewer',viewer_origin:'https://assist.example.com'};},
+  revokeViewer:async()=>{revoked++;},stop:async()=>{}};
+ const localRpc=async(_name,args)=>{
+  if(args.p_action==='access')return {allowed:true};
+  if(args.p_action==='open')return {valid:true,id:sid,native_username:'test-viewer',generation:1,expires_at:new Date(expiresAt).toISOString()};
+  if(args.p_action==='activate')return {valid:true,expires_at:new Date(expiresAt).toISOString()};
+  if(args.p_action==='check'){if(checksFail)throw Error('provider_disconnected');return {valid:true};}
+  if(args.p_action==='end'){ended++;return {valid:true};}
+  if(args.p_action==='touch')return {valid:true,expires_at:new Date(expiresAt).toISOString()};
+ };
+ try{
+  const sessions=createSupportBroker({rpc:localRpc,runtime:localRuntime,requeue:async()=>{},labelDirectory:directory});
+  await assert.rejects(sessions.handle({...context,operation:'connect',device_id:device}),/device_unavailable/);
+  assert.equal(created,0,'Offline devices never launch remote viewers');
+  online=true;
+  const connected=await sessions.handle({...context,operation:'connect',device_id:device});
+  assert.equal(connected.session_id,sid);
+  assert.equal((await sessions.handle({...context,operation:'end',session_id:sid})).ended,true);
+  assert.equal(revoked,1,'Explicit end immediately revokes native access');
+  assert.equal(ended,1);
+  await assert.rejects(sessions.handle({...context,operation:'touch',session_id:sid}),/session_unavailable/);
+  expiresAt=Date.now()-1000;
+  await sessions.handle({...context,operation:'connect',device_id:device});
+  checksFail=true;
+  await sessions.sweep();
+  assert.equal(revoked,2,'Expired session is revoked when provider is unreachable');
+  assert.equal(ended,2);
+  await assert.rejects(sessions.handle({...context,operation:'touch',session_id:sid}),/session_unavailable/);
+ }finally{await rm(directory,{recursive:true,force:true});}
+}
 const actorInfo={...context,subdomain:'elife'};
 let controlled=0;const handler=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>actorInfo,control:async body=>{controlled++;if(body.operation==='devices')return {devices:[{id:device,name:'Laptop',online:true,secret:'must-not-leak'}]};return started;}});
 const request=(body,origin='https://elife.myjobview.com')=>new Request('https://backend.example/functions/v1/assist-support',{method:'POST',headers:{origin,authorization:'Bearer verified-by-auth-test'},body:JSON.stringify(body)});
