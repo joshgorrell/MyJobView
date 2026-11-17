@@ -5,6 +5,12 @@ on:
       - 'tests/assist/windows/**'
       - '.github/workflows/assist-windows-environment.yml'
   workflow_dispatch:
+    inputs:
+      architecture:
+        description: 'Desktop environment to diagnose (ARM64 is currently unsupported)'
+        type: choice
+        default: x64
+        options: [x64, arm64]
 permissions:
   contents: read
 jobs:
@@ -12,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-2022, windows-11-arm]
+        runner: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.architecture == 'arm64' && '["windows-11-arm"]' || '["windows-2022"]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     steps:
