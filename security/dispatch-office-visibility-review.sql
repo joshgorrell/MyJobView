@@ -25,13 +25,11 @@ as $$
         or coalesce(visibility.visibility_scope, 'all_offices') = 'all_offices'
         or (
           visibility.visibility_scope = 'office_only'
+          and viewer.primary_office_id is not null
           and exists (
-            select 1 from public.user_offices own_office
-            join public.user_offices employee_office
-              on employee_office.office_id = own_office.office_id
-             and employee_office.organization_id = viewer.organization_id
-            where own_office.user_id = viewer.id
-              and own_office.organization_id = viewer.organization_id
+            select 1 from public.user_offices employee_office
+            where employee_office.office_id = viewer.primary_office_id
+              and employee_office.organization_id = viewer.organization_id
               and employee_office.user_id = employee.id
           )
         )
@@ -47,6 +45,7 @@ as $$
               and employee_office.user_id = employee.id
           )
         )
+        or visibility.visibility_scope = 'own_only' and employee.id = viewer.id
       )
   );
 $$;
