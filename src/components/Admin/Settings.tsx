@@ -13,6 +13,7 @@ const SuggestionManagement = lazy(() => import('./SuggestionManagement').then(m 
 const ProductsManagement = lazy(() => import('../Products/ProductsManagement'));
 const PointsAndRewards = lazy(() => import('./PointsAndRewards').then(m => ({ default: m.PointsAndRewards })));
 const PriorityManagement = lazy(() => import('./PriorityManagement').then(m => ({ default: m.PriorityManagement })));
+const TextMessagingSettings = lazy(() => import('./TextMessagingSettings').then(m => ({ default: m.TextMessagingSettings })));
 const EmailTemplates = lazy(() => import('./EmailTemplates').then(m => ({ default: m.EmailTemplates })));
 const CompanyMessagesManagement = lazy(() => import('./CompanyMessagesManagement').then(m => ({ default: m.CompanyMessagesManagement })));
 const PermissionsManagement = lazy(() => import('./PermissionsManagement').then(m => ({ default: m.PermissionsManagement })));
@@ -43,8 +44,8 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   const { companySettings, profile } = useAuth();
   const jobModuleEnabled = companySettings?.job_module_enabled ?? false;
   const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
-  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders' | 'portal' | 'billing' | 'automation' | 'email_config';
-  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders', 'portal', 'billing', 'automation', 'email_config'];
+  type SettingsTab = 'messages' | 'users' | 'sessions' | 'permissions' | 'roles' | 'cards' | 'company' | 'departments' | 'integrations' | 'salestax' | 'salestargets' | 'suggestions' | 'products' | 'catalog' | 'rewards' | 'priorities' | 'emails' | 'travel' | 'contracts' | 'timeclock' | 'proposals' | 'labor' | 'classes' | 'orphaned' | 'kiosk' | 'contact_import' | 'work_orders' | 'portal' | 'billing' | 'automation' | 'email_config' | 'text_messaging';
+  const validTabs: SettingsTab[] = ['messages', 'users', 'sessions', 'permissions', 'roles', 'cards', 'company', 'departments', 'integrations', 'salestax', 'salestargets', 'suggestions', 'products', 'catalog', 'rewards', 'priorities', 'emails', 'travel', 'contracts', 'timeclock', 'proposals', 'labor', 'classes', 'orphaned', 'kiosk', 'contact_import', 'work_orders', 'portal', 'billing', 'automation', 'email_config', 'text_messaging'];
   const adminGroups = [
     { id: 'company', label: 'Company & Branding', description: 'Identity, offices, portal' },
     { id: 'people', label: 'People & Access', description: 'Team, roles, security' },
@@ -75,6 +76,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'timeclock', label: 'Time Clock', group: 'operations' },
     { id: 'travel', label: 'Travel Bonus', group: 'operations' },
     { id: 'priorities', label: 'Priorities', group: 'operations' },
+    { id: 'text_messaging', label: 'Text Messaging', group: 'communications', visible: isAdminOrManager },
     { id: 'emails', label: 'Email Templates', group: 'communications' },
     { id: 'email_config', label: 'Email Settings', group: 'communications' },
     { id: 'messages', label: 'Company Messages', group: 'communications' },
@@ -179,6 +181,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
             {activeTab === 'catalog' && <CatalogManagement />}
             {activeTab === 'rewards' && <PointsAndRewards />}
             {activeTab === 'priorities' && <PriorityManagement />}
+            {activeTab === 'text_messaging' && isAdminOrManager && <TextMessagingSettings />}
             {activeTab === 'emails' && <EmailTemplates />}
             {activeTab === 'messages' && <CompanyMessagesManagement />}
             {activeTab === 'travel' && <TravelBonusSettings />}
