@@ -48,6 +48,9 @@ let controlled=0;const handler=createAssistSupportHandler({publicOrigin:'https:/
 const request=(body,origin='https://elife.myjobview.com')=>new Request('https://backend.example/functions/v1/assist-support',{method:'POST',headers:{origin,authorization:'Bearer verified-by-auth-test'},body:JSON.stringify(body)});
 assert.equal((await handler(request({operation:'devices',organizationId:org},'https://other.myjobview.com'))).status,403);assert.equal(controlled,0);
 assert.equal((await handler(request({operation:'devices',organizationId:sid}))).status,403);
+const invalidLabels=['Bad\\nName','Tab\\tName','Delete\\u007fName','   '];
+for(const label of invalidLabels){const before=controlled;assert.equal((await handler(request({operation:'device_label',organizationId:org,deviceId:device,label}))).status,400);assert.equal(controlled,before);}
+const beforeRename=controlled;assert.equal((await handler(request({operation:'device_label',organizationId:org,deviceId:device,label:'Justin – Windows 11 x64'}))).status,200);assert.equal(controlled,beforeRename+1);
 const viewerResponse=await handler(request({operation:'connect',organizationId:org,deviceId:device}));assert.equal(viewerResponse.status,200);
 const response=await handler(request({operation:'devices',organizationId:org}));assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.ok(!(await response.text()).includes('must-not-leak'));
 const jwt=claims=>'Bearer e30.'+Buffer.from(JSON.stringify(claims)).toString('base64url')+'.verified-signature';
