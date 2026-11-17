@@ -13,7 +13,8 @@ const SuggestionManagement = lazy(() => import('./SuggestionManagement').then(m 
 const ProductsManagement = lazy(() => import('../Products/ProductsManagement'));
 const PointsAndRewards = lazy(() => import('./PointsAndRewards').then(m => ({ default: m.PointsAndRewards })));
 const PriorityManagement = lazy(() => import('./PriorityManagement').then(m => ({ default: m.PriorityManagement })));
-const TextMessagingSettings = lazy(() => import('./TextMessagingSettings').then(m => ({ default: m.TextMessagingSettings })));\nconst EmailTemplates = lazy(() => import('./EmailTemplates').then(m => ({ default: m.EmailTemplates })));
+const TextMessagingSettings = lazy(() => import('./TextMessagingSettings').then(m => ({ default: m.TextMessagingSettings })));
+const EmailTemplates = lazy(() => import('./EmailTemplates').then(m => ({ default: m.EmailTemplates })));
 const CompanyMessagesManagement = lazy(() => import('./CompanyMessagesManagement').then(m => ({ default: m.CompanyMessagesManagement })));
 const PermissionsManagement = lazy(() => import('./PermissionsManagement').then(m => ({ default: m.PermissionsManagement })));
 const RolePermissionManagement = lazy(() => import('./RolePermissionManagement').then(m => ({ default: m.RolePermissionManagement })));
@@ -75,7 +76,8 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
     { id: 'timeclock', label: 'Time Clock', group: 'operations' },
     { id: 'travel', label: 'Travel Bonus', group: 'operations' },
     { id: 'priorities', label: 'Priorities', group: 'operations' },
-    { id: 'text_messaging', label: 'Text Messaging', group: 'communications', visible: isAdminOrManager },\n    { id: 'emails', label: 'Email Templates', group: 'communications' },
+    { id: 'text_messaging', label: 'Text Messaging', group: 'communications', visible: isAdminOrManager },
+    { id: 'emails', label: 'Email Templates', group: 'communications' },
     { id: 'email_config', label: 'Email Settings', group: 'communications' },
     { id: 'messages', label: 'Company Messages', group: 'communications' },
     { id: 'integrations', label: 'Integrations', group: 'system' },
@@ -179,7 +181,8 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
             {activeTab === 'catalog' && <CatalogManagement />}
             {activeTab === 'rewards' && <PointsAndRewards />}
             {activeTab === 'priorities' && <PriorityManagement />}
-            {activeTab === 'text_messaging' && isAdminOrManager && <TextMessagingSettings />}\n            {activeTab === 'emails' && <EmailTemplates />}
+            {activeTab === 'text_messaging' && isAdminOrManager && <TextMessagingSettings />}
+            {activeTab === 'emails' && <EmailTemplates />}
             {activeTab === 'messages' && <CompanyMessagesManagement />}
             {activeTab === 'travel' && <TravelBonusSettings />}
             {activeTab === 'timeclock' && <TimeClockManagement />}
