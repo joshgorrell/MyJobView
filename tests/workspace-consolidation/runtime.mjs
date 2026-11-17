@@ -17,7 +17,7 @@ assert.equal(showWorkspaceMenu('tasks',k=>k==='feed'),false);
 assert.equal(showWorkspaceMenu('tasks',()=>false),true);
 assert.equal(showWorkspaceMenu('individual_dashboard',()=>true),false);
 assert.equal(workspaceMenuKey('leads'),'pipeline_board');
-globalThis.window={location:{search:''}};
+globalThis.window={location:{href:'http://localhost/',search:''},sessionStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},localStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}}};
 globalThis.allowed=new Set(['tasks']);
 const before=globalThis.flowLoads||0;
 const tasksOnly=renderToString(<MasterFeed initialTaskView onLeadClick={()=>{}} tasksContent={<div>Task-only tools</div>}/>);
