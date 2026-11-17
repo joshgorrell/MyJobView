@@ -16,7 +16,6 @@ import TimeClockScreen from './src/screens/TimeClockScreen';
 import WorkOrdersScreen from './src/screens/WorkOrdersScreen';
 import WorkOrderDetailScreen from './src/screens/WorkOrderDetailScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
-import LocationHistoryScreen from './src/screens/LocationHistoryScreen';
 import TimeHistoryScreen from './src/screens/TimeHistoryScreen';
 
 const Stack = createNativeStackNavigator();
@@ -33,7 +32,6 @@ function MobileTabBar({ activeRoute }: { activeRoute: string }) {
   const insets = useSafeAreaInsets();
   const selectedRoute = activeRoute === 'WorkOrderDetail' ? 'WorkOrders'
     : activeRoute === 'TimeHistory' ? 'TimeClock'
-    : activeRoute === 'LocationHistory' ? 'Settings'
     : activeRoute;
   return (
     <View style={[tabStyles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -81,7 +79,6 @@ function AppNavigation() {
           <Stack.Screen name="TimeClock" component={TimeClockScreen} options={{ headerShown: false }} />
           <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} options={{ headerShown: false }} />
           <Stack.Screen name="WorkOrderDetail" component={WorkOrderDetailScreen} />
-          <Stack.Screen name="LocationHistory" component={LocationHistoryScreen} />
           <Stack.Screen name="TimeHistory" component={TimeHistoryScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
         </>}
