@@ -706,7 +706,7 @@ export function AddUserForm({ onClose, onSuccess }: AddUserFormProps) {
                   <label className="block text-sm font-medium text-gray-300 mb-2">Office Assignments</label>
                   <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
                     <p className="text-xs text-gray-400 mb-3">
-                      Select which offices this user has access to. Leave empty for access to all offices.
+                      Select the offices this user belongs to. These assignments do not by themselves restrict report visibility or grant module access.
                     </p>
                     {offices.map((office) => (
                       <label key={office.id} className="flex items-center gap-2 cursor-pointer">
