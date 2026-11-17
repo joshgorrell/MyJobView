@@ -12,16 +12,29 @@ function authorized(header,secret){
  const actual=Buffer.from(header),expected=Buffer.from('Bearer '+secret);
  return actual.length===expected.length&&timingSafeEqual(actual,expected);
 }
-export function createWindowsCanaryServer({verify,token,os=platform(),maxBody=8192}={}){
+export function createWindowsCanaryServer({verify,token,os=platform(),maxBody=8192,verifyTimeoutMs=12000}={}){
  if(os!=='win32')throw new Error('windows_host_required');
  if(typeof token!=='string'||token.length<32)throw new Error('canary_token_required');
- const handle=createWindowsCanaryHandler({verify});
+ if(!Number.isSafeInteger(verifyTimeoutMs)||verifyTimeoutMs<1||verifyTimeoutMs>14000)throw new Error('invalid_canary_timeout');
+ let active=false;
+ const handle=createWindowsCanaryHandler({verify:async request=>{
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),verifyTimeoutMs);
+  try{
+   return await Promise.race([
+    Promise.resolve().then(()=>verify(request,{signal:controller.signal})),
+    new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(new Error('canary_timeout')),{once:true}))
+   ]);
+  }finally{clearTimeout(timer);controller.abort();}
+ }});
  return http.createServer(async(req,res)=>{
   const reply=(status,value)=>{res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(value));};
   if(req.url!=='/v1/assist/probe')return reply(404,{error:'not_found'});
   if(req.method!=='POST')return reply(405,{error:'method_not_allowed'});
   if(!authorized(req.headers.authorization,token))return reply(401,{error:'unauthorized'});
   if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')return reply(415,{error:'unsupported_media_type'});
+  if(active)return reply(503,{error:'canary_busy'});
+  active=true;
   try{
    let size=0,chunks=[];
    for await(const chunk of req){size+=chunk.length;if(size>maxBody)throw new Error('request_too_large');chunks.push(chunk);}
@@ -29,6 +42,7 @@ export function createWindowsCanaryServer({verify,token,os=platform(),maxBody=81
    const proof=await handle(data);
    return reply(200,proof);
   }catch{return reply(503,{error:'canary_unavailable'});}
+  finally{active=false;}
  });
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
