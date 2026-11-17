@@ -9,6 +9,8 @@ import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
 type Mode = 'day' | 'week' | 'month' | 'agenda';
+type PrivateAppointment = { id: string; appointment_date: string; start_time: string | null; end_time: string | null; title: string | null; status: string; assigned_technician: string | null; can_view_details: boolean | null };
+type TeamLeaveDay = { request_id: string; employee_id: string; leave_date: string; full_day: boolean; start_time: string | null; end_time: string | null };
 type Event = { id: string; date: string; start: string | null; end: string | null; title: string; subtitle: string; kind: 'job' | 'appointment' | 'internal' | 'time_off'; workOrderId?: string };
 const pad = (n: number) => String(n).padStart(2, '0');
 const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -87,8 +89,8 @@ export default function CalendarScreen({ navigation }: any) {
           kind: 'job' as const, workOrderId: j.id,
         })),
         ...(appointments.data || [])
-          .filter(a => a.status !== 'cancelled' && a.assigned_technician === profile.id)
-          .map(a => ({
+          .filter((a: PrivateAppointment) => a.status !== 'cancelled' && a.assigned_technician === profile.id)
+          .map((a: PrivateAppointment) => ({
             id: `appointment-${a.id}`, date: a.appointment_date, start: a.start_time, end: a.end_time,
             title: a.can_view_details === false ? 'Busy' : (a.title || 'Appointment'),
             subtitle: a.can_view_details === false ? 'Private appointment' : 'Appointment',
@@ -98,7 +100,7 @@ export default function CalendarScreen({ navigation }: any) {
           id: `internal-${item.id}`, date: item.session_date, start: item.start_time, end: item.end_time,
           title: item.title || 'Internal session', subtitle: 'Internal time', kind: 'internal' as const,
         })),
-        ...(timeOff.data || []).filter(item => item.employee_id === profile.id).map(item => ({
+        ...(timeOff.data || []).filter((item: TeamLeaveDay) => item.employee_id === profile.id).map((item: TeamLeaveDay) => ({
           id: `leave-${item.request_id}-${item.leave_date}`, date: item.leave_date,
           start: item.full_day ? null : item.start_time, end: item.full_day ? null : item.end_time,
           title: item.full_day ? 'Approved time off' : 'Approved time off (partial day)',
