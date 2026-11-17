@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { NotificationService } from '../services/NotificationService';
 import { locationTrackingService } from '../services/LocationTrackingService';
+import { clearCalendarCache } from '../services/CalendarCache';
 
 interface Profile {
   id: string;
@@ -93,6 +94,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     await locationTrackingService.stopTracking();
     await NotificationService.unregisterToken().catch(() => {});
+    // Clear sensitive local snapshots before ending the session. If deletion
+    // fails, don't report a successful logout while customer data remains.
+    await clearCalendarCache();
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
