@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.app.json",
-    "test:sms:templates": "node tests/sms/template-render.mjs",
+    "test:sms:templates": "node tests/sms/template-render.mjs && node tests/sms/template-queue.mjs",
     "test:proposal-notifications:browser": "npm run build && node tests/reviews/proposal-notification-browser.mjs",
     "test:navigation:browser": "npm run build && node tests/navigation/responsive-browser.mjs",
     "test:themes": "node tests/themes/database.mjs",
