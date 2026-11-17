@@ -20,5 +20,6 @@ try{
   if($report.status -ne "FAIL" -or $report.production_approval -ne $false -or $report.architecture -ne $arch){throw "invalid_failure_report"}
   if($report.sha256 -or $report.bytes){throw "unexpected_download_result"}
  }
+ $global:LASTEXITCODE=0 # The intentionally failing child checks succeeded; clear their process exit code.
  Write-Host "Assist Windows agent preflight parsed and rejected invalid URLs on $($PSVersionTable.PSVersion)"
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}
