@@ -5,15 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
-  ViewStyle,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useLocation } from '../contexts/LocationContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
-import { Logo } from '../components/Logo';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
@@ -159,14 +156,6 @@ export default function DashboardScreen({ navigation }: any) {
     return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   }
 
-  const menuItems: { title: string; screen: string; color: string; icon: string; description: string }[] = [
-    { title: 'My Calendar', screen: 'Calendar', color: Colors.primary[500], icon: 'calendar', description: 'Day, week and month schedule' },
-    { title: 'Time Clock', screen: 'TimeClock', color: Colors.primary[600], icon: 'clock', description: 'Clock in/out with GPS' },
-    { title: 'My Time History', screen: 'TimeHistory', color: Colors.primary[400], icon: 'history', description: 'View past shifts' },
-    { title: 'Work Orders', screen: 'WorkOrders', color: Colors.green[600], icon: 'wrench', description: 'View assigned jobs' },
-    { title: 'Location History', screen: 'LocationHistory', color: Colors.amber[500], icon: 'location', description: 'GPS trail data' },
-    { title: 'Settings', screen: 'Settings', color: Colors.gray[600], icon: 'settings', description: 'App preferences' },
-  ];
 
   return (
     <ScreenContainer scroll>
@@ -189,13 +178,10 @@ export default function DashboardScreen({ navigation }: any) {
         )}
       </View>
 
-      {/* Header with Logo */}
+      {/* Compact identity header */}
       <View style={styles.header}>
-        <Logo size={56} variant="dark" />
         <View style={styles.headerText}>
-          <Text style={styles.greeting}>Welcome back</Text>
           <Text style={styles.name}>{profile?.full_name || profile?.email}</Text>
-          <Text style={styles.role}>{profile?.role?.replace(/_/g, ' ')}</Text>
         </View>
       </View>
 
@@ -256,85 +242,8 @@ export default function DashboardScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Navigation Menu */}
-      <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>MENU</Text>
-        {menuItems.map((item) => (
-          <TouchableOpacity
-            key={item.screen}
-            style={styles.menuRow}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate(item.screen)}
-          >
-            <View style={[styles.menuIconContainer, { backgroundColor: item.color }]}>
-              <MenuIcon name={item.icon} size={22} color={Colors.white} />
-            </View>
-            <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuDescription}>{item.description}</Text>
-            </View>
-            <View style={styles.menuChevron} />
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Sign Out */}
-      <TouchableOpacity style={styles.signOutButton} onPress={() => navigation.navigate('Settings')} activeOpacity={0.7}>
-        <Text style={styles.signOutText}>Account & Sign Out</Text>
-      </TouchableOpacity>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>MyJobView</Text>
-        <Text style={styles.footerSubtext}>Version 1.0.0</Text>
-      </View>
     </ScreenContainer>
   );
-}
-
-function MenuIcon({ name, size, color }: { name: string; size: number; color: string }) {
-  const iconStyle: ViewStyle = { width: size, height: size };
-  switch (name) {
-    case 'calendar':
-      return <View style={[iconStyle, { borderWidth: 2, borderColor: color, borderRadius: 3, borderTopWidth: 5 }]} />;
-    case 'clock':
-      return (
-        <View style={[iconStyle, { alignItems: 'center', justifyContent: 'center' }]}>
-          <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: color }} />
-          <View style={{ position: 'absolute', width: 2, height: size / 2 - 4, backgroundColor: color, top: 3, left: size / 2 - 1 }} />
-          <View style={{ position: 'absolute', width: size / 3, height: 2, backgroundColor: color, top: size / 2 - 1, left: size / 2 - 1 }} />
-        </View>
-      );
-    case 'history':
-      return (
-        <View style={[iconStyle, { alignItems: 'center', justifyContent: 'center' }]}>
-          <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 2, borderColor: color }} />
-          <View style={{ position: 'absolute', width: 2, height: size / 3, backgroundColor: color, top: 3, left: size / 2 - 1 }} />
-          <View style={{ position: 'absolute', width: size / 3, height: 2, backgroundColor: color, top: size / 2, left: size / 2 - 4 }} />
-        </View>
-      );
-    case 'wrench':
-      return (
-        <View style={[iconStyle, { alignItems: 'center', justifyContent: 'center' }]}>
-          <View style={{ width: size - 4, height: 3, backgroundColor: color, borderRadius: 2, transform: [{ rotate: '-45deg' }] }} />
-        </View>
-      );
-    case 'location':
-      return (
-        <View style={[iconStyle, { alignItems: 'center', justifyContent: 'center' }]}>
-          <View style={{ width: size - 6, height: size - 6, borderRadius: (size - 6) / 2, borderWidth: 2, borderColor: color }} />
-          <View style={{ width: 3, height: 6, backgroundColor: color, marginTop: -1 }} />
-        </View>
-      );
-    case 'settings':
-      return (
-        <View style={[iconStyle, { alignItems: 'center', justifyContent: 'center' }]}>
-          <View style={{ width: size - 4, height: size - 4, borderRadius: (size - 4) / 2, borderWidth: 2, borderColor: color }} />
-          <View style={{ position: 'absolute', width: size / 3, height: size / 3, borderRadius: size / 6, borderWidth: 2, borderColor: color }} />
-        </View>
-      );
-    default:
-      return <View style={iconStyle} />;
-  }
 }
 
 const styles = StyleSheet.create({
@@ -359,7 +268,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
@@ -371,8 +280,8 @@ const styles = StyleSheet.create({
   role: { ...Typography.caption, color: Colors.primary[600], fontWeight: '600', textTransform: 'capitalize' as const, letterSpacing: 0 },
   heroCard: {
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 8,
     borderRadius: Radius.lg,
     padding: 16,
     flexDirection: 'row',
