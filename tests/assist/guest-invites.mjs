@@ -37,6 +37,20 @@ const connected=await staff('invite_connect',{invite_id:invite.invite_id});asser
 await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unavailable/);assert.equal(opens,1,'Only one desktop viewer is issued');
 assert.equal((await guest('end')).ended,true);assert.equal(revokes,1);assert.equal(deletes,1);assert.equal(endReasons.at(-1),'user_ended');
 await assert.rejects(guest('status'),/unavailable/);
+// A guest that closes the temporary Windows client without clicking End must
+// lose the native viewer on the next short session sweep.
+const disconnectedInvite=await staff('invite_create');
+const disconnectedClaim=await broker.guest({organization_id:org,operation:'redeem',code:disconnectedInvite.code});
+online=[{id:device,online:true}];
+await staff('invite_status',{invite_id:disconnectedInvite.invite_id});
+await staff('invite_connect',{invite_id:disconnectedInvite.invite_id});
+const beforeDisconnectRevokes=revokes,beforeDisconnectDeletes=deletes;
+online=[];
+await broker.sweep();
+assert.equal(revokes,beforeDisconnectRevokes+1,'Disconnected guest viewer is revoked at sweep');
+assert.equal(deletes,beforeDisconnectDeletes+1,'Disconnected guest group is removed');
+await assert.rejects(staff('invite_status',{invite_id:disconnectedInvite.invite_id}),/unavailable/);
+await assert.rejects(broker.guest({organization_id:org,operation:'status',invite_id:disconnectedInvite.invite_id,claim_token:disconnectedClaim.claim_token}),/unavailable/);
 const expired=await staff('invite_create');clock+=180001;await broker.sweep();await assert.rejects(staff('invite_status',{invite_id:expired.invite_id}),/unavailable/);
 const revoked=await staff('invite_create');allowed=false;await broker.sweep();allowed=true;
 await assert.rejects(broker.guest({organization_id:org,operation:'redeem',code:revoked.code}),/unavailable/);

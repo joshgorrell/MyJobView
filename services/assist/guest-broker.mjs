@@ -102,7 +102,12 @@ export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,a
     const results=await Promise.allSettled(rows.slice(offset,offset+8).map(row=>exclusive(row.organization_id,async()=>{
      if(!invites.has(row.id))return;
      try{if(row.ended||!await live(row)||(!row.claimHash&&now()>=row.joinDeadline))await close(row,'expired');
-      else if(row.session){if((await call('check',{organization_id:row.organization_id},{session_id:row.session.id}))?.valid!==true)await close(row,'access_revoked');}
+      else if(row.session){
+       // A temporary computer that disconnects must not leave its viewer capability alive.
+       const connected=(await runtime.inventory(row.organization_id,row.meshId)).filter(d=>d.online&&d.id===row.device);
+       if(connected.length!==1)await close(row,'computer_disconnected');
+       else if((await call('check',{organization_id:row.organization_id},{session_id:row.session.id}))?.valid!==true)await close(row,'access_revoked');
+      }
      }catch{ // Failure to verify authorization never extends a guest capability.
       await close(row,'verification_failed');
      }
