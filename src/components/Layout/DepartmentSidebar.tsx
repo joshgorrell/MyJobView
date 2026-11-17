@@ -2,7 +2,7 @@ import { useAssistMenu } from '../../hooks/useAssistMenu';
 import { workspaceMenuKey } from '../../lib/workspaceNavigation';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
-import { Monitor, Menu, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
+import { MousePointer2, Menu, ChevronRight, Star, X, Search, ChevronsDownUp, ChevronsUpDown, Pin } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useDepartments } from '../../contexts/DepartmentContext';
 import { useToast } from '../Shared/Toast';
@@ -378,7 +378,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
               <button type="button" onClick={() => handleModuleClick('assist')}
                 aria-current={activeModule === 'assist' ? 'page' : undefined}
                 className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeModule === 'assist' ? 'bg-blue-500/20 text-brand' : 'text-muted hover:bg-surface hover:text-primary'}`}>
-                <Monitor className="h-4 w-4 shrink-0" />Assist
+                <MousePointer2 className="h-4 w-4 shrink-0 text-red-500" fill="currentColor" aria-hidden="true" />Assist
               </button>
             )}
             {searchQuery.trim() && filteredDepartments.length === 0 && !(assistEnabled && 'assist remote support'.includes(searchQuery.trim().toLowerCase())) && (
