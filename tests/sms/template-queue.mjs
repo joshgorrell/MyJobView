@@ -9,7 +9,7 @@ const transpile = source => ts.transpileModule(source, {
 }).outputText;
 const renderUrl = 'data:text/javascript;base64,' + Buffer.from(transpile(renderSource)).toString('base64');
 const adapterUrl = 'data:text/javascript;base64,' +
-  Buffer.from(transpile(adapterSource).replace("'./sms-template-render.ts'", "'" + renderUrl + "'")).toString('base64');
+  Buffer.from(transpile(adapterSource).replace(/(['"])\.\/sms-template-render\.ts\1/, (_, quote) => quote + renderUrl + quote)).toString('base64');
 const { queueTemplatedSms } = await import(adapterUrl);
 const org = '00000000-0000-0000-0000-000000000001';
 const contact = '00000000-0000-0000-0000-000000000002';
