@@ -1,3 +1,4 @@
+import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -362,11 +363,9 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     }
   }
 
-  const localDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
   async function snoozeLead(leadId: string, nextDate: string) {
     if (!nextDate || !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return;
-    const today = localDay(new Date());
+    const today = dateInputValue(new Date());
     if (nextDate <= today) {
       notify('Choose a future follow-up date.', { theme: 'violet', tone: 'warning' });
       return;
@@ -771,23 +770,20 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                           </span>
                         </div>
                       )}
-                      {(Boolean(item.reminder_date) && String(item.reminder_date).slice(0, 10) <= localDay(new Date())) && (
+                      {(Boolean(item.reminder_date) && String(item.reminder_date).slice(0, 10) <= dateInputValue(new Date())) && (
                         <div className="mb-2">
                           <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
                           {snoozeLeadId === item.id && (
                             <div onClick={e => e.stopPropagation()} className="mt-2 rounded border border-gray-200 bg-white p-2 space-y-2">
                               <div className="flex flex-wrap gap-1">
-                                {([{ label: 'Tomorrow', days: 1 }, { label: '3 days', days: 3 }, { label: '1 week', days: 7 }, { label: '1 month', months: 1 }, { label: '3 months', months: 3 }, { label: '6 months', months: 6 }] as const).map(option => (
-                                  <button key={option.label} type="button" disabled={snoozing} onClick={() => {
-                                    const date = new Date();
-                                    if ('months' in option) date.setMonth(date.getMonth() + option.months);
-                                    else date.setDate(date.getDate() + option.days);
-                                    void snoozeLead(item.id, localDay(date));
-                                  }} className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{option.label}</button>
+                                {FOLLOW_UP_PRESETS.map(({ label, months }) => (
+                                  <button key={months} type="button" disabled={snoozing}
+                                    onClick={() => void snoozeLead(item.id, followUpInMonths(months))}
+                                    className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{label}</button>
                                 ))}
                               </div>
-                              <label className="block text-xs text-gray-600">Custom follow-up date
-                                <input type="date" min={localDay(new Date(new Date().setDate(new Date().getDate() + 1)))} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
+                              <label className="block text-xs text-gray-600">Custom
+                                <input type="date" min={dateInputValue(new Date(new Date().setDate(new Date().getDate() + 1)))} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
                               </label>
                             </div>
                           )}
