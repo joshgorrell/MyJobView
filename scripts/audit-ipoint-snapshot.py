@@ -42,8 +42,14 @@ def audit(path: Path, start: date) -> dict:
             findings["missing_source_id"] += 1
         if not (row["Sales Rep"] or "").strip():
             findings["missing_source_rep"] += 1
+        amount_text = (row["total_Price"] or "").strip()
+        if not amount_text:
+            findings["missing_amount"] += 1
+            if (row.get("Sales Order Created TS") or "").strip():
+                findings["missing_amount_with_order_timestamp"] += 1
+            continue
         try:
-            amount = Decimal((row["total_Price"] or "").strip())
+            amount = Decimal(amount_text)
             if not amount.is_finite():
                 raise InvalidOperation
         except InvalidOperation:
