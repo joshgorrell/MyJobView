@@ -631,24 +631,19 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
           <HelpCircle className="h-5 w-5" />
         </button>
+        <PipelineStageOverview
+          showAll={viewMode === 'all' && canViewAllPipeline}
+          canViewProposals={canViewProposals}
+          canViewSalesOrders={canViewSalesOrders}
+          onOpenProposals={() => onNavigate?.('proposals')}
+          onOpenSalesOrders={() => onNavigate?.('sales_orders')}
+          onOpenProspect={handleContactClick}
+          onAddProspect={() => {
+            setContactFormInitialStatus('prospect');
+            setShowContactForm(true);
+          }}
+        />
       </div>
-      {/* Four real stages, backed by the canonical Contacts, Leads, Proposals and Sales Orders tables. */}
-      <PipelineStageOverview
-        showAll={viewMode === 'all' && canViewAllPipeline}
-        canViewProposals={canViewProposals}
-        canViewSalesOrders={canViewSalesOrders}
-        onOpenLeads={() => {
-          if (selectedWidgets.includes('leads')) document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          else onNavigate?.('leads');
-        }}
-        onOpenProposals={() => onNavigate?.('proposals')}
-        onOpenSalesOrders={() => onNavigate?.('sales_orders')}
-        onOpenProspect={handleContactClick}
-        onAddProspect={() => {
-          setContactFormInitialStatus('prospect');
-          setShowContactForm(true);
-        }}
-      />
 
       <div className="grid gap-4 pb-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
         {filteredStages.map(stage => (
