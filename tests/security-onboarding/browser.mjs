@@ -190,6 +190,41 @@ for(const label of ['First Name','Agreement Term','Price Override (Optional)']) 
  assert.equal(await staffPage.locator('label').filter({hasText:label}).first().locator('svg[role="img"][aria-label^="Customer-visible"]').count(),1);
 }
 assert.ok((await staffPage.locator('body').innerText()).includes('Service names: Customer-visible. Individual prices and catalog descriptions: Internal only.'));
+// Use the signed-in workspace theme, including its control and surface overrides.
+await staffPage.evaluate(() => {
+  document.documentElement.dataset.theme = 'dark';
+  document.getElementById('root').classList.add('theme-workspace');
+});
+const createDialog = staffPage.getByRole('dialog', { name: 'Create Security Agreement' });
+const customerDetails = createDialog.getByRole('heading', { name: 'Customer Details' });
+const termLabel = createDialog.getByText('Agreement Term', { exact: false }).first();
+const createButton = createDialog.getByRole('button', { name: 'Create Agreement' });
+const emailOverride = createDialog.getByPlaceholder('Send invitation to a different email address...');
+for (const viewport of [{ width: 1366, height: 768 }, { width: 1024, height: 600 }, { width: 320, height: 640 }]) {
+  await staffPage.setViewportSize(viewport);
+  await customerDetails.scrollIntoViewIfNeeded();
+  const customerBox = await customerDetails.boundingBox();
+  const termBox = await termLabel.boundingBox();
+  assert.equal(termBox.x > customerBox.x, viewport.width >= 1024, 'Agreement fields sit beside customer details on desktop');
+  const before = await createButton.boundingBox();
+  await emailOverride.scrollIntoViewIfNeeded();
+  assert.deepEqual(await createButton.boundingBox(), before, 'Create stays in place as fields scroll');
+  const emailBox = await emailOverride.boundingBox();
+  assert.ok(emailBox.y + emailBox.height <= before.y, 'Last field stays above the action bar');
+  assert.ok(before.y + before.height <= viewport.height, 'Create stays inside the viewport');
+  assert.ok(await createDialog.evaluate(el => el.scrollWidth <= el.clientWidth), 'Dialog fits the viewport width');
+}
+const customerPalette = await customerDetails.evaluate(el => ({
+  background: getComputedStyle(el.parentElement).backgroundColor,
+  text: getComputedStyle(el).color,
+  inputScheme: getComputedStyle(el.parentElement.querySelector('input')).colorScheme,
+}));
+assert.deepEqual(customerPalette, {
+  background: 'rgb(31, 41, 55)',
+  text: 'rgb(249, 250, 251)',
+  inputScheme: 'dark',
+}, 'Customer details follow the dark workspace palette');
+await staffPage.setViewportSize({ width: 390, height: 844 });
 await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?edit');
 await staffPage.getByRole('heading',{name:'Edit Security Contract',exact:true}).waitFor();
 assert.equal(await staffPage.locator('label').filter({hasText:'Monthly Price Override'}).locator('svg[role="img"][aria-label^="Customer-visible"]').count(),1);

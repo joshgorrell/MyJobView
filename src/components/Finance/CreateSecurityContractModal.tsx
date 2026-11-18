@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { SecurityFieldVisibility, SecurityVisibilityGuide } from './SecurityFieldVisibility';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { SECURITY_INITIAL_TERMS, staffSecurityOnboarding } from '../../lib/securityOnboarding';
 import { supabase } from '../../lib/supabase';
 import { X, Search, Plus, Wrench } from 'lucide-react';
@@ -59,6 +59,7 @@ interface CreateSecurityContractModalProps {
 }
 
 export default function CreateSecurityContractModal({ onClose, onSuccess, onPaperCreated, prefill }: CreateSecurityContractModalProps) {
+  const titleId = useId();
   const creationRequest = useRef(crypto.randomUUID());
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
@@ -298,11 +299,13 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   }
 
   return (
-    <div className="security-onboarding-controls fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-white rounded-none sm:rounded-lg shadow-2xl w-full max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col min-h-0">
+    <div className="security-onboarding-controls fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 [.theme-workspace_&]:[color-scheme:inherit]">
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-dvh min-h-0 w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-lg">
         <div className="shrink-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
+          <h2 id={titleId} className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
@@ -311,737 +314,739 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
         </div>
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-8">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <p className="text-gray-600">Loading...</p>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-6 space-y-4 sm:space-y-6">
-          <SecurityVisibilityGuide />
-            {prefill && (
-              <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-600">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3 sm:p-5">
+              <SecurityVisibilityGuide />
+              {prefill && (
+                <div className="flex items-start gap-3 px-4 py-3 bg-infoSoft border border-subtle rounded-lg">
+                  <div className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-600">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                      <path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Pre-filled by AI Assistant</p>
+                    <p className="text-xs text-blue-600 mt-0.5">Review all fields before saving. Customer details were matched from your contact directory.</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Pre-filled by AI Assistant</p>
-                  <p className="text-xs text-blue-600 mt-0.5">Review all fields before saving. Customer details were matched from your contact directory.</p>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agreement Template <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-              <select
-                value={selectedTemplate}
-                onChange={(e) => setSelectedTemplate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select a template...</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                ))}
-              </select>
-              {selectedTemplate && (
-                <p className="mt-2 text-sm text-gray-600">
-                  {templates.find(t => t.id === selectedTemplate)?.description}
-                </p>
               )}
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Customer <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-
-              <div className="relative mb-2">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    if (selectedContact) {
-                      setSelectedContact('');
-                    }
-                    if (showNewContactForm) {
-                      setShowNewContactForm(false);
-                    }
-                  }}
-                  placeholder="Type a name or email to search..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {(searchTerm.trim() || contactSearchLoading) && !selectedContact && (
-              <div className="border border-gray-300 rounded-lg max-h-48 sm:max-h-64 overflow-y-auto">
-                {contactSearchLoading ? (
-                  <div className="p-4 text-center text-gray-500">Searching...</div>
-                ) : filteredContacts.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    {searchTerm.trim() ? (
-                      <div>
-                        <p>No contacts found matching "{searchTerm}"</p>
-                        <button
-                          type="button"
-                          onClick={() => setShowNewContactForm(true)}
-                          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          <Plus className="w-4 h-4" />
-                          Add "{searchTerm}" as a new customer
-                        </button>
-                      </div>
-                    ) : (
-                      'Start typing to search all contacts'
+              <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+                <div className="min-w-0 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Agreement Template <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                    <select
+                      value={selectedTemplate}
+                      onChange={(e) => setSelectedTemplate(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select a template...</option>
+                      {templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedTemplate && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        {templates.find(t => t.id === selectedTemplate)?.description}
+                      </p>
                     )}
                   </div>
-                ) : (
-                  filteredContacts.map((contact) => {
-                    const displayName = contact.full_name ||
-                      [contact.first_name, contact.last_name].filter(Boolean).join(' ') ||
-                      contact.email ||
-                      'Unknown';
-                    return (
-                      <button
-                        type="button"
-                        key={contact.id}
-                        onClick={() => {
-                          setSelectedContact(contact.id);
-                          setShowNewContactForm(false);
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Customer <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          if (selectedContact) {
+                            setSelectedContact('');
+                          }
+                          if (showNewContactForm) {
+                            setShowNewContactForm(false);
+                          }
                         }}
-                        className={`w-full text-left flex items-start gap-3 p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
-                          selectedContact === contact.id ? 'bg-blue-100 border-blue-200' : 'bg-white'
-                        }`}
-                      >
-                        <div className={`mt-1 w-4 h-4 rounded-full border-2 flex-shrink-0 ${
-                          selectedContact === contact.id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
-                        }`} />
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{displayName}</div>
-                          {contact.company_name && (
-                            <div className="text-xs text-gray-500">{contact.company_name}</div>
-                          )}
-                          <div className="text-sm text-gray-600">{contact.email}</div>
-                          <div className="text-sm text-gray-500">{contact.phone}</div>
-                          {contact.street_address && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {contact.street_address}, {contact.city}, {contact.state} {contact.zip_code}
+                        placeholder="Type a name or email to search..."
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {(searchTerm.trim() || contactSearchLoading) && !selectedContact && (
+                    <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-subtle sm:max-h-64">
+                      {contactSearchLoading ? (
+                        <div className="p-4 text-center text-gray-500">Searching...</div>
+                      ) : filteredContacts.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500">
+                          {searchTerm.trim() ? (
+                            <div>
+                              <p>No contacts found matching "{searchTerm}"</p>
+                              <button
+                                type="button"
+                                onClick={() => setShowNewContactForm(true)}
+                                className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add "{searchTerm}" as a new customer
+                              </button>
                             </div>
+                          ) : (
+                            'Start typing to search all contacts'
                           )}
                         </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              )}
-
-              {showNewContactForm && (
-                <div className="mt-3 p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg space-y-3 sm:space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">New Customer</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowNewContactForm(false)}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        First Name <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={newContact.first_name}
-                        onChange={(e) => setNewContact({ ...newContact, first_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={showNewContactForm && !selectedContact}
-                      />
+                      ) : (
+                        filteredContacts.map((contact) => {
+                          const displayName = contact.full_name ||
+                            [contact.first_name, contact.last_name].filter(Boolean).join(' ') ||
+                            contact.email ||
+                            'Unknown';
+                          return (
+                            <button
+                              type="button"
+                              key={contact.id}
+                              onClick={() => {
+                                setSelectedContact(contact.id);
+                                setShowNewContactForm(false);
+                              }}
+                              className={`w-full text-left flex items-start gap-3 p-3 hover:bg-infoSoft cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
+                                selectedContact === contact.id ? 'bg-infoSoft border-strong' : 'bg-white'
+                              }`}
+                            >
+                              <div className={`mt-1 w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                                selectedContact === contact.id ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                              }`} />
+                              <div className="min-w-0 flex-1 break-words">
+                                <div className="font-medium text-gray-900">{displayName}</div>
+                                {contact.company_name && (
+                                  <div className="text-xs text-gray-500">{contact.company_name}</div>
+                                )}
+                                <div className="text-sm text-gray-600">{contact.email}</div>
+                                <div className="text-sm text-gray-500">{contact.phone}</div>
+                                {contact.street_address && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {contact.street_address}, {contact.city}, {contact.state} {contact.zip_code}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Last Name <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={newContact.last_name}
-                        onChange={(e) => setNewContact({ ...newContact, last_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={showNewContactForm && !selectedContact}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name (Optional) <SecurityFieldVisibility internal /></label>
-                    <input
-                      type="text"
-                      value={newContact.company_name}
-                      onChange={(e) => setNewContact({ ...newContact, company_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                      <input
-                        type="email"
-                        value={newContact.email}
-                        onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={showNewContactForm && !selectedContact}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Phone <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                      <input
-                        type="tel"
-                        value={newContact.phone}
-                        onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={showNewContactForm && !selectedContact}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Street Address <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                    <AddressAutocomplete
-                      value={newContact.street_address}
-                      onChange={(address, components) => {
-                        try {
-                          if (components) {
-                            setNewContact(prev => ({
-                              ...prev,
-                              street_address: address,
-                              city: components.city || prev.city,
-                              state: components.state || prev.state,
-                              zip_code: components.zip || prev.zip_code
-                            }));
-                          } else {
-                            setNewContact(prev => ({ ...prev, street_address: address }));
-                          }
-                        } catch (error) {
-                          console.error('Error updating new contact address:', error);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      required={showNewContactForm && !selectedContact}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        City <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={newContact.city}
-                        onChange={(e) => setNewContact({ ...newContact, city: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={showNewContactForm && !selectedContact}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        State <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={newContact.state}
-                        onChange={(e) => setNewContact({ ...newContact, state: e.target.value })}
-                        maxLength={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                        required={showNewContactForm && !selectedContact}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ZIP Code <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-                    <input
-                      type="text"
-                      value={newContact.zip_code}
-                      onChange={(e) => setNewContact({ ...newContact, zip_code: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      required={showNewContactForm && !selectedContact}
-                    />
-                  </div>
-                </div>
-              )}
 
-              {showContactEdit && selectedContactData && (
-                <div className="mt-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3 sm:space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-1 mb-3">
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Review & Edit Customer Information</h3>
-                    <span className="text-xs text-blue-600">Make any necessary changes below</span>
-                  </div>
+                    )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={contactEdits.first_name}
-                        onChange={(e) => setContactEdits({ ...contactEdits, first_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={contactEdits.last_name}
-                        onChange={(e) => setContactEdits({ ...contactEdits, last_name: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <SecurityFieldVisibility internal /></label>
-                    <input
-                      type="text"
-                      value={contactEdits.company_name}
-                      onChange={(e) => setContactEdits({ ...contactEdits, company_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email <SecurityFieldVisibility /></label>
-                      <input
-                        type="email"
-                        value={contactEdits.email}
-                        onChange={(e) => setContactEdits({ ...contactEdits, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone <SecurityFieldVisibility /></label>
-                      <input
-                        type="tel"
-                        value={contactEdits.phone}
-                        onChange={(e) => setContactEdits({ ...contactEdits, phone: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Street Address <SecurityFieldVisibility /></label>
-                    <AddressAutocomplete
-                      value={contactEdits.street_address}
-                      onChange={(address, components) => {
-                        try {
-                          if (components) {
-                            setContactEdits(prev => ({
-                              ...prev,
-                              street_address: address,
-                              city: components.city || prev.city,
-                              state: components.state || prev.state,
-                              zip_code: components.zip || prev.zip_code
-                            }));
-                          } else {
-                            setContactEdits(prev => ({ ...prev, street_address: address }));
-                          }
-                        } catch (error) {
-                          console.error('Error updating contact address:', error);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">City <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={contactEdits.city}
-                        onChange={(e) => setContactEdits({ ...contactEdits, city: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">State <SecurityFieldVisibility /></label>
-                      <input
-                        type="text"
-                        value={contactEdits.state}
-                        onChange={(e) => setContactEdits({ ...contactEdits, state: e.target.value })}
-                        maxLength={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code <SecurityFieldVisibility /></label>
-                    <input
-                      type="text"
-                      value={contactEdits.zip_code}
-                      onChange={(e) => setContactEdits({ ...contactEdits, zip_code: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sales Order (Optional) <SecurityFieldVisibility internal /></label>
-              <select
-                value={selectedSalesOrder}
-                onChange={(e) => setSelectedSalesOrder(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">None - No linked sales order</option>
-                {filteredSalesOrders.map((order) => (
-                  <option key={order.id} value={order.id}>
-                    {order.order_number}
-                  </option>
-                ))}
-              </select>
-              {selectedContact && filteredSalesOrders.length === 0 && (
-                <p className="mt-2 text-sm text-gray-500">
-                  No sales orders found for this customer
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agreement Term <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
-              <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                {SECURITY_INITIAL_TERMS.map((months) => (
-                  <button
-                    key={months}
-                    type="button"
-                    onClick={() => setTermMonths(months)}
-                    aria-pressed={termMonths === months}
-                    className={`px-1 sm:px-4 py-2 sm:py-3 text-center rounded-lg border-2 transition-all text-sm sm:text-base ${
-                      termMonths === months
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    {months}<span className="sr-only"> months</span><br/>
-                    <span aria-hidden="true" className="text-[10px] sm:text-xs">mo</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Account Classification */}
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
-              <h3 className="text-sm font-semibold text-gray-800">Account Classification</h3>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Type <SecurityFieldVisibility internal /></label>
-                <div className="flex gap-3">
-                  {(['residential', 'commercial'] as const).map(type => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setAccountType(type)}
-                      className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium capitalize transition-all ${
-                        accountType === type
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Monitoring <SecurityFieldVisibility internal /></label>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isMonitoring}
-                    onChange={(e) => setIsMonitoring(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-blue-600 rounded"
-                  />
-                  <span className="text-sm text-gray-700">Yes, this system calls a monitoring center when the alarm goes off</span>
-                </label>
-                {isMonitoring && (
-                  <div className="mt-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Monitoring Account Number <span className="text-gray-400 font-normal">(optional -- fill in now or later)</span> <SecurityFieldVisibility internal /></label>
-                    <input
-                      type="text"
-                      value={monitoringAccountNumber}
-                      onChange={(e) => setMonitoringAccountNumber(e.target.value)}
-                      placeholder="e.g. 12345"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Services <SecurityFieldVisibility internal /></label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: 'dial_up', label: 'Dial-Up' },
-                    { value: 'telguard', label: 'Telguard' },
-                    { value: 'alarmnet', label: 'Alarmnet' },
-                    { value: 'alarm_com', label: 'Alarm.com' },
-                    { value: 'video_monitoring', label: 'Video / CCTV' },
-                    { value: 'access_control', label: 'Access Control' },
-                  ].map(svc => (
-                    <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={accountServices.includes(svc.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setAccountServices(prev => [...prev, svc.value]);
-                          } else {
-                            setAccountServices(prev => prev.filter(s => s !== svc.value));
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 rounded"
-                      />
-                      <span className="text-sm text-gray-700">{svc.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-
-            {/* Installation Details */}
-            <div className="p-3 sm:p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3 sm:space-y-4">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-amber-600" />
-                <h3 className="text-xs sm:text-sm font-semibold text-gray-800">Installation Details</h3>
-                <span className="text-xs text-amber-600">Optional -- fill in now or after the system is installed</span>
-              </div>
-
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date <SecurityFieldVisibility internal /></label>
-                <input
-                  type="date"
-                  value={installationDate}
-                  onChange={(e) => setInstallationDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-
-              {accountServices.filter(s => ['dial_up', 'telguard', 'alarmnet', 'alarm_com'].includes(s)).length > 0 && (
-                <div className="space-y-2">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers <SecurityFieldVisibility internal /></label>
-                  {accountServices.includes('dial_up') && (
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
-                      <input
-                        type="text"
-                        value={serviceAccountNumbers.dial_up || ''}
-                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, dial_up: e.target.value }))}
-                        placeholder="e.g. 12345"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  )}
-                  {accountServices.includes('telguard') && (
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
-                      <input
-                        type="text"
-                        value={serviceAccountNumbers.telguard || ''}
-                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, telguard: e.target.value }))}
-                        placeholder="e.g. TG67890"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  )}
-                  {accountServices.includes('alarmnet') && (
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
-                      <input
-                        type="text"
-                        value={serviceAccountNumbers.alarmnet || ''}
-                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarmnet: e.target.value }))}
-                        placeholder="e.g. AN111"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  )}
-                  {accountServices.includes('alarm_com') && (
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
-                      <input
-                        type="text"
-                        value={serviceAccountNumbers.alarm_com || ''}
-                        onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarm_com: e.target.value }))}
-                        placeholder="e.g. AC222"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Renewal Term <SecurityFieldVisibility /></label>
-              <p className="text-sm text-gray-700">Automatically renews month-to-month after the initial term. Cancellation after the initial term requires 30 days' notice.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Monitoring Services
-              </label>
-              <p className="text-xs text-gray-600 mb-2">Service names: Customer-visible. Individual prices and catalog descriptions: Internal only.</p>
-              <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
-                {monitoringServices.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    No monitoring services available
-                  </div>
-                ) : (
-                  Object.entries(
-                    monitoringServices.reduce((acc, service) => {
-                      const category = service.category || 'Other';
-                      if (!acc[category]) acc[category] = [];
-                      acc[category].push(service);
-                      return acc;
-                    }, {} as Record<string, MonitoringService[]>)
-                  ).map(([category, services]) => (
-                    <div key={category}>
-                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700">
-                        {category}
-                      </div>
-                      {services.map((service) => (
-                        <label
-                          key={service.id}
-                          className={`flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            selectedServices.includes(service.id) ? 'bg-blue-50' : ''
-                          }`}
-                        >
+                    {showNewContactForm && (
+                      <div className="mt-3 space-y-3 rounded-lg border border-subtle bg-surface p-3 sm:p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">New Customer</h3>
+                          <button
+                            type="button"
+                            onClick={() => setShowNewContactForm(false)}
+                            className="text-sm text-gray-500 hover:text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              First Name <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={newContact.first_name}
+                              onChange={(e) => setNewContact({ ...newContact, first_name: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Last Name <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={newContact.last_name}
+                              onChange={(e) => setNewContact({ ...newContact, last_name: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name (Optional) <SecurityFieldVisibility internal /></label>
                           <input
-                            type="checkbox"
-                            checked={selectedServices.includes(service.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedServices([...selectedServices, service.id]);
-                              } else {
-                                setSelectedServices(selectedServices.filter(id => id !== service.id));
+                            type="text"
+                            value={newContact.company_name}
+                            onChange={(e) => setNewContact({ ...newContact, company_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Email <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="email"
+                              value={newContact.email}
+                              onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Phone <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="tel"
+                              value={newContact.phone}
+                              onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Street Address <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                          <AddressAutocomplete
+                            value={newContact.street_address}
+                            onChange={(address, components) => {
+                              try {
+                                if (components) {
+                                  setNewContact(prev => ({
+                                    ...prev,
+                                    street_address: address,
+                                    city: components.city || prev.city,
+                                    state: components.state || prev.state,
+                                    zip_code: components.zip || prev.zip_code
+                                  }));
+                                } else {
+                                  setNewContact(prev => ({ ...prev, street_address: address }));
+                                }
+                              } catch (error) {
+                                console.error('Error updating new contact address:', error);
                               }
                             }}
-                            className="mt-1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            required={showNewContactForm && !selectedContact}
                           />
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="font-medium text-gray-900">{service.name}</div>
-                              <div className="text-sm font-semibold text-blue-600">
-                                ${service.monthly_price.toFixed(2)}/mo <SecurityFieldVisibility internal />
-                              </div>
-                            </div>
-                            {service.description && (
-                              <div className="text-sm text-gray-600 mt-1">{service.description}</div>
-                            )}
+                        </div>
+                        <div className="grid grid-cols-[minmax(0,2fr)_minmax(4.25rem,1fr)_minmax(4.25rem,1.2fr)] gap-2 sm:gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              City <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={newContact.city}
+                              onChange={(e) => setNewContact({ ...newContact, city: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
                           </div>
-                        </label>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              State <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={newContact.state}
+                              onChange={(e) => setNewContact({ ...newContact, state: e.target.value })}
+                              maxLength={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">ZIP <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={newContact.zip_code}
+                              onChange={(e) => setNewContact({ ...newContact, zip_code: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                              required={showNewContactForm && !selectedContact}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {showContactEdit && selectedContactData && (
+                      <div className="mt-3 space-y-3 rounded-lg border border-subtle bg-surface p-3 sm:p-4">
+                        <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Customer Details</h3>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">First Name <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={contactEdits.first_name}
+                              onChange={(e) => setContactEdits({ ...contactEdits, first_name: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={contactEdits.last_name}
+                              onChange={(e) => setContactEdits({ ...contactEdits, last_name: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <SecurityFieldVisibility internal /></label>
+                          <input
+                            type="text"
+                            value={contactEdits.company_name}
+                            onChange={(e) => setContactEdits({ ...contactEdits, company_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email <SecurityFieldVisibility /></label>
+                            <input
+                              type="email"
+                              value={contactEdits.email}
+                              onChange={(e) => setContactEdits({ ...contactEdits, email: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone <SecurityFieldVisibility /></label>
+                            <input
+                              type="tel"
+                              value={contactEdits.phone}
+                              onChange={(e) => setContactEdits({ ...contactEdits, phone: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="[&>div]:border-none [&>div]:p-0">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Street Address <SecurityFieldVisibility /></label>
+                          <AddressAutocomplete
+                            value={contactEdits.street_address}
+                            onChange={(address, components) => {
+                              try {
+                                if (components) {
+                                  setContactEdits(prev => ({
+                                    ...prev,
+                                    street_address: address,
+                                    city: components.city || prev.city,
+                                    state: components.state || prev.state,
+                                    zip_code: components.zip || prev.zip_code
+                                  }));
+                                } else {
+                                  setContactEdits(prev => ({ ...prev, street_address: address }));
+                                }
+                              } catch (error) {
+                                console.error('Error updating contact address:', error);
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-[minmax(0,2fr)_minmax(4.25rem,1fr)_minmax(4.25rem,1.2fr)] gap-2 sm:gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">City <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={contactEdits.city}
+                              onChange={(e) => setContactEdits({ ...contactEdits, city: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">State <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={contactEdits.state}
+                              onChange={(e) => setContactEdits({ ...contactEdits, state: e.target.value })}
+                              maxLength={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">ZIP <SecurityFieldVisibility /></label>
+                            <input
+                              type="text"
+                              value={contactEdits.zip_code}
+                              onChange={(e) => setContactEdits({ ...contactEdits, zip_code: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sales Order (Optional) <SecurityFieldVisibility internal /></label>
+                    <select
+                      value={selectedSalesOrder}
+                      onChange={(e) => setSelectedSalesOrder(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">None - No linked sales order</option>
+                      {filteredSalesOrders.map((order) => (
+                        <option key={order.id} value={order.id}>
+                          {order.order_number}
+                        </option>
                       ))}
+                    </select>
+                    {selectedContact && filteredSalesOrders.length === 0 && (
+                      <p className="mt-2 text-sm text-gray-500">
+                        No sales orders found for this customer
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Account Classification */}
+                  <div className="space-y-3 rounded-lg border border-subtle bg-surface p-3 sm:p-4">
+                    <h3 className="text-sm font-semibold text-gray-800">Account Classification</h3>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Account Type <SecurityFieldVisibility internal /></label>
+                      <div className="flex gap-3">
+                        {(['residential', 'commercial'] as const).map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setAccountType(type)}
+                            aria-pressed={accountType === type}
+                            className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-medium capitalize transition-all ${
+                              accountType === type
+                                ? 'border-brand bg-infoSoft text-brand'
+                                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                            }`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
-              {selectedServices.length > 0 && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-700">
-                      Calculated Monthly Price ({selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''})
-                    </span>
-                    <span className="text-lg font-bold text-blue-700">
-                      ${calculatedMonthlyPrice.toFixed(2)}/mo
-                    </span>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Monitoring <SecurityFieldVisibility internal /></label>
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isMonitoring}
+                          onChange={(e) => setIsMonitoring(e.target.checked)}
+                          className="mt-1 h-4 w-4 shrink-0 rounded text-blue-600"
+                        />
+                        <span className="text-sm text-gray-700">Send alarms to a monitoring center</span>
+                      </label>
+                      {isMonitoring && (
+                        <div className="mt-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Monitoring Account Number <span className="text-gray-400 font-normal">(Optional)</span> <SecurityFieldVisibility internal /></label>
+                          <input
+                            type="text"
+                            value={monitoringAccountNumber}
+                            onChange={(e) => setMonitoringAccountNumber(e.target.value)}
+                            placeholder="e.g. 12345"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Account Services <SecurityFieldVisibility internal /></label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: 'dial_up', label: 'Dial-Up' },
+                          { value: 'telguard', label: 'Telguard' },
+                          { value: 'alarmnet', label: 'Alarmnet' },
+                          { value: 'alarm_com', label: 'Alarm.com' },
+                          { value: 'video_monitoring', label: 'Video / CCTV' },
+                          { value: 'access_control', label: 'Access Control' },
+                        ].map(svc => (
+                          <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={accountServices.includes(svc.value)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setAccountServices(prev => [...prev, svc.value]);
+                                } else {
+                                  setAccountServices(prev => prev.filter(s => s !== svc.value));
+                                }
+                              }}
+                              className="h-4 w-4 shrink-0 rounded text-blue-600"
+                            />
+                            <span className="text-sm text-gray-700">{svc.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Installation Details */}
+                  <div className="space-y-3 rounded-lg border border-subtle bg-surface p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Wrench className="w-4 h-4 text-amber-600" />
+                      <h3 className="text-xs sm:text-sm font-semibold text-gray-800">Installation Details</h3>
+                      <span className="text-xs text-amber-600">Optional</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Installation Date <SecurityFieldVisibility internal /></label>
+                      <input
+                        type="date"
+                        value={installationDate}
+                        onChange={(e) => setInstallationDate(e.target.value)}
+                        className="w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {accountServices.filter(s => ['dial_up', 'telguard', 'alarmnet', 'alarm_com'].includes(s)).length > 0 && (
+                      <div className="space-y-2">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700">Service Account Numbers <SecurityFieldVisibility internal /></label>
+                        {accountServices.includes('dial_up') && (
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Monitoring Account Number</label>
+                            <input
+                              type="text"
+                              value={serviceAccountNumbers.dial_up || ''}
+                              onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, dial_up: e.target.value }))}
+                              placeholder="e.g. 12345"
+                              className="w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                        {accountServices.includes('telguard') && (
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Telguard Account Number</label>
+                            <input
+                              type="text"
+                              value={serviceAccountNumbers.telguard || ''}
+                              onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, telguard: e.target.value }))}
+                              placeholder="e.g. TG67890"
+                              className="w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                        {accountServices.includes('alarmnet') && (
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Alarmnet Account Number</label>
+                            <input
+                              type="text"
+                              value={serviceAccountNumbers.alarmnet || ''}
+                              onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarmnet: e.target.value }))}
+                              placeholder="e.g. AN111"
+                              className="w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                        {accountServices.includes('alarm_com') && (
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Alarm.com Account Number</label>
+                            <input
+                              type="text"
+                              value={serviceAccountNumbers.alarm_com || ''}
+                              onChange={(e) => setServiceAccountNumbers(prev => ({ ...prev, alarm_com: e.target.value }))}
+                              placeholder="e.g. AC222"
+                              className="w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
+                <div className="min-w-0 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Agreement Term <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
+                    <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                      {SECURITY_INITIAL_TERMS.map((months) => (
+                        <button
+                          key={months}
+                          type="button"
+                          onClick={() => setTermMonths(months)}
+                          aria-pressed={termMonths === months}
+                          className={`min-h-10 whitespace-nowrap rounded-lg border px-1 py-1.5 text-center text-sm transition-colors ${
+                            termMonths === months
+                              ? 'border-brand bg-infoSoft text-brand font-semibold'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                          }`}
+                        >
+                          {months}<span className="sr-only"> months</span>
+                          <span aria-hidden="true" className="ml-0.5 text-xs">mo</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Price Override (Optional) <SecurityFieldVisibility /></label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={priceOverride}
-                  onChange={(e) => setPriceOverride(e.target.value)}
-                  placeholder="Leave blank to use calculated price"
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              {priceOverride && (
-                <p className="mt-2 text-sm text-amber-600">
-                  Override active: ${parseFloat(priceOverride).toFixed(2)}/mo will be used instead of calculated price
-                </p>
-              )}
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-gray-900">Final Monthly Price <SecurityFieldVisibility /></span>
-                  <span className="text-xl font-bold text-green-700">
-                    ${finalMonthlyPrice.toFixed(2)}/mo
-                  </span>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Renewal Term <SecurityFieldVisibility /></label>
+                    <p className="text-sm text-gray-700">Automatically renews month-to-month after the initial term. Cancellation after the initial term requires 30 days' notice.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Monitoring Services
+                    </label>
+                    <p className="text-xs text-gray-600 mb-2">Service names: Customer-visible. Individual prices and catalog descriptions: Internal only.</p>
+                    <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+                      {monitoringServices.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500">
+                          No monitoring services available
+                        </div>
+                      ) : (
+                        Object.entries(
+                          monitoringServices.reduce((acc, service) => {
+                            const category = service.category || 'Other';
+                            if (!acc[category]) acc[category] = [];
+                            acc[category].push(service);
+                            return acc;
+                          }, {} as Record<string, MonitoringService[]>)
+                        ).map(([category, services]) => (
+                          <div key={category}>
+                            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700">
+                              {category}
+                            </div>
+                            {services.map((service) => (
+                              <label
+                                key={service.id}
+                                className={`flex items-start gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                                  selectedServices.includes(service.id) ? 'bg-infoSoft' : ''
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedServices.includes(service.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedServices([...selectedServices, service.id]);
+                                    } else {
+                                      setSelectedServices(selectedServices.filter(id => id !== service.id));
+                                    }
+                                  }}
+                                  className="mt-1"
+                                />
+                                <div className="min-w-0 flex-1 break-words">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="font-medium text-gray-900">{service.name}</div>
+                                    <div className="text-sm font-semibold text-blue-600">
+                                      ${service.monthly_price.toFixed(2)}/mo <SecurityFieldVisibility internal />
+                                    </div>
+                                  </div>
+                                  {service.description && (
+                                    <div className="text-sm text-gray-600 mt-1">{service.description}</div>
+                                  )}
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {selectedServices.length > 0 && (
+                      <div className="mt-3 p-3 bg-infoSoft border border-subtle rounded-lg">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span className="font-medium text-gray-700">
+                            Calculated Monthly Price ({selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''})
+                          </span>
+                          <span className="text-lg font-bold text-blue-700">
+                            ${calculatedMonthlyPrice.toFixed(2)}/mo
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Price Override (Optional) <SecurityFieldVisibility /></label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={priceOverride}
+                        onChange={(e) => setPriceOverride(e.target.value)}
+                        placeholder="Leave blank to use calculated price"
+                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    {priceOverride && (
+                      <p className="mt-2 text-sm text-amber-600">
+                        Override active: ${parseFloat(priceOverride).toFixed(2)}/mo will be used instead of calculated price
+                      </p>
+                    )}
+                    <div className="mt-3 p-3 bg-successSoft border border-subtle rounded-lg">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-gray-900">Final Monthly Price <SecurityFieldVisibility /></span>
+                        <span className="text-xl font-bold text-green-700">
+                          ${finalMonthlyPrice.toFixed(2)}/mo
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Notes (Optional) <SecurityFieldVisibility internal /></label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add any notes about this agreement..."
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Override (Optional) <SecurityFieldVisibility internal /></label>
+                    <input
+                      type="email"
+                      value={emailOverride}
+                      onChange={(e) => setEmailOverride(e.target.value)}
+                      placeholder="Send invitation to a different email address..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Delivery address only; this override is not displayed on the customer form. Leave blank to use the customer's email on file.</p>
+                  </div>
                 </div>
               </div>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes (Optional) <SecurityFieldVisibility internal /></label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes about this agreement..."
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Override (Optional) <SecurityFieldVisibility internal /></label>
-              <input
-                type="email"
-                value={emailOverride}
-                onChange={(e) => setEmailOverride(e.target.value)}
-                placeholder="Send invitation to a different email address..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">Delivery address only; this override is not displayed on the customer form. Leave blank to use the customer's email on file.</p>
-            </div>
-
-            <div className="sticky bottom-0 z-10 flex gap-3 py-3 px-1 bg-white border-t border-gray-200 shadow-[0_-6px_14px_-12px_rgba(0,0,0,0.4)]">
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-subtle bg-white px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:gap-3 sm:px-5">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
+                className="shrink-0 px-3 py-2 text-sm sm:px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="min-w-0 px-3 py-2 text-sm sm:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Creating...' : onPaperCreated ? 'Continue to Onboarding Form' : 'Create Agreement'}
               </button>
