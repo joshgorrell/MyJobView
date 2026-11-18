@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../theme/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -43,6 +44,7 @@ interface BreakEntry {
 }
 
 export default function TimeHistoryScreen() {
+  const themedStyles = useThemedStyles(styles);
   const [usesDailyClock, setUsesDailyClock] = useState<boolean | null>(null);
   const { profile } = useAuth();
   const { isConnected } = useOffline();
@@ -157,14 +159,14 @@ export default function TimeHistoryScreen() {
       contentStyle={{ paddingTop: 0 }}
     >
       {/* Summary Card */}
-      <Card style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>This Week</Text>
-        <Text style={styles.summaryValue}>{weekTotal.toFixed(2)}h</Text>
-        <Text style={styles.summarySubtext}>Total hours worked</Text>
+      <Card style={themedStyles.summaryCard}>
+        <Text style={themedStyles.summaryLabel}>This Week</Text>
+        <Text style={themedStyles.summaryValue}>{weekTotal.toFixed(2)}h</Text>
+        <Text style={themedStyles.summarySubtext}>Total hours worked</Text>
       </Card>
 
       {/* Time Entries */}
-      <Text style={styles.sectionTitle}>RECENT SHIFTS</Text>
+      <Text style={themedStyles.sectionTitle}>RECENT SHIFTS</Text>
 
       {entries.map((entry) => {
         const isExpanded = expandedEntry === entry.id;
@@ -176,53 +178,53 @@ export default function TimeHistoryScreen() {
         }, 0);
 
         return (
-          <View key={entry.id} style={styles.entrySection}>
+          <View key={entry.id} style={themedStyles.entrySection}>
             <TouchableOpacity
-              style={styles.entryHeader}
+              style={themedStyles.entryHeader}
               onPress={() => setExpandedEntry(isExpanded ? null : entry.id)}
               activeOpacity={0.7}
             >
-              <View style={styles.entryHeaderLeft}>
-                <Text style={styles.entryDate}>{formatDate(entry.clock_in)}</Text>
-                <Text style={styles.entryTimeRange}>
+              <View style={themedStyles.entryHeaderLeft}>
+                <Text style={themedStyles.entryDate}>{formatDate(entry.clock_in)}</Text>
+                <Text style={themedStyles.entryTimeRange}>
                   {formatTime(entry.clock_in)}
                   {entry.clock_out ? ` - ${formatTime(entry.clock_out)}` : ' - Active'}
                 </Text>
               </View>
-              <View style={styles.entryHeaderRight}>
-                <Text style={styles.entryHours}>{entry.total_hours ? entry.total_hours.toFixed(2) : '0.00'}h</Text>
+              <View style={themedStyles.entryHeaderRight}>
+                <Text style={themedStyles.entryHours}>{entry.total_hours ? entry.total_hours.toFixed(2) : '0.00'}h</Text>
                 {isActive ? (
                   <Badge label="Active" variant="green" />
                 ) : (
                   <Badge label="Completed" variant="gray" />
                 )}
-                <View style={[styles.chevron, isExpanded && styles.chevronExpanded]} />
+                <View style={[themedStyles.chevron, isExpanded && themedStyles.chevronExpanded]} />
               </View>
             </TouchableOpacity>
 
             {isExpanded && (
-              <Card style={styles.entryDetails}>
+              <Card style={themedStyles.entryDetails}>
                 {totalBreakMinutes > 0 && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Break Time</Text>
-                    <Text style={styles.detailValue}>{getDurationText(totalBreakMinutes)}</Text>
+                  <View style={themedStyles.detailRow}>
+                    <Text style={themedStyles.detailLabel}>Break Time</Text>
+                    <Text style={themedStyles.detailValue}>{getDurationText(totalBreakMinutes)}</Text>
                   </View>
                 )}
                 {entry.notes && (
-                  <View style={styles.notesSection}>
-                    <Text style={styles.detailLabel}>Notes</Text>
-                    <Text style={styles.notesText}>{entry.notes}</Text>
+                  <View style={themedStyles.notesSection}>
+                    <Text style={themedStyles.detailLabel}>Notes</Text>
+                    <Text style={themedStyles.notesText}>{entry.notes}</Text>
                   </View>
                 )}
                 {entry.clock_in_latitude != null && (
-                  <View style={styles.gpsSection}>
-                    <Text style={styles.detailLabel}>GPS</Text>
-                    <Text style={styles.gpsText}>
+                  <View style={themedStyles.gpsSection}>
+                    <Text style={themedStyles.detailLabel}>GPS</Text>
+                    <Text style={themedStyles.gpsText}>
                       In: {entry.clock_in_latitude.toFixed(4)}, {entry.clock_in_longitude?.toFixed(4)}
                       {entry.clock_in_gps_accuracy ? ` (±${entry.clock_in_gps_accuracy.toFixed(0)}m)` : ''}
                     </Text>
                     {entry.clock_out_latitude != null && (
-                      <Text style={styles.gpsText}>
+                      <Text style={themedStyles.gpsText}>
                         Out: {entry.clock_out_latitude.toFixed(4)}, {entry.clock_out_longitude?.toFixed(4)}
                       </Text>
                     )}
@@ -231,17 +233,17 @@ export default function TimeHistoryScreen() {
 
                 {/* Breaks list */}
                 {entryBreaks.length > 0 && (
-                  <View style={styles.breaksSection}>
-                    <Text style={styles.detailLabel}>Break Details</Text>
+                  <View style={themedStyles.breaksSection}>
+                    <Text style={themedStyles.detailLabel}>Break Details</Text>
                     {entryBreaks.map((brk) => (
-                      <View key={brk.id} style={styles.breakDetailRow}>
-                        <Text style={styles.breakType}>{brk.break_type}</Text>
-                        <Text style={styles.breakTimeText}>
+                      <View key={brk.id} style={themedStyles.breakDetailRow}>
+                        <Text style={themedStyles.breakType}>{brk.break_type}</Text>
+                        <Text style={themedStyles.breakTimeText}>
                           {formatTime(brk.break_start)}
                           {brk.break_end ? ` - ${formatTime(brk.break_end)}` : ' - Active'}
                         </Text>
                         {brk.break_end && (
-                          <Text style={styles.breakDurationText}>
+                          <Text style={themedStyles.breakDurationText}>
                             {getDurationText(Math.floor((new Date(brk.break_end).getTime() - new Date(brk.break_start).getTime()) / 60000))}
                           </Text>
                         )}
@@ -251,7 +253,7 @@ export default function TimeHistoryScreen() {
                 )}
 
                 {!totalBreakMinutes && !entry.notes && entry.clock_in_latitude == null && (
-                  <Text style={styles.noDetails}>No additional details for this shift</Text>
+                  <Text style={themedStyles.noDetails}>No additional details for this shift</Text>
                 )}
               </Card>
             )}
@@ -259,8 +261,8 @@ export default function TimeHistoryScreen() {
         );
       })}
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Showing last {entries.length} shifts</Text>
+      <View style={themedStyles.footer}>
+        <Text style={themedStyles.footerText}>Showing last {entries.length} shifts</Text>
       </View>
     </ScreenContainer>
   );

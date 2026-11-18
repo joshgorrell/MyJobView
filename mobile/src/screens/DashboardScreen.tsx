@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../theme/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -16,6 +17,7 @@ import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
 export default function DashboardScreen({ navigation }: any) {
+  const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const { isConnected, pendingSync } = useOffline();
   const { isTracking } = useLocation();
@@ -140,60 +142,60 @@ export default function DashboardScreen({ navigation }: any) {
   return (
     <ScreenContainer scroll>
       {/* Status Bar */}
-      <View style={styles.statusBar}>
-        <View style={styles.statusItem}>
-          <View style={[styles.statusDot, isConnected ? styles.online : styles.offline]} />
-          <Text style={styles.statusText}>{isConnected ? 'Online' : 'Offline'}</Text>
+      <View style={themedStyles.statusBar}>
+        <View style={themedStyles.statusItem}>
+          <View style={[themedStyles.statusDot, isConnected ? themedStyles.online : themedStyles.offline]} />
+          <Text style={themedStyles.statusText}>{isConnected ? 'Online' : 'Offline'}</Text>
         </View>
         {pendingSync > 0 && (
-          <View style={styles.statusItem}>
-            <Text style={styles.syncText}>{pendingSync} pending sync</Text>
+          <View style={themedStyles.statusItem}>
+            <Text style={themedStyles.syncText}>{pendingSync} pending sync</Text>
           </View>
         )}
         {isTracking && (
-          <View style={styles.statusItem}>
-            <View style={styles.trackingDot} />
-            <Text style={styles.statusText}>GPS Active</Text>
+          <View style={themedStyles.statusItem}>
+            <View style={themedStyles.trackingDot} />
+            <Text style={themedStyles.statusText}>GPS Active</Text>
           </View>
         )}
       </View>
 
       {/* Compact identity header */}
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.name}>{profile?.full_name || profile?.email}</Text>
+      <View style={themedStyles.header}>
+        <View style={themedStyles.headerText}>
+          <Text style={themedStyles.name}>{profile?.full_name || profile?.email}</Text>
         </View>
       </View>
 
       {/* Clock Status Hero Card */}
       <TouchableOpacity
-        style={styles.heroCard}
+        style={themedStyles.heroCard}
         activeOpacity={0.85}
         onPress={() => navigation.navigate('TimeClock')}
       >
-        <View style={styles.heroLeft}>
-          <Text style={styles.heroLabel}>{usesDailyClock === false ? 'JOB TIME STATUS' : isClockedIn ? 'CURRENT SHIFT' : 'CLOCK STATUS'}</Text>
-          <Text style={styles.heroValue}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No active job') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
+        <View style={themedStyles.heroLeft}>
+          <Text style={themedStyles.heroLabel}>{usesDailyClock === false ? 'JOB TIME STATUS' : isClockedIn ? 'CURRENT SHIFT' : 'CLOCK STATUS'}</Text>
+          <Text style={themedStyles.heroValue}>{usesDailyClock === false ? (jobTimerActive ? getElapsedTime() : 'No active job') : isClockedIn ? getElapsedTime() : 'Not Clocked In'}</Text>
           {(isClockedIn || jobTimerActive) && clockInTime && (
-            <Text style={styles.heroSubtext}>Started at {formatTime(clockInTime)}</Text>
+            <Text style={themedStyles.heroSubtext}>Started at {formatTime(clockInTime)}</Text>
           )}
         </View>
-        <View style={[styles.heroButton, { backgroundColor: (isClockedIn || jobTimerActive) ? Colors.green[500] : Colors.primary[600] }]}>
-          <Text style={styles.heroButtonText}>{usesDailyClock === false ? 'MY TIME' : isClockedIn ? 'VIEW' : 'START'}</Text>
+        <View style={[themedStyles.heroButton, { backgroundColor: (isClockedIn || jobTimerActive) ? Colors.green[500] : Colors.primary[600] }]}>
+          <Text style={themedStyles.heroButtonText}>{usesDailyClock === false ? 'MY TIME' : isClockedIn ? 'VIEW' : 'START'}</Text>
         </View>
       </TouchableOpacity>
 
       {/* Quick Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{loadingStats ? '--' : hoursToday}</Text>
-          <Text style={styles.statUnit}>hrs</Text>
-          <Text style={styles.statLabel}>{usesDailyClock === false ? 'Recorded Today' : isClockedIn ? 'Elapsed Today' : 'Today'}</Text>
+      <View style={themedStyles.statsContainer}>
+        <View style={themedStyles.statCard}>
+          <Text style={themedStyles.statValue}>{loadingStats ? '--' : hoursToday}</Text>
+          <Text style={themedStyles.statUnit}>hrs</Text>
+          <Text style={themedStyles.statLabel}>{usesDailyClock === false ? 'Recorded Today' : isClockedIn ? 'Elapsed Today' : 'Today'}</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{loadingStats ? '--' : String(jobsToday)}</Text>
-          <Text style={styles.statUnit}>jobs</Text>
-          <Text style={styles.statLabel}>Today</Text>
+        <View style={themedStyles.statCard}>
+          <Text style={themedStyles.statValue}>{loadingStats ? '--' : String(jobsToday)}</Text>
+          <Text style={themedStyles.statUnit}>jobs</Text>
+          <Text style={themedStyles.statLabel}>Today</Text>
         </View>
       </View>
 

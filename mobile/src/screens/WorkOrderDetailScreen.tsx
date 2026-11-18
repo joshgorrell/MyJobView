@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -17,6 +18,7 @@ import { Badge, Card, InfoRow, Divider } from '../components/UI';
 import { ScreenContainer } from '../components/ScreenContainer';
 
 export default function WorkOrderDetailScreen({ route, navigation }: any) {
+  const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
@@ -108,7 +110,7 @@ export default function WorkOrderDetailScreen({ route, navigation }: any) {
   if (!workOrder) {
     return (
       <ScreenContainer center>
-        <Text style={styles.notFoundText}>Work order not found</Text>
+        <Text style={themedStyles.notFoundText}>Work order not found</Text>
       </ScreenContainer>
     );
   }
@@ -119,29 +121,29 @@ export default function WorkOrderDetailScreen({ route, navigation }: any) {
   return (
     <ScreenContainer scroll>
       {/* Header Card */}
-      <View style={styles.headerCard}>
-        <View style={styles.headerTop}>
+      <View style={themedStyles.headerCard}>
+        <View style={themedStyles.headerTop}>
           <View>
-            <Text style={styles.woNumber}>{wo.work_order_number}</Text>
+            <Text style={themedStyles.woNumber}>{wo.work_order_number}</Text>
             <Badge label={wo.work_order_type} variant="blue" />
           </View>
           <Badge label={statusLabel} variant={getStatusVariant(wo.status)} />
         </View>
-        <Text style={styles.customerName}>{wo.customer_name}</Text>
-        {wo.description ? <Text style={styles.description}>{wo.description}</Text> : null}
+        <Text style={themedStyles.customerName}>{wo.customer_name}</Text>
+        {wo.description ? <Text style={themedStyles.description}>{wo.description}</Text> : null}
       </View>
 
       {/* Job Time Card */}
       {jobTime && (
-        <Card style={styles.timeCard}>
-          <Text style={styles.cardTitle}>Job Time</Text>
+        <Card style={themedStyles.timeCard}>
+          <Text style={themedStyles.cardTitle}>Job Time</Text>
           {jobTime.active ? (
-            <View style={styles.activeJobSection}>
-              <View style={styles.activeJobBadge}>
-                <View style={styles.activeDot} />
-                <Text style={styles.activeJobText}>Active</Text>
+            <View style={themedStyles.activeJobSection}>
+              <View style={themedStyles.activeJobBadge}>
+                <View style={themedStyles.activeDot} />
+                <Text style={themedStyles.activeJobText}>Active</Text>
               </View>
-              <Text style={styles.activeJobTime}>
+              <Text style={themedStyles.activeJobTime}>
                 Started at {jobTime.clockIn ? formatTime(jobTime.clockIn) : '--'}
               </Text>
             </View>
@@ -152,28 +154,28 @@ export default function WorkOrderDetailScreen({ route, navigation }: any) {
       )}
 
       {/* Job Details */}
-      <Card style={styles.detailsCard}>
-        <Text style={styles.cardTitle}>Details</Text>
+      <Card style={themedStyles.detailsCard}>
+        <Text style={themedStyles.cardTitle}>Details</Text>
         {wo.scheduled_date ? <InfoRow label="Scheduled" value={formatDate(wo.scheduled_date)} /> : null}
         {wo.address ? (
-          <View style={styles.addressSection}>
-            <Text style={styles.addressLabel}>Job Site Address</Text>
-            <Text style={styles.addressValue}>{wo.address}</Text>
+          <View style={themedStyles.addressSection}>
+            <Text style={themedStyles.addressLabel}>Job Site Address</Text>
+            <Text style={themedStyles.addressValue}>{wo.address}</Text>
           </View>
         ) : null}
         {wo.work_order_type ? <InfoRow label="Type" value={wo.work_order_type} /> : null}
       </Card>
 
       {/* Actions */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.primaryButton} onPress={open} disabled={opening} activeOpacity={0.85}>
+      <View style={themedStyles.actionsContainer}>
+        <TouchableOpacity style={themedStyles.primaryButton} onPress={open} disabled={opening} activeOpacity={0.85}>
           {opening ? (
             <ActivityIndicator color={Colors.white} size="small" />
           ) : (
-            <Text style={styles.primaryButtonText}>Open Full Work Order</Text>
+            <Text style={themedStyles.primaryButtonText}>Open Full Work Order</Text>
           )}
         </TouchableOpacity>
-        <Text style={styles.actionHint}>
+        <Text style={themedStyles.actionHint}>
           Opens the complete work order in your browser for job time, parts, notes, photos, and completion.
         </Text>
       </View>

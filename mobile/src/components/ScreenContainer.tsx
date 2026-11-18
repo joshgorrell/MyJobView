@@ -1,3 +1,4 @@
+import { useTheme, themeColor } from '../theme/ThemeContext';
 import React from 'react';
 import { View, ScrollView, ViewStyle, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,10 +28,11 @@ export function ScreenContainer({
   center = false,
 }: ScreenContainerProps) {
   const { insets, contentMaxWidth } = useTabletAwareStyles();
+  const { dark } = useTheme();
 
   const baseStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: Colors.gray[100],
+    backgroundColor: themeColor(Colors.gray[100], dark),
     paddingTop: insets.top,
     paddingBottom: insets.bottom,
   };
@@ -69,9 +71,10 @@ interface SafeHeaderProps {
 
 export function SafeHeader({ children, style }: SafeHeaderProps) {
   const { insets, contentMaxWidth } = useTabletAwareStyles();
+  const { dark } = useTheme();
 
   return (
-    <View style={[safeHeaderStyles.outer, { paddingTop: insets.top }]}>
+    <View style={[safeHeaderStyles.outer, { paddingTop: insets.top, backgroundColor: themeColor(Colors.white, dark), borderBottomColor: themeColor(Colors.gray[200], dark) }]}>
       <View style={[safeHeaderStyles.inner, { maxWidth: contentMaxWidth }, style]}>
         {children}
       </View>

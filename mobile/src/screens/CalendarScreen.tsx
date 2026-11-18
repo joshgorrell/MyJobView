@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../theme/ThemeContext';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,6 +27,7 @@ const formatClock = (s: string | null) => {
 };
 
 export default function CalendarScreen({ navigation }: any) {
+  const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const { isConnected } = useOffline();
   const [mode, setMode] = useState<Mode>('week');
@@ -210,59 +212,59 @@ export default function CalendarScreen({ navigation }: any) {
 
   return (
     <ScreenContainer contentStyle={{ flex: 1 }}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}
+      <ScrollView style={themedStyles.scroll} contentContainerStyle={themedStyles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}>
-        <View style={styles.header}>
-          <Text style={styles.title}>My Calendar</Text>
-          <TouchableOpacity accessibilityRole="button" onPress={() => setSelected(workDate(new Date(), timezone))} style={styles.today}><Text style={styles.todayText}>Today</Text></TouchableOpacity>
+        <View style={themedStyles.header}>
+          <Text style={themedStyles.title}>My Calendar</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={() => setSelected(workDate(new Date(), timezone))} style={themedStyles.today}><Text style={themedStyles.todayText}>Today</Text></TouchableOpacity>
         </View>
-        <View style={styles.modeRow}>
+        <View style={themedStyles.modeRow}>
           {(['day', 'week', 'month', 'agenda'] as Mode[]).map(value =>
             <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: mode === value }}
-              style={[styles.mode, mode === value && styles.modeActive]} onPress={() => setMode(value)}>
-              <Text style={[styles.modeText, mode === value && styles.modeTextActive]}>{value[0].toUpperCase() + value.slice(1)}</Text>
+              style={[themedStyles.mode, mode === value && themedStyles.modeActive]} onPress={() => setMode(value)}>
+              <Text style={[themedStyles.modeText, mode === value && themedStyles.modeTextActive]}>{value[0].toUpperCase() + value.slice(1)}</Text>
             </TouchableOpacity>)}
         </View>
-        <View style={styles.period}>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous period" style={styles.arrow} onPress={() => move(-1)}><Text style={styles.arrowText}>‹</Text></TouchableOpacity>
-          <Text style={styles.periodText}>{date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next period" style={styles.arrow} onPress={() => move(1)}><Text style={styles.arrowText}>›</Text></TouchableOpacity>
+        <View style={themedStyles.period}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous period" style={themedStyles.arrow} onPress={() => move(-1)}><Text style={themedStyles.arrowText}>‹</Text></TouchableOpacity>
+          <Text style={themedStyles.periodText}>{date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next period" style={themedStyles.arrow} onPress={() => move(1)}><Text style={themedStyles.arrowText}>›</Text></TouchableOpacity>
         </View>
-        {mode !== 'day' && mode !== 'agenda' && <View style={styles.grid}>
-          {['S','M','T','W','T','F','S'].map((name, i) => <Text key={i} style={styles.weekday}>{name}</Text>)}
+        {mode !== 'day' && mode !== 'agenda' && <View style={themedStyles.grid}>
+          {['S','M','T','W','T','F','S'].map((name, i) => <Text key={i} style={themedStyles.weekday}>{name}</Text>)}
           {visibleDays.map(day => {
             const dateKey = key(day), chosen = dateKey === selected;
             return <TouchableOpacity key={dateKey} accessibilityRole="button"
               accessibilityLabel={day.toDateString() + (eventDates.has(dateKey) ? ', scheduled events' : '')}
               accessibilityState={{ selected: chosen }}
-              onPress={() => setSelected(dateKey)} style={[styles.day, chosen && styles.dayActive]}>
-              <Text style={[styles.dayText, day.getMonth() !== date.getMonth() && mode === 'month' && styles.muted, chosen && styles.dayTextActive]}>{day.getDate()}</Text>
-              {eventDates.has(dateKey) && <View style={[styles.dot, chosen && styles.dotActive]} />}
+              onPress={() => setSelected(dateKey)} style={[themedStyles.day, chosen && themedStyles.dayActive]}>
+              <Text style={[themedStyles.dayText, day.getMonth() !== date.getMonth() && mode === 'month' && themedStyles.muted, chosen && themedStyles.dayTextActive]}>{day.getDate()}</Text>
+              {eventDates.has(dateKey) && <View style={[themedStyles.dot, chosen && themedStyles.dotActive]} />}
             </TouchableOpacity>;
           })}
         </View>}
-        <Text style={styles.dayHeading}>{mode === 'agenda' ? 'Upcoming 30 days' : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
-        {!isConnected && <Text style={styles.notice}>{loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd
+        <Text style={themedStyles.dayHeading}>{mode === 'agenda' ? 'Upcoming 30 days' : date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
+        {!isConnected && <Text style={themedStyles.notice}>{loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd
           ? 'Offline — saved schedule from ' + (cachedAt ? new Date(cachedAt).toLocaleString() : 'this session') + '. Changes may not be shown.'
           : 'Offline — no saved schedule for this period.'}</Text>}
-        {isConnected && cachedAt && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && <Text style={styles.notice}>Showing saved schedule from {new Date(cachedAt).toLocaleString()} while refreshing.</Text>}
-        {!!error && <Text style={styles.error}>{error}</Text>}
+        {isConnected && cachedAt && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && <Text style={themedStyles.notice}>Showing saved schedule from {new Date(cachedAt).toLocaleString()} while refreshing.</Text>}
+        {!!error && <Text style={themedStyles.error}>{error}</Text>}
         {loading && <ActivityIndicator color={Colors.primary[600]} />}
-        {!loading && !error && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>Nothing scheduled for this period.</Text>}
-        {!loading && !!error && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={styles.empty}>No events were returned from the available calendar sources.</Text>}
+        {!loading && !error && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={themedStyles.empty}>Nothing scheduled for this period.</Text>}
+        {!loading && !!error && loadedRange === (profile?.id || '') + ':' + rangeStart + ':' + rangeEnd && selectedEvents.length === 0 && <Text style={themedStyles.empty}>No events were returned from the available calendar sources.</Text>}
         {selectedEvents.map(event =>
           <TouchableOpacity key={event.id} accessibilityRole="button"
             disabled={!event.workOrderId}
             onPress={() => event.workOrderId && navigation.navigate('WorkOrderDetail', { workOrderId: event.workOrderId })}
-            style={styles.event}>
-            <View style={[styles.eventStripe, { backgroundColor: event.kind === 'job' ? Colors.primary[600] : event.kind === 'appointment' ? '#8b5cf6' : event.kind === 'time_off' ? Colors.gray[400] : Colors.amber[500] }]} />
-            <View style={styles.eventContent}>
-              <Text style={styles.eventTime}>{mode === 'agenda' ? fromKey(event.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' : ''}{formatClock(event.start)}{event.end ? ` – ${formatClock(event.end)}` : ''}</Text>
-              <Text style={styles.eventTitle}>{event.title}</Text>
-              <Text style={styles.eventSubtitle}>{event.subtitle}</Text>
+            style={themedStyles.event}>
+            <View style={[themedStyles.eventStripe, { backgroundColor: event.kind === 'job' ? Colors.primary[600] : event.kind === 'appointment' ? '#8b5cf6' : event.kind === 'time_off' ? Colors.gray[400] : Colors.amber[500] }]} />
+            <View style={themedStyles.eventContent}>
+              <Text style={themedStyles.eventTime}>{mode === 'agenda' ? fromKey(event.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' : ''}{formatClock(event.start)}{event.end ? ` – ${formatClock(event.end)}` : ''}</Text>
+              <Text style={themedStyles.eventTitle}>{event.title}</Text>
+              <Text style={themedStyles.eventSubtitle}>{event.subtitle}</Text>
             </View>
           </TouchableOpacity>)}
-        <Text style={styles.note}>Read-only schedule · Jobs, appointments, internal time and approved leave</Text>
+        <Text style={themedStyles.note}>Read-only schedule · Jobs, appointments, internal time and approved leave</Text>
       </ScrollView>
     </ScreenContainer>
   );
