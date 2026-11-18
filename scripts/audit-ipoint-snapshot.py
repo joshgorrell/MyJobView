@@ -35,6 +35,10 @@ def audit(path: Path, start: date) -> dict:
         if created < start:
             continue
         findings["rows_in_window"] += 1
+        amount_text = (row["total_Price"] or "").strip()
+        if not amount_text and (row.get("status") or "").strip().casefold() == "ready to invoice":
+            findings["excluded_ready_to_invoice_missing_amount"] += 1
+            continue
         identifier = (row["id_Serial"] or "").strip()
         if identifier:
             identifiers[identifier] += 1
@@ -42,7 +46,6 @@ def audit(path: Path, start: date) -> dict:
             findings["missing_source_id"] += 1
         if not (row["Sales Rep"] or "").strip():
             findings["missing_source_rep"] += 1
-        amount_text = (row["total_Price"] or "").strip()
         if not amount_text:
             findings["missing_amount"] += 1
             if (row.get("Sales Order Created TS") or "").strip():
