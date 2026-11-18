@@ -2,7 +2,7 @@ import { Shield, ArrowLeft } from 'lucide-react';
 
 export function PrivacyPolicy() {
   const companyName = "MyJobView";
-  const effectiveDate = "January 21, 2025";
+  const effectiveDate = "November 18, 2026";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -113,6 +113,25 @@ export function PrivacyPolicy() {
               <h3 className="text-lg font-semibold text-slate-800 mb-3 mt-4">With Your Consent</h3>
               <p className="text-slate-700 leading-relaxed">
                 We may share your information for any other purpose with your consent.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-slate-900 mb-4">SMS and Text Messaging</h2>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                MyJobView provides tools that allow participating businesses to communicate with their customers by text message. During the initial rollout, Electronic Life is the participating business. Electronic Life is the sender of its customer messages; MyJobView provides the software and delivery infrastructure.
+              </p>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                Depending on your choices and the services you request, messages may include technician on-the-way notices, appointment confirmations and reminders, service updates, review requests, and proposal follow-ups. Review requests, promotional messages, and other marketing-related texts require the appropriate separate consent where applicable. Providing a telephone number or accepting this Privacy Policy alone does not constitute consent to receive marketing texts. Consent is not a condition of purchase.
+              </p>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                When you opt in, we and Electronic Life may process your phone number, your consent choices and how and when they were collected, message content and metadata, delivery status, and opt-out requests to send messages, honor preferences, troubleshoot delivery, and maintain compliance. Authorized messaging providers, including Twilio and telecommunications carriers, process information as needed to deliver messages. Mobile information and SMS opt-in consent data will not be sold or shared with third parties or affiliates for their own marketing or promotional purposes. Sharing with messaging service providers solely to operate the requested messaging service is permitted.
+              </p>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                Message frequency varies with your appointments, service activity, and preferences. Message and data rates may apply. Reply STOP to a message to opt out of texts from that sender, or reply HELP for assistance. You may also contact Electronic Life directly to manage messaging preferences. Opting out of text messages does not prevent essential communications through other channels. We retain consent and suppression records as reasonably necessary to honor your choices and meet legal requirements.
+              </p>
+              <p className="text-slate-700 leading-relaxed">
+                Electronic Life customers should review the consent language presented at the point where they sign up for text messages. That opt-in notice identifies the sending business, applicable message categories, and relevant terms. This Privacy Policy is a disclosure, not a substitute for an affirmative opt-in.
               </p>
             </section>
 

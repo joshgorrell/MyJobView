@@ -2,7 +2,7 @@ import { FileText, ArrowLeft } from 'lucide-react';
 
 export function EULA() {
   const companyName = "MyJobView";
-  const effectiveDate = "January 21, 2025";
+  const effectiveDate = "November 18, 2026";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -67,6 +67,22 @@ export function EULA() {
               <h2 className="text-2xl font-semibold text-slate-900 mb-4">4. Data and Privacy</h2>
               <p className="text-slate-700 leading-relaxed">
                 Your use of the Software is also governed by our Privacy Policy, available at <a href="https://myjobview.com/privacy-policy" className="text-blue-600 hover:text-blue-700 underline">https://myjobview.com/privacy-policy</a>. By using the Software, you consent to the collection and use of your data as described in the Privacy Policy.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-slate-900 mb-4">Customer Text Messaging Terms</h2>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                MyJobView may enable business users to send SMS messages to customers. Initially, this feature is intended for Electronic Life only. Electronic Life, rather than MyJobView, is the sender of its customer text messages. Message categories may include appointment reminders, technician on-the-way notices, service updates, review requests, and proposal follow-ups, subject to the sender's approved messaging program and applicable consent.
+              </p>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                Customer enrollment in text messaging must be voluntary and supported by appropriate opt-in records. Consent to transactional or service-related messages does not automatically authorize promotional or marketing messages. Consent to receive marketing texts is not required as a condition of purchasing goods or services. Message frequency varies; message and data rates may apply.
+              </p>
+              <p className="text-slate-700 leading-relaxed mb-3">
+                Recipients can reply STOP to opt out of messages from the sender or HELP for assistance. A sender must honor opt-out requests and may not bypass suppression through a different sending workflow. Message delivery is subject to carrier availability and filtering; an API acceptance does not guarantee delivery. The sender is responsible for obtaining and maintaining any required registrations and approvals before enabling customer messages.
+              </p>
+              <p className="text-slate-700 leading-relaxed">
+                SMS enrollment and preferences are described in the applicable opt-in notice and our <a href="https://myjobview.com/privacy-policy" className="text-blue-600 hover:text-blue-700 underline">Privacy Policy</a>. These terms do not themselves enroll a recipient in text messaging.
               </p>
             </section>
 
