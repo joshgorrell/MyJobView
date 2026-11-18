@@ -200,21 +200,34 @@ const createDialog = staffPage.getByRole('dialog', { name: 'Create Security Agre
 const customerDetails = createDialog.getByRole('heading', { name: 'Customer Details' });
 const termLabel = createDialog.getByText('Agreement Term', { exact: false }).first();
 const createButton = createDialog.getByRole('button', { name: 'Create Agreement' });
+const accountClassification = createDialog.getByRole('heading', { name: 'Account Classification' });
+const monthlyTotal = createDialog.getByLabel('Monthly Total', { exact: true });
 const emailOverride = createDialog.getByPlaceholder('Send invitation to a different email address...');
-for (const viewport of [{ width: 1366, height: 768 }, { width: 1024, height: 600 }, { width: 320, height: 640 }]) {
+for (const viewport of [{ width: 1366, height: 768 }, { width: 1206, height: 784 }, { width: 1024, height: 600 }, { width: 320, height: 640 }]) {
   await staffPage.setViewportSize(viewport);
   await customerDetails.scrollIntoViewIfNeeded();
   const customerBox = await customerDetails.boundingBox();
   const termBox = await termLabel.boundingBox();
   assert.equal(termBox.x > customerBox.x, viewport.width >= 1024, 'Agreement fields sit beside customer details on desktop');
+  const accountBox = await accountClassification.boundingBox();
+  assert.equal(accountBox.x > customerBox.x + 100, viewport.width >= 1100, 'Wide desktop has a dedicated account column');
   const before = await createButton.boundingBox();
+  const totalBefore = await monthlyTotal.boundingBox();
   await emailOverride.scrollIntoViewIfNeeded();
   assert.deepEqual(await createButton.boundingBox(), before, 'Create stays in place as fields scroll');
+  assert.deepEqual(await monthlyTotal.boundingBox(), totalBefore, 'Monthly total stays in view as fields scroll');
+  assert.ok(totalBefore.y >= 0 && totalBefore.y + totalBefore.height <= viewport.height, 'Monthly total fits inside the viewport');
   const emailBox = await emailOverride.boundingBox();
   assert.ok(emailBox.y + emailBox.height <= before.y, 'Last field stays above the action bar');
   assert.ok(before.y + before.height <= viewport.height, 'Create stays inside the viewport');
   assert.ok(await createDialog.evaluate(el => el.scrollWidth <= el.clientWidth), 'Dialog fits the viewport width');
 }
+assert.equal((await monthlyTotal.textContent()).trim(), '$35.00/mo', 'Total includes selected services');
+const priceOverride = createDialog.getByPlaceholder('Leave blank to use calculated price');
+await priceOverride.fill('42.50');
+assert.equal((await monthlyTotal.textContent()).trim(), '$42.50/mo', 'Total reflects the override');
+await priceOverride.clear();
+assert.equal((await monthlyTotal.textContent()).trim(), '$35.00/mo', 'Clearing the override restores the calculated price');
 const customerPalette = await customerDetails.evaluate(el => ({
   background: getComputedStyle(el.parentElement).backgroundColor,
   text: getComputedStyle(el).color,
