@@ -11,7 +11,7 @@ function query(table:string){let single=false;const q:any=new Proxy({}, {get(_,k
 export const supabase={from:query,channel:()=>channel,removeChannel:async()=>{},auth:{getUser:async()=>({data:{user:{id:'me'}}}),getSession:async()=>({data:{session:{user:{id:'me'}}}})},rpc(name:string,args:any){(window as any).__calls.push({name,args});let data:any=[];
  if(name==='can_manage_pto')data=true;
  if(name==='preview_time_off')data=Array.from({length:5},(_,i)=>({date:`2027-01-0${4+i}`,hours:8,start:'08:00',end:'17:00'}));
- if(name==='submit_time_off'){balance.pending_hours=40;requests.push({id:'req',start_date:args.p_start,end_date:args.p_end,total_hours:40,status:'pending',reason:args.p_reason,review_notes:null,leave_days:null,policy,employee:{id:'me',full_name:'Josh'},submitted_at:new Date().toISOString()});data='req';}
+ if(name==='submit_classified_pto'){balance.pending_hours=40;requests.push({id:'req',start_date:args.p_start,end_date:args.p_end,total_hours:40,status:'pending',leave_category:args.p_category,reason:args.p_reason,review_notes:null,leave_days:null,policy,employee:{id:'me',full_name:'Josh'},submitted_at:new Date().toISOString()});data='req';}
  if(name==='cancel_time_off'){requests[0].status='cancelled';balance.pending_hours=0;}
  if(name==='team_time_off')data=[{request_id:'off',employee_id:'luis',employee_name:'Luis',leave_date:args.p_from,start_time:'08:00',end_time:'12:00',hours:4,full_day:false}];
  if(name==='team_work_schedule'){for(let day=new Date(args.p_from+'T12:00Z');day<=new Date(args.p_to+'T12:00Z');day.setUTCDate(day.getUTCDate()+1)){for(const [id,employee_name] of [['me','Josh'],['luis','Luis']])data.push({employee_id:id,employee_name,work_date:day.toISOString().slice(0,10),scheduled:day.getUTCDay()>0&&day.getUTCDay()<6});}}

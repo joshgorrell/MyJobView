@@ -32,6 +32,7 @@ interface PTOPolicy {
 
 interface PTORequest {
   leave_days: LeaveDay[] | null;
+  leave_category: "sick" | "vacation" | null;
   id: string;
   start_date: string;
   end_date: string;
@@ -82,6 +83,9 @@ export function PTOManagement() {
   const [policies, setPolicies] = useState<PTOPolicy[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("pending");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [setup, setSetup] = useState(false);
   const [employees, setEmployees] = useState<
@@ -190,7 +194,7 @@ export function PTOManagement() {
     return () => {
       channel.unsubscribe();
     };
-  }, [activeTab, filterStatus]);
+  }, [activeTab, filterStatus, filterCategory, filterFrom, filterTo]);
 
   async function loadData() {
     setLoading(true);
@@ -225,6 +229,11 @@ export function PTOManagement() {
       if (filterStatus !== "all") {
         query = query.eq("status", filterStatus);
       }
+
+      if (filterFrom) query = query.gte("end_date", filterFrom);
+      if (filterTo) query = query.lte("start_date", filterTo);
+      if (filterCategory === "unclassified") query = query.is("leave_category", null);
+      else if (filterCategory !== "all") query = query.eq("leave_category", filterCategory);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -539,6 +548,30 @@ export function PTOManagement() {
             </div>
           )}
         </div>
+        {activeTab === "requests" && (
+          <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-white sm:grid-cols-3">
+            <label>
+              PTO category
+              <select className="block min-h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3"
+                value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                <option value="all">All categories</option>
+                <option value="sick">Sick</option>
+                <option value="vacation">Vacation</option>
+                <option value="unclassified">Unclassified</option>
+              </select>
+            </label>
+            <label>
+              From date
+              <input className="block min-h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3"
+                type="date" value={filterFrom} max={filterTo || undefined} onChange={(e) => setFilterFrom(e.target.value)} />
+            </label>
+            <label>
+              Through date
+              <input className="block min-h-11 w-full rounded-lg border border-gray-600 bg-gray-700 px-3"
+                type="date" value={filterTo} min={filterFrom || undefined} onChange={(e) => setFilterTo(e.target.value)} />
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Requests Tab */}
@@ -597,7 +630,7 @@ export function PTOManagement() {
                           {request.policy.policy_name}
                         </div>
                         <div className="text-xs text-gray-500 capitalize">
-                          {request.policy.pto_type.replace("_", " ")}
+                          {request.leave_category ?? "Unclassified"}
                         </div>
                         {request.is_same_day_callin && (
                           <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
@@ -699,7 +732,7 @@ export function PTOManagement() {
                                 Deny
                               </button>
                             </div>
-                            {request.policy.pto_type === "vacation" && (
+                            {(request.leave_category ?? request.policy.pto_type) === "vacation" && (
                               <button
                                 disabled={busyRequest === request.id}
                                 onClick={async () => {
