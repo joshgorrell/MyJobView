@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../theme/ThemeContext';
 import { InternalTimeCard } from '../components/InternalTimeCard';
 import { assertNoInternalTimer } from '../services/InternalTime';
 import { saveNativeClockGps } from '../services/ClockEventGps';
@@ -48,6 +49,7 @@ interface Break {
 }
 
 export default function TimeClockScreen({ navigation }: { navigation: any }) {
+  const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const [timeContext, setTimeContext] = useState<{ timezone: string; basis: string; dailyClock: boolean } | null>(null);
   const { currentLocation, isTracking } = useLocation();
@@ -579,21 +581,21 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   if (!timeContext?.dailyClock) {
     return (
       <ScreenContainer scroll>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>My Work & Time</Text>
-          <Text style={styles.infoText}>
+        <View style={themedStyles.infoCard}>
+          <Text style={themedStyles.infoTitle}>My Work & Time</Text>
+          <Text style={themedStyles.infoText}>
             {timeContext?.basis === 'work_allocation'
               ? 'Your approved Work Order time determines pay. Manual Job Time and recorded Shop/Training Time count toward payroll after manager approval.'
               : 'Your recorded job time is used for job costing. Your configuration does not require a Daily Clock.'}
           </Text>
-          <TouchableOpacity onPress={openCommandCenter} style={styles.linkButton}>
-            <Text style={styles.linkText}>Daily Calendar, My Time & Requests</Text>
+          <TouchableOpacity onPress={openCommandCenter} style={themedStyles.linkButton}>
+            <Text style={themedStyles.linkText}>Daily Calendar, My Time & Requests</Text>
           </TouchableOpacity>
         </View>
         <InternalTimeCard key={profile?.id} />
-        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('TimeHistory')} style={styles.historyLink}>
-          <Text style={styles.historyLinkText}>View My Time History</Text>
-          <View style={styles.chevronRight} />
+        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('TimeHistory')} style={themedStyles.historyLink}>
+          <Text style={themedStyles.historyLinkText}>View My Time History</Text>
+          <View style={themedStyles.chevronRight} />
         </TouchableOpacity>
       </ScreenContainer>
     );
@@ -610,24 +612,24 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
   return (
     <ScreenContainer scroll>
       {clockFlash && (
-        <View accessible accessibilityRole="alert" style={styles.clockFlash}>
-          <Text style={styles.clockFlashTitle}>{clockFlash.pending ? 'CLOCK SAVED' : clockFlash.action === 'in' ? "YOU'RE IN!" : "YOU'RE OFF!"}</Text>
-          <Text style={styles.clockFlashText}>{clockFlash.pending ? 'Pending sync — points will be confirmed later.' : clockFlash.action === 'in' ? 'Have a great day!' : 'Enjoy the rest of your day!'}</Text>
+        <View accessible accessibilityRole="alert" style={themedStyles.clockFlash}>
+          <Text style={themedStyles.clockFlashTitle}>{clockFlash.pending ? 'CLOCK SAVED' : clockFlash.action === 'in' ? "YOU'RE IN!" : "YOU'RE OFF!"}</Text>
+          <Text style={themedStyles.clockFlashText}>{clockFlash.pending ? 'Pending sync — points will be confirmed later.' : clockFlash.action === 'in' ? 'Have a great day!' : 'Enjoy the rest of your day!'}</Text>
           {clockFlash.action === 'in' && !clockFlash.pending && clockFlash.points !== undefined && (
-            <Text style={styles.clockFlashPoints}>{clockFlash.points > 0 ? '+' : ''}{clockFlash.points} points {clockFlash.points < 0 ? 'deducted' : 'earned'}</Text>
+            <Text style={themedStyles.clockFlashPoints}>{clockFlash.points > 0 ? '+' : ''}{clockFlash.points} points {clockFlash.points < 0 ? 'deducted' : 'earned'}</Text>
           )}
         </View>
       )}
       {/* GPS Status Banner */}
-      <View style={[styles.statusBanner, isTracking ? styles.trackingActive : styles.trackingInactive]}>
-        <View style={styles.bannerContent}>
-          <View style={[styles.bannerDot, { backgroundColor: Colors.white }]} />
-          <Text style={styles.bannerText}>
+      <View style={[themedStyles.statusBanner, isTracking ? themedStyles.trackingActive : themedStyles.trackingInactive]}>
+        <View style={themedStyles.bannerContent}>
+          <View style={[themedStyles.bannerDot, { backgroundColor: Colors.white }]} />
+          <Text style={themedStyles.bannerText}>
             {isTracking ? 'GPS Tracking Active' : 'GPS Tracking Inactive'}
           </Text>
         </View>
         {currentLocation && (
-          <Text style={styles.bannerSubtext}>
+          <Text style={themedStyles.bannerSubtext}>
             Accuracy: {currentLocation.coords.accuracy?.toFixed(0)}m
           </Text>
         )}
@@ -635,60 +637,60 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
       {/* Sync Status */}
       {pendingSync > 0 && (
-        <View style={styles.syncBanner}>
-          <Text style={styles.syncText}>
+        <View style={themedStyles.syncBanner}>
+          <Text style={themedStyles.syncText}>
             {pendingSync} time or location record{pendingSync !== 1 ? 's' : ''} awaiting sync
           </Text>
         </View>
       )}
 
       {clockStateUnverified && (
-        <View style={styles.syncBanner}>
-          <Text style={styles.syncText}>Clock status unverified. Offline clock-out may be saved locally; synchronization is required for payroll.</Text>
+        <View style={themedStyles.syncBanner}>
+          <Text style={themedStyles.syncText}>Clock status unverified. Offline clock-out may be saved locally; synchronization is required for payroll.</Text>
         </View>
       )}
 
       {/* Main Clock Card */}
-      <LinearGradient colors={gradientColors} style={styles.clockCard}>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusBadgeText}>
+      <LinearGradient colors={gradientColors} style={themedStyles.clockCard}>
+        <View style={themedStyles.statusBadge}>
+          <Text style={themedStyles.statusBadgeText}>
             {clockStateUnverified ? 'PENDING SYNC / REVIEW' : isClockedOut ? 'CLOCKED OUT' : isClockedIn ? 'CLOCKED IN' : 'READY TO CLOCK IN'}
           </Text>
         </View>
 
-        <Text style={styles.currentTime}>
+        <Text style={themedStyles.currentTime}>
           {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </Text>
 
-        <Text style={styles.currentDate}>
+        <Text style={themedStyles.currentDate}>
           {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </Text>
 
         {!todayEntry && (
-          <TouchableOpacity style={styles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
-            <Text style={styles.clockButtonText}>CLOCK IN</Text>
+          <TouchableOpacity style={themedStyles.clockButton} onPress={handleClockIn} disabled={clockStateUnverified} activeOpacity={0.85}>
+            <Text style={themedStyles.clockButtonText}>CLOCK IN</Text>
           </TouchableOpacity>
         )}
 
         {isClockedIn && todayEntry && (
-          <View style={styles.activeClockSection}>
-            <View style={styles.elapsedTimeCard}>
-              <Text style={styles.elapsedTimeLabel}>Time Elapsed</Text>
-              <Text style={styles.elapsedTime}>{getTimeSince(todayEntry.clock_in)}</Text>
-              <Text style={styles.clockInTime}>
+          <View style={themedStyles.activeClockSection}>
+            <View style={themedStyles.elapsedTimeCard}>
+              <Text style={themedStyles.elapsedTimeLabel}>Time Elapsed</Text>
+              <Text style={themedStyles.elapsedTime}>{getTimeSince(todayEntry.clock_in)}</Text>
+              <Text style={themedStyles.clockInTime}>
                 Started at {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
 
-            <View style={styles.actionButtons}>
+            <View style={themedStyles.actionButtons}>
               {!activeBreak ? (
-                <TouchableOpacity style={styles.breakButton} onPress={showBreakOptions} activeOpacity={0.8}>
-                  <Text style={styles.breakButtonText}>Start Break</Text>
+                <TouchableOpacity style={themedStyles.breakButton} onPress={showBreakOptions} activeOpacity={0.8}>
+                  <Text style={themedStyles.breakButtonText}>Start Break</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.endBreakButton} onPress={handleEndBreak} activeOpacity={0.8}>
-                  <Text style={styles.endBreakButtonText}>End Break</Text>
-                  <Text style={styles.breakElapsed}>
+                <TouchableOpacity style={themedStyles.endBreakButton} onPress={handleEndBreak} activeOpacity={0.8}>
+                  <Text style={themedStyles.endBreakButtonText}>End Break</Text>
+                  <Text style={themedStyles.breakElapsed}>
                     {Math.floor((currentTime.getTime() - new Date(activeBreak.break_start).getTime()) / 60000)}m elapsed
                   </Text>
                 </TouchableOpacity>
@@ -697,31 +699,31 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               {!!activeActivity && <View style={{ backgroundColor: Colors.amber[50], borderRadius: Radius.md, padding: Spacing.lg, marginBottom: Spacing.md }}>
                 <Text style={{ color: Colors.amber[700], fontWeight: '700' }}>ACTIVE {activeActivity.internal_session_id ? 'SHOP / TRAINING' : 'JOB'} TIME</Text>
                 <Text style={{ color: Colors.gray[800], marginTop: Spacing.xs }}>Running {Math.max(0, Math.floor((currentTime.getTime() - new Date(activeActivity.clock_in).getTime()) / 60000))} minutes. Stop this timer before ending your workday.</Text>
-                {!activeActivity.internal_session_id && <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} accessibilityRole="button" style={[styles.primaryButton, { marginTop: Spacing.md }]}>
-                  <Text style={styles.primaryButtonText}>Open Job Time Controls</Text>
+                {!activeActivity.internal_session_id && <TouchableOpacity onPress={() => navigation.navigate('WorkOrders')} accessibilityRole="button" style={[themedStyles.primaryButton, { marginTop: Spacing.md }]}>
+                  <Text style={themedStyles.primaryButtonText}>Open Job Time Controls</Text>
                 </TouchableOpacity>}
                 {!!activeActivity.internal_session_id && <Text style={{ color: Colors.gray[700], marginTop: Spacing.sm }}>Use the Shop Time & Training controls below to stop this timer.</Text>}
               </View>}
               <TouchableOpacity
-                style={[styles.clockOutButton, !!activeBreak && styles.disabledButton]}
+                style={[themedStyles.clockOutButton, !!activeBreak && themedStyles.disabledButton]}
                 onPress={handleClockOut}
                 disabled={!!activeBreak || !!activeActivity}
                 activeOpacity={0.8}
               >
-                <Text style={styles.clockOutButtonText}>Clock Out</Text>
+                <Text style={themedStyles.clockOutButtonText}>Clock Out</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
         {isClockedOut && todayEntry && (
-          <View style={styles.completedCard}>
-            <View style={styles.completedCheckmark}>
-              <View style={styles.completedCheckInner} />
+          <View style={themedStyles.completedCard}>
+            <View style={themedStyles.completedCheckmark}>
+              <View style={themedStyles.completedCheckInner} />
             </View>
-            <Text style={styles.completedTitle}>Clocked Out</Text>
-            <Text style={styles.completedHours}>{clockStateUnverified ? 'Hours pending synchronization or review' : `Total Hours: ${todayEntry.total_hours.toFixed(2)}`}</Text>
-            <Text style={styles.completedTime}>
+            <Text style={themedStyles.completedTitle}>Clocked Out</Text>
+            <Text style={themedStyles.completedHours}>{clockStateUnverified ? 'Hours pending synchronization or review' : `Total Hours: ${todayEntry.total_hours.toFixed(2)}`}</Text>
+            <Text style={themedStyles.completedTime}>
               {new Date(todayEntry.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               {' - '}
               {new Date(todayEntry.clock_out!).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
@@ -734,25 +736,25 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
       {/* Breaks History */}
       {breaks.length > 0 && (
-        <Card style={styles.breaksCard}>
-          <Text style={styles.breaksTitle}>Today's Breaks</Text>
+        <Card style={themedStyles.breaksCard}>
+          <Text style={themedStyles.breaksTitle}>Today's Breaks</Text>
           {breaks.map(brk => (
-            <View key={brk.id} style={styles.breakItem}>
+            <View key={brk.id} style={themedStyles.breakItem}>
               <View>
-                <Text style={styles.breakType}>{brk.break_type}</Text>
-                <Text style={styles.breakTime}>
+                <Text style={themedStyles.breakType}>{brk.break_type}</Text>
+                <Text style={themedStyles.breakTime}>
                   {new Date(brk.break_start).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                   {brk.break_end && ` - ${new Date(brk.break_end).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
                 </Text>
               </View>
               {brk.break_end ? (
-                <Text style={styles.breakDuration}>
+                <Text style={themedStyles.breakDuration}>
                   {Math.floor((new Date(brk.break_end).getTime() - new Date(brk.break_start).getTime()) / 60000)}m
                 </Text>
               ) : (
-                <View style={styles.breakActiveBadge}>
-                  <View style={styles.breakActiveDot} />
-                  <Text style={styles.breakActiveText}>Active</Text>
+                <View style={themedStyles.breakActiveBadge}>
+                  <View style={themedStyles.breakActiveDot} />
+                  <Text style={themedStyles.breakActiveText}>Active</Text>
                 </View>
               )}
             </View>
@@ -761,9 +763,9 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
       )}
 
       {/* View History Link */}
-      <TouchableOpacity style={styles.historyLink} onPress={() => navigation.navigate('TimeHistory')} activeOpacity={0.7}>
-        <Text style={styles.historyLinkText}>View My Time History</Text>
-        <View style={styles.chevronRight} />
+      <TouchableOpacity style={themedStyles.historyLink} onPress={() => navigation.navigate('TimeHistory')} activeOpacity={0.7}>
+        <Text style={themedStyles.historyLinkText}>View My Time History</Text>
+        <View style={themedStyles.chevronRight} />
       </TouchableOpacity>
     </ScreenContainer>
   );
