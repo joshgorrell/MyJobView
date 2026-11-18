@@ -10,7 +10,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
-def audit(path: Path, start: date) -> dict:
+def audit(path: Path, start: date, rep_map: dict[str, str] | None = None) -> dict:
     data = path.read_bytes()
     try:
         contents = data.decode("utf-8-sig")
@@ -60,6 +60,14 @@ def audit(path: Path, start: date) -> dict:
             findings["invalid_amount"] += 1
         else:
             total += amount
+            if rep_map is not None:
+                target = rep_map.get(rep)
+                if target is None:
+                    findings["unmapped_rep_rows"] += 1
+                else:
+                    findings["mapped_rep_rows"] += 1
+                    if target != rep:
+                        findings["reassigned_rep_rows"] += 1
 
     findings["duplicate_source_id_rows"] = sum(count - 1 for count in identifiers.values())
     return {
@@ -73,8 +81,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("export", type=Path)
     parser.add_argument("--start", type=date.fromisoformat, required=True)
+    parser.add_argument("--rep-map", type=Path, help="JSON object from source names to reporting names")
     args = parser.parse_args()
-    print(json.dumps(audit(args.export, args.start), indent=2))
+    rep_map = None
+    if args.rep_map:
+        rep_map = json.loads(args.rep_map.read_text(encoding="utf-8"))
+        if not isinstance(rep_map, dict) or any(
+            not source.strip() or not isinstance(target, str) or not target.strip()
+            for source, target in rep_map.items()
+        ):
+            parser.error("--rep-map must contain an object of nonblank source and reporting names")
+    print(json.dumps(audit(args.export, args.start, rep_map), indent=2))
 
 
 if __name__ == "__main__":
