@@ -310,7 +310,7 @@ export function JobTimeHistory() {
       {/* Filters */}
       <div className="bg-gray-800 rounded-lg p-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative min-w-0 basis-full sm:flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
@@ -324,7 +324,7 @@ export function JobTimeHistory() {
           <select
             value={selectedEmployee}
             onChange={e => setSelectedEmployee(e.target.value)}
-            className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+            className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
           >
             <option value="all">All Employees</option>
             {employees.map(emp => (
@@ -335,7 +335,7 @@ export function JobTimeHistory() {
           <select
             value={dateRange}
             onChange={e => setDateRange(e.target.value)}
-            className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+            className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
           >
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
@@ -360,14 +360,14 @@ export function JobTimeHistory() {
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+              className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
             />
             <span className="text-gray-400 text-sm py-1.5">to</span>
             <input
               type="date"
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
-              className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+              className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
             />
           </div>
         )}

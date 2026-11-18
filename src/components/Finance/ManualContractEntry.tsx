@@ -391,7 +391,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       City <span className="text-red-500">*</span>
@@ -465,7 +465,7 @@ export default function ManualContractEntry({ contract, onClose, onComplete }: M
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-4 mb-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 mb-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Full Name <span className="text-red-500">*</span>

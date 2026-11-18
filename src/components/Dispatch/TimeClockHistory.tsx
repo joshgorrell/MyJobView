@@ -1052,12 +1052,12 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
   return (
     <div className="space-y-3">
       {/* Page Header */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-bold text-white">Time Clock</h2>
           {refreshing && activeTab === 'clock' && <span className="text-xs text-gray-400 animate-pulse">Updating...</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 [&>button]:min-h-11 sm:[&>button]:min-h-0">
           {onNavigate && (
             <button
               onClick={() => onNavigate('tech_stats')}
@@ -1119,7 +1119,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       </div>
 
       {/* Tab Navigation */}
-      <div role="tablist" aria-label="Time clock sections" className="flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-700 w-full sm:w-fit overflow-x-auto">
+      <div role="tablist" aria-label="Time clock sections" className="responsive-tabs flex gap-1 bg-gray-900 rounded-lg p-1 border border-gray-700 w-full sm:w-fit">
         <button
           onClick={() => setActiveTab('clock')}
           role="tab"
@@ -1545,7 +1545,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
       <div className="bg-gray-800 rounded-lg p-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative min-w-0 basis-full sm:flex-1">
             <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
@@ -1560,7 +1560,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           <select
             value={selectedEmployee}
             onChange={(e) => setSelectedEmployee(e.target.value)}
-            className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+            className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
           >
             <option value="all">All Employees</option>
             {employees.map(emp => (
@@ -1572,7 +1572,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as any)}
-            className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+            className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
           >
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
@@ -1586,7 +1586,7 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+            className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
           >
             <option value="all">All Statuses</option>
             <option value="clocked_in">Clocked In</option>
@@ -1628,14 +1628,14 @@ export function TimeClockHistory({ onNavigate, initialTab }: TimeClockHistoryPro
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+              className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
             />
             <span className="text-gray-400 text-sm py-1.5">to</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
+              className="min-w-0 max-w-full px-2.5 py-1.5 text-sm bg-gray-700 border border-gray-600 text-white rounded focus:ring-1 focus:ring-blue-500"
             />
           </div>
         )}
