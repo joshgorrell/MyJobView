@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 const dir=await mkdtemp(join(tmpdir(),'mjv-assist-'));
 const fixture=`const mode=new URLSearchParams(location.search).get('mode');
 export function useAuth(){return {profile:{organization_id:'org-one',role:mode?.startsWith('settings')?'admin':'tech',is_active:true},isPortalUser:false};}
-export function useTenant(){return {tenant:{organizationId:mode==='mismatch'?'org-two':'org-one',organizationName:'Electronic Life'},loading:false,error:null};}
+export function useTenant(){return {tenant:{organizationId:mode==='mismatch'?'org-two':'org-one',organizationName:'Electronic Life',logoUrl:mode==='guest-no-logo'?null:'https://assets.example.test/dealer-logo.png'},loading:false,error:null};}
 window.calls=[];window.directoryCalls=[];
 const directory={
   contacts:[{id:'contact-one',full_name:'Alex Customer',company_name:null,contact_name:'Alex Customer',email:'alex@example.com',contact_type:'person'},{id:'contact-two',full_name:'Example LLC',company_name:'Example LLC',contact_name:'Jamie',email:'shared@example.com',contact_type:'business'}],
@@ -101,6 +101,12 @@ try{
   await page.setViewportSize({width,height:900});
   await page.goto(url+'?mode=guest&width='+width+'#code=ABCD-EFGH-JKLM');
   await page.getByLabel('Support code').waitFor();
+  const dealerLogo=page.getByRole('img',{name:'Electronic Life'});
+  await dealerLogo.waitFor();
+  assert.equal(await dealerLogo.getAttribute('src'),'https://assets.example.test/dealer-logo.png');
+  assert.equal(await dealerLogo.evaluate(el=>getComputedStyle(el).objectFit),'contain');
+  await page.getByRole('img',{name:'MyJobView Assist'}).waitFor();
+  assert.equal(await page.getByRole('img',{name:'MyJobView Assist'}).getAttribute('src'),'/images/myjobview-assist.png');
   assert.equal(await page.getByLabel('Support code').inputValue(),'ABCD-EFGH-JKLM');
   assert.equal(await page.evaluate(()=>location.hash),'');
   assert.equal(await page.evaluate(()=>window.calls.length),0,'Guest entry requires no staff RPC');
@@ -126,6 +132,10 @@ try{
   await page.getByText('For Windows ARM64.',{exact:false}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  }
+ await page.goto(url+'?mode=guest-no-logo');
+ await page.getByRole('heading',{name:'Electronic Life',exact:true}).waitFor();
+ await page.getByRole('img',{name:'MyJobView Assist'}).waitFor();
+ assert.equal(await page.getByRole('img',{name:'Electronic Life'}).count(),0,'No broken dealer image when logo is missing');
  await page.goto(url+'?mode=guest-wrong-architecture#code=ABCD-EFGH-JKLM');
  await page.getByLabel('Computer type').selectOption('arm64');
  await page.getByRole('button',{name:'Continue',exact:true}).click();
