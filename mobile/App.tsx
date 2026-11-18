@@ -70,8 +70,8 @@ function AppNavigation() {
   return (
     <NavigationContainer ref={navigationRef} onReady={() => setActiveRoute(navigationRef.getCurrentRoute()?.name || 'Dashboard')}
       onStateChange={() => setActiveRoute(navigationRef.getCurrentRoute()?.name || 'Dashboard')}>
-      <StatusBar style="auto" />
-      <View style={{ flex: 1 }}>
+      <StatusBar style={session ? "auto" : "light"} backgroundColor={session ? undefined : "#000000"} />
+      <View style={{ flex: 1, backgroundColor: session ? Colors.white : "#000000" }}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
           <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />

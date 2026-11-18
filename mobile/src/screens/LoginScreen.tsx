@@ -12,7 +12,6 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import { Colors } from '../theme/colors';
@@ -81,10 +80,7 @@ export default function LoginScreen() {
       style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <LinearGradient
-        colors={['#000000', '#171717', '#000000']}
-        style={styles.gradient}
-      >
+      <View style={styles.gradient}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Logo / Title */}
           <View style={styles.header}>
@@ -179,14 +175,14 @@ export default function LoginScreen() {
             <Text style={styles.footerText}>Accurate. Reliable. Secure.</Text>
           </View>
         </ScrollView>
-      </LinearGradient>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  gradient: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#000000' },
+  gradient: { flex: 1, backgroundColor: '#000000' },
   scrollContent: { flexGrow: 1, justifyContent: 'space-between', padding: Spacing.xxl, maxWidth: 600, alignSelf: 'center', width: '100%' },
   header: { alignItems: 'center', marginTop: 60, gap: Spacing.md },
   title: { fontSize: 32, fontWeight: '700', color: Colors.white, letterSpacing: 0.5 },
