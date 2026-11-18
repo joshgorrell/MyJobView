@@ -1,3 +1,4 @@
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 import React from 'react';
 import { View, Text, StyleSheet, Platform, ViewStyle } from 'react-native';
 import { Colors } from '../theme/colors';
@@ -22,39 +23,45 @@ const variantText: Record<BadgeVariant, string> = {
 };
 
 export function Badge({ label, variant = 'gray' }: { label: string; variant?: BadgeVariant }) {
+  const themedStyles = useThemedStyles(styles);
   return (
-    <View style={[styles.badge, { backgroundColor: variantColors[variant] }]}>
-      <Text style={[styles.badgeText, { color: variantText[variant] }]}>{label}</Text>
+    <View style={[themedStyles.badge, { backgroundColor: variantColors[variant] }]}>
+      <Text style={[themedStyles.badgeText, { color: variantText[variant] }]}>{label}</Text>
     </View>
   );
 }
 
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const themedStyles = useThemedStyles(styles);
+  return <View style={[themedStyles.card, style]}>{children}</View>;
 }
 
 export function StatusDot({ color, size = 8 }: { color: string; size?: number }) {
-  return <View style={[styles.statusDot, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]} />;
+  const themedStyles = useThemedStyles(styles);
+  return <View style={[themedStyles.statusDot, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]} />;
 }
 
 export function Divider() {
-  return <View style={styles.divider} />;
+  const themedStyles = useThemedStyles(styles);
+  return <View style={themedStyles.divider} />;
 }
 
 export function EmptyState({ title, message }: { title: string; message: string }) {
+  const themedStyles = useThemedStyles(styles);
   return (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyText}>{message}</Text>
+    <View style={themedStyles.emptyContainer}>
+      <Text style={themedStyles.emptyTitle}>{title}</Text>
+      <Text style={themedStyles.emptyText}>{message}</Text>
     </View>
   );
 }
 
 export function InfoRow({ label, value }: { label: string; value: string }) {
+  const themedStyles = useThemedStyles(styles);
   return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+    <View style={themedStyles.infoRow}>
+      <Text style={themedStyles.infoLabel}>{label}</Text>
+      <Text style={themedStyles.infoValue}>{value}</Text>
     </View>
   );
 }
