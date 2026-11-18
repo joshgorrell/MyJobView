@@ -87,8 +87,8 @@ Deno.serve(async (req: Request) => {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const recipientPhone = contact.phone;
-    const recipientName = contact.full_name || contact.contact_name || "Customer";
+    recipientPhone = contact.phone;
+    recipientName = contact.full_name || contact.contact_name || "Customer";
     if (!recipientPhone) {
       return new Response(JSON.stringify({ error: "Contact has no phone number" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

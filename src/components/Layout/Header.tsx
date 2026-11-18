@@ -233,7 +233,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                     <Wrench className="w-4 h-4 text-orange-400" />
                     <div>
                       <div className="font-medium">Service Request</div>
-                      <div className="text-xs text-muted">Request service or project work</div>
+                      <div className="text-xs text-muted">Get service scheduled.</div>
                     </div>
                   </button>
 
@@ -247,7 +247,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                     <CheckSquare className="w-4 h-4 text-cyan-400" />
                     <div>
                       <div className="font-medium">New Assignment</div>
-                      <div className="text-xs text-muted">Assign a follow-up or reminder</div>
+                      <div className="text-xs text-muted">Get something done.</div>
                     </div>
                   </button>
 
@@ -435,7 +435,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                     <Wrench className="w-4 h-4 text-orange-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">Service Request</div>
-                      <div className="text-xs text-muted">Request service or project work</div>
+                      <div className="text-xs text-muted">Get service scheduled.</div>
                     </div>
                   </button>
 
@@ -446,7 +446,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                     <CheckSquare className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                     <div>
                       <div className="text-sm font-medium">New Assignment</div>
-                      <div className="text-xs text-muted">Assign a follow-up or reminder</div>
+                      <div className="text-xs text-muted">Get something done.</div>
                     </div>
                   </button>
 

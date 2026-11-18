@@ -30,11 +30,35 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles").select("organization_id, role").eq("id", user.id).single();
+    if (profileError || !profile?.organization_id || !["admin", "manager"].includes(profile.role)) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const { workOrderId, daysBefore = 1 }: WorkOrderReminderRequest = await req.json();
+    // Bulk scheduling is not authorized through this user-facing endpoint.
+    // It needs a separately authenticated, dealer-scoped scheduler.
+    if (!workOrderId || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(workOrderId)) {
+      return new Response(JSON.stringify({ error: "A valid work order ID is required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let workOrders = [];
 
@@ -66,49 +90,12 @@ Deno.serve(async (req: Request) => {
           )
         `)
         .eq("id", workOrderId)
+        .eq("organization_id", profile.organization_id)
         .eq("send_appointment_reminder", true)
         .maybeSingle();
 
       if (error) throw error;
       if (data) workOrders = [data];
-    } else {
-      const reminderDate = new Date();
-      reminderDate.setDate(reminderDate.getDate() + daysBefore);
-      const reminderDateStr = reminderDate.toISOString().split('T')[0];
-
-      const { data, error } = await supabase
-        .from("work_orders")
-        .select(`
-          id,
-          work_order_number,
-          type,
-          description,
-          start_date,
-          start_time,
-          send_appointment_reminder,
-          reminder_email,
-          reminder_sms,
-          reminder_sent_at,
-          contact:contacts(
-            id,
-            full_name,
-            email,
-            phone
-          ),
-          technician:profiles!assigned_technician(
-            id,
-            full_name,
-            email,
-            phone
-          )
-        `)
-        .eq("send_appointment_reminder", true)
-        .eq("start_date", reminderDateStr)
-        .is("reminder_sent_at", null)
-        .in("status", ["scheduled", "pending"]);
-
-      if (error) throw error;
-      workOrders = data || [];
     }
 
     if (workOrders.length === 0) {

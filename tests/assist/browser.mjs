@@ -70,8 +70,8 @@ try{
  assert.equal((await page.locator('body').innerText()).includes('private-viewer-token'),false);
  await page.getByRole('button',{name:'End session',exact:true}).click();
  await page.waitForFunction(()=>window.edgeCalls.some(c=>c.body.operation==='end'&&c.body.sessionId==='viewer-session'));
- await page.getByLabel('Customer, user, or email').fill('guest@example.com');
- await page.getByRole('button',{name:'Create invitation',exact:true}).click();
+ await page.getByRole('searchbox',{name:'Customer, user, or email'}).fill('guest@example.com');
+  await page.getByRole('button',{name:'Create invitation',exact:true}).click();
  await page.getByText('ABCD-EFGH-JKLM',{exact:true}).waitFor();
  await page.getByRole('button',{name:'End invitation',exact:true}).click();
  await page.getByRole('button',{name:'Create invitation',exact:true}).waitFor();
