@@ -1057,17 +1057,12 @@ function AppContent() {
             />
           )}
           {['sales_dashboard', 'sales_performance', 'pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && (
-            <WorkspaceTabs key={activeTab} title="Sales Dashboard" initial={['sales_dashboard', 'sales_performance'].includes(activeTab) ? 'performance' : 'pipeline'} onSelect={(tab) => setActiveTab(tab === 'performance' ? 'sales_dashboard' : checkModuleAccess('pipeline_board') ? 'pipeline_board' : checkModuleAccess('leads') ? 'leads' : 'fishbowl')} tabs={[
-              ...(['pipeline_board', 'leads', 'fishbowl'].some(key => checkModuleAccess(key)) ? [{
-                key: 'pipeline', label: 'Pipeline',
-                content: <WorkspaceTabs title="" initial={['leads', 'fishbowl'].includes(activeTab) ? activeTab : 'pipeline_board'} onSelect={setActiveTab} tabs={[
-                  ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Board', content: <PipelineBoard onNavigate={setActiveTab} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
-                  ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
-                  ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
-                ]} />
-              }] : []),
+            <WorkspaceTabs key={activeTab} title="Sales Dashboard" initial={activeTab === 'sales_performance' ? 'sales_dashboard' : activeTab} onSelect={setActiveTab} tabs={[
+              ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Pipeline', content: <PipelineBoard onNavigate={setActiveTab} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
+              ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
+              ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
               ...(checkModuleAccess('sales_dashboard') ? [{
-                key: 'performance', label: 'Performance',
+                key: 'sales_dashboard', label: 'Performance',
                 content: <SalesDashboard onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onOpenRecord={openSalesDashboardRecord} onRepContextChange={setSalesRepAIContext} onNavigateToTab={navigateSalesDashboard} />
               }] : []),
             ]} />
