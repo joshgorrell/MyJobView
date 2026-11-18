@@ -255,7 +255,7 @@ export function ScheduleTimelineView() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-2xl font-bold text-gray-900">{technicians.length}</div>
           <div className="text-sm text-gray-600">Technicians</div>
@@ -282,25 +282,25 @@ export function ScheduleTimelineView() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="flex border-b border-gray-200">
           {/* Technician Names Column */}
-          <div className="w-48 flex-shrink-0 bg-gray-50 border-r border-gray-200">
-            <div className="h-12 flex items-center px-4 border-b border-gray-200 font-medium text-sm text-gray-700">
+          <div className="w-28 flex-shrink-0 bg-gray-50 sm:w-48 border-r border-gray-200">
+            <div className="h-12 flex items-center px-2 sm:px-4 border-b border-gray-200 font-medium text-sm text-gray-700">
               Technician
             </div>
             {technicians.map(tech => (
               <div
                 key={tech.id}
-                className="h-16 flex items-center px-4 border-b border-gray-200 hover:bg-gray-100"
+                className="h-16 flex items-center px-2 sm:px-4 border-b border-gray-200 hover:bg-gray-100"
               >
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-900">{tech.full_name}</span>
+                <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+                  <User className="w-4 h-4 shrink-0 text-gray-400" />
+                  <span className="truncate text-sm font-medium text-gray-900" title={tech.full_name}>{tech.full_name}</span>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Timeline Grid */}
-          <div className="flex-1 overflow-x-auto" ref={scrollRef}>
+          <div className="min-w-0 flex-1 overflow-x-auto" ref={scrollRef}>
             <div style={{ minWidth: `${totalWidth}px` }}>
               {/* Date Headers */}
               <div className="h-12 flex border-b border-gray-200 bg-gray-50">

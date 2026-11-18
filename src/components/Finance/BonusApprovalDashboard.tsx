@@ -382,7 +382,7 @@ export function BonusApprovalDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Award className="w-8 h-8 text-purple-600" />
           <div>
@@ -471,7 +471,7 @@ export function BonusApprovalDashboard() {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
                   <div>
                     <div className="text-xs text-gray-600 mb-1">Field Target</div>
                     <div className="text-sm font-medium text-gray-900">{calc.field_labor_target.toFixed(1)}h</div>
@@ -575,7 +575,7 @@ export function BonusApprovalDashboard() {
 
                 {/* Actions */}
                 {calc.status === 'provisional' && (
-                  <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-200 [&>button]:min-h-11">
                     <button
                       onClick={() => handleApproval(calc.id, 'approve')}
                       className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
