@@ -34,7 +34,7 @@ export function TechDashboard() {
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-1">
+        <nav className="responsive-tabs flex gap-1">
           {showDailyClock && <button
             onClick={() => setActiveTab('clock')}
             className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${

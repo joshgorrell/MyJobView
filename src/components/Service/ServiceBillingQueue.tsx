@@ -299,7 +299,7 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
 
       {/* Queue Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-4">
+        <nav className="responsive-tabs flex gap-4">
           <button
             onClick={() => setActiveQueue('ready')}
             className={`px-4 py-3 border-b-2 font-medium transition-colors relative ${

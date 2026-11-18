@@ -406,3 +406,27 @@ html {
   background: rgb(var(--accent-surface));
   color: rgb(var(--accent-text));
 }
+
+/* Tab rows own their horizontal scrolling at every viewport size, including
+   landscape tablets whose CSS width crosses the desktop breakpoint. */
+.responsive-tabs {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.responsive-tabs > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 44px;
+}
+/* Prevent iOS focus zoom in workspace forms, including large iPads. Keep
+   checkboxes/radios and custom switches at their designed size. */
+@media (hover: none) and (pointer: coarse) {
+  .theme-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  .theme-workspace select,
+  .theme-workspace textarea {
+    font-size: max(16px, 1em);
+  }
+}

@@ -401,7 +401,7 @@ export function BonusApprovalDashboard() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="flex gap-6">
+        <nav className="responsive-tabs flex gap-6">
           {[
             { key: 'pending', label: 'Pending', count: calculations.filter(c => c.status === 'provisional').length },
             { key: 'approved', label: 'Approved', count: calculations.filter(c => c.status === 'approved').length },
