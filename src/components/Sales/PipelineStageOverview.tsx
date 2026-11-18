@@ -30,6 +30,7 @@ interface Props {
   onAddProspect: () => void;
 }
 
+const PROSPECTS_PER_PAGE = 30;
 const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewed', 'portal', 'approved_pending_action'];
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
@@ -45,6 +46,8 @@ export function PipelineStageOverview({
   const proposalVisibility = (profile as any)?.proposal_visibility_scope || 'own';
   const [counts, setCounts] = useState<StageCounts>({ prospects: null, leads: null, proposals: null, salesOrders: null });
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [prospectPage, setProspectPage] = useState({ page: 0, showAll });
+  const page = prospectPage.showAll === showAll ? prospectPage.page : 0;
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -62,7 +65,9 @@ export function PipelineStageOverview({
         // These are live stage snapshots, not activity counts limited by the 14/30/60/90-day filter.
         let prospectQuery = supabase.from('contacts')
           .select('id, contact_name, company_name, email, phone, created_at', { count: 'exact' })
-          .eq('contact_type', 'prospect').order('created_at', { ascending: false }).limit(100);
+          .eq('contact_type', 'prospect')
+          .order('created_at', { ascending: false }).order('id')
+          .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
         let leadQuery = supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .is('converted_at', null).not('status', 'in', '(closed_won,closed_lost)');
@@ -128,7 +133,7 @@ export function PipelineStageOverview({
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility]);
+  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility, page]);
 
   const label = (count: number | null, suffix: string, allowed = true) =>
     !allowed ? 'No access' : loading ? 'Loading…' : count === null ? 'Unavailable' : String(count) + ' ' + suffix;
@@ -187,8 +192,15 @@ export function PipelineStageOverview({
               ))}
             </div>
           )}
-          {counts.prospects !== null && counts.prospects > prospects.length && (
-            <p className="mt-2 text-xs text-gray-500">Showing the {prospects.length} most recent of {counts.prospects} prospects.</p>
+          {(page > 0 || (counts.prospects ?? 0) > PROSPECTS_PER_PAGE) && (
+            <nav aria-label="Prospect pages" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted">
+              <button type="button" disabled={page === 0} className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
+                onClick={() => setProspectPage({ page: page - 1, showAll })}>Previous</button>
+              <span>Page {page + 1} of {Math.max(1, Math.ceil((counts.prospects ?? 0) / PROSPECTS_PER_PAGE))}</span>
+              <button type="button" disabled={(page + 1) * PROSPECTS_PER_PAGE >= (counts.prospects ?? 0)}
+                className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
+                onClick={() => setProspectPage({ page: page + 1, showAll })}>Next</button>
+            </nav>
           )}
         </div>
       )}
