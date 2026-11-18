@@ -1,3 +1,4 @@
+import { useThemedStyles } from '../theme/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -30,6 +31,7 @@ interface WorkOrder {
 }
 
 export default function WorkOrdersScreen({ navigation }: any) {
+  const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const { isConnected } = useOffline();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -135,45 +137,45 @@ export default function WorkOrdersScreen({ navigation }: any) {
   function renderWorkOrder({ item }: { item: WorkOrder }) {
     return (
       <TouchableOpacity
-        style={styles.workOrderCard}
+        style={themedStyles.workOrderCard}
         onPress={() => navigation.navigate('WorkOrderDetail', { workOrderId: item.id, workOrder: item })}
         activeOpacity={0.8}
       >
-        <View style={styles.cardHeader}>
-          <View style={styles.cardHeaderLeft}>
+        <View style={themedStyles.cardHeader}>
+          <View style={themedStyles.cardHeaderLeft}>
             <Badge label={item.work_order_type} variant={getTypeBadgeVariant(item.work_order_type)} />
-            <Text style={styles.workOrderNumber}>{item.work_order_number}</Text>
+            <Text style={themedStyles.workOrderNumber}>{item.work_order_number}</Text>
           </View>
           <Badge label={item.status.replace(/_/g, ' ')} variant={getBadgeVariant(item.status)} />
         </View>
 
-        <Text style={styles.customerName}>{item.customer_name}</Text>
+        <Text style={themedStyles.customerName}>{item.customer_name}</Text>
 
         {item.address ? (
-          <View style={styles.infoRow}>
-            <View style={styles.infoIconContainer}>
-              <View style={styles.locationPin} />
+          <View style={themedStyles.infoRow}>
+            <View style={themedStyles.infoIconContainer}>
+              <View style={themedStyles.locationPin} />
             </View>
-            <Text style={styles.infoText} numberOfLines={2}>{item.address}</Text>
+            <Text style={themedStyles.infoText} numberOfLines={2}>{item.address}</Text>
           </View>
         ) : null}
 
         {item.scheduled_date ? (
-          <View style={styles.infoRow}>
-            <View style={styles.infoIconContainer}>
-              <View style={styles.calendarIcon} />
+          <View style={themedStyles.infoRow}>
+            <View style={themedStyles.infoIconContainer}>
+              <View style={themedStyles.calendarIcon} />
             </View>
-            <Text style={styles.infoText}>{formatDate(item.scheduled_date)}</Text>
+            <Text style={themedStyles.infoText}>{formatDate(item.scheduled_date)}</Text>
           </View>
         ) : null}
 
         {item.description ? (
-          <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+          <Text style={themedStyles.description} numberOfLines={2}>{item.description}</Text>
         ) : null}
 
-        <View style={styles.cardFooter}>
-          <Text style={styles.viewDetailsText}>View Details</Text>
-          <View style={styles.chevronRight} />
+        <View style={themedStyles.cardFooter}>
+          <Text style={themedStyles.viewDetailsText}>View Details</Text>
+          <View style={themedStyles.chevronRight} />
         </View>
       </TouchableOpacity>
     );
@@ -183,7 +185,7 @@ export default function WorkOrdersScreen({ navigation }: any) {
     return (
       <ScreenContainer center>
         <ActivityIndicator size="large" color={Colors.primary[600]} />
-        <Text style={styles.loadingText}>Loading work orders...</Text>
+        <Text style={themedStyles.loadingText}>Loading work orders...</Text>
       </ScreenContainer>
     );
   }
@@ -191,8 +193,8 @@ export default function WorkOrdersScreen({ navigation }: any) {
   return (
     <ScreenContainer>
       {!isConnected && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>Viewing cached work orders</Text>
+        <View style={themedStyles.offlineBanner}>
+          <Text style={themedStyles.offlineText}>Viewing cached work orders</Text>
         </View>
       )}
 
@@ -200,7 +202,7 @@ export default function WorkOrdersScreen({ navigation }: any) {
         data={workOrders}
         renderItem={renderWorkOrder}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={themedStyles.listContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary[600]]} />}
         ListEmptyComponent={
           <EmptyState title="No Work Orders" message="You don't have any assigned work orders at the moment." />
