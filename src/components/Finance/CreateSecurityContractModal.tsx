@@ -341,7 +341,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   }
 
   return (
-    <div ref={overlayRef} className="security-onboarding-controls fixed inset-0 z-50 flex h-dvh items-center justify-center bg-black/50 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] sm:pt-[max(1rem,env(safe-area-inset-top))] sm:pb-4 [.theme-workspace_&]:[color-scheme:inherit]">
+    <div ref={overlayRef} className="security-onboarding-controls fixed inset-0 z-50 flex h-dvh items-center justify-center bg-[rgb(0_0_0_/_0.5)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] sm:pt-[max(1rem,env(safe-area-inset-top))] sm:pb-4 [.theme-workspace_&]:[color-scheme:inherit]">
       <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-full max-h-full min-h-0 w-full max-w-[82rem] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:rounded-lg [@media(pointer:coarse)]:[&_:is(input:not([type=checkbox]),select,textarea)]:min-h-11 [@media(pointer:coarse)]:[&_:is(input:not([type=checkbox]),select,textarea)]:text-base">
         <div className="shrink-0 px-4 sm:px-5 py-2 border-b border-gray-200 flex items-center justify-between">
           <h2 id={titleId} className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
