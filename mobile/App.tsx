@@ -1,3 +1,4 @@
+import { ThemeProvider, useTheme, themeColor } from './src/theme/ThemeContext';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
@@ -30,11 +31,12 @@ const tabs = [
 
 function MobileTabBar({ activeRoute }: { activeRoute: string }) {
   const insets = useSafeAreaInsets();
+  const { dark } = useTheme();
   const selectedRoute = activeRoute === 'WorkOrderDetail' ? 'WorkOrders'
     : activeRoute === 'TimeHistory' ? 'TimeClock'
     : activeRoute;
   return (
-    <View style={[tabStyles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[tabStyles.bar, { paddingBottom: Math.max(insets.bottom, 8), backgroundColor: themeColor(Colors.white, dark), borderTopColor: themeColor(Colors.gray[200], dark) }]}>
       {tabs.map(tab => {
         const selected = selectedRoute === tab.route;
         return (
@@ -45,8 +47,8 @@ function MobileTabBar({ activeRoute }: { activeRoute: string }) {
               navigationRef.navigate(tab.route);
             }}
             style={tabStyles.item} activeOpacity={0.75}>
-            <Text style={[tabStyles.glyph, selected && tabStyles.active]}>{tab.glyph}</Text>
-            <Text style={[tabStyles.label, selected && tabStyles.active]}>{tab.label}</Text>
+            <Text style={[tabStyles.glyph, { color: selected ? Colors.primary[500] : themeColor(Colors.gray[500], dark) }]}>{tab.glyph}</Text>
+            <Text style={[tabStyles.label, { color: selected ? Colors.primary[500] : themeColor(Colors.gray[500], dark) }]}>{tab.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -65,13 +67,14 @@ const tabStyles = StyleSheet.create({
 
 function AppNavigation() {
   const { session, loading } = useAuth();
+  const { dark } = useTheme();
   const [activeRoute, setActiveRoute] = useState('Dashboard');
   if (loading) return null;
   return (
     <NavigationContainer ref={navigationRef} onReady={() => setActiveRoute(navigationRef.getCurrentRoute()?.name || 'Dashboard')}
       onStateChange={() => setActiveRoute(navigationRef.getCurrentRoute()?.name || 'Dashboard')}>
-      <StatusBar style={session ? "auto" : "light"} backgroundColor={session ? undefined : "#000000"} />
-      <View style={{ flex: 1, backgroundColor: session ? Colors.white : "#000000" }}>
+      <StatusBar style={!session || dark ? "light" : "dark"} backgroundColor={!session ? "#000000" : dark ? "#10141c" : "#ffffff"} />
+      <View style={{ flex: 1, backgroundColor: session ? (dark ? "#10141c" : Colors.white) : "#000000" }}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!session ? <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} /> : <>
           <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
@@ -92,6 +95,7 @@ function AppNavigation() {
 export default function App() {
   return (
     <SafeAreaProvider>
+      <ThemeProvider>
       <AuthProvider>
         <OfflineProvider>
           <LocationProvider>
@@ -99,6 +103,7 @@ export default function App() {
           </LocationProvider>
         </OfflineProvider>
       </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
