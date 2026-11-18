@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Plus, UserRound } from 'lucide-react';
+import { ChevronDown, Plus, UserRound } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -14,7 +14,6 @@ interface Prospect {
 
 interface StageCounts {
   prospects: number | null;
-  leads: number | null;
   proposals: number | null;
   salesOrders: number | null;
 }
@@ -23,7 +22,6 @@ interface Props {
   showAll: boolean;
   canViewProposals: boolean;
   canViewSalesOrders: boolean;
-  onOpenLeads: () => void;
   onOpenProposals: () => void;
   onOpenSalesOrders: () => void;
   onOpenProspect: (id: string) => void;
@@ -35,7 +33,7 @@ const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewe
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
 export function PipelineStageOverview({
-  showAll, canViewProposals, canViewSalesOrders, onOpenLeads, onOpenProposals,
+  showAll, canViewProposals, canViewSalesOrders, onOpenProposals,
   onOpenSalesOrders, onOpenProspect, onAddProspect,
 }: Props) {
   const { profile } = useAuth();
@@ -44,7 +42,7 @@ export function PipelineStageOverview({
   const canViewProspects = profile?.role === 'admin' || profile?.can_view_prospects === true;
   const isManager = profile?.role === 'admin' || profile?.role === 'manager';
   const proposalVisibility = (profile as any)?.proposal_visibility_scope || 'own';
-  const [counts, setCounts] = useState<StageCounts>({ prospects: null, leads: null, proposals: null, salesOrders: null });
+  const [counts, setCounts] = useState<StageCounts>({ prospects: null, proposals: null, salesOrders: null });
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [prospectPage, setProspectPage] = useState({ page: 0, showAll });
   const page = prospectPage.showAll === showAll ? prospectPage.page : 0;
@@ -68,9 +66,6 @@ export function PipelineStageOverview({
           .eq('contact_type', 'prospect')
           .order('created_at', { ascending: false }).order('id')
           .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
-        let leadQuery = supabase.from('leads')
-          .select('id', { count: 'exact', head: true })
-          .is('converted_at', null).not('status', 'in', '(closed_won,closed_lost)');
         let proposalQuery = supabase.from('proposals')
           .select('id', { count: 'exact', head: true })
           .eq('is_revision', false).is('sales_order_id', null)
@@ -81,14 +76,11 @@ export function PipelineStageOverview({
 
         if (organizationId) {
           prospectQuery = prospectQuery.eq('organization_id', organizationId);
-          leadQuery = leadQuery.eq('organization_id', organizationId);
           proposalQuery = proposalQuery.eq('organization_id', organizationId);
           orderQuery = orderQuery.eq('organization_id', organizationId);
         }
         if (!showAll) {
-          // Shared, unclaimed Leads remain visible to salespeople alongside their own Leads.
           prospectQuery = prospectQuery.or('assigned_to.eq.' + userId + ',created_by.eq.' + userId);
-          leadQuery = leadQuery.or('assigned_to.eq.' + userId + ',assigned_to.is.null');
           proposalQuery = proposalQuery.eq('created_by', userId);
           orderQuery = orderQuery.or('sales_rep_id.eq.' + userId + ',created_by.eq.' + userId);
         } else {
@@ -97,22 +89,20 @@ export function PipelineStageOverview({
           if (!isManager) orderQuery = orderQuery.or('sales_rep_id.eq.' + userId + ',created_by.eq.' + userId);
         }
 
-        const [prospectResult, leadResult, proposalResult, orderResult] = await Promise.all([
+        const [prospectResult, proposalResult, orderResult] = await Promise.all([
           canViewProspects ? prospectQuery : Promise.resolve(null),
-          leadQuery,
           canViewProposals ? proposalQuery : Promise.resolve(null),
           canViewSalesOrders ? orderQuery : Promise.resolve(null),
         ]);
         if (!active) return;
         setCounts({
           prospects: prospectResult?.error ? null : prospectResult?.count ?? null,
-          leads: leadResult.error ? null : leadResult.count ?? null,
           proposals: proposalResult?.error ? null : proposalResult?.count ?? null,
           salesOrders: orderResult?.error ? null : orderResult?.count ?? null,
         });
         setProspects((prospectResult?.data || []) as Prospect[]);
-        const failed = Boolean(prospectResult?.error || leadResult.error || proposalResult?.error || orderResult?.error);
-        if (failed) console.error('Pipeline stage query failed', { prospect: prospectResult?.error, lead: leadResult.error, proposal: proposalResult?.error, order: orderResult?.error });
+        const failed = Boolean(prospectResult?.error || proposalResult?.error || orderResult?.error);
+        if (failed) console.error('Pipeline stage query failed', { prospect: prospectResult?.error, proposal: proposalResult?.error, order: orderResult?.error });
         setLoadError(failed);
       } catch (error) {
         if (active) setLoadError(true);
@@ -125,7 +115,6 @@ export function PipelineStageOverview({
     void refresh();
     const channel = supabase.channel('pipeline_stage_summary_' + userId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => { void refresh(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => { void refresh(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proposals' }, () => { void refresh(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_orders' }, () => { void refresh(); })
       .subscribe();
@@ -139,33 +128,37 @@ export function PipelineStageOverview({
     !allowed ? 'No access' : loading ? 'Loading…' : count === null ? 'Unavailable' : String(count) + ' ' + suffix;
 
   return (
-    <section aria-label="Sales pipeline stages" className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)}
-          aria-expanded={expanded} aria-controls="pipeline-prospects"
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-50">
-          <span className="flex items-center justify-between">Prospects <ArrowRight className="h-4 w-4" /></span>
-          <span className="mt-1 block text-xs font-normal text-gray-300">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
-        </button>
-        <button type="button" onClick={onOpenLeads}
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/20">
-          <span className="flex items-center justify-between">Leads <ArrowRight className="h-4 w-4" /></span>
-          <span className="mt-1 block text-xs font-normal text-gray-300">{label(counts.leads, 'open')}</span>
-        </button>
-        <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-50">
-          <span className="flex items-center justify-between">Proposals <ArrowRight className="h-4 w-4" /></span>
-          <span className="mt-1 block text-xs font-normal text-gray-300">{label(counts.proposals, 'active', canViewProposals)}</span>
-        </button>
-        <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
-          className="rounded-lg border border-white/20 bg-white/10 px-3 py-3 text-left text-sm font-semibold text-white hover:bg-white/20 disabled:opacity-50">
-          <span className="flex items-center justify-between">Sales Orders <ArrowRight className="h-4 w-4" /></span>
-          <span className="mt-1 block text-xs font-normal text-gray-300">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
-        </button>
-      </div>
-      {loadError && <p role="status" className="text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
+    <>
+      <details className="relative self-start sm:self-auto">
+        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-gray-300 bg-surface px-3 py-2.5 text-sm font-medium text-primary [&::-webkit-details-marker]:hidden">
+          Sales stages <ChevronDown className="h-4 w-4" />
+        </summary>
+        <div className="absolute left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-surface p-1 shadow-lg sm:left-auto sm:right-0">
+          <button type="button" disabled={!canViewProspects}
+            onClick={event => {
+              setExpanded(value => !value);
+              event.currentTarget.closest('details')?.removeAttribute('open');
+            }}
+            aria-expanded={expanded} aria-controls={expanded ? 'pipeline-prospects' : undefined}
+            className="block w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-gray-100 disabled:opacity-50">
+            <span className="font-medium">Prospects</span>
+            <span className="block text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
+          </button>
+          <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
+            className="block w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-gray-100 disabled:opacity-50">
+            <span className="font-medium">Proposals</span>
+            <span className="block text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
+          </button>
+          <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
+            className="block w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-gray-100 disabled:opacity-50">
+            <span className="font-medium">Sales Orders</span>
+            <span className="block text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
+          </button>
+        </div>
+      </details>
+      {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
       {expanded && canViewProspects && (
-        <div id="pipeline-prospects" className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-base font-semibold text-gray-900">Prospects</h3>
@@ -204,6 +197,6 @@ export function PipelineStageOverview({
           )}
         </div>
       )}
-    </section>
+    </>
   );
 }

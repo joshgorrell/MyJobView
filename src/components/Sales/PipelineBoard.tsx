@@ -25,13 +25,30 @@ interface PipelineStage {
   count: number;
 }
 
+const ACTIVITY_PAGE_SIZE = 500;
+
+async function loadActivityPages<T>(
+  fetchPage: (start: number, end: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  const records: T[] = [];
+  while (true) {
+    const start = records.length;
+    const { data, error } = await fetchPage(start, start + ACTIVITY_PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data?.length) return records;
+
+    records.push(...data);
+    if (data.length < ACTIVITY_PAGE_SIZE) return records;
+  }
+}
+
 export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSalesOrders = false }: { onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void; canViewProposals?: boolean; canViewSalesOrders?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
-  const [timeFilter, setTimeFilter] = useState<number>(14);
+  const [timeFilter, setTimeFilter] = useState<number | 'all'>(14);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [leadAgeFilter, setLeadAgeFilter] = useState<number | null>(null);
   const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
@@ -243,6 +260,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
 
 
   function getDateCutoff() {
+    if (timeFilter === 'all') return null;
+
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - timeFilter);
     return cutoff.toISOString();
@@ -261,14 +280,16 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
               .select(`
                 *
               `)
-              .gte('created_at', dateCutoff)
-              .order('created_at', { ascending: false });
+              .order('created_at', { ascending: false })
+              .order('id');
 
             if (!showAll && profile?.id) {
               contactsQuery = contactsQuery.eq('created_by', profile.id);
             }
 
-            const { data } = await contactsQuery;
+            if (!dateCutoff) return loadActivityPages((start, end) => contactsQuery.range(start, end));
+
+            const { data } = await contactsQuery.gte('created_at', dateCutoff);
             return data || [];
           })()
         : Promise.resolve([]);
@@ -287,14 +308,16 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                   phone
                 )
               `)
-              .gte('created_at', dateCutoff)
-              .order('created_at', { ascending: false });
+              .order('created_at', { ascending: false })
+              .order('id');
 
             if (!showAll && profile?.id) {
               connectionsQuery = connectionsQuery.eq('user_id', profile.id);
             }
 
-            const { data } = await connectionsQuery;
+            if (!dateCutoff) return loadActivityPages((start, end) => connectionsQuery.range(start, end));
+
+            const { data } = await connectionsQuery.gte('created_at', dateCutoff);
             return data || [];
           })()
         : Promise.resolve([]);
@@ -586,13 +609,14 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           aria-label="Date range for contacts and connections"
           title="Date range for contacts and connections"
           value={timeFilter}
-          onChange={(e) => setTimeFilter(Number(e.target.value))}
+          onChange={(e) => setTimeFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
           className="px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-manipulation"
         >
           <option value={14}>Last 14 days</option>
           <option value={30}>Last 30 days</option>
           <option value={60}>Last 60 days</option>
           <option value={90}>Last 90 days</option>
+          <option value="all">All time</option>
         </select>
         {/* Widget Customization Button */}
         <button
@@ -607,24 +631,19 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
           <HelpCircle className="h-5 w-5" />
         </button>
+        <PipelineStageOverview
+          showAll={viewMode === 'all' && canViewAllPipeline}
+          canViewProposals={canViewProposals}
+          canViewSalesOrders={canViewSalesOrders}
+          onOpenProposals={() => onNavigate?.('proposals')}
+          onOpenSalesOrders={() => onNavigate?.('sales_orders')}
+          onOpenProspect={handleContactClick}
+          onAddProspect={() => {
+            setContactFormInitialStatus('prospect');
+            setShowContactForm(true);
+          }}
+        />
       </div>
-      {/* Four real stages, backed by the canonical Contacts, Leads, Proposals and Sales Orders tables. */}
-      <PipelineStageOverview
-        showAll={viewMode === 'all' && canViewAllPipeline}
-        canViewProposals={canViewProposals}
-        canViewSalesOrders={canViewSalesOrders}
-        onOpenLeads={() => {
-          if (selectedWidgets.includes('leads')) document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          else onNavigate?.('leads');
-        }}
-        onOpenProposals={() => onNavigate?.('proposals')}
-        onOpenSalesOrders={() => onNavigate?.('sales_orders')}
-        onOpenProspect={handleContactClick}
-        onAddProspect={() => {
-          setContactFormInitialStatus('prospect');
-          setShowContactForm(true);
-        }}
-      />
 
       <div className="grid gap-4 pb-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
         {filteredStages.map(stage => (
