@@ -48,6 +48,11 @@ jobs:
         run: |
           npx playwright install --only-shell chromium
           node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({headless: true}); await browser.close();'
+      - name: Install WebKit for iPhone and iPad coverage
+        timeout-minutes: 5
+        run: npx playwright install --with-deps webkit
       - name: Mobile resume, signing and printable agreement
         timeout-minutes: 5
+        env:
+          SECURITY_ONBOARDING_WEBKIT: "1"
         run: node tests/security-onboarding/browser.mjs

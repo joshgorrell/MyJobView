@@ -60,6 +60,8 @@ interface CreateSecurityContractModalProps {
 
 export default function CreateSecurityContractModal({ onClose, onSuccess, onPaperCreated, prefill }: CreateSecurityContractModalProps) {
   const titleId = useId();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const formScrollRef = useRef<HTMLDivElement>(null);
   const creationRequest = useRef(crypto.randomUUID());
   const [templates, setTemplates] = useState<Template[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
@@ -113,6 +115,46 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const overlay = overlayRef.current;
+    if (!viewport || !overlay || !window.matchMedia('(pointer: coarse)').matches) return;
+
+    let frame = 0;
+    const updateViewport = () => {
+      // iOS can shrink or pan the visual viewport while leaving the layout viewport in place.
+      if (viewport.scale !== 1) return;
+      overlay.style.top = `${viewport.offsetTop}px`;
+      overlay.style.height = `${viewport.height}px`;
+      overlay.style.bottom = 'auto';
+
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const scroller = formScrollRef.current;
+        const field = document.activeElement;
+        if (!scroller || !(field instanceof HTMLElement) || !scroller.contains(field) ||
+            !field.matches('input:not([type=checkbox]), select, textarea')) return;
+
+        const bounds = scroller.getBoundingClientRect();
+        const fieldBounds = field.getBoundingClientRect();
+        if (fieldBounds.bottom > bounds.bottom - 8) {
+          scroller.scrollTop += fieldBounds.bottom - bounds.bottom + 8;
+        } else if (fieldBounds.top < bounds.top + 8) {
+          scroller.scrollTop += fieldBounds.top - bounds.top - 8;
+        }
+      });
+    };
+
+    updateViewport();
+    viewport.addEventListener('resize', updateViewport);
+    viewport.addEventListener('scroll', updateViewport);
+    return () => {
+      viewport.removeEventListener('resize', updateViewport);
+      viewport.removeEventListener('scroll', updateViewport);
+      cancelAnimationFrame(frame);
+    };
   }, []);
 
   const calculatedMonthlyPrice = selectedServices.reduce((total, serviceId) => {
@@ -299,15 +341,15 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
   }
 
   return (
-    <div className="security-onboarding-controls fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 [.theme-workspace_&]:[color-scheme:inherit]">
-      <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-dvh min-h-0 w-full max-w-[82rem] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-lg">
+    <div ref={overlayRef} className="security-onboarding-controls fixed inset-0 z-50 flex h-dvh items-center justify-center bg-[rgb(0_0_0_/_0.5)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))] sm:pt-[max(1rem,env(safe-area-inset-top))] sm:pb-4 [.theme-workspace_&]:[color-scheme:inherit]">
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-full max-h-full min-h-0 w-full max-w-[82rem] flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:rounded-lg [@media(pointer:coarse)]:[&_:is(input:not([type=checkbox]),select,textarea)]:min-h-11 [@media(pointer:coarse)]:[&_:is(input:not([type=checkbox]),select,textarea)]:text-base">
         <div className="shrink-0 px-4 sm:px-5 py-2 border-b border-gray-200 flex items-center justify-between">
           <h2 id={titleId} className="text-lg sm:text-xl font-bold text-gray-900">{onPaperCreated ? 'Enter Completed Paper Form' : 'Create Security Agreement'}</h2>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+            className="p-2 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
             <X className="w-5 h-5" />
           </button>
@@ -322,7 +364,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:px-5 sm:py-3">
+            <div ref={formScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:px-5 sm:py-3">
               <SecurityVisibilityGuide />
               {prefill && (
                 <div className="flex items-start gap-3 px-4 py-3 bg-infoSoft border border-subtle rounded-lg">
@@ -338,7 +380,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                 </div>
               )}
 
-              <div className="grid items-start gap-4 lg:grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.2fr)]">
+              <div className="grid items-start gap-4 md:grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,1.2fr)]">
                 <div className="min-w-0 space-y-3 min-[1100px]:contents min-[1100px]:space-y-0">
                   <div className="min-w-0 space-y-3">
                     <div>
@@ -574,6 +616,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                               <label className="block text-sm font-medium text-gray-700 mb-1">ZIP <span className="text-red-500">*</span> <SecurityFieldVisibility /></label>
                               <input
                                 type="text"
+                                inputMode="numeric"
                                 value={newContact.zip_code}
                                 onChange={(e) => setNewContact({ ...newContact, zip_code: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
@@ -689,6 +732,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                               <label className="block text-sm font-medium text-gray-700 mb-1">ZIP <SecurityFieldVisibility /></label>
                               <input
                                 type="text"
+                                inputMode="numeric"
                                 value={contactEdits.zip_code}
                                 onChange={(e) => setContactEdits({ ...contactEdits, zip_code: e.target.value })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
@@ -736,7 +780,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                               type="button"
                               onClick={() => setAccountType(type)}
                               aria-pressed={accountType === type}
-                              className={`flex-1 py-1.5 rounded-lg border text-sm font-medium capitalize transition-all ${
+                              className={`flex-1 [@media(pointer:coarse)]:min-h-11 py-1.5 rounded-lg border text-sm font-medium capitalize transition-all ${
                                 accountType === type
                                   ? 'border-brand bg-infoSoft text-brand'
                                   : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
@@ -750,12 +794,12 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Monitoring <SecurityFieldVisibility internal /></label>
-                        <label className="flex items-start gap-2 cursor-pointer">
+                        <label className="flex cursor-pointer items-center gap-2 [@media(pointer:coarse)]:min-h-11">
                           <input
                             type="checkbox"
                             checked={isMonitoring}
                             onChange={(e) => setIsMonitoring(e.target.checked)}
-                            className="mt-1 h-4 w-4 shrink-0 rounded text-blue-600"
+                            className="h-4 w-4 shrink-0 rounded text-blue-600"
                           />
                           <span className="text-sm text-gray-700">Send alarms to a monitoring center</span>
                         </label>
@@ -784,7 +828,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                             { value: 'video_monitoring', label: 'Video / CCTV' },
                             { value: 'access_control', label: 'Access Control' },
                           ].map(svc => (
-                            <label key={svc.value} className="flex items-center gap-2 cursor-pointer">
+                            <label key={svc.value} className="flex cursor-pointer items-center gap-2 [@media(pointer:coarse)]:min-h-11">
                               <input
                                 type="checkbox"
                                 checked={accountServices.includes(svc.value)}
@@ -915,7 +959,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                           type="button"
                           onClick={() => setTermMonths(months)}
                           aria-pressed={termMonths === months}
-                          className={`min-h-10 whitespace-nowrap rounded-lg border px-1 py-1.5 text-center text-sm transition-colors ${
+                          className={`min-h-10 [@media(pointer:coarse)]:min-h-11 whitespace-nowrap rounded-lg border px-1 py-1.5 text-center text-sm transition-colors ${
                             termMonths === months
                               ? 'border-brand bg-infoSoft text-brand font-semibold'
                               : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
@@ -960,7 +1004,7 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                             {services.map((service) => (
                               <label
                                 key={service.id}
-                                className={`flex cursor-pointer items-start gap-2 border-b border-subtle px-3 py-2 last:border-b-0 hover:bg-gray-50 ${
+                                className={`flex cursor-pointer items-start gap-2 [@media(pointer:coarse)]:min-h-11 border-b border-subtle px-3 py-2 last:border-b-0 hover:bg-gray-50 ${
                                   selectedServices.includes(service.id) ? 'bg-infoSoft' : ''
                                 }`}
                               >
@@ -1030,14 +1074,14 @@ export default function CreateSecurityContractModal({ onClose, onSuccess, onPape
                 <button
                   type="button"
                   onClick={onClose}
-                  className="shrink-0 px-3 py-2 text-sm sm:px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
+                  className="shrink-0 px-3 py-2 text-sm sm:px-4 [@media(pointer:coarse)]:min-h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="min-w-0 px-3 py-2 text-sm sm:px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-w-0 px-3 py-2 text-sm sm:px-4 [@media(pointer:coarse)]:min-h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Creating...' : onPaperCreated ? 'Continue to Onboarding Form' : 'Create Agreement'}
                 </button>

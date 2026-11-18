@@ -14,7 +14,7 @@ for(let attempt=0;attempt<50;attempt++) {
 }
 assert.ok(serverReady,'Test Vite server started');
 const require=createRequire(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES ? process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES + '/' : import.meta.url);
-const { chromium }=require('playwright');
+const { chromium, devices, webkit }=require('playwright');
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH || undefined,args:['--no-sandbox']});
 const context=await browser.newContext({viewport:{width:390,height:844}});
 let saves=[]; let failNext=false; let added=false; let tokenized=false;
@@ -143,7 +143,7 @@ assert.ok(saves.every(s=>s.form_data.paymentDetails===undefined && s.form_data.s
 assert.deepEqual(errors,[],'No runtime errors');
 const staffContext=await browser.newContext({viewport:{width:390,height:844}});
 let insertedContract;
-await staffContext.route('https://security-test.supabase.co/**', async route => {
+const staffRoute = async route => {
   const u = new URL(route.request().url());
   if (u.pathname.endsWith('/auth/v1/user')) return route.fulfill({json:{id:'staff-user'}});
   if (u.pathname.endsWith('/security_contract_templates')) return route.fulfill({json:[{id:'template-1',name:'Monitoring',description:'Initial term [term]'}]});
@@ -158,7 +158,8 @@ await staffContext.route('https://security-test.supabase.co/**', async route => 
     return route.fulfill({json:{id:'new-contract',...insertedContract}});
   }
   return route.fulfill({json:[]});
-});
+};
+await staffContext.route('https://security-test.supabase.co/**', staffRoute);
 const staffPage=await staffContext.newPage();
 // Supply a synthetic authenticated session. No real credentials are used.
 await staffPage.addInitScript(() => {
@@ -208,7 +209,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 1206, height: 784
   await customerDetails.scrollIntoViewIfNeeded();
   const customerBox = await customerDetails.boundingBox();
   const termBox = await termLabel.boundingBox();
-  assert.equal(termBox.x > customerBox.x, viewport.width >= 1024, 'Agreement fields sit beside customer details on desktop');
+  assert.equal(termBox.x > customerBox.x, viewport.width >= 768, 'Agreement fields sit beside customer details on tablet and desktop');
   const accountBox = await accountClassification.boundingBox();
   assert.equal(accountBox.x > customerBox.x + 100, viewport.width >= 1100, 'Wide desktop has a dedicated account column');
   const before = await createButton.boundingBox();
@@ -238,6 +239,80 @@ assert.deepEqual(customerPalette, {
   text: 'rgb(249, 250, 251)',
   inputScheme: 'dark',
 }, 'Customer details follow the dark workspace palette');
+if (process.env.SECURITY_ONBOARDING_WEBKIT === '1') {
+  const safari = await webkit.launch();
+  try {
+    for (const deviceName of ['iPhone SE (3rd gen)', 'iPhone 13', 'iPad (gen 7)', 'iPad (gen 7) landscape']) {
+      const device = devices[deviceName];
+      const deviceContext = await safari.newContext({ ...device });
+      try {
+        await deviceContext.route('https://security-test.supabase.co/**', staffRoute);
+        const devicePage = await deviceContext.newPage();
+        await devicePage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?staff');
+        await devicePage.evaluate(() => {
+          document.documentElement.dataset.theme = 'dark';
+          document.documentElement.style.colorScheme = 'dark';
+          document.getElementById('root').classList.add('theme-workspace');
+        });
+        const dialog = devicePage.getByRole('dialog', { name: 'Create Security Agreement' });
+        const customer = dialog.getByRole('heading', { name: 'Customer Details' });
+        await customer.waitFor();
+        assert.ok(await devicePage.evaluate(() => matchMedia('(pointer: coarse)').matches), deviceName);
+        const term = dialog.getByRole('button', { name: '24 months', exact: true });
+        const issue = dialog.getByRole('button', { name: 'Create Agreement', exact: true });
+        const search = dialog.getByPlaceholder('Type a name or email to search...');
+        const email = dialog.getByPlaceholder('Send invitation to a different email address...');
+        for (const control of [search, email, term, issue, dialog.getByRole('button', { name: 'Close', exact: true })]) {
+          assert.ok((await control.boundingBox()).height >= 44, `${deviceName} has 44px touch controls`);
+        }
+        for (const field of [search, email, dialog.locator('input[inputmode="numeric"]').first()]) {
+          assert.ok(await field.evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 16), `${deviceName} has 16px input text`);
+        }
+        const termBox = await dialog.getByText('Agreement Term', { exact: false }).first().boundingBox();
+        const customerBox = await customer.boundingBox();
+        assert.equal(termBox.x > customerBox.x, deviceName.startsWith('iPad'), `${deviceName} uses the expected columns`);
+        assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), `${deviceName} fits the dialog`);
+        await term.tap();
+        assert.equal(await term.getAttribute('aria-pressed'), 'true');
+        await email.fill('test@example.com');
+
+        if (deviceName.startsWith('iPhone')) {
+          // Playwright devices emulate Safari touch and viewport geometry without a native keyboard.
+          await devicePage.evaluate(() => {
+            const viewport = window.visualViewport;
+            Object.defineProperties(viewport, { height: { configurable: true, value: 340 }, offsetTop: { configurable: true, value: 12 } });
+            viewport.dispatchEvent(new Event('resize'));
+          });
+          await devicePage.waitForFunction(() => {
+            const field = document.activeElement;
+            const submit = document.querySelector('button[type=submit]');
+            if (!(field instanceof HTMLInputElement) || !submit) return false;
+            const fieldBox = field.getBoundingClientRect();
+            const submitBox = submit.getBoundingClientRect();
+            return fieldBox.bottom <= submitBox.top && submitBox.bottom <= 352;
+          });
+          await devicePage.evaluate(() => {
+            const viewport = window.visualViewport;
+            delete viewport.height;
+            delete viewport.offsetTop;
+            viewport.dispatchEvent(new Event('resize'));
+          });
+        }
+        insertedContract = undefined;
+        await Promise.all([
+          devicePage.waitForResponse(response => response.url().endsWith('/rpc/staff_security_onboarding') && response.ok()),
+          issue.tap(),
+        ]);
+        assert.equal(insertedContract?.term_months, 24, `${deviceName} saves the selected term`);
+        assert.equal(insertedContract?.email_override, 'test@example.com', `${deviceName} saves the delivery email`);
+      } finally {
+        await deviceContext.close();
+      }
+    }
+  } finally {
+    await safari.close();
+  }
+}
 await staffPage.setViewportSize({ width: 390, height: 844 });
 await staffPage.goto('http://127.0.0.1:5173/tests/security-onboarding/browser.html?edit');
 await staffPage.getByRole('heading',{name:'Edit Security Contract',exact:true}).waitFor();
