@@ -1,4 +1,5 @@
 import { useThemedStyles } from '../theme/ThemeContext';
+import { PtoRequestCard } from '../components/PtoRequestCard';
 import { InternalTimeCard } from '../components/InternalTimeCard';
 import { assertNoInternalTimer } from '../services/InternalTime';
 import { saveNativeClockGps } from '../services/ClockEventGps';
@@ -578,9 +579,14 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     );
   }
 
+  const ptoRequest = profile && timeContext && (
+    <PtoRequestCard key={profile.id} employeeId={profile.id} timezone={timeContext.timezone} />
+  );
+
   if (!timeContext?.dailyClock) {
     return (
       <ScreenContainer scroll>
+        {ptoRequest}
         <View style={themedStyles.infoCard}>
           <Text style={themedStyles.infoTitle}>My Work & Time</Text>
           <Text style={themedStyles.infoText}>
@@ -611,6 +617,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   return (
     <ScreenContainer scroll>
+      {ptoRequest}
       {clockFlash && (
         <View accessible accessibilityRole="alert" style={themedStyles.clockFlash}>
           <Text style={themedStyles.clockFlashTitle}>{clockFlash.pending ? 'CLOCK SAVED' : clockFlash.action === 'in' ? "YOU'RE IN!" : "YOU'RE OFF!"}</Text>

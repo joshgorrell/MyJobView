@@ -27,19 +27,21 @@ interface Request {
   total_hours: number;
   status: string;
   request_type: string;
+  leave_category: "sick" | "vacation" | null;
   reason: string | null;
   review_notes: string | null;
   leave_days: LeaveDay[] | null;
   policy: { policy_name: string };
 }
-export function MyTimeOff({ compact = false }: { compact?: boolean }) {
+export function MyTimeOff({ compact = false, openRequest = false }: { compact?: boolean; openRequest?: boolean }) {
   const { user, profile } = useAuth();
   const [tab, setTab] = useState<"mine" | "team" | "manage">("mine");
   const [balances, setBalances] = useState<Balance[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(openRequest);
+  const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [type, setType] = useState("full_day");
@@ -54,7 +56,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [today, setToday] = useState("");
   const [settings, setSettings] = useState({
-    notice: 28,
+    notice: 14,
     cutoff: "07:00",
     points: 10,
   });
@@ -72,7 +74,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       .then(({ data }) => {
         if (data && active)
           setSettings({
-            notice: data.pto_vacation_advance_days ?? 28,
+            notice: data.pto_vacation_advance_days ?? 14,
             cutoff: (data.pto_same_day_callin_cutoff_time ?? "07:00").slice(
               0,
               5,
@@ -99,7 +101,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
       supabase
         .from("pto_requests")
         .select(
-          "id,start_date,end_date,total_hours,request_type,status,reason,review_notes,leave_days,policy:pto_policies!policy_id(policy_name)",
+          "id,start_date,end_date,total_hours,request_type,leave_category,status,reason,review_notes,leave_days,policy:pto_policies!policy_id(policy_name)",
         )
         .eq("employee_id", user.id)
         .order("submitted_at", { ascending: false }),
@@ -185,33 +187,45 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   // A single assigned balance is required until legacy multi-policy data is reconciled.
   const activePolicy = balances.length === 1 ? balances[0].policy.id : "";
   const selected = balances.length === 1 ? balances[0] : undefined;
+  const classifiesPto = !!selected?.policy.is_paid && ["vacation", "sick", "personal"].includes(selected.policy.pto_type);
   const total = preview.reduce((sum, d) => sum + Number(d.hours), 0);
   const shortNotice =
     start &&
     today &&
+    (classifiesPto ? category === "vacation" : selected?.policy.pto_type === "vacation") &&
     (new Date(start + "T12:00Z").getTime() -
       new Date(today + "T12:00Z").getTime()) /
       86400000 <
-      28;
+      settings.notice;
   async function submit() {
-    if (!activePolicy || !preview.length || previewError || (start === today && !calledManagerAcknowledged)) return;
+    if (!activePolicy || (classifiesPto && !category) || !preview.length || previewError || (start === today && !calledManagerAcknowledged)) return;
     setBusy(true);
     setError("");
-    const { error } = await supabase.rpc("submit_time_off", {
+    const params = {
       p_policy: activePolicy,
       p_start: start,
       p_end: end,
       p_type: type,
       p_start_time: type === "full_day" ? null : startTime,
       p_end_time: type === "full_day" ? null : endTime,
-      p_reason: start === today
-        ? [reason.trim() || "Same-day call-in", `Manager phone call self-attested by employee ${user?.id ?? "unknown"} at ${new Date().toISOString()} (UTC).`].join("\n")
-        : reason || null,
-    });
+    };
+    const { error } = classifiesPto
+      ? await supabase.rpc("submit_classified_pto", {
+          ...params, p_category: category, p_reason: reason || null,
+          p_called_manager: calledManagerAcknowledged,
+        })
+      : await supabase.rpc("submit_time_off", {
+          ...params,
+          p_reason: start === today
+            ? [reason.trim() || "Same-day call-in", `Manager phone call self-attested by employee ${user?.id ?? "unknown"} at ${new Date().toISOString()} (UTC).`].join("\n")
+            : reason || null,
+        });
     if (error) setError(error.message);
     else {
       setCalledManagerAcknowledged(false);
       setShowForm(false);
+      setCategory("");
+      setReason("");
       setRefresh((v) => v + 1);
     }
     setBusy(false);
@@ -238,7 +252,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
           }}
           className="min-h-11 rounded-lg bg-blue-600 px-4 text-white"
         >
-          Request Time Off
+          Request PTO
         </button>
       </div>
       {!compact && <div className="flex flex-wrap gap-2">
@@ -315,7 +329,8 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
             {requests.slice().sort((a, b) => (["pending", "approved"].includes(a.status) ? 0 : 1) - (["pending", "approved"].includes(b.status) ? 0 : 1)).map((r) => (
               <article key={r.id} className="border-b border-subtle pb-3">
                 <div className="flex flex-wrap justify-between gap-2">
-                  <strong>{r.policy?.policy_name || "Time off"}</strong>
+                  <strong>{r.leave_category === "sick" ? "Sick" : r.leave_category === "vacation" ? "Vacation" : "Unclassified"}</strong>
+                  {!r.leave_category && r.policy?.policy_name && <span className="ml-2 text-sm text-muted">{r.policy.policy_name}</span>}
                   <span className="capitalize">{r.status}</span>
                 </div>
                 <p>
@@ -386,8 +401,18 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                   : "Your PTO setup needs administrator review before requesting time off."}
               </p>
             )}
+            {classifiesPto && (
+              <label className="block">
+                PTO Category
+                <select className={field} value={category} onChange={(e) => setCategory(e.target.value)} required>
+                  <option value="">Choose a category</option>
+                  <option value="sick">Sick</option>
+                  <option value="vacation">Vacation</option>
+                </select>
+              </label>
+            )}
             <label className="block">
-              Request Type
+              Duration
               <select
                 className={field}
                 value={type}
@@ -411,6 +436,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                   value={start}
                   onChange={(e) => {
                     setStart(e.target.value);
+                    setCalledManagerAcknowledged(false);
                     if (type === "hours" || !end || end < e.target.value)
                       setEnd(e.target.value);
                   }}
@@ -467,7 +493,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
               )
             )}
             {shortNotice && (
-              <p className="text-xs leading-relaxed text-muted">PTO requests made less than four weeks in advance may not be approved. Approval is not guaranteed.</p>
+              <p className="text-xs leading-relaxed text-muted">Vacation requests made less than {settings.notice} days in advance require a manager override.</p>
             )}
             {start === today &&
               selected &&
@@ -504,6 +530,7 @@ export function MyTimeOff({ compact = false }: { compact?: boolean }) {
                 (start === today && !calledManagerAcknowledged) ||
                 previewLoading ||
                 !activePolicy ||
+                (classifiesPto && !category) ||
                 !preview.length ||
                 !!previewError
               }

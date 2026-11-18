@@ -44,6 +44,7 @@ UPDATE pto_policies SET organization_id='${id(1)}';INSERT INTO company_settings(
 GRANT USAGE ON SCHEMA public,auth TO authenticated,anon;GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 `);
 await db.exec(await readFile('supabase/migrations/20261013181442_complete_pto_in_existing_workspaces.sql','utf8'));
+await db.exec(await readFile('supabase/migrations/20261118133000_classify_shared_pto_requests.sql','utf8'));
 const vacation=(await db.query("SELECT id FROM pto_policies WHERE pto_type='vacation'")).rows[0].id;
 async function as(n){await db.exec(`RESET ROLE;SELECT set_config('test.uid','${n?id(n):''}',false);SET ROLE authenticated;`);}
 const scalar=async(sql,args=[])=>(await db.query(sql,args)).rows[0];
@@ -81,6 +82,38 @@ await as(11);const pending=(await scalar("SELECT submit_time_off($1,'2027-03-01'
 await as(12);await db.exec(`INSERT INTO pay_periods VALUES('${id(60)}','${id(1)}',null,'2027-04-01','2027-04-30','locked')`);
 await as(11);const locked=(await scalar("SELECT submit_time_off($1,'2027-04-01','2027-04-01','full_day') id",[vacation])).id;
 await as(12);await assert.rejects(db.query('SELECT review_time_off($1,\'approved\')',[locked]),/Reopen/);
+await as(12);
+await db.exec("UPDATE company_settings SET pto_vacation_advance_days=36500");
+await db.exec("UPDATE employee_payroll_configs SET expected_weekly_hours=56, work_days=ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday']");
+await as(11);
+const current = (await scalar("SELECT (now() AT TIME ZONE 'America/Chicago')::date::text today")).today;
+const submitClassified = (category, called) => scalar(
+  "SELECT submit_classified_pto($1,$2,$2,'full_day',$3,null,null,null,$4) id",
+  [vacation, current, category, called],
+);
+await assert.rejects(submitClassified('sick', false), /Call your manager/);
+await assert.rejects(submitClassified('other', true), /Choose Sick or Vacation/);
+const sick = (await submitClassified('sick', true)).id;
+const sickRecord = await scalar('SELECT leave_category, reason FROM pto_requests WHERE id=$1', [sick]);
+assert.equal(sickRecord.leave_category, 'sick');
+assert.match(sickRecord.reason, /phone call self-attested/);
+assert.equal((await scalar('SELECT leave_category FROM pto_requests WHERE id=$1', [locked])).leave_category, null);
+assert.equal(Number((await scalar('SELECT pending_hours FROM pto_balances')).pending_hours), 16);
+await as(12);
+await db.query("SELECT review_time_off($1,'approved')", [sick]);
+await as(11);
+assert.equal(Number((await scalar('SELECT current_balance_hours FROM pto_balances')).current_balance_hours), 72);
+const planned = (await scalar(
+  "SELECT submit_classified_pto($1,current_date+7,current_date+7,'full_day','vacation') id",
+  [vacation],
+)).id;
+await as(12);
+await assert.rejects(db.query("SELECT review_time_off($1,'approved')", [planned]), /override reason/);
+await db.query("SELECT review_time_off($1,'approved','Staffing confirmed',true)", [planned]);
+await as(11);
+assert.equal(Number((await scalar('SELECT current_balance_hours FROM pto_balances')).current_balance_hours), 64);
+await as(13);
+assert.equal((await db.query('SELECT leave_category FROM pto_requests')).rows.length, 0);
 await db.exec('SET ROLE anon');await assert.rejects(db.query("SELECT * FROM team_time_off('2027-01-04','2027-01-08')"),/permission denied/);
 console.log('PTO database checks passed: real schedule, scoped privacy, approval, daily payroll, cancellation, partial-day booking, coverage and payroll locks.');
 // Apply the new migration on top of the real PTO workflow, including its mirrors/RLS/locks.
