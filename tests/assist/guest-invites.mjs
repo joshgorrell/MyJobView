@@ -39,7 +39,6 @@ assert.equal(armDownload.searchParams.get('id'),'43','ARM64 must request its own
 assert.equal(armDownload.searchParams.get('installflags'),'1','ARM64 guest must remain temporary');
 assert.equal(armDownload.searchParams.get('meshid'),new URL(download).searchParams.get('meshid'),'Architecture must not change dealer group');
 await archEnabled.guest({organization_id:org,operation:'end',invite_id:armInvite.invite_id,claim_token:armClaim.claim_token});
-const baselineRevokes=revokes,baselineDeletes=deletes;
 const invite=await staff('invite_create');assert.match(invite.code,/^[2-9A-HJ-NP-Z]{4}(-[2-9A-HJ-NP-Z]{4}){2}$/);
 await assert.rejects(broker.guest({organization_id:other,operation:'redeem',code:invite.code}),/unavailable/);
 const claims=await Promise.allSettled([1,2].map(()=>broker.guest({organization_id:org,operation:'redeem',code:invite.code.toLowerCase()})));
@@ -53,7 +52,8 @@ await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unava
 online=[{id:device,online:true}];assert.equal((await staff('invite_status',{invite_id:invite.invite_id})).state,'computer_ready');
 const connected=await staff('invite_connect',{invite_id:invite.invite_id});assert.equal(connected.state,'support_window_ready');assert.equal(opens,1);
 await assert.rejects(staff('invite_connect',{invite_id:invite.invite_id}),/unavailable/);assert.equal(opens,1,'Only one desktop viewer is issued');
-assert.equal((await guest('end')).ended,true);assert.equal(revokes,baselineRevokes+1);assert.equal(deletes,baselineDeletes+1);assert.equal(endReasons.at(-1),'user_ended');
+const beforeGuestEndRevokes=revokes,beforeGuestEndDeletes=deletes;
+assert.equal((await guest('end')).ended,true);assert.equal(revokes,beforeGuestEndRevokes+1);assert.equal(deletes,beforeGuestEndDeletes+1);assert.equal(endReasons.at(-1),'user_ended');
 await assert.rejects(guest('status'),/unavailable/);
 // A guest that closes the temporary Windows client without clicking End must
 // lose the native viewer on the next short session sweep.
@@ -104,17 +104,17 @@ let checked=0;const outages=createGuestBroker({...options,rpc:async(name,args)=>
 await outages.staff({...context,operation:'invite_create'});checked=0; // A second independent invitation must also be swept on auth failure.
 await outages.staff({...context,operation:'invite_create'});checked=2;
 const beforeDeletes=deletes;await outages.sweep();assert.equal(deletes,beforeDeletes+2);
-const fallbackInvite=await staff('invite_create');
-await assert.rejects(broker.guest({organization_id:org,operation:'redeem',code:fallbackInvite.code,architecture:'arm64'}),/unavailable/);
-const fallbackClaim=await broker.guest({organization_id:org,operation:'redeem',code:fallbackInvite.code,architecture:'x64'});assert.equal(new URL(fallbackClaim.download_url).searchParams.get('id'),'4','Unapproved ARM request does not consume code');
+const unapprovedArmInvite=await staff('invite_create');
+await assert.rejects(broker.guest({organization_id:org,operation:'redeem',code:unapprovedArmInvite.code,architecture:'arm64'}),/unavailable/);
+const fallbackClaim=await broker.guest({organization_id:org,operation:'redeem',code:unapprovedArmInvite.code,architecture:'x64'});assert.equal(new URL(fallbackClaim.download_url).searchParams.get('id'),'4','Unapproved ARM request does not consume code');
 const armBroker=createGuestBroker({...options,arm64Enabled:true});
 const arm=await armBroker.staff({...context,operation:'invite_create'});
-const armBrokerClaim=await armBroker.guest({organization_id:org,operation:'redeem',code:arm.code,architecture:'arm64'});
-assert.equal(new URL(armBrokerClaim.download_url).searchParams.get('id'),'43');assert.equal(new URL(armBrokerClaim.download_url).searchParams.get('installflags'),'1');
-assert.equal(new URL(armBrokerClaim.download_url).searchParams.get('meshid'),new URL(download).searchParams.get('meshid'));
+const approvedArmClaim=await armBroker.guest({organization_id:org,operation:'redeem',code:arm.code,architecture:'arm64'});
+assert.equal(new URL(approvedArmClaim.download_url).searchParams.get('id'),'43');assert.equal(new URL(approvedArmClaim.download_url).searchParams.get('installflags'),'1');
+assert.equal(new URL(approvedArmClaim.download_url).searchParams.get('meshid'),new URL(download).searchParams.get('meshid'));
 assert.throws(()=>validateGuestRequest({organization_id:org,operation:'redeem',code:arm.code,architecture:'linux'}));
-const armHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async c=>{assert.equal(c.architecture,'arm64');return armBrokerClaim;}});
+const armHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async c=>{assert.equal(c.architecture,'arm64');return approvedArmClaim;}});
 assert.equal((await armHandler(request({operation:'redeem',code:arm.code,architecture:'arm64'}))).status,200);
-const wrongArmHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...armBrokerClaim,download_url:download})});
+const wrongArmHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...approvedArmClaim,download_url:download})});
 assert.equal((await wrongArmHandler(request({operation:'redeem',code:arm.code,architecture:'arm64'}))).status,503);
 console.log('Assist guest invitations: one-time claim, tenant/actor/session binding, temporary scope, expiry, revocation, generation fences, cleanup fallback, restart and Edge validation pass');
