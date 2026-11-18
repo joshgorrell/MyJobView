@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Download, X } from 'lucide-react';
+import { ArrowLeft, Download, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useTenant } from '../../contexts/TenantContext';
 const CODE_ALPHABET = /^[2-9A-HJ-NP-Z]{12}$/;
@@ -68,6 +68,15 @@ export default function AssistGuestPage({ initialCode = '' }: { initialCode?: st
   }
   return <main className="theme-workspace min-h-screen bg-workspace px-4 py-10 sm:py-16">
     <div className="mx-auto w-full max-w-lg rounded-xl border border-subtle bg-surface p-6 shadow-sm sm:p-8">
+      {!claim && !busy && (
+        <a
+          href="/"
+          className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-info hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+          Return to MyJobView
+        </a>
+      )}
       <header className="mb-6 flex flex-col items-center text-center">
         {tenant?.logoUrl && !dealerLogoFailed ? <img src={tenant.logoUrl} onError={() => setDealerLogoFailed(true)} alt={tenant.organizationName || 'Your support provider'} className="mb-4 h-auto max-h-32 w-auto max-w-full object-contain" /> : <h1 className="mb-4 text-2xl font-bold text-primary">{tenant?.organizationName || 'Remote support'}</h1>}
         <img src="/images/myjobview-assist.png" alt="MyJobView Assist" width={2172} height={724} className="h-auto w-36 max-w-full object-contain" />
