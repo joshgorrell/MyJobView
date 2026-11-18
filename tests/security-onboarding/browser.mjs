@@ -193,6 +193,7 @@ assert.ok((await staffPage.locator('body').innerText()).includes('Service names:
 // Use the signed-in workspace theme, including its control and surface overrides.
 await staffPage.evaluate(() => {
   document.documentElement.dataset.theme = 'dark';
+  document.documentElement.style.colorScheme = 'dark';
   document.getElementById('root').classList.add('theme-workspace');
 });
 const createDialog = staffPage.getByRole('dialog', { name: 'Create Security Agreement' });
