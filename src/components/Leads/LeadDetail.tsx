@@ -1,3 +1,4 @@
+import { FOLLOW_UP_PRESETS, followUpInMonths } from '../../lib/followUpDates';
 import { notify } from '../../lib/feedback';
 import { useEffect, useState } from 'react';
 import { X, Mail, Phone, Building2, MessageSquare, Send, User, Tag, Calendar, UserCircle, Edit2, Save, Trash2, AlertCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react';
@@ -750,13 +751,23 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             <div className="flex flex-wrap items-center gap-3 rounded-lg border border-subtle px-3 py-2 text-sm">
               <span className="text-secondary">Lead status</span>
               <span className="font-medium text-primary">{lead.converted_at ? 'Converted' : lead.status === 'closed_won' || lead.status === 'closed_lost' ? 'Closed' : Date.now() - new Date(lead.last_contact_date || lead.created_at).getTime() >= 90 * 86400000 ? 'Stale' : 'Active'}</span>
-              <label className="ml-auto flex flex-wrap items-center gap-2 text-secondary">
-                <Calendar className="w-4 h-4" /> Reminder
-                <input type="datetime-local" aria-label="Follow-up reminder" value={reminderDate}
-                  onChange={(e) => { setReminderDate(e.target.value); void handleReminderDateChange(e.target.value); }}
-                  disabled={savingReminder}
-                  className="rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-primary disabled:opacity-50" />
-              </label>
+              <div className="ml-auto flex flex-wrap items-center gap-2 text-secondary" role="group" aria-label="Reminder">
+                <span className="inline-flex items-center gap-1"><Calendar className="w-4 h-4" /> Reminder</span>
+                {FOLLOW_UP_PRESETS.map(({ label, months }) => (
+                  <button key={months} type="button" disabled={savingReminder}
+                    onClick={() => void handleReminderDateChange(`${followUpInMonths(months)}T09:00`)}
+                    className="rounded-md border border-subtle bg-surface px-2 py-1.5 text-xs text-primary disabled:opacity-50">
+                    {label}
+                  </button>
+                ))}
+                <label className="inline-flex flex-wrap items-center gap-1">
+                  Custom
+                  <input type="datetime-local" aria-label="Custom follow-up reminder" value={reminderDate}
+                    onChange={(event) => { setReminderDate(event.target.value); void handleReminderDateChange(event.target.value); }}
+                    disabled={savingReminder}
+                    className="rounded-md border border-subtle bg-surface px-2 py-1.5 text-sm text-primary disabled:opacity-50" />
+                </label>
+              </div>
             </div>
           )}
 
