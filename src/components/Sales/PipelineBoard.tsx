@@ -33,7 +33,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
   const [timeFilter, setTimeFilter] = useState<number>(14);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [leadAgeFilter] = useState<number | null>(null);
+  const [leadAgeFilter, setLeadAgeFilter] = useState<number | null>(null);
   const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
@@ -541,11 +541,73 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     );
   }
 
-  const totalItems = filteredStages.reduce((sum, stage) => sum + stage.count, 0);
-  const originalTotalItems = stages.reduce((sum, stage) => sum + stage.count, 0);
+  const leads = stages.find(stage => stage.id === 'leads')?.items.filter(item => filterItems(item, 'leads')) || [];
+  const leadAging = [30, 60, 90].map(days => ({
+    days,
+    count: leads.filter(lead => lead.created_at && getDaysOld(lead.created_at) >= days).length,
+  }));
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        {/* Search Box */}
+        <div className="relative flex-1 sm:min-w-56 sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search the pipeline…"
+            aria-label="Search the pipeline"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all touch-manipulation"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear pipeline search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
+        </div>
+        {canViewAllPipeline && (
+          <select
+            aria-label="Pipeline scope"
+            value={viewMode}
+            onChange={event => setViewMode(event.target.value === 'all' ? 'all' : 'my')}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-primary"
+          >
+            <option value="my">My Pipeline</option>
+            <option value="all">All</option>
+          </select>
+        )}
+        <select
+          aria-label="Date range for contacts and connections"
+          title="Date range for contacts and connections"
+          value={timeFilter}
+          onChange={(e) => setTimeFilter(Number(e.target.value))}
+          className="px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-manipulation"
+        >
+          <option value={14}>Last 14 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={60}>Last 60 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
+        {/* Widget Customization Button */}
+        <button
+          onClick={() => setShowWidgetSettings(true)}
+          className="flex items-center gap-2 px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
+          title="Customize widgets"
+        >
+          <Settings className="w-4 h-4" />
+          <span className="hidden sm:inline">Widgets</span>
+        </button>
+        <button type="button" onClick={() => setShowTutorial(true)} aria-label="Pipeline help" title="Pipeline help"
+          className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
+          <HelpCircle className="h-5 w-5" />
+        </button>
+      </div>
       {/* Four real stages, backed by the canonical Contacts, Leads, Proposals and Sales Orders tables. */}
       <PipelineStageOverview
         showAll={viewMode === 'all' && canViewAllPipeline}
@@ -563,296 +625,79 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           setShowContactForm(true);
         }}
       />
-      {/* Header Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">
-                Pipeline Board
-              </h2>
-              <p className="text-sm sm:text-base text-gray-300">
-                {searchQuery ? `${totalItems} of ${originalTotalItems} items` : `${totalItems} items`}
-              </p>
-            </div>
-            <button
-              onClick={() => setShowTutorial(true)}
-              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              title="Learn about Pipeline concepts"
-            >
-              <HelpCircle className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
 
-        {/* Search and Filter Row */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search contacts, leads, companies..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all touch-manipulation"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
-              >
-                <X className="w-4 h-4 text-gray-400" />
-              </button>
-            )}
-          </div>
-
-          {/* View Mode and Time Filter */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {canViewAllPipeline && (
-              <div className="flex items-center gap-1 bg-white rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('my')}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors touch-manipulation ${
-                    viewMode === 'my'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'
-                  }`}
-                >
-                  <UserCircle className="w-4 h-4" />
-                  <span className="hidden sm:inline">My Pipeline</span>
-                  <span className="sm:hidden">My</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('all')}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors touch-manipulation ${
-                    viewMode === 'all'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span className="hidden sm:inline">All Pipeline</span>
-                  <span className="sm:hidden">All</span>
-                </button>
-              </div>
-            )}
-
-            <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(Number(e.target.value))}
-              className="px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-manipulation"
-            >
-              <option value={14}>Last 14 days</option>
-              <option value={30}>Last 30 days</option>
-              <option value={60}>Last 60 days</option>
-              <option value={90}>Last 90 days</option>
-            </select>
-
-            {/* Widget Customization Button */}
-            <button
-              onClick={() => setShowWidgetSettings(true)}
-              className="flex items-center gap-2 px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
-              title="Customize widgets"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Widgets</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Aging reflects currently displayed leads, not historical funnel conversions. */}
-      {selectedWidgets.includes('leads') && (() => {
-        const leads = stages.find(stage => stage.id === 'leads')?.items.filter(item => filterItems(item, 'leads')) || [];
-        const aging = [30, 60, 90].map(days => ({
-          days,
-          count: leads.filter(lead => lead.created_at && getDaysOld(lead.created_at) >= days).length,
-        }));
-        return (
-          <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4" aria-label="Lead aging">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="text-sm font-semibold text-gray-800">Open lead aging</span>
-              {aging.map(({ days, count }) => (
-                <span key={days} className={`text-xs sm:text-sm ${count > 0 && days >= 90 ? 'text-amber-700 font-semibold' : 'text-gray-600'}`}>
-                  {days}+ days: <strong>{count}</strong>
-                </span>
-              ))}
-              <span className="text-xs text-gray-500">Select an age to filter Leads below. Counts overlap; based on creation date and current search/rep filters.</span>
-            </div>
-          </div>
-        );
-      })()}
-
-      <div className="overflow-x-auto pb-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
-          {filteredStages.map(stage => (
-            <div key={stage.id} id={`pipeline-${stage.id}`} className="flex flex-col scroll-mt-6">
-              <div className={`${stage.bgColor} border-2 ${stage.borderColor} rounded-t-lg p-3 sm:p-4`}>
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className={`text-sm sm:text-base font-semibold ${stage.color}`}>
-                    {stage.name}
-                  </h3>
-                  <div className="flex items-center gap-1">
-                    {stage.id === 'leads' && (
-                      <button
-                        onClick={() => {
-                          setShowPrintLeads(true);
-                        }}
-                        className="p-1.5 hover:bg-white/50 active:bg-white/70 rounded transition-colors touch-manipulation"
-                        title={`Print ${stage.name} report`}
-                      >
-                        <Printer className="w-4 h-4 text-gray-600" />
-                      </button>
-                    )}
+      <div className="grid gap-4 pb-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
+        {filteredStages.map(stage => (
+          <div key={stage.id} id={`pipeline-${stage.id}`} className="flex min-w-0 scroll-mt-6 flex-col rounded-lg border border-gray-200 bg-surface">
+            <div className="border-b border-gray-200 px-3 py-2.5">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-primary">
+                  {stage.name}
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs tabular-nums text-gray-700">{stage.count}</span>
+                </h3>
+                <div className="flex items-center gap-1">
+                  {stage.id === 'leads' && (
                     <button
-                      onClick={() => handleAddNew(stage.id)}
+                      onClick={() => {
+                        setShowPrintLeads(true);
+                      }}
                       className="p-1.5 hover:bg-white/50 active:bg-white/70 rounded transition-colors touch-manipulation"
-                      title={`Add new ${stage.name.toLowerCase()}`}
+                      title={`Print ${stage.name} report`}
                     >
-                      <Plus className="w-4 h-4 text-gray-700" />
+                      <Printer className="w-4 h-4 text-gray-600" />
                     </button>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-600 mb-2">{stage.description}</p>
-                <div className="text-xs sm:text-sm">
-                  <span className="text-gray-700 font-medium">
-                    {stage.count} item{stage.count !== 1 ? 's' : ''}
-                  </span>
+                  )}
+                  <button
+                    onClick={() => handleAddNew(stage.id)}
+                    className="p-1.5 hover:bg-white/50 active:bg-white/70 rounded transition-colors touch-manipulation"
+                    title={`Add new ${stage.name.toLowerCase()}`}
+                  >
+                    <Plus className="w-4 h-4 text-gray-700" />
+                  </button>
                 </div>
               </div>
+              {stage.id === 'leads' && (leadAgeFilter !== null || leadAging.some(({ count }) => count > 0)) && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter leads by age">
+                  {leadAging.map(({ days, count }) => (
+                    <button
+                      key={days}
+                      type="button"
+                      aria-pressed={leadAgeFilter === days}
+                      onClick={() => setLeadAgeFilter(leadAgeFilter === days ? null : days)}
+                      className={`rounded-md border border-gray-200 px-2 py-1 text-xs ${leadAgeFilter === days ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      {days}+ days · {count}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-              <div className="bg-gray-50 border-l-2 border-r-2 border-b-2 border-gray-200 rounded-b-lg p-2 space-y-2 min-h-[500px]">
-                {stage.count === 0 ? (
-                  <div className="text-center py-8 text-sm text-gray-400">
-                    No items
-                  </div>
-                ) : (
-                  stage.items.map(item => {
-                    const daysOld = getDaysOld(item.created_at);
-                    const isNew = daysOld <= 14;
+            <div className="min-h-24 flex-1 space-y-2 rounded-b-lg bg-gray-50 p-2">
+              {stage.count === 0 ? (
+                <div className="text-center py-8 text-sm text-gray-400">
+                  No items
+                </div>
+              ) : (
+                stage.items.map(item => {
+                  const daysOld = getDaysOld(item.created_at);
+                  const isNew = daysOld <= 14;
 
-                    // Render different card types based on stage
-                    if (stage.id === 'contacts') {
-
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => handleContactClick(item.id)}
-                          className={`bg-white rounded-lg border-2 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation border-gray-200`}
-                        >
-                          <div className="mb-2">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <h4 className="customer-link font-semibold text-sm truncate">
-                                {item.contact_type === 'person'
-                                  ? (item.contact_name || item.company_name)
-                                  : (item.company_name || item.contact_name)}
-                              </h4>
-                              <div className="flex items-center gap-1">
-                                {isNew && (
-                                  <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                                    NEW
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {item.contact_type === 'person' ? (
-                              item.company_name && (
-                                <p className="text-xs text-gray-600">
-                                  {item.company_name}
-                                </p>
-                              )
-                            ) : (
-                              item.contact_name && (
-                                <p className="text-xs text-gray-600">
-                                  {item.contact_name}
-                                </p>
-                              )
-                            )}
-                          </div>
-
-                          {item.email && (
-                            <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-                              <Mail className="w-3 h-3" />
-                              <span className="truncate">{item.email}</span>
-                            </div>
-                          )}
-                          {item.phone && (
-                            <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                              <Phone className="w-3 h-3" />
-                              <span>{item.phone}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Clock className="w-3 h-3" />
-                              <span>{formatDistanceToNow(item.created_at)}</span>
-                            </div>
-                            <Eye className="w-4 h-4 text-gray-400" />
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (stage.id === 'connections') {
-                      const contact = item.contacts || {};
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => handleContactClick(item.contact_id)}
-                          className="bg-white rounded-lg border-2 border-gray-200 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation"
-                        >
-                          <div className="mb-2">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <h4 className="customer-link font-semibold text-sm truncate">
-                                {contact.contact_type === 'person'
-                                  ? (contact.contact_name || contact.company_name)
-                                  : (contact.company_name || contact.contact_name)}
-                              </h4>
-                              {isNew && (
-                                <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                                  NEW
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-600">
-                              {item.connection_type?.replace('_', ' ')}
-                            </p>
-                          </div>
-                          {item.notes && (
-                            <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                              {item.notes}
-                            </p>
-                          )}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Clock className="w-3 h-3" />
-                              <span>{formatDistanceToNow(item.created_at)}</span>
-                            </div>
-                            <Eye className="w-4 h-4 text-gray-400" />
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // Leads and Fishbowl
-                    const isAssignedToMe = item.assigned_to === profile?.id;
-                    const isAssigned = !!item.assigned_to;
+                  // Render different card types based on stage
+                  if (stage.id === 'contacts') {
 
                     return (
                       <div
                         key={item.id}
-                        onClick={() => openLead(item.id)}
-                        className={`bg-white rounded-lg border-2 p-3 hover:shadow-md active:shadow-lg transition-all cursor-pointer touch-manipulation ${
-                          isAssignedToMe
-                            ? 'border-blue-500 bg-blue-50/30'
-                            : 'border-gray-200 hover:border-blue-400 active:bg-gray-50'
-                        }`}
+                        onClick={() => handleContactClick(item.id)}
+                        className={`bg-white rounded-lg border-2 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation border-gray-200`}
                       >
                         <div className="mb-2">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <h4 className="customer-link font-semibold text-sm truncate">
-                              {item.contact_name}
+                              {item.contact_type === 'person'
+                                ? (item.contact_name || item.company_name)
+                                : (item.company_name || item.contact_name)}
                             </h4>
                             <div className="flex items-center gap-1">
                               {isNew && (
@@ -860,82 +705,33 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                                   NEW
                                 </span>
                               )}
-                              {isAssignedToMe && (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
-                                  MINE
-                                </span>
-                              )}
                             </div>
                           </div>
-                          {item.company_name && item.company_name.toLowerCase() !== 'unknown' && (
-                            <p className="text-xs text-gray-600 mb-1">
-                              {item.company_name}
-                            </p>
-                          )}
-                          {item.lead_source === 'kiosk' && (
-                            <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
-                              <span>📱 Kiosk Entry</span>
-                            </div>
-                          )}
-                          {item.lead_source === 'email_forward' && (
-                            <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
-                              <MailOpen className="w-3 h-3" />
-                              <span>Email Forward</span>
-                            </div>
+                          {item.contact_type === 'person' ? (
+                            item.company_name && (
+                              <p className="text-xs text-gray-600">
+                                {item.company_name}
+                              </p>
+                            )
+                          ) : (
+                            item.contact_name && (
+                              <p className="text-xs text-gray-600">
+                                {item.contact_name}
+                              </p>
+                            )
                           )}
                         </div>
+
                         {item.email && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
                             <Mail className="w-3 h-3" />
                             <span className="truncate">{item.email}</span>
                           </div>
                         )}
                         {item.phone && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600 mb-2">
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
                             <Phone className="w-3 h-3" />
                             <span>{item.phone}</span>
-                          </div>
-                        )}
-                        {item.priority && (
-                          <div className="mb-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                              item.priority === 'critical'
-                                ? 'bg-red-100 text-red-800'
-                                : item.priority === 'high'
-                                ? 'bg-orange-100 text-orange-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {item.priority}
-                            </span>
-                          </div>
-                        )}
-                        {(Boolean(item.reminder_date) && String(item.reminder_date).slice(0, 10) <= localDay(new Date())) && (
-                          <div className="mb-2">
-                            <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
-                            {snoozeLeadId === item.id && (
-                              <div onClick={e => e.stopPropagation()} className="mt-2 rounded border border-gray-200 bg-white p-2 space-y-2">
-                                <div className="flex flex-wrap gap-1">
-                                  {([{ label: 'Tomorrow', days: 1 }, { label: '3 days', days: 3 }, { label: '1 week', days: 7 }, { label: '1 month', months: 1 }, { label: '3 months', months: 3 }, { label: '6 months', months: 6 }] as const).map(option => (
-                                    <button key={option.label} type="button" disabled={snoozing} onClick={() => {
-                                      const date = new Date();
-                                      if ('months' in option) date.setMonth(date.getMonth() + option.months);
-                                      else date.setDate(date.getDate() + option.days);
-                                      void snoozeLead(item.id, localDay(date));
-                                    }} className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{option.label}</button>
-                                  ))}
-                                </div>
-                                <label className="block text-xs text-gray-600">Custom follow-up date
-                                  <input type="date" min={localDay(new Date(new Date().setDate(new Date().getDate() + 1)))} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
-                                </label>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {/* Show assigned rep info */}
-                        {isAssigned && !isAssignedToMe && item.assigned_rep?.full_name && (
-                          <div className="flex items-center gap-1 text-xs text-gray-600 mb-2 bg-gray-50 px-2 py-1 rounded">
-                            <User className="w-3 h-3" />
-                            <span className="truncate">{item.assigned_rep.full_name}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-2">
@@ -945,65 +741,179 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                           </div>
                           <Eye className="w-4 h-4 text-gray-400" />
                         </div>
-                        {(!item.assigned_to || item.status === 'unclaimed') && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleClaimClick(item.id, item.contact_name);
-                            }}
-                            className="w-full px-3 py-2.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors mt-2 touch-manipulation"
-                          >
-                            Claim Lead
-                          </button>
-                        )}
                       </div>
                     );
-                  })
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+                  }
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Pipeline Insights {searchQuery && <span className="text-sm text-gray-500 font-normal">(filtered)</span>}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {selectedWidgets.includes('contacts') && (
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">New Contacts</p>
-              <p className="text-2xl font-bold text-gray-700">
-                {filteredStages.find(s => s.id === 'contacts')?.count || 0}
-              </p>
+                  if (stage.id === 'connections') {
+                    const contact = item.contacts || {};
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleContactClick(item.contact_id)}
+                        className="bg-white rounded-lg border-2 border-gray-200 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation"
+                      >
+                        <div className="mb-2">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h4 className="customer-link font-semibold text-sm truncate">
+                              {contact.contact_type === 'person'
+                                ? (contact.contact_name || contact.company_name)
+                                : (contact.company_name || contact.contact_name)}
+                            </h4>
+                            {isNew && (
+                              <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {item.connection_type?.replace('_', ' ')}
+                          </p>
+                        </div>
+                        {item.notes && (
+                          <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                            {item.notes}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatDistanceToNow(item.created_at)}</span>
+                          </div>
+                          <Eye className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Leads and Fishbowl
+                  const isAssignedToMe = item.assigned_to === profile?.id;
+                  const isAssigned = !!item.assigned_to;
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => openLead(item.id)}
+                      className={`bg-white rounded-lg border-2 p-3 hover:shadow-md active:shadow-lg transition-all cursor-pointer touch-manipulation ${
+                        isAssignedToMe
+                          ? 'border-blue-500 bg-blue-50/30'
+                          : 'border-gray-200 hover:border-blue-400 active:bg-gray-50'
+                      }`}
+                    >
+                      <div className="mb-2">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <h4 className="customer-link font-semibold text-sm truncate">
+                            {item.contact_name}
+                          </h4>
+                          <div className="flex items-center gap-1">
+                            {isNew && (
+                              <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
+                                NEW
+                              </span>
+                            )}
+                            {isAssignedToMe && (
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
+                                MINE
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {item.company_name && item.company_name.toLowerCase() !== 'unknown' && (
+                          <p className="text-xs text-gray-600 mb-1">
+                            {item.company_name}
+                          </p>
+                        )}
+                        {item.lead_source === 'kiosk' && (
+                          <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
+                            <span>📱 Kiosk Entry</span>
+                          </div>
+                        )}
+                        {item.lead_source === 'email_forward' && (
+                          <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
+                            <MailOpen className="w-3 h-3" />
+                            <span>Email Forward</span>
+                          </div>
+                        )}
+                      </div>
+                      {item.email && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                          <Mail className="w-3 h-3" />
+                          <span className="truncate">{item.email}</span>
+                        </div>
+                      )}
+                      {item.phone && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600 mb-2">
+                          <Phone className="w-3 h-3" />
+                          <span>{item.phone}</span>
+                        </div>
+                      )}
+                      {item.priority && (
+                        <div className="mb-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            item.priority === 'critical'
+                              ? 'bg-red-100 text-red-800'
+                              : item.priority === 'high'
+                              ? 'bg-orange-100 text-orange-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {item.priority}
+                          </span>
+                        </div>
+                      )}
+                      {(Boolean(item.reminder_date) && String(item.reminder_date).slice(0, 10) <= localDay(new Date())) && (
+                        <div className="mb-2">
+                          <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
+                          {snoozeLeadId === item.id && (
+                            <div onClick={e => e.stopPropagation()} className="mt-2 rounded border border-gray-200 bg-white p-2 space-y-2">
+                              <div className="flex flex-wrap gap-1">
+                                {([{ label: 'Tomorrow', days: 1 }, { label: '3 days', days: 3 }, { label: '1 week', days: 7 }, { label: '1 month', months: 1 }, { label: '3 months', months: 3 }, { label: '6 months', months: 6 }] as const).map(option => (
+                                  <button key={option.label} type="button" disabled={snoozing} onClick={() => {
+                                    const date = new Date();
+                                    if ('months' in option) date.setMonth(date.getMonth() + option.months);
+                                    else date.setDate(date.getDate() + option.days);
+                                    void snoozeLead(item.id, localDay(date));
+                                  }} className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{option.label}</button>
+                                ))}
+                              </div>
+                              <label className="block text-xs text-gray-600">Custom follow-up date
+                                <input type="date" min={localDay(new Date(new Date().setDate(new Date().getDate() + 1)))} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Show assigned rep info */}
+                      {isAssigned && !isAssignedToMe && item.assigned_rep?.full_name && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600 mb-2 bg-gray-50 px-2 py-1 rounded">
+                          <User className="w-3 h-3" />
+                          <span className="truncate">{item.assigned_rep.full_name}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <Clock className="w-3 h-3" />
+                          <span>{formatDistanceToNow(item.created_at)}</span>
+                        </div>
+                        <Eye className="w-4 h-4 text-gray-400" />
+                      </div>
+                      {(!item.assigned_to || item.status === 'unclaimed') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClaimClick(item.id, item.contact_name);
+                          }}
+                          className="w-full px-3 py-2.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors mt-2 touch-manipulation"
+                        >
+                          Claim Lead
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
-          )}
-          {selectedWidgets.includes('connections') && (
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">New Connections</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {filteredStages.find(s => s.id === 'connections')?.count || 0}
-              </p>
-            </div>
-          )}
-          {selectedWidgets.includes('leads') && (
-            <div className="p-4 bg-green-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Leads</p>
-              <p className="text-2xl font-bold text-green-600">
-                {filteredStages.find(s => s.id === 'leads')?.count || 0}
-              </p>
-            </div>
-          )}
-          {selectedWidgets.includes('fishbowl') && (
-            <div className="p-4 bg-teal-50 rounded-lg">
-              <p className="text-sm text-gray-600 mb-1">Sales Department Leads</p>
-              <p className="text-2xl font-bold text-teal-600">
-                {filteredStages.find(s => s.id === 'fishbowl')?.count || 0}
-              </p>
-            </div>
-          )}
-        </div>
+          </div>
+        ))}
       </div>
 
       {/* Detail View Modals */}
