@@ -8,10 +8,9 @@ import { PipelineStageOverview } from './PipelineStageOverview';
 import { ContactForm } from '../Contacts/ContactForm';
 import { LeadDetail } from '../Leads/LeadDetail';
 import { LeadForm } from '../Leads/LeadForm';
-import ConnectionForm from '../Connections/ConnectionForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, CalendarClock, Settings, Check, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Settings, Check, HelpCircle, Printer } from 'lucide-react';
 
 
 interface PipelineStage {
@@ -26,6 +25,7 @@ interface PipelineStage {
 }
 
 const ACTIVITY_PAGE_SIZE = 500;
+const DEFAULT_PIPELINE_WIDGETS = ['contacts', 'leads', 'fishbowl'];
 
 async function loadActivityPages<T>(
   fetchPage: (start: number, end: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
@@ -65,12 +65,11 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactFormInitialStatus, setContactFormInitialStatus] = useState<'customer' | 'prospect'>('customer');
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showConnectionForm, setShowConnectionForm] = useState(false);
   const [showFishbowlForm, setShowFishbowlForm] = useState(false);
   const [showClaimConfirm, setShowClaimConfirm] = useState(false);
   const [leadToClaim, setLeadToClaim] = useState<{ id: string; name: string } | null>(null);
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
-  const [selectedWidgets, setSelectedWidgets] = useState<string[]>(['contacts', 'connections', 'leads', 'fishbowl']);
+  const [selectedWidgets, setSelectedWidgets] = useState<string[]>(DEFAULT_PIPELINE_WIDGETS);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showPrintLeads, setShowPrintLeads] = useState(false);
   const [salesReps, setSalesReps] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
@@ -84,14 +83,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       color: 'text-gray-700',
       bgColor: 'bg-gray-50',
       borderColor: 'border-gray-300'
-    },
-    {
-      id: 'connections',
-      name: 'Connections',
-      description: 'New connections',
-      color: 'text-blue-700',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-300'
     },
     {
       id: 'leads',
@@ -157,17 +148,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       )
       .subscribe();
 
-    const connectionsChannel = supabase
-      .channel('pipeline_connections')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'connections' },
-        () => {
-          loadPipelineData();
-        }
-      )
-      .subscribe();
-
     const leadsChannel = supabase
       .channel('pipeline_leads')
       .on(
@@ -182,7 +162,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     // Cleanup subscriptions
     return () => {
       supabase.removeChannel(contactsChannel);
-      supabase.removeChannel(connectionsChannel);
       supabase.removeChannel(leadsChannel);
     };
   }, [viewMode, timeFilter, profile, authLoading, preferencesLoaded, selectedWidgets]);
@@ -217,8 +196,9 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
         .eq('id', profile.id)
         .maybeSingle();
 
-      if (data?.pipeline_widgets) {
-        setSelectedWidgets(data.pipeline_widgets as string[]);
+      if (Array.isArray(data?.pipeline_widgets)) {
+        const widgets = (data.pipeline_widgets as string[]).filter(widget => DEFAULT_PIPELINE_WIDGETS.includes(widget));
+        setSelectedWidgets(widgets.length > 0 ? widgets : DEFAULT_PIPELINE_WIDGETS);
       }
     } catch (error) {
       console.error('Error loading widget preferences:', error);
@@ -294,33 +274,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           })()
         : Promise.resolve([]);
 
-      const connectionsPromise = selectedWidgets.includes('connections')
-        ? (async () => {
-            let connectionsQuery = supabase
-              .from('connections')
-              .select(`
-                *,
-                contacts:contact_id (
-                  contact_type,
-                  company_name,
-                  contact_name,
-                  email,
-                  phone
-                )
-              `)
-              .order('created_at', { ascending: false })
-              .order('id');
-
-            if (!showAll && profile?.id) {
-              connectionsQuery = connectionsQuery.eq('user_id', profile.id);
-            }
-
-            if (!dateCutoff) return loadActivityPages((start, end) => connectionsQuery.range(start, end));
-
-            const { data } = await connectionsQuery.gte('created_at', dateCutoff);
-            return data || [];
-          })()
-        : Promise.resolve([]);
 
       // A single leads query powers both the assigned and shared Sales Department views.
       // Keep the legacy 'fishbowl' widget key for existing saved preferences.
@@ -333,9 +286,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as any[], error: null });
 
-      const [contacts, connections, leadResult] = await Promise.all([
+      const [contacts, leadResult] = await Promise.all([
         contactsPromise,
-        connectionsPromise,
         leadRecordsPromise
       ]);
       if (leadResult.error) throw leadResult.error;
@@ -360,12 +312,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
             ...def,
             items: nonProspectContacts,
             count: nonProspectContacts.length
-          });
-        } else if (def.id === 'connections') {
-          stagesData.push({
-            ...def,
-            items: connections,
-            count: connections.length
           });
         } else if (def.id === 'leads') {
           stagesData.push({
@@ -468,16 +414,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       );
     }
 
-    if (stageId === 'connections') {
-      const contact = item.contacts || {};
-      return (
-        contact.company_name?.toLowerCase().includes(query) ||
-        contact.contact_name?.toLowerCase().includes(query) ||
-        item.connection_type?.toLowerCase().includes(query) ||
-        item.notes?.toLowerCase().includes(query)
-      );
-    }
-
     // Leads and Fishbowl
     return (
       item.company_name?.toLowerCase().includes(query) ||
@@ -507,9 +443,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       case 'contacts':
         setContactFormInitialStatus('customer');
         setShowContactForm(true);
-        break;
-      case 'connections':
-        setShowConnectionForm(true);
         break;
       case 'leads':
         setShowLeadForm(true);
@@ -606,8 +539,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           </select>
         )}
         <select
-          aria-label="Date range for contacts and connections"
-          title="Date range for contacts and connections"
+          aria-label="Date range for contacts"
+          title="Date range for contacts"
           value={timeFilter}
           onChange={(e) => setTimeFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
           className="px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-manipulation"
@@ -752,47 +685,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                             <Phone className="w-3 h-3" />
                             <span>{item.phone}</span>
                           </div>
-                        )}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatDistanceToNow(item.created_at)}</span>
-                          </div>
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (stage.id === 'connections') {
-                    const contact = item.contacts || {};
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleContactClick(item.contact_id)}
-                        className="bg-white rounded-lg border-2 border-gray-200 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation"
-                      >
-                        <div className="mb-2">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h4 className="customer-link font-semibold text-sm truncate">
-                              {contact.contact_type === 'person'
-                                ? (contact.contact_name || contact.company_name)
-                                : (contact.company_name || contact.contact_name)}
-                            </h4>
-                            {isNew && (
-                              <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                                NEW
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-600">
-                            {item.connection_type?.replace('_', ' ')}
-                          </p>
-                        </div>
-                        {item.notes && (
-                          <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                            {item.notes}
-                          </p>
                         )}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -1028,31 +920,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
         </div>
       )}
 
-      {showConnectionForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-gray-900">New Connection</h2>
-              <button
-                onClick={() => setShowConnectionForm(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-6">
-              <ConnectionForm
-                onClose={() => setShowConnectionForm(false)}
-                onSuccess={() => {
-                  setShowConnectionForm(false);
-                  loadPipelineData();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {showFishbowlForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1123,13 +990,13 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mt-1">Select up to 4 widgets to display</p>
+              <p className="text-sm text-gray-600 mt-1">Choose which widgets to display</p>
             </div>
 
             <div className="p-6 space-y-3">
               {allWidgetDefinitions.map(widget => {
                 const isSelected = selectedWidgets.includes(widget.id);
-                const canToggle = isSelected || selectedWidgets.length < 4;
+                const canToggle = isSelected || selectedWidgets.length < DEFAULT_PIPELINE_WIDGETS.length;
 
                 return (
                   <button
@@ -1183,7 +1050,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                 disabled={selectedWidgets.length === 0}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
               >
-                Save ({selectedWidgets.length}/4)
+                Save ({selectedWidgets.length}/{DEFAULT_PIPELINE_WIDGETS.length})
               </button>
             </div>
           </div>
@@ -1277,30 +1144,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                 </div>
               </div>
 
-              {/* Connections */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <CalendarClock className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Connections</h3>
-                    <p className="text-gray-700 leading-relaxed mb-3">
-                      A <strong>Connection</strong> is a logged interaction with a contact — a call, email, meeting,
-                      site visit, or any other touchpoint. Every connection is dated, typed, and can include notes and
-                      a follow-up flag. This column shows your most recent connections so you can see who you've been
-                      in touch with and who needs attention.
-                    </p>
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                      <p className="text-sm text-gray-600">
-                        <strong>Example:</strong> "Called Mike on 2/20 to check in — he wants to revisit pricing next
-                        quarter. Follow-up reminder set for 5/1."
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Fishbowl */}
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
@@ -1341,7 +1184,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-blue-600 font-bold">2.</span>
-                        <span>When there is an opportunity, create a <strong>Lead</strong> and log <strong>Connections</strong> to follow up, even if the customer is not ready yet.</span>
+                        <span>When there is an opportunity, create a <strong>Lead</strong> and schedule a follow-up if the customer needs more time.</span>
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-blue-600 font-bold">3.</span>
@@ -1362,7 +1205,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-green-600 font-bold">3.</span>
-                        <span>The rep logs <strong>Connections</strong> as they work the opportunity and closes it as Won or Lost.</span>
+                        <span>The rep tracks follow-up on the Lead and creates a proposal when the opportunity is ready.</span>
                       </p>
                       <p className="flex items-start gap-2 text-sm">
                         <span className="text-green-600 font-bold">4.</span>
@@ -1384,10 +1227,8 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-1">Pro Tip</h4>
                     <p className="text-sm text-gray-700">
-                      Use the <strong>My Pipeline</strong> toggle to focus only on contacts, leads, and connections
-                      assigned to or owned by you. Use the <strong>search bar</strong> to quickly find anyone by name,
-                      company, or phone. Keep your pipeline healthy by logging connections after every touchpoint and
-                      claiming Fishbowl leads promptly — speed to contact wins deals.
+                      Select <strong>My Pipeline</strong> to focus on your contacts and leads. Use <strong>search</strong> to find someone by
+                      name, company, or phone, and check <strong>Sales Department</strong> for unclaimed leads.
                     </p>
                   </div>
                 </div>
