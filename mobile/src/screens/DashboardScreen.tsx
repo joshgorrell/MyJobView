@@ -13,6 +13,7 @@ import { useLocation } from '../contexts/LocationContext';
 import { Colors } from '../theme/colors';
 import { Typography, Spacing, Radius, Shadows } from '../theme/styles';
 import { ScreenContainer } from '../components/ScreenContainer';
+import { CompanyMessages } from '../components/CompanyMessages';
 import { supabase } from '../services/supabase';
 import { getEmployeeTimeContext, workDate } from '../services/EmployeeTimeContext';
 
@@ -184,6 +185,13 @@ export default function DashboardScreen({ navigation }: any) {
           <Text style={themedStyles.heroButtonText}>{usesDailyClock === false ? 'MY TIME' : isClockedIn ? 'VIEW' : 'START'}</Text>
         </View>
       </TouchableOpacity>
+
+      {profile?.organization_id && (
+        <CompanyMessages
+          key={`${profile.id}:${profile.organization_id}`}
+          organizationId={profile.organization_id}
+        />
+      )}
 
       {/* Quick Stats */}
       <View style={themedStyles.statsContainer}>
