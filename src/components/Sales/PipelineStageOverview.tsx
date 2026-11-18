@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { notify } from '../../lib/feedback';
 import { ChevronDown, Plus, UserRound } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,6 +11,7 @@ interface Prospect {
   email: string | null;
   phone: string | null;
   created_at: string;
+  prospect_follow_up_on: string | null;
 }
 
 interface StageCounts {
@@ -32,6 +34,20 @@ const PROSPECTS_PER_PAGE = 30;
 const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewed', 'portal', 'approved_pending_action'];
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
+function dateInputValue(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function followUpInMonths(months: number): string {
+  const today = new Date();
+  const target = new Date(today.getFullYear(), today.getMonth() + months, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(today.getDate(), lastDay));
+  return dateInputValue(target);
+}
+
 export function PipelineStageOverview({
   showAll, canViewProposals, canViewSalesOrders, onOpenProposals,
   onOpenSalesOrders, onOpenProspect, onAddProspect,
@@ -49,6 +65,11 @@ export function PipelineStageOverview({
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [editingProspectId, setEditingProspectId] = useState<string | null>(null);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const today = dateInputValue(new Date());
 
   useEffect(() => {
     if (!userId) {
@@ -62,8 +83,9 @@ export function PipelineStageOverview({
       try {
         // These are live stage snapshots, not activity counts limited by the 14/30/60/90-day filter.
         let prospectQuery = supabase.from('contacts')
-          .select('id, contact_name, company_name, email, phone, created_at', { count: 'exact' })
+          .select('id, contact_name, company_name, email, phone, created_at, prospect_follow_up_on', { count: 'exact' })
           .eq('contact_type', 'prospect')
+          .order('prospect_follow_up_on', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: false }).order('id')
           .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
         let proposalQuery = supabase.from('proposals')
@@ -122,7 +144,31 @@ export function PipelineStageOverview({
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility, page]);
+  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility, page, refreshVersion]);
+
+  async function saveFollowUp(prospectId: string, date: string | null) {
+    if (!canViewProspects || !organizationId || savingFollowUp) return;
+    setSavingFollowUp(true);
+    try {
+      const { data, error } = await supabase.from('contacts')
+        .update({ prospect_follow_up_on: date })
+        .eq('id', prospectId)
+        .eq('organization_id', organizationId)
+        .eq('contact_type', 'prospect')
+        .select('id')
+        .maybeSingle();
+      if (error || !data) throw error ?? new Error('Prospect could not be updated');
+      setProspects(items => items.map(item => item.id === prospectId ? { ...item, prospect_follow_up_on: date } : item));
+      setEditingProspectId(null);
+      setRefreshVersion(version => version + 1);
+      notify(date ? 'Prospect follow-up saved.' : 'Prospect follow-up cleared.', { theme: 'blue', tone: 'success' });
+    } catch (error) {
+      console.error('Unable to save prospect follow-up', error);
+      notify('Unable to save prospect follow-up.', { theme: 'blue', tone: 'error' });
+    } finally {
+      setSavingFollowUp(false);
+    }
+  }
 
   const label = (count: number | null, suffix: string, allowed = true) =>
     !allowed ? 'No access' : loading ? 'Loading…' : count === null ? 'Unavailable' : String(count) + ' ' + suffix;
@@ -173,15 +219,57 @@ export function PipelineStageOverview({
           ) : (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {prospects.map(prospect => (
-                <button key={prospect.id} type="button" onClick={() => onOpenProspect(prospect.id)}
-                  className="flex items-start gap-2 rounded-md border border-gray-200 p-3 text-left hover:border-blue-400 hover:bg-blue-50">
-                  <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-gray-900">{prospect.contact_name || prospect.company_name || 'Unnamed prospect'}</span>
-                    {prospect.company_name && <span className="block truncate text-xs text-gray-500">{prospect.company_name}</span>}
-                    {prospect.email && <span className="block truncate text-xs text-gray-500">{prospect.email}</span>}
-                  </span>
-                </button>
+                <article key={prospect.id} className="min-w-0 rounded-md border border-gray-200 p-3">
+                  <button type="button" onClick={() => onOpenProspect(prospect.id)}
+                    className="flex w-full items-start gap-2 rounded-md text-left hover:bg-gray-50">
+                    <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-gray-900">{prospect.contact_name || prospect.company_name || 'Unnamed prospect'}</span>
+                      {prospect.company_name && <span className="block truncate text-xs text-gray-500">{prospect.company_name}</span>}
+                      {prospect.email && <span className="block truncate text-xs text-gray-500">{prospect.email}</span>}
+                    </span>
+                  </button>
+                  {prospect.prospect_follow_up_on && (
+                    <p className={`mt-2 text-xs ${prospect.prospect_follow_up_on <= today ? 'font-semibold text-amber-700' : 'text-gray-600'}`}>
+                      {prospect.prospect_follow_up_on < today ? 'Overdue' : prospect.prospect_follow_up_on === today ? 'Due today' : 'Follow-up'}{' · '}
+                      <time dateTime={prospect.prospect_follow_up_on}>
+                        {new Date(prospect.prospect_follow_up_on + 'T12:00:00').toLocaleDateString()}
+                      </time>
+                    </p>
+                  )}
+                  {editingProspectId === prospect.id ? (
+                    <form className="mt-2 space-y-2" onSubmit={event => {
+                      event.preventDefault();
+                      if (followUpDate) void saveFollowUp(prospect.id, followUpDate);
+                    }}>
+                      <fieldset disabled={savingFollowUp} className="min-w-0 space-y-2">
+                        <label className="block text-xs font-medium text-gray-700">
+                          Follow-up date
+                          <input type="date" required value={followUpDate} onChange={event => setFollowUpDate(event.target.value)}
+                            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900" />
+                        </label>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
+                          <button type="button" onClick={() => setFollowUpDate(followUpInMonths(6))}>In 6 months</button>
+                          <button type="button" onClick={() => setFollowUpDate(followUpInMonths(12))}>In 1 year</button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                          <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white">Save reminder</button>
+                          <button type="button" onClick={() => setEditingProspectId(null)} className="text-gray-700">Cancel</button>
+                          {prospect.prospect_follow_up_on && (
+                            <button type="button" onClick={() => void saveFollowUp(prospect.id, null)} className="text-gray-700">Clear</button>
+                          )}
+                        </div>
+                      </fieldset>
+                    </form>
+                  ) : (
+                    <button type="button" disabled={savingFollowUp || !organizationId} onClick={() => {
+                      setEditingProspectId(prospect.id);
+                      setFollowUpDate(prospect.prospect_follow_up_on ?? '');
+                    }} className="mt-2 text-xs font-semibold text-blue-700 hover:underline disabled:opacity-50">
+                      {prospect.prospect_follow_up_on ? 'Edit reminder' : 'Set reminder'}
+                    </button>
+                  )}
+                </article>
               ))}
             </div>
           )}
