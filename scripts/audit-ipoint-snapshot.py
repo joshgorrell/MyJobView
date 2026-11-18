@@ -27,30 +27,31 @@ def audit(path: Path, start: date) -> dict:
     findings = Counter()
     total = Decimal(0)
     for row in reader:
+        date_text = (row["Creation Date"] or "").strip()
+        if not date_text:
+            findings["excluded_missing_date"] += 1
+            continue
         try:
-            created = datetime.strptime(row["Creation Date"].split()[0], "%m/%d/%Y").date()
-        except (AttributeError, IndexError, ValueError):
+            created = datetime.strptime(date_text.split()[0], "%m/%d/%Y").date()
+        except ValueError:
             findings["invalid_date"] += 1
             continue
         if created < start:
             continue
         findings["rows_in_window"] += 1
         amount_text = (row["total_Price"] or "").strip()
-        if not amount_text and (row.get("status") or "").strip().casefold() == "ready to invoice":
-            findings["excluded_ready_to_invoice_missing_amount"] += 1
-            continue
         identifier = (row["id_Serial"] or "").strip()
-        if identifier:
-            identifiers[identifier] += 1
-        else:
+        rep = (row["Sales Rep"] or "").strip()
+        if not identifier:
             findings["missing_source_id"] += 1
-        if not (row["Sales Rep"] or "").strip():
+        if not rep:
             findings["missing_source_rep"] += 1
         if not amount_text:
             findings["missing_amount"] += 1
-            if (row.get("Sales Order Created TS") or "").strip():
-                findings["missing_amount_with_order_timestamp"] += 1
+        if not all((identifier, rep, amount_text)):
+            findings["excluded_missing_required_field"] += 1
             continue
+        identifiers[identifier] += 1
         try:
             amount = Decimal(amount_text)
             if not amount.is_finite():
