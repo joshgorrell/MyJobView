@@ -1,3 +1,4 @@
+import { useThemedStyles, useTheme } from '../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,6 +20,8 @@ import { Card, InfoRow } from '../components/UI';
 import { ScreenContainer } from '../components/ScreenContainer';
 
 export default function SettingsScreen({ navigation }: any) {
+  const themedStyles = useThemedStyles(styles);
+  const { appearance, setAppearance } = useTheme();
   const { profile, signOut } = useAuth();
   const { isConnected, pendingSync, syncNow } = useOffline();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -80,38 +83,57 @@ export default function SettingsScreen({ navigation }: any) {
   return (
     <ScreenContainer scroll>
       {/* Profile Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile</Text>
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+      <View style={themedStyles.section}>
+        <Text style={themedStyles.sectionTitle}>Profile</Text>
+        <View style={themedStyles.profileCard}>
+          <View style={themedStyles.avatar}>
+            <Text style={themedStyles.avatarText}>{initials}</Text>
           </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile?.full_name || 'User'}</Text>
-            <Text style={styles.profileEmail}>{profile?.email}</Text>
-            <Text style={styles.profileRole}>{profile?.role?.replace(/_/g, ' ')}</Text>
+          <View style={themedStyles.profileInfo}>
+            <Text style={themedStyles.profileName}>{profile?.full_name || 'User'}</Text>
+            <Text style={themedStyles.profileEmail}>{profile?.email}</Text>
+            <Text style={themedStyles.profileRole}>{profile?.role?.replace(/_/g, ' ')}</Text>
           </View>
         </View>
       </View>
 
       {/* Secondary destinations moved from the old dashboard menu. */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>History</Text>
-        <TouchableOpacity style={styles.historyLink} accessibilityRole="button"
+      <View style={themedStyles.section}>
+        <Text style={themedStyles.sectionTitle}>History</Text>
+        <TouchableOpacity style={themedStyles.historyLink} accessibilityRole="button"
           onPress={() => navigation.navigate('TimeHistory')}>
-          <Text style={styles.historyLabel}>My Time History</Text>
-          <Text style={styles.historyArrow}>›</Text>
+          <Text style={themedStyles.historyLabel}>My Time History</Text>
+          <Text style={themedStyles.historyArrow}>›</Text>
         </TouchableOpacity>
       </View>
 
       {/* App Settings */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App Settings</Text>
-        <Card style={styles.settingCard}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingText}>
-              <Text style={styles.settingLabel}>Push Notifications</Text>
-              <Text style={styles.settingDescription}>Receive work order updates</Text>
+      <View style={themedStyles.section}>
+        <Text style={themedStyles.sectionTitle}>App Settings</Text>
+        <Card style={themedStyles.settingCard}>
+          <View style={{ marginBottom: 18 }}>
+            <Text style={themedStyles.settingLabel}>Appearance</Text>
+            <Text style={themedStyles.settingDescription}>Choose your preferred app theme</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              {(['light', 'dark', 'system'] as const).map(option => (
+                <TouchableOpacity key={option} accessibilityRole="radio"
+                  accessibilityState={{ checked: appearance === option }}
+                  accessibilityLabel={option === 'system' ? 'Use device appearance' : option + ' mode'}
+                  onPress={() => setAppearance(option)}
+                  style={{ flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center',
+                    borderWidth: 1, borderColor: appearance === option ? Colors.primary[600] : (appearance === 'dark' ? '#485161' : Colors.gray[200]),
+                    backgroundColor: appearance === option ? Colors.primary[600] : (appearance === 'dark' ? '#303744' : Colors.gray[50]) }}>
+                  <Text style={{ fontWeight: '600', color: appearance === option ? '#ffffff' : (appearance === 'dark' ? '#e8ebf0' : Colors.gray[800]) }}>
+                    {option === 'light' ? '☀ Light' : option === 'dark' ? '☾ Dark' : '◐ System'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={themedStyles.settingRow}>
+            <View style={themedStyles.settingText}>
+              <Text style={themedStyles.settingLabel}>Push Notifications</Text>
+              <Text style={themedStyles.settingDescription}>Receive work order updates</Text>
             </View>
             <Switch
               value={notificationsEnabled}
@@ -129,40 +151,40 @@ export default function SettingsScreen({ navigation }: any) {
       </View>
 
       {/* Data & Sync */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data & Sync</Text>
-        <Card style={styles.syncCard}>
-          <View style={styles.connectionRow}>
-            <Text style={styles.connectionLabel}>Connection Status</Text>
-            <View style={styles.connectionRight}>
-              <View style={[styles.statusDot, isConnected ? styles.online : styles.offline]} />
-              <Text style={styles.connectionValue}>{isConnected ? 'Online' : 'Offline'}</Text>
+      <View style={themedStyles.section}>
+        <Text style={themedStyles.sectionTitle}>Data & Sync</Text>
+        <Card style={themedStyles.syncCard}>
+          <View style={themedStyles.connectionRow}>
+            <Text style={themedStyles.connectionLabel}>Connection Status</Text>
+            <View style={themedStyles.connectionRight}>
+              <View style={[themedStyles.statusDot, isConnected ? themedStyles.online : themedStyles.offline]} />
+              <Text style={themedStyles.connectionValue}>{isConnected ? 'Online' : 'Offline'}</Text>
             </View>
           </View>
           <InfoRow label="Pending Sync" value={`${pendingSync} items`} />
         </Card>
 
         {pendingSync > 0 && (
-          <TouchableOpacity style={styles.syncButton} onPress={handleSyncNow} disabled={!isConnected} activeOpacity={0.85}>
-            <Text style={styles.syncButtonText}>Sync Now</Text>
+          <TouchableOpacity style={themedStyles.syncButton} onPress={handleSyncNow} disabled={!isConnected} activeOpacity={0.85}>
+            <Text style={themedStyles.syncButtonText}>Sync Now</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Notifications */}
       {unreadCount > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <Card style={styles.aboutCard}>
+        <View style={themedStyles.section}>
+          <Text style={themedStyles.sectionTitle}>Notifications</Text>
+          <Card style={themedStyles.aboutCard}>
             <InfoRow label="Unread" value={`${unreadCount} new`} />
           </Card>
         </View>
       )}
 
       {/* About */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <Card style={styles.aboutCard}>
+      <View style={themedStyles.section}>
+        <Text style={themedStyles.sectionTitle}>About</Text>
+        <Card style={themedStyles.aboutCard}>
           <InfoRow label="App Name" value="MyJobView" />
           <InfoRow label="Version" value={Application.nativeApplicationVersion || '1.0.0'} />
           <InfoRow label="Build" value={Application.nativeBuildVersion || '1'} />
@@ -170,13 +192,13 @@ export default function SettingsScreen({ navigation }: any) {
       </View>
 
       {/* Sign Out */}
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} activeOpacity={0.7}>
-        <Text style={styles.signOutText}>Sign Out</Text>
+      <TouchableOpacity style={themedStyles.signOutButton} onPress={handleSignOut} activeOpacity={0.7}>
+        <Text style={themedStyles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>MyJobView</Text>
-        <Text style={styles.footerSubtext}>© 2025 MyJobView</Text>
+      <View style={themedStyles.footer}>
+        <Text style={themedStyles.footerText}>MyJobView</Text>
+        <Text style={themedStyles.footerSubtext}>© 2025 MyJobView</Text>
       </View>
     </ScreenContainer>
   );
