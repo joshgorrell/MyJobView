@@ -10,7 +10,12 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
-def audit(path: Path, start: date, rep_map: dict[str, str] | None = None) -> dict:
+def audit(
+    path: Path,
+    start: date,
+    rep_map: dict[str, str] | None = None,
+    staging_rows: list[dict] | None = None,
+) -> dict:
     data = path.read_bytes()
     try:
         contents = data.decode("utf-8-sig")
@@ -60,6 +65,7 @@ def audit(path: Path, start: date, rep_map: dict[str, str] | None = None) -> dic
             findings["invalid_amount"] += 1
         else:
             total += amount
+            target = None
             if rep_map is not None:
                 target = rep_map.get(rep)
                 if target is None:
@@ -68,6 +74,15 @@ def audit(path: Path, start: date, rep_map: dict[str, str] | None = None) -> dic
                     findings["mapped_rep_rows"] += 1
                     if target != rep:
                         findings["reassigned_rep_rows"] += 1
+            if staging_rows is not None:
+                staging_rows.append({
+                    "source_id": identifier,
+                    "created_date": created.isoformat(),
+                    "source_salesperson": rep,
+                    "reporting_salesperson": target,
+                    "amount": str(amount),
+                    "source_status": row.get("status"),
+                })
 
     findings["duplicate_source_id_rows"] = sum(count - 1 for count in identifiers.values())
     return {
@@ -82,6 +97,7 @@ def main() -> None:
     parser.add_argument("export", type=Path)
     parser.add_argument("--start", type=date.fromisoformat, required=True)
     parser.add_argument("--rep-map", type=Path, help="JSON object from source names to reporting names")
+    parser.add_argument("--stage", type=Path, help="Write a new local JSON Lines staging file")
     args = parser.parse_args()
     rep_map = None
     if args.rep_map:
@@ -91,7 +107,15 @@ def main() -> None:
             for source, target in rep_map.items()
         ):
             parser.error("--rep-map must contain an object of nonblank source and reporting names")
-    print(json.dumps(audit(args.export, args.start, rep_map), indent=2))
+    staging_rows = [] if args.stage else None
+    summary = audit(args.export, args.start, rep_map, staging_rows)
+    if args.stage:
+        if summary["findings"]["duplicate_source_id_rows"]:
+            parser.error("Staging requires unique source IDs in the selected window")
+        with args.stage.open("x", encoding="utf-8") as staged:
+            for row in staging_rows:
+                staged.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":
