@@ -25,7 +25,9 @@ export const supabase={from,rpc:async(name,args)=>{window.calls.push({name,args}
 window.edgeCalls=[];window.open=()=>({opener:null,closed:false,document:{title:'',body:{textContent:''},createElement:()=>({}),head:{appendChild:()=>{}}},location:{replace:url=>{window.viewerUrl=url}},close(){this.closed=true;}});
 `;
 let browser;
+const testPng=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/vXcAAAAASUVORK5CYII=','base64');
 const server=createServer(async(req,res)=>{
+ if(req.url.startsWith('/images/myjobview-assist.png')){res.setHeader('Content-Type','image/png');res.end(testPng);return;}
  const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
  res.end(await readFile(join(dir,file)));
@@ -37,7 +39,7 @@ try{
  await writeFile(join(dir,'index.html'),'<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body><main class="theme-workspace bg-workspace"><div id="root"></div></main><script src="/app.js"></script></body></html>');
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
- const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage();await page.route('https://assets.example.test/dealer-logo.png',route=>route.fulfill({status:200,contentType:'image/png',body:testPng}));const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const url='http://127.0.0.1:'+server.address().port;
  for(const width of [1280,390]){
   await page.setViewportSize({width,height:900});
