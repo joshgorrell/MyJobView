@@ -1,3 +1,4 @@
+import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
 import { useEffect, useState } from 'react';
 import { notify } from '../../lib/feedback';
 import { ChevronDown, Plus, UserRound } from 'lucide-react';
@@ -33,20 +34,6 @@ interface Props {
 const PROSPECTS_PER_PAGE = 30;
 const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewed', 'portal', 'approved_pending_action'];
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
-
-function dateInputValue(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function followUpInMonths(months: number): string {
-  const today = new Date();
-  const target = new Date(today.getFullYear(), today.getMonth() + months, 1);
-  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  target.setDate(Math.min(today.getDate(), lastDay));
-  return dateInputValue(target);
-}
 
 export function PipelineStageOverview({
   showAll, canViewProposals, canViewSalesOrders, onOpenProposals,
@@ -243,15 +230,16 @@ export function PipelineStageOverview({
                       if (followUpDate) void saveFollowUp(prospect.id, followUpDate);
                     }}>
                       <fieldset disabled={savingFollowUp} className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
+                          {FOLLOW_UP_PRESETS.map(({ label, months }) => (
+                            <button key={months} type="button" onClick={() => setFollowUpDate(followUpInMonths(months))}>{label}</button>
+                          ))}
+                        </div>
                         <label className="block text-xs font-medium text-gray-700">
-                          Follow-up date
+                          Custom
                           <input type="date" required value={followUpDate} onChange={event => setFollowUpDate(event.target.value)}
                             className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900" />
                         </label>
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
-                          <button type="button" onClick={() => setFollowUpDate(followUpInMonths(6))}>In 6 months</button>
-                          <button type="button" onClick={() => setFollowUpDate(followUpInMonths(12))}>In 1 year</button>
-                        </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs">
                           <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white">Save reminder</button>
                           <button type="button" onClick={() => setEditingProspectId(null)} className="text-gray-700">Cancel</button>
