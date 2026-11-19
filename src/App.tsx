@@ -1056,16 +1056,24 @@ function AppContent() {
               }}
             />
           )}
-          {['sales_dashboard', 'sales_performance', 'pipeline_board', 'leads', 'fishbowl'].includes(activeTab) && (
+          {['sales_dashboard', 'sales_performance', 'pipeline_board'].includes(activeTab) && (
             <WorkspaceTabs key={activeTab} title="Sales Dashboard" initial={activeTab === 'sales_performance' ? 'sales_dashboard' : activeTab} onSelect={setActiveTab} tabs={[
-              ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Pipeline', content: <PipelineBoard onNavigate={setActiveTab} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
-              ...(checkModuleAccess('leads') ? [{ key: 'leads', label: 'Leads', content: <LeadsHistory onLeadClick={setSelectedLeadId} /> }] : []),
-              ...(checkModuleAccess('fishbowl') ? [{ key: 'fishbowl', label: 'Sales Department', content: <LeadsHistory initialTab="shared" onLeadClick={setSelectedLeadId} /> }] : []),
+              ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Pipeline', content: <PipelineBoard onNavigate={setActiveTab} canViewLeads={checkModuleAccess('leads')} canViewProposals={checkModuleAccess('proposals')} canViewSalesOrders={checkModuleAccess('sales_orders')} /> }] : []),
               ...(checkModuleAccess('sales_dashboard') ? [{
                 key: 'sales_dashboard', label: 'Performance',
                 content: <SalesDashboard onProposalClick={(proposalId) => { setOpenProposalId(proposalId); setActiveTab('proposals'); }} onOpenRecord={openSalesDashboardRecord} onRepContextChange={setSalesRepAIContext} onNavigateToTab={navigateSalesDashboard} />
               }] : []),
             ]} />
+          )}
+          {((activeTab === 'leads' && checkModuleAccess('leads')) || (activeTab === 'fishbowl' && checkModuleAccess('fishbowl'))) && (
+            <section className="min-w-0 space-y-3">
+              {checkModuleAccess('pipeline_board') && (
+                <button type="button" className="text-sm text-blue-600 hover:underline" onClick={() => setActiveTab('pipeline_board')}>
+                  Back to Sales Dashboard
+                </button>
+              )}
+              <LeadsHistory key={activeTab} initialTab={activeTab === 'fishbowl' ? 'shared' : 'all'} onLeadClick={setSelectedLeadId} />
+            </section>
           )}
           {activeTab === 'reviews' && checkModuleAccess('reviews') && <ReviewsView key={activeTab} />}
           {activeTab === 'sales_service_requests' && checkModuleAccess('service_requests') && <SalesServiceRequestsView key={activeTab} />}
