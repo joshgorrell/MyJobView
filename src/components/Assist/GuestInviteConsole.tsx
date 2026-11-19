@@ -47,7 +47,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [organizationId, recipientQuery, recipient]);
   const selectedEmail = recipient?.email || (validEmail(recipientQuery) ? recipientQuery.trim() : '');
-  const inviteText = invite ? `Remote support invitation\n\nVisit: ${new URL(invite.join_url).origin}/assist\nCode: ${invite.code}\nOr open: ${invite.join_url}\n\nThis is a one-time support session. You will be asked to approve remote access.` : '';
+  const inviteText = invite ? `Open this link to get remote support: ${invite.join_url}\n\nClick Download Assist, open the app, and approve the support request. This link can be used once.` : '';
   async function invoke(operation: string, inviteId?: string) {
     const { data, error: failure } = await supabase.functions.invoke('assist-support', { body: { operation, organizationId, ...(inviteId ? { inviteId } : {}) } });
     if (failure || data?.error) throw new Error('Invitation unavailable'); return data;
@@ -132,17 +132,20 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       <p className="mt-2 text-sm text-muted">Create a one-time code or link. They won’t need an MJV account.</p>
       <button type="button" disabled={busy || !selectedEmail} onClick={() => void create()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create invitation'}</button>
     </> : <>
-      <p className="mt-3 text-sm text-muted">Ask them to visit <strong>{new URL(invite.join_url).origin}/assist</strong> and enter:</p>
-      <div className="my-3 flex flex-wrap items-center gap-3"><p className="break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code).then(() => setCodeCopied(true)).catch(() => setError('Unable to copy code.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{codeCopied ? 'Code copied' : 'Copy code'}</button></div>
-      <p className="mb-2 text-sm text-muted">Invitation for <strong>{selectedEmail}</strong>. Email opens your mail app; it is not sent automatically.</p>
-      <div className="mb-3 flex flex-wrap gap-2">
-        <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white">Prepare invitation email</a>
-        <button type="button" onClick={() => void navigator.clipboard.writeText(inviteText).then(() => setCopied(true)).catch(() => setError('Unable to copy invitation.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />Copy invitation</button>
+      <p className="mt-3 text-sm text-muted">Send this one-time link to <strong>{selectedEmail}</strong>. It opens Assist with the code already filled in.</p>
+      <div className="my-3 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"><Copy size={16} />{copied ? 'Link copied' : 'Copy invitation link'}</button>
+        <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg border border-subtle px-4 text-sm font-semibold text-primary">Email invitation</a>
       </div>
-      <div className="flex flex-wrap gap-3"><button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{copied ? 'Link copied' : 'Copy invitation link'}</button>
-        <button type="button" disabled={busy} onClick={() => void end()} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><X size={16} />End invitation</button></div>
-      <p className="break-all text-xs text-muted">{invite.join_url}</p>
-      <p className="mt-3 text-sm text-primary" role="status">{invite.state === 'waiting_for_guest' ? 'Waiting for them to enter the code…' : invite.state === 'waiting_for_computer' ? 'Waiting for them to download, open the app and choose Connect…' : invite.state === 'computer_ready' ? 'Their computer is ready. Open support, then ask them to approve control.' : 'Support window ready. They must approve control on their computer.'}</p>
+      <p className="text-xs text-muted">Email invitation opens a draft in your email app.</p>
+      <p className="mt-1 break-all text-xs text-muted">{invite.join_url}</p>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-sm font-medium text-info">Share a code by phone</summary>
+        <p className="mt-2 text-sm text-muted">Ask them to visit <strong>{new URL(invite.join_url).origin}/assist</strong> and enter this code.</p>
+      <div className="my-3 flex flex-wrap items-center gap-3"><p className="break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code).then(() => setCodeCopied(true)).catch(() => setError('Unable to copy code.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{codeCopied ? 'Code copied' : 'Copy code'}</button></div>
+      </details>
+      <button type="button" disabled={busy} onClick={() => void end()} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-info"><X size={16} />End invitation</button>
+      <p className="mt-3 text-sm text-primary" role="status">{invite.state === 'waiting_for_guest' ? 'Waiting for the customer to open Assist…' : invite.state === 'waiting_for_computer' ? 'Waiting for them to download, open the app and choose Connect…' : invite.state === 'computer_ready' ? 'Their computer is ready. Open support, then ask them to approve control.' : 'Support window ready. They must approve control on their computer.'}</p>
       {invite.state === 'computer_ready' && <button type="button" disabled={busy} onClick={() => void connect()} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50"><ExternalLink size={16} />Open guest support</button>}
       <p className="mt-3 text-xs text-muted">Keep this MJV page open. Codes can be used once within 10 minutes. End the invitation when finished; sessions last up to one hour.</p>
     </>}
