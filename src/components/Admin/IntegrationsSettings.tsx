@@ -54,6 +54,35 @@ export function IntegrationsSettings() {
   const [quickbooksPayments, setQuickbooksPayments] = useState(false);
   const [ringcentralConnected, setRingcentralConnected] = useState(false);
   const [techsafeConnected, setTechsafeConnected] = useState(false);
+  const [assistBadge, setAssistBadge] = useState<'active' | 'pending' | 'attention' | null>(null);
+  useEffect(() => {
+    const organizationId = profile?.organization_id;
+    setAssistBadge(null);
+    if (!organizationId || profile?.role !== 'admin' || !profile.is_active) return;
+    let generation = 0;
+    const refreshAssistBadge = async () => {
+      const request = ++generation;
+      try {
+        const { data, error } = await supabase.rpc('get_assist_setup', { p_organization_id: organizationId });
+        if (request !== generation) return;
+        if (error || !data || !data.enabled) { setAssistBadge(null); return; }
+        if (data.activation_state === 'needs_attention') { setAssistBadge('attention'); return; }
+        if (!data.windows_download_ready) { setAssistBadge('pending'); return; }
+        const response = await supabase.functions.invoke('assist-support', { body: { operation: 'invite_capability', organizationId } });
+        if (request === generation) setAssistBadge(response.error ? 'attention' : response.data?.available === true ? 'active' : 'pending');
+      } catch {
+        if (request === generation) setAssistBadge(null);
+      }
+    };
+    void refreshAssistBadge();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshAssistBadge(); }, 15000);
+    window.addEventListener('assist-settings-changed', refreshAssistBadge);
+    return () => {
+      generation++;
+      window.clearInterval(timer);
+      window.removeEventListener('assist-settings-changed', refreshAssistBadge);
+    };
+  }, [profile?.organization_id, profile?.role, profile?.is_active]);
   const [activeIntegration, setActiveIntegration] = useState<IntegrationId>(integrationFromUrl);
   useEffect(() => {
     const nav = integrationNavigation.current;
@@ -476,6 +505,9 @@ export function IntegrationsSettings() {
           <button type="button" aria-current={activeIntegration === 'assist' ? 'page' : undefined} onClick={() => selectIntegration('assist')}
             className={`flex shrink-0 items-center gap-1.5 px-2 lg:px-2.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
             Assist
+            {assistBadge === 'active' && <CheckCircle2 className="h-4 w-4 text-green-500" aria-label="Active" />}
+            {assistBadge === 'pending' && <span className="text-xs text-amber-500">Pending</span>}
+            {assistBadge === 'attention' && <span className="text-xs text-amber-500">Needs attention</span>}
           </button>
         </nav>
       </div>
