@@ -15,7 +15,29 @@ interface Prospect {
   prospect_follow_up_on: string | null;
 }
 
-interface StagePreview { id: string; status: string | null; created_at: string | null; }
+interface StagePreview {
+  id: string;
+  status: string | null;
+  created_at: string | null;
+  title?: string | null;
+  name?: string | null;
+  project_name?: string | null;
+  proposal_name?: string | null;
+  customer_name?: string | null;
+  order_number?: string | number | null;
+  proposal_number?: string | number | null;
+}
+
+function previewTitle(item: StagePreview, kind: 'proposal' | 'order'): string {
+  const readable = [item.project_name, item.proposal_name, item.customer_name, item.title, item.name]
+    .find(value => typeof value === 'string' && value.trim());
+  if (readable) return readable;
+  const number = kind === 'proposal' ? item.proposal_number : item.order_number;
+  if (number !== null && number !== undefined && String(number).trim()) {
+    return (kind === 'proposal' ? 'Proposal #' : 'Sales Order #') + number;
+  }
+  return (kind === 'proposal' ? 'Proposal ' : 'Sales Order ') + item.id.slice(0, 8);
+}
 
 interface StageCounts {
   prospects: number | null;
@@ -81,7 +103,7 @@ export function PipelineStageOverview({
           .order('created_at', { ascending: false }).order('id')
           .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
         let proposalQuery = supabase.from('proposals')
-          .select('id, status, created_at', { count: 'exact' })
+          .select('*', { count: 'exact' })
           .order('created_at', { ascending: false }).limit(5)
           .eq('is_revision', false).is('sales_order_id', null)
           .in('status', ACTIVE_PROPOSAL_STATUSES);
@@ -203,7 +225,7 @@ export function PipelineStageOverview({
             {proposalPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No active proposals in this view'}</p> : (
               <ul className="space-y-1">{proposalPreviews.map(item => (
                 <li key={item.id}><button type="button" onClick={onOpenProposals} className="flex w-full items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-2 text-left text-xs hover:border-blue-300">
-                  <span className="truncate font-medium">Proposal {item.id.slice(0, 8)}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Active'}</span>
+                  <span className="truncate font-medium">{previewTitle(item, 'proposal')}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Active'}</span>
                 </button></li>
               ))}</ul>
             )}
@@ -218,7 +240,7 @@ export function PipelineStageOverview({
             {orderPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No open sales orders in this view'}</p> : (
               <ul className="space-y-1">{orderPreviews.map(item => (
                 <li key={item.id}><button type="button" onClick={onOpenSalesOrders} className="flex w-full items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-2 text-left text-xs hover:border-blue-300">
-                  <span className="truncate font-medium">Sales Order {item.id.slice(0, 8)}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Open'}</span>
+                  <span className="truncate font-medium">{previewTitle(item, 'order')}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Open'}</span>
                 </button></li>
               ))}</ul>
             )}
