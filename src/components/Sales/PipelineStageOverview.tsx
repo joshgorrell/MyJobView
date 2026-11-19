@@ -15,6 +15,8 @@ interface Prospect {
   prospect_follow_up_on: string | null;
 }
 
+interface StagePreview { id: string; status: string | null; created_at: string | null; }
+
 interface StageCounts {
   prospects: number | null;
   proposals: number | null;
@@ -48,6 +50,8 @@ export function PipelineStageOverview({
   const proposalVisibility = (profile as any)?.proposal_visibility_scope || 'own';
   const [counts, setCounts] = useState<StageCounts>({ prospects: null, proposals: null, salesOrders: null });
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [proposalPreviews, setProposalPreviews] = useState<StagePreview[]>([]);
+  const [orderPreviews, setOrderPreviews] = useState<StagePreview[]>([]);
   const [prospectPage, setProspectPage] = useState({ page: 0, showAll });
   const page = prospectPage.showAll === showAll ? prospectPage.page : 0;
   const [expanded, setExpanded] = useState(false);
@@ -77,7 +81,8 @@ export function PipelineStageOverview({
           .order('created_at', { ascending: false }).order('id')
           .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
         let proposalQuery = supabase.from('proposals')
-          .select('id', { count: 'exact', head: true })
+          .select('id, status, created_at', { count: 'exact' })
+          .order('created_at', { ascending: false }).limit(5)
           .eq('is_revision', false).is('sales_order_id', null)
           .in('status', ACTIVE_PROPOSAL_STATUSES);
         let orderQuery = supabase.from('sales_orders')
@@ -111,6 +116,8 @@ export function PipelineStageOverview({
           salesOrders: orderResult?.error ? null : orderResult?.count ?? null,
         });
         setProspects((prospectResult?.data || []) as Prospect[]);
+        setProposalPreviews((proposalResult?.data || []) as StagePreview[]);
+        setOrderPreviews((orderResult?.data || []) as StagePreview[]);
         const failed = Boolean(prospectResult?.error || proposalResult?.error || orderResult?.error);
         if (failed) console.error('Pipeline stage query failed', { prospect: prospectResult?.error, proposal: proposalResult?.error, order: orderResult?.error });
         setLoadError(failed);
@@ -186,6 +193,38 @@ export function PipelineStageOverview({
           <span className="block truncate text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
         </button>
       </nav>
+      <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Recent pipeline records">
+        {canViewProposals && (
+          <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-primary">Recent Proposals</h3>
+              <button type="button" onClick={onOpenProposals} className="text-xs font-medium text-blue-700 hover:underline">View all</button>
+            </div>
+            {proposalPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No active proposals in this view'}</p> : (
+              <ul className="space-y-1">{proposalPreviews.map(item => (
+                <li key={item.id}><button type="button" onClick={onOpenProposals} className="flex w-full items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-2 text-left text-xs hover:border-blue-300">
+                  <span className="truncate font-medium">Proposal {item.id.slice(0, 8)}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Active'}</span>
+                </button></li>
+              ))}</ul>
+            )}
+          </section>
+        )}
+        {canViewSalesOrders && (
+          <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-primary">Recent Sales Orders</h3>
+              <button type="button" onClick={onOpenSalesOrders} className="text-xs font-medium text-blue-700 hover:underline">View all</button>
+            </div>
+            {orderPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No open sales orders in this view'}</p> : (
+              <ul className="space-y-1">{orderPreviews.map(item => (
+                <li key={item.id}><button type="button" onClick={onOpenSalesOrders} className="flex w-full items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-2 text-left text-xs hover:border-blue-300">
+                  <span className="truncate font-medium">Sales Order {item.id.slice(0, 8)}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Open'}</span>
+                </button></li>
+              ))}</ul>
+            )}
+          </section>
+        )}
+      </div>
       {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
       {expanded && canViewProspects && (
         <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
