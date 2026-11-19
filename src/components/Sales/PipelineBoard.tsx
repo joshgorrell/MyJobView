@@ -46,7 +46,6 @@ async function loadActivityPages<T>(
 export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSalesOrders = false }: { onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void; canViewProposals?: boolean; canViewSalesOrders?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [showLeadsStage, setShowLeadsStage] = useState(true);
   const [loading, setLoading] = useState(true);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
@@ -520,24 +519,17 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
           <HelpCircle className="h-5 w-5" />
         </button>
+
+      </div>
+
         <PipelineStageOverview
           showAll={viewMode === 'all' && canViewAllPipeline}
-          onStageVisibilityChange={keys => setShowLeadsStage(keys.includes('leads'))}
+
           canViewProposals={canViewProposals}
           canViewSalesOrders={canViewSalesOrders}
           onOpenLeads={() => document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          onOpenProposals={() => onNavigate?.('proposals')}
-          onOpenSalesOrders={() => onNavigate?.('sales_orders')}
-          onOpenProspect={handleContactClick}
-          onAddProspect={() => {
-            setContactFormInitialStatus('prospect');
-            setShowContactForm(true);
-          }}
-        />
-      </div>
-
-      <div className="grid gap-2.5 pb-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))]">
-        {showLeadsStage && filteredStages.map(stage => (
+          leadsColumn={      <div className="grid gap-2.5 pb-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))]">
+        {filteredStages.map(stage => (
           <div key={stage.id} id={`pipeline-${stage.id}`} className="flex min-w-0 scroll-mt-6 flex-col rounded-lg border border-gray-200 bg-surface">
             <div className="border-b border-gray-200 px-3 py-2.5">
               <div className="flex items-center justify-between mb-1">
@@ -781,6 +773,15 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           </div>
         ))}
       </div>
+          }
+          onOpenProposals={() => onNavigate?.('proposals')}
+          onOpenSalesOrders={() => onNavigate?.('sales_orders')}
+          onOpenProspect={handleContactClick}
+          onAddProspect={() => {
+            setContactFormInitialStatus('prospect');
+            setShowContactForm(true);
+          }}
+        />
 
       {/* Detail View Modals */}
       {selectedContact && (
