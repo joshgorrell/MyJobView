@@ -221,6 +221,7 @@ export interface ContactCapture {
 
 export interface Task {
   id: string;
+  is_support_request?: boolean;
   lead_id: string | null;
   contact_id: string | null;
   project_id?: string | null;

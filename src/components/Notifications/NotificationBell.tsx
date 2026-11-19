@@ -278,22 +278,18 @@ export function NotificationBell({ onLeadClick, onTaskClick, onMessageClick, onP
       return;
     }
 
-    // Service request notifications - navigate to service requests queue
-    if ((notifType === 'service_request' || notifType === 'service_request_created' || notifType === 'punchlist_service_request') && onTabChange) {
-      onTabChange('service_requests');
+    if (notifType === 'service_request_created' || notifType === 'punchlist_service_request'
+      || notifType === 'service_request_resubmitted' || notifType === 'service_request_kicked_back') {
+      if (notification.related_id) {
+        window.location.assign(`/service-requests?serviceRequestId=${encodeURIComponent(notification.related_id)}`);
+      } else if (onTabChange) {
+        onTabChange(notifType === 'service_request_kicked_back' ? 'sales_service_requests' : 'service_requests');
+      }
       setIsOpen(false);
       return;
     }
 
-    // Service request kicked back - navigate to sales service requests tab
-    if (notifType === 'service_request_kicked_back' && onTabChange) {
-      onTabChange('sales_service_requests');
-      setIsOpen(false);
-      return;
-    }
-
-    // Service request resubmitted - navigate to service requests queue
-    if (notifType === 'service_request_resubmitted' && onTabChange) {
+    if (notifType === 'service_request' && onTabChange) {
       onTabChange('service_requests');
       setIsOpen(false);
       return;

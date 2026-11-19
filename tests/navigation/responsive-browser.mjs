@@ -17,10 +17,10 @@ export const formatDateInTimezone=()=> '2026-10-09';
 export const formatTimeInTimezone=()=> '8:00 AM';
 export const createTimestampInTimezone=(date,time)=>date+'T'+time+':00Z';
 window.actions=[];
-const records=Array.from({length:10},(_,i)=>({id:'notice-'+i,type:i===0?'auto_clock_out':'work_order_assignment',related_id:'wo-'+i,title:i===0?'Auto Clock-Out: Needs Approval':'Work order assigned',body:'Technicians completed the installation. Follow up with the customer regarding remaining programming and additional equipment before returning to the project.',created_at:new Date(Date.now()-i*60000).toISOString(),is_read:i>1}));
+const records=Array.from({length:10},(_,i)=>({id:'notice-'+i,type:i===0?'auto_clock_out':i===1?'service_request_created':'work_order_assignment',related_id:'wo-'+i,title:i===0?'Auto Clock-Out: Needs Approval':i===1?'New Service Request':'Work order assigned',body:'Technicians completed the installation. Follow up with the customer regarding remaining programming and additional equipment before returning to the project.',created_at:new Date(Date.now()-i*60000).toISOString(),is_read:i>1}));
 export const supabase={from(table){const q=new Proxy({},{get(_,key){if(key==='then'){let data=table==='notifications'?records:table==='organizations'?{header_logo_url:'/logo.svg'}:table==='company_settings'?{}:table==='business_cards'?{}:table==='daily_clock_entries'?null:[];return(a,b)=>Promise.resolve({data,error:null}).then(a,b);}return()=>q;}});return q;},channel(){const q={on(){return q;},subscribe(){return q;},unsubscribe(){}};return q;},removeChannel(){}};
 `;
-const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {Header} from './src/components/Layout/Header';document.documentElement.dataset.theme=new URLSearchParams(location.search).get('theme')||'dark';createRoot(document.getElementById('root')).render(<div className="theme-workspace"><div style={{transform:'translateZ(0)'}}><Header activeTab="feed" isAdmin={false} onCreateContact={()=>{}} onCreateLead={()=>{}} onCreateServiceRequest={()=>{}} onCreateTask={()=>{}} onLeadClick={id=>window.actions.push(id)} onTabChange={tab=>window.actions.push(tab)} onMenuToggle={()=>window.actions.push('sidebar')}/></div><main style={{height:2000}}>Workspace content</main></div>);`;
+const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {Header} from './src/components/Layout/Header';document.documentElement.dataset.theme=new URLSearchParams(location.search).get('theme')||'dark';createRoot(document.getElementById('root')).render(<div className="theme-workspace"><div style={{transform:'translateZ(0)'}}><Header activeTab="feed" isAdmin={false} onCreateContact={()=>{}} onCreateLead={()=>{}} onCreateServiceRequest={()=>window.actions.push('service')} onCreateSupportRequest={location.search.includes('restricted')?undefined:()=>window.actions.push('support')} onCreateTask={()=>window.actions.push('assignment')} onLeadClick={id=>window.actions.push(id)} onTabChange={tab=>window.actions.push(tab)} onMenuToggle={()=>window.actions.push('sidebar')}/></div><main style={{height:2000}}>Workspace content</main></div>);`;
 const server = createServer(async (req, res) => {
   if(req.url==='/logo.svg'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="280" height="40"><rect width="280" height="40" fill="#008dbc"/><text x="5" y="30" font-size="28" fill="white">Electronic Life</text></svg>');return;}
   const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';
@@ -70,6 +70,23 @@ try {
     await bell.click();await page.getByRole('button',{name:'Close notifications'}).click();assert.equal(await dialog.count(),0);
     if(process.env.NAVIGATION_SCREENSHOT_DIR&&theme==='dark'&&width===390){await bell.click();await page.screenshot({path:join(process.env.NAVIGATION_SCREENSHOT_DIR,'mobile-navigation.png')});await page.keyboard.press('Escape');}
     console.log(theme+' '+width+'x'+height+': header spacing, panel containment, scroll, expand, close and navigation pass');
+  }
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({width,height:900});
+    await page.goto(url);
+    const openCreate = () => page.getByRole('button', {name: width < 768 ? 'Open menu' : 'Create', exact: true}).click();
+    for (const [label, action] of [['Service Request','service'],['Support Request','support'],['New Assignment','assignment']]) {
+      await openCreate();
+      await page.getByRole('button',{name:new RegExp('^'+label+' ')}).click();
+      assert.equal(await page.evaluate(()=>window.actions.at(-1)), action);
+    }
+    await page.goto(url+'?restricted');
+    await openCreate();
+    assert.equal(await page.getByRole('button',{name:/^Support Request /}).count(), 0);
+    await page.goto(url);
+    await page.getByRole('button',{name:'Notifications',exact:true}).filter({visible:true}).click();
+    await page.getByRole('button',{name:/New Service Request/}).click();
+    await page.waitForURL('**/service-requests?serviceRequestId=wo-1');
   }
   assert.deepEqual(errors,[]);
 } finally {await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}
