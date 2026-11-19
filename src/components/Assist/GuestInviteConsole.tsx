@@ -16,6 +16,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [availabilityMessage, setAvailabilityMessage] = useState('');
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const current = useRef<Invite | null>(null);
   const viewer = useRef<Window | null>(null);
@@ -60,7 +61,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     finally { if (version === epoch.current) { working.current = false; setBusy(false); } }
   }
   useEffect(() => {
-    const version = ++epoch.current; setAvailable(false); setInvite(null); setError(''); setBusy(false); working.current = false;
+    const version = ++epoch.current; setAvailable(false); setAvailabilityMessage(''); setCheckingAvailability(false); setInvite(null); setError(''); setBusy(false); working.current = false;
     void invoke('invite_capability').then(data => { if (version === epoch.current) setAvailable(data?.available === true); }).catch(() => {});
     let polling = false;
     const timer = window.setInterval(() => {
@@ -82,10 +83,22 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
   }, [organizationId]);
   async function recheckAvailability() {
     if (checkingAvailability || busy) return;
+    const version = epoch.current;
+    setAvailabilityMessage('');
     setCheckingAvailability(true);
-    try { const data = await invoke('invite_capability'); setAvailable(data?.available === true); }
-    catch { setAvailable(false); }
-    finally { setCheckingAvailability(false); }
+    try {
+      const data = await invoke('invite_capability');
+      if (version !== epoch.current) return;
+      const ready = data?.available === true;
+      setAvailable(ready);
+      setAvailabilityMessage(ready ? 'Invitations are ready.' : 'Checked just now. Invitations are still waiting for Assist activation.');
+    } catch {
+      if (version !== epoch.current) return;
+      setAvailable(false);
+      setAvailabilityMessage('Could not check invitation availability. Try again in a moment.');
+    } finally {
+      if (version === epoch.current) setCheckingAvailability(false);
+    }
   }
   async function create(sendEmail: boolean) {
     if (working.current || current.current || !available || !selectedEmail) return;
@@ -128,7 +141,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       {!recipient && searching && <p className="mt-1 text-xs text-muted">Searching…</p>}
       {!recipient && directoryError && <p className="mt-1 text-xs text-muted">Some directory results could not be loaded. You can still enter an email address.</p>}
     </div>}
-    {!available ? <div className="mt-2"><p className="text-sm text-muted">Invitation codes are not active yet. Remote support must pass the Windows pilot before sessions can be started.</p><button type="button" disabled={checkingAvailability || busy} onClick={() => void recheckAvailability()} className="mt-2 min-h-11 text-sm font-medium text-info disabled:opacity-50">{checkingAvailability ? 'Checking…' : 'Check availability again'}</button></div> : !invite ? <>
+    {!available ? <div className="mt-2"><p className="text-sm text-muted">Invitations are unavailable. Assist needs to finish activation and pass the Windows pilot before you can start a session.</p><button type="button" disabled={checkingAvailability || busy} onClick={() => void recheckAvailability()} className="mt-2 min-h-11 text-sm font-medium text-info disabled:opacity-50">{checkingAvailability ? 'Checking…' : 'Check availability again'}</button></div> : !invite ? <>
       <p className="mt-2 text-sm text-muted">Email a one-time invitation or create a link to share. The recipient won’t need an MJV account.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={busy || !selectedEmail} onClick={() => void create(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Preparing…' : 'Email invitation'}</button>
@@ -150,6 +163,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       {invite.state === 'computer_ready' && <button type="button" disabled={busy} onClick={() => void connect()} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50"><ExternalLink size={16} />Open guest support</button>}
       <p className="mt-3 text-xs text-muted">Keep this MJV page open. Codes can be used once within 10 minutes. End the invitation when finished; sessions last up to one hour.</p>
     </>}
+    <p role="status" className={availabilityMessage ? 'mt-2 text-sm text-muted' : 'sr-only'}>{availabilityMessage}</p>
     {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
   </div>;
 }
