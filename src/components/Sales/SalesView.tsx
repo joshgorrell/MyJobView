@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useDepartments } from '../../contexts/DepartmentContext';
+import { workspaceUrl } from '../../lib/workspaceRoutes';
 import { PipelineBoard } from './PipelineBoard';
 import { ContactsView } from '../Contacts/ContactsView';
 import ProposalsView from '../Proposals/ProposalsView';
@@ -39,6 +41,7 @@ interface QuickStats {
 
 export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
   const { profile } = useAuth();
+  const { hasModuleAccess } = useDepartments();
   const [activeView, setActiveView] = useState(initialView);
   const [officeFilter, setOfficeFilter] = useState<{ id: string; name: string } | null>(null);
   const [quickStats, setQuickStats] = useState<QuickStats>({
@@ -151,7 +154,7 @@ export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
       id: 'pipeline',
       name: 'Pipeline',
       icon: Target,
-      component: PipelineBoard,
+      component: null,
       badge: 0
     },
     {
@@ -217,7 +220,13 @@ export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
 
   const views = allViews;
 
-  const ActiveComponent = views.find(v => v.id === activeView)?.component || PipelineBoard;
+  const ActiveComponent = views.find(v => v.id === activeView)?.component;
+
+  function handlePipelineNavigate(module: 'leads' | 'proposals' | 'sales_orders') {
+    if (!hasModuleAccess(module)) return;
+    const url = workspaceUrl(new URL(window.location.href), module);
+    if (url) window.location.assign(url);
+  }
 
   function handleNavigateToOffice(officeId: string, officeName: string) {
     setOfficeFilter({ id: officeId, name: officeName });
@@ -271,8 +280,15 @@ export function SalesView({ initialView = 'pipeline' }: SalesViewProps) {
                 setActiveView('by_office');
               }}
             />
-          ) : (
+          ) : ActiveComponent ? (
             <ActiveComponent />
+          ) : (
+            <PipelineBoard
+              onNavigate={handlePipelineNavigate}
+              canViewLeads={hasModuleAccess('leads')}
+              canViewProposals={hasModuleAccess('proposals')}
+              canViewSalesOrders={hasModuleAccess('sales_orders')}
+            />
           )}
         </div>
       </div>

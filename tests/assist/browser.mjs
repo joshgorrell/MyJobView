@@ -22,7 +22,7 @@ export const from=table=>({
 });
 let enabled=mode==='settings-failed';let activation=mode==='settings-failed'?'needs_attention':'off';
 export const supabase={from,rpc:async(name,args)=>{window.calls.push({name,args});if(name==='get_assist_access')return {data:{can_operate:mode==='engineer',windows_download_ready:mode==='engineer'}};if(name==='manage_assist_operators')return {data:{people:[{id:'admin',name:'Administrator',admin:true,granted:true},{id:'jp',name:'Josh Paul',admin:false,granted:args.p_granted===true}]}};if(name==='retry_assist_activation'){activation='activation_pending';return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};}if(name==='set_assist_enabled'){enabled=args.p_enabled;activation=enabled?'activation_pending':'deactivation_pending';return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};}if(mode==='error')return {error:new Error('failed')};if(name==='get_assist_setup'&&mode?.startsWith('settings'))return {data:{enabled,activation_state:activation,provisioned:false,windows_download_ready:false}};if(name==='get_assist_setup')return {data:{enabled:true,provisioned:mode!=='pending',windows_download_ready:mode!=='pending'}};if(mode==='disabled')return {error:new Error('disabled')};return {data:{url:'https://assist.example.com/elife/meshagents?meshid=one&id=4'}};} ,functions:{invoke:async(name,options)=>{window.edgeCalls.push({name,body:options.body});if(name==='assist-guest'){if(options.body.operation==='redeem')return {data:{invite_id:'guest-invite',claim_token:'test-claim-token',download_url:'https://assist.example.com/mjv-orgone/meshagents?meshid=guest&id='+(options.body.architecture==='arm64'&&mode!=='guest-wrong-architecture'?'43':'4')+'&installflags=1',state:'waiting_for_computer',expires_at:new Date(Date.now()+180000).toISOString()}};return {data:{ended:true,state:'waiting_for_computer',expires_at:new Date(Date.now()+180000).toISOString()}};}if(options.body.operation==='invite_capability')return {data:{available:mode==='engineer'}};if(options.body.operation==='invite_create')return {data:{invite_id:'guest-invite',code:'ABCD-EFGH-JKLM',join_url:'https://elife.myjobview.com/assist#code=ABCD-EFGH-JKLM',state:'waiting_for_guest'}};if(options.body.operation==='invite_status')return {data:{state:'waiting_for_computer'}};if(options.body.operation==='devices')return {data:{devices:[{id:'node/mjv-orgone/online',name:'Jesse laptop',online:true,os:'Windows'},{id:'node/mjv-orgone/offline',name:'Offline laptop',online:false,os:'Windows'}]}};if(options.body.operation==='connect')return {data:{session_id:'viewer-session',viewer_origin:'https://assist.example.com',viewer_url:'https://assist.example.com/mjv-orgone/?login=private-viewer-token',expires_at:new Date(Date.now()+180000).toISOString()}};return {data:{ended:true,active:true}};}}};
-window.edgeCalls=[];window.open=()=>({opener:null,closed:false,document:{title:'',body:{textContent:''},createElement:()=>({}),head:{appendChild:()=>{}}},location:{replace:url=>{window.viewerUrl=url}},close(){this.closed=true;}});
+window.edgeCalls=[];document.addEventListener('click',event=>{if(event.target instanceof HTMLAnchorElement&&event.target.hostname==='assist.example.com'){event.preventDefault();window.guestDownloadTarget=event.target.href;}});window.open=()=>({opener:null,closed:false,document:{title:'',body:{textContent:''},createElement:()=>({}),head:{appendChild:()=>{}}},location:{replace:url=>{window.viewerUrl=url}},close(){this.closed=true;}});
 `;
 let browser;
 const testPng=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/vXcAAAAASUVORK5CYII=','base64');
@@ -112,9 +112,10 @@ try{
   assert.equal(await page.getByLabel('Support code').inputValue(),'ABCD-EFGH-JKLM');
   assert.equal(await page.evaluate(()=>location.hash),'');
   assert.equal(await page.evaluate(()=>window.calls.length),0,'Guest entry requires no staff RPC');
-  await page.getByRole('button',{name:'Continue',exact:true}).click();
-  const download=page.getByRole('link',{name:'Download support app',exact:true});await download.waitFor();
+  await page.getByRole('button',{name:'Download Assist',exact:true}).click();
+  const download=page.getByRole('link',{name:'Download Assist again',exact:true});await download.waitFor();
   assert.match(await download.getAttribute('href'),/installflags=1/);
+  assert.equal(await page.evaluate(()=>window.guestDownloadTarget),await download.getAttribute('href'));
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   assert.equal((await page.locator('body').innerText()).includes('test-claim-token'),false);
   await page.getByRole('button',{name:'End session',exact:true}).click();
@@ -126,23 +127,30 @@ try{
  for(const width of [1280,390]){
   await page.setViewportSize({width,height:900});
   await page.goto(url+'?mode=guest-arm&width='+width+'#code=ABCD-EFGH-JKLM');
+  await page.getByText('Other download options',{exact:true}).click();
   await page.getByLabel('Computer type').selectOption('arm64');
-  await page.getByRole('button',{name:'Continue',exact:true}).click();
-  const armDownload=page.getByRole('link',{name:'Download support app',exact:true});await armDownload.waitFor();
+  await page.getByRole('button',{name:'Download Assist',exact:true}).click();
+  const armDownload=page.getByRole('link',{name:'Download Assist again',exact:true});await armDownload.waitFor();
   assert.equal(new URL(await armDownload.getAttribute('href')).searchParams.get('id'),'43');
   assert.equal(await page.evaluate(()=>window.edgeCalls.find(c=>c.body.operation==='redeem').body.architecture),'arm64');
   await page.getByText('For Windows ARM64.',{exact:false}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  }
+ await page.addInitScript(() => Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{platform:'Windows',getHighEntropyValues:async()=>({architecture:'arm',bitness:'64'})}}));
+ await page.goto(url+'?mode=guest-arm#code=ABCD-EFGH-JKLM');
+ await page.getByRole('button',{name:'Download Assist',exact:true}).click();
+ await page.getByRole('link',{name:'Download Assist again',exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>new URL(window.guestDownloadTarget).searchParams.get('id')),'43');
  await page.goto(url+'?mode=guest-no-logo');
  await page.getByRole('heading',{name:'Electronic Life',exact:true}).waitFor();
  await page.getByRole('img',{name:'MyJobView Assist'}).waitFor();
  assert.equal(await page.getByRole('img',{name:'Electronic Life'}).count(),0,'No broken dealer image when logo is missing');
  await page.goto(url+'?mode=guest-wrong-architecture#code=ABCD-EFGH-JKLM');
- await page.getByLabel('Computer type').selectOption('arm64');
- await page.getByRole('button',{name:'Continue',exact:true}).click();
+ await page.getByText('Other download options',{exact:true}).click();
+  await page.getByLabel('Computer type').selectOption('arm64');
+ await page.getByRole('button',{name:'Download Assist',exact:true}).click();
  await page.getByRole('alert').filter({hasText:'We couldn’t use that code'}).waitFor();
- assert.equal(await page.getByRole('link',{name:'Download support app',exact:true}).count(),0);
+ assert.equal(await page.getByRole('link',{name:'Download Assist again',exact:true}).count(),0);
  await page.waitForFunction(()=>window.edgeCalls.some(c=>c.body.operation==='end'&&c.body.inviteId==='guest-invite'));
  await page.goto(url+'?mode=settings');await page.getByRole('checkbox',{name:'Josh Paul',exact:true}).check();
  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='manage_assist_operators'&&c.args.p_user_id==='jp'&&c.args.p_granted===true).length),1);
