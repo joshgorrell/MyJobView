@@ -98,6 +98,28 @@ assert.equal((await redirectHandler(request({operation:'redeem',code:invite.code
 const badHandler=createAssistGuestHandler({publicOrigin:'https://assist.example.com',resolveDealer:async()=>org,control:async()=>({...claim,download_url:download.replace('installflags=1','installflags=0')})});assert.equal((await badHandler(request({operation:'redeem',code:invite.code}))).status,503);
 const staffHandler=createAssistSupportHandler({publicOrigin:'https://assist.example.com',authenticate:async()=>({...context,subdomain:'elife'}),control:async()=>({...invite,secret:'never return'})});
 const staffResponse=await staffHandler(new Request('https://backend.example/functions/v1/assist-support',{method:'POST',headers:{origin:'https://elife.myjobview.com',authorization:'Bearer verified'},body:JSON.stringify({operation:'invite_create',organizationId:org})}));assert.equal(staffResponse.status,200);const data=await staffResponse.json();assert.equal(data.join_url,`https://elife.myjobview.com/assist#code=${invite.code}`);assert.equal(data.secret,undefined);
+const mails=[];let emailInviteCreations=0;let failEmail=false;
+const emailHandler=createAssistSupportHandler({
+ publicOrigin:'https://assist.example.com',
+ authenticate:async()=>({...context,subdomain:'elife'}),
+ control:async body=>{assert.equal(body.emailRecipient,undefined);emailInviteCreations++;return invite;},
+ sendInviteEmail:async mail=>{mails.push(mail);if(failEmail)throw new Error('provider unavailable');return true;},
+});
+const emailRequest=(recipient,origin='https://elife.myjobview.com')=>emailHandler(new Request('https://backend.example/functions/v1/assist-support',{
+ method:'POST',headers:{origin,authorization:'Bearer verified'},
+ body:JSON.stringify({operation:'invite_create',organizationId:org,emailRecipient:recipient}),
+}));
+assert.equal((await emailRequest('one@example.com,two@example.com')).status,400);
+assert.equal((await emailRequest('guest@example.com','https://other.myjobview.com')).status,403);
+assert.equal(emailInviteCreations,0);
+const emailed=await (await emailRequest('guest@example.com')).json();
+assert.equal(emailed.email_sent,true);
+assert.deepEqual(mails,[{recipient:'guest@example.com',joinUrl:data.join_url,inviteId:invite.invite_id}]);
+failEmail=true;
+const undelivered=await (await emailRequest('guest@example.com')).json();
+assert.equal(undelivered.email_sent,false);
+assert.equal(undelivered.join_url,data.join_url);
+
 const limited=createGuestBroker(options);
 for(let i=0;i<241;i++)await assert.rejects(limited.guest({organization_id:org,operation:'redeem',code:'ABCD-EFGH-JKLM'}),/unavailable/);
 let checked=0;const outages=createGuestBroker({...options,rpc:async(name,args)=>{if(args.p_action==='access'&&++checked>2)throw new Error('auth offline');return rpc(name,args);}});
