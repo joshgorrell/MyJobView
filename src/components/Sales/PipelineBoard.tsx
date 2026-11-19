@@ -26,7 +26,7 @@ interface PipelineStage {
 }
 
 const ACTIVITY_PAGE_SIZE = 500;
-const DEFAULT_PIPELINE_WIDGETS = ['contacts', 'leads', 'fishbowl'];
+const DEFAULT_PIPELINE_WIDGETS = ['leads'];
 
 async function loadActivityPages<T>(
   fetchPage: (start: number, end: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
@@ -78,28 +78,12 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   // All available widget definitions
   const allWidgetDefinitions = [
     {
-      id: 'contacts',
-      name: 'Contacts',
-      description: 'New contacts',
-      color: 'text-gray-700',
-      bgColor: 'bg-gray-50',
-      borderColor: 'border-gray-300'
-    },
-    {
       id: 'leads',
       name: 'Leads',
       description: viewMode === 'my' ? 'My leads & unclaimed' : 'All active leads',
       color: 'text-green-700',
       bgColor: 'bg-green-50',
       borderColor: 'border-green-300'
-    },
-    {
-      id: 'fishbowl',
-      name: 'Sales Department',
-      description: 'Unclaimed leads available to sales reps',
-      color: 'text-teal-700',
-      bgColor: 'bg-teal-50',
-      borderColor: 'border-teal-300'
     }
   ];
 
@@ -294,7 +278,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       if (leadResult.error) throw leadResult.error;
       const allLeadRecords = leadResult.data || [];
       const leads = allLeadRecords.filter((lead: any) =>
-        !lead.is_fishbowl && (showAll || !profile?.id || lead.assigned_to === profile.id || lead.assigned_to == null)
+        (showAll || !profile?.id || lead.assigned_to === profile.id || lead.assigned_to == null || (lead.is_fishbowl && lead.status === 'unclaimed'))
       );
       const fishbowl = allLeadRecords.filter((lead: any) =>
         lead.is_fishbowl === true && lead.status === 'unclaimed' && lead.assigned_to == null
