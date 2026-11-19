@@ -154,6 +154,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [customerVisible, setCustomerVisible] = useState(true);
   const [showTaxExplanation, setShowTaxExplanation] = useState(false);
+  const taxHelpButton = useRef<HTMLButtonElement>(null);
+
+  function closeTaxExplanation() {
+    setShowTaxExplanation(false);
+    taxHelpButton.current?.focus();
+  }
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>('residential');
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -1397,7 +1403,15 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
 
               {/* Totals */}
               <div className="mt-4 pt-4 border-t border-gray-700 flex justify-end">
-                <div className="w-full sm:w-72 space-y-1.5">
+                <div
+                  className="relative w-full sm:w-72 space-y-1.5"
+                  onKeyDown={event => {
+                    if (showTaxExplanation && event.key === 'Escape') {
+                      event.stopPropagation();
+                      closeTaxExplanation();
+                    }
+                  }}
+                >
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Subtotal</span>
                     <span className="font-medium text-white">{formatCurrency(calculateSubtotal())}</span>
@@ -1409,7 +1423,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         : `Sales tax (${(getEffectiveTaxRate() * 100).toFixed(2)}%)`}</span>
                       <button
                         type="button"
+                        ref={taxHelpButton}
                         aria-label="How sales tax is calculated"
+                        aria-controls={showTaxExplanation ? 'invoice-tax-explanation' : undefined}
                         aria-expanded={showTaxExplanation}
                         onClick={() => setShowTaxExplanation(open => !open)}
                         className="inline-flex h-8 w-8 items-center justify-center rounded text-blue-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-blue-400"
@@ -1420,12 +1436,28 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     <span className="font-medium text-white">{formatCurrency(calculateTax())}</span>
                   </div>
                   {showTaxExplanation && (
-                    <div className="space-y-2 rounded-lg border border-gray-700 bg-gray-900 p-3 text-xs leading-relaxed text-gray-300">
+                    <div
+                      id="invoice-tax-explanation"
+                      role="region"
+                      aria-label="How sales tax is calculated"
+                      className="absolute inset-x-0 bottom-full z-20 mb-2 space-y-3 rounded-xl border border-gray-600 bg-gray-900 p-4 text-sm leading-relaxed text-gray-300 shadow-xl"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-semibold text-white">How sales tax is calculated</h3>
+                        <button
+                          type="button"
+                          aria-label="Close sales tax help"
+                          onClick={closeTaxExplanation}
+                          className="rounded p-1 text-gray-300 hover:bg-gray-700 hover:text-white focus-visible:outline focus-visible:outline-blue-400"
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </div>
                       <p>
                         {isExemptProject
-                          ? 'This preview shows zero tax because Exempt Project is selected. Keep the applicable project exemption documentation on file.'
+                          ? 'Exempt Project is selected. To submit with an exemption, the customer needs an active certificate for the transaction state.'
                           : selectedContact?.is_tax_exempt
-                            ? 'This preview shows zero tax because the customer is marked Tax Exempt. Keep an applicable certificate on file.'
+                            ? 'The customer is marked Tax Exempt. At submission, MyJobView checks for an active certificate for the transaction state.'
                             : `This preview applies ${(getEffectiveTaxRate() * 100).toFixed(2)}% to taxable line items based on their tax settings, the environment, and project type. MyJobView recalculates tax at submission.`}
                       </p>
                       {selectedContactId ? (
