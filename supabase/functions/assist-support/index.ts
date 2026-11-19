@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
+import {sendSystemEmail} from '../_shared/system-email.ts';
 import {createAssistSupportHandler,sessionClaimsAfterVerification} from '../_shared/assist-support-handler.mjs';
 
 Deno.serve(async(request:Request)=>{
@@ -18,6 +19,19 @@ Deno.serve(async(request:Request)=>{
     const {data:org,error:oe}=await db.from('organizations').select('subdomain,is_active').eq('id',profile.organization_id).maybeSingle();
     if(oe||!org?.is_active||!org.subdomain)return null;
     return {organization_id:profile.organization_id,actor_id:user.id,subdomain:org.subdomain,...claims};
+   },
+   sendInviteEmail:async({recipient,joinUrl,inviteId}:{recipient:string;joinUrl:string;inviteId:string})=>{
+    const response=await sendSystemEmail({
+     signal:AbortSignal.timeout(10000),
+     headers:{'Idempotency-Key':`assist-invite/${inviteId}`},
+     body:JSON.stringify({
+      to:[recipient],
+      subject:'MyJobView Assist invitation',
+      text:`Open this one-time link to get remote support:\n${joinUrl}\n\nClick Download Assist, open the app, and approve the support request. Only approve if you were expecting help.`,
+     }),
+    });
+    await response.body?.cancel();
+    return response.ok;
    },
    control:async(body:unknown)=>{
     const response=await fetch(controlOrigin+'/v1/support',{method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),headers:{'content-type':'application/json',authorization:'Bearer '+secret},body:JSON.stringify(body)});

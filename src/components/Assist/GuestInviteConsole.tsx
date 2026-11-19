@@ -3,7 +3,7 @@ import { Copy, ExternalLink, UserPlus, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 type Recipient = { id: string; name: string; email: string; type: 'Customer' | 'User' };
 const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-type Invite = { invite_id: string; code: string; join_url: string; state: string };
+type Invite = { invite_id: string; code: string; join_url: string; state: string; email_sent?: boolean };
 export function GuestInviteConsole({ organizationId }: { organizationId: string }) {
   const [available, setAvailable] = useState(false);
   const [recipientQuery, setRecipientQuery] = useState('');
@@ -47,9 +47,8 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [organizationId, recipientQuery, recipient]);
   const selectedEmail = recipient?.email || (validEmail(recipientQuery) ? recipientQuery.trim() : '');
-  const inviteText = invite ? `Open this link to get remote support: ${invite.join_url}\n\nClick Download Assist, open the app, and approve the support request. This link can be used once.` : '';
-  async function invoke(operation: string, inviteId?: string) {
-    const { data, error: failure } = await supabase.functions.invoke('assist-support', { body: { operation, organizationId, ...(inviteId ? { inviteId } : {}) } });
+  async function invoke(operation: string, inviteId?: string, emailRecipient?: string) {
+    const { data, error: failure } = await supabase.functions.invoke('assist-support', { body: { operation, organizationId, ...(inviteId ? { inviteId } : {}), ...(emailRecipient ? { emailRecipient } : {}) } });
     if (failure || data?.error) throw new Error('Invitation unavailable'); return data;
   }
   async function end() {
@@ -88,13 +87,14 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     catch { setAvailable(false); }
     finally { setCheckingAvailability(false); }
   }
-  async function create() {
+  async function create(sendEmail: boolean) {
     if (working.current || current.current || !available || !selectedEmail) return;
     const version = epoch.current; working.current = true; setBusy(true); setError(''); setCopied(false); setCodeCopied(false);
     try {
-      const row = await invoke('invite_create');
+      const row = await invoke('invite_create', undefined, sendEmail ? selectedEmail : undefined);
       if (version !== epoch.current) { void invoke('invite_end', row.invite_id).catch(() => {}); return; }
       current.current = row; setInvite(row);
+      if (sendEmail && row.email_sent !== true) setError('Email delivery could not be confirmed. You can copy the invitation link and share it yourself.');
     } catch { if (version === epoch.current) setError('Unable to create an invitation. Check Assist availability and try again.'); }
     finally { if (version === epoch.current) { working.current = false; setBusy(false); } }
   }
@@ -129,15 +129,17 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       {!recipient && directoryError && <p className="mt-1 text-xs text-muted">Some directory results could not be loaded. You can still enter an email address.</p>}
     </div>}
     {!available ? <div className="mt-2"><p className="text-sm text-muted">Invitation codes are not active yet. Remote support must pass the Windows pilot before sessions can be started.</p><button type="button" disabled={checkingAvailability || busy} onClick={() => void recheckAvailability()} className="mt-2 min-h-11 text-sm font-medium text-info disabled:opacity-50">{checkingAvailability ? 'Checking…' : 'Check availability again'}</button></div> : !invite ? <>
-      <p className="mt-2 text-sm text-muted">Create a one-time code or link. They won’t need an MJV account.</p>
-      <button type="button" disabled={busy || !selectedEmail} onClick={() => void create()} className="mt-3 min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Creating…' : 'Create invitation'}</button>
+      <p className="mt-2 text-sm text-muted">Email a one-time invitation or create a link to share. The recipient won’t need an MJV account.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" disabled={busy || !selectedEmail} onClick={() => void create(true)} className="min-h-11 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Preparing…' : 'Email invitation'}</button>
+        <button type="button" disabled={busy || !selectedEmail} onClick={() => void create(false)} className="min-h-11 rounded-lg border border-subtle px-4 font-semibold text-primary disabled:opacity-50">Create invitation</button>
+      </div>
     </> : <>
-      <p className="mt-3 text-sm text-muted">Send this one-time link to <strong>{selectedEmail}</strong>. It opens Assist with the code already filled in.</p>
+      {invite.email_sent && <p className="mt-3 text-sm text-primary">Invitation emailed to <strong>{selectedEmail}</strong>.</p>}
+      <p className="mt-3 text-sm text-muted">Share this one-time link to <strong>{selectedEmail}</strong>. It opens Assist with the code already filled in.</p>
       <div className="my-3 flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"><Copy size={16} />{copied ? 'Link copied' : 'Copy invitation link'}</button>
-        <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg border border-subtle px-4 text-sm font-semibold text-primary">Email invitation</a>
       </div>
-      <p className="text-xs text-muted">Email invitation opens a draft in your email app.</p>
       <p className="mt-1 break-all text-xs text-muted">{invite.join_url}</p>
       <details className="mt-3">
         <summary className="cursor-pointer text-sm font-medium text-info">Share a code by phone</summary>
