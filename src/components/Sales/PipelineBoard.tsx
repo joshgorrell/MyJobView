@@ -519,6 +519,9 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
           <HelpCircle className="h-5 w-5" />
         </button>
+
+      </div>
+
         <PipelineStageOverview
           showAll={viewMode === 'all' && canViewAllPipeline}
 
@@ -779,7 +782,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
             setShowContactForm(true);
           }}
         />
-      </div>
 
       {/* Detail View Modals */}
       {selectedContact && (
