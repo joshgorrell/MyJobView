@@ -2,7 +2,7 @@ import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User, CircleHelp } from 'lucide-react';
+import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User, HelpCircle } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -1430,7 +1430,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         onClick={() => setShowTaxExplanation(open => !open)}
                         className="inline-flex h-8 w-8 items-center justify-center rounded text-blue-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-blue-400"
                       >
-                        <CircleHelp size={16} aria-hidden="true" />
+                        <HelpCircle size={16} aria-hidden="true" />
                       </button>
                     </div>
                     <span className="font-medium text-white">{formatCurrency(calculateTax())}</span>
