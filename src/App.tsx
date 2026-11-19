@@ -204,7 +204,7 @@ function AppContent() {
   const [showServiceRequestForm, setShowServiceRequestForm] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [aiTaskPrefill, setAiTaskPrefill] = useState<{ contactId?: string; contactName?: string; title?: string; description?: string; priority?: string; dueDate?: string } | null>(null);
-  const [showAiTaskForm, setShowAiTaskForm] = useState(false);
+  const [taskFormMode, setTaskFormMode] = useState<'assignment' | 'support' | null>(null);
   const [showJobMediaUpload, setShowJobMediaUpload] = useState(false);
   const [showAddProjectTime, setShowAddProjectTime] = useState(false);
   const [showTellUsModal, setShowTellUsModal] = useState(false);
@@ -871,9 +871,13 @@ function AppContent() {
             onCreateInternalChat={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => { setCreateInternalChatRequested(true); setActiveTab('feed'); } : undefined}
             onCreateFlowUpdate={['contacts', 'projects', 'work_orders'].some(checkModuleAccess) ? () => setShowFlowUpdate(true) : undefined}
             onCreateServiceRequest={() => setShowServiceRequestForm(true)}
+            onCreateSupportRequest={checkModuleAccess('tasks') ? () => {
+              setAiTaskPrefill(null);
+              setTaskFormMode('support');
+            } : undefined}
             onCreateTask={() => {
               setAiTaskPrefill(null);
-              setShowAiTaskForm(true);
+              setTaskFormMode('assignment');
             }}
             onCreateJobMedia={() => setShowJobMediaUpload(true)}
             onCreateProjectTime={['admin', 'manager', 'service_manager', 'sales_manager'].includes(profile.role) ? () => setShowAddProjectTime(true) : undefined}
@@ -1274,11 +1278,18 @@ function AppContent() {
 
 
 
-      {showAiTaskForm && (
+      {taskFormMode && (
         <Suspense fallback={null}>
           <TaskForm
-            onClose={() => { setShowAiTaskForm(false); setAiTaskPrefill(null); }}
-            onSuccess={() => { setShowAiTaskForm(false); setAiTaskPrefill(null); }}
+            key={taskFormMode}
+            supportMode={taskFormMode === 'support'}
+            onClose={() => { setTaskFormMode(null); setAiTaskPrefill(null); }}
+            onSuccess={() => { setTaskFormMode(null); setAiTaskPrefill(null); }}
+            onCreated={(taskId) => {
+              if (!checkModuleAccess('tasks')) return;
+              setOpenTaskId(taskId);
+              setActiveTab('tasks');
+            }}
             aiPrefill={aiTaskPrefill}
           />
         </Suspense>
@@ -1350,11 +1361,11 @@ function AppContent() {
               setAiLeadPrefill((action.prefill as LeadPrefill | undefined) ?? null);
               setShowLeadForm(true);
             } else if (action.type === 'CREATE_TASK') {
-              if (action.prefill) setAiTaskPrefill(action.prefill as { title?: string; description?: string; priority?: string; dueDate?: string });
-              setShowAiTaskForm(true);
+              setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
+              setTaskFormMode('assignment');
             } else if (action.type === 'CREATE_SUPPORT_REQUEST') {
               setAiTaskPrefill((action.prefill as typeof aiTaskPrefill) ?? null);
-              setShowAiTaskForm(true);
+              setTaskFormMode('support');
             } else if (action.type === 'CREATE_SERVICE_REQUEST') {
               if (action.prefill) setAiServiceRequestPrefill(action.prefill as ServiceRequestPrefill);
               setShowServiceRequestForm(true);

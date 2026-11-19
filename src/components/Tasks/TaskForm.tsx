@@ -1,6 +1,6 @@
 import { notify } from '../../lib/feedback';
 import { AIFormFill } from '../Shared/AIFormFill';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Flag, Users, Plus, UserPlus, ListTodo } from 'lucide-react';
 import { QuickActionModal } from '../Shared/QuickActionModal';
 import { supabase } from '../../lib/supabase';
@@ -29,11 +29,15 @@ interface TaskFormProps {
   task?: Task;
   onClose: () => void;
   onSuccess: () => void;
+  onCreated?: (taskId: string) => void;
   aiPrefill?: AIPrefill | null;
   supportMode?: boolean;
 }
 
-export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefill, supportMode = false }: TaskFormProps) {
+export function TaskForm({ leadId, contactId, task, onClose, onSuccess, onCreated, aiPrefill, supportMode: createSupport = false }: TaskFormProps) {
+  const supportMode = task?.is_support_request ?? createSupport;
+  const itemName = supportMode ? 'Support Request' : 'Assignment';
+  const action = task ? 'Update' : 'Create';
   const { profile } = useAuth();
   const [formData, setFormData] = useState({
     title: task?.title || (supportMode ? 'Support: ' : ''),
@@ -58,9 +62,11 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
   const [showDetails, setShowDetails] = useState(!!task);
   const [priorities, setPriorities] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([]);
   const [loading, setLoading] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [showNewContactForm, setShowNewContactForm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [savedOffline, setSavedOffline] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
   const autoSaveKey = task ? `task_edit_${task.id}` : supportMode ? 'task_new_support' : 'task_new';
@@ -249,21 +255,24 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || submitting.current) return;
 
-    if (supportMode && !formData.title.replace(/^Support:\s*/i, '').trim()) {
-      setError('Enter a short description of the support needed.');
+    const subject = supportMode ? formData.title.replace(/^Support:\s*/i, '').trim() : formData.title.trim();
+    if (!subject) {
+      setError(supportMode ? 'Enter a short description of the support needed.' : 'Enter an assignment title.');
       return;
     }
     if (supportMode && !formData.contact_id) {
       setError('Select a customer contact for this support request.');
       return;
     }
+    submitting.current = true;
+    const offline = !navigator.onLine;
     setLoading(true);
     setError(null);
 
     try {
-      const { data: pointsConfig } = await supabase
+      const { data: pointsConfig } = offline ? { data: null } : await supabase
         .from('points_configuration')
         .select('task_completion_points')
         .single();
@@ -271,7 +280,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
       const taskPoints = pointsConfig?.task_completion_points || 10;
 
       const taskData = {
-        title: formData.title,
+        title: supportMode ? `Support: ${subject}` : subject,
         description: formData.description,
         priority: formData.priority,
         status: formData.status,
@@ -302,13 +311,14 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             task_id: task.id,
             contact_id: formData.contact_id,
             user_id: profile.id,
-            metadata: { task_title: formData.title },
+            metadata: { task_title: taskData.title },
           });
         }
       } else {
         const insertResult = await offlineSupabaseInsert('tasks', {
           ...taskData,
           lead_id: leadId || null,
+          ...(supportMode ? { is_support_request: true } : {}),
           contact_id: formData.contact_id || null,
           user_id: profile.id,
         });
@@ -324,24 +334,30 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
             lead_id: leadId || null,
             contact_id: formData.contact_id || null,
             user_id: profile.id,
-            metadata: { task_title: formData.title },
+            metadata: { task_title: taskData.title },
           });
         }
       }
 
       clearSavedData();
+      setSavedOffline(offline);
       setShowSuccess(true);
       await new Promise(resolve => setTimeout(resolve, 900));
       onSuccess();
 
       if (!task && taskId) {
-        onClose();
-        window.location.hash = `#tasks`;
+        if (onCreated) {
+          if (!offline) onCreated(taskId);
+        } else {
+          onClose();
+          window.location.hash = '#tasks';
+        }
       }
     } catch (err: any) {
       console.error('Error saving task:', err);
       setError(err.message || 'Failed to save task');
     } finally {
+      submitting.current = false;
       setLoading(false);
     }
   }
@@ -375,13 +391,13 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
     <>
     <QuickActionModal
       scrollBody={false}
-      title={task ? 'Edit Assignment' : supportMode ? 'New Support Request' : 'New Assignment'}
-      subtitle={task ? 'Update assignment details' : supportMode ? 'Customer assistance tracked as an assignment' : 'Get something done. Assign a task, question, issue, or follow-up.'}
+      title={`${task ? 'Edit' : 'New'} ${itemName}`}
+      subtitle={task ? undefined : supportMode ? 'Track a customer issue or remote support.' : 'Assign a task, question, issue, or follow-up.'}
       icon={<ListTodo className="w-5 h-5 text-primary" />}
       accentColor="from-sky-600 to-blue-700"
       onClose={handleClose}
       showSuccess={showSuccess}
-      successMessage={task ? 'Assignment Updated!' : supportMode ? 'Support Request Created!' : 'Assignment Created!'}
+      successMessage={savedOffline ? 'Saved on this device. It will sync when you reconnect.' : `${itemName} ${task ? 'Updated' : 'Created'}!`}
 
     >
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
@@ -670,7 +686,7 @@ export function TaskForm({ leadId, contactId, task, onClose, onSuccess, aiPrefil
               disabled={loading}
               className="flex-1 px-4 py-3 bg-gradient-to-r from-sky-600 to-blue-700 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm disabled:opacity-50"
             >
-              {loading ? 'Saving...' : supportMode ? 'Create Support Request' : task ? 'Update Assignment' : 'Create Assignment'}
+              {loading ? 'Saving...' : `${action} ${itemName}`}
             </button>
           </div>
         </form>

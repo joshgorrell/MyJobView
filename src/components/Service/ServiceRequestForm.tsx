@@ -756,9 +756,13 @@ export function ServiceRequestForm({ onClose, onSuccess, prefilledContactId, edi
               .eq('id', serviceRequest.id);
             if (attachmentError) throw attachmentError;
           }
+          const failedCount = photos.length - photoPaths.length;
+          if (failedCount > 0) {
+            notify(`Service request saved. ${failedCount} of ${photos.length} photos could not be attached.`, { theme: 'blue', tone: 'warning' });
+          }
         } catch (photoError) {
           console.error('Service request saved, but photo upload failed:', photoError);
-          notify('Service request saved, but photos could not be attached. You can add them later.', { theme: 'blue', tone: 'warning' });
+          notify('Service request saved, but photos could not be attached.', { theme: 'blue', tone: 'warning' });
         } finally {
           setUploadingPhotos(false);
         }

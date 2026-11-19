@@ -1,5 +1,5 @@
 import { notify } from '../../lib/feedback';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Circle, Clock, Flag, Calendar, Edit2, Trash2, Plus, Filter, MessageSquare, ChevronUp, HelpCircle, X, Search } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
 import { supabase } from '../../lib/supabase';
@@ -19,6 +19,9 @@ interface TasksViewProps {
 export function TasksView({ initialShowForm = false, onFormClose, openTaskId, onTaskOpened }: TasksViewProps = {}) {
   const { profile, loading: authLoading } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const requestSequence = useRef(0);
+  const targetTaskId = useRef(openTaskId);
+  targetTaskId.current = openTaskId;
   const [leads, setLeads] = useState<Record<string, Pick<Lead, 'id' | 'company_name' | 'contact_name'>>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(initialShowForm);
@@ -30,6 +33,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       setShowForm(true);
     }
   }, [initialShowForm]);
+  const [requestFilter, setRequestFilter] = useState<'all' | 'assignment' | 'support'>('all');
   const [showCompleted, setShowCompleted] = useState<boolean>(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; isDiscussion?: boolean } | null>(null);
   const [viewFilter, setViewFilter] = useState<'my' | 'all'>('my');
@@ -61,6 +65,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
         event: '*',
         schema: 'public',
         table: 'tasks',
+        filter: `organization_id=eq.${profile.organization_id}`,
       }, () => {
         loadTasks();
       })
@@ -71,12 +76,27 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       }, () => {
         loadTasks();
       })
-      .subscribe();
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') void loadTasks();
+      });
 
+    const reloadOnFocus = () => { void loadTasks(); };
+    window.addEventListener('focus', reloadOnFocus);
+    // Changes that remove a user's row access may be filtered out of Realtime.
+    const refreshTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadTasks();
+    }, 60_000);
     return () => {
+      requestSequence.current++;
+      window.removeEventListener('focus', reloadOnFocus);
+      window.clearInterval(refreshTimer);
       supabase.removeChannel(channel);
     };
   }, [viewFilter, authLoading, profile]);
+
+  useEffect(() => {
+    if (openTaskId && profile && !authLoading) void loadTasks(openTaskId);
+  }, [openTaskId, profile, authLoading]);
 
   // Auto-expand task when openTaskId is provided
   useEffect(() => {
@@ -84,6 +104,9 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       const taskExists = tasks.find(t => t.id === openTaskId);
       if (taskExists) {
         setExpandedTaskId(openTaskId);
+        setRequestFilter('all');
+        setSearchTerm('');
+        if (taskExists.status === 'completed') setShowCompleted(true);
         onTaskOpened?.();
 
         // Scroll to the task
@@ -133,8 +156,9 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
     }
   }
 
-  async function loadTasks() {
+  async function loadTasks(targetId = targetTaskId.current) {
     if (!profile) return;
+    const sequence = ++requestSequence.current;
 
     try {
       // Load regular tasks
@@ -151,6 +175,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
       const { data: departmentRows, error: departmentError } = await supabase.rpc('get_my_task_department_ids');
       if (departmentError) throw departmentError;
       const accessibleDepartmentIds = (departmentRows || []).map((row: any) => row.department_id);
+      if (sequence !== requestSequence.current) return;
       setMyDepartmentIds(accessibleDepartmentIds);
 
       if (viewFilter === 'my') {
@@ -159,6 +184,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
           `assigned_to.eq.${profile.id}`,
           'and(assigned_to.is.null,assigned_department_id.is.null)'
         ];
+        if (targetId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(targetId)) myFilters.push(`id.eq.${targetId}`);
         if (accessibleDepartmentIds.length > 0) {
           myFilters.push(`assigned_department_id.in.(${accessibleDepartmentIds.join(',')})`);
         }
@@ -233,7 +259,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
 
         const leadsMap: Record<string, Pick<Lead, 'id' | 'company_name' | 'contact_name'>> = {};
         leadsData?.forEach((lead) => { leadsMap[lead.id] = lead; });
-        setLeads(leadsMap);
+        if (sequence === requestSequence.current) setLeads(leadsMap);
       }
 
       const sortedTasks = allTasks.sort((a, b) => {
@@ -252,11 +278,11 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
-      setTasks(sortedTasks);
+      if (sequence === requestSequence.current) setTasks(sortedTasks);
     } catch (error) {
       console.error('Error loading tasks:', error);
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }
 
@@ -288,6 +314,7 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
     } catch (error) {
       console.error('Error updating task:', error);
       notify('Failed to update assignment status', { theme: 'cyan', tone: 'error' });
+      void loadTasks();
     }
   }
 
@@ -339,6 +366,9 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
   }
 
   const filteredTasks = tasks.filter(task => {
+    if (requestFilter === 'support' && !task.is_support_request) return false;
+    if (requestFilter === 'assignment' && task.is_support_request) return false;
+
     // Hide completed tasks unless showCompleted is checked
     if (!showCompleted && task.status === 'completed') return false;
 
@@ -423,6 +453,16 @@ export function TasksView({ initialShowForm = false, onFormClose, openTaskId, on
               <span className="sm:hidden">New</span>
             </button>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-secondary">
+            Type
+            <select value={requestFilter} onChange={event => setRequestFilter(event.target.value as typeof requestFilter)}
+              className="rounded-lg border border-subtle bg-canvas px-2 py-1.5 text-primary">
+              <option value="all">All types</option>
+              <option value="assignment">Assignments</option>
+              <option value="support">Support Requests</option>
+            </select>
+          </label>
 
           {/* Search bar - full width on mobile */}
           <div className="relative w-full">

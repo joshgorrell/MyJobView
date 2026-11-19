@@ -1,5 +1,5 @@
 import { DailyLaunchpad, DailyLaunchpadButton } from './DailyLaunchpad';
-import { Plus, Menu, X, ChevronDown, UserPlus, TrendingUp, Wrench, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
+import { Plus, Menu, X, ChevronDown, UserPlus, TrendingUp, Wrench, Headset, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { useState, useEffect, useRef } from 'react';
@@ -15,8 +15,9 @@ interface HeaderProps {
   onCreateLead: () => void;
   onCreateInternalChat?: () => void;
   onCreateFlowUpdate?: () => void;
-  onCreateServiceRequest: () => void;
-  onCreateTask: () => void;
+  onCreateServiceRequest?: () => void;
+  onCreateSupportRequest?: () => void;
+  onCreateTask?: () => void;
   onCreateJobMedia?: () => void;
   onCreateProjectTime?: () => void;
   onLeadClick: (leadId: string) => void;
@@ -31,7 +32,7 @@ interface HeaderProps {
   onOpenAIAssistant?: () => void;
 }
 
-export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
+export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, onCreateSupportRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
   const { mainDepartments: _mainDepartments, footerDepartments: _footerDepartments, getUserModules: _getUserModules, starredModules, loading: deptLoading } = useDepartments();
@@ -42,6 +43,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
+
+  const requestActions = [
+    { label: 'Service Request', hint: 'Request an on-site service visit.', Icon: Wrench, color: 'text-orange-400', open: onCreateServiceRequest },
+    { label: 'Support Request', hint: 'Track a customer issue or remote support.', Icon: Headset, color: 'text-blue-400', open: onCreateSupportRequest },
+    { label: 'New Assignment', hint: 'Give a person or department a task.', Icon: CheckSquare, color: 'text-cyan-400', open: onCreateTask },
+  ].filter((action): action is typeof action & { open: () => void } => !!action.open);
 
   const loading = deptLoading;
   const initials = profile?.full_name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
@@ -223,33 +230,16 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => {
-                      onCreateServiceRequest();
-                      setShowCreateMenu(false);
-                    }}
-                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
-                  >
-                    <Wrench className="w-4 h-4 text-orange-400" />
-                    <div>
-                      <div className="font-medium">Service Request</div>
-                      <div className="text-xs text-muted">Get service scheduled.</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onCreateTask();
-                      setShowCreateMenu(false);
-                    }}
-                    className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3"
-                  >
-                    <CheckSquare className="w-4 h-4 text-cyan-400" />
-                    <div>
-                      <div className="font-medium">New Assignment</div>
-                      <div className="text-xs text-muted">Get something done.</div>
-                    </div>
-                  </button>
+                  {requestActions.map(({ label, hint, Icon, color, open }) => (
+                    <button key={label} type="button" onClick={() => { setShowCreateMenu(false); open(); }}
+                      className="w-full px-4 py-3 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3">
+                      <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                      <div>
+                        <div className="font-medium">{label}</div>
+                        <div className="text-xs text-muted">{hint}</div>
+                      </div>
+                    </button>
+                  ))}
 
                   {onCreateProjectTime && (
                     <button
@@ -428,27 +418,16 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => { onCreateServiceRequest(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
-                  >
-                    <Wrench className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm font-medium">Service Request</div>
-                      <div className="text-xs text-muted">Get service scheduled.</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => { onCreateTask(); setMobileMenuOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg"
-                  >
-                    <CheckSquare className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm font-medium">New Assignment</div>
-                      <div className="text-xs text-muted">Get something done.</div>
-                    </div>
-                  </button>
+                  {requestActions.map(({ label, hint, Icon, color, open }) => (
+                    <button key={label} type="button" onClick={() => { setMobileMenuOpen(false); open(); }}
+                      className="w-full px-3 py-2.5 text-left text-secondary hover:bg-surface hover:text-primary transition-colors flex items-center gap-3 rounded-lg">
+                      <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                      <div>
+                        <div className="text-sm font-medium">{label}</div>
+                        <div className="text-xs text-muted">{hint}</div>
+                      </div>
+                    </button>
+                  ))}
 
                   {onCreateProjectTime && (
                     <button

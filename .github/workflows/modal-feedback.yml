@@ -4,6 +4,9 @@ on:
     paths:
       - 'src/**'
       - 'tests/modals/**'
+      - 'supabase/migrations/*create_workflow_readiness.sql'
+      - 'tests/flow/create-workflow-database.mjs'
+      - 'tests/smart-intake/service-entry-contract.mjs'
       - '.github/workflows/modal-feedback.yml'
   workflow_dispatch:
 permissions:
@@ -20,6 +23,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: node tests/flow/create-workflow-database.mjs && node tests/smart-intake/service-entry-contract.mjs
       - run: npm run build
       - name: Install headless Chromium and verify launch
         timeout-minutes: 5
