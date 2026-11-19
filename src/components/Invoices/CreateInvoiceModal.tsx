@@ -2,7 +2,7 @@ import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User } from 'lucide-react';
+import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User, CircleHelp } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
@@ -153,6 +153,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [dueDateAutoSet, setDueDateAutoSet] = useState(false);
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [customerVisible, setCustomerVisible] = useState(true);
+  const [showTaxExplanation, setShowTaxExplanation] = useState(false);
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>('residential');
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -1402,11 +1403,49 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     <span className="font-medium text-white">{formatCurrency(calculateSubtotal())}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">{isExemptProject || selectedContact?.is_tax_exempt
-                      ? 'Sales tax (exempt)'
-                      : `Tax (${(getEffectiveTaxRate() * 100).toFixed(2)}%)`}</span>
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <span>{isExemptProject || selectedContact?.is_tax_exempt
+                        ? 'Sales tax (exempt)'
+                        : `Sales tax (${(getEffectiveTaxRate() * 100).toFixed(2)}%)`}</span>
+                      <button
+                        type="button"
+                        aria-label="How sales tax is calculated"
+                        aria-expanded={showTaxExplanation}
+                        onClick={() => setShowTaxExplanation(open => !open)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded text-blue-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-blue-400"
+                      >
+                        <CircleHelp size={16} aria-hidden="true" />
+                      </button>
+                    </div>
                     <span className="font-medium text-white">{formatCurrency(calculateTax())}</span>
                   </div>
+                  {showTaxExplanation && (
+                    <div className="space-y-2 rounded-lg border border-gray-700 bg-gray-900 p-3 text-xs leading-relaxed text-gray-300">
+                      <p>
+                        {isExemptProject
+                          ? 'This preview shows zero tax because Exempt Project is selected. Keep the applicable project exemption documentation on file.'
+                          : selectedContact?.is_tax_exempt
+                            ? 'This preview shows zero tax because the customer is marked Tax Exempt. Keep an applicable certificate on file.'
+                            : `This preview applies ${(getEffectiveTaxRate() * 100).toFixed(2)}% to taxable line items based on their tax settings, the environment, and project type. MyJobView recalculates tax at submission.`}
+                      </p>
+                      {selectedContactId ? (
+                        <p>
+                          To add a customer exemption, open{' '}
+                          <a
+                            href={`/?tab=contacts&contactId=${encodeURIComponent(selectedContactId)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-300 underline underline-offset-2"
+                          >
+                            Customer Details (opens in a new tab)
+                          </a>
+                          {' '}and record the exemption and certificate.
+                        </p>
+                      ) : (
+                        <p>Select a customer to open their record and add an exemption.</p>
+                      )}
+                    </div>
+                  )}
                   <div className="flex justify-between pt-2 border-t border-gray-700">
                     <span className="font-semibold text-white">Total</span>
                     <span className="text-xl font-bold text-green-400">{formatCurrency(calculateTotal())}</span>
