@@ -11,7 +11,7 @@ import { LeadDetail } from '../Leads/LeadDetail';
 import { LeadForm } from '../Leads/LeadForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Settings, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, HelpCircle, Printer } from 'lucide-react';
 
 
 interface PipelineStage {
@@ -70,7 +70,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const [showFishbowlForm, setShowFishbowlForm] = useState(false);
   const [showClaimConfirm, setShowClaimConfirm] = useState(false);
   const [leadToClaim, setLeadToClaim] = useState<{ id: string; name: string } | null>(null);
-  const [showWidgetSettings, setShowWidgetSettings] = useState(false);
   const [selectedWidgets, setSelectedWidgets] = useState<string[]>(DEFAULT_PIPELINE_WIDGETS);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showPrintLeads, setShowPrintLeads] = useState(false);
@@ -188,25 +187,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       }
     } catch (error) {
       console.error('Error loading widget preferences:', error);
-    }
-  }
-
-  async function saveWidgetPreferences(widgets: string[]) {
-    if (!profile?.id) return;
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ pipeline_widgets: widgets })
-        .eq('id', profile.id);
-
-      if (error) throw error;
-
-      setSelectedWidgets(widgets);
-      setShowWidgetSettings(false);
-    } catch (error) {
-      console.error('Error saving widget preferences:', error);
-      notify('Failed to save widget preferences', { theme: 'violet', tone: 'error' });
     }
   }
 
