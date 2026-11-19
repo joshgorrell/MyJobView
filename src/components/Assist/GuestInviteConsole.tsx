@@ -135,9 +135,10 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
       <p className="mt-3 text-sm text-muted">Send this one-time link to <strong>{selectedEmail}</strong>. It opens Assist with the code already filled in.</p>
       <div className="my-3 flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"><Copy size={16} />{copied ? 'Link copied' : 'Copy invitation link'}</button>
-        <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-info">Open email draft</a>
+        <a href={`mailto:${encodeURIComponent(selectedEmail)}?subject=${encodeURIComponent('Remote support invitation')}&body=${encodeURIComponent(inviteText)}`} className="inline-flex min-h-11 items-center rounded-lg border border-subtle px-4 text-sm font-semibold text-primary">Email invitation</a>
       </div>
-      <p className="break-all text-xs text-muted">{invite.join_url}</p>
+      <p className="text-xs text-muted">Email invitation opens a draft in your email app.</p>
+      <p className="mt-1 break-all text-xs text-muted">{invite.join_url}</p>
       <details className="mt-3">
         <summary className="cursor-pointer text-sm font-medium text-info">Share a code by phone</summary>
         <p className="mt-2 text-sm text-muted">Ask them to visit <strong>{new URL(invite.join_url).origin}/assist</strong> and enter this code.</p>
