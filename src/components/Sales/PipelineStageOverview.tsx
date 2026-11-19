@@ -50,6 +50,7 @@ interface Props {
   canViewProposals: boolean;
   canViewSalesOrders: boolean;
   onOpenLeads: () => void;
+  onStageVisibilityChange?: (visible: readonly StageKey[]) => void;
   onOpenProposals: () => void;
   onOpenSalesOrders: () => void;
   onOpenProspect: (id: string) => void;
@@ -68,7 +69,7 @@ const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'activ
 
 export function PipelineStageOverview({
   showAll, canViewProposals, canViewSalesOrders, onOpenLeads, onOpenProposals,
-  onOpenSalesOrders, onOpenProspect, onAddProspect,
+  onOpenSalesOrders, onOpenProspect, onAddProspect, onStageVisibilityChange,
 }: Props) {
   const { profile } = useAuth();
   const userId = profile?.id;
@@ -90,12 +91,15 @@ export function PipelineStageOverview({
     if (!userId) return;
     try {
       const saved = window.localStorage.getItem('mjv.pipeline.stages.' + userId);
-      if (!saved) { setVisibleStages([...STAGE_KEYS]); return; }
+      if (!saved) { setVisibleStages([...STAGE_KEYS]); onStageVisibilityChange?.([...STAGE_KEYS]); return; }
       const parsed: unknown = JSON.parse(saved);
       if (!Array.isArray(parsed)) return;
       const allowed = STAGE_KEYS.filter(key => parsed.includes(key));
-      setVisibleStages(allowed.length ? allowed : [...STAGE_KEYS]);
+      const next = allowed.length ? allowed : [...STAGE_KEYS];
+      setVisibleStages(next);
+      onStageVisibilityChange?.(next);
     } catch (error) {
+      onStageVisibilityChange?.([...STAGE_KEYS]);
       console.warn('Could not load pipeline stage visibility', error);
     }
   }, [userId]);
@@ -104,6 +108,7 @@ export function PipelineStageOverview({
     setVisibleStages(current => {
       const next = current.includes(key) ? current.filter(value => value !== key) : STAGE_KEYS.filter(value => current.includes(value) || value === key);
       if (!next.length) return current;
+      onStageVisibilityChange?.(next);
       if (userId) {
         try { window.localStorage.setItem('mjv.pipeline.stages.' + userId, JSON.stringify(next)); }
         catch (error) { console.warn('Could not save pipeline stage visibility', error); }
@@ -114,6 +119,7 @@ export function PipelineStageOverview({
 
   function resetStageVisibility() {
     setVisibleStages([...STAGE_KEYS]);
+    onStageVisibilityChange?.([...STAGE_KEYS]);
     if (userId) {
       try { window.localStorage.removeItem('mjv.pipeline.stages.' + userId); }
       catch (error) { console.warn('Could not reset pipeline stage visibility', error); }
