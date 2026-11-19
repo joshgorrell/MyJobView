@@ -34,6 +34,13 @@ export interface DepartmentModule {
   is_quick_access: boolean;
 }
 
+function navigationDepartmentId(module: DepartmentModule, salesDepartmentId?: string): string {
+  if (salesDepartmentId && (module.module_key === 'pipeline_board' || module.module_key === 'sales_dashboard')) {
+    return salesDepartmentId;
+  }
+  return module.department_id;
+}
+
 export interface StarredModule extends DepartmentModule {
   star_order: number;
   department_name: string;
@@ -252,8 +259,9 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       setStarredModules(starred);
 
       // Calculate accessible departments - only show departments with at least one accessible module
+      const salesDepartmentId = depts.find(dept => dept.name === 'sales' && dept.is_active)?.id;
       const accessible = depts.filter(dept => {
-        const deptModules = mods.filter(m => m.department_id === dept.id);
+        const deptModules = mods.filter(m => navigationDepartmentId(m, salesDepartmentId) === dept.id);
         return deptModules.some(mod => isDepartmentNavigationModule(mod.module_key, checkAccess) && isPreferredNavigationCopy(mod, mods, depts, profile.role) && checkModuleAccess(mod));
       });
 
@@ -283,8 +291,9 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   }
 
   function getUserModules(departmentId: string): DepartmentModule[] {
+    const salesDepartmentId = departments.find(dept => dept.name === 'sales' && dept.is_active)?.id;
     return modules.filter(mod => {
-      if (mod.department_id !== departmentId || !isDepartmentNavigationModule(mod.module_key, hasModuleAccess) || !isPreferredNavigationCopy(mod, modules, departments, profile?.role || '')) return false;
+      if (navigationDepartmentId(mod, salesDepartmentId) !== departmentId || !isDepartmentNavigationModule(mod.module_key, hasModuleAccess) || !isPreferredNavigationCopy(mod, modules, departments, profile?.role || '')) return false;
       return hasModuleAccess(mod);
     }).map(mod => ({ ...mod, display_name: workspaceMenuLabel(mod.module_key, mod.display_name) }));
   }
