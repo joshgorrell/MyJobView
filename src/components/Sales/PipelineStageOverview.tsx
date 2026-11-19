@@ -1,5 +1,5 @@
 import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { notify } from '../../lib/feedback';
 import { Plus, UserRound, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -50,6 +50,7 @@ interface Props {
   canViewProposals: boolean;
   canViewSalesOrders: boolean;
   onOpenLeads: () => void;
+  leadsColumn: ReactNode;
   onStageVisibilityChange?: (visible: readonly StageKey[]) => void;
   onOpenProposals: () => void;
   onOpenSalesOrders: () => void;
@@ -69,7 +70,7 @@ const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'activ
 
 export function PipelineStageOverview({
   showAll, canViewProposals, canViewSalesOrders, onOpenLeads, onOpenProposals,
-  onOpenSalesOrders, onOpenProspect, onAddProspect, onStageVisibilityChange,
+  onOpenSalesOrders, onOpenProspect, onAddProspect, onStageVisibilityChange, leadsColumn,
 }: Props) {
   const { profile } = useAuth();
   const userId = profile?.id;
@@ -289,11 +290,12 @@ export function PipelineStageOverview({
         </button>
         )}
       </nav>
-      <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Recent pipeline records">
+      <div className="grid w-full grid-cols-1 items-start gap-2 md:grid-cols-2 xl:grid-cols-3" aria-label="Pipeline stage records">
+        {visibleStages.includes('leads') && <section aria-label="Leads" className="min-w-0">{leadsColumn}</section>}
         {canViewProposals && visibleStages.includes('proposals') && (
           <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-primary">Recent Proposals</h3>
+              <h3 className="text-sm font-semibold text-primary">Proposals</h3>
               <button type="button" onClick={onOpenProposals} className="text-xs font-medium text-blue-700 hover:underline">View all</button>
             </div>
             {proposalPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No active proposals in this view'}</p> : (
@@ -308,7 +310,7 @@ export function PipelineStageOverview({
         {canViewSalesOrders && visibleStages.includes('salesOrders') && (
           <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-primary">Recent Sales Orders</h3>
+              <h3 className="text-sm font-semibold text-primary">Sales Orders</h3>
               <button type="button" onClick={onOpenSalesOrders} className="text-xs font-medium text-blue-700 hover:underline">View all</button>
             </div>
             {orderPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No open sales orders in this view'}</p> : (
@@ -322,8 +324,8 @@ export function PipelineStageOverview({
         )}
       </div>
       {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
-      {expanded && canViewProspects && visibleStages.includes('prospects') && (
-        <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+      {canViewProspects && visibleStages.includes('prospects') && (
+        <div id="pipeline-prospects" className="w-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-base font-semibold text-gray-900">Prospects</h3>
