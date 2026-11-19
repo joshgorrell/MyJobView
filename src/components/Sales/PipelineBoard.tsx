@@ -11,7 +11,7 @@ import { LeadDetail } from '../Leads/LeadDetail';
 import { LeadForm } from '../Leads/LeadForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Settings, Check, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Settings, HelpCircle, Printer } from 'lucide-react';
 
 
 interface PipelineStage {
@@ -550,15 +550,34 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           <option value={90}>Last 90 days</option>
           <option value="all">All time</option>
         </select>
-        {/* Widget Customization Button */}
-        <button
-          onClick={() => setShowWidgetSettings(true)}
-          className="flex items-center gap-2 px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
-          title="Customize widgets"
-        >
-          <Settings className="w-4 h-4" />
-          <span className="hidden sm:inline">Widgets</span>
-        </button>
+        {/* Compact per-user pipeline settings */}
+        <div className="relative ml-auto">
+          <button type="button" onClick={() => setShowWidgetSettings(value => !value)}
+            aria-label="Customize pipeline view" aria-expanded={showWidgetSettings} title="Customize pipeline view"
+            className="rounded-lg border border-gray-300 bg-white p-2.5 text-gray-600 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500">
+            <Settings className="h-4 w-4" />
+          </button>
+          {showWidgetSettings && (
+            <div className="absolute right-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 shadow-xl" role="group" aria-label="Pipeline view settings">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-900">Visible sections</span>
+                <button type="button" onClick={() => setShowWidgetSettings(false)} aria-label="Close view settings" className="rounded p-1 text-gray-500 hover:bg-gray-100"><X className="h-4 w-4" /></button>
+              </div>
+              {allWidgetDefinitions.map(widget => (
+                <label key={widget.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                  <input type="checkbox" checked={selectedWidgets.includes(widget.id)}
+                    onChange={() => setSelectedWidgets(current => current.includes(widget.id) ? (current.length > 1 ? current.filter(id => id !== widget.id) : current) : [...current, widget.id])}
+                    className="h-4 w-4 accent-blue-600" />
+                  <span>{widget.name}</span>
+                </label>
+              ))}
+              <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-3">
+                <button type="button" onClick={() => setSelectedWidgets([...DEFAULT_PIPELINE_WIDGETS])} className="text-xs font-medium text-blue-700 hover:underline">Reset to default</button>
+                <button type="button" onClick={() => void saveWidgetPreferences(selectedWidgets)} className="rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Save</button>
+              </div>
+            </div>
+          )}
+        </div>
         <button type="button" onClick={() => setShowTutorial(true)} aria-label="Pipeline help" title="Pipeline help"
           className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
           <HelpCircle className="h-5 w-5" />
@@ -577,7 +596,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
         />
       </div>
 
-      <div className="grid gap-4 pb-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
+      <div className="grid gap-2.5 pb-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))]">
         {filteredStages.map(stage => (
           <div key={stage.id} id={`pipeline-${stage.id}`} className="flex min-w-0 scroll-mt-6 flex-col rounded-lg border border-gray-200 bg-surface">
             <div className="border-b border-gray-200 px-3 py-2.5">
@@ -966,87 +985,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 Yes, Claim Lead
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Widget Settings Modal */}
-      {showWidgetSettings && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Customize Pipeline Widgets</h3>
-                <button
-                  onClick={() => setShowWidgetSettings(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              <p className="text-sm text-gray-600 mt-1">Choose which widgets to display</p>
-            </div>
-
-            <div className="p-6 space-y-3">
-              {allWidgetDefinitions.map(widget => {
-                const isSelected = selectedWidgets.includes(widget.id);
-                const canToggle = isSelected || selectedWidgets.length < DEFAULT_PIPELINE_WIDGETS.length;
-
-                return (
-                  <button
-                    key={widget.id}
-                    onClick={() => {
-                      if (!canToggle && !isSelected) return;
-
-                      const newWidgets = isSelected
-                        ? selectedWidgets.filter(w => w !== widget.id)
-                        : [...selectedWidgets, widget.id];
-
-                      setSelectedWidgets(newWidgets);
-                    }}
-                    disabled={!canToggle && !isSelected}
-                    className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
-                      isSelected
-                        ? `${widget.borderColor} ${widget.bgColor}`
-                        : canToggle
-                        ? 'border-gray-200 bg-white hover:border-gray-300'
-                        : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className="flex-1 text-left">
-                      <div className={`font-semibold ${isSelected ? widget.color : 'text-gray-700'}`}>
-                        {widget.name}
-                      </div>
-                      <div className="text-sm text-gray-600">{widget.description}</div>
-                    </div>
-                    {isSelected && (
-                      <div className={`flex items-center justify-center w-6 h-6 rounded-full ${widget.color.replace('text-', 'bg-')} bg-opacity-20`}>
-                        <Check className={`w-4 h-4 ${widget.color}`} />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg flex gap-3">
-              <button
-                onClick={() => {
-                  setShowWidgetSettings(false);
-                  loadWidgetPreferences();
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => saveWidgetPreferences(selectedWidgets)}
-                disabled={selectedWidgets.length === 0}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                Save ({selectedWidgets.length}/{DEFAULT_PIPELINE_WIDGETS.length})
               </button>
             </div>
           </div>
