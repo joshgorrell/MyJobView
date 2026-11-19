@@ -15,29 +15,7 @@ interface Prospect {
   prospect_follow_up_on: string | null;
 }
 
-interface StagePreview {
-  id: string;
-  status: string | null;
-  created_at: string | null;
-  title?: string | null;
-  name?: string | null;
-  project_name?: string | null;
-  proposal_name?: string | null;
-  customer_name?: string | null;
-  order_number?: string | number | null;
-  proposal_number?: string | number | null;
-}
 
-function previewTitle(item: StagePreview, kind: 'proposal' | 'order'): string {
-  const readable = [item.project_name, item.proposal_name, item.customer_name, item.title, item.name]
-    .find(value => typeof value === 'string' && value.trim());
-  if (readable) return readable;
-  const number = kind === 'proposal' ? item.proposal_number : item.order_number;
-  if (number !== null && number !== undefined && String(number).trim()) {
-    return (kind === 'proposal' ? 'Proposal #' : 'Sales Order #') + number;
-  }
-  return (kind === 'proposal' ? 'Proposal ' : 'Sales Order ') + item.id.slice(0, 8);
-}
 
 interface StageCounts {
   prospects: number | null;
@@ -47,10 +25,11 @@ interface StageCounts {
 
 interface Props {
   showAll: boolean;
+  canViewLeads: boolean;
   canViewProposals: boolean;
+  prospectRefresh: number;
   canViewSalesOrders: boolean;
   onOpenLeads: () => void;
-  onStageVisibilityChange?: (visible: readonly StageKey[]) => void;
   onOpenProposals: () => void;
   onOpenSalesOrders: () => void;
   onOpenProspect: (id: string) => void;
@@ -68,8 +47,8 @@ const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewe
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
 export function PipelineStageOverview({
-  showAll, canViewProposals, canViewSalesOrders, onOpenLeads, onOpenProposals,
-  onOpenSalesOrders, onOpenProspect, onAddProspect, onStageVisibilityChange,
+  showAll, canViewLeads, canViewProposals, prospectRefresh, canViewSalesOrders, onOpenLeads, onOpenProposals,
+  onOpenSalesOrders, onOpenProspect, onAddProspect,
 }: Props) {
   const { profile } = useAuth();
   const userId = profile?.id;
@@ -79,8 +58,6 @@ export function PipelineStageOverview({
   const proposalVisibility = (profile as any)?.proposal_visibility_scope || 'own';
   const [counts, setCounts] = useState<StageCounts>({ prospects: null, proposals: null, salesOrders: null });
   const [prospects, setProspects] = useState<Prospect[]>([]);
-  const [proposalPreviews, setProposalPreviews] = useState<StagePreview[]>([]);
-  const [orderPreviews, setOrderPreviews] = useState<StagePreview[]>([]);
   const [prospectPage, setProspectPage] = useState({ page: 0, showAll });
   const page = prospectPage.showAll === showAll ? prospectPage.page : 0;
   const [expanded, setExpanded] = useState(false);
@@ -91,15 +68,13 @@ export function PipelineStageOverview({
     if (!userId) return;
     try {
       const saved = window.localStorage.getItem('mjv.pipeline.stages.' + userId);
-      if (!saved) { setVisibleStages([...STAGE_KEYS]); onStageVisibilityChange?.([...STAGE_KEYS]); return; }
+      if (!saved) { setVisibleStages([...STAGE_KEYS]); return; }
       const parsed: unknown = JSON.parse(saved);
       if (!Array.isArray(parsed)) return;
       const allowed = STAGE_KEYS.filter(key => parsed.includes(key));
       const next = allowed.length ? allowed : [...STAGE_KEYS];
       setVisibleStages(next);
-      onStageVisibilityChange?.(next);
     } catch (error) {
-      onStageVisibilityChange?.([...STAGE_KEYS]);
       console.warn('Could not load pipeline stage visibility', error);
     }
   }, [userId]);
@@ -108,7 +83,6 @@ export function PipelineStageOverview({
     setVisibleStages(current => {
       const next = current.includes(key) ? current.filter(value => value !== key) : STAGE_KEYS.filter(value => current.includes(value) || value === key);
       if (!next.length) return current;
-      onStageVisibilityChange?.(next);
       if (userId) {
         try { window.localStorage.setItem('mjv.pipeline.stages.' + userId, JSON.stringify(next)); }
         catch (error) { console.warn('Could not save pipeline stage visibility', error); }
@@ -119,7 +93,6 @@ export function PipelineStageOverview({
 
   function resetStageVisibility() {
     setVisibleStages([...STAGE_KEYS]);
-    onStageVisibilityChange?.([...STAGE_KEYS]);
     if (userId) {
       try { window.localStorage.removeItem('mjv.pipeline.stages.' + userId); }
       catch (error) { console.warn('Could not reset pipeline stage visibility', error); }
@@ -151,8 +124,7 @@ export function PipelineStageOverview({
           .order('created_at', { ascending: false }).order('id')
           .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
         let proposalQuery = supabase.from('proposals')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false }).limit(5)
+          .select('id', { count: 'exact', head: true })
           .eq('is_revision', false).is('sales_order_id', null)
           .in('status', ACTIVE_PROPOSAL_STATUSES);
         let orderQuery = supabase.from('sales_orders')
@@ -186,8 +158,6 @@ export function PipelineStageOverview({
           salesOrders: orderResult?.error ? null : orderResult?.count ?? null,
         });
         setProspects((prospectResult?.data || []) as Prospect[]);
-        setProposalPreviews((proposalResult?.data || []) as StagePreview[]);
-        setOrderPreviews((orderResult?.data || []) as StagePreview[]);
         const failed = Boolean(prospectResult?.error || proposalResult?.error || orderResult?.error);
         if (failed) console.error('Pipeline stage query failed', { prospect: prospectResult?.error, proposal: proposalResult?.error, order: orderResult?.error });
         setLoadError(failed);
@@ -209,7 +179,7 @@ export function PipelineStageOverview({
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility, page, refreshVersion]);
+  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility, page, refreshVersion, prospectRefresh]);
 
   async function saveFollowUp(prospectId: string, date: string | null) {
     if (!canViewProspects || !organizationId || savingFollowUp) return;
@@ -240,92 +210,63 @@ export function PipelineStageOverview({
 
   return (
     <>
-      <div className="flex w-full justify-end">
-        <div className="relative">
-          <button type="button" aria-label="Choose visible pipeline stages" aria-expanded={showStageSettings} onClick={() => setShowStageSettings(open => !open)}
-            className="rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
-          {showStageSettings && (
-            <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-              <p className="mb-2 text-xs font-semibold text-gray-800">Visible pipeline stages</p>
-              {STAGE_KEYS.map(key => (
-                <label key={key} className="flex items-center gap-2 py-1.5 text-sm text-gray-700">
-                  <input type="checkbox" checked={visibleStages.includes(key)} disabled={visibleStages.length === 1 && visibleStages.includes(key)} onChange={() => toggleStage(key)} />
-                  {STAGE_LABELS[key]}
-                </label>
-              ))}
-              <button type="button" onClick={resetStageVisibility} className="mt-2 text-xs font-medium text-blue-700 hover:underline">Reset to default</button>
-            </div>
-          )}
+      {!expanded && <>
+        <div className="flex w-full justify-end">
+          <div className="relative">
+            <button type="button" aria-label="Choose visible pipeline stages" aria-expanded={showStageSettings} onClick={() => setShowStageSettings(open => !open)}
+              className="rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
+            {showStageSettings && (
+              <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                <p className="mb-2 text-xs font-semibold text-gray-800">Visible pipeline stages</p>
+                {STAGE_KEYS.map(key => (
+                  <label key={key} className="flex items-center gap-2 py-1.5 text-sm text-gray-700">
+                    <input type="checkbox" checked={visibleStages.includes(key)} disabled={visibleStages.length === 1 && visibleStages.includes(key)} onChange={() => toggleStage(key)} />
+                    {STAGE_LABELS[key]}
+                  </label>
+                ))}
+                <button type="button" onClick={resetStageVisibility} className="mt-2 text-xs font-medium text-blue-700 hover:underline">Reset to default</button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      <nav aria-label="Sales pipeline stages" className="grid w-full grid-cols-2 gap-2 lg:grid-cols-4">
-        {visibleStages.includes('prospects') && (
-        <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)}
-          aria-expanded={expanded} aria-controls="pipeline-prospects"
-          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-          <span className="block text-sm font-semibold text-primary">Prospects</span>
-          <span className="block truncate text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
-        </button>
-        )}
-        {visibleStages.includes('leads') && (
-        <button type="button" onClick={() => onOpenLeads()}
-          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300">
-          <span className="block text-sm font-semibold text-primary">Leads</span>
-          <span className="block truncate text-xs text-muted">Active opportunities</span>
-        </button>
-        )}
-        {visibleStages.includes('proposals') && (
-        <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
-          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-          <span className="block text-sm font-semibold text-primary">Proposals</span>
-          <span className="block truncate text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
-        </button>
-        )}
-        {visibleStages.includes('salesOrders') && (
-        <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
-          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-          <span className="block text-sm font-semibold text-primary">Sales Orders</span>
-          <span className="block truncate text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
-        </button>
-        )}
-      </nav>
-      <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Recent pipeline records">
-        {canViewProposals && visibleStages.includes('proposals') && (
-          <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-primary">Recent Proposals</h3>
-              <button type="button" onClick={onOpenProposals} className="text-xs font-medium text-blue-700 hover:underline">View all</button>
-            </div>
-            {proposalPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No active proposals in this view'}</p> : (
-              <ul className="space-y-1">{proposalPreviews.map(item => (
-                <li key={item.id}><button type="button" onClick={onOpenProposals} className="flex w-full items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-2 text-left text-xs hover:border-blue-300">
-                  <span className="truncate font-medium">{previewTitle(item, 'proposal')}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Active'}</span>
-                </button></li>
-              ))}</ul>
-            )}
-          </section>
-        )}
-        {canViewSalesOrders && visibleStages.includes('salesOrders') && (
-          <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-primary">Recent Sales Orders</h3>
-              <button type="button" onClick={onOpenSalesOrders} className="text-xs font-medium text-blue-700 hover:underline">View all</button>
-            </div>
-            {orderPreviews.length === 0 ? <p className="text-xs text-muted">{loading ? 'Loading…' : 'No open sales orders in this view'}</p> : (
-              <ul className="space-y-1">{orderPreviews.map(item => (
-                <li key={item.id}><button type="button" onClick={onOpenSalesOrders} className="flex w-full items-center justify-between gap-2 rounded border border-gray-200 bg-white px-2 py-2 text-left text-xs hover:border-blue-300">
-                  <span className="truncate font-medium">{previewTitle(item, 'order')}</span><span className="shrink-0 text-muted">{item.status?.replace(/_/g, ' ') || 'Open'}</span>
-                </button></li>
-              ))}</ul>
-            )}
-          </section>
-        )}
-      </div>
+        <nav aria-label="Sales pipeline stages" className="grid w-full grid-cols-2 gap-2 lg:grid-cols-4">
+          {visibleStages.includes('prospects') && (
+          <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)}
+            aria-expanded={expanded} aria-controls="pipeline-prospects"
+            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+            <span className="block text-sm font-semibold text-primary">Prospects</span>
+            <span className="block truncate text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
+          </button>
+          )}
+          {visibleStages.includes('leads') && (
+          <button type="button" disabled={!canViewLeads} onClick={onOpenLeads}
+            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+            <span className="block text-sm font-semibold text-primary">Leads</span>
+            <span className="block truncate text-xs text-muted">{canViewLeads ? 'Active opportunities' : 'No access'}</span>
+          </button>
+          )}
+          {visibleStages.includes('proposals') && (
+          <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
+            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+            <span className="block text-sm font-semibold text-primary">Proposals</span>
+            <span className="block truncate text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
+          </button>
+          )}
+          {visibleStages.includes('salesOrders') && (
+          <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
+            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+            <span className="block text-sm font-semibold text-primary">Sales Orders</span>
+            <span className="block truncate text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
+          </button>
+          )}
+        </nav>
+      </>}
       {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
       {expanded && canViewProspects && visibleStages.includes('prospects') && (
         <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
+              <button type="button" onClick={() => setExpanded(false)} className="mb-2 text-sm text-blue-600 hover:underline">Back to Pipeline</button>
               <h3 className="text-base font-semibold text-gray-900">Prospects</h3>
               <p className="text-xs text-gray-500">Future opportunities. Open a contact to nurture or convert it to a Lead.</p>
             </div>
