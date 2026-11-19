@@ -12,17 +12,25 @@ const profile={id:'employee',organization_id:'org',full_name:'Josh Example',role
 export const useAuth=()=>({profile});
 export const useDepartments=()=>({mainDepartments:[],footerDepartments:[],getUserModules:()=>[],hasModuleAccess:()=>true,starredModules:[{id:"product",module_key:"products",display_name:"Product Catalog",icon:"Menu"},{id:"punchlist",module_key:"punchlist",display_name:"Punchlist",icon:"Menu"},{id:"reviews",module_key:"reviews",display_name:"Feedback",icon:"Star"}],loading:false});
 export const useActivityCounts=()=>({counts:{pipeline_lead:0,test_tune:0,feedback:0,service_request:0}});export const markActivitySeen=async()=>{};
-export const useTaskCount=()=>0;export const useFishbowlCount=()=>0;export const useToast=()=>({error(){},warning(){},success(){}});
+export const useTaskCount=()=>0;export const useFishbowlCount=()=>0;
 export const useEmployeeTimePolicy=()=>({dailyClock:true});
 export const getOrganizationTimezone=async()=> 'America/Chicago';
 export const formatDateInTimezone=()=> '2026-10-09';
 export const formatTimeInTimezone=()=> '8:00 AM';
 export const createTimestampInTimezone=(date,time)=>date+'T'+time+':00Z';
 window.actions=[];
+const survey = {
+  id: 'survey-1',
+  customer_name: 'Example Customer',
+  customer_email: 'customer@example.com',
+  sent_at: new Date(Date.now() - 20 * 86400000).toISOString(),
+  follow_up_sent_at: localStorage.getItem('followUpSentAt'),
+  survey_type: 'job_completion',
+};
 const records=Array.from({length:10},(_,i)=>({id:'notice-'+i,type:i===0?'auto_clock_out':'work_order_assignment',related_id:'wo-'+i,title:i===0?'Auto Clock-Out: Needs Approval':'Work order assigned',body:'Technicians completed the installation. Follow up with the customer regarding remaining programming and additional equipment before returning to the project.',created_at:new Date(Date.now()-i*60000).toISOString(),is_read:i>1}));
-export const supabase={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from(table){const q=new Proxy({},{get(_,key){if(key==='then'){let data=table==='notifications'?records:table==='organizations'?{header_logo_url:'/logo.svg'}:table==='company_settings'?{}:table==='business_cards'?{}:table==='daily_clock_entries'?null:[];return(a,b)=>Promise.resolve({data,error:null}).then(a,b);}return()=>q;}});return q;},channel(){const q={on(){return q;},subscribe(){return q;},unsubscribe(){}};return q;},removeChannel(){}};
+export const supabase={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from(table){const q=new Proxy({},{get(_,key){if(key==='then'){let data=table==='notifications'?records:table==='customer_satisfaction'?[survey]:table==='organizations'?{header_logo_url:'/logo.svg'}:table==='company_settings'?{}:table==='business_cards'?{}:table==='daily_clock_entries'?null:[];return(a,b)=>Promise.resolve({data,error:null}).then(a,b);}return()=>q;}});return q;},channel(){const q={on(){return q;},subscribe(){return q;},unsubscribe(){}};return q;},removeChannel(){}};
 `;
-const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {Header} from './src/components/Layout/Header';import {QuickAccessNavigation} from './src/components/Layout/QuickAccessNavigation';import ReviewsView from './src/components/Sales/ReviewsView';createRoot(document.getElementById('root')).render(<><Header activeTab="reviews" isAdmin onCreateContact={()=>{}} onCreateLead={()=>{}} onCreateServiceRequest={()=>{}} onCreateTask={()=>{}} onLeadClick={()=>{}} onTabChange={()=>{}} onMenuToggle={()=>{}}/><div className="px-3 py-1.5"><QuickAccessNavigation activeModule="reviews" onModuleChange={()=>{}}/></div><main className="px-3 py-3"><ReviewsView/></main></>);`;
+const source = `import React from 'react';import {createRoot} from 'react-dom/client';import {Header} from './src/components/Layout/Header';import {QuickAccessNavigation} from './src/components/Layout/QuickAccessNavigation';import ReviewsView from './src/components/Sales/ReviewsView';import {ToastProvider} from './src/components/Shared/Toast';createRoot(document.getElementById('root')).render(<ToastProvider><Header activeTab="reviews" isAdmin onCreateContact={()=>{}} onCreateLead={()=>{}} onCreateServiceRequest={()=>{}} onCreateTask={()=>{}} onLeadClick={()=>{}} onTabChange={()=>{}} onMenuToggle={()=>{}}/><div className="px-3 py-1.5"><QuickAccessNavigation activeModule="reviews" onModuleChange={()=>{}}/></div><main className="px-3 py-3"><ReviewsView/></main></ToastProvider>);`;
 const server = createServer(async (req, res) => {
   if(req.url==='/logo.svg'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="280" height="40"><rect width="280" height="40" fill="#008dbc"/><text x="5" y="30" font-size="28" fill="white">Electronic Life</text></svg>');return;}
   const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/style.css')?'style.css':'index.html';
@@ -32,7 +40,7 @@ const server = createServer(async (req, res) => {
 let browser;
 try {
   await build({stdin:{contents:source,resolveDir:process.cwd(),loader:'tsx'},bundle:true,define:{'import.meta.env.VITE_SUPABASE_URL':'"https://fixture.test"'},format:'iife',jsx:'automatic',outfile:join(directory,'app.js'),plugins:[{name:'fixtures',setup(b){
-    b.onResolve({filter:/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useEmployeeTimePolicy$|hooks\/useTaskCount$|hooks\/useActivityCounts$|hooks\/useFishbowlCount$|Shared\/Toast$|lib\/timezoneUtils$/},()=>({path:'fixture',namespace:'fixture'}));
+    b.onResolve({filter:/supabase$|contexts\/AuthContext$|contexts\/DepartmentContext$|hooks\/useEmployeeTimePolicy$|hooks\/useTaskCount$|hooks\/useActivityCounts$|hooks\/useFishbowlCount$|lib\/timezoneUtils$/},()=>({path:'fixture',namespace:'fixture'}));
     b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:fixture,loader:'js',resolveDir:process.cwd()}));
     b.onResolve({filter:/ProposalFollowUps$|LostOpportunityReviews$/},()=>({path:'review-child',namespace:'review-child'}));
     b.onLoad({filter:/.*/,namespace:'review-child'},()=>({contents:'export default ()=>null;',loader:'js'}));
@@ -70,5 +78,35 @@ try {
     await page.getByRole('button',{name:'Ask for a Google Review',exact:true}).click();await page.getByRole('heading',{name:'Ask for a Google Review',exact:true}).waitFor();
     console.log(width+'x'+height+': header, compact cards, favorites, tabs, preview and review actions pass');
   }
+  await page.goto(url);
+  const history = page.getByRole('table', { name: 'Job review history' });
+  const followUp = history.getByRole('button', { name: 'Send Follow-up', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Send Follow-up?' });
+  const followUpSentAt = new Date().toISOString();
+  let rejected = true;
+  await page.route('https://fixture.test/functions/v1/send-satisfaction-email', async route => {
+    assert.equal(route.request().postDataJSON().resendRecordId, 'survey-1');
+    if (rejected) {
+      await route.fulfill({ status: 500, json: { error: 'Failed to send email' } });
+    } else {
+      await page.evaluate(timestamp => localStorage.setItem('followUpSentAt', timestamp), followUpSentAt);
+      await route.fulfill({ json: { success: true, followUpSentAt } });
+    }
+  });
+
+  await followUp.click();
+  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  await dialog.getByRole('alert').getByText('Failed to send email').waitFor();
+  assert.equal(await history.locator('time').count(), 0, 'A failed send leaves the timestamp empty');
+
+  rejected = false;
+  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  await page.getByText('Follow-up sent.', { exact: true }).waitFor();
+  const timestamp = history.locator(`time[datetime="${followUpSentAt}"]`);
+  await timestamp.waitFor();
+  assert.equal(await followUp.count(), 0, 'The reminder resets after a successful follow-up');
+  await page.reload();
+  await timestamp.waitFor();
+  assert.equal(await followUp.count(), 0, 'The saved follow-up stays visible after a reload');
   assert.deepEqual(errors,[]);
 } finally {await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}
