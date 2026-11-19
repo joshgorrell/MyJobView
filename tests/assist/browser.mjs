@@ -89,7 +89,11 @@ try{
  assert.equal(await recipientSearch.inputValue(),'Alex Customer (alex@example.com)');
  assert.equal(await page.evaluate(()=>window.directoryCalls.includes('contacts')&&window.directoryCalls.includes('profiles')),true);
  await page.getByRole('button',{name:'Create invitation',exact:true}).click();
- await page.getByText('ABCD-EFGH-JKLM',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Copy invitation link',exact:true}).waitFor();
+ const phoneCode=page.getByText('ABCD-EFGH-JKLM',{exact:true});
+ assert.equal(await phoneCode.isVisible(),false);
+ await page.getByText('Share a code by phone',{exact:true}).click();
+ await phoneCode.waitFor();
  await page.getByRole('button',{name:'End invitation',exact:true}).click();
  await page.getByRole('button',{name:'Create invitation',exact:true}).waitFor();
  await recipientSearch.fill('shared');
