@@ -1,7 +1,7 @@
 import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
 import { useEffect, useState } from 'react';
 import { notify } from '../../lib/feedback';
-import { Plus, UserRound } from 'lucide-react';
+import { Plus, UserRound, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -56,6 +56,12 @@ interface Props {
   onAddProspect: () => void;
 }
 
+const STAGE_KEYS = ['prospects', 'leads', 'proposals', 'salesOrders'] as const;
+type StageKey = typeof STAGE_KEYS[number];
+const STAGE_LABELS: Record<StageKey, string> = {
+  prospects: 'Prospects', leads: 'Leads', proposals: 'Proposals', salesOrders: 'Sales Orders',
+};
+
 const PROSPECTS_PER_PAGE = 30;
 const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewed', 'portal', 'approved_pending_action'];
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
@@ -77,6 +83,42 @@ export function PipelineStageOverview({
   const [prospectPage, setProspectPage] = useState({ page: 0, showAll });
   const page = prospectPage.showAll === showAll ? prospectPage.page : 0;
   const [expanded, setExpanded] = useState(false);
+  const [visibleStages, setVisibleStages] = useState<StageKey[]>([...STAGE_KEYS]);
+  const [showStageSettings, setShowStageSettings] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      const saved = window.localStorage.getItem('mjv.pipeline.stages.' + userId);
+      if (!saved) { setVisibleStages([...STAGE_KEYS]); return; }
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return;
+      const allowed = STAGE_KEYS.filter(key => parsed.includes(key));
+      setVisibleStages(allowed.length ? allowed : [...STAGE_KEYS]);
+    } catch (error) {
+      console.warn('Could not load pipeline stage visibility', error);
+    }
+  }, [userId]);
+
+  function toggleStage(key: StageKey) {
+    setVisibleStages(current => {
+      const next = current.includes(key) ? current.filter(value => value !== key) : STAGE_KEYS.filter(value => current.includes(value) || value === key);
+      if (!next.length) return current;
+      if (userId) {
+        try { window.localStorage.setItem('mjv.pipeline.stages.' + userId, JSON.stringify(next)); }
+        catch (error) { console.warn('Could not save pipeline stage visibility', error); }
+      }
+      return next;
+    });
+  }
+
+  function resetStageVisibility() {
+    setVisibleStages([...STAGE_KEYS]);
+    if (userId) {
+      try { window.localStorage.removeItem('mjv.pipeline.stages.' + userId); }
+      catch (error) { console.warn('Could not reset pipeline stage visibility', error); }
+    }
+  }
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [editingProspectId, setEditingProspectId] = useState<string | null>(null);
@@ -192,31 +234,57 @@ export function PipelineStageOverview({
 
   return (
     <>
+      <div className="flex w-full justify-end">
+        <div className="relative">
+          <button type="button" aria-label="Choose visible pipeline stages" aria-expanded={showStageSettings} onClick={() => setShowStageSettings(open => !open)}
+            className="rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
+          {showStageSettings && (
+            <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+              <p className="mb-2 text-xs font-semibold text-gray-800">Visible pipeline stages</p>
+              {STAGE_KEYS.map(key => (
+                <label key={key} className="flex items-center gap-2 py-1.5 text-sm text-gray-700">
+                  <input type="checkbox" checked={visibleStages.includes(key)} disabled={visibleStages.length === 1 && visibleStages.includes(key)} onChange={() => toggleStage(key)} />
+                  {STAGE_LABELS[key]}
+                </label>
+              ))}
+              <button type="button" onClick={resetStageVisibility} className="mt-2 text-xs font-medium text-blue-700 hover:underline">Reset to default</button>
+            </div>
+          )}
+        </div>
+      </div>
       <nav aria-label="Sales pipeline stages" className="grid w-full grid-cols-2 gap-2 lg:grid-cols-4">
+        {visibleStages.includes('prospects') && (
         <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)}
           aria-expanded={expanded} aria-controls="pipeline-prospects"
           className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
           <span className="block text-sm font-semibold text-primary">Prospects</span>
           <span className="block truncate text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
         </button>
+        )}
+        {visibleStages.includes('leads') && (
         <button type="button" onClick={() => onOpenLeads()}
           className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300">
           <span className="block text-sm font-semibold text-primary">Leads</span>
           <span className="block truncate text-xs text-muted">Active opportunities</span>
         </button>
+        )}
+        {visibleStages.includes('proposals') && (
         <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
           className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
           <span className="block text-sm font-semibold text-primary">Proposals</span>
           <span className="block truncate text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
         </button>
+        )}
+        {visibleStages.includes('salesOrders') && (
         <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
           className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
           <span className="block text-sm font-semibold text-primary">Sales Orders</span>
           <span className="block truncate text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
         </button>
+        )}
       </nav>
       <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Recent pipeline records">
-        {canViewProposals && (
+        {canViewProposals && visibleStages.includes('proposals') && (
           <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-primary">Recent Proposals</h3>
@@ -231,7 +299,7 @@ export function PipelineStageOverview({
             )}
           </section>
         )}
-        {canViewSalesOrders && (
+        {canViewSalesOrders && visibleStages.includes('salesOrders') && (
           <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-primary">Recent Sales Orders</h3>
@@ -248,7 +316,7 @@ export function PipelineStageOverview({
         )}
       </div>
       {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
-      {expanded && canViewProspects && (
+      {expanded && canViewProspects && visibleStages.includes('prospects') && (
         <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
