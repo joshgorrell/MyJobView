@@ -248,19 +248,19 @@ export function PipelineStageOverview({
       <div className="flex items-center justify-between gap-2">
         {isManager && (
           <select aria-label="Pipeline owner" value={showAll ? 'all' : ownerId === userId ? 'my' : selection}
-            className="rounded-md border border-gray-300 bg-surface px-3 py-2 text-sm text-primary"
+            className="min-h-11 min-w-0 max-w-full flex-1 truncate rounded-md border border-gray-300 bg-surface px-3 py-2 text-base text-primary sm:max-w-xs sm:text-sm"
             onChange={event => { setSelection(event.target.value); setEditingProspectId(null); }}>
             <option value="my">My Pipeline</option>
             <option value="all">All users</option>
             {users.filter(user => user.id !== userId).map(user => <option key={user.id} value={user.id}>{user.full_name || 'Unnamed user'}</option>)}
           </select>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto shrink-0">
           <div className="relative">
             <button type="button" aria-label="Choose visible pipeline stages" aria-expanded={showStageSettings} onClick={() => setShowStageSettings(open => !open)}
-              className="rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
             {showStageSettings && (
-              <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+              <div className="absolute right-0 top-full z-30 mt-1 w-56 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
                 <p className="mb-2 text-xs font-semibold text-gray-800">Visible pipeline stages</p>
                 {STAGE_KEYS.map(key => (
                   <label key={key} className="flex items-center gap-2 py-1.5 text-sm text-gray-700">
@@ -283,7 +283,7 @@ export function PipelineStageOverview({
                 <span className="block text-sm font-semibold text-primary">{expanded ? 'Back to Pipeline' : 'Prospects'}</span>
                 <span className="block text-xs text-muted">{!canViewProspects ? 'No access' : pending ? 'Loading…' : counts.prospects === null ? 'Unavailable' : counts.prospects + ' to nurture'}</span>
               </button>
-              {canViewProspects && <button type="button" onClick={onAddProspect} title="New Prospect" aria-label="New Prospect" className="rounded-md border border-gray-200 p-2 text-primary"><Plus className="h-4 w-4" /></button>}
+              {canViewProspects && <button type="button" onClick={onAddProspect} title="New Prospect" aria-label="New Prospect" className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-gray-200 p-2 text-primary"><Plus className="h-4 w-4" /></button>}
             </div>
             {canViewProspects && !pending && counts.prospects !== null && <>
           {prospects.length === 0 ? (
@@ -323,7 +323,7 @@ export function PipelineStageOverview({
                         <label className="block text-xs font-medium text-gray-700">
                           Custom
                           <input type="date" required value={followUpDate} onChange={event => setFollowUpDate(event.target.value)}
-                            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900" />
+                            className="mt-1 block min-h-11 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-base text-gray-900 sm:text-sm" />
                         </label>
                         <div className="flex flex-wrap items-center gap-3 text-xs">
                           <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white">Save reminder</button>
@@ -374,7 +374,7 @@ export function PipelineStageOverview({
                 <ul className="space-y-1">
                   {stage.records.map(record => (
                     <li key={record.id}>
-                      <button type="button" onClick={() => onOpenRecord(stage.kind, record.id)} className="block w-full rounded-md border border-gray-200 px-2.5 py-2 text-left text-sm text-primary hover:border-blue-300">
+                      <button type="button" onClick={() => onOpenRecord(stage.kind, record.id)} className="block min-h-11 w-full rounded-md border border-gray-200 px-2.5 py-2 text-left text-sm text-primary hover:border-blue-300">
                         <span className="block truncate">{record.title}</span>
                         {record.detail && <span className="block text-xs capitalize text-muted">{record.detail.replace(/_/g, ' ')}</span>}
                       </button>
