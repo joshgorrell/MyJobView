@@ -1,7 +1,7 @@
 import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
 import { useEffect, useState } from 'react';
 import { notify } from '../../lib/feedback';
-import { ChevronDown, Plus, UserRound } from 'lucide-react';
+import { Plus, UserRound } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -25,6 +25,7 @@ interface Props {
   showAll: boolean;
   canViewProposals: boolean;
   canViewSalesOrders: boolean;
+  onOpenLeads: () => void;
   onOpenProposals: () => void;
   onOpenSalesOrders: () => void;
   onOpenProspect: (id: string) => void;
@@ -36,7 +37,7 @@ const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewe
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
 export function PipelineStageOverview({
-  showAll, canViewProposals, canViewSalesOrders, onOpenProposals,
+  showAll, canViewProposals, canViewSalesOrders, onOpenLeads, onOpenProposals,
   onOpenSalesOrders, onOpenProspect, onAddProspect,
 }: Props) {
   const { profile } = useAuth();
@@ -162,33 +163,29 @@ export function PipelineStageOverview({
 
   return (
     <>
-      <details className="relative self-start sm:self-auto">
-        <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-gray-300 bg-surface px-3 py-2.5 text-sm font-medium text-primary [&::-webkit-details-marker]:hidden">
-          Sales stages <ChevronDown className="h-4 w-4" />
-        </summary>
-        <div className="absolute left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-surface p-1 shadow-lg sm:left-auto sm:right-0">
-          <button type="button" disabled={!canViewProspects}
-            onClick={event => {
-              setExpanded(value => !value);
-              event.currentTarget.closest('details')?.removeAttribute('open');
-            }}
-            aria-expanded={expanded} aria-controls={expanded ? 'pipeline-prospects' : undefined}
-            className="block w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-gray-100 disabled:opacity-50">
-            <span className="font-medium">Prospects</span>
-            <span className="block text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
-          </button>
-          <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
-            className="block w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-gray-100 disabled:opacity-50">
-            <span className="font-medium">Proposals</span>
-            <span className="block text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
-          </button>
-          <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
-            className="block w-full rounded-md px-3 py-2 text-left text-sm text-primary hover:bg-gray-100 disabled:opacity-50">
-            <span className="font-medium">Sales Orders</span>
-            <span className="block text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
-          </button>
-        </div>
-      </details>
+      <nav aria-label="Sales pipeline stages" className="grid w-full grid-cols-2 gap-2 lg:grid-cols-4">
+        <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)}
+          aria-expanded={expanded} aria-controls="pipeline-prospects"
+          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+          <span className="block text-sm font-semibold text-primary">Prospects</span>
+          <span className="block truncate text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
+        </button>
+        <button type="button" onClick={() => onOpenLeads()}
+          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300">
+          <span className="block text-sm font-semibold text-primary">Leads</span>
+          <span className="block truncate text-xs text-muted">Active opportunities</span>
+        </button>
+        <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
+          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+          <span className="block text-sm font-semibold text-primary">Proposals</span>
+          <span className="block truncate text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
+        </button>
+        <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
+          className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
+          <span className="block text-sm font-semibold text-primary">Sales Orders</span>
+          <span className="block truncate text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
+        </button>
+      </nav>
       {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
       {expanded && canViewProspects && (
         <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
