@@ -1,40 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { notify } from '../../lib/feedback';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 import { ContactDetail } from '../Contacts/ContactDetail';
 import { ContactForm } from '../Contacts/ContactForm';
 import { PipelineStageOverview } from './PipelineStageOverview';
 
 interface PipelineBoardProps {
-  onNavigate: (module: 'proposals' | 'sales_orders' | 'leads') => void;
-  canViewLeads: boolean;
-  canViewProposals: boolean;
-  canViewSalesOrders: boolean;
+  onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void;
+  onOpenRecord?: (kind: 'lead' | 'proposal' | 'order', id: string) => void;
+  canViewLeads?: boolean;
+  canViewProposals?: boolean;
+  canViewSalesOrders?: boolean;
 }
 
-export function PipelineBoard({ onNavigate, canViewLeads, canViewProposals, canViewSalesOrders }: PipelineBoardProps) {
-  const { profile } = useAuth();
-  const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
-  const [allPipelineUserId, setAllPipelineUserId] = useState<string | null>(null);
+export function PipelineBoard({ onNavigate, onOpenRecord, canViewLeads = false, canViewProposals = false, canViewSalesOrders = false }: PipelineBoardProps) {
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [prospectRefresh, setProspectRefresh] = useState(0);
-  const userId = profile?.id;
-  const canViewAllPipeline = Boolean(userId && allPipelineUserId === userId);
-
-  useEffect(() => {
-    let active = true;
-    if (userId) {
-      void supabase.from('profiles').select('can_view_all_pipeline').eq('id', userId).maybeSingle()
-        .then(({ data, error }) => {
-          if (active) setAllPipelineUserId(!error && data?.can_view_all_pipeline === true ? userId : null);
-        });
-    }
-    return () => { active = false; };
-  }, [userId]);
-
   function refreshProspects() {
     setProspectRefresh(version => version + 1);
   }
@@ -72,26 +55,15 @@ export function PipelineBoard({ onNavigate, canViewLeads, canViewProposals, canV
 
   return (
     <div className="space-y-3">
-      {canViewAllPipeline && (
-        <select
-          aria-label="Pipeline scope"
-          value={viewMode}
-          onChange={event => setViewMode(event.target.value === 'all' ? 'all' : 'my')}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-primary"
-        >
-          <option value="my">My Pipeline</option>
-          <option value="all">All</option>
-        </select>
-      )}
       <PipelineStageOverview
-        showAll={viewMode === 'all' && canViewAllPipeline}
+        onOpenRecord={(kind, id) => onOpenRecord?.(kind, id)}
         canViewLeads={canViewLeads}
         canViewProposals={canViewProposals}
         canViewSalesOrders={canViewSalesOrders}
         prospectRefresh={prospectRefresh}
-        onOpenLeads={() => onNavigate('leads')}
-        onOpenProposals={() => onNavigate('proposals')}
-        onOpenSalesOrders={() => onNavigate('sales_orders')}
+        onOpenLeads={() => onNavigate?.('leads')}
+        onOpenProposals={() => onNavigate?.('proposals')}
+        onOpenSalesOrders={() => onNavigate?.('sales_orders')}
         onOpenProspect={handleContactClick}
         onAddProspect={() => setShowContactForm(true)}
       />

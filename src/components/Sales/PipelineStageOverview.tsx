@@ -19,12 +19,13 @@ interface Prospect {
 
 interface StageCounts {
   prospects: number | null;
+  leads: number | null;
   proposals: number | null;
   salesOrders: number | null;
 }
 
 interface Props {
-  showAll: boolean;
+  onOpenRecord: (kind: 'lead' | 'proposal' | 'order', id: string) => void;
   canViewLeads: boolean;
   canViewProposals: boolean;
   prospectRefresh: number;
@@ -37,6 +38,8 @@ interface Props {
 }
 
 const STAGE_KEYS = ['prospects', 'leads', 'proposals', 'salesOrders'] as const;
+type StageRecord = { id: string; title: string; detail?: string };
+const STAGE_PREVIEW_LIMIT = 10;
 type StageKey = typeof STAGE_KEYS[number];
 const STAGE_LABELS: Record<StageKey, string> = {
   prospects: 'Prospects', leads: 'Leads', proposals: 'Proposals', salesOrders: 'Sales Orders',
@@ -47,7 +50,7 @@ const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewe
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
 export function PipelineStageOverview({
-  showAll, canViewLeads, canViewProposals, prospectRefresh, canViewSalesOrders, onOpenLeads, onOpenProposals,
+  onOpenRecord, canViewLeads, canViewProposals, prospectRefresh, canViewSalesOrders, onOpenLeads, onOpenProposals,
   onOpenSalesOrders, onOpenProspect, onAddProspect,
 }: Props) {
   const { profile } = useAuth();
@@ -55,11 +58,31 @@ export function PipelineStageOverview({
   const organizationId = profile?.organization_id;
   const canViewProspects = profile?.role === 'admin' || profile?.can_view_prospects === true;
   const isManager = profile?.role === 'admin' || profile?.role === 'manager';
-  const proposalVisibility = (profile as any)?.proposal_visibility_scope || 'own';
-  const [counts, setCounts] = useState<StageCounts>({ prospects: null, proposals: null, salesOrders: null });
+  const [selection, setSelection] = useState('my');
+  const [directory, setDirectory] = useState<{ organizationId: string; users: { id: string; full_name: string | null }[] } | null>(null);
+  const users = isManager && directory?.organizationId === organizationId ? directory?.users ?? [] : [];
+  const showAll = isManager && selection === 'all';
+  const ownerId = showAll ? null : users.some(user => user.id === selection) ? selection : userId;
+  const scope = JSON.stringify([organizationId, userId, ownerId, canViewProspects, canViewLeads, canViewProposals, canViewSalesOrders]);
+  const [loadedScope, setLoadedScope] = useState('');
+  const [leads, setLeads] = useState<StageRecord[]>([]);
+  const [proposals, setProposals] = useState<StageRecord[]>([]);
+  const [orders, setOrders] = useState<StageRecord[]>([]);
+
+  useEffect(() => {
+    if (!isManager || !organizationId) return;
+    let active = true;
+    void supabase.from('profiles').select('id, full_name')
+      .eq('organization_id', organizationId).eq('is_active', true).order('full_name')
+      .then(({ data, error }) => {
+        if (active && !error) setDirectory({ organizationId, users: data ?? [] });
+      });
+    return () => { active = false; };
+  }, [isManager, organizationId]);
+  const [counts, setCounts] = useState<StageCounts>({ prospects: null, leads: null, proposals: null, salesOrders: null });
   const [prospects, setProspects] = useState<Prospect[]>([]);
-  const [prospectPage, setProspectPage] = useState({ page: 0, showAll });
-  const page = prospectPage.showAll === showAll ? prospectPage.page : 0;
+  const [prospectPage, setProspectPage] = useState({ page: 0, scope });
+  const page = prospectPage.scope === scope ? prospectPage.page : 0;
   const [expanded, setExpanded] = useState(false);
   const [visibleStages, setVisibleStages] = useState<StageKey[]>([...STAGE_KEYS]);
   const [showStageSettings, setShowStageSettings] = useState(false);
@@ -107,14 +130,14 @@ export function PipelineStageOverview({
   const today = dateInputValue(new Date());
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !organizationId) {
       setLoading(false);
       return;
     }
     let active = true;
 
     async function refresh() {
-      if (!userId) return;
+      if (!userId || !organizationId) return;
       try {
         // These are live stage snapshots, not activity counts limited by the 14/30/60/90-day filter.
         let prospectQuery = supabase.from('contacts')
@@ -123,46 +146,58 @@ export function PipelineStageOverview({
           .order('prospect_follow_up_on', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: false }).order('id')
           .range(page * PROSPECTS_PER_PAGE, (page + 1) * PROSPECTS_PER_PAGE - 1);
+        let leadQuery = supabase.from('leads')
+          .select('id, contact_name, company_name, status', { count: 'exact' })
+          .is('converted_at', null).not('status', 'in', '(closed_won,closed_lost)')
+          .order('created_at', { ascending: false }).order('id').limit(STAGE_PREVIEW_LIMIT);
         let proposalQuery = supabase.from('proposals')
-          .select('id', { count: 'exact', head: true })
+          .select('id, title, proposal_number, status', { count: 'exact' })
           .eq('is_revision', false).is('sales_order_id', null)
-          .in('status', ACTIVE_PROPOSAL_STATUSES);
+          .in('status', ACTIVE_PROPOSAL_STATUSES)
+          .order('created_at', { ascending: false }).order('id').limit(STAGE_PREVIEW_LIMIT);
         let orderQuery = supabase.from('sales_orders')
-          .select('id', { count: 'exact', head: true })
-          .in('status', OPEN_ORDER_STATUSES);
+          .select('id, order_number, status', { count: 'exact' })
+          .in('status', OPEN_ORDER_STATUSES)
+          .order('created_at', { ascending: false }).order('id').limit(STAGE_PREVIEW_LIMIT);
 
-        if (organizationId) {
-          prospectQuery = prospectQuery.eq('organization_id', organizationId);
-          proposalQuery = proposalQuery.eq('organization_id', organizationId);
-          orderQuery = orderQuery.eq('organization_id', organizationId);
-        }
-        if (!showAll) {
-          prospectQuery = prospectQuery.or('assigned_to.eq.' + userId + ',created_by.eq.' + userId);
-          proposalQuery = proposalQuery.eq('created_by', userId);
-          orderQuery = orderQuery.or('sales_rep_id.eq.' + userId + ',created_by.eq.' + userId);
-        } else {
-          // All Pipeline does not override separate Proposals/Sales Orders visibility permissions.
-          if (!isManager && proposalVisibility === 'own') proposalQuery = proposalQuery.eq('created_by', userId);
-          if (!isManager) orderQuery = orderQuery.or('sales_rep_id.eq.' + userId + ',created_by.eq.' + userId);
+        prospectQuery = prospectQuery.eq('organization_id', organizationId);
+        leadQuery = leadQuery.eq('organization_id', organizationId);
+        proposalQuery = proposalQuery.eq('organization_id', organizationId);
+        orderQuery = orderQuery.eq('organization_id', organizationId);
+        if (ownerId) {
+          prospectQuery = prospectQuery.or(`assigned_to.eq.${ownerId},and(assigned_to.is.null,created_by.eq.${ownerId})`);
+          leadQuery = leadQuery.eq('assigned_to', ownerId);
+          proposalQuery = proposalQuery.eq('created_by', ownerId);
+          orderQuery = orderQuery.or(`sales_rep_id.eq.${ownerId},and(sales_rep_id.is.null,created_by.eq.${ownerId})`);
         }
 
-        const [prospectResult, proposalResult, orderResult] = await Promise.all([
+        const [prospectResult, leadResult, proposalResult, orderResult] = await Promise.all([
           canViewProspects ? prospectQuery : Promise.resolve(null),
+          canViewLeads ? leadQuery : Promise.resolve(null),
           canViewProposals ? proposalQuery : Promise.resolve(null),
           canViewSalesOrders ? orderQuery : Promise.resolve(null),
         ]);
         if (!active) return;
         setCounts({
           prospects: prospectResult?.error ? null : prospectResult?.count ?? null,
+          leads: leadResult?.error ? null : leadResult?.count ?? null,
           proposals: proposalResult?.error ? null : proposalResult?.count ?? null,
           salesOrders: orderResult?.error ? null : orderResult?.count ?? null,
         });
         setProspects((prospectResult?.data || []) as Prospect[]);
-        const failed = Boolean(prospectResult?.error || proposalResult?.error || orderResult?.error);
-        if (failed) console.error('Pipeline stage query failed', { prospect: prospectResult?.error, proposal: proposalResult?.error, order: orderResult?.error });
+        setLeads((leadResult?.data ?? []).map(item => ({ id: item.id, title: item.contact_name || item.company_name || 'Unnamed lead', detail: item.status })));
+        setProposals((proposalResult?.data ?? []).map(item => ({ id: item.id, title: item.title || String(item.proposal_number ?? 'Untitled proposal'), detail: item.status })));
+        setOrders((orderResult?.data ?? []).map(item => ({ id: item.id, title: 'Order ' + (item.order_number ?? item.id), detail: item.status })));
+        setLoadedScope(scope);
+        const failed = Boolean(prospectResult?.error || leadResult?.error || proposalResult?.error || orderResult?.error);
+        if (failed) console.error('Pipeline stage query failed', { prospect: prospectResult?.error, lead: leadResult?.error, proposal: proposalResult?.error, order: orderResult?.error });
         setLoadError(failed);
       } catch (error) {
-        if (active) setLoadError(true);
+        if (active) {
+          setCounts({ prospects: null, leads: null, proposals: null, salesOrders: null });
+          setLoadedScope(scope);
+          setLoadError(true);
+        }
         console.error('Pipeline stage refresh failed', error);
       } finally {
         if (active) setLoading(false);
@@ -172,6 +207,7 @@ export function PipelineStageOverview({
     void refresh();
     const channel = supabase.channel('pipeline_stage_summary_' + userId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' }, () => { void refresh(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => { void refresh(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'proposals' }, () => { void refresh(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_orders' }, () => { void refresh(); })
       .subscribe();
@@ -179,7 +215,7 @@ export function PipelineStageOverview({
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [userId, organizationId, showAll, canViewProspects, canViewProposals, canViewSalesOrders, isManager, proposalVisibility, page, refreshVersion, prospectRefresh]);
+  }, [userId, organizationId, scope, ownerId, canViewProspects, canViewLeads, canViewProposals, canViewSalesOrders, page, refreshVersion, prospectRefresh]);
 
   async function saveFollowUp(prospectId: string, date: string | null) {
     if (!canViewProspects || !organizationId || savingFollowUp) return;
@@ -205,18 +241,26 @@ export function PipelineStageOverview({
     }
   }
 
-  const label = (count: number | null, suffix: string, allowed = true) =>
-    !allowed ? 'No access' : loading ? 'Loading…' : count === null ? 'Unavailable' : String(count) + ' ' + suffix;
+  const pending = loading || loadedScope !== scope;
 
   return (
-    <>
-      {!expanded && <>
-        <div className="flex w-full justify-end">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        {isManager && (
+          <select aria-label="Pipeline owner" value={showAll ? 'all' : ownerId === userId ? 'my' : selection}
+            className="min-h-11 min-w-0 max-w-full flex-1 truncate rounded-md border border-gray-300 bg-surface px-3 py-2 text-base text-primary sm:max-w-xs sm:text-sm"
+            onChange={event => { setSelection(event.target.value); setEditingProspectId(null); }}>
+            <option value="my">My Pipeline</option>
+            <option value="all">All users</option>
+            {users.filter(user => user.id !== userId).map(user => <option key={user.id} value={user.id}>{user.full_name || 'Unnamed user'}</option>)}
+          </select>
+        )}
+        <div className="ml-auto shrink-0">
           <div className="relative">
             <button type="button" aria-label="Choose visible pipeline stages" aria-expanded={showStageSettings} onClick={() => setShowStageSettings(open => !open)}
-              className="rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-gray-200 bg-surface p-2 text-muted hover:text-primary" title="Choose visible stages"><Settings className="h-4 w-4" /></button>
             {showStageSettings && (
-              <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+              <div className="absolute right-0 top-full z-30 mt-1 w-56 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
                 <p className="mb-2 text-xs font-semibold text-gray-800">Visible pipeline stages</p>
                 {STAGE_KEYS.map(key => (
                   <label key={key} className="flex items-center gap-2 py-1.5 text-sm text-gray-700">
@@ -229,55 +273,23 @@ export function PipelineStageOverview({
             )}
           </div>
         </div>
-        <nav aria-label="Sales pipeline stages" className="grid w-full grid-cols-2 gap-2 lg:grid-cols-4">
-          {visibleStages.includes('prospects') && (
-          <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)}
-            aria-expanded={expanded} aria-controls="pipeline-prospects"
-            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-            <span className="block text-sm font-semibold text-primary">Prospects</span>
-            <span className="block truncate text-xs text-muted">{label(counts.prospects, 'to nurture', canViewProspects)}</span>
-          </button>
-          )}
-          {visibleStages.includes('leads') && (
-          <button type="button" disabled={!canViewLeads} onClick={onOpenLeads}
-            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-            <span className="block text-sm font-semibold text-primary">Leads</span>
-            <span className="block truncate text-xs text-muted">{canViewLeads ? 'Active opportunities' : 'No access'}</span>
-          </button>
-          )}
-          {visibleStages.includes('proposals') && (
-          <button type="button" disabled={!canViewProposals} onClick={onOpenProposals}
-            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-            <span className="block text-sm font-semibold text-primary">Proposals</span>
-            <span className="block truncate text-xs text-muted">{label(counts.proposals, 'active', canViewProposals)}</span>
-          </button>
-          )}
-          {visibleStages.includes('salesOrders') && (
-          <button type="button" disabled={!canViewSalesOrders} onClick={onOpenSalesOrders}
-            className="min-w-0 rounded-lg border border-gray-200 bg-surface px-3 py-2 text-left hover:border-blue-300 disabled:opacity-50">
-            <span className="block text-sm font-semibold text-primary">Sales Orders</span>
-            <span className="block truncate text-xs text-muted">{label(counts.salesOrders, 'open', canViewSalesOrders)}</span>
-          </button>
-          )}
-        </nav>
-      </>}
-      {loadError && <p role="status" className="basis-full text-xs text-amber-300">Some pipeline stage counts could not be loaded. Try refreshing.</p>}
-      {expanded && canViewProspects && visibleStages.includes('prospects') && (
-        <div id="pipeline-prospects" className="basis-full rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <button type="button" onClick={() => setExpanded(false)} className="mb-2 text-sm text-blue-600 hover:underline">Back to Pipeline</button>
-              <h3 className="text-base font-semibold text-gray-900">Prospects</h3>
-              <p className="text-xs text-gray-500">Future opportunities. Open a contact to nurture or convert it to a Lead.</p>
+      </div>
+      {loadError && !pending && <p role="status" className="text-xs text-amber-300">Some pipeline records could not be loaded.</p>}
+      <div aria-label="Sales pipeline stages" className={`grid items-start gap-3 ${expanded ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'}`}>
+        {visibleStages.includes('prospects') && (
+          <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)} className="text-left hover:underline disabled:opacity-50">
+                <span className="block text-sm font-semibold text-primary">{expanded ? 'Back to Pipeline' : 'Prospects'}</span>
+                <span className="block text-xs text-muted">{!canViewProspects ? 'No access' : pending ? 'Loading…' : counts.prospects === null ? 'Unavailable' : counts.prospects + ' to nurture'}</span>
+              </button>
+              {canViewProspects && <button type="button" onClick={onAddProspect} title="New Prospect" aria-label="New Prospect" className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-gray-200 p-2 text-primary"><Plus className="h-4 w-4" /></button>}
             </div>
-            <button type="button" onClick={onAddProspect} className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              <Plus className="h-4 w-4" /> New Prospect
-            </button>
-          </div>
+            {canViewProspects && !pending && counts.prospects !== null && <>
           {prospects.length === 0 ? (
             <p className="rounded-md bg-gray-50 px-3 py-5 text-center text-sm text-gray-500">No prospects in this view yet.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
               {prospects.map(prospect => (
                 <article key={prospect.id} className="min-w-0 rounded-md border border-gray-200 p-3">
                   <button type="button" onClick={() => onOpenProspect(prospect.id)}
@@ -311,7 +323,7 @@ export function PipelineStageOverview({
                         <label className="block text-xs font-medium text-gray-700">
                           Custom
                           <input type="date" required value={followUpDate} onChange={event => setFollowUpDate(event.target.value)}
-                            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900" />
+                            className="mt-1 block min-h-11 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-base text-gray-900 sm:text-sm" />
                         </label>
                         <div className="flex flex-wrap items-center gap-3 text-xs">
                           <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white">Save reminder</button>
@@ -337,15 +349,46 @@ export function PipelineStageOverview({
           {(page > 0 || (counts.prospects ?? 0) > PROSPECTS_PER_PAGE) && (
             <nav aria-label="Prospect pages" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted">
               <button type="button" disabled={page === 0} className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
-                onClick={() => setProspectPage({ page: page - 1, showAll })}>Previous</button>
+                onClick={() => setProspectPage({ page: page - 1, scope })}>Previous</button>
               <span>Page {page + 1} of {Math.max(1, Math.ceil((counts.prospects ?? 0) / PROSPECTS_PER_PAGE))}</span>
               <button type="button" disabled={(page + 1) * PROSPECTS_PER_PAGE >= (counts.prospects ?? 0)}
                 className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
-                onClick={() => setProspectPage({ page: page + 1, showAll })}>Next</button>
+                onClick={() => setProspectPage({ page: page + 1, scope })}>Next</button>
             </nav>
           )}
-        </div>
-      )}
-    </>
+            </>}
+          </section>
+        )}
+        {!expanded && ([
+          { key: 'leads', records: leads, count: counts.leads, allowed: canViewLeads, open: onOpenLeads, kind: 'lead' },
+          { key: 'proposals', records: proposals, count: counts.proposals, allowed: canViewProposals, open: onOpenProposals, kind: 'proposal' },
+          { key: 'salesOrders', records: orders, count: counts.salesOrders, allowed: canViewSalesOrders, open: onOpenSalesOrders, kind: 'order' },
+        ] as const).filter(stage => visibleStages.includes(stage.key)).map(stage => (
+          <section key={stage.key} className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
+            <button type="button" disabled={!stage.allowed} onClick={stage.open} className="mb-3 w-full text-left hover:underline disabled:opacity-50">
+              <span className="block text-sm font-semibold text-primary">{STAGE_LABELS[stage.key]}</span>
+              <span className="block text-xs text-muted">{!stage.allowed ? 'No access' : pending ? 'Loading…' : stage.count === null ? 'Unavailable' : stage.count + (stage.key === 'salesOrders' ? ' open' : ' active')}</span>
+            </button>
+            {stage.allowed && !pending && stage.count !== null && (
+              stage.records.length ? (
+                <ul className="space-y-1">
+                  {stage.records.map(record => (
+                    <li key={record.id}>
+                      <button type="button" onClick={() => onOpenRecord(stage.kind, record.id)} className="block min-h-11 w-full rounded-md border border-gray-200 px-2.5 py-2 text-left text-sm text-primary hover:border-blue-300">
+                        <span className="block truncate">{record.title}</span>
+                        {record.detail && <span className="block text-xs capitalize text-muted">{record.detail.replace(/_/g, ' ')}</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="px-2 py-3 text-xs text-muted">No records in this view.</p>
+            )}
+            {stage.allowed && !pending && (stage.count ?? 0) > STAGE_PREVIEW_LIMIT && (
+              <button type="button" onClick={stage.open} className="mt-3 text-xs font-medium text-primary hover:underline">View all {STAGE_LABELS[stage.key].toLowerCase()}</button>
+            )}
+          </section>
+        ))}
+      </div>
+    </div>
   );
 }
