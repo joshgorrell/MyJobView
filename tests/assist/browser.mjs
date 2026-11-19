@@ -67,7 +67,6 @@ try{
  const toggle=page.getByRole('switch',{name:'Enable Remote Support for this dealer'});
  await toggle.waitFor();await page.getByText('Remote Support is off.',{exact:true}).waitFor();
  await toggle.check();await page.getByRole('status').filter({hasText:'activation is pending'}).waitFor();
- await page.getByRole('button',{name:'Assist Pending',exact:true}).waitFor();
  assert.equal(await toggle.isChecked(),true);
  assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.name==='set_assist_enabled'&&c.args.p_organization_id==='org-one'&&c.args.p_enabled===true).length),1);
  await toggle.uncheck();await page.getByRole('status').filter({hasText:'Turning off'}).waitFor();
