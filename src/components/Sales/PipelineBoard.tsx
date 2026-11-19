@@ -7,14 +7,14 @@ import { ContactForm } from '../Contacts/ContactForm';
 import { PipelineStageOverview } from './PipelineStageOverview';
 
 interface PipelineBoardProps {
-  onNavigate: (module: 'proposals' | 'sales_orders' | 'leads') => void;
-  onOpenRecord: (kind: 'lead' | 'proposal' | 'order', id: string) => void;
-  canViewLeads: boolean;
-  canViewProposals: boolean;
-  canViewSalesOrders: boolean;
+  onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void;
+  onOpenRecord?: (kind: 'lead' | 'proposal' | 'order', id: string) => void;
+  canViewLeads?: boolean;
+  canViewProposals?: boolean;
+  canViewSalesOrders?: boolean;
 }
 
-export function PipelineBoard({ onNavigate, onOpenRecord, canViewLeads, canViewProposals, canViewSalesOrders }: PipelineBoardProps) {
+export function PipelineBoard({ onNavigate, onOpenRecord, canViewLeads = false, canViewProposals = false, canViewSalesOrders = false }: PipelineBoardProps) {
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [prospectRefresh, setProspectRefresh] = useState(0);
@@ -56,14 +56,14 @@ export function PipelineBoard({ onNavigate, onOpenRecord, canViewLeads, canViewP
   return (
     <div className="space-y-3">
       <PipelineStageOverview
-        onOpenRecord={onOpenRecord}
+        onOpenRecord={(kind, id) => onOpenRecord?.(kind, id)}
         canViewLeads={canViewLeads}
         canViewProposals={canViewProposals}
         canViewSalesOrders={canViewSalesOrders}
         prospectRefresh={prospectRefresh}
-        onOpenLeads={() => onNavigate('leads')}
-        onOpenProposals={() => onNavigate('proposals')}
-        onOpenSalesOrders={() => onNavigate('sales_orders')}
+        onOpenLeads={() => onNavigate?.('leads')}
+        onOpenProposals={() => onNavigate?.('proposals')}
+        onOpenSalesOrders={() => onNavigate?.('sales_orders')}
         onOpenProspect={handleContactClick}
         onAddProspect={() => setShowContactForm(true)}
       />
