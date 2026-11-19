@@ -357,3 +357,6 @@ verify_jwt = false
 # Twilio inbound SMS webhook validates provider signature and account SID.
 [functions.sms-inbound-webhook]
 verify_jwt = false
+
+[functions.send-tax-exemption-request]
+verify_jwt = false

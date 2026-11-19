@@ -1,3 +1,4 @@
+import { TaxExemptionCertificateRequest } from '../Shared/TaxExemptionCertificateRequest';
 import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
@@ -502,6 +503,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     return selectedContact?.tax_rate || 0.0935;
   }
 
+  const isExemptProject = taxProjectType === 'exempt_project';
+
   function calculateTax() {
     const result = computeInvoiceTax({
       lineItems: lineItems.map(item => ({
@@ -539,8 +542,13 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   async function handleSubmit(e: React.FormEvent, action: 'draft' | 'submit' | 'submit_email' = 'draft') {
     e.preventDefault();
 
-    if (!selectedContactId) {
+    if (!selectedContactId || selectedContact?.id !== selectedContactId) {
       notify('Please select a customer', { theme: 'emerald', tone: 'warning' });
+      return;
+    }
+
+    if (action !== 'draft' && !dueDate) {
+      notify('Enter a due date before submitting this invoice.', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -551,56 +559,13 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
 
     setSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
       const customerZip = await requireCustomerZip(selectedContactId);
       if (!customerZip) return;
       const subtotal = calculateSubtotal();
       const tax = calculateTax();
       const total = calculateTotal();
 
-      const { data: invoiceData, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          company_id: companySettings?.id,
-          contact_id: selectedContactId,
-          project_id: selectedProjectId || null,
-          sales_order_id: salesOrderId || null,
-          invoice_date: invoiceDate,
-          due_date: dueDate || null,
-          status: 'draft',
-          customer_visible_on_submit: customerVisible,
-          subtotal,
-          tax_amount: tax,
-          total,
-          amount_paid: 0,
-          amount_due: total,
-          notes: invoiceNotes || null,
-          tax_environment: taxEnvironment,
-          tax_project_type: taxProjectType,
-          tax_rate: getEffectiveTaxRate(),
-          payment_terms: normalizePaymentTerms(selectedContact?.default_payment_terms) || null,
-          billing_name: billing.billing_name || null,
-          billing_address_line1: billing.billing_address_line1 || null,
-          billing_address_line2: billing.billing_address_line2 || null,
-          billing_city: billing.billing_city || null,
-          billing_state: billing.billing_state || null,
-          billing_zip: billing.billing_zip || customerZip,
-          bill_to_contact_id: billToContact?.id || null,
-          jobsite_address: jobsiteAddress,
-          jobsite_city: jobsiteCity,
-          jobsite_state: jobsiteState,
-          jobsite_zip: jobsiteZip || customerZip,
-          created_by: user.id
-        })
-        .select()
-        .single();
-
-      if (invoiceError) throw invoiceError;
-
       const lineItemsData = lineItems.map((item, index) => ({
-        invoice_id: invoiceData.id,
         product_id: item.product_id || null,
         sku: item.sku || null,
         description: item.description,
@@ -617,33 +582,52 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
         sort_order: index
       }));
 
-      const { error: itemsError } = await supabase
-        .from('invoice_line_items')
-        .insert(lineItemsData);
+      const { data: invoiceId, error: createError } = await supabase.rpc('create_manual_invoice_atomic', {
+        p_invoice: {
+          company_id: companySettings?.id,
+          contact_id: selectedContactId,
+          project_id: selectedProjectId || null,
+          sales_order_id: salesOrderId || null,
+          invoice_date: invoiceDate,
+          due_date: dueDate || null,
+          customer_visible_on_submit: customerVisible,
+          subtotal,
+          tax_amount: tax,
+          total,
+          notes: invoiceNotes || null,
+          tax_environment: taxEnvironment,
+          tax_project_type: taxProjectType,
+          tax_rate: getEffectiveTaxRate(),
+          payment_terms: normalizePaymentTerms(selectedContact?.default_payment_terms) || null,
+          billing_name: billing.billing_name || null,
+          billing_address_line1: billing.billing_address_line1 || null,
+          billing_address_line2: billing.billing_address_line2 || null,
+          billing_city: billing.billing_city || null,
+          billing_state: billing.billing_state || null,
+          billing_zip: billing.billing_zip || customerZip,
+          bill_to_contact_id: billToContact?.id || null,
+          jobsite_address: jobsiteAddress,
+          jobsite_city: jobsiteCity,
+          jobsite_state: jobsiteState,
+          jobsite_zip: jobsiteZip || customerZip,
+        },
+        p_line_items: lineItemsData,
+        p_submit: action !== 'draft',
+      });
+      if (createError) throw new Error(createError.message);
 
-      if (itemsError) throw itemsError;
-
-      if (action === 'submit' || action === 'submit_email') {
-        const { data: submitResult, error: submitError } = await supabase
-          .rpc('submit_invoice', { p_invoice_id: invoiceData.id });
-
-        if (submitError) throw submitError;
-        if (submitResult && !submitResult.success) {
-          throw new Error(submitResult.errors?.join(', ') || 'Submission failed');
-        }
-
-        if (action === 'submit_email' && customerVisible) {
-          try {
-            await supabase.functions.invoke('send-invoice-email', { body: { invoiceId: invoiceData.id } });
-          } catch (sendErr) {
-            console.error('Invoice submitted but email send failed:', sendErr);
-            notify('Invoice submitted successfully, but the email failed to send. You can resend it from the invoice detail view.', { theme: 'emerald', tone: 'error' });
-          }
+      if (action === 'submit_email' && customerVisible) {
+        try {
+          const { error } = await supabase.functions.invoke('send-invoice-email', { body: { invoiceId } });
+          if (error) throw error;
+        } catch (sendErr) {
+          console.error('Invoice submitted but email send failed:', sendErr);
+          notify('Invoice submitted successfully, but the email failed to send. You can resend it from the invoice detail view.', { theme: 'emerald', tone: 'error' });
         }
       }
 
       notify('Invoice created!', { theme: 'emerald', tone: 'success' });
-      onSuccess(invoiceData.id);
+      onSuccess(invoiceId);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
@@ -835,6 +819,10 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                 />
               </div>
             </div>
+
+            {selectedContact?.id === selectedContactId && (
+              <TaxExemptionCertificateRequest recipientId={selectedContactId} email={selectedContact.email} />
+            )}
 
             {/* Bill To - Collapsed Card */}
             {selectedContactId && (
@@ -1215,7 +1203,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       <div className="w-[48px] flex-shrink-0 flex justify-center">
                         <input
                           type="checkbox"
-                          checked={item.is_taxable}
+                          checked={!isExemptProject && item.is_taxable}
+                          disabled={isExemptProject}
                           onChange={(e) => updateLineItem(item.id, 'is_taxable', e.target.checked)}
                           className="w-4 h-4 text-blue-600 rounded cursor-pointer"
                           title="Taxable"
@@ -1357,7 +1346,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                           <label className="block text-[11px] text-gray-400 mb-1">Tax</label>
                           <input
                             type="checkbox"
-                            checked={item.is_taxable}
+                            checked={!isExemptProject && item.is_taxable}
+                            disabled={isExemptProject}
                             onChange={(e) => updateLineItem(item.id, 'is_taxable', e.target.checked)}
                             className="w-5 h-5 text-blue-600 rounded cursor-pointer mt-1.5"
                           />
@@ -1417,7 +1407,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     <span className="font-medium text-white">{formatCurrency(calculateSubtotal())}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Tax ({(getEffectiveTaxRate() * 100).toFixed(2)}%)</span>
+                    <span className="text-gray-400">{isExemptProject || selectedContact?.is_tax_exempt
+                      ? 'Sales tax (exempt)'
+                      : `Tax (${(getEffectiveTaxRate() * 100).toFixed(2)}%)`}</span>
                     <span className="font-medium text-white">{formatCurrency(calculateTax())}</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-700">

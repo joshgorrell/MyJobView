@@ -1,3 +1,4 @@
+import { TaxExemptionCertificateRequest } from '../Shared/TaxExemptionCertificateRequest';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, Send, Percent, ArrowRight, ClipboardCheck, Mail, CreditCard as Edit2, AlertCircle } from 'lucide-react';
@@ -425,6 +426,10 @@ export function ManualApprovalModal({
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+
+          {contactId && (
+            <TaxExemptionCertificateRequest recipientId={contactId} email={contactEmailResolved} />
+          )}
 
           {/* Section 1: Acceptance Method */}
           <div>
