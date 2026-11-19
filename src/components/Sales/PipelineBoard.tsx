@@ -1,424 +1,45 @@
-import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { notify } from '../../lib/feedback';
-import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { markActivitySeen } from '../../hooks/useActivityCounts';
 import { ContactDetail } from '../Contacts/ContactDetail';
-import { PipelineStageOverview } from './PipelineStageOverview';
 import { ContactForm } from '../Contacts/ContactForm';
-import { LeadDetail } from '../Leads/LeadDetail';
-import { LeadForm } from '../Leads/LeadForm';
-import PrintLeadsView from '../Leads/PrintLeadsView';
-import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, HelpCircle, Printer } from 'lucide-react';
+import { PipelineStageOverview } from './PipelineStageOverview';
 
-
-interface PipelineStage {
-  description?: string;
-  id: string;
-  name: string;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  items: any[];
-  count: number;
+interface PipelineBoardProps {
+  onNavigate: (module: 'proposals' | 'sales_orders' | 'leads') => void;
+  canViewLeads: boolean;
+  canViewProposals: boolean;
+  canViewSalesOrders: boolean;
 }
 
-const ACTIVITY_PAGE_SIZE = 500;
-const DEFAULT_PIPELINE_WIDGETS = ['leads'];
-
-async function loadActivityPages<T>(
-  fetchPage: (start: number, end: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<T[]> {
-  const records: T[] = [];
-  while (true) {
-    const start = records.length;
-    const { data, error } = await fetchPage(start, start + ACTIVITY_PAGE_SIZE - 1);
-    if (error) throw error;
-    if (!data?.length) return records;
-
-    records.push(...data);
-    if (data.length < ACTIVITY_PAGE_SIZE) return records;
-  }
-}
-
-export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSalesOrders = false }: { onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void; canViewProposals?: boolean; canViewSalesOrders?: boolean }) {
-  const { profile, loading: authLoading } = useAuth();
-  const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [showLeadsStage, setShowLeadsStage] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+export function PipelineBoard({ onNavigate, canViewLeads, canViewProposals, canViewSalesOrders }: PipelineBoardProps) {
+  const { profile } = useAuth();
   const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
-  const [timeFilter, setTimeFilter] = useState<number | 'all'>(14);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [leadAgeFilter, setLeadAgeFilter] = useState<number | null>(null);
-  const [canViewAllPipeline, setCanViewAllPipeline] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<any | null>(null);
-  const [selectedLead, setSelectedLead] = useState<string | null>(null);
-  const [snoozeLeadId, setSnoozeLeadId] = useState<string | null>(null);
-  const [snoozing, setSnoozing] = useState(false);
-  const openLead = (id: string) => {
-    setSelectedLead(id);
-    if (profile?.id && profile.organization_id) {
-      void markActivitySeen(profile.id, profile.organization_id, 'pipeline_lead', id).catch(console.error);
-    }
-  };
+  const [allPipelineUserId, setAllPipelineUserId] = useState<string | null>(null);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
   const [showContactForm, setShowContactForm] = useState(false);
-  const [contactFormInitialStatus, setContactFormInitialStatus] = useState<'customer' | 'prospect'>('customer');
-  const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showFishbowlForm, setShowFishbowlForm] = useState(false);
-  const [showClaimConfirm, setShowClaimConfirm] = useState(false);
-  const [leadToClaim, setLeadToClaim] = useState<{ id: string; name: string } | null>(null);
-  const [selectedWidgets, setSelectedWidgets] = useState<string[]>(DEFAULT_PIPELINE_WIDGETS);
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [showPrintLeads, setShowPrintLeads] = useState(false);
-  const [salesReps, setSalesReps] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
-
-  // All available widget definitions
-  const allWidgetDefinitions = [
-    {
-      id: 'leads',
-      name: 'Leads',
-      description: viewMode === 'my' ? 'My leads & unclaimed' : 'All active leads',
-      color: 'text-green-700',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-300'
-    }
-  ];
-
-  // Filter to only show selected widgets
-  const stageDefinitions = allWidgetDefinitions.filter(widget =>
-    selectedWidgets.includes(widget.id)
-  );
+  const [prospectRefresh, setProspectRefresh] = useState(0);
+  const userId = profile?.id;
+  const canViewAllPipeline = Boolean(userId && allPipelineUserId === userId);
 
   useEffect(() => {
-    // Wait for auth to complete before attempting to load
-    if (authLoading) {
-      return;
+    let active = true;
+    if (userId) {
+      void supabase.from('profiles').select('can_view_all_pipeline').eq('id', userId).maybeSingle()
+        .then(({ data, error }) => {
+          if (active) setAllPipelineUserId(!error && data?.can_view_all_pipeline === true ? userId : null);
+        });
     }
+    return () => { active = false; };
+  }, [userId]);
 
-    if (!profile) {
-      setLoading(false);
-      return;
-    }
-
-    const initializePreferences = async () => {
-      await checkPermissions();
-      await loadWidgetPreferences();
-      await loadSalesReps();
-      setPreferencesLoaded(true);
-    };
-
-    initializePreferences();
-  }, [profile, authLoading]);
-
-  useEffect(() => {
-    // Wait for auth AND preferences to load before loading pipeline data
-    if (authLoading || !profile || !preferencesLoaded) {
-      return;
-    }
-
-    loadPipelineData();
-
-    // Set up real-time subscriptions
-    const contactsChannel = supabase
-      .channel('pipeline_contacts')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'contacts' },
-        () => {
-          loadPipelineData();
-        }
-      )
-      .subscribe();
-
-    const leadsChannel = supabase
-      .channel('pipeline_leads')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'leads' },
-        () => {
-          loadPipelineData();
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscriptions
-    return () => {
-      supabase.removeChannel(contactsChannel);
-      supabase.removeChannel(leadsChannel);
-    };
-  }, [viewMode, timeFilter, profile, authLoading, preferencesLoaded, selectedWidgets]);
-
-  async function checkPermissions() {
-    if (!profile?.id) return;
-
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('can_view_all_pipeline')
-        .eq('id', profile.id)
-        .maybeSingle();
-
-      setCanViewAllPipeline(data?.can_view_all_pipeline ?? false);
-
-      if (!data?.can_view_all_pipeline) {
-        setViewMode('my');
-      }
-    } catch (error) {
-      console.error('Error checking permissions:', error);
-    }
-  }
-
-  async function loadWidgetPreferences() {
-    if (!profile?.id) return;
-
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('pipeline_widgets')
-        .eq('id', profile.id)
-        .maybeSingle();
-
-      if (Array.isArray(data?.pipeline_widgets)) {
-        const widgets = (data.pipeline_widgets as string[]).filter(widget => DEFAULT_PIPELINE_WIDGETS.includes(widget));
-        setSelectedWidgets(widgets.length > 0 ? widgets : DEFAULT_PIPELINE_WIDGETS);
-      }
-    } catch (error) {
-      console.error('Error loading widget preferences:', error);
-    }
-  }
-
-  async function loadSalesReps() {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, role')
-        .eq('is_sales_rep', true)
-        .eq('is_active', true)
-        .order('full_name');
-      if (data) setSalesReps(data);
-    } catch (error) {
-      console.error('Error loading sales reps:', error);
-    }
-  }
-
-
-  function getDateCutoff() {
-    if (timeFilter === 'all') return null;
-
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - timeFilter);
-    return cutoff.toISOString();
-  }
-
-  async function loadPipelineData() {
-    try {
-      const dateCutoff = getDateCutoff();
-      const showAll = viewMode === 'all' && canViewAllPipeline;
-
-      // Build all independent queries
-      const contactsPromise = (selectedWidgets.includes('contacts'))
-        ? (async () => {
-            let contactsQuery = supabase
-              .from('contacts')
-              .select(`
-                *
-              `)
-              .order('created_at', { ascending: false })
-              .order('id');
-
-            if (!showAll && profile?.id) {
-              contactsQuery = contactsQuery.eq('created_by', profile.id);
-            }
-
-            if (!dateCutoff) return loadActivityPages((start, end) => contactsQuery.range(start, end));
-
-            const { data } = await contactsQuery.gte('created_at', dateCutoff);
-            return data || [];
-          })()
-        : Promise.resolve([]);
-
-
-      // A single leads query powers both the assigned and shared Sales Department views.
-      // Keep the legacy 'fishbowl' widget key for existing saved preferences.
-      const leadRecordsPromise = (selectedWidgets.includes('leads') || selectedWidgets.includes('fishbowl'))
-        ? supabase
-            .from('leads')
-            .select(`*, assigned_rep:profiles!leads_assigned_to_fkey(id, full_name)`)
-            .is('converted_at', null)
-            .not('status', 'in', '(closed_won,closed_lost)')
-            .order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] as any[], error: null });
-
-      const [contacts, leadResult] = await Promise.all([
-        contactsPromise,
-        leadRecordsPromise
-      ]);
-      if (leadResult.error) throw leadResult.error;
-      const allLeadRecords = leadResult.data || [];
-      const leads = allLeadRecords.filter((lead: any) =>
-        (showAll || !profile?.id || lead.assigned_to === profile.id || lead.assigned_to == null || (lead.is_fishbowl && lead.status === 'unclaimed'))
-      );
-      const fishbowl = allLeadRecords.filter((lead: any) =>
-        lead.is_fishbowl === true && lead.status === 'unclaimed' && lead.assigned_to == null
-      );
-
-      // Build stages based on selected widgets
-      const stagesData = [];
-
-      // Add stages in the order they appear in stageDefinitions (which respects selectedWidgets order)
-      for (const def of stageDefinitions) {
-        if (def.id === 'contacts') {
-          // Legacy lead/prospect contact classifications are excluded from new-contact activity.
-          // Actual opportunities are shown through the canonical Leads widget.
-          const nonProspectContacts = contacts.filter((c: any) => c.contact_type !== 'prospect' && c.contact_type !== 'lead');
-          stagesData.push({
-            ...def,
-            items: nonProspectContacts,
-            count: nonProspectContacts.length
-          });
-        } else if (def.id === 'leads') {
-          stagesData.push({
-            ...def,
-            items: leads,
-            count: leads.length
-          });
-        } else if (def.id === 'fishbowl') {
-          stagesData.push({
-            ...def,
-            items: fishbowl,
-            count: fishbowl.length
-          });
-        }
-      }
-
-      setStages(stagesData);
-    } catch (error) {
-      console.error('Error loading pipeline data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function claimLead() {
-    if (!leadToClaim) return;
-
-    try {
-      // All claim entry points must use the same first-wins, tenant-scoped transaction.
-      const { data: claimed, error } = await supabase.rpc('claim_shared_lead', {
-        p_lead_id: leadToClaim.id
-      });
-      if (error) throw error;
-      if (!claimed) {
-        notify('This lead has already been claimed by another salesperson.', { theme: 'violet', tone: 'error' });
-        setShowClaimConfirm(false);
-        setLeadToClaim(null);
-        await loadPipelineData();
-        return;
-      }
-
-      setShowClaimConfirm(false);
-      setLeadToClaim(null);
-      loadPipelineData();
-    } catch (error) {
-      console.error('Error claiming lead:', error);
-      notify('Failed to claim lead. Please try again.', { theme: 'violet', tone: 'error' });
-    }
-  }
-
-  async function snoozeLead(leadId: string, nextDate: string) {
-    if (!nextDate || !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return;
-    const today = dateInputValue(new Date());
-    if (nextDate <= today) {
-      notify('Choose a future follow-up date.', { theme: 'violet', tone: 'warning' });
-      return;
-    }
-    setSnoozing(true);
-    try {
-      const { data, error } = await supabase.from('leads').update({ reminder_date: `${nextDate}T09:00:00` }).eq('id', leadId).is('converted_at', null).select('id');
-      if (error) throw error;
-      if (!data?.length) throw new Error('Lead is no longer open or cannot be updated');
-      setSnoozeLeadId(null);
-      await loadPipelineData();
-      notify('Follow-up snoozed.', { theme: 'violet', tone: 'success' });
-    } catch (error) {
-      console.error('Unable to snooze lead', error);
-      notify('Unable to snooze follow-up.', { theme: 'violet', tone: 'error' });
-    } finally {
-      setSnoozing(false);
-    }
-  }
-
-  function handleClaimClick(leadId: string, leadName: string) {
-    setLeadToClaim({ id: leadId, name: leadName });
-    setShowClaimConfirm(true);
-  }
-
-  const getDaysOld = (createdAt: string) => {
-    const date = new Date(createdAt);
-    const today = new Date();
-    const diffTime = today.getTime() - date.getTime();
-    return Number.isFinite(diffTime) ? Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24))) : 0;
-  };
-
-  // Filter items based on search query
-  const filterItems = (item: any, stageId: string) => {
-    if (!searchQuery.trim()) return true;
-
-    const query = searchQuery.toLowerCase();
-
-    if (stageId === 'contacts') {
-      return (
-        item.company_name?.toLowerCase().includes(query) ||
-        item.contact_name?.toLowerCase().includes(query) ||
-        item.email?.toLowerCase().includes(query) ||
-        item.phone?.toLowerCase().includes(query)
-      );
-    }
-
-    // Leads and Fishbowl
-    return (
-      item.company_name?.toLowerCase().includes(query) ||
-      item.contact_name?.toLowerCase().includes(query) ||
-      item.email?.toLowerCase().includes(query) ||
-      item.phone?.toLowerCase().includes(query) ||
-      item.assigned_rep?.full_name?.toLowerCase().includes(query)
-    );
-  };
-
-  // Filter stages based on search
-  const filteredStages = stages.map(stage => {
-    let filteredItems = stage.items.filter(item => filterItems(item, stage.id));
-    if (stage.id === 'leads' && leadAgeFilter !== null) {
-      filteredItems = filteredItems.filter(item => item.created_at && getDaysOld(item.created_at) >= leadAgeFilter);
-    }
-
-    return {
-      ...stage,
-      items: filteredItems,
-      count: filteredItems.length
-    };
-  });
-
-  function handleAddNew(stageId: string) {
-    switch (stageId) {
-      case 'contacts':
-        setContactFormInitialStatus('customer');
-        setShowContactForm(true);
-        break;
-      case 'leads':
-        setShowLeadForm(true);
-        break;
-      case 'fishbowl':
-        setShowFishbowlForm(true);
-        break;
-    }
+  function refreshProspects() {
+    setProspectRefresh(version => version + 1);
   }
 
   async function handleContactClick(contactId: string) {
-    console.log('Contact clicked:', contactId);
     try {
       const { data, error } = await supabase
         .from('contacts')
@@ -442,7 +63,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
         return;
       }
 
-      console.log('Contact loaded successfully:', data);
       setSelectedContact(data);
     } catch (error: any) {
       console.error('Error loading contact:', error);
@@ -450,339 +70,31 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
     }
   }
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading pipeline...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const leads = stages.find(stage => stage.id === 'leads')?.items.filter(item => filterItems(item, 'leads')) || [];
-  const leadAging = [30, 60, 90].map(days => ({
-    days,
-    count: leads.filter(lead => lead.created_at && getDaysOld(lead.created_at) >= days).length,
-  }));
-
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        {/* Search Box */}
-        <div className="relative flex-1 sm:min-w-56 sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search the pipeline…"
-            aria-label="Search the pipeline"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all touch-manipulation"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              aria-label="Clear pipeline search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
-          )}
-        </div>
-        {canViewAllPipeline && (
-          <select
-            aria-label="Pipeline scope"
-            value={viewMode}
-            onChange={event => setViewMode(event.target.value === 'all' ? 'all' : 'my')}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-primary"
-          >
-            <option value="my">My Pipeline</option>
-            <option value="all">All</option>
-          </select>
-        )}
+    <div className="space-y-3">
+      {canViewAllPipeline && (
         <select
-          aria-label="Date range for contacts"
-          title="Date range for contacts"
-          value={timeFilter}
-          onChange={(e) => setTimeFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-          className="px-3 py-2.5 text-sm bg-white border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 active:bg-gray-100 transition-colors focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-manipulation"
+          aria-label="Pipeline scope"
+          value={viewMode}
+          onChange={event => setViewMode(event.target.value === 'all' ? 'all' : 'my')}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-primary"
         >
-          <option value={14}>Last 14 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={60}>Last 60 days</option>
-          <option value={90}>Last 90 days</option>
-          <option value="all">All time</option>
+          <option value="my">My Pipeline</option>
+          <option value="all">All</option>
         </select>
-        {/* Compact per-user pipeline settings */}
-        <button type="button" onClick={() => setShowTutorial(true)} aria-label="Pipeline help" title="Pipeline help"
-          className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
-          <HelpCircle className="h-5 w-5" />
-        </button>
-        <PipelineStageOverview
-          showAll={viewMode === 'all' && canViewAllPipeline}
-          onStageVisibilityChange={keys => setShowLeadsStage(keys.includes('leads'))}
-          canViewProposals={canViewProposals}
-          canViewSalesOrders={canViewSalesOrders}
-          onOpenLeads={() => document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          onOpenProposals={() => onNavigate?.('proposals')}
-          onOpenSalesOrders={() => onNavigate?.('sales_orders')}
-          onOpenProspect={handleContactClick}
-          onAddProspect={() => {
-            setContactFormInitialStatus('prospect');
-            setShowContactForm(true);
-          }}
-        />
-      </div>
-
-      <div className="grid gap-2.5 pb-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))]">
-        {showLeadsStage && filteredStages.map(stage => (
-          <div key={stage.id} id={`pipeline-${stage.id}`} className="flex min-w-0 scroll-mt-6 flex-col rounded-lg border border-gray-200 bg-surface">
-            <div className="border-b border-gray-200 px-3 py-2.5">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-primary">
-                  {stage.name}
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs tabular-nums text-gray-700">{stage.count}</span>
-                </h3>
-                <div className="flex items-center gap-1">
-                  {stage.id === 'leads' && (
-                    <button
-                      onClick={() => {
-                        setShowPrintLeads(true);
-                      }}
-                      className="p-1.5 hover:bg-white/50 active:bg-white/70 rounded transition-colors touch-manipulation"
-                      title={`Print ${stage.name} report`}
-                    >
-                      <Printer className="w-4 h-4 text-gray-600" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleAddNew(stage.id)}
-                    className="p-1.5 hover:bg-white/50 active:bg-white/70 rounded transition-colors touch-manipulation"
-                    title={`Add new ${stage.name.toLowerCase()}`}
-                  >
-                    <Plus className="w-4 h-4 text-gray-700" />
-                  </button>
-                </div>
-              </div>
-              {stage.id === 'leads' && (leadAgeFilter !== null || leadAging.some(({ count }) => count > 0)) && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter leads by age">
-                  {leadAging.map(({ days, count }) => (
-                    <button
-                      key={days}
-                      type="button"
-                      aria-pressed={leadAgeFilter === days}
-                      onClick={() => setLeadAgeFilter(leadAgeFilter === days ? null : days)}
-                      className={`rounded-md border border-gray-200 px-2 py-1 text-xs ${leadAgeFilter === days ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                    >
-                      {days}+ days · {count}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="min-h-24 flex-1 space-y-2 rounded-b-lg bg-gray-50 p-2">
-              {stage.count === 0 ? (
-                <div className="text-center py-8 text-sm text-gray-400">
-                  No items
-                </div>
-              ) : (
-                stage.items.map(item => {
-                  const daysOld = getDaysOld(item.created_at);
-                  const isNew = daysOld <= 14;
-
-                  // Render different card types based on stage
-                  if (stage.id === 'contacts') {
-
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => handleContactClick(item.id)}
-                        className={`bg-white rounded-lg border-2 p-3 hover:shadow-md hover:border-blue-400 active:bg-gray-50 transition-all cursor-pointer touch-manipulation border-gray-200`}
-                      >
-                        <div className="mb-2">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h4 className="customer-link font-semibold text-sm truncate">
-                              {item.contact_type === 'person'
-                                ? (item.contact_name || item.company_name)
-                                : (item.company_name || item.contact_name)}
-                            </h4>
-                            <div className="flex items-center gap-1">
-                              {isNew && (
-                                <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                                  NEW
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {item.contact_type === 'person' ? (
-                            item.company_name && (
-                              <p className="text-xs text-gray-600">
-                                {item.company_name}
-                              </p>
-                            )
-                          ) : (
-                            item.contact_name && (
-                              <p className="text-xs text-gray-600">
-                                {item.contact_name}
-                              </p>
-                            )
-                          )}
-                        </div>
-
-                        {item.email && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-                            <Mail className="w-3 h-3" />
-                            <span className="truncate">{item.email}</span>
-                          </div>
-                        )}
-                        {item.phone && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                            <Phone className="w-3 h-3" />
-                            <span>{item.phone}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatDistanceToNow(item.created_at)}</span>
-                          </div>
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Leads and Fishbowl
-                  const isAssignedToMe = item.assigned_to === profile?.id;
-                  const isAssigned = !!item.assigned_to;
-
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => openLead(item.id)}
-                      className={`bg-white rounded-lg border-2 p-3 hover:shadow-md active:shadow-lg transition-all cursor-pointer touch-manipulation ${
-                        isAssignedToMe
-                          ? 'border-blue-500 bg-blue-50/30'
-                          : 'border-gray-200 hover:border-blue-400 active:bg-gray-50'
-                      }`}
-                    >
-                      <div className="mb-2">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <h4 className="customer-link font-semibold text-sm truncate">
-                            {item.contact_name}
-                          </h4>
-                          <div className="flex items-center gap-1">
-                            {isNew && (
-                              <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-bold rounded-full">
-                                NEW
-                              </span>
-                            )}
-                            {isAssignedToMe && (
-                              <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
-                                MINE
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {item.company_name && item.company_name.toLowerCase() !== 'unknown' && (
-                          <p className="text-xs text-gray-600 mb-1">
-                            {item.company_name}
-                          </p>
-                        )}
-                        {item.lead_source === 'kiosk' && (
-                          <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
-                            <span>📱 Kiosk Entry</span>
-                          </div>
-                        )}
-                        {item.lead_source === 'email_forward' && (
-                          <div className="flex items-center gap-1 text-blue-600 text-xs font-semibold mb-1">
-                            <MailOpen className="w-3 h-3" />
-                            <span>Email Forward</span>
-                          </div>
-                        )}
-                      </div>
-                      {item.email && (
-                        <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                          <Mail className="w-3 h-3" />
-                          <span className="truncate">{item.email}</span>
-                        </div>
-                      )}
-                      {item.phone && (
-                        <div className="flex items-center gap-1 text-xs text-gray-600 mb-2">
-                          <Phone className="w-3 h-3" />
-                          <span>{item.phone}</span>
-                        </div>
-                      )}
-                      {item.priority && (
-                        <div className="mb-2">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            item.priority === 'critical'
-                              ? 'bg-red-100 text-red-800'
-                              : item.priority === 'high'
-                              ? 'bg-orange-100 text-orange-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {item.priority}
-                          </span>
-                        </div>
-                      )}
-                      {(Boolean(item.reminder_date) && String(item.reminder_date).slice(0, 10) <= dateInputValue(new Date())) && (
-                        <div className="mb-2">
-                          <button type="button" onClick={e => { e.stopPropagation(); setSnoozeLeadId(current => current === item.id ? null : item.id); }} className="text-xs font-semibold text-blue-700 hover:underline">Snooze follow-up</button>
-                          {snoozeLeadId === item.id && (
-                            <div onClick={e => e.stopPropagation()} className="mt-2 rounded border border-gray-200 bg-white p-2 space-y-2">
-                              <div className="flex flex-wrap gap-1">
-                                {FOLLOW_UP_PRESETS.map(({ label, months }) => (
-                                  <button key={months} type="button" disabled={snoozing}
-                                    onClick={() => void snoozeLead(item.id, followUpInMonths(months))}
-                                    className="rounded bg-gray-100 px-2 py-1 text-xs hover:bg-blue-100 disabled:opacity-50">{label}</button>
-                                ))}
-                              </div>
-                              <label className="block text-xs text-gray-600">Custom
-                                <input type="date" min={dateInputValue(new Date(new Date().setDate(new Date().getDate() + 1)))} disabled={snoozing} onChange={e => { if (e.target.value) void snoozeLead(item.id, e.target.value); }} className="mt-1 block rounded border border-gray-300 p-1 text-sm" />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {/* Show assigned rep info */}
-                      {isAssigned && !isAssignedToMe && item.assigned_rep?.full_name && (
-                        <div className="flex items-center gap-1 text-xs text-gray-600 mb-2 bg-gray-50 px-2 py-1 rounded">
-                          <User className="w-3 h-3" />
-                          <span className="truncate">{item.assigned_rep.full_name}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <Clock className="w-3 h-3" />
-                          <span>{formatDistanceToNow(item.created_at)}</span>
-                        </div>
-                        <Eye className="w-4 h-4 text-gray-400" />
-                      </div>
-                      {(!item.assigned_to || item.status === 'unclaimed') && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClaimClick(item.id, item.contact_name);
-                          }}
-                          className="w-full px-3 py-2.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 active:bg-blue-800 transition-colors mt-2 touch-manipulation"
-                        >
-                          Claim Lead
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Detail View Modals */}
+      )}
+      <PipelineStageOverview
+        showAll={viewMode === 'all' && canViewAllPipeline}
+        canViewLeads={canViewLeads}
+        canViewProposals={canViewProposals}
+        canViewSalesOrders={canViewSalesOrders}
+        prospectRefresh={prospectRefresh}
+        onOpenLeads={() => onNavigate('leads')}
+        onOpenProposals={() => onNavigate('proposals')}
+        onOpenSalesOrders={() => onNavigate('sales_orders')}
+        onOpenProspect={handleContactClick}
+        onAddProspect={() => setShowContactForm(true)}
+      />
       {selectedContact && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-gray-50 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -791,7 +103,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
               <button
                 onClick={() => {
                   setSelectedContact(null);
-                  loadPipelineData();
+                  refreshProspects();
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -802,33 +114,21 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
               contact={selectedContact}
               onBack={() => {
                 setSelectedContact(null);
-                loadPipelineData();
+                refreshProspects();
               }}
               onConverted={() => {
                 setSelectedContact(null);
-                loadPipelineData();
+                refreshProspects();
               }}
             />
           </div>
         </div>
       )}
-
-      {selectedLead && (
-        <LeadDetail
-          leadId={selectedLead}
-          onClose={() => {
-            setSelectedLead(null);
-            loadPipelineData();
-          }}
-        />
-      )}
-
-      {/* Create Forms */}
       {showContactForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-gray-900">New Contact</h2>
+              <h2 className="text-xl font-bold text-gray-900">New Prospect</h2>
               <button
                 onClick={() => setShowContactForm(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -838,284 +138,13 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
             </div>
             <div className="p-6">
               <ContactForm
-                initialSalesStatus={contactFormInitialStatus}
+                initialSalesStatus="prospect"
                 onClose={() => setShowContactForm(false)}
                 onSuccess={() => {
                   setShowContactForm(false);
-                  loadPipelineData();
+                  refreshProspects();
                 }}
               />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showLeadForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-gray-900">New Lead</h2>
-              <button
-                onClick={() => setShowLeadForm(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-6">
-              <LeadForm
-                onClose={() => setShowLeadForm(false)}
-                onSuccess={() => {
-                  setShowLeadForm(false);
-                  loadPipelineData();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showFishbowlForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h2 className="text-xl font-bold text-gray-900">New Sales Department Lead</h2>
-              <button
-                onClick={() => setShowFishbowlForm(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-6">
-              <LeadForm
-                onClose={() => setShowFishbowlForm(false)}
-                onSuccess={() => {
-                  setShowFishbowlForm(false);
-                  loadPipelineData();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showClaimConfirm && leadToClaim && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Claim This Lead?</h3>
-            <p className="text-gray-600 mb-2">
-              Are you sure you want to claim <strong>{leadToClaim.name}</strong>?
-            </p>
-            <p className="text-sm text-gray-500 mb-6">
-              This will assign the lead to you and move it from the Sales Department queue to your Leads list.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowClaimConfirm(false);
-                  setLeadToClaim(null);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={claimLead}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-              >
-                Yes, Claim Lead
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Print Modals */}
-      {showPrintLeads && (() => {
-        const leadsStage = filteredStages.find(s => s.id === 'leads');
-        return (
-          <PrintLeadsView
-            leads={leadsStage?.items || []}
-            repName={viewMode === 'all' ? 'All Reps' : (profile?.full_name || 'Unknown Rep')}
-            viewMode={viewMode}
-            onClose={() => setShowPrintLeads(false)}
-            salesReps={salesReps}
-            isAdminOrManager={profile?.role === 'admin' || profile?.role === 'manager'}
-          />
-        );
-      })()}
-
-      {/* Tutorial Modal */}
-      {showTutorial && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex items-center justify-between z-10 rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <HelpCircle className="w-6 h-6" />
-                <h2 className="text-xl font-bold">Pipeline Board Tutorial</h2>
-              </div>
-              <button
-                onClick={() => setShowTutorial(false)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-gray-700 leading-relaxed">
-                  The Pipeline Board gives you a kanban-style view of your entire sales pipeline — from new contacts
-                  to hot leads ready to close. Here's what each column means:
-                </p>
-              </div>
-
-              {/* Contacts */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <UserCircle className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Contacts</h3>
-                    <p className="text-gray-700 leading-relaxed mb-3">
-                      A <strong>Contact</strong> is a person or company in your database. Contacts store people and company details. Sales opportunities are managed separately as
-                      <strong> Leads</strong>, linked to their contact records. You can log interactions against contacts.
-                    </p>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <p className="text-sm text-gray-600">
-                        <strong>Example:</strong> A homeowner you installed a system for last year (Customer), or a new
-                        business you met at a networking event (Contact). Create a Lead when there is a sales opportunity.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Leads */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <User className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Leads</h3>
-                    <p className="text-gray-700 leading-relaxed mb-3">
-                      A <strong>Lead</strong> is a sales opportunity, including inquiries that need follow-up before the customer is ready to buy. Leads have
-                      a priority level (Urgent, High, Medium, Low), a temperature rating, and are assigned to a specific
-                      salesperson once claimed. An unclaimed lead sits in the <strong>Fishbowl</strong> until a rep
-                      picks it up. Once claimed, it appears in that rep's active pipeline. Leads close as
-                      either <strong>Won</strong> or <strong>Lost</strong>.
-                    </p>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <p className="text-sm text-gray-600">
-                        <strong>Example:</strong> Someone who called in requesting a quote today. Priority: High,
-                        Temperature: Hot. Claimed by and assigned to Sarah — she works it until it closes.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fishbowl */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-6 h-6 text-teal-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Fishbowl</h3>
-                    <p className="text-gray-700 leading-relaxed mb-3">
-                      The <strong>Fishbowl</strong> is the pool of unclaimed leads available for any salesperson to pick up.
-                      A lead enters the Fishbowl when it hasn't been assigned to anyone yet — whether it came in through
-                      a web form, was entered manually, or was released back by a rep. When you claim a lead from the
-                      Fishbowl, it's assigned to you and moves into your active Leads pipeline.
-                    </p>
-                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-3">
-                      <p className="text-sm text-gray-600">
-                        <strong>Example:</strong> Three new inbound inquiries came in overnight. They sit in the Fishbowl
-                        until a rep claims one — first come, first served.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* How it all works together */}
-              <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-5">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <ChevronRight className="w-5 h-5 text-blue-600" />
-                  How It All Works Together
-                </h3>
-                <div className="space-y-3 text-gray-700">
-                  <div>
-                    <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-1">Nurture Path</p>
-                    <div className="space-y-1.5 pl-1">
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-blue-600 font-bold">1.</span>
-                        <span>You meet someone and add them as a <strong>Contact</strong>.</span>
-                      </p>
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-blue-600 font-bold">2.</span>
-                        <span>When there is an opportunity, create a <strong>Lead</strong> and schedule a follow-up if the customer needs more time.</span>
-                      </p>
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-blue-600 font-bold">3.</span>
-                        <span>Keep the <strong>Lead</strong> updated as the opportunity progresses, then create a proposal when appropriate.</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-green-700 uppercase tracking-wide mb-1">Inbound / Fishbowl Path</p>
-                    <div className="space-y-1.5 pl-1">
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-green-600 font-bold">1.</span>
-                        <span>A new inquiry comes in and lands in the <strong>Fishbowl</strong> as an unclaimed Lead.</span>
-                      </p>
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-green-600 font-bold">2.</span>
-                        <span>A rep claims it — the Lead is now assigned to them and active in their pipeline.</span>
-                      </p>
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-green-600 font-bold">3.</span>
-                        <span>The rep tracks follow-up on the Lead and creates a proposal when the opportunity is ready.</span>
-                      </p>
-                      <p className="flex items-start gap-2 text-sm">
-                        <span className="text-green-600 font-bold">4.</span>
-                        <span>If the timing isn't right, keep the <strong>Lead</strong> for follow-up without creating another record.</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pro Tip */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-yellow-900 font-bold text-sm">
-                      !
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Pro Tip</h4>
-                    <p className="text-sm text-gray-700">
-                      Select <strong>My Pipeline</strong> to focus on your contacts and leads. Use <strong>search</strong> to find someone by
-                      name, company, or phone, and check <strong>Sales Department</strong> for unclaimed leads.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg flex justify-end">
-              <button
-                onClick={() => setShowTutorial(false)}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                Got It!
-              </button>
             </div>
           </div>
         </div>
