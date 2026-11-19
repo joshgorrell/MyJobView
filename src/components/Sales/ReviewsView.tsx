@@ -71,6 +71,8 @@ interface EmailPreview {
   recipientName: string;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const REVIEW_URL = 'https://g.page/r/CZzvVUth7kuyEBM/review';
 
 
@@ -613,7 +615,7 @@ export default function ReviewsView() {
   }
 
   async function resendSatisfactionSurvey(record: SatisfactionRecord) {
-    toast.confirm(`Resend satisfaction survey to ${record.customer_name || record.customer_email}?`, async () => {
+    toast.confirm(`Send a follow-up email to ${record.customer_name || record.customer_email}?`, async () => {
       setSending(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -631,19 +633,26 @@ export default function ReviewsView() {
           }),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to resend (${response.status})`);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success !== true) {
+          throw new Error(result.error || `Failed to send follow-up (${response.status})`);
         }
 
-        toast.success('Satisfaction survey resent successfully!');
-      } catch (error: any) {
+        if (result.followUpSentAt) {
+          setSatisfactionHistory(history => history.map(item => item.id === record.id
+            ? { ...item, follow_up_sent_at: result.followUpSentAt }
+            : item));
+          toast.success('Follow-up sent.');
+        } else {
+          toast.warning(result.historyWarning || 'Follow-up sent, but its timestamp is unavailable.');
+        }
+      } catch (error) {
         console.error('Error resending satisfaction survey:', error);
-        toast.error(`Failed to resend: ${error.message || 'Please try again.'}`);
+        throw error;
       } finally {
         setSending(false);
       }
-    }, 'Resend Survey?');
+    }, 'Send Follow-up?');
   }
 
   async function resendReviewRequest(request: ReviewRequest) {
@@ -1212,7 +1221,7 @@ export default function ReviewsView() {
             const now = Date.now();
             const followUpCount =
               requests.filter(r => !r.review_completed && (now - new Date(r.sent_at).getTime()) >= 14 * 24 * 60 * 60 * 1000).length +
-              satisfactionHistory.filter(r => !r.rating && (now - new Date(r.sent_at).getTime()) >= 14 * 24 * 60 * 60 * 1000).length;
+              satisfactionHistory.filter(r => !r.rating && now - Date.parse(r.follow_up_sent_at || r.sent_at) >= 14 * DAY_MS).length;
             return followUpCount > 0 ? (
               <div className="px-6 py-3 bg-amber-900/25 border-b border-amber-700/50 flex items-center gap-2 text-sm text-amber-300">
                 <RefreshCw className="w-4 h-4 flex-shrink-0" />
@@ -1410,8 +1419,8 @@ export default function ReviewsView() {
                     okay: 'Okay',
                     needs_attention: 'Needs Attention',
                   };
-                  const satSentMs = new Date(record.sent_at).getTime();
-                  const satDaysSince = Math.floor((Date.now() - satSentMs) / (1000 * 60 * 60 * 24));
+                  const satSentMs = Date.parse(record.follow_up_sent_at || record.sent_at);
+                  const satDaysSince = Math.floor((Date.now() - satSentMs) / DAY_MS);
                   const isSatFollowUpDue = !record.rating && satDaysSince >= 14;
                   return (
                     <tr key={`sat-${record.id}`} className={`grid grid-cols-1 sm:grid-cols-2 gap-x-4 px-4 py-3 lg:table-row lg:p-0 hover:bg-gray-750 ${isSatFollowUpDue ? 'bg-amber-950/20' : 'bg-blue-950/10'}`}>
@@ -1455,7 +1464,10 @@ export default function ReviewsView() {
                           )}
                           {record.follow_up_sent_at && (
                             <span className="flex items-center gap-1 text-teal-400 text-xs font-medium mt-0.5">
-                              <Mail className="w-3.5 h-3.5" /> Auto Follow-up Sent
+                              <Mail className="w-3.5 h-3.5 shrink-0" />
+                              <span>Follow-up sent <time dateTime={record.follow_up_sent_at}>
+                                {new Date(record.follow_up_sent_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                              </time></span>
                             </span>
                           )}
                           {record.responded_at && (

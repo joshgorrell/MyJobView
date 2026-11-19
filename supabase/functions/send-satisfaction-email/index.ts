@@ -166,7 +166,7 @@ Deno.serve(async (req: Request) => {
       user = data.user;
     }
 
-    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType = 'manual', projectId, salesOrderId, previewOnly = false, customSubject, personalNote } = await req.json();
+    const { contactId, customerName, customerEmail, salesRepId, salesRepName, leadTechId, leadTechName, appUrl: appUrlFromClient, resendRecordId, surveyType: requestedSurveyType = 'manual', projectId, salesOrderId, previewOnly = false, customSubject, personalNote } = await req.json();
 
     if (!customerEmail && !resendRecordId) {
       return new Response(JSON.stringify({ error: 'Customer email is required' }), {
@@ -191,6 +191,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    let surveyType = requestedSurveyType;
+    let followUpIdempotencyKey: string | undefined;
     let record: { id: string; response_token: string; customer_name: string; customer_email: string };
 
     if (previewOnly) {
@@ -220,7 +222,7 @@ Deno.serve(async (req: Request) => {
     if (resendRecordId) {
       const { data: existing, error: fetchError } = await supabaseAdmin
         .from('customer_satisfaction')
-        .select('id, response_token, customer_name, customer_email')
+        .select('id, response_token, customer_name, customer_email, survey_type, rating, follow_up_sent_at')
         .eq('id', resendRecordId)
         .eq('organization_id', organizationId)
         .maybeSingle();
@@ -231,7 +233,15 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      if (existing.rating) {
+        return new Response(JSON.stringify({ error: 'This customer has already responded to the survey' }), {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       record = existing;
+      surveyType = existing.survey_type || 'manual';
+      followUpIdempotencyKey = `satisfaction-follow-up/${existing.id}/${existing.follow_up_sent_at || 'first'}`;
     } else {
       const responseToken = crypto.randomUUID();
       const openToken = crypto.randomUUID() + crypto.randomUUID();
@@ -308,6 +318,7 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,
+        ...(followUpIdempotencyKey ? { 'Idempotency-Key': followUpIdempotencyKey } : {}),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -328,8 +339,27 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    let followUpSentAt: string | undefined;
+    let historyWarning: string | undefined;
+    if (resendRecordId) {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('customer_satisfaction')
+        .update({ follow_up_sent_at: new Date().toISOString() })
+        .eq('id', record.id)
+        .eq('organization_id', organizationId)
+        .select('follow_up_sent_at')
+        .single();
+
+      if (updateError || !updated?.follow_up_sent_at) {
+        console.error('Failed to record satisfaction follow-up:', record.id, updateError);
+        historyWarning = 'Follow-up sent, but its timestamp could not be saved.';
+      } else {
+        followUpSentAt = updated.follow_up_sent_at;
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, message: 'Satisfaction survey sent', recordId: record.id }),
+      JSON.stringify({ success: true, followUpSentAt, historyWarning, message: 'Satisfaction survey sent', recordId: record.id }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
