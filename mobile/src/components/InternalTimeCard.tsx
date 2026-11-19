@@ -9,6 +9,7 @@ import {
   loadInternalTime, startNewInternalTime, startInternalTime, stopInternalTime,
   type InternalTimeType, type InternalSession, type ActivityEntry,
 } from '../services/InternalTime';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 import { Colors } from '../theme/colors';
 import { Spacing, Radius, Typography } from '../theme/styles';
 import { Card } from './UI';
@@ -21,6 +22,8 @@ function elapsed(clockIn: string, now: number) {
 }
 
 export function InternalTimeCard() {
+  const { dark } = useTheme();
+  const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const { isConnected } = useOffline();
   const [data, setData] = useState<InternalTimeData | null>(null);
@@ -79,7 +82,7 @@ export function InternalTimeCard() {
       await action();
       success?.();
     } catch (e: any) {
-      Alert.alert('Unable to save', e.message || 'Refresh and try again.');
+      Alert.alert('Unable to save', e.message || 'Try again.');
     } finally {
       await refresh();
       saving.current = false;
@@ -114,21 +117,21 @@ export function InternalTimeCard() {
       : session.status === 'completed' ? (entry?.status === 'approved' ? 'Approved' : 'Submitted for review')
       : approved ? 'Ready to start' : 'Manager approval needed';
     return (
-      <View key={session.id} style={styles.session}>
-        <Text style={styles.sessionType}>{label(session.session_type)}</Text>
-        <Text style={styles.sessionTitle}>{session.title}</Text>
-        {!!session.description && <Text style={styles.body}>{session.description}</Text>}
-        <Text style={styles.status}>{status}</Text>
-        {session.status === 'denied' && !!session.denial_reason && <Text style={styles.body}>{session.denial_reason}</Text>}
-        {running && <Text accessibilityLiveRegion="none" style={styles.elapsed}>{elapsed(entry!.clock_in, now)}</Text>}
-        {entry?.clock_out && <Text style={styles.body}>{Number(entry.total_hours || 0).toFixed(2)} hours recorded</Text>}
+      <View key={session.id} style={themedStyles.session}>
+        <Text style={[themedStyles.sessionType, dark && styles.darkAccent]}>{label(session.session_type)}</Text>
+        <Text style={themedStyles.sessionTitle}>{session.title}</Text>
+        {!!session.description && <Text style={themedStyles.body}>{session.description}</Text>}
+        <Text style={themedStyles.status}>{status}</Text>
+        {session.status === 'denied' && !!session.denial_reason && <Text style={themedStyles.body}>{session.denial_reason}</Text>}
+        {running && <Text accessibilityLiveRegion="none" style={[themedStyles.elapsed, dark && styles.darkAccent]}>{elapsed(entry!.clock_in, now)}</Text>}
+        {entry?.clock_out && <Text style={themedStyles.body}>{Number(entry.total_hours || 0).toFixed(2)} hours recorded</Text>}
         {approved && !entry && session.predetermined_hours != null && (
-          <Text style={styles.body}>Approved block: {Number(session.predetermined_hours)} hours. The timer records actual time.</Text>
+          <Text style={themedStyles.body}>Approved block: {Number(session.predetermined_hours)} hours. The timer records actual time.</Text>
         )}
         {running && (
           <TextInput accessibilityLabel="Session notes" placeholder="Notes about the work (optional)" multiline
             editable={!busy} value={notes[session.id] || ''} onChangeText={value => setNotes(previous => ({ ...previous, [session.id]: value }))}
-            style={styles.input} />
+            placeholderTextColor={themedStyles.body.color} style={themedStyles.input} />
         )}
         {(running || needsFinish) && button(needsFinish ? 'Finish submitting' : 'Stop ' + label(session.session_type),
           () => { void perform(() => stopInternalTime(profile!, session.id, notes[session.id] || '')); }, disabled, true)}
@@ -138,28 +141,27 @@ export function InternalTimeCard() {
     );
   }
   return (
-    <Card style={styles.card}>
-      <Text style={styles.heading}>Shop Time & Training</Text>
-      <Text style={styles.body}>Track Shop Time and Training separately from customer jobs. Daily Clock employees stay on their workday clock; Job Time employees do not need a Daily Clock. Completed time is submitted for review.</Text>
-      {!isConnected && <Text style={styles.warning}>Reconnect to start or stop internal time.</Text>}
+    <Card style={themedStyles.card}>
+      <Text style={themedStyles.heading}>Shop Time & Training</Text>
+      <Text style={themedStyles.body}>Record internal work. Stopping a timer submits your time for manager review.</Text>
+      {!isConnected && <Text style={[themedStyles.warning, dark && styles.darkWarning]}>Reconnect to start or stop internal time.</Text>}
       {loading && <ActivityIndicator color={Colors.primary[600]} />}
-      {!!error && <Text accessibilityRole="alert" style={styles.warning}>{error}</Text>}
-      {!!data?.active && !activeInternal && <Text style={styles.warning}>A job timer is running. Stop it before starting internal time.</Text>}
-      {button('Refresh sessions', () => { void refresh(); }, busy || !isConnected)}
+      {!!error && <Text accessibilityRole="alert" style={[themedStyles.warning, dark && styles.darkWarning]}>{error}</Text>}
+      {!!data?.active && !activeInternal && <Text style={[themedStyles.warning, dark && styles.darkWarning]}>A job timer is running. Stop it before starting internal time.</Text>}
+      {!!error && isConnected && button('Retry', () => { void refresh(); }, busy)}
       {data?.sessions.map(sessionRow)}
-      {!loading && !error && !data?.sessions.length && <Text style={styles.body}>Choose Shop Time or Training to start recording internal work.</Text>}
       {!requestType && (
-        <View style={styles.requests}>
+        <View style={themedStyles.requests}>
           {button('Start Shop Time', () => openRequest('shop_time'), noNewStarts)}
           {button('Start Training', () => openRequest('training'), noNewStarts)}
         </View>
       )}
       {!!requestType && (
-        <View style={styles.session}>
-          <Text style={styles.sessionTitle}>Start {label(requestType)}</Text>
-          <Text style={styles.body}>Add an optional note, then start your timer. Recorded hours stay pending until a manager approves them for payroll.</Text>
+        <View style={themedStyles.session}>
+          <Text style={themedStyles.sessionTitle}>Start {label(requestType)}</Text>
+          <Text style={themedStyles.body}>Add an optional note, then start your timer. Recorded hours stay pending until a manager approves them for payroll.</Text>
           <TextInput accessibilityLabel="Internal time notes" placeholder="What will you be working on?" multiline maxLength={2000}
-            editable={!busy} value={reason} onChangeText={setReason} style={styles.input} />
+            editable={!busy} value={reason} onChangeText={setReason} placeholderTextColor={themedStyles.body.color} style={themedStyles.input} />
           {button('Start timer', () => { void perform(
             () => startNewInternalTime(profile!, requestType, reason, requestId),
             () => { setRequestType(null); },
@@ -175,6 +177,8 @@ const styles = StyleSheet.create({
   card: { marginVertical: Spacing.sm, marginHorizontal: Spacing.md, padding: Spacing.md },
   heading: { ...Typography.subheading, marginBottom: 4 },
   body: { ...Typography.body, color: Colors.gray[600], marginBottom: 6, lineHeight: 18, fontSize: 13 },
+  darkAccent: { color: Colors.primary[300] },
+  darkWarning: { color: Colors.amber[400] },
   warning: { ...Typography.body, color: Colors.amber[700], marginVertical: Spacing.sm },
   session: { borderTopWidth: 1, borderColor: Colors.gray[200], paddingTop: Spacing.lg, marginTop: Spacing.lg },
   sessionType: { ...Typography.caption, color: Colors.primary[600], fontWeight: '700', marginBottom: Spacing.xs },
