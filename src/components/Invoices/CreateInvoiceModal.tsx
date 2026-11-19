@@ -1,4 +1,3 @@
-import { TaxExemptionCertificateRequest } from '../Shared/TaxExemptionCertificateRequest';
 import { requireCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
@@ -819,10 +818,6 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                 />
               </div>
             </div>
-
-            {isExemptProject && selectedContact?.id === selectedContactId && !selectedContact.is_tax_exempt && (
-              <TaxExemptionCertificateRequest recipientId={selectedContactId} email={selectedContact.email} />
-            )}
 
             {/* Bill To - Collapsed Card */}
             {selectedContactId && (

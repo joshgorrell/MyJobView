@@ -6,14 +6,15 @@ interface Props {
   recipientId: string;
   source?: 'contact' | 'lead';
   email?: string | null;
+  light?: boolean;
 }
 
-export function TaxExemptionCertificateRequest({ recipientId, source = 'contact', email }: Props) {
+export function TaxExemptionCertificateRequest({ recipientId, source = 'contact', email, light }: Props) {
   const key = `${source}:${recipientId}:${email?.trim().toLowerCase() ?? ''}`;
-  return <CertificateRequestButton key={key} recipientId={recipientId} source={source} email={email?.trim()} />;
+  return <CertificateRequestButton key={key} recipientId={recipientId} source={source} email={email?.trim()} light={light} />;
 }
 
-function CertificateRequestButton({ recipientId, source, email }: Props) {
+function CertificateRequestButton({ recipientId, source, email, light }: Props) {
   const requestId = useRef<string | null>(null);
   const pending = useRef(false);
   const [sending, setSending] = useState(false);
@@ -44,17 +45,17 @@ function CertificateRequestButton({ recipientId, source, email }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-3">
-      <p className="mb-2 text-xs font-semibold text-gray-300">Sales tax exemption</p>
+    <div className={`rounded-lg border p-3 ${light ? 'border-gray-200 bg-gray-50' : 'border-gray-700 bg-gray-900/50'}`}>
+      <p className={`mb-2 text-xs font-semibold ${light ? 'text-gray-700' : 'text-gray-300'}`}>Sales tax exemption</p>
       <button
         type="button"
         onClick={sendRequest}
         disabled={!email || sending || !!sentAt}
-        className="rounded-lg border border-blue-500/50 px-3 py-2 text-sm text-blue-300 hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`rounded-lg border border-blue-500/50 px-3 py-2 text-sm hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 ${light ? 'text-blue-700' : 'text-blue-300'}`}
       >
         {sending ? 'Sending request…' : 'Request Sales Tax Exemption Certificate'}
       </button>
-      <p aria-live="polite" className="mt-1.5 break-words text-xs text-gray-400">
+      <p aria-live="polite" className={`mt-1.5 break-words text-xs ${light ? 'text-gray-600' : 'text-gray-400'}`}>
         {sentAt
           ? `Emailed to ${email} on ${new Date(sentAt).toLocaleString()}.`
           : email ? `Email request to ${email}.` : 'Add an email address to the customer record to send a request.'}
