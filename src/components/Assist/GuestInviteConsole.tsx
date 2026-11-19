@@ -48,6 +48,14 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [organizationId, recipientQuery, recipient]);
   const selectedEmail = recipient?.email || (validEmail(recipientQuery) ? recipientQuery.trim() : '');
+  async function readAvailability() {
+    const { data, error } = await supabase.rpc('get_assist_access', { p_organization_id: organizationId });
+    if (error || !data) throw new Error('Assist status unavailable');
+    if (data.can_operate !== true) return 'restricted';
+    if (data.windows_download_ready !== true) return 'pending';
+    const capability = await invoke('invite_capability');
+    return capability?.available === true ? 'ready' : 'pilot';
+  }
   async function invoke(operation: string, inviteId?: string, emailRecipient?: string) {
     const { data, error: failure } = await supabase.functions.invoke('assist-support', { body: { operation, organizationId, ...(inviteId ? { inviteId } : {}), ...(emailRecipient ? { emailRecipient } : {}) } });
     if (failure || data?.error) throw new Error('Invitation unavailable'); return data;
@@ -62,7 +70,7 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
   }
   useEffect(() => {
     const version = ++epoch.current; setAvailable(false); setAvailabilityMessage(''); setCheckingAvailability(false); setInvite(null); setError(''); setBusy(false); working.current = false;
-    void invoke('invite_capability').then(data => { if (version === epoch.current) setAvailable(data?.available === true); }).catch(() => {});
+    void readAvailability().then(status => { if (version === epoch.current) setAvailable(status === 'ready'); }).catch(() => {});
     let polling = false;
     const timer = window.setInterval(() => {
       const row = current.current; if (!row || polling || working.current) return;
@@ -87,11 +95,17 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
     setAvailabilityMessage('');
     setCheckingAvailability(true);
     try {
-      const data = await invoke('invite_capability');
+      const status = await readAvailability();
       if (version !== epoch.current) return;
-      const ready = data?.available === true;
+      const ready = status === 'ready';
       setAvailable(ready);
-      setAvailabilityMessage(ready ? 'Invitations are ready.' : 'Checked just now. Invitations are still waiting for Assist activation.');
+      const messages = {
+        ready: 'Invitations are ready.',
+        pending: 'Checked just now. Assist activation is still pending.',
+        pilot: 'Checked just now. The service is reachable, and invitations are still awaiting Windows pilot approval.',
+        restricted: 'Your account does not have permission to create Assist invitations.',
+      };
+      setAvailabilityMessage(messages[status]);
     } catch {
       if (version !== epoch.current) return;
       setAvailable(false);
