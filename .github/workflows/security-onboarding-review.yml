@@ -21,7 +21,7 @@ jobs:
     name: Build and isolated onboarding checks
     # Hosted Ubuntu 24.04 includes Chrome/Chromium's system libraries.
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       VITE_SUPABASE_URL: https://security-test.supabase.co
       VITE_SUPABASE_ANON_KEY: test-key
@@ -49,7 +49,8 @@ jobs:
           npx playwright install --only-shell chromium
           node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({headless: true}); await browser.close();'
       - name: Install WebKit for iPhone and iPad coverage
-        timeout-minutes: 5
+        # WebKit also installs OS packages, which can be slow on hosted Ubuntu mirrors.
+        timeout-minutes: 20
         run: npx playwright install --with-deps webkit
       - name: Mobile resume, signing and printable agreement
         timeout-minutes: 5
