@@ -40,7 +40,8 @@ const probe=async request=>({...request,checked_at:Date.now(),desktop_control:tr
 runtime.target=()=>({port:22000});
 const plane=createControlPlane({store,runtime,validateLease:async()=>lease,probe});
 try{
- const result=await plane.reconcile(job);assert.equal(result.verified,true);assert.equal((await plane.checkHealth(org)).healthy,true);assert.equal((await store.read(org)).phase,'verified');
+ assert.equal(plane.canServe(domain),false);
+ const result=await plane.reconcile(job);assert.equal(plane.canServe(domain),true);assert.equal(result.verified,true);assert.equal((await plane.checkHealth(org)).healthy,true);assert.equal((await store.read(org)).phase,'verified');
  await Promise.all([plane.reconcile(job),plane.reconcile(job)]);assert.equal(maxActive,1,'Same dealer side effects serialize');
  assert.equal((await stat(join(directory,org+'.json'))).mode&0o777,0o600);
  await assert.rejects(store.read('../bad'),/invalid_organization/);
@@ -49,7 +50,7 @@ try{
  await assert.rejects(plane.reconcile(job),/stale_generation/);assert.equal((await store.read(org)).generation,2);
  lease=false;await assert.rejects(plane.reconcile({...job,generation:3}),/stale_lease/);lease=true;
  const failPlane=createControlPlane({store,runtime,validateLease:async()=>true,probe:async()=>({desktop_control:true,organization_id:other})});
- await assert.rejects(failPlane.reconcile({...job,generation:3}),/reconcile_failed/);assert.equal(stopped,true);assert.equal((await store.read(org)).phase,'failed');
+ await assert.rejects(failPlane.reconcile({...job,generation:3}),/reconcile_failed/);assert.equal(stopped,true);assert.equal((await store.read(org)).phase,'failed');assert.equal(failPlane.canServe(domain),false);
  await plane.reconcile({...job,generation:3});
  assert.equal((await failPlane.checkHealth(org)).healthy,false,'Failed live canary closes the runtime');
  assert.equal(stopped,true);
@@ -79,8 +80,8 @@ try{
 }finally{await rm(cacheRoot,{recursive:true,force:true});}
 const token='t'.repeat(40);let applied=0;
 const upstream=http.createServer((request,response)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify({url:request.url,authorization:request.headers.authorization||null,meshAuth:request.headers['x-meshauth']||null,proto:request.headers['x-forwarded-proto']}));});
-await new Promise(r=>upstream.listen(0,'127.0.0.1',r));let serving=true;const sockets=new Set();
-const server=createControlServer({token,plane:{reconcile:async()=>{applied++;return {status:'applied'};}},runtime:{target:d=>serving&&d===domain?{port:upstream.address().port,sockets}:null},guests:{guest:async()=>({ended:true})}});
+await new Promise(r=>upstream.listen(0,'127.0.0.1',r));let serving=true,verified=false;const sockets=new Set();
+const server=createControlServer({token,plane:{canServe:()=>verified,reconcile:async()=>{applied++;return {status:'applied'};}},runtime:{target:d=>serving&&d===domain?{port:upstream.address().port,sockets}:null},guests:{guest:async()=>({ended:true})}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
 assert.equal((await fetch(url+'/v1/guest',{method:'POST',body:'{}'})).status,401);
 assert.equal((await fetch(url+'/v1/guest',{method:'POST',headers:{authorization:'Bearer '+token},body:JSON.stringify({organization_id:org,operation:'end',invite_id:org,claim_token:'0'.repeat(64)})})).status,200);
@@ -89,6 +90,15 @@ try{
  assert.equal((await fetch(url+'/v1/dealers/reconcile',{method:'POST',headers:{authorization:'Bearer '+token,'idempotency-key':org+':1'},body:JSON.stringify(job)})).status,200);
  assert.equal(applied,1);
  assert.equal((await fetch(url+'/v1/dealers/reconcile',{method:'POST',headers:{authorization:'Bearer '+token},body:'not json'})).status,400);
+ assert.equal((await fetch(url+'/'+domain+'/test')).status,404);
+ const pilot=createControlServer({pilotDomain:domain,runtime:{target:()=>({port:upstream.address().port,sockets})}});
+ await new Promise(r=>pilot.listen(0,'127.0.0.1',r));const pilotUrl='http://127.0.0.1:'+pilot.address().port;
+ try{
+  assert.equal((await fetch(pilotUrl+'/'+domain+'/test')).status,200);
+  assert.equal((await fetch(pilotUrl+'/'+dealerDomain(other)+'/test')).status,404);
+  assert.equal((await fetch(pilotUrl+'/v1/dealers/reconcile',{method:'POST'})).status,404);
+ }finally{pilot.closeAllConnections();await new Promise(r=>pilot.close(r));}
+ verified=true;
  const proxied=await fetch(url+'/'+domain+'/test',{headers:{authorization:'Bearer must-not-forward','x-meshauth':'must-not-forward'}});
  const echoed=await proxied.json();assert.equal(echoed.authorization,null);assert.equal(echoed.meshAuth,null);assert.equal(echoed.proto,'https');
  serving=false;for(const socket of sockets)socket.destroy();

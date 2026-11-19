@@ -5,27 +5,30 @@ import {pathToFileURL} from 'node:url';
 import {createSupportBroker,validateSupportRequest} from './support-broker.mjs';
 import {createStateStore} from './state-store.mjs';
 import {createManagedRuntime} from './managed-runtime.mjs';
-import {createControlPlane,validControlToken,validateControlJob} from './control-core.mjs';
+import {createControlPlane,dealerDomain,validControlToken,validateControlJob} from './control-core.mjs';
 import {createHttpDependencies} from './activation-worker.mjs';
 
 async function readBody(request){let text='';for await(const chunk of request){text+=chunk;if(Buffer.byteLength(text)>8192)throw new Error('oversized_request');}return JSON.parse(text);}
 function respond(response,status,value){response.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(value));}
-export function createControlServer({plane,runtime,token,broker,guests}){
- if(typeof token!=='string'||token.length<32)throw new Error('weak_control_token');
+export function createControlServer({plane,runtime,token,broker,guests,pilotDomain}){
+ if(pilotDomain!==undefined&&!/^mjv-[a-f0-9]{32}$/.test(pilotDomain))throw new Error('invalid_pilot_domain');
+ if(!pilotDomain&&(typeof token!=='string'||token.length<32))throw new Error('weak_control_token');
  const target=request=>{
   if(!request.url.startsWith('/'))return null;
   const raw=request.url.split('?')[0];const path=new URL(request.url,'http://localhost').pathname;
   if(raw!==path||path.includes('\\')||/%2f|%5c|%2e/i.test(raw))return null;
-  const match=path.match(/^\/(mjv-[a-f0-9]{32})\//);return match?runtime.target(match[1]):null;
+  const match=path.match(/^\/(mjv-[a-f0-9]{32})\//);const domain=match?.[1];
+  if(!domain||(pilotDomain ? pilotDomain!==domain : plane.canServe?.(domain)!==true))return null;
+  return runtime.target(domain);
  };
  const server=http.createServer(async(request,response)=>{
-  if(request.url==='/v1/guest'){
+  if(!pilotDomain&&request.url==='/v1/guest'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
    try{const body=validateGuestRequest(await readBody(request));if(!guests)throw new Error('unavailable');return respond(response,200,await guests.guest(body));}
    catch{return respond(response,503,{error:'guest_unavailable'});}
   }
-  if(request.url==='/v1/support'){
+  if(!pilotDomain&&request.url==='/v1/support'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
    if(!broker)return respond(response,503,{error:'unavailable'});
@@ -33,7 +36,7 @@ export function createControlServer({plane,runtime,token,broker,guests}){
    try{return respond(response,200,await (inviteOperations.includes(body.operation)?guests.staff(body):broker.handle(body)));}
    catch(error){return respond(response,error.message==='forbidden'?403:503,{error:'support_unavailable'});}
   }
-  if(request.url==='/v1/dealers/reconcile'){
+  if(!pilotDomain&&request.url==='/v1/dealers/reconcile'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
    let job;try{job=validateControlJob(await readBody(request),request.headers['idempotency-key']);}catch{return respond(response,400,{error:'invalid_request'});}
@@ -76,7 +79,7 @@ export function createCanaryProbe(env,fetchImpl=fetch){
  };
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- let server,runtime,release,monitor,sessionMonitor;
+ let server,pilotServer,runtime,release,monitor,sessionMonitor;
  try{
   const env=process.env;const dependencies=createHttpDependencies(env);
   const store=createStateStore(env.ASSIST_STATE_DIRECTORY||'/var/lib/mjv-assist');release=await store.lock();
@@ -94,6 +97,14 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   sessionMonitor=setInterval(async()=>{if(sweeping)return;sweeping=true;try{await broker.sweep();await guests.sweep();}catch{console.error('Assist session revocation requires attention');}finally{sweeping=false;}},5000);
   const port=Number(env.ASSIST_CONTROL_PORT||8443);if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('invalid_control_port');
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
+  if(env.ASSIST_PILOT_LOOPBACK_PORT || env.ASSIST_PILOT_ORGANIZATION_ID){
+   const pilotPort=Number(env.ASSIST_PILOT_LOOPBACK_PORT);
+   const id=env.ASSIST_PILOT_ORGANIZATION_ID;
+   if(!Number.isInteger(pilotPort)||pilotPort<1024||pilotPort>65535||pilotPort===port||
+    !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id||''))throw new Error('invalid_pilot_listener');
+   pilotServer=createControlServer({runtime,pilotDomain:dealerDomain(id)});
+   await new Promise((resolve,reject)=>{pilotServer.once('error',reject);pilotServer.listen(pilotPort,'127.0.0.1',resolve);});
+  }
   // On restart, old 'verified' journals do not imply a running or healthy child process.
   for(const state of await store.list()){if(state.desired_enabled)await requeue(state.organization_id,state.generation);}
   let checking=false;
@@ -105,10 +116,10 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    }}catch{console.error('Assist health check failed; operator attention required');}finally{checking=false;}
   },15*60*1000);
   console.log('MJV Assist control service listening on loopback');
-  const stop=async()=>{clearInterval(monitor);clearInterval(sessionMonitor);const closed=new Promise(r=>server.close(r));server.closeAllConnections();await runtime.stopAll();await closed;await release();process.exit(0);};
+  const stop=async()=>{clearInterval(monitor);clearInterval(sessionMonitor);const closed=[server,pilotServer].filter(Boolean).map(s=>{const done=new Promise(r=>s.close(r));s.closeAllConnections();return done;});await runtime.stopAll();await Promise.all(closed);await release();process.exit(0);};
   process.once('SIGTERM',()=>{void stop();});process.once('SIGINT',()=>{void stop();});
  }catch{
-  clearInterval(monitor);clearInterval(sessionMonitor);if(server)server.close();if(runtime)await runtime.stopAll().catch(()=>{});if(release)await release();
+  clearInterval(monitor);clearInterval(sessionMonitor);if(server)server.close();if(pilotServer)pilotServer.close();if(runtime)await runtime.stopAll().catch(()=>{});if(release)await release();
   console.error('MJV Assist control service could not start; verify platform configuration');process.exitCode=1;
  }
 }

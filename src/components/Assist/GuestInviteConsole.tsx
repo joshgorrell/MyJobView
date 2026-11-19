@@ -141,11 +141,10 @@ export function GuestInviteConsole({ organizationId }: { organizationId: string 
         <button type="button" onClick={() => void copy()} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"><Copy size={16} />{copied ? 'Link copied' : 'Copy invitation link'}</button>
       </div>
       <p className="mt-1 break-all text-xs text-muted">{invite.join_url}</p>
-      <details className="mt-3">
-        <summary className="cursor-pointer text-sm font-medium text-info">Share a code by phone</summary>
-        <p className="mt-2 text-sm text-muted">Ask them to visit <strong>{new URL(invite.join_url).origin}/assist</strong> and enter this code.</p>
-      <div className="my-3 flex flex-wrap items-center gap-3"><p className="break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code).then(() => setCodeCopied(true)).catch(() => setError('Unable to copy code.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{codeCopied ? 'Code copied' : 'Copy code'}</button></div>
-      </details>
+      <div className="mt-3">
+        <p className="text-sm font-medium text-primary">Support code</p>
+        <div className="mt-1 flex flex-wrap items-center gap-3"><p className="break-all font-mono text-2xl font-bold tracking-wide text-primary">{invite.code}</p><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code).then(() => setCodeCopied(true)).catch(() => setError('Unable to copy code.'))} className="inline-flex min-h-11 items-center gap-2 text-sm text-info"><Copy size={16} />{codeCopied ? 'Code copied' : 'Copy code'}</button></div>
+      </div>
       <button type="button" disabled={busy} onClick={() => void end()} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-info"><X size={16} />End invitation</button>
       <p className="mt-3 text-sm text-primary" role="status">{invite.state === 'waiting_for_guest' ? 'Waiting for the customer to open Assist…' : invite.state === 'waiting_for_computer' ? 'Waiting for them to download, open the app and choose Connect…' : invite.state === 'computer_ready' ? 'Their computer is ready. Open support, then ask them to approve control.' : 'Support window ready. They must approve control on their computer.'}</p>
       {invite.state === 'computer_ready' && <button type="button" disabled={busy} onClick={() => void connect()} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 font-semibold text-white disabled:opacity-50"><ExternalLink size={16} />Open guest support</button>}

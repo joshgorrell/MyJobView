@@ -53,6 +53,10 @@ Back up the complete private state volume, including per-dealer databases/certif
 
 Still required: real Windows canary implementation/host; host startup and monitoring/alerts; live verification of the staff API and live confirmation of the device list/browser support window; staged automated updates/rollback; live Windows UAC/reboot/reconnect and under-one-minute setup acceptance. Zoho Assist remains in use until those checks pass.
 
+## Private pilot routing
+
+Native HTTP and WebSocket requests on the public control listener require a successful canary and a durably verified runtime. To make a single dedicated test dealer reachable during verification, configure both `ASSIST_PILOT_ORGANIZATION_ID` and `ASSIST_PILOT_LOOPBACK_PORT` on the control service. The optional listener binds to `127.0.0.1`, forwards only the configured dealer domain, and has no platform API endpoints. Keep it behind private, access-controlled HTTPS ingress for the pilot machines. Never add it to the public Caddy configuration. The real Windows verifier, least-privilege test identities, and independent consent and isolation checks are still required.
+
 ## Enrolled device management and fast repeat support (product requirements)
 
 Assist supports **any person receiving help**, whether a customer, coworker, subcontractor or field technician. Receiving support does not require an MJV login. Authorized MJV staff can initiate support. One-time guest codes and enrolled devices are complementary, not separate customer-versus-employee products.

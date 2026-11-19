@@ -12,6 +12,7 @@ export function validateControlJob(body,idempotencyKey){
 }
 export function createControlPlane({store,runtime,validateLease,probe}){
  const queues=new Map();
+ const verifiedDomains=new Set();
  const verifiedProbe=async body=>{
   const requested=Date.now();const nonce=randomUUID();const result=await probe({...body,probe_nonce:nonce,probe_requested_at:requested});
   if(result?.organization_id!==body.organization_id||result?.generation!==body.generation||result?.probe_nonce!==nonce||!Number.isFinite(result?.checked_at)||result.checked_at<requested-5000||result.checked_at>Date.now()+5000||result?.desktop_control!==true||result?.consent_enforced!==true||result?.cross_tenant_denied!==true)throw new Error('canary_failed');
@@ -23,6 +24,7 @@ export function createControlPlane({store,runtime,validateLease,probe}){
  };
  return {
   runExclusive:serialize,
+  canServe:domain=>verifiedDomains.has(domain),
   checkHealth(id){return serialize(id,async()=>{
    const state=await store.read(id);if(!state||!state.desired_enabled||state.phase!=='verified')return null;
    const domain=dealerDomain(id);
@@ -32,6 +34,7 @@ export function createControlPlane({store,runtime,validateLease,probe}){
     if(evidence?.organization_id!==id||evidence?.generation!==state.generation||evidence?.desktop_control!==true||evidence?.consent_enforced!==true||evidence?.cross_tenant_denied!==true)throw new Error('canary_failed');
     return {healthy:true,organization_id:id,generation:state.generation};
    }catch{
+    verifiedDomains.delete(domain);
     await runtime.stop(id).catch(()=>{});await store.write(id,{...state,phase:'failed',result:null}).catch(()=>{});
     return {healthy:false,organization_id:id,generation:state.generation};
    }
@@ -42,6 +45,7 @@ export function createControlPlane({store,runtime,validateLease,probe}){
    };
    await check();let state=await store.read(id);
    if(state && (state.generation>job.generation || (state.generation===job.generation&&state.desired_enabled!==job.desired_enabled)))throw new Error('stale_generation');
+   verifiedDomains.delete(dealerDomain(id));
    // Durable intent is recorded BEFORE any runtime operation. A failed stop never reports off.
    state={...state,organization_id:id,generation:job.generation,desired_enabled:job.desired_enabled,phase:'applying',result:null};
    try{await store.write(id,state);}catch{await runtime.stop(id).catch(()=>{});throw new Error('state_unavailable');}
@@ -61,7 +65,9 @@ export function createControlPlane({store,runtime,validateLease,probe}){
     await check();
     if(evidence?.organization_id!==id||evidence?.generation!==job.generation||evidence?.desktop_control!==true||evidence?.consent_enforced!==true||evidence?.cross_tenant_denied!==true)throw new Error('canary_failed');
     const result={...identity,status:'applied',verified:true,consent_enforced:true,isolation_verified:true,mesh_domain:job.mesh_domain,server_origin:provisioned.server_origin,windows_download_url:provisioned.windows_download_url};
-    state=await store.read(id);await store.write(id,{...state,generation:job.generation,desired_enabled:true,phase:'verified',mesh_id:provisioned.meshId,result});return result;
+    state=await store.read(id);await store.write(id,{...state,generation:job.generation,desired_enabled:true,phase:'verified',mesh_id:provisioned.meshId,result});
+    verifiedDomains.add(job.mesh_domain);
+    return result;
    }catch(error){
     // Unknown/stale/failed activation is never left exposed through the managed proxy.
     await runtime.stop(id).catch(()=>{});
