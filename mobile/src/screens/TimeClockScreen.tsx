@@ -1,4 +1,4 @@
-import { useThemedStyles } from '../theme/ThemeContext';
+import { useTheme, useThemedStyles } from '../theme/ThemeContext';
 import { PtoRequestCard } from '../components/PtoRequestCard';
 import { InternalTimeCard } from '../components/InternalTimeCard';
 import { assertNoInternalTimer } from '../services/InternalTime';
@@ -50,6 +50,7 @@ interface Break {
 }
 
 export default function TimeClockScreen({ navigation }: { navigation: any }) {
+  const { dark } = useTheme();
   const themedStyles = useThemedStyles(styles);
   const { profile } = useAuth();
   const [timeContext, setTimeContext] = useState<{ timezone: string; basis: string; dailyClock: boolean } | null>(null);
@@ -579,14 +580,27 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
     );
   }
 
-  const ptoRequest = profile && timeContext && (
-    <PtoRequestCard key={profile.id} employeeId={profile.id} timezone={timeContext.timezone} />
+  const timeActions = (
+    <View style={themedStyles.timeActions}>
+      {profile && timeContext && (
+        <PtoRequestCard key={profile.id} employeeId={profile.id} timezone={timeContext.timezone} />
+      )}
+      <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('TimeHistory')} style={themedStyles.historyLink}>
+        <Text style={[themedStyles.historyLinkText, dark && themedStyles.darkLinkText]}>View My Time History</Text>
+        <View style={themedStyles.chevronRight} />
+      </TouchableOpacity>
+      {!timeContext?.dailyClock && (
+        <TouchableOpacity accessibilityRole="button" onPress={openCommandCenter} style={themedStyles.historyLink}>
+          <Text style={[themedStyles.historyLinkText, dark && themedStyles.darkLinkText]}>My Time & Requests on Web</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   if (!timeContext?.dailyClock) {
     return (
       <ScreenContainer scroll>
-        {ptoRequest}
+        <InternalTimeCard key={profile?.id} />
         <View style={themedStyles.infoCard}>
           <Text style={themedStyles.infoTitle}>My Work & Time</Text>
           <Text style={themedStyles.infoText}>
@@ -594,15 +608,8 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
               ? 'Your approved Work Order time determines pay. Manual Job Time and recorded Shop/Training Time count toward payroll after manager approval.'
               : 'Your recorded job time is used for job costing. Your configuration does not require a Daily Clock.'}
           </Text>
-          <TouchableOpacity onPress={openCommandCenter} style={themedStyles.linkButton}>
-            <Text style={themedStyles.linkText}>Daily Calendar, My Time & Requests</Text>
-          </TouchableOpacity>
         </View>
-        <InternalTimeCard key={profile?.id} />
-        <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('TimeHistory')} style={themedStyles.historyLink}>
-          <Text style={themedStyles.historyLinkText}>View My Time History</Text>
-          <View style={themedStyles.chevronRight} />
-        </TouchableOpacity>
+        {timeActions}
       </ScreenContainer>
     );
   }
@@ -617,7 +624,6 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
 
   return (
     <ScreenContainer scroll>
-      {ptoRequest}
       {clockFlash && (
         <View accessible accessibilityRole="alert" style={themedStyles.clockFlash}>
           <Text style={themedStyles.clockFlashTitle}>{clockFlash.pending ? 'CLOCK SAVED' : clockFlash.action === 'in' ? "YOU'RE IN!" : "YOU'RE OFF!"}</Text>
@@ -769,11 +775,7 @@ export default function TimeClockScreen({ navigation }: { navigation: any }) {
         </Card>
       )}
 
-      {/* View History Link */}
-      <TouchableOpacity style={themedStyles.historyLink} onPress={() => navigation.navigate('TimeHistory')} activeOpacity={0.7}>
-        <Text style={themedStyles.historyLinkText}>View My Time History</Text>
-        <View style={themedStyles.chevronRight} />
-      </TouchableOpacity>
+      {timeActions}
     </ScreenContainer>
   );
 }
@@ -858,9 +860,11 @@ const styles = StyleSheet.create({
   breakActiveBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   breakActiveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.amber[500] },
   breakActiveText: { fontSize: 12, fontWeight: '700', color: Colors.amber[600] },
+  timeActions: { marginHorizontal: Spacing.md, marginVertical: Spacing.sm, gap: Spacing.xs },
+  darkLinkText: { color: Colors.primary[300] },
   historyLink: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    margin: Spacing.lg, padding: Spacing.lg, gap: Spacing.sm,
+    minHeight: 44, paddingHorizontal: Spacing.md, gap: Spacing.sm,
   },
   historyLinkText: { ...Typography.body, color: Colors.primary[600], fontWeight: '600' },
   chevronRight: {
@@ -868,13 +872,11 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   infoCard: {
-    marginHorizontal: Spacing.md, marginTop: Spacing.md, marginBottom: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.primary[50],
-    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.primary[200],
+    marginHorizontal: Spacing.md, marginTop: Spacing.md, marginBottom: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.white,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.gray[200],
   },
   infoTitle: { ...Typography.heading, marginBottom: 4 },
   infoText: { ...Typography.body, color: Colors.gray[600], lineHeight: 19, fontSize: 13 },
-  linkButton: { paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, marginTop: 4 },
-  linkText: { color: Colors.primary[600], textAlign: 'center', fontWeight: '600', fontSize: 14 },
   primaryButton: { minHeight: 44, justifyContent: 'center', paddingVertical: Spacing.sm, backgroundColor: Colors.primary[600], borderRadius: Radius.md, marginTop: 4 },
   primaryButtonText: { color: Colors.white, textAlign: 'center', fontWeight: '700', fontSize: 15 },
 });
