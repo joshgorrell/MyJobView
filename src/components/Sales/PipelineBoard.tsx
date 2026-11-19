@@ -11,7 +11,7 @@ import { LeadDetail } from '../Leads/LeadDetail';
 import { LeadForm } from '../Leads/LeadForm';
 import PrintLeadsView from '../Leads/PrintLeadsView';
 import { formatDistanceToNow } from '../../lib/utils';
-import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, Settings, HelpCircle, Printer } from 'lucide-react';
+import { Clock, User, Phone, Mail, MailOpen, Eye, ChevronRight, Users, CircleUser as UserCircle, X, Plus, Search, HelpCircle, Printer } from 'lucide-react';
 
 
 interface PipelineStage {
@@ -46,6 +46,7 @@ async function loadActivityPages<T>(
 export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSalesOrders = false }: { onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void; canViewProposals?: boolean; canViewSalesOrders?: boolean }) {
   const { profile, loading: authLoading } = useAuth();
   const [stages, setStages] = useState<PipelineStage[]>([]);
+  const [showLeadsStage, setShowLeadsStage] = useState(true);
   const [loading, setLoading] = useState(true);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<'my' | 'all'>('my');
@@ -69,7 +70,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
   const [showFishbowlForm, setShowFishbowlForm] = useState(false);
   const [showClaimConfirm, setShowClaimConfirm] = useState(false);
   const [leadToClaim, setLeadToClaim] = useState<{ id: string; name: string } | null>(null);
-  const [showWidgetSettings, setShowWidgetSettings] = useState(false);
   const [selectedWidgets, setSelectedWidgets] = useState<string[]>(DEFAULT_PIPELINE_WIDGETS);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showPrintLeads, setShowPrintLeads] = useState(false);
@@ -187,25 +187,6 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       }
     } catch (error) {
       console.error('Error loading widget preferences:', error);
-    }
-  }
-
-  async function saveWidgetPreferences(widgets: string[]) {
-    if (!profile?.id) return;
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ pipeline_widgets: widgets })
-        .eq('id', profile.id);
-
-      if (error) throw error;
-
-      setSelectedWidgets(widgets);
-      setShowWidgetSettings(false);
-    } catch (error) {
-      console.error('Error saving widget preferences:', error);
-      notify('Failed to save widget preferences', { theme: 'violet', tone: 'error' });
     }
   }
 
@@ -535,39 +516,13 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           <option value="all">All time</option>
         </select>
         {/* Compact per-user pipeline settings */}
-        <div className="relative ml-auto">
-          <button type="button" onClick={() => setShowWidgetSettings(value => !value)}
-            aria-label="Customize pipeline view" aria-expanded={showWidgetSettings} title="Customize pipeline view"
-            className="rounded-lg border border-gray-300 bg-white p-2.5 text-gray-600 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500">
-            <Settings className="h-4 w-4" />
-          </button>
-          {showWidgetSettings && (
-            <div className="absolute right-0 top-full z-30 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white p-3 shadow-xl" role="group" aria-label="Pipeline view settings">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-900">Visible sections</span>
-                <button type="button" onClick={() => setShowWidgetSettings(false)} aria-label="Close view settings" className="rounded p-1 text-gray-500 hover:bg-gray-100"><X className="h-4 w-4" /></button>
-              </div>
-              {allWidgetDefinitions.map(widget => (
-                <label key={widget.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                  <input type="checkbox" checked={selectedWidgets.includes(widget.id)}
-                    onChange={() => setSelectedWidgets(current => current.includes(widget.id) ? (current.length > 1 ? current.filter(id => id !== widget.id) : current) : [...current, widget.id])}
-                    className="h-4 w-4 accent-blue-600" />
-                  <span>{widget.name}</span>
-                </label>
-              ))}
-              <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-3">
-                <button type="button" onClick={() => setSelectedWidgets([...DEFAULT_PIPELINE_WIDGETS])} className="text-xs font-medium text-blue-700 hover:underline">Reset to default</button>
-                <button type="button" onClick={() => void saveWidgetPreferences(selectedWidgets)} className="rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Save</button>
-              </div>
-            </div>
-          )}
-        </div>
         <button type="button" onClick={() => setShowTutorial(true)} aria-label="Pipeline help" title="Pipeline help"
           className="self-start rounded-lg p-2.5 text-muted hover:bg-surface hover:text-primary sm:self-auto">
           <HelpCircle className="h-5 w-5" />
         </button>
         <PipelineStageOverview
           showAll={viewMode === 'all' && canViewAllPipeline}
+          onStageVisibilityChange={keys => setShowLeadsStage(keys.includes('leads'))}
           canViewProposals={canViewProposals}
           canViewSalesOrders={canViewSalesOrders}
           onOpenLeads={() => document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -582,7 +537,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
       </div>
 
       <div className="grid gap-2.5 pb-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr))]">
-        {filteredStages.map(stage => (
+        {showLeadsStage && filteredStages.map(stage => (
           <div key={stage.id} id={`pipeline-${stage.id}`} className="flex min-w-0 scroll-mt-6 flex-col rounded-lg border border-gray-200 bg-surface">
             <div className="border-b border-gray-200 px-3 py-2.5">
               <div className="flex items-center justify-between mb-1">
