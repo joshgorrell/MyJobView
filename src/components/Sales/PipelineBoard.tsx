@@ -586,6 +586,7 @@ export function PipelineBoard({ onNavigate, canViewProposals = false, canViewSal
           showAll={viewMode === 'all' && canViewAllPipeline}
           canViewProposals={canViewProposals}
           canViewSalesOrders={canViewSalesOrders}
+          onOpenLeads={() => document.getElementById('pipeline-leads')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           onOpenProposals={() => onNavigate?.('proposals')}
           onOpenSalesOrders={() => onNavigate?.('sales_orders')}
           onOpenProspect={handleContactClick}
