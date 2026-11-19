@@ -51,6 +51,7 @@ const nodes = t => Array.isArray(t) ? t.flatMap(nodes) : t && typeof t === 'obje
 const text = t => Array.isArray(t) ? t.map(text).join('') : t && typeof t === 'object' ? text(t.props?.children) : t == null ? '' : String(t);
 const serviceCalls = [], alerts = [];
 let connected = true;
+let loadFailure = false;
 let data = { sessions: [], entries: [], active: null };
 let changeHandler;
 const palette = new Proxy({}, { get: () => new Proxy({}, { get: () => '#123456' }) });
@@ -65,11 +66,15 @@ const screen = compile('mobile/src/components/InternalTimeCard.tsx', {
   '../contexts/OfflineContext': { useOffline: () => ({ isConnected: connected }) },
   '../services/supabase': { supabase: { channel: () => ({ on() { return this; }, subscribe() { return this; } }), removeChannel() {} } },
   '../services/InternalTime': {
-    loadInternalTime: async () => data,
+    loadInternalTime: async () => {
+      if (loadFailure) throw new Error('Could not load sessions');
+      return data;
+    },
     startNewInternalTime: async (...args) => serviceCalls.push(['start', ...args]),
     startInternalTime: async (...args) => serviceCalls.push(['assigned', ...args]),
     stopInternalTime: async (...args) => serviceCalls.push(['stop', ...args]),
   },
+  '../theme/ThemeContext': { useTheme: () => ({ dark: true }), useThemedStyles: styles => styles },
   '../theme/colors': { Colors: palette },
   '../theme/styles': { Spacing: {}, Radius: {}, Typography: {} },
   './UI': { Card: 'Card' },
@@ -77,6 +82,14 @@ const screen = compile('mobile/src/components/InternalTimeCard.tsx', {
 const render = () => { cursor = 0; return screen.InternalTimeCard(); };
 const settle = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 let tree = render(); effects.splice(0).forEach(fn => fn()); await settle(); tree = render();
+assert.equal(nodes(tree).some(n => n.props?.accessibilityLabel === 'Refresh sessions'), false);
+loadFailure = true;
+changeHandler('active'); await settle(); tree = render();
+const retry = nodes(tree).find(n => n.props?.accessibilityLabel === 'Retry');
+assert.ok(retry && !retry.props.disabled);
+loadFailure = false;
+retry.props.onPress(); await settle(); tree = render();
+assert.equal(nodes(tree).some(n => n.props?.accessibilityLabel === 'Retry'), false);
 let start = nodes(tree).find(n => n.props?.accessibilityLabel === 'Start Shop Time');
 assert.ok(start && !start.props.disabled);
 start.props.onPress(); tree = render();
