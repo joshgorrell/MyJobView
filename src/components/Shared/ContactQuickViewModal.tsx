@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { X, Phone, Mail, MapPin, Building2, ExternalLink, FileText, Briefcase, DollarSign, CheckSquare, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { TaxExemptionCertificateRequest } from './TaxExemptionCertificateRequest';
 
 interface ContactQuickViewData {
   id: string;
   full_name: string;
   company_name: string | null;
   email: string | null;
+  is_tax_exempt: boolean;
   phone: string | null;
   business_phone: string | null;
   street_address: string | null;
@@ -42,7 +44,7 @@ export function ContactQuickViewModal({ contactId, onClose, onNavigateToContact 
       const [contactRes, proposalsRes, salesOrdersRes, invoicesRes, workOrdersRes] = await Promise.all([
         supabase
           .from('contacts')
-          .select('id, full_name, company_name, email, phone, business_phone, street_address, city, state, zip_code')
+          .select('id, full_name, company_name, email, is_tax_exempt, phone, business_phone, street_address, city, state, zip_code')
           .eq('id', contactId)
           .maybeSingle(),
         supabase.from('proposals').select('id', { count: 'exact', head: true }).eq('contact_id', contactId),
@@ -82,7 +84,7 @@ export function ContactQuickViewModal({ contactId, onClose, onNavigateToContact 
       className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-[#0f2347] px-5 py-4 flex items-start justify-between">
           <div className="flex-1 min-w-0">
@@ -152,6 +154,12 @@ export function ContactQuickViewModal({ contactId, onClose, onNavigateToContact 
                 <p className="text-sm text-gray-400 italic">No contact info on file.</p>
               )}
             </div>
+
+            {contact.id === contactId && !contact.is_tax_exempt && (
+              <div className="px-5 pb-4">
+                <TaxExemptionCertificateRequest recipientId={contact.id} email={contact.email} light />
+              </div>
+            )}
 
             {/* Related counts */}
             <div className="px-5 pb-4 grid grid-cols-4 gap-2">

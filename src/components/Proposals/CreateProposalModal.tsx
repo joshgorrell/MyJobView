@@ -1,3 +1,4 @@
+import { TaxExemptionCertificateRequest } from '../Shared/TaxExemptionCertificateRequest';
 import { requireCustomerZip, validCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -604,6 +605,14 @@ export default function CreateProposalModal({ onClose, onCreated, contactId, lea
               </select>
             </div>
           </div>
+
+          {selectedResult && (
+            <TaxExemptionCertificateRequest
+              recipientId={selectedResult.id}
+              source={selectedResult.source}
+              email={selectedResult.email}
+            />
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
