@@ -8,7 +8,7 @@ export function sessionClaimsAfterVerification(bearer,userId){
  return {auth_session_id:claims.session_id,token_exp:claims.exp};
 }
 const dealerOrigin=origin=>/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.myjobview\.com$/.test(origin||'');
-export function createAssistSupportHandler({authenticate,control,publicOrigin}){
+export function createAssistSupportHandler({authenticate,control,publicOrigin,sendInviteEmail}){
  const expected=new URL(publicOrigin);if(expected.protocol!=='https:'||expected.origin!==publicOrigin)throw new Error('invalid_support_origin');
  return async request=>{
   const origin=request.headers.get('origin');const cors=dealerOrigin(origin)?{'access-control-allow-origin':origin,vary:'Origin','access-control-allow-headers':'authorization,apikey,content-type,x-client-info','access-control-allow-methods':'POST,OPTIONS'}:{};
@@ -35,6 +35,8 @@ export function createAssistSupportHandler({authenticate,control,publicOrigin}){
    }
    if(['touch','end'].includes(body.operation)){if(!uuid.test(body.sessionId))return reply(400,{error:'invalid_session'});context.session_id=body.sessionId;}
    if(inviteOperations.includes(body.operation)&&!['invite_create','invite_capability'].includes(body.operation)){if(!uuid.test(body.inviteId))return reply(400,{error:'invalid_invite'});context.invite_id=body.inviteId;}
+   const recipient=body.operation==='invite_create' ? body.emailRecipient : undefined;
+   if(recipient!==undefined && (typeof recipient!=='string'||recipient.length>254||!(/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/).test(recipient)))return reply(400,{error:'invalid_recipient'});
    const data=await control(context);const domain='mjv-'+actor.organization_id.replaceAll('-','');
    if(body.operation==='devices'){
     if(!Array.isArray(data?.devices)||data.devices.length>500||data.devices.some(d=>typeof d.id!=='string'||!d.id.startsWith(`node/${domain}/`)))throw new Error('invalid_response');
@@ -46,6 +48,11 @@ export function createAssistSupportHandler({authenticate,control,publicOrigin}){
    if(['invite_create','invite_status'].includes(body.operation)){
     const result=guestStatus(data);
     if(body.operation==='invite_create'){if(!/^[2-9A-HJ-NP-Z]{4}(-[2-9A-HJ-NP-Z]{4}){2}$/.test(data.code||''))throw new Error('invalid_response');result.code=data.code;result.join_url=`https://${actor.subdomain}.myjobview.com/assist#code=${data.code}`;}
+    if(recipient!==undefined){
+     try{
+      result.email_sent=await sendInviteEmail({recipient,joinUrl:result.join_url,inviteId:result.invite_id})===true;
+     }catch{result.email_sent=false;}
+    }
     return reply(200,result);
    }
    if(body.operation==='invite_end')return reply(200,{ended:data?.ended===true});
