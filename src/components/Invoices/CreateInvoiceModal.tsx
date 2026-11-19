@@ -820,7 +820,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </div>
             </div>
 
-            {selectedContact?.id === selectedContactId && (
+            {isExemptProject && selectedContact?.id === selectedContactId && !selectedContact.is_tax_exempt && (
               <TaxExemptionCertificateRequest recipientId={selectedContactId} email={selectedContact.email} />
             )}
 
