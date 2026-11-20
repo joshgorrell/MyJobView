@@ -48,6 +48,13 @@ async function getTaxClassificationIds(): Promise<Record<string, string>> {
   return map;
 }
 
+interface ChangeOrderBillingLine {
+  id: string;
+  description: string;
+  change_amount: number;
+  tax_classification_id: string | null;
+}
+
 interface ChangeOrder {
   id: string;
   change_order_number: string;
@@ -55,6 +62,7 @@ interface ChangeOrder {
   total_impact: number;
   amount_billed: number;
   billing_status: string;
+  billingLines: ChangeOrderBillingLine[];
 }
 
 interface CreateProgressInvoiceModalProps {
@@ -144,7 +152,7 @@ export default function CreateProgressInvoiceModal({
 
       const { data: changeOrders } = await supabase
         .from('change_orders')
-        .select('id, change_order_number, description, new_contract_total, original_contract_amount, amount_billed, billing_status')
+        .select('id, change_order_number, description, change_amount, amount_billed, billing_status, change_order_line_items(id, description, change_amount, tax_classification_id)')
         .eq('sales_order_id', salesOrderId)
         .eq('approval_status', 'approved')
         .neq('billing_status', 'fully_billed');
@@ -153,7 +161,8 @@ export default function CreateProgressInvoiceModal({
         id: co.id,
         change_order_number: co.change_order_number,
         description: co.description,
-        total_impact: co.new_contract_total - co.original_contract_amount,
+        total_impact: Number(co.change_amount),
+        billingLines: co.change_order_line_items || [],
         amount_billed: co.amount_billed || 0,
         billing_status: co.billing_status
       }));
@@ -315,9 +324,49 @@ export default function CreateProgressInvoiceModal({
     await doSubmit();
   }
 
+  function allocateChangeOrderLines() {
+    return Object.entries(selectedChangeOrders).flatMap(([orderId, amount]) => {
+      const order = availableChangeOrders.find(entry => entry.id === orderId);
+      if (!order) throw new Error('Reload the approved change order before billing it.');
+      const billCents = Math.round(amount * 100);
+      const baseCents = Math.round(order.total_impact * 100);
+      const lines = order.billingLines.map(line => ({
+        ...line,
+        cents: Math.round(Number(line.change_amount) * 100),
+        classification: Object.keys(classificationIds).find(code => classificationIds[code] === line.tax_classification_id),
+      })).filter(line => line.cents !== 0).sort((a, b) => a.id.localeCompare(b.id));
+      if (!Number.isSafeInteger(billCents) || !Number.isSafeInteger(baseCents) ||
+          billCents <= 0 || billCents > baseCents - Math.round(order.amount_billed * 100) ||
+          lines.some(line => !Number.isSafeInteger(line.cents) || line.cents < 0 ||
+            !line.classification || !CLASSIFICATION_ITEM_TYPE[line.classification]) ||
+          lines.reduce((sum, line) => sum + line.cents, 0) !== baseCents) {
+        throw new Error(`Change order ${order.change_order_number} needs positive, classified lines that match its approved pretax amount before billing.`);
+      }
+
+      let sourceCents = 0;
+      let allocatedCents = 0;
+      return lines.flatMap(line => {
+        sourceCents += line.cents;
+        const nextAllocated = Math.round(billCents * (sourceCents / baseCents));
+        const allocated = (nextAllocated - allocatedCents) / 100;
+        allocatedCents = nextAllocated;
+        return allocated > 0 ? [{
+          description: `CO ${order.change_order_number} – ${line.description || 'Approved change'}`,
+          quantity: 1,
+          unit_price: allocated,
+          amount: allocated,
+          item_type: CLASSIFICATION_ITEM_TYPE[line.classification!],
+          is_taxable: true,
+          tax_classification_id: line.tax_classification_id,
+        }] : [];
+      });
+    });
+  }
+
   async function doSubmit() {
     setSubmitting(true);
     try {
+      const changeOrderLines = allocateChangeOrderLines();
       const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
@@ -364,6 +413,13 @@ export default function CreateProgressInvoiceModal({
           sort_order: index
         }));
 
+      lineItemsToInsert.push(...changeOrderLines.map((line, index) => ({
+        ...line,
+        invoice_id: invoice.id,
+        tax_amount: 0,
+        sort_order: lineItemsToInsert.length + index,
+      })));
+
       if (lineItemsToInsert.length > 0) {
         const { error: liErr } = await supabase.from('invoice_line_items').insert(lineItemsToInsert);
         if (liErr) throw liErr;
@@ -386,7 +442,7 @@ export default function CreateProgressInvoiceModal({
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
-      notify('Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
+      notify(error instanceof Error ? error.message : 'Failed to create invoice. Please try again.', { theme: 'violet', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
