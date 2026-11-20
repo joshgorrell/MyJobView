@@ -338,6 +338,13 @@ Deno.serve(async (req: Request) => {
           p_transaction_id: transactionId,
           p_taxjar_result: {
             ...tax,
+            ...(transactionType === "invoice" ? {
+              invoice_tax_inputs: [
+                calcStatus, calcResult.origin_result ?? null, calcResult.destination_result ?? null,
+                calcResult.taxable_subtotal ?? null, calcResult.taxability_results ?? null,
+                calcResult.collection_status ?? null, calcResult.exemption_reference ?? null,
+              ],
+            } : {}),
             breakdown: {
               ...breakdown,
               state: { state_abbrev: tax.jurisdictions.state, state_rate: rates[0] },
