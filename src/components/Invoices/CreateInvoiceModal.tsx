@@ -711,17 +711,40 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const updates: Partial<Contact> & { tax_jurisdiction_id?: string | null } = {
         street_address: address.address, city: address.city, state: address.state, zip_code: address.zip,
       };
-      if (address.zip !== contact.zip_code && !contact.is_tax_exempt) {
-        const jurisdiction = await lookupTaxRateByZip(address.zip);
-        if (jurisdiction?.combined_rate == null) throw new Error('Tax rate unavailable for the new ZIP.');
-        const { data: jurisdictionRow, error: jurisdictionError } = await supabase.from('tax_jurisdictions')
-          .select('id').eq('zip_code', address.zip).eq('is_active', true).limit(1).maybeSingle();
-        if (jurisdictionError) throw jurisdictionError;
+      const previousLocation = {
+        street_address: contact.street_address ?? null,
+        city: contact.city ?? null,
+        state: contact.state ?? null,
+        zip_code: contact.zip_code ?? null,
+      };
+      const locationChanged = Object.entries(updates).some(([field, value]) =>
+        previousLocation[field as keyof typeof previousLocation] !== value
+      );
+      if (locationChanged) {
+        const jurisdiction = await lookupTaxRateByZip(address.zip, {
+          street: address.address,
+          city: address.city,
+          state: address.state,
+        });
+        if (jurisdiction?.combined_rate == null) throw new Error('TaxJar could not verify the new address rate.');
         updates.tax_rate = jurisdiction.combined_rate;
-        updates.tax_jurisdiction_id = jurisdictionRow?.id ?? null;
+        const { data: matchingJurisdictions, error: jurisdictionError } = await supabase
+          .from('tax_jurisdictions')
+          .select('id')
+          .eq('zip_code', address.zip)
+          .eq('state', address.state)
+          .eq('combined_rate', jurisdiction.combined_rate)
+          .eq('jurisdiction_name', jurisdiction.jurisdiction_name)
+          .eq('is_active', true)
+          .limit(2);
+        if (jurisdictionError) throw jurisdictionError;
+        updates.tax_jurisdiction_id = matchingJurisdictions?.length === 1 ? matchingJurisdictions[0].id : null;
       }
-      const { data, error } = await supabase.from('contacts').update(updates)
-        .eq('id', contact.id).select('street_address, city, state, zip_code, tax_rate').single();
+      let update = supabase.from('contacts').update(updates).eq('id', contact.id);
+      for (const [field, value] of Object.entries({ ...previousLocation, tax_rate: contact.tax_rate ?? null })) {
+        update = value === null ? update.is(field, null) : update.eq(field, value);
+      }
+      const { data, error } = await update.select('street_address, city, state, zip_code, tax_rate').single();
       if (error) throw error;
       const updatedContact = { ...contact, ...data };
       setSelectedContact(updatedContact);
@@ -730,7 +753,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       notify('Customer address updated.', { theme: 'emerald', tone: 'success' });
     } catch (error) {
       console.error('Could not update customer address:', error);
-      setLocationError('Could not update the customer address. Check the ZIP or use the address for this invoice.');
+      setLocationError('Customer address and tax rate were not updated. Check the full address or reopen the invoice if the customer was edited.');
     } finally {
       setSavingLocation(false);
     }

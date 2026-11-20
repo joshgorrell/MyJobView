@@ -35,6 +35,7 @@ interface TaxJarTaxesResponse {
     freight_taxable: boolean;
     tax_source: string;
     breakdown: Record<string, unknown>;
+    jurisdictions?: { state?: string; county?: string; city?: string };
   };
 }
 
@@ -301,35 +302,23 @@ Deno.serve(async (req: Request) => {
         return jsonResponse(failResult ?? { error: reason });
       }
 
-      // Step 7: Validate the TaxJar response — require amount, rate, AND breakdown
-      const taxjarData = (await taxjarResponse.json()) as TaxJarTaxesResponse;
+      // TaxJar returns flat breakdown fields. Keep them and supply the
+      // nested jurisdiction fields expected by the snapshot writer.
+      const taxjarData = await taxjarResponse.json().catch(() => null) as TaxJarTaxesResponse | null;
       const tax = taxjarData?.tax;
-
-      if (
-        !tax ||
-        tax.amount_to_collect === undefined ||
-        tax.rate === undefined
-      ) {
-        const reason = "TaxJar returned incomplete response (missing amount_to_collect or rate)";
-        const { data: failResult } = await supabaseAdmin.rpc(
-          "mark_tax_review_required",
-          {
-            p_transaction_type: transactionType,
-            p_transaction_id: transactionId,
-            p_failure_reason: reason,
-          }
-        );
-        return jsonResponse(failResult ?? { error: reason });
-      }
-
-      // Validate breakdown / jurisdiction data required by our snapshot architecture
-      if (
-        !tax.breakdown ||
-        typeof tax.breakdown !== "object" ||
-        !tax.breakdown.state ||
-        !(tax.breakdown.state as Record<string, unknown>).state_rate
-      ) {
-        const reason = "TaxJar returned incomplete response (missing jurisdiction breakdown)";
+      const breakdown = tax?.breakdown;
+      const rates = [
+        breakdown?.state_tax_rate,
+        breakdown?.county_tax_rate,
+        breakdown?.city_tax_rate,
+        breakdown?.special_tax_rate,
+      ];
+      if (!tax || tax.has_nexus !== true ||
+          !Number.isFinite(tax.amount_to_collect) || tax.amount_to_collect < 0 ||
+          !Number.isFinite(tax.rate) || tax.rate < 0 || tax.rate > 1 ||
+          !tax.jurisdictions?.state ||
+          rates.some(rate => typeof rate !== "number" || !Number.isFinite(rate) || rate < 0 || rate > 1)) {
+        const reason = "TaxJar did not confirm collection and return a complete jurisdiction breakdown.";
         const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
@@ -347,7 +336,16 @@ Deno.serve(async (req: Request) => {
         {
           p_transaction_type: transactionType,
           p_transaction_id: transactionId,
-          p_taxjar_result: tax,
+          p_taxjar_result: {
+            ...tax,
+            breakdown: {
+              ...breakdown,
+              state: { state_abbrev: tax.jurisdictions.state, state_rate: rates[0] },
+              county: { county_name: tax.jurisdictions.county, county_rate: rates[1] },
+              city: { city_name: tax.jurisdictions.city, city_rate: rates[2] },
+              special: { special_rate: rates[3] },
+            },
+          },
         }
       );
 
@@ -400,6 +398,7 @@ Deno.serve(async (req: Request) => {
     const street: string | undefined = payload.street;
     const city: string | undefined = payload.city;
     const state: string | undefined = payload.state;
+    const verifyAddress = payload.verifyAddress === true;
     const autoSave: boolean = payload.autoSave === true;
 
     // ── TEST ──────────────────────────────────────────────────────────────────
@@ -423,12 +422,45 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: "zipCode is required" }, 400);
       }
 
+      let verifiedAddress: { street: string; city: string; state: string; zip: string } | null = null;
+      if (verifyAddress) {
+        if (!street?.trim() || !city?.trim() || !state || !/^[A-Z]{2}$/.test(state) ||
+            !/^\d{5}(?:-\d{4})?$/.test(zipCode) || autoSave) {
+          return jsonResponse({ error: "A complete U.S. street address is required for verification." }, 400);
+        }
+
+        const validation = await fetch("https://api.taxjar.com/v2/addresses/validate", {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ country: "US", street, city, state, zip: zipCode }),
+        });
+        if (!validation.ok) {
+          return jsonResponse({ error: "TaxJar could not verify this street address." }, 422);
+        }
+        const { addresses } = await validation.json();
+        const match = Array.isArray(addresses) && addresses.length === 1 ? addresses[0] : null;
+        if (typeof match?.street !== "string" || !match.street.trim() ||
+            typeof match.city !== "string" || !match.city.trim() || match.state !== state ||
+            typeof match.zip !== "string" || !/^\d{5}(?:-\d{4})?$/.test(match.zip) ||
+            match.zip.slice(0, 5) !== zipCode.slice(0, 5) ||
+            (zipCode.length > 5 && match.zip !== zipCode)) {
+          return jsonResponse({ error: "TaxJar did not return one matching street address." }, 422);
+        }
+        verifiedAddress = { street: match.street, city: match.city, state: match.state, zip: match.zip };
+      }
+
       const params = new URLSearchParams();
-      if (street) params.append("street", street);
-      if (city) params.append("city", city);
-      if (state) params.append("state", state);
+      if (verifiedAddress) {
+        params.set("street", verifiedAddress.street);
+        params.set("city", verifiedAddress.city);
+        params.set("state", verifiedAddress.state);
+      } else {
+        if (street) params.set("street", street);
+        if (city) params.set("city", city);
+        if (state) params.set("state", state);
+      }
       const query = params.toString();
-      const url = `https://api.taxjar.com/v2/rates/${encodeURIComponent(zipCode)}${query ? `?${query}` : ""}`;
+      const url = `https://api.taxjar.com/v2/rates/${encodeURIComponent(verifiedAddress?.zip ?? zipCode)}${query ? `?${query}` : ""}`;
 
       const resp = await fetch(url, { headers: authHeaders });
 
@@ -452,7 +484,16 @@ Deno.serve(async (req: Request) => {
       const countyRate = toNumber(rate.county_rate);
       const cityRate = toNumber(rate.city_rate);
       const specialRate = toNumber(rate.combined_district_rate);
-      const combinedRate = toNumber(rate.combined_rate);
+      const rawRate = rate.combined_rate;
+      const verifiedRate = typeof rawRate === "number" || (typeof rawRate === "string" && rawRate.trim())
+        ? Number(rawRate)
+        : NaN;
+      if (verifyAddress && (!Number.isFinite(verifiedRate) || verifiedRate < 0 || verifiedRate > 1 ||
+          rate.state !== verifiedAddress?.state || typeof rate.zip !== "string" ||
+          rate.zip.slice(0, 5) !== zipCode.slice(0, 5))) {
+        return jsonResponse({ error: "TaxJar did not return a valid rate for the verified address." }, 422);
+      }
+      const combinedRate = verifyAddress ? verifiedRate : toNumber(rawRate);
       const city_label = rate.city || city || "";
       const county_label = rate.county || "";
       const stateCode = rate.state;
@@ -478,6 +519,7 @@ Deno.serve(async (req: Request) => {
         jurisdictionName,
         freightTaxable: rate.freight_taxable,
         source: "taxjar",
+        ...(verifiedAddress ? { verifiedAddress } : {}),
       };
 
       // Auto-save: upsert into tax_jurisdictions as a TaxJar-sourced cached entry

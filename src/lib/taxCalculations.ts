@@ -201,16 +201,21 @@ export interface LineItemTaxCalculation {
 /**
  * Look up tax rate from TaxJar API
  */
-export async function lookupTaxRateByZip(zipCode: string): Promise<TaxJurisdiction | null> {
+export async function lookupTaxRateByZip(
+  zipCode: string,
+  address?: { street: string; city: string; state: string }
+): Promise<TaxJurisdiction | null> {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Sign in to look up a tax rate.');
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/taxjar-lookup`;
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ action: 'rates', zipCode }),
+      body: JSON.stringify({ action: 'rates', zipCode, ...address, verifyAddress: !!address }),
     });
 
     const data = await response.json();
@@ -222,6 +227,12 @@ export async function lookupTaxRateByZip(zipCode: string): Promise<TaxJurisdicti
 
     if (data.error) {
       throw new Error(data.error);
+    }
+
+    if (address && (!data.verifiedAddress || data.state !== address.state ||
+        typeof data.combinedRate !== 'number' || !Number.isFinite(data.combinedRate) ||
+        data.combinedRate < 0 || data.combinedRate > 1)) {
+      throw new Error('TaxJar did not verify a rate for the street address.');
     }
 
     return {
@@ -281,11 +292,13 @@ export async function calculateTaxJarTax(
   transactionType: string,
   transactionId: string
 ): Promise<TaxJarTaxResult> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sign in to calculate tax.');
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/taxjar-lookup`;
   const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
