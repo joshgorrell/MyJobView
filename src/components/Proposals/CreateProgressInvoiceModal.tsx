@@ -367,41 +367,9 @@ export default function CreateProgressInvoiceModal({
     setSubmitting(true);
     try {
       const changeOrderLines = allocateChangeOrderLines();
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          company_id: companySettings?.id,
-          sales_order_id: salesOrderId,
-          proposal_id: proposalId,
-          contact_id: contactId,
-          invoice_title: invoiceTitle,
-          source_type: invoiceType,
-          invoice_date: invoiceDate,
-          due_date: dueDate,
-          subtotal: parseFloat(subtotal.toFixed(2)),
-          tax_amount: parseFloat(taxAmount.toFixed(2)),
-          tax_rate: taxRate / 100,
-          total: parseFloat(total.toFixed(2)),
-          amount_paid: 0,
-          amount_due: parseFloat(total.toFixed(2)),
-          status: 'draft',
-          portal_visible: false,
-          payment_terms: paymentTerms,
-          notes,
-          billed_from_proposal: lineItems.some(i => i.source_type === 'proposal_line_item'),
-          includes_change_orders: Object.keys(selectedChangeOrders).length > 0,
-          created_by: profile?.id,
-          created_by_name: profile?.full_name
-        })
-        .select()
-        .single();
-
-      if (invoiceError) throw invoiceError;
-
       const lineItemsToInsert = lineItems
         .filter(item => item.description.trim() && item.quantity * item.unit_price > 0)
         .map((item, index) => ({
-          invoice_id: invoice.id,
           description: item.description,
           quantity: item.quantity,
           unit_price: parseFloat(item.unit_price.toFixed(2)),
@@ -415,30 +383,39 @@ export default function CreateProgressInvoiceModal({
 
       lineItemsToInsert.push(...changeOrderLines.map((line, index) => ({
         ...line,
-        invoice_id: invoice.id,
         tax_amount: 0,
         sort_order: lineItemsToInsert.length + index,
       })));
 
-      if (lineItemsToInsert.length > 0) {
-        const { error: liErr } = await supabase.from('invoice_line_items').insert(lineItemsToInsert);
-        if (liErr) throw liErr;
-      }
-
-      if (Object.keys(selectedChangeOrders).length > 0) {
-        const coLinks = Object.entries(selectedChangeOrders).map(([coId, amount]) => ({
+      const { data: invoiceId, error } = await supabase.rpc('create_progress_invoice_draft', {
+        p_header: {
           company_id: companySettings?.id,
-          invoice_id: invoice.id,
-          change_order_id: coId,
+          sales_order_id: salesOrderId,
+          proposal_id: proposalId,
+          contact_id: contactId,
+          invoice_title: invoiceTitle,
+          source_type: invoiceType,
+          invoice_date: invoiceDate,
+          due_date: dueDate,
+          subtotal: parseFloat(subtotal.toFixed(2)),
+          tax_amount: parseFloat(taxAmount.toFixed(2)),
+          tax_rate: taxRate / 100,
+          payment_terms: paymentTerms,
+          notes,
+          billed_from_proposal: lineItems.some(i => i.source_type === 'proposal_line_item'),
+          includes_change_orders: Object.keys(selectedChangeOrders).length > 0,
+          created_by_name: profile?.full_name
+        },
+        p_lines: lineItemsToInsert,
+        p_change_orders: Object.entries(selectedChangeOrders).map(([changeOrderId, amount]) => ({
+          change_order_id: changeOrderId,
           amount_billed: parseFloat(amount.toFixed(2)),
-          fully_billed: false
-        }));
-        const { error: coErr } = await supabase.from('invoice_change_order_links').insert(coLinks);
-        if (coErr) throw coErr;
-      }
+        })),
+      });
+      if (error) throw new Error(error.message);
 
       notify('Progress invoice created!', { theme: 'violet', tone: 'success' });
-      onSuccess(invoice.id);
+      onSuccess(invoiceId);
       onClose();
     } catch (error) {
       console.error('Error creating invoice:', error);
