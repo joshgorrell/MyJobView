@@ -400,6 +400,7 @@ Deno.serve(async (req: Request) => {
     const street: string | undefined = payload.street;
     const city: string | undefined = payload.city;
     const state: string | undefined = payload.state;
+    const verifyAddress = payload.verifyAddress === true;
     const autoSave: boolean = payload.autoSave === true;
 
     // ── TEST ──────────────────────────────────────────────────────────────────
@@ -423,12 +424,45 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: "zipCode is required" }, 400);
       }
 
+      let verifiedAddress: { street: string; city: string; state: string; zip: string } | null = null;
+      if (verifyAddress) {
+        if (!street?.trim() || !city?.trim() || !state || !/^[A-Z]{2}$/.test(state) ||
+            !/^\d{5}(?:-\d{4})?$/.test(zipCode) || autoSave) {
+          return jsonResponse({ error: "A complete U.S. street address is required for verification." }, 400);
+        }
+
+        const validation = await fetch("https://api.taxjar.com/v2/addresses/validate", {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ country: "US", street, city, state, zip: zipCode }),
+        });
+        if (!validation.ok) {
+          return jsonResponse({ error: "TaxJar could not verify this street address." }, 422);
+        }
+        const { addresses } = await validation.json();
+        const match = Array.isArray(addresses) && addresses.length === 1 ? addresses[0] : null;
+        if (typeof match?.street !== "string" || !match.street.trim() ||
+            typeof match.city !== "string" || !match.city.trim() || match.state !== state ||
+            typeof match.zip !== "string" || !/^\d{5}(?:-\d{4})?$/.test(match.zip) ||
+            match.zip.slice(0, 5) !== zipCode.slice(0, 5) ||
+            (zipCode.length > 5 && match.zip !== zipCode)) {
+          return jsonResponse({ error: "TaxJar did not return one matching street address." }, 422);
+        }
+        verifiedAddress = { street: match.street, city: match.city, state: match.state, zip: match.zip };
+      }
+
       const params = new URLSearchParams();
-      if (street) params.append("street", street);
-      if (city) params.append("city", city);
-      if (state) params.append("state", state);
+      if (verifiedAddress) {
+        params.set("street", verifiedAddress.street);
+        params.set("city", verifiedAddress.city);
+        params.set("state", verifiedAddress.state);
+      } else {
+        if (street) params.set("street", street);
+        if (city) params.set("city", city);
+        if (state) params.set("state", state);
+      }
       const query = params.toString();
-      const url = `https://api.taxjar.com/v2/rates/${encodeURIComponent(zipCode)}${query ? `?${query}` : ""}`;
+      const url = `https://api.taxjar.com/v2/rates/${encodeURIComponent(verifiedAddress?.zip ?? zipCode)}${query ? `?${query}` : ""}`;
 
       const resp = await fetch(url, { headers: authHeaders });
 
@@ -452,7 +486,16 @@ Deno.serve(async (req: Request) => {
       const countyRate = toNumber(rate.county_rate);
       const cityRate = toNumber(rate.city_rate);
       const specialRate = toNumber(rate.combined_district_rate);
-      const combinedRate = toNumber(rate.combined_rate);
+      const rawRate = rate.combined_rate;
+      const verifiedRate = typeof rawRate === "number" || (typeof rawRate === "string" && rawRate.trim())
+        ? Number(rawRate)
+        : NaN;
+      if (verifyAddress && (!Number.isFinite(verifiedRate) || verifiedRate < 0 || verifiedRate > 1 ||
+          rate.state !== verifiedAddress?.state || typeof rate.zip !== "string" ||
+          rate.zip.slice(0, 5) !== zipCode.slice(0, 5))) {
+        return jsonResponse({ error: "TaxJar did not return a valid rate for the verified address." }, 422);
+      }
+      const combinedRate = verifyAddress ? verifiedRate : toNumber(rawRate);
       const city_label = rate.city || city || "";
       const county_label = rate.county || "";
       const stateCode = rate.state;
@@ -478,6 +521,7 @@ Deno.serve(async (req: Request) => {
         jurisdictionName,
         freightTaxable: rate.freight_taxable,
         source: "taxjar",
+        ...(verifiedAddress ? { verifiedAddress } : {}),
       };
 
       // Auto-save: upsert into tax_jurisdictions as a TaxJar-sourced cached entry
