@@ -321,7 +321,7 @@ export async function calculateTaxJarTax(
   return data as TaxJarTaxResult;
 }
 
-export async function verifyAndSubmitInvoice(invoiceId: string): Promise<void> {
+export async function verifyInvoiceTax(invoiceId: string): Promise<void> {
   const result = await calculateTaxJarTax('invoice', invoiceId);
   const verified = result.tax_calculation_status === 'ready' && !!result.taxjar_verified_at;
   const noTax = ['exempt', 'not_collecting'].includes(result.tax_calculation_status)
@@ -336,7 +336,10 @@ export async function verifyAndSubmitInvoice(invoiceId: string): Promise<void> {
   if (!invoice || invoice.status !== 'draft' || invoice.tax_amount !== result.tax_amount) {
     throw new Error('The draft tax amount does not match the verification result. Review the invoice and retry.');
   }
+}
 
+export async function verifyAndSubmitInvoice(invoiceId: string): Promise<void> {
+  await verifyInvoiceTax(invoiceId);
   const { data, error } = await supabase.rpc('submit_invoice', { p_invoice_id: invoiceId });
   if (error || !data?.success) {
     throw new Error(error?.message || data?.errors?.join(', ') || 'Invoice submission failed.');
