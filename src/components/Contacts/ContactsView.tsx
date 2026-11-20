@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Users, Plus, Search, ArrowRight, Lock, Camera, Shield, Target, Sparkles, UserCheck, Flame, Thermometer, HelpCircle, X, Building2, ChevronRight, Columns3, AlertCircle, RotateCw } from 'lucide-react';
+import { notify } from '../../lib/feedback';
 import { supabase } from '../../lib/supabase';
 import { Contact } from '../../lib/types';
 import { ContactForm } from './ContactForm';
@@ -88,6 +89,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
 
   const hasLoadedOnce = useRef(false);
   const currentRequestId = useRef(0);
+  const contactRequestId = useRef(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -201,6 +203,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
   }, [profile, authLoading, viewFilter, typeFilter, temperatureFilter]);
 
   async function loadContactById(contactId: string) {
+    const requestId = ++contactRequestId.current;
     try {
       const { data: contactData, error } = await supabase
         .from('contacts')
@@ -214,12 +217,15 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
         .eq('id', contactId)
         .single();
 
+      if (requestId !== contactRequestId.current) return;
       if (error) throw error;
       if (contactData) {
         setSelectedContact(contactData);
       }
     } catch (error) {
+      if (requestId !== contactRequestId.current) return;
       console.error('Error loading contact:', error);
+      notify('Could not load the contact profile.', { tone: 'error' });
       const url = new URL(window.location.href);
       url.searchParams.delete('contactId');
       window.history.replaceState({}, '', url);
@@ -227,13 +233,14 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
   }
 
   function selectContact(contact: ContactRow) {
-    setSelectedContact(contact as unknown as Contact);
     const url = new URL(window.location.href);
     url.searchParams.set('contactId', contact.id);
     window.history.pushState({}, '', url);
+    void loadContactById(contact.id);
   }
 
   function clearSelectedContact() {
+    contactRequestId.current += 1;
     setSelectedContact(null);
     const url = new URL(window.location.href);
     url.searchParams.delete('contactId');

@@ -1,5 +1,6 @@
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Package, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Product } from '../../lib/types';
@@ -50,6 +51,7 @@ interface InlineProductSearchProps {
   placeholder?: string;
   autoFocus?: boolean;
   dataRoomId?: string;
+  searchCatalog?: boolean;
 }
 
 export default function InlineProductSearch({
@@ -62,7 +64,8 @@ export default function InlineProductSearch({
   className,
   placeholder,
   autoFocus,
-  dataRoomId
+  dataRoomId,
+  searchCatalog = false
 }: InlineProductSearchProps) {
   const { profile: _profile, companySettings } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
@@ -75,23 +78,78 @@ export default function InlineProductSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
+  const [catalogResults, setCatalogResults] = useState<{ query: string; products: Product[] } | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<React.CSSProperties>();
 
   useEffect(() => {
-    loadProducts();
+    if (!searchCatalog) loadProducts();
     if (onPackageSelect) {
       loadPackages();
     }
-  }, [companySettings?.id]);
+  }, [companySettings?.id, searchCatalog]);
+
+  useEffect(() => {
+    const query = value.trim();
+    if (!searchCatalog || !companySettings?.id || !query || inputRef.current !== document.activeElement) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      const pattern = JSON.stringify('%' + query.replace(/[\\%_]/g, '\\$&') + '%');
+      const { data, error } = await supabase.from('products')
+        .select('*')
+        .eq('company_id', companySettings.id)
+        .eq('is_active', true)
+        .or(`manufacturer_model_number.ilike.${pattern},sku.ilike.${pattern},name.ilike.${pattern},description.ilike.${pattern}`)
+        .order('sku')
+        .limit(8)
+        .abortSignal(controller.signal);
+      if (!controller.signal.aborted && !error) setCatalogResults({ query, products: data || [] });
+    }, 175);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchCatalog, companySettings?.id, value]);
+
+  useEffect(() => {
+    if (!searchCatalog || !showDropdown) return;
+    function positionDropdown() {
+      const input = inputRef.current;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 16);
+      const below = window.innerHeight - rect.bottom;
+      const above = rect.top;
+      const openAbove = below < 220 && above > below;
+      setDropdownPosition({
+        position: 'fixed',
+        left: Math.min(rect.left, window.innerWidth - width - 8),
+        width,
+        maxHeight: Math.min(300, Math.max(0, (openAbove ? above : below) - 8)),
+        ...(openAbove ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+      });
+    }
+    positionDropdown();
+    window.addEventListener('resize', positionDropdown);
+    window.addEventListener('scroll', positionDropdown, true);
+    return () => {
+      window.removeEventListener('resize', positionDropdown);
+      window.removeEventListener('scroll', positionDropdown, true);
+    };
+  }, [searchCatalog, showDropdown]);
 
   useEffect(() => {
     if (value.length >= 1) {
       const query = value.toLowerCase();
 
-      const filteredProducts: DropdownItem[] = products
+      const availableProducts = searchCatalog
+        ? (catalogResults?.query === value.trim() ? catalogResults.products : [])
+        : products;
+      const filteredProducts: DropdownItem[] = availableProducts
         .filter(p =>
-          p.sku?.toLowerCase().includes(query) ||
-          p.name?.toLowerCase().includes(query) ||
-          p.description?.toLowerCase().includes(query)
+          p.manufacturer_model_number?.toLowerCase().includes(query.trim()) ||
+          p.sku?.toLowerCase().includes(query.trim()) ||
+          p.name?.toLowerCase().includes(query.trim()) ||
+          p.description?.toLowerCase().includes(query.trim())
         )
         .slice(0, 8)
         .map(p => ({ kind: 'product', data: p }));
@@ -108,13 +166,13 @@ export default function InlineProductSearch({
 
       const combined = [...filteredProducts, ...filteredPackages];
       setDropdownItems(combined);
-      setShowDropdown(combined.length > 0);
+      setShowDropdown(combined.length > 0 && (!searchCatalog || document.activeElement === inputRef.current));
       setSelectedIndex(0);
     } else {
       setDropdownItems([]);
       setShowDropdown(false);
     }
-  }, [value, products, packages]);
+  }, [value, products, packages, searchCatalog, catalogResults]);
 
   async function loadProducts() {
     try {
@@ -226,7 +284,7 @@ export default function InlineProductSearch({
           justSelectedRef.current = true;
         }
         return;
-      } else if (e.key === 'Tab') {
+      } else if (e.key === 'Tab' && (!searchCatalog || !e.shiftKey)) {
         const item = dropdownItems[selectedIndex];
         if (item) {
           e.preventDefault();
@@ -270,6 +328,8 @@ export default function InlineProductSearch({
     }, 150);
   }
 
+  const renderDropdown = (dropdown: React.ReactElement) => searchCatalog ? createPortal(dropdown, document.body) : dropdown;
+
   return (
     <div className="relative flex-1">
       <input
@@ -290,11 +350,11 @@ export default function InlineProductSearch({
         data-room-id={dataRoomId}
       />
 
-      {showDropdown && dropdownItems.length > 0 && (
+      {showDropdown && dropdownItems.length > 0 && (!searchCatalog || dropdownPosition) && renderDropdown(
         <div
           ref={dropdownRef}
-          className="absolute z-[100] left-0 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl mt-1 overflow-y-auto"
-          style={{ minWidth: '280px', maxWidth: '420px', maxHeight: '300px' }}
+          className={`z-[100] rounded-lg border border-gray-600 bg-gray-800 shadow-2xl overflow-y-auto ${searchCatalog ? '' : 'absolute left-0 mt-1'}`}
+          style={searchCatalog ? dropdownPosition : { minWidth: '280px', maxWidth: '420px', maxHeight: '300px' }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {dropdownItems[0]?.kind === 'recent' && (
@@ -319,7 +379,10 @@ export default function InlineProductSearch({
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white text-sm leading-tight truncate">{item.data.name}</div><ProductStatusNotice product={item.data} />
-                    {item.data.sku && (
+                    {searchCatalog && item.data.manufacturer_model_number && (
+                      <div className="text-gray-400 text-xs mt-0.5">{item.data.manufacturer_model_number}</div>
+                    )}
+                    {item.data.sku && (!searchCatalog || item.data.sku !== item.data.manufacturer_model_number) && (
                       <div className="text-gray-400 text-xs mt-0.5">
                         {item.data.sku}
                       </div>
