@@ -221,7 +221,7 @@ async function fetchPayments(startDate: string, endDate: string): Promise<Paymen
       invoice_amount_paid: inv.amount_paid || 0,
       tax_environment: inv.tax_environment || '',
       tax_project_type: inv.tax_project_type || '',
-      tax_rate: inv.tax_rate || jur.combined_rate || 0,
+      tax_rate: inv.tax_rate ?? jur.combined_rate ?? 0,
       state_rate: jur.state_rate || 0,
       county_rate: jur.county_rate || 0,
       city_rate: jur.city_rate || 0,
@@ -237,7 +237,7 @@ async function fetchPayments(startDate: string, endDate: string): Promise<Paymen
       customer_name: contact.full_name || contact.contact_name || 'Unknown',
       jurisdiction_name: jur.jurisdiction_name || 'Default',
       jurisdiction_id: jur.id,
-      jurisdiction_state: jur.state || 'KS',
+      jurisdiction_state: jur.state?.trim().toUpperCase(),
       ks_jurisdiction_code: jur.ks_jurisdiction_code,
       mo_jurisdiction_code: jur.mo_jurisdiction_code,
     };
@@ -261,7 +261,7 @@ function proratedSubtotal(payment: PaymentRow): number {
 function getDeductionLabel(p: PaymentRow): string | null {
   const env = p.tax_environment as TaxEnvironment;
   const pt = p.tax_project_type as TaxProjectType;
-  const state = p.jurisdiction_state || 'KS';
+  const state = p.jurisdiction_state;
 
   if (p.government_entity) return 'Government Entity';
   if (p.non_profit_entity) return 'Non-Profit Organization';
@@ -271,7 +271,7 @@ function getDeductionLabel(p: PaymentRow): string | null {
     }
     return 'Tax-Exempt Customer';
   }
-  if (!env || !pt) return null;
+  if (!env || !pt || !state) return null;
 
   const { partsTaxable, laborTaxable } = getTaxApplicability(env, pt, state);
   if (!partsTaxable && !laborTaxable) {
@@ -298,11 +298,11 @@ function getDeductionLabel(p: PaymentRow): string | null {
 // KS ST-36 builder
 // ─────────────────────────────────────────────
 function buildST36Rows(payments: PaymentRow[]): ST36JurisdictionRow[] {
-  const ksPayments = payments.filter(p => (p.jurisdiction_state || 'KS') === 'KS');
+  const ksPayments = payments.filter(p => p.jurisdiction_state === 'KS');
   const map = new Map<string, ST36JurisdictionRow>();
 
   for (const p of ksPayments) {
-    const key = p.jurisdiction_id || 'default';
+    const key = JSON.stringify([p.jurisdiction_id ?? p.invoice_id, p.ks_jurisdiction_code, p.tax_rate]);
     if (!map.has(key)) {
       map.set(key, {
         jurisdiction_id: key,
@@ -396,7 +396,10 @@ function buildMO53Rows(payments: PaymentRow[]): MO53Row[] {
   const map = new Map<string, MO53Row>();
 
   for (const p of moPayments) {
-    const key = p.jurisdiction_id || 'default';
+    const key = JSON.stringify([
+      p.jurisdiction_id ?? p.invoice_id, p.mo_jurisdiction_code, p.tax_rate,
+      p.state_rate, p.county_rate, p.city_rate, p.special_rate,
+    ]);
     if (!map.has(key)) {
       map.set(key, {
         jurisdiction_id: key,
@@ -748,8 +751,8 @@ function DailyCollectionsReport() {
                   payments.map(p => {
                     const env = p.tax_environment as TaxEnvironment;
                     const pt = p.tax_project_type as TaxProjectType;
-                    const state = p.jurisdiction_state || 'KS';
-                    const appl = env && pt ? getTaxApplicability(env, pt, state) : null;
+                    const state = p.jurisdiction_state;
+                    const appl = env && pt && state ? getTaxApplicability(env, pt, state) : null;
                     const tax = proratedTax(p);
                     const sub = proratedSubtotal(p);
                     return (
@@ -766,7 +769,7 @@ function DailyCollectionsReport() {
                         <td className="px-4 py-3 text-sm text-gray-700 capitalize whitespace-nowrap">{p.payment_method.replace(/_/g, ' ')}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{pt ? pt.replace(/_/g, ' ') : '—'}</td>
                         <td className="px-4 py-3 text-sm capitalize text-gray-700 whitespace-nowrap">{env || '—'}</td>
-                        <td className="px-4 py-3 text-sm font-mono font-semibold text-gray-600 whitespace-nowrap">{state}</td>
+                        <td className="px-4 py-3 text-sm font-mono font-semibold text-gray-600 whitespace-nowrap">{state || 'Unknown'}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{p.jurisdiction_name}</td>
                         <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium whitespace-nowrap">${fmt(sub)}</td>
                         <td className="px-4 py-3 text-sm text-right text-gray-700 whitespace-nowrap">
@@ -838,7 +841,7 @@ function ST36Report() {
     { gross_sales: 0, total_deductions: 0, net_taxable: 0, net_tax_due: 0 }
   );
 
-  const zeroTaxPayments = payments.filter(p => (p.jurisdiction_state || 'KS') === 'KS' && proratedTax(p) === 0);
+  const zeroTaxPayments = payments.filter(p => p.jurisdiction_state === 'KS' && proratedTax(p) === 0);
   const missingCodeRows = rows.filter(r => !r.ks_jurisdiction_code);
 
   const deductionColumns: { key: keyof ST36JurisdictionRow; label: string; abbr: string }[] = [
@@ -913,6 +916,13 @@ function ST36Report() {
             <button onClick={exportCSV} disabled={rows.length === 0} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm transition-colors"><Download className="w-4 h-4" />CSV</button>
           </div>
         </div>
+
+        {payments.some(p => !p.jurisdiction_state) && (
+          <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {payments.filter(p => !p.jurisdiction_state).length} payment(s) have an unknown tax state
+            and are excluded from this worksheet. Review their invoices in the collections report before filing.
+          </div>
+        )}
 
         {missingCodeRows.length > 0 && (
           <div className="no-print bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
@@ -1220,6 +1230,13 @@ function MO53Report() {
             <div><span className="font-semibold">Exempt Projects:</span> Non-taxable with valid exemption documentation</div>
           </div>
         </div>
+
+        {payments.some(p => !p.jurisdiction_state) && (
+          <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            {payments.filter(p => !p.jurisdiction_state).length} payment(s) have an unknown tax state
+            and are excluded from this worksheet. Review their invoices in the collections report before filing.
+          </div>
+        )}
 
         {missingCodeRows.length > 0 && (
           <div className="no-print bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
