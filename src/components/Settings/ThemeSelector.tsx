@@ -28,7 +28,7 @@ export function ThemeSelector() {
     <section className="rounded-xl border border-subtle bg-canvas p-3 sm:p-4 text-primary" aria-labelledby="appearance-title">
       <h2 id="appearance-title" className="font-semibold">Appearance</h2>
       <p className="mt-1 text-sm text-muted">Choose your look. Your theme is saved to your account across devices.</p>
-      <div className="mt-3 grid grid-cols-5 gap-2" role="group" aria-label="Color theme" aria-busy={saving}>
+      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,7.5rem),1fr))] gap-2" role="group" aria-label="Color theme" aria-busy={saving}>
         {choices.map(({ value, label, description, icon: Icon, preview }) => (
           <button key={value} type="button" aria-pressed={preference === value} disabled={saving}
             onClick={() => select(value)}
@@ -36,7 +36,7 @@ export function ThemeSelector() {
             <span data-theme-fixed aria-hidden="true" className={`mb-2 flex h-7 items-center justify-end rounded-md bg-gradient-to-r ${preview} ${value === 'mjv' ? 'border-2 border-black' : ''}`}>
               {preference === value && <Check className="mr-1 h-5 w-5 rounded-full bg-black p-0.5 text-white" />}
             </span>
-            <span className="flex flex-col sm:flex-row items-start gap-1 text-xs sm:text-sm font-semibold leading-4 sm:leading-5"><Icon aria-hidden="true" className="h-4 w-4 shrink-0" />{label}</span>
+            <span className="flex flex-col sm:flex-row items-start gap-1 text-xs sm:text-sm font-semibold leading-4 sm:leading-5"><Icon aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{label}</span></span>
             <span className="mt-0.5 hidden sm:block text-xs text-muted">{description}</span>
           </button>
         ))}
