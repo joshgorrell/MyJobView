@@ -321,6 +321,28 @@ export async function calculateTaxJarTax(
   return data as TaxJarTaxResult;
 }
 
+export async function verifyAndSubmitInvoice(invoiceId: string): Promise<void> {
+  const result = await calculateTaxJarTax('invoice', invoiceId);
+  const verified = result.tax_calculation_status === 'ready' && !!result.taxjar_verified_at;
+  const noTax = ['exempt', 'not_collecting'].includes(result.tax_calculation_status)
+    && result.tax_amount === 0;
+  if (!verified && !noTax) {
+    throw new Error(result.taxjar_error || 'Sales tax could not be verified. Review the invoice location and tax settings, then retry.');
+  }
+
+  const { data: invoice, error: readError } = await supabase
+    .from('invoices').select('status, tax_amount').eq('id', invoiceId).single();
+  if (readError) throw new Error(readError.message);
+  if (!invoice || invoice.status !== 'draft' || invoice.tax_amount !== result.tax_amount) {
+    throw new Error('The draft tax amount does not match the verification result. Review the invoice and retry.');
+  }
+
+  const { data, error } = await supabase.rpc('submit_invoice', { p_invoice_id: invoiceId });
+  if (error || !data?.success) {
+    throw new Error(error?.message || data?.errors?.join(', ') || 'Invoice submission failed.');
+  }
+}
+
 /**
  * Check if a transaction is blocked from finalization due to tax review.
  * Returns an error message if blocked, null if allowed.
