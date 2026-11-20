@@ -190,7 +190,7 @@ export default function InvoiceCatalogBrowser({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, SKU, or model number..."
+                placeholder="Search by model or name…"
                 className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -291,10 +291,9 @@ export default function InvoiceCatalogBrowser({
                         )}
                         <span className="font-medium text-white">{product.name}</span><ProductStatusNotice product={product} />
                       </div>
-                      <div className="text-sm text-gray-400 mb-1">
-                        SKU: {product.sku || 'N/A'}
-                        {product.manufacturer_model_number && ` | Model: ${product.manufacturer_model_number}`}
-                      </div>
+                      {product.manufacturer_model_number && product.manufacturer_model_number !== product.name && (
+                        <div className="mb-1 text-sm text-gray-400">Model: {product.manufacturer_model_number}</div>
+                      )}
                       {product.description && (
                         <div className="text-sm text-gray-500 line-clamp-2">{product.description}</div>
                       )}

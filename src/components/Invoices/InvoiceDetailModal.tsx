@@ -1798,7 +1798,7 @@ function buildPrintHTML(invoice: InvoiceDetail, settings: CompanySettings | null
   const itemsHTML = customerSecurityInvoiceLines(invoice,invoice.invoice_line_items).map(item => `
     <tr>
       <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">
-        ${item.description}
+        ${String(item.description ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}
         ${item.notes_visible_on_invoice && item.notes ? `<div style="font-size:11px;color:#6b7280;margin-top:3px;font-style:italic;">${item.notes}</div>` : ''}
       </td>
       <td style="padding:10px 12px;text-align:center;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${item.quantity}</td>

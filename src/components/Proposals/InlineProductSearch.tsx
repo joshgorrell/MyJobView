@@ -14,6 +14,7 @@ interface ProductPackageItem {
   product?: {
     id: string;
     sku: string;
+    manufacturer_model_number?: string | null;
     name: string;
     our_price?: number;
     cost?: number;
@@ -206,7 +207,7 @@ export default function InlineProductSearch({
         (pkgData || []).map(async (pkg) => {
           const { data: items } = await supabase
             .from('product_package_items')
-            .select('id, product_id, quantity, include_labor, product:products(id, sku, name, our_price, cost, unit, is_taxable, is_active, is_discontinued)')
+            .select('id, product_id, quantity, include_labor, product:products(id, sku, manufacturer_model_number, name, our_price, cost, unit, is_taxable, is_active, is_discontinued)')
             .eq('package_id', pkg.id)
             .order('sort_order').overrideTypes<ProductPackageItem[], { merge: false }>();
           return { ...pkg, items: items || [] };
@@ -382,7 +383,7 @@ export default function InlineProductSearch({
                     {searchCatalog && item.data.manufacturer_model_number && (
                       <div className="text-gray-400 text-xs mt-0.5">{item.data.manufacturer_model_number}</div>
                     )}
-                    {item.data.sku && (!searchCatalog || item.data.sku !== item.data.manufacturer_model_number) && (
+                    {!searchCatalog && item.data.sku && (
                       <div className="text-gray-400 text-xs mt-0.5">
                         {item.data.sku}
                       </div>
@@ -416,7 +417,7 @@ export default function InlineProductSearch({
                       </span>
                       <div className="font-medium text-white text-sm leading-tight truncate">{item.data.package_name}</div>
                     </div>
-                    {item.data.package_sku && (
+                    {!searchCatalog && item.data.package_sku && (
                       <div className="text-gray-400 text-xs mt-0.5">{item.data.package_sku}</div>
                     )}
                   </div>

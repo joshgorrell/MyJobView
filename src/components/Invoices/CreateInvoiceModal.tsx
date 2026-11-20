@@ -40,6 +40,7 @@ interface LineItem {
   id: string;
   product_id?: string | null;
   sku?: string;
+  model?: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -91,7 +92,7 @@ function blankLineItem(): LineItem {
 }
 
 function isBlankLineItem(item: LineItem) {
-  return !item.description.trim() && !item.sku?.trim() && !item.product_id &&
+  return !item.description.trim() && !item.model?.trim() && !item.product_id &&
     !item.notes?.trim() && item.quantity === 1 && item.unit_price === 0;
 }
 
@@ -464,6 +465,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       ...row,
       product_id: product.id,
       sku: product.sku,
+      model: product.manufacturer_model_number || undefined,
       description: product.name,
       is_discontinued: product.is_discontinued,
       unit_price: price,
@@ -491,6 +493,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       id: crypto.randomUUID(),
       product_id: item.product?.id,
       sku: item.product?.sku,
+      model: item.product?.manufacturer_model_number || undefined,
       description: item.product?.name || 'Unknown Product',
       quantity: item.quantity,
       unit_price: item.product?.our_price || 0,
@@ -605,7 +608,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const lineItemsData = invoiceItems.map((item, index) => ({
         product_id: item.product_id || null,
         sku: item.sku || null,
-        description: item.description,
+        description: item.model?.trim() && item.model.trim().toLowerCase() !== item.description.trim().toLowerCase()
+          ? `${item.model.trim()} — ${item.description.trim()}`
+          : item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
         cost: item.cost || null,
@@ -1159,7 +1164,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               <div className="hidden lg:grid grid-cols-[16px_16px_minmax(0,1fr)_minmax(0,2fr)_80px_100px_48px_120px_96px_70px] gap-2 px-[9px] mb-1">
                 <span />
                 <span />
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Model / SKU</span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Model</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Description</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider text-center">Qty</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider text-right">Unit Price</span>
@@ -1196,12 +1201,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </div>
                       <span className="text-[10px] text-gray-600 w-4 text-center flex-shrink-0">{index + 1}</span>
 
-                      {/* SKU */}
+                      {/* Model */}
                       <div className="flex-1 min-w-0">
                         <ProductStatusNotice product={item} />
                         <InlineProductSearch
-                          value={item.sku || ''}
-                          onChange={(value) => updateLineItem(item.id, 'sku', value)}
+                          value={item.model || ''}
+                          onChange={(value) => updateLineItem(item.id, 'model', value)}
                           onProductSelect={(product) => handleProductSelect(product, item.id)}
                           onPackageSelect={(pkg) => handlePackageSelect(pkg, item.id)}
                           dataRoomId={item.id}
@@ -1210,7 +1215,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                             if (event.key === 'Enter') event.preventDefault();
                           }}
                           className="w-full px-2 py-1.5 text-sm bg-gray-900 border border-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Model, SKU or name"
+                          placeholder="Search by model or name"
                         />
                       </div>
 
@@ -1333,13 +1338,13 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         </div>
                       </div>
 
-                      {/* SKU Search */}
+                      {/* Model Search */}
                       <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">Model / SKU</label>
+                        <label className="block text-[11px] text-gray-400 mb-1">Model</label>
                         <ProductStatusNotice product={item} />
                         <InlineProductSearch
-                          value={item.sku || ''}
-                          onChange={(value) => updateLineItem(item.id, 'sku', value)}
+                          value={item.model || ''}
+                          onChange={(value) => updateLineItem(item.id, 'model', value)}
                           onProductSelect={(product) => handleProductSelect(product, item.id)}
                           onPackageSelect={(pkg) => handlePackageSelect(pkg, item.id)}
                           dataRoomId={item.id}
@@ -1348,7 +1353,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                             if (event.key === 'Enter') event.preventDefault();
                           }}
                           className="w-full px-3 py-2.5 text-sm bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Model, SKU or name"
+                          placeholder="Search by model or name"
                         />
                       </div>
 
