@@ -9,7 +9,7 @@ import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import InlineProductSearch from '../Proposals/InlineProductSearch';
 import InvoiceCatalogBrowser from './InvoiceCatalogBrowser';
-import { computeInvoiceTax, lookupTaxRateByZip, type TaxEnvironment, type TaxProjectType, type ItemType } from '../../lib/taxCalculations';
+import { computeInvoiceTax, lookupTaxRateByZip, verifyAndSubmitInvoice, type TaxEnvironment, type TaxProjectType, type ItemType } from '../../lib/taxCalculations';
 import { TaxRulesBadge } from '../Shared/TaxRulesBadge';
 
 interface Contact {
@@ -654,7 +654,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           jobsite_zip: jobsiteZip || customerZip,
         },
         p_line_items: lineItemsData,
-        p_submit: action !== 'draft',
+        p_submit: false,
       });
       if (createError) {
         console.error('Invoice save failed:', createError);
@@ -663,6 +663,18 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
             ? 'Invoice saving is unavailable. Ask your MyJobView administrator to check the invoice database deployment.'
             : createError.message
         );
+      }
+
+      if (action !== 'draft') {
+        try {
+          await verifyAndSubmitInvoice(invoiceId);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Tax verification or submission failed.';
+          notify(`Invoice saved as a draft. ${message}`, { theme: 'emerald', tone: 'error' });
+          onSuccess(invoiceId);
+          onClose();
+          return;
+        }
       }
 
       if (action === 'submit_email' && customerVisible) {
