@@ -43,7 +43,7 @@ export function ManualApprovalModal({
   const [paymentTermsSource, setPaymentTermsSource] = useState<'contact' | 'settings' | 'default'>('default');
   const [proposalTotal, setProposalTotal] = useState(0);
   const [contactId, setContactId] = useState<string | null>(null);
-  const [_contactName, setContactName] = useState('');
+  const [isTaxExemptCustomer, setIsTaxExemptCustomer] = useState(false);
   const [contactEmailResolved, setContactEmailResolved] = useState(contactEmail);
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailInput, setEmailInput] = useState(contactEmail);
@@ -147,17 +147,18 @@ export function ManualApprovalModal({
         .filter((m: string) => m !== 'payment');
       setAcceptanceMethods(methods);
 
-      // Load contact details including payment terms and email
+      setIsTaxExemptCustomer(false);
+
+      // Load the customer's payment terms, email, and exemption status
       if (proposal?.contact_id) {
         const { data: contact } = await supabase
           .from('contacts')
-          .select('default_payment_terms, email, first_name, last_name, full_name')
+          .select('default_payment_terms, email, is_tax_exempt')
           .eq('id', proposal.contact_id)
           .maybeSingle();
 
         if (contact) {
-          const name = contact.full_name || [contact.first_name, contact.last_name].filter(Boolean).join(' ') || '';
-          setContactName(name);
+          setIsTaxExemptCustomer(contact.is_tax_exempt === true);
 
           if (contact.email) {
             setContactEmailResolved(contact.email);
@@ -426,6 +427,12 @@ export function ManualApprovalModal({
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+
+          {isTaxExemptCustomer && (
+            <span className="inline-flex rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
+              Tax Exempt Customer
+            </span>
+          )}
 
           {contactId && (
             <TaxExemptionCertificateRequest recipientId={contactId} email={contactEmailResolved} />
