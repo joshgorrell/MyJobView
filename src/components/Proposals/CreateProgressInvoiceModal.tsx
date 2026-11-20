@@ -140,7 +140,7 @@ export default function CreateProgressInvoiceModal({
         .eq('id', contactId)
         .single();
       // tax_rate is stored as a decimal (e.g. 0.0935); display and compute as percentage here
-      setTaxRate((contact?.tax_rate ?? 0.0935) * 100);
+      setTaxRate((contact?.tax_rate ?? 0) * 100);
 
       const { data: changeOrders } = await supabase
         .from('change_orders')
@@ -331,6 +331,7 @@ export default function CreateProgressInvoiceModal({
           due_date: dueDate,
           subtotal: parseFloat(subtotal.toFixed(2)),
           tax_amount: parseFloat(taxAmount.toFixed(2)),
+          tax_rate: taxRate / 100,
           total: parseFloat(total.toFixed(2)),
           amount_paid: 0,
           amount_due: parseFloat(total.toFixed(2)),
@@ -829,7 +830,8 @@ export default function CreateProgressInvoiceModal({
 
                 {/* Invoice Totals */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3 text-sm">Invoice Totals</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1 text-sm">Estimated Invoice Totals</h3>
+                  <p className="mb-3 text-xs text-gray-600">Sales tax is verified when the draft is submitted.</p>
                   <div className="space-y-2">
                     {lineItems.filter(i => i.description.trim() && i.quantity * i.unit_price > 0).map(item => (
                       <div key={item.id} className="flex justify-between text-sm text-gray-600">
