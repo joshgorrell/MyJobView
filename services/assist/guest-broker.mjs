@@ -35,7 +35,7 @@ export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,a
   async staff(c){
    return exclusive(c.organization_id,async()=>{
     if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
-    if(c.operation==='invite_capability')return {available:enabled};
+    if(c.operation==='invite_capability')return {available:enabled&&Number.isInteger(runtime.generation(c.organization_id))};
     if(!enabled)throw new Error('guest_pilot_required');
     if(c.operation==='invite_create'){
      if(invites.size>=200||[...invites.values()].filter(i=>i.organization_id===c.organization_id).length>=10)throw new Error('invite_limit');
