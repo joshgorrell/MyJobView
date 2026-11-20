@@ -620,7 +620,14 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
         p_line_items: lineItemsData,
         p_submit: action !== 'draft',
       });
-      if (createError) throw new Error(createError.message);
+      if (createError) {
+        console.error('Invoice save failed:', createError);
+        throw new Error(
+          createError.code === 'PGRST202'
+            ? 'Invoice saving is unavailable. Ask your MyJobView administrator to check the invoice database deployment.'
+            : createError.message
+        );
+      }
 
       if (action === 'submit_email' && customerVisible) {
         try {
@@ -704,7 +711,14 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
             <div className="grid grid-cols-2 lg:flex lg:flex-wrap lg:items-end gap-3">
               {/* Customer — takes available space */}
               <div className="col-span-2 lg:flex-[2] lg:min-w-[200px]">
-                <label className="block text-xs font-medium text-gray-400 mb-1">Customer *</label>
+                <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <label className="text-xs font-medium text-gray-400">Customer *</label>
+                  {selectedContact?.id === selectedContactId && selectedContact?.is_tax_exempt && (
+                    <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
+                      Tax Exempt Customer
+                    </span>
+                  )}
+                </div>
                 <ContactSearchSelect
                   contacts={(() => {
                     const list = contacts.map(c => ({
