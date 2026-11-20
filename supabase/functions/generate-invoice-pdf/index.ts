@@ -140,7 +140,7 @@ function generateInvoiceHTML(invoice: any, settings: any, hasPartialCO = false):
   const itemsHTML = items.map((item: any) => `
     <tr style="border-bottom: 1px solid #e5e7eb;">
       <td style="padding: 12px; font-size: 13px; color: #374151;">
-        ${item.description}
+        ${String(item.description ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
       </td>
       <td style="text-align: center; padding: 12px; font-size: 13px; color: #374151;">${item.quantity}</td>
       <td style="text-align: right; padding: 12px; font-size: 13px; color: #374151;">$${item.unit_price.toFixed(2)}</td>

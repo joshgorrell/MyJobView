@@ -1,15 +1,15 @@
-import { requireCustomerZip } from '../../lib/customerZip';
+import { requireCustomerZip, validCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, Truck, User, HelpCircle } from 'lucide-react';
+import { X, Plus, Trash2, Save, Search, StickyNote, ChevronUp, ChevronDown, Eye, EyeOff, MapPin, ArrowLeftRight, Receipt, Pencil, Check, Send, CheckCircle, Building2, HelpCircle } from 'lucide-react';
 import { ContactSearchSelect } from '../Shared/ContactSearchSelect';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import InlineProductSearch from '../Proposals/InlineProductSearch';
 import InvoiceCatalogBrowser from './InvoiceCatalogBrowser';
-import { computeInvoiceTax, type TaxEnvironment, type TaxProjectType, type ItemType } from '../../lib/taxCalculations';
+import { computeInvoiceTax, lookupTaxRateByZip, type TaxEnvironment, type TaxProjectType, type ItemType } from '../../lib/taxCalculations';
 import { TaxRulesBadge } from '../Shared/TaxRulesBadge';
 
 interface Contact {
@@ -20,6 +20,7 @@ interface Contact {
   company_name?: string;
   email: string;
   tax_rate?: number;
+  office_id?: string | null;
   is_tax_exempt?: boolean;
   default_payment_terms?: string;
   street_address?: string | null;
@@ -39,6 +40,7 @@ interface LineItem {
   id: string;
   product_id?: string | null;
   sku?: string;
+  model?: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -84,6 +86,15 @@ const PAYMENT_TERMS_DAYS: Record<string, number> = {
   net45: 45,
   net60: 60,
 };
+
+function blankLineItem(): LineItem {
+  return { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' };
+}
+
+function isBlankLineItem(item: LineItem) {
+  return !item.description.trim() && !item.model?.trim() && !item.product_id &&
+    !item.notes?.trim() && item.quantity === 1 && item.unit_price === 0;
+}
 
 function normalizePaymentTerms(terms: string | undefined | null): string {
   if (!terms) return '';
@@ -153,6 +164,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [dueDateAutoSet, setDueDateAutoSet] = useState(false);
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [customerVisible, setCustomerVisible] = useState(true);
+  const taxRulesDialog = useRef<HTMLDialogElement>(null);
   const [showTaxExplanation, setShowTaxExplanation] = useState(false);
   const taxHelpButton = useRef<HTMLButtonElement>(null);
 
@@ -162,9 +174,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   }
   const [taxEnvironment, setTaxEnvironment] = useState<'residential' | 'commercial'>('residential');
   const [taxProjectType, setTaxProjectType] = useState('general_installation_repair');
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
-  ]);
+  const [lineItems, setLineItems] = useState<LineItem[]>(() => [blankLineItem()]);
   const [billToContact, setBillToContact] = useState<Contact | null>(null);
   const [billing, setBilling] = useState<BillingAddress>({ ...EMPTY_BILLING });
   const [billingSource, setBillingSource] = useState<'customer' | 'bill_to'>('customer');
@@ -173,6 +183,11 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [offices, setOffices] = useState<Array<{ id: string; office_name: string; address_line1: string; address_line2: string | null; city: string; state: string; zip: string }>>([]);
   const [selectedOfficeId, setSelectedOfficeId] = useState<string>('');
   const [customLocation, setCustomLocation] = useState({ address: '', city: '', state: '', zip: '' });
+  const [locationDraft, setLocationDraft] = useState(customLocation);
+  const [locationError, setLocationError] = useState('');
+  const [locationRate, setLocationRate] = useState<{ zip: string; rate: number | null } | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const locationDialog = useRef<HTMLDialogElement>(null);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -183,7 +198,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [newRowId, setNewRowId] = useState<string | null>(null);
   const [classificationIds, setClassificationIds] = useState<Record<string, string>>({});
 
-  const descriptionRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const lineItemsRef = useRef<HTMLDivElement>(null);
 
   const getContactDisplayName = useCallback((contact: Contact) => {
     return contact.company_name || contact.full_name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim();
@@ -218,6 +233,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   }, []);
 
   useEffect(() => {
+    setTransactionLocation('customer');
     if (selectedContactId) {
       loadContactDetails(selectedContactId);
       loadProjectsForContact(selectedContactId);
@@ -313,17 +329,17 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       const terms = query.trim().split(/\s+/);
       let q = supabase
         .from('contacts')
-        .select('id, first_name, last_name, email, tax_rate, is_tax_exempt, default_payment_terms, street_address, city, state, zip_code')
+        .select('id, first_name, last_name, full_name, company_name, email, tax_rate, is_tax_exempt, default_payment_terms, street_address, city, state, zip_code')
         .order('first_name')
         .limit(50);
 
       if (terms.length >= 2) {
         q = q.or(
           `first_name.ilike.%${terms[0]}%,last_name.ilike.%${terms[1]}%,` +
-          `first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%`
+          `first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%,company_name.ilike.%${query.trim()}%`
         );
       } else {
-        q = q.or(`first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%,email.ilike.%${query.trim()}%`);
+        q = q.or(`first_name.ilike.%${query.trim()}%,last_name.ilike.%${query.trim()}%,company_name.ilike.%${query.trim()}%,email.ilike.%${query.trim()}%`);
       }
 
       const { data, error } = await q;
@@ -340,7 +356,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, full_name, company_name, email, tax_rate, is_tax_exempt, default_payment_terms, street_address, city, state, zip_code')
+        .select('id, first_name, last_name, full_name, company_name, email, tax_rate, is_tax_exempt, default_payment_terms, street_address, city, state, zip_code, office_id')
         .eq('id', cid)
         .single();
 
@@ -370,31 +386,41 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     }
   }
 
+  useEffect(() => {
+    if (!newRowId) return;
+    const row = lineItemsRef.current?.querySelector(`[data-invoice-row="${newRowId}"]`);
+    const input = Array.from(row?.querySelectorAll<HTMLInputElement>('input[data-room-id]') ?? [])
+      .find(field => field.getClientRects().length > 0);
+    input?.focus();
+    setNewRowId(null);
+  }, [newRowId]);
+
   function addLineItem() {
-    const id = crypto.randomUUID();
-    setLineItems(prev => [
-      ...prev,
-      { id, description: '', quantity: 1, unit_price: 0, amount: 0, is_taxable: true, source_type: 'manual', tax_classification_code: 'material' }
-    ]);
-    setNewRowId(id);
+    const lastItem = lineItems[lineItems.length - 1];
+    if (lastItem && isBlankLineItem(lastItem)) {
+      setNewRowId(lastItem.id);
+      return;
+    }
+    const item = blankLineItem();
+    setLineItems(prev => [...prev, item]);
+    setNewRowId(item.id);
   }
 
   function insertLineItemAfter(afterId: string) {
-    const idx = lineItems.findIndex(item => item.id === afterId);
-    const id = crypto.randomUUID();
-    const newItem: LineItem = {
-      id,
-      description: '',
-      quantity: 1,
-      unit_price: 0,
-      amount: 0,
-      is_taxable: true,
-      source_type: 'manual'
-    };
-    const updated = [...lineItems];
-    updated.splice(idx + 1, 0, newItem);
-    setLineItems(updated);
-    setNewRowId(id);
+    const item = blankLineItem();
+    setLineItems(prev => {
+      const index = prev.findIndex(row => row.id === afterId);
+      return [...prev.slice(0, index + 1), item, ...prev.slice(index + 1)];
+    });
+    setNewRowId(item.id);
+  }
+
+  function advanceToNextRow(event: React.KeyboardEvent, index: number) {
+    if (event.key !== 'Tab' || event.shiftKey || isBlankLineItem(lineItems[index])) return;
+    event.preventDefault();
+    const nextItem = lineItems[index + 1];
+    if (nextItem) setNewRowId(nextItem.id);
+    else addLineItem();
   }
 
   function moveLineItemUp(id: string) {
@@ -430,54 +456,44 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   }
 
   function handleProductSelect(product: any, rowId?: string) {
-    if (rowId) {
-      setLineItems(prev => prev.map(item => {
-        if (item.id !== rowId) return item;
-        const qty = item.quantity || 1;
-        const price = product.our_price || 0;
-        return {
-          ...item,
-          product_id: product.id,
-          sku: product.sku,
-          description: product.name,
-          is_discontinued: product.is_discontinued,
-          unit_price: price,
-          cost: product.cost,
-          amount: qty * price,
-          is_taxable: product.is_taxable !== false,
-          source_type: 'catalog' as const,
-        };
-      }));
-      // Focus description after selection if empty
-      setTimeout(() => {
-        const descInput = descriptionRefs.current[rowId];
-        if (descInput && !descInput.value) {
-          descInput.focus();
-        }
-      }, 30);
-    } else {
-      const newItem: LineItem = {
-        id: crypto.randomUUID(),
-        product_id: product.id,
-        sku: product.sku,
-        description: product.name,
-          is_discontinued: product.is_discontinued,
-        quantity: 1,
-        unit_price: product.our_price || 0,
-        cost: product.cost,
-        amount: product.our_price || 0,
-        is_taxable: product.is_taxable !== false,
-        source_type: 'catalog'
-      };
-      setLineItems([...lineItems, newItem]);
-    }
+    const target = rowId
+      ? lineItems.find(item => item.id === rowId)
+      : lineItems.find(isBlankLineItem);
+    const row = target || blankLineItem();
+    const price = product.our_price || 0;
+    const updated: LineItem = {
+      ...row,
+      product_id: product.id,
+      sku: product.sku,
+      model: product.manufacturer_model_number || undefined,
+      description: product.name,
+      is_discontinued: product.is_discontinued,
+      unit_price: price,
+      cost: product.cost,
+      amount: row.quantity * price,
+      is_taxable: product.is_taxable !== false,
+      source_type: 'catalog',
+    };
+    const rows = target
+      ? lineItems.map(item => item.id === target.id ? updated : item)
+      : [...lineItems, updated];
+    keepEntryRow(rows, row.id);
   }
 
-  function handlePackageSelect(packageData: any) {
+  function keepEntryRow(rows: LineItem[], afterId: string) {
+    const lastRow = rows[rows.length - 1];
+    const entryRow = isBlankLineItem(lastRow) ? lastRow : blankLineItem();
+    setLineItems(entryRow === lastRow ? rows : [...rows, entryRow]);
+    const nextRow = rows[rows.findIndex(item => item.id === afterId) + 1];
+    setNewRowId(nextRow?.id || entryRow.id);
+  }
+
+  function handlePackageSelect(packageData: any, rowId: string) {
     const newItems: LineItem[] = (packageData.items || []).map((item: any) => ({
       id: crypto.randomUUID(),
       product_id: item.product?.id,
       sku: item.product?.sku,
+      model: item.product?.manufacturer_model_number || undefined,
       description: item.product?.name || 'Unknown Product',
       quantity: item.quantity,
       unit_price: item.product?.our_price || 0,
@@ -486,7 +502,12 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       is_taxable: item.product?.is_taxable !== false,
       source_type: 'package' as const
     }));
-    setLineItems([...lineItems, ...newItems]);
+    if (!newItems.length) return;
+    const index = lineItems.findIndex(item => item.id === rowId);
+    const row = lineItems[index];
+    const replaceSearchRow = !row.description.trim() && !row.product_id && !row.notes?.trim() && row.quantity === 1 && row.unit_price === 0;
+    const rows = [...lineItems.slice(0, index + (replaceSearchRow ? 0 : 1)), ...newItems, ...lineItems.slice(index + 1)];
+    keepEntryRow(rows, newItems[newItems.length - 1].id);
   }
 
   function toggleNotes(id: string) {
@@ -506,7 +527,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   }
 
   function getEffectiveTaxRate() {
-    return selectedContact?.tax_rate || 0.0935;
+    return locationRate?.zip === alternateZip && locationRate?.rate != null
+      ? locationRate.rate
+      : selectedContact?.tax_rate ?? 0.0935;
   }
 
   const isExemptProject = taxProjectType === 'exempt_project';
@@ -553,28 +576,41 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       return;
     }
 
+    if (awaitingLocationRate) {
+      notify('Confirm the tax rate for this location before saving.', { theme: 'emerald', tone: 'warning' });
+      return;
+    }
+
     if (action !== 'draft' && !dueDate) {
       notify('Enter a due date before submitting this invoice.', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
-    if (lineItems.some(item => !item.description.trim())) {
+    const invoiceItems = lineItems.filter(item => !isBlankLineItem(item));
+    if (!invoiceItems.length) {
+      notify('Add at least one invoice item.', { theme: 'emerald', tone: 'warning' });
+      return;
+    }
+    if (invoiceItems.some(item => !item.description.trim())) {
       notify('Please fill in all line item descriptions', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const customerZip = await requireCustomerZip(selectedContactId);
+      const customerZip = transactionLocation === 'custom' && validCustomerZip(jobsiteZip)
+        ? jobsiteZip : await requireCustomerZip(selectedContactId);
       if (!customerZip) return;
       const subtotal = calculateSubtotal();
       const tax = calculateTax();
       const total = calculateTotal();
 
-      const lineItemsData = lineItems.map((item, index) => ({
+      const lineItemsData = invoiceItems.map((item, index) => ({
         product_id: item.product_id || null,
         sku: item.sku || null,
-        description: item.description,
+        description: item.model?.trim() && item.model.trim().toLowerCase() !== item.description.trim().toLowerCase()
+          ? `${item.model.trim()} — ${item.description.trim()}`
+          : item.description,
         quantity: item.quantity,
         unit_price: item.unit_price,
         cost: item.cost || null,
@@ -610,7 +646,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           billing_address_line2: billing.billing_address_line2 || null,
           billing_city: billing.billing_city || null,
           billing_state: billing.billing_state || null,
-          billing_zip: billing.billing_zip || customerZip,
+          billing_zip: billing.billing_zip || (transactionLocation === 'custom' ? null : customerZip),
           bill_to_contact_id: billToContact?.id || null,
           jobsite_address: jobsiteAddress,
           jobsite_city: jobsiteCity,
@@ -650,17 +686,54 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     }
   }
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-800 rounded-lg p-8 max-w-4xl w-full">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-300">Loading...</p>
-          </div>
-        </div>
-      </div>
-    );
+  async function saveLocation(updateCustomer: boolean) {
+    const contact = selectedContact;
+    if (!contact || contact.id !== selectedContactId || savingLocation) return;
+    setLocationError('');
+    const address = {
+      address: locationDraft.address.trim(),
+      city: locationDraft.city.trim(),
+      state: locationDraft.state.trim().toUpperCase(),
+      zip: locationDraft.zip.trim(),
+    };
+    if (!address.address || !address.city || !/^[A-Z]{2}$/.test(address.state) || !validCustomerZip(address.zip)) {
+      setLocationError('Enter a street address, city, two-letter state, and valid ZIP.');
+      return;
+    }
+    if (!updateCustomer) {
+      setCustomLocation(address);
+      setTransactionLocation('custom');
+      locationDialog.current?.close();
+      return;
+    }
+    setSavingLocation(true);
+    try {
+      const updates: Partial<Contact> & { tax_jurisdiction_id?: string | null } = {
+        street_address: address.address, city: address.city, state: address.state, zip_code: address.zip,
+      };
+      if (address.zip !== contact.zip_code && !contact.is_tax_exempt) {
+        const jurisdiction = await lookupTaxRateByZip(address.zip);
+        if (jurisdiction?.combined_rate == null) throw new Error('Tax rate unavailable for the new ZIP.');
+        const { data: jurisdictionRow, error: jurisdictionError } = await supabase.from('tax_jurisdictions')
+          .select('id').eq('zip_code', address.zip).eq('is_active', true).limit(1).maybeSingle();
+        if (jurisdictionError) throw jurisdictionError;
+        updates.tax_rate = jurisdiction.combined_rate;
+        updates.tax_jurisdiction_id = jurisdictionRow?.id ?? null;
+      }
+      const { data, error } = await supabase.from('contacts').update(updates)
+        .eq('id', contact.id).select('street_address, city, state, zip_code, tax_rate').single();
+      if (error) throw error;
+      const updatedContact = { ...contact, ...data };
+      setSelectedContact(updatedContact);
+      setTransactionLocation('customer');
+      locationDialog.current?.close();
+      notify('Customer address updated.', { theme: 'emerald', tone: 'success' });
+    } catch (error) {
+      console.error('Could not update customer address:', error);
+      setLocationError('Could not update the customer address. Check the ZIP or use the address for this invoice.');
+    } finally {
+      setSavingLocation(false);
+    }
   }
 
   const termsLabel = formatTermsLabel(selectedContact?.default_payment_terms);
@@ -688,14 +761,45 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     : transactionLocation === 'dealer'
       ? (selectedOffice?.zip || null)
       : (customLocation.zip || null);
+  const alternateZip = transactionLocation !== 'customer' && jobsiteZip !== selectedContact?.zip_code &&
+    validCustomerZip(jobsiteZip) ? jobsiteZip : null;
+  const hasLocationRate = locationRate?.zip === alternateZip && locationRate?.rate != null;
+  const awaitingLocationRate = !!alternateZip && !isExemptProject && !selectedContact?.is_tax_exempt && !hasLocationRate;
+
+  useEffect(() => {
+    setLocationRate(null);
+    if (!alternateZip || isExemptProject || selectedContact?.is_tax_exempt) return;
+    let current = true;
+    lookupTaxRateByZip(alternateZip)
+      .then(jurisdiction => {
+        if (current) setLocationRate({ zip: alternateZip, rate: jurisdiction?.combined_rate ?? null });
+      })
+      .catch(() => {
+        if (current) setLocationRate({ zip: alternateZip, rate: null });
+      });
+    return () => { current = false; };
+  }, [alternateZip, isExemptProject, selectedContact?.is_tax_exempt]);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 rounded-lg p-8 max-w-4xl w-full">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-300">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 p-3 sm:p-4 overflow-y-auto">
-        <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-5xl my-4 sm:my-8 border border-gray-700">
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-3">
+        <div className="bg-gray-800 rounded-xl shadow-2xl flex max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-1.5rem)] w-full max-w-7xl flex-col border border-gray-700">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+          <div className="flex items-center justify-between shrink-0 px-4 py-2 border-b border-gray-700">
             <h2 className="text-lg sm:text-xl font-bold text-white">New Invoice</h2>
             <button
               onClick={onClose}
@@ -705,10 +809,11 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
+            <div className="min-h-0 overflow-y-auto p-3 sm:px-4 space-y-2.5 max-lg:[&_input]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base">
 
             {/* All header fields on one desktop row, 2-col grid on mobile */}
-            <div className="grid grid-cols-2 lg:flex lg:flex-wrap lg:items-end gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:flex lg:flex-wrap lg:items-end">
               {/* Customer — takes available space */}
               <div className="col-span-2 lg:flex-[2] lg:min-w-[200px]">
                 <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -723,13 +828,13 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                   contacts={(() => {
                     const list = contacts.map(c => ({
                       id: c.id,
-                      label: `${c.first_name} ${c.last_name}`.trim(),
+                      label: getContactDisplayName(c),
                       sublabel: c.email || undefined,
                     }));
                     if (selectedContact && !list.find(c => c.id === selectedContact.id)) {
                       list.unshift({
                         id: selectedContact.id,
-                        label: `${selectedContact.first_name} ${selectedContact.last_name}`.trim(),
+                        label: getContactDisplayName(selectedContact),
                         sublabel: selectedContact.email || undefined,
                       });
                     }
@@ -792,23 +897,34 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </div>
 
               {/* Project Type */}
-              <div className="col-span-2 lg:flex-1 lg:min-w-[180px]">
+              <div className="col-span-2 md:col-span-3 lg:flex-1 lg:min-w-[180px]">
                 <label className="block text-xs font-medium text-gray-400 mb-1">Project Type *</label>
-                <select
-                  value={taxProjectType}
-                  onChange={(e) => setTaxProjectType(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="original_construction">Original Construction</option>
-                  <option value="remodel">Remodel</option>
-                  <option value="general_installation_repair">General Installation/Repair or Retail</option>
-                  <option value="exempt_project">Exempt Project</option>
-                  <option value="design_services">Design Services</option>
-                  <option value="maintenance_agreement">Maintenance Agreement</option>
-                  <option value="membership">Membership</option>
-                  <option value="security_monitoring">Security Monitoring</option>
-                </select>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={taxProjectType}
+                    onChange={(e) => setTaxProjectType(e.target.value)}
+                    required
+                    className="min-w-0 w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="original_construction">Original Construction</option>
+                    <option value="remodel">Remodel</option>
+                    <option value="general_installation_repair">General Installation/Repair or Retail</option>
+                    <option value="exempt_project">Exempt Project</option>
+                    <option value="design_services">Design Services</option>
+                    <option value="maintenance_agreement">Maintenance Agreement</option>
+                    <option value="membership">Membership</option>
+                    <option value="security_monitoring">Security Monitoring</option>
+                  </select>
+                  <button
+                    type="button"
+                    aria-label="View tax rules"
+                    aria-haspopup="dialog"
+                    onClick={() => taxRulesDialog.current?.showModal()}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-blue-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-blue-400"
+                  >
+                    <HelpCircle size={16} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
 
               {projectId && (
@@ -829,15 +945,6 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                   </select>
                 </div>
               )}
-
-              {/* Tax rules badge */}
-              <div className="col-span-2 lg:flex-shrink-0 lg:self-end">
-                <TaxRulesBadge
-                  taxEnvironment={taxEnvironment}
-                  taxProjectType={taxProjectType}
-                  darkMode={true}
-                />
-              </div>
             </div>
 
             {/* Bill To - Collapsed Card */}
@@ -964,140 +1071,68 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </div>
             )}
 
-            {/* Transaction Location */}
             {selectedContactId && (
-              <div className="border border-gray-700 rounded-lg overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-750">
-                  <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Transaction Location</span>
-                  <span className="text-xs text-gray-500 ml-1">Determines tax jurisdiction</span>
-                </div>
-                <div className="p-3 space-y-2.5">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTransactionLocation('customer')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                        transactionLocation === 'customer'
-                          ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-600'
-                      }`}
-                    >
-                      <User className="w-3.5 h-3.5" />
-                      Customer Location
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTransactionLocation('dealer')}
-                      disabled={offices.length === 0}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                        transactionLocation === 'dealer'
-                          ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-600'
-                      }`}
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      Dealer / Pickup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTransactionLocation('custom')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                        transactionLocation === 'custom'
-                          ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white hover:bg-gray-600'
-                      }`}
-                    >
-                      <Truck className="w-3.5 h-3.5" />
-                      Custom Location
-                    </button>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-gray-700 px-3 py-2">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden="true" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Location</span>
+                <button
+                  type="button"
+                  disabled={!selectedContact || selectedContact.id !== selectedContactId}
+                  aria-label={transactionLocation === 'dealer' ? 'Use Customer Address' : 'Edit invoice location address'}
+                  onClick={() => {
+                    if (transactionLocation === 'dealer') {
+                      setTransactionLocation('customer');
+                      return;
+                    }
+                    setLocationError('');
+                    setLocationDraft(transactionLocation === 'custom' ? customLocation : {
+                      address: selectedContact?.street_address || '', city: selectedContact?.city || '',
+                      state: selectedContact?.state || '', zip: selectedContact?.zip_code || '',
+                    });
+                    locationDialog.current?.showModal();
+                  }}
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded px-2 py-1 text-left text-sm text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+                >
+                  <Pencil size={12} className="shrink-0" aria-hidden="true" />
+                  {transactionLocation === 'dealer' ? 'Use Customer Address' :
+                    [jobsiteAddress, jobsiteCity, jobsiteState, jobsiteZip].filter(Boolean).join(', ') || 'Add customer address'}
+                  {transactionLocation === 'custom' && <span className="text-xs text-gray-400">(invoice only)</span>}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={transactionLocation === 'dealer'}
+                  disabled={offices.length === 0}
+                  onClick={() => {
+                    if (transactionLocation === 'dealer') {
+                      setTransactionLocation('customer');
+                    } else {
+                      if (!selectedOfficeId) {
+                        const customerOffice = offices.find(office => office.id === selectedContact?.office_id);
+                        setSelectedOfficeId(customerOffice?.id || offices[0].id);
+                      }
+                      setTransactionLocation('dealer');
+                    }
+                  }}
+                  className="ml-auto inline-flex items-center gap-1.5 rounded border border-gray-600 px-2 py-1 text-xs text-gray-200 hover:bg-gray-700 aria-pressed:border-blue-500 aria-pressed:bg-blue-600 disabled:opacity-40"
+                >
+                  <Building2 size={14} aria-hidden="true" />
+                  Store Pickup
+                </button>
+                {transactionLocation === 'dealer' && (
+                  <div className="flex w-full flex-wrap items-center gap-2 text-xs text-gray-400">
+                    {offices.length > 1 && (
+                      <select
+                        aria-label="Pickup store"
+                        value={selectedOfficeId}
+                        onChange={event => setSelectedOfficeId(event.target.value)}
+                        className="rounded border border-gray-700 bg-gray-900 px-2 py-1 text-gray-200"
+                      >
+                        {offices.map(office => <option key={office.id} value={office.id}>{office.office_name}</option>)}
+                      </select>
+                    )}
+                    <span>{[jobsiteAddress, jobsiteCity, jobsiteState, jobsiteZip].filter(Boolean).join(', ')}</span>
                   </div>
-
-                  {/* Customer Location summary */}
-                  {transactionLocation === 'customer' && (
-                    <div className="text-xs text-gray-400 px-1">
-                      {selectedContact
-                        ? [selectedContact.street_address, selectedContact.city, selectedContact.state, selectedContact.zip_code].filter(Boolean).join(', ') || 'No address on file'
-                        : 'Select a customer first'}
-                    </div>
-                  )}
-
-                  {/* Dealer / Pickup office selector */}
-                  {transactionLocation === 'dealer' && (
-                    <div className="space-y-2">
-                      {offices.length > 1 && (
-                        <select
-                          value={selectedOfficeId}
-                          onChange={(e) => setSelectedOfficeId(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Select office...</option>
-                          {offices.map(o => (
-                            <option key={o.id} value={o.id}>{o.office_name}</option>
-                          ))}
-                        </select>
-                      )}
-                      {selectedOffice ? (
-                        <div className="text-xs text-gray-400 px-1">
-                          {selectedOffice.address_line1}{selectedOffice.address_line2 ? `, ${selectedOffice.address_line2}` : ''}, {selectedOffice.city}, {selectedOffice.state} {selectedOffice.zip}
-                        </div>
-                      ) : offices.length === 1 ? (
-                        <div className="text-xs text-gray-400 px-1">{offices[0].office_name}</div>
-                      ) : (
-                        <div className="text-xs text-gray-500 px-1">No active offices configured</div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Custom Location fields */}
-                  {transactionLocation === 'custom' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <div className="sm:col-span-2">
-                        <label className="block text-[11px] text-gray-400 mb-1">Address</label>
-                        <input
-                          type="text"
-                          value={customLocation.address}
-                          onChange={(e) => setCustomLocation(prev => ({ ...prev, address: e.target.value }))}
-                          placeholder="Street address..."
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">City</label>
-                        <input
-                          type="text"
-                          value={customLocation.city}
-                          onChange={(e) => setCustomLocation(prev => ({ ...prev, city: e.target.value }))}
-                          placeholder="City..."
-                          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[11px] text-gray-400 mb-1">State</label>
-                          <input
-                            type="text"
-                            value={customLocation.state}
-                            onChange={(e) => setCustomLocation(prev => ({ ...prev, state: e.target.value.toUpperCase().slice(0, 2) }))}
-                            placeholder="KS"
-                            maxLength={2}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-gray-400 mb-1">ZIP</label>
-                          <input
-                            type="text"
-                            value={customLocation.zip}
-                            onChange={(e) => setCustomLocation(prev => ({ ...prev, zip: e.target.value }))}
-                            placeholder="66101"
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             )}
 
@@ -1126,22 +1161,25 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </div>
 
               {/* Column Headers - Desktop only */}
-              <div className="hidden lg:grid grid-cols-[1fr_2fr_80px_100px_48px_96px_auto] gap-2 px-2 mb-1">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">SKU</span>
+              <div className="hidden lg:grid grid-cols-[16px_16px_minmax(0,1fr)_minmax(0,2fr)_80px_100px_48px_120px_96px_70px] gap-2 px-[9px] mb-1">
+                <span />
+                <span />
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Model</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Description</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider text-center">Qty</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider text-right">Unit Price</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider text-center">Tax</span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Tax Class</span>
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider text-right">Amount</span>
-                <span className="text-[10px] text-gray-500 w-20"></span>
+                <span />
               </div>
 
-              <div className="space-y-2">
+              <div ref={lineItemsRef} className="space-y-2">
                 {lineItems.map((item, index) => (
-                  <div key={item.id} className="bg-gray-750 rounded-lg border border-gray-700/80">
+                  <div key={item.id} data-invoice-row={item.id} className="bg-gray-750 rounded-lg border border-gray-700/80">
 
                     {/* Desktop Row */}
-                    <div className="hidden lg:flex gap-2 items-center px-2 py-2">
+                    <div className="hidden lg:grid grid-cols-[16px_16px_minmax(0,1fr)_minmax(0,2fr)_80px_100px_48px_120px_96px_70px] gap-2 items-center px-2 py-1.5">
                       {/* Reorder */}
                       <div className="flex flex-col gap-0 flex-shrink-0">
                         <button
@@ -1163,28 +1201,27 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </div>
                       <span className="text-[10px] text-gray-600 w-4 text-center flex-shrink-0">{index + 1}</span>
 
-                      {/* SKU */}
+                      {/* Model */}
                       <div className="flex-1 min-w-0">
                         <ProductStatusNotice product={item} />
                         <InlineProductSearch
-                          value={item.sku || ''}
-                          onChange={(value) => updateLineItem(item.id, 'sku', value)}
+                          value={item.model || ''}
+                          onChange={(value) => updateLineItem(item.id, 'model', value)}
                           onProductSelect={(product) => handleProductSelect(product, item.id)}
-                          onPackageSelect={handlePackageSelect}
-                          onTabAfterSelect={() => {
-                            const descInput = descriptionRefs.current[item.id];
-                            if (descInput) descInput.focus();
+                          onPackageSelect={(pkg) => handlePackageSelect(pkg, item.id)}
+                          dataRoomId={item.id}
+                          searchCatalog
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') event.preventDefault();
                           }}
-                          autoFocus={newRowId === item.id}
                           className="w-full px-2 py-1.5 text-sm bg-gray-900 border border-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="SKU / search..."
+                          placeholder="Search by model or name"
                         />
                       </div>
 
                       {/* Description */}
                       <div className="flex-[2] min-w-0">
                         <input
-                          ref={el => { descriptionRefs.current[item.id] = el; }}
                           type="text"
                           value={item.description}
                           onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
@@ -1232,6 +1269,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         value={item.tax_classification_code || 'material'}
                         onChange={(e) => updateLineItem(item.id, 'tax_classification_code', e.target.value)}
                         className="w-[120px] flex-shrink-0 px-1.5 py-1.5 text-xs bg-gray-900 border border-gray-700 rounded text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onKeyDown={event => advanceToNextRow(event, index)}
                         title="Tax classification"
                       >
                         <option value="material">Material</option>
@@ -1277,8 +1315,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     </div>
 
                     {/* Mobile/Tablet Card Layout */}
-                    <div className="lg:hidden p-3 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
+                    <div className="grid gap-2 p-3 md:grid-cols-2 lg:hidden">
+                      <div className="flex items-center justify-between gap-2 md:col-span-2">
                         <span className="text-[10px] text-gray-500 font-medium">#{index + 1}</span>
                         <div className="flex items-center gap-1">
                           <button type="button" onClick={() => moveLineItemUp(item.id)} disabled={index === 0}
@@ -1300,22 +1338,22 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         </div>
                       </div>
 
-                      {/* SKU Search */}
+                      {/* Model Search */}
                       <div>
-                        <label className="block text-[11px] text-gray-400 mb-1">SKU / Search</label>
+                        <label className="block text-[11px] text-gray-400 mb-1">Model</label>
                         <ProductStatusNotice product={item} />
                         <InlineProductSearch
-                          value={item.sku || ''}
-                          onChange={(value) => updateLineItem(item.id, 'sku', value)}
+                          value={item.model || ''}
+                          onChange={(value) => updateLineItem(item.id, 'model', value)}
                           onProductSelect={(product) => handleProductSelect(product, item.id)}
-                          onPackageSelect={handlePackageSelect}
-                          onTabAfterSelect={() => {
-                            const descInput = descriptionRefs.current[item.id];
-                            if (descInput) descInput.focus();
+                          onPackageSelect={(pkg) => handlePackageSelect(pkg, item.id)}
+                          dataRoomId={item.id}
+                          searchCatalog
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') event.preventDefault();
                           }}
-                          autoFocus={newRowId === item.id}
                           className="w-full px-3 py-2.5 text-sm bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Type SKU or product name..."
+                          placeholder="Search by model or name"
                         />
                       </div>
 
@@ -1323,7 +1361,6 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-1">Description *</label>
                         <input
-                          ref={el => { descriptionRefs.current[item.id] = el; }}
                           type="text"
                           value={item.description}
                           onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
@@ -1333,7 +1370,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </div>
 
                       {/* Qty / Price / Tax / Amount */}
-                      <div className="grid grid-cols-4 gap-2 items-end">
+                      <div className="grid grid-cols-4 items-end gap-2 md:col-span-2">
                         <div>
                           <label className="block text-[11px] text-gray-400 mb-1">Qty</label>
                           <input
@@ -1351,6 +1388,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                           <input
                             type="number"
                             value={item.unit_price}
+                            onKeyDown={isExemptProject ? event => advanceToNextRow(event, index) : undefined}
                             onChange={(e) => updateLineItem(item.id, 'unit_price', Number(e.target.value))}
                             min="0"
                             step="0.01"
@@ -1365,6 +1403,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                             checked={!isExemptProject && item.is_taxable}
                             disabled={isExemptProject}
                             onChange={(e) => updateLineItem(item.id, 'is_taxable', e.target.checked)}
+                            onKeyDown={event => advanceToNextRow(event, index)}
                             className="w-5 h-5 text-blue-600 rounded cursor-pointer mt-1.5"
                           />
                         </div>
@@ -1377,7 +1416,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       <button
                         type="button"
                         onClick={() => insertLineItemAfter(item.id)}
-                        className="w-full py-2 text-xs text-gray-500 hover:text-green-400 border border-dashed border-gray-700 hover:border-green-700 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-700 py-2 text-xs text-gray-500 transition-colors hover:border-green-700 hover:text-green-400 md:col-span-2"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Insert row below
@@ -1416,7 +1455,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </div>
 
               {/* Totals */}
-              <div className="mt-4 pt-4 border-t border-gray-700 flex justify-end">
+              <div className="mt-2 pt-2 border-t border-gray-700 flex justify-end">
                 <div
                   className="relative w-full sm:w-72 space-y-1.5"
                   onKeyDown={event => {
@@ -1434,7 +1473,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     <div className="flex items-center gap-2 text-gray-400">
                       <span>{isExemptProject || selectedContact?.is_tax_exempt
                         ? 'Sales tax (exempt)'
-                        : `Sales tax (${(getEffectiveTaxRate() * 100).toFixed(2)}%)`}</span>
+                        : awaitingLocationRate ? 'Sales tax' : `Sales tax (${(getEffectiveTaxRate() * 100).toFixed(2)}%)`}</span>
                       <button
                         type="button"
                         ref={taxHelpButton}
@@ -1447,7 +1486,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                         <HelpCircle size={16} aria-hidden="true" />
                       </button>
                     </div>
-                    <span className="font-medium text-white">{formatCurrency(calculateTax())}</span>
+                    <span className="font-medium text-white">
+                      {awaitingLocationRate ? (locationRate?.zip === alternateZip ? 'Rate unavailable' : 'Looking up rate…') : formatCurrency(calculateTax())}
+                    </span>
                   </div>
                   {showTaxExplanation && (
                     <div
@@ -1469,9 +1510,10 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </div>
                       <p>
                         {isExemptProject
-                          ? 'Exempt Project is selected. To submit with an exemption, the customer needs an active certificate for the transaction state.'
+                          ? 'Exempt Project is selected. To submit with an exemption, the customer needs an active certificate for the state shown under Location.'
                           : selectedContact?.is_tax_exempt
-                            ? 'The customer is marked Tax Exempt. At submission, MyJobView checks for an active certificate for the transaction state.'
+                            ? 'The customer is marked Tax Exempt. At submission, MyJobView checks for an active certificate for the state shown under Location.'
+                            : awaitingLocationRate ? 'MyJobView needs a rate for the ZIP shown under Location.'
                             : `This preview applies ${(getEffectiveTaxRate() * 100).toFixed(2)}% to taxable line items based on their tax settings, the environment, and project type. MyJobView recalculates tax at submission.`}
                       </p>
                       {selectedContactId ? (
@@ -1494,26 +1536,28 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                   )}
                   <div className="flex justify-between pt-2 border-t border-gray-700">
                     <span className="font-semibold text-white">Total</span>
-                    <span className="text-xl font-bold text-green-400">{formatCurrency(calculateTotal())}</span>
+                    <span className="text-xl font-bold text-green-400">{awaitingLocationRate ? '—' : formatCurrency(calculateTotal())}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Notes */}
-            <div>
-              <label className="block text-xs font-medium text-gray-400 mb-1">Invoice Notes</label>
+            <details>
+              <summary className="cursor-pointer text-xs font-medium text-gray-300">Invoice Notes</summary>
               <textarea
+                aria-label="Invoice Notes"
                 value={invoiceNotes}
                 onChange={(e) => setInvoiceNotes(e.target.value)}
                 rows={2}
                 placeholder="Add any additional notes for the customer..."
                 className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+            </details>
             </div>
 
             {/* Footer Actions */}
-            <div className="flex gap-3 justify-end pt-3 border-t border-gray-700">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-gray-700 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -1521,10 +1565,10 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               >
                 Cancel
               </button>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={customerVisible} onChange={e=>setCustomerVisible(e.target.checked)} />Customer-visible on submission (off = internal only)</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={customerVisible} onChange={e=>setCustomerVisible(e.target.checked)} />Visible to customer</label>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || awaitingLocationRate}
                 onClick={(e) => { e.preventDefault(); handleSubmit(e as any, 'draft'); }}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >
@@ -1533,7 +1577,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </button>
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || awaitingLocationRate}
                 onClick={(e) => { e.preventDefault(); handleSubmit(e as any, 'submit'); }}
                 className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >
@@ -1542,7 +1586,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </button>
               <button
                 type="button"
-                disabled={submitting || !customerVisible}
+                disabled={submitting || awaitingLocationRate || !customerVisible}
                 onClick={(e) => { e.preventDefault(); handleSubmit(e as any, 'submit_email'); }}
                 className="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >
@@ -1553,6 +1597,54 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           </form>
         </div>
       </div>
+
+      <dialog
+        ref={locationDialog}
+        aria-labelledby="invoice-location-title"
+        onCancel={event => { if (savingLocation) event.preventDefault(); }}
+        className="m-auto w-11/12 max-w-lg rounded-xl border border-gray-600 bg-gray-900 p-4 text-gray-200 shadow-xl backdrop:bg-black/70"
+      >
+        <h2 id="invoice-location-title" className="mb-3 font-semibold text-white">Edit Location</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {(['address', 'city', 'state', 'zip'] as const).map(field => (
+            <label key={field} className={field === 'address' || field === 'city' ? 'col-span-2 text-xs' : 'text-xs'}>
+              {{ address: 'Street address', city: 'City', state: 'State', zip: 'ZIP' }[field]}
+              <input
+                value={locationDraft[field]}
+                disabled={savingLocation}
+                onChange={event => setLocationDraft(prev => ({ ...prev, [field]: event.target.value }))}
+                maxLength={field === 'state' ? 2 : undefined}
+                className="mt-1 w-full rounded border border-gray-700 bg-gray-800 px-2 py-1.5 text-base text-white lg:text-sm"
+              />
+            </label>
+          ))}
+        </div>
+        {locationError && <p role="alert" className="mt-3 text-sm text-red-300">{locationError}</p>}
+        <div className="mt-4 flex flex-wrap justify-end gap-2 text-sm">
+          <button type="button" disabled={savingLocation} onClick={() => locationDialog.current?.close()} className="rounded border border-gray-600 px-2 py-1.5">Cancel</button>
+          <button type="button" disabled={savingLocation} onClick={() => void saveLocation(false)} className="rounded bg-gray-700 px-2 py-1.5">Use for This Invoice</button>
+          <button type="button" disabled={savingLocation} onClick={() => void saveLocation(true)} className="rounded bg-blue-600 px-2 py-1.5 text-white">{savingLocation ? 'Updating…' : 'Update Customer Record'}</button>
+        </div>
+      </dialog>
+
+      <dialog
+        ref={taxRulesDialog}
+        aria-labelledby="invoice-tax-rules-title"
+        className="m-auto w-11/12 max-w-md rounded-xl border border-gray-600 bg-gray-900 p-4 text-gray-300 shadow-xl backdrop:bg-black/70"
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 id="invoice-tax-rules-title" className="font-semibold text-white">Tax Rules</h2>
+          <button
+            type="button"
+            aria-label="Close tax rules"
+            onClick={() => taxRulesDialog.current?.close()}
+            className="rounded p-2 hover:bg-gray-700 hover:text-white focus-visible:outline focus-visible:outline-blue-400"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <TaxRulesBadge taxEnvironment={taxEnvironment} taxProjectType={taxProjectType} darkMode showTitle={false} />
+      </dialog>
 
       {showCatalogBrowser && (
         <InvoiceCatalogBrowser
