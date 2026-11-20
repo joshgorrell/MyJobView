@@ -15,6 +15,7 @@ export const TaxRulesBadge=()=>null;
 // ZIP completion is tested separately; this billing fixture has a verified customer ZIP.
 export const requireCustomerZip=async()=> '66604';
 export const computeInvoiceTax=({lineItems})=>({subtotal:lineItems.reduce((s,l)=>s+l.amount,0),taxAmount:0,total:lineItems.reduce((s,l)=>s+l.amount,0)});
+export const verifyInvoiceTax=async(invoiceId)=>{window.saved.push({name:'verifyInvoiceTax',invoiceId});};
 export const supabase={rpc:async(name,args)=>{window.saved.push({name,args});return{data:'invoice',error:null};},from(table){let selection='';let eqs={};const q={select:s=>{selection=s;return q;},eq:(key,value)=>{eqs[key]=value;return q;},neq:()=>q,in:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:table==='company_settings'?{default_labor_rate:100,portal_invoices_enabled:true}:null,error:null}),single:async()=>({data:null,error:null}),then:resolve=>Promise.resolve({data:table==='work_orders'?(eqs.id?orders.filter(w=>w.id===eqs.id):orders):table==='service_billing_queue'?[{work_order_id:'a',status:'ready_for_billing'},{work_order_id:'b',status:'ready_for_billing'}]:table==='service_parts_used'?parts:table==='time_entries'?[{id:'t1',technician_id:'tech1',work_order_id:'a',total_hours:2,clock_out:'2026-10-05',status:'draft',profiles:{first_name:'Tech',last_name:'One'}},{id:'t2',technician_id:'tech2',work_order_id:'b',total_hours:2.13,clock_out:'2026-10-05',status:'submitted',profiles:{first_name:'Tech',last_name:'Two'}}]:table==='job_completions'?[{tech_notes:'Internal visit notes'}]:[],error:null}).then(resolve)};return q;}};`;
 const source=`import React from 'react';import{createRoot}from'react-dom/client';import{CreateInvoiceFromWorkOrderModal}from'./src/components/Invoices/CreateInvoiceFromWorkOrderModal';createRoot(document.getElementById('root')).render(<CreateInvoiceFromWorkOrderModal preSelectedWorkOrderId="a" onClose={()=>{}} onSuccess={()=>{}}/>);`;
 let browser;
@@ -31,7 +32,24 @@ try {
   await page.getByRole('button',{name:/Catalog Parts/}).click();await page.getByRole('button',{name:'Add catalog item',exact:true}).click();assert.equal(await page.getByPlaceholder('Description').count(),4,'Another identical catalog item is not dropped');
   const labor=page.getByPlaceholder('Description').filter({hasText:'Service labor'});const descriptions=await page.getByPlaceholder('Description').evaluateAll(nodes=>nodes.map(n=>n.value));const index=descriptions.indexOf('Service labor');await page.getByPlaceholder('Qty',{exact:true}).nth(index).fill('4.5');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false,`No horizontal page overflow at ${width}`);
-  await page.getByRole('button',{name:'Submit Invoice',exact:true}).click();const saved=await page.evaluate(()=>window.saved);assert.equal(saved.length,1);assert.deepEqual(saved[0].args.p_work_order_ids,['a','b']);assert.equal(saved[0].args.p_portal,true);assert.equal(saved[0].args.p_publish,true);assert.equal(saved[0].args.p_lines.find(l=>l.item_type==='labor').quantity,4.5);assert.deepEqual(saved[0].args.p_lines.filter(l=>l.source_part_id).map(l=>l.source_part_id),['part-a','part-b','part-c']);assert.ok(saved[0].args.p_lines.filter(l=>l.source_part_id).every(l=>l.unit_price===100&&l.notes_visible_on_invoice===false));assert.deepEqual(errors,[]);await page.close();
+  await page.getByRole('button',{name:'Submit Invoice',exact:true}).click();await page.waitForFunction(()=>window.saved.length===3);
+  const [draft, verification, publish]=await page.evaluate(()=>window.saved);
+  assert.equal(draft.name,'save_work_order_invoice');
+  assert.deepEqual(draft.args.p_work_order_ids,['a','b']);
+  assert.equal(draft.args.p_publish,false);
+  assert.equal(draft.args.p_lines.find(l=>l.item_type==='labor').quantity,4.5);
+  const parts=draft.args.p_lines.filter(l=>l.source_part_id);
+  assert.deepEqual(parts.map(l=>l.source_part_id),['part-a','part-b','part-c']);
+  assert.ok(parts.every(l=>l.unit_price===100&&l.notes_visible_on_invoice===false));
+  assert.deepEqual(verification,{name:'verifyInvoiceTax',invoiceId:'invoice'});
+  assert.equal(publish.name,'save_work_order_invoice');
+  assert.deepEqual(publish.args.p_work_order_ids,['a','b']);
+  assert.equal(publish.args.p_invoice_id,'invoice');
+  assert.equal(publish.args.p_request_id,draft.args.p_request_id);
+  assert.equal(publish.args.p_portal,true);
+  assert.equal(publish.args.p_publish,true);
+  assert.equal(publish.args.p_lines,null);
+  assert.deepEqual(errors,[]);await page.close();
  }
  console.log('Mobile/desktop linked visit review, editable hours, catalog additions, selling prices and portal publication passed.');
 }finally{await browser?.close();server.close();await rm(directory,{recursive:true,force:true});}
