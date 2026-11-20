@@ -17,6 +17,7 @@ import ConfirmModal from '../ui/ConfirmModal';
 import {
   getTaxApplicability, getProjectTypeDisplayName, getEnvironmentDisplayName,
   checkTaxFinalizationGuard,
+  verifyAndSubmitInvoice,
   type TaxEnvironment, type TaxProjectType
 } from '../../lib/taxCalculations';
 
@@ -167,6 +168,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
   const [officeAddress, setOfficeAddress] = useState<OfficeAddress | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [submittingDraft, setSubmittingDraft] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -747,11 +749,24 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
           </div>}
           {/* Action Bar */}
           <div className="flex items-center gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 flex-wrap">
-            {!readonly && !customerView && canManageBilling && invoice.status==='draft' && <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm" onClick={async()=>{
-              const {data:links}=await supabase.from('work_order_invoice_links').select('work_order_id').eq('invoice_id',invoice.id).limit(1);
-              if(links?.[0]) setEditWorkOrderId(links[0].work_order_id);
-              else {const {data,error}=await supabase.rpc('submit_invoice',{p_invoice_id:invoice.id});if(error || !data?.success)notify(error?.message || data?.errors?.join(', ') || 'Submission failed', { theme: 'emerald', tone: 'error' });else loadInvoice();}
-            }}> {invoice.source_type ? 'Submit Invoice' : 'Review & Submit'} </button>}
+            {!readonly && !customerView && canManageBilling && invoice.status==='draft' && <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm" disabled={submittingDraft} onClick={async () => {
+              setSubmittingDraft(true);
+              try {
+                const { data: links, error } = await supabase.from('work_order_invoice_links')
+                  .select('work_order_id').eq('invoice_id', invoice.id).limit(1);
+                if (error) throw new Error(error.message);
+                if (links?.[0]) {
+                  setEditWorkOrderId(links[0].work_order_id);
+                } else {
+                  await verifyAndSubmitInvoice(invoice.id);
+                  await loadInvoice();
+                }
+              } catch (error) {
+                notify(error instanceof Error ? error.message : 'Invoice submission failed.', { theme: 'emerald', tone: 'error' });
+              } finally {
+                setSubmittingDraft(false);
+              }
+            }}>{submittingDraft ? 'Submitting…' : invoice.source_type ? 'Submit Invoice' : 'Review & Submit'}</button>}
             {!readonly && !customerView && canManageBilling && ['submitted','overdue'].includes(invoice.status) && invoice.amount_paid===0 && !invoice.security_billing_cycle_id && <button className="px-4 py-2 rounded-lg border text-sm" onClick={async()=>{
               const reason=(await requestText('Unlock this invoice for changes? It will be hidden from the portal until resubmitted. Previously delivered copies and QuickBooks links remain issued. Enter the reason:', '', { theme: 'emerald' }));
               if(!reason?.trim())return;
