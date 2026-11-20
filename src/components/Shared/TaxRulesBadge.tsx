@@ -7,9 +7,10 @@ interface TaxRulesBadgeProps {
   darkMode?: boolean;
   state?: string;
   reviewRequired?: boolean;
+  showTitle?: boolean;
 }
 
-export function TaxRulesBadge({ taxEnvironment, taxProjectType, darkMode = false, state = 'KS', reviewRequired = false }: TaxRulesBadgeProps) {
+export function TaxRulesBadge({ taxEnvironment, taxProjectType, darkMode = false, state = 'KS', reviewRequired = false, showTitle = true }: TaxRulesBadgeProps) {
   const taxInfo = getTaxApplicability(
     taxEnvironment as TaxEnvironment,
     taxProjectType as TaxProjectType,
@@ -26,7 +27,7 @@ export function TaxRulesBadge({ taxEnvironment, taxProjectType, darkMode = false
 
   return (
     <div className={containerCls}>
-      <p className={labelCls}>Tax Rules</p>
+      {showTitle && <p className={labelCls}>Tax Rules</p>}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           {taxInfo.partsTaxable ? (

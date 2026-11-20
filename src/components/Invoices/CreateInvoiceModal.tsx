@@ -153,6 +153,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [dueDateAutoSet, setDueDateAutoSet] = useState(false);
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [customerVisible, setCustomerVisible] = useState(true);
+  const taxRulesDialog = useRef<HTMLDialogElement>(null);
   const [showTaxExplanation, setShowTaxExplanation] = useState(false);
   const taxHelpButton = useRef<HTMLButtonElement>(null);
 
@@ -794,21 +795,32 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               {/* Project Type */}
               <div className="col-span-2 lg:flex-1 lg:min-w-[180px]">
                 <label className="block text-xs font-medium text-gray-400 mb-1">Project Type *</label>
-                <select
-                  value={taxProjectType}
-                  onChange={(e) => setTaxProjectType(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="original_construction">Original Construction</option>
-                  <option value="remodel">Remodel</option>
-                  <option value="general_installation_repair">General Installation/Repair or Retail</option>
-                  <option value="exempt_project">Exempt Project</option>
-                  <option value="design_services">Design Services</option>
-                  <option value="maintenance_agreement">Maintenance Agreement</option>
-                  <option value="membership">Membership</option>
-                  <option value="security_monitoring">Security Monitoring</option>
-                </select>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={taxProjectType}
+                    onChange={(e) => setTaxProjectType(e.target.value)}
+                    required
+                    className="min-w-0 w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="original_construction">Original Construction</option>
+                    <option value="remodel">Remodel</option>
+                    <option value="general_installation_repair">General Installation/Repair or Retail</option>
+                    <option value="exempt_project">Exempt Project</option>
+                    <option value="design_services">Design Services</option>
+                    <option value="maintenance_agreement">Maintenance Agreement</option>
+                    <option value="membership">Membership</option>
+                    <option value="security_monitoring">Security Monitoring</option>
+                  </select>
+                  <button
+                    type="button"
+                    aria-label="View tax rules"
+                    aria-haspopup="dialog"
+                    onClick={() => taxRulesDialog.current?.showModal()}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-blue-300 hover:bg-gray-700 focus-visible:outline focus-visible:outline-blue-400"
+                  >
+                    <HelpCircle size={16} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
 
               {projectId && (
@@ -829,15 +841,6 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                   </select>
                 </div>
               )}
-
-              {/* Tax rules badge */}
-              <div className="col-span-2 lg:flex-shrink-0 lg:self-end">
-                <TaxRulesBadge
-                  taxEnvironment={taxEnvironment}
-                  taxProjectType={taxProjectType}
-                  darkMode={true}
-                />
-              </div>
             </div>
 
             {/* Bill To - Collapsed Card */}
@@ -964,18 +967,18 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               </div>
             )}
 
-            {/* Transaction Location */}
+            {/* Sales Tax Address */}
             {selectedContactId && (
               <div className="border border-gray-700 rounded-lg overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-750">
                   <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Transaction Location</span>
-                  <span className="text-xs text-gray-500 ml-1">Determines tax jurisdiction</span>
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sales Tax Address</span>
                 </div>
                 <div className="p-3 space-y-2.5">
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
+                      aria-pressed={transactionLocation === 'customer'}
                       onClick={() => setTransactionLocation('customer')}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                         transactionLocation === 'customer'
@@ -984,10 +987,11 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       }`}
                     >
                       <User className="w-3.5 h-3.5" />
-                      Customer Location
+                      Customer Address
                     </button>
                     <button
                       type="button"
+                      aria-pressed={transactionLocation === 'dealer'}
                       onClick={() => setTransactionLocation('dealer')}
                       disabled={offices.length === 0}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -997,10 +1001,11 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       }`}
                     >
                       <Building2 className="w-3.5 h-3.5" />
-                      Dealer / Pickup
+                      Pickup Address
                     </button>
                     <button
                       type="button"
+                      aria-pressed={transactionLocation === 'custom'}
                       onClick={() => setTransactionLocation('custom')}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                         transactionLocation === 'custom'
@@ -1009,7 +1014,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       }`}
                     >
                       <Truck className="w-3.5 h-3.5" />
-                      Custom Location
+                      Other Address
                     </button>
                   </div>
 
@@ -1469,9 +1474,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </div>
                       <p>
                         {isExemptProject
-                          ? 'Exempt Project is selected. To submit with an exemption, the customer needs an active certificate for the transaction state.'
+                          ? 'Exempt Project is selected. To submit with an exemption, the customer needs an active certificate for the state in the Sales Tax Address.'
                           : selectedContact?.is_tax_exempt
-                            ? 'The customer is marked Tax Exempt. At submission, MyJobView checks for an active certificate for the transaction state.'
+                            ? 'The customer is marked Tax Exempt. At submission, MyJobView checks for an active certificate for the state in the Sales Tax Address.'
                             : `This preview applies ${(getEffectiveTaxRate() * 100).toFixed(2)}% to taxable line items based on their tax settings, the environment, and project type. MyJobView recalculates tax at submission.`}
                       </p>
                       {selectedContactId ? (
@@ -1553,6 +1558,25 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
           </form>
         </div>
       </div>
+
+      <dialog
+        ref={taxRulesDialog}
+        aria-labelledby="invoice-tax-rules-title"
+        className="m-auto w-11/12 max-w-md rounded-xl border border-gray-600 bg-gray-900 p-4 text-gray-300 shadow-xl backdrop:bg-black/70"
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 id="invoice-tax-rules-title" className="font-semibold text-white">Tax Rules</h2>
+          <button
+            type="button"
+            aria-label="Close tax rules"
+            onClick={() => taxRulesDialog.current?.close()}
+            className="rounded p-2 hover:bg-gray-700 hover:text-white focus-visible:outline focus-visible:outline-blue-400"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <TaxRulesBadge taxEnvironment={taxEnvironment} taxProjectType={taxProjectType} darkMode showTitle={false} />
+      </dialog>
 
       {showCatalogBrowser && (
         <InvoiceCatalogBrowser
