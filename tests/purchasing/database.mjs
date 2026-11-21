@@ -65,6 +65,7 @@ await db.exec(
 );
 await db.exec(await readFile("supabase/migrations/20261008222600_catalog_product_lifecycle.sql", "utf8"));
 await db.exec(await readFile("supabase/migrations/20261122000100_lock_issued_purchase_order_line_prices.sql", "utf8"));
+await db.exec(await readFile("supabase/migrations/20261122000200_close_issued_po_snapshot_bypasses.sql", "utf8"));
 await db.exec(
   "grant usage on schema public,auth to authenticated;grant select on profiles,vendors,warehouses,company_offices,product_requests,product_request_items to authenticated;grant all on purchase_orders,po_items to authenticated;set role authenticated",
 );
@@ -194,6 +195,18 @@ await assert.rejects(
 await assert.rejects(
   db.query("update po_items set total_price=total_price+1 where id=$1", [polines[0].id]),
   /historical snapshots/,
+);
+await assert.rejects(
+  db.query("update po_items set quantity=quantity+1 where id=$1", [polines[0].id]),
+  /historical snapshots/,
+);
+await assert.rejects(
+  db.query("delete from po_items where id=$1", [polines[0].id]),
+  /cannot be deleted/,
+);
+await assert.rejects(
+  db.query("update purchase_orders set status='draft' where id=$1", [po]),
+  /cannot be reopened/,
 );
 const quantities = polines.map((l) => ({
   id: l.id,
