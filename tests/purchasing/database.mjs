@@ -164,6 +164,7 @@ const beforeVendorRefresh = (await db.query(
 )).rows;
 await db.exec("reset role");
 await db.query("update products set is_active=false where id=$1", [product]);
+await db.query("update products set is_active=true where id=$1", [product]);
 await db.exec("set role authenticated");
 const afterVendorRefresh = (await db.query(
   "select id,unit_price,total_price from po_items where po_id=$1 order by id", [po]
