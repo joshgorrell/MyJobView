@@ -78,7 +78,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
   };
 
   return (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex items-center gap-1 sm:gap-2 min-w-0 w-full">
       <div className="hidden xl:flex flex-shrink-0 items-center gap-1 text-brand">
         <Star className="w-4 h-4 fill-current" />
         <span className="text-xs font-semibold uppercase tracking-wider hidden lg:inline">Favorites</span>
@@ -92,7 +92,7 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
           Click the <Star className="w-3 h-3 inline mx-1" /> on any menu item to add it here
         </div>
       ) : (
-        <nav ref={navigationRef} className="flex gap-1.5 sm:gap-2 overflow-x-auto min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
+        <nav ref={navigationRef} className="flex w-full gap-1 sm:gap-2 overflow-x-auto overscroll-x-contain min-w-0 py-0.5 scrollbar-hide" aria-label="Bookmarked pages">
           {starredModules.map((module) => {
           const isActive = activeModule === module.module_key || workspaceMenuKey(activeModule) === module.module_key;
 
@@ -121,12 +121,12 @@ export function QuickAccessNavigation({ activeModule, onModuleChange }: QuickAcc
                   onModuleChange(module.module_key);
                 }
               }}
-              className={`min-h-11 px-2 sm:px-3 py-1.5 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
+              className={`min-h-10 sm:min-h-11 px-2 sm:px-3 py-1 font-medium transition-all relative whitespace-nowrap flex-shrink-0 rounded-lg ${getColorClass(isActive)}`}
               title={`${module.display_name} (${module.description || 'Quick access'})`}
             >
               <div className="flex items-center gap-2">
                 {module.module_key === 'feed' ? <FlowWaveIcon className="w-4 h-4 text-lg" /> : renderIcon(module.icon, "w-4 h-4")}
-                <span className="text-xs sm:text-sm font-semibold">{module.display_name}</span>
+                <span className="text-[11px] sm:text-sm font-semibold">{module.display_name}</span>
                 {showBadge && <ActivityBadge count={badgeCount} className="absolute -top-1 -right-1 pointer-events-none" />}
               </div>
             </button>
