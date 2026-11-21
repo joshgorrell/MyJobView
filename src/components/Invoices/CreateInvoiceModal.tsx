@@ -1,3 +1,4 @@
+import { snapshotDocumentLine } from '../../lib/documentPriceSnapshot';
 import { requireCustomerZip, validCustomerZip } from '../../lib/customerZip';
 import { notify } from '../../lib/feedback';
 import ProductStatusNotice from '../Products/ProductStatusNotice';
@@ -461,7 +462,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       : lineItems.find(isBlankLineItem);
     const row = target || blankLineItem();
     const price = product.our_price || 0;
-    const updated: LineItem = {
+    const updated: LineItem = snapshotDocumentLine({
       ...row,
       product_id: product.id,
       sku: product.sku,
@@ -473,7 +474,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       amount: row.quantity * price,
       is_taxable: product.is_taxable !== false,
       source_type: 'catalog',
-    };
+    });
     const rows = target
       ? lineItems.map(item => item.id === target.id ? updated : item)
       : [...lineItems, updated];
@@ -489,7 +490,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   }
 
   function handlePackageSelect(packageData: any, rowId: string) {
-    const newItems: LineItem[] = (packageData.items || []).map((item: any) => ({
+    const newItems: LineItem[] = (packageData.items || []).map((item: any) => snapshotDocumentLine({
       id: crypto.randomUUID(),
       product_id: item.product?.id,
       sku: item.product?.sku,
