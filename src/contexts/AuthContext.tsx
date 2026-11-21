@@ -6,6 +6,7 @@ import { Profile, CompanySettings } from '../lib/types';
 import { parseUserAgent } from '../lib/userAgentParser';
 import { browserInstallationId } from '../lib/sessionDevices';
 import { isValidReturnHost } from '../lib/crossDomainAuth';
+import { isRootDealerLogin, navigateToDealerBridge, resolveAuthenticatedDealerHost } from '../lib/dealerLoginRouting';
 import { MJV_IDLE_TIMEOUT_MS, MJV_IDLE_WARNING_MS, remainingIdleMs, mayResetOnReload } from '../lib/sessionInactivity';
 
 interface AuthContextType {
@@ -267,6 +268,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       bridgeUrl.searchParams.set('return_to', redirectTo);
       bridgeUrl.searchParams.set('path', returnPath);
       window.location.replace(bridgeUrl.toString());
+    } else if (isRootDealerLogin() && data.user.user_metadata?.is_portal_user !== true) {
+      // Root-domain staff login: derive destination from authenticated membership.
+      // If no active organization can be resolved, retain the existing root login
+      // rather than guessing a dealer or transferring credentials elsewhere.
+      try {
+        const dealerHost = await resolveAuthenticatedDealerHost(data.user.id);
+        if (dealerHost) navigateToDealerBridge(dealerHost);
+      } catch (routingError) {
+        console.error('Unable to resolve dealer workspace:', routingError);
+      }
     }
   }
 
