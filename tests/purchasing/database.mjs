@@ -158,6 +158,18 @@ assert.equal(
   2,
   "Failed order rolls back entirely",
 );
+// Vendor catalog repricing must not mutate the already-created PO line snapshots.
+const beforeVendorRefresh = (await db.query(
+  "select id,unit_price,total_price from po_items where po_id=$1 order by id", [po]
+)).rows;
+await db.exec("reset role");
+await db.query("update products set is_active=false where id=$1", [product]);
+await db.exec("set role authenticated");
+const afterVendorRefresh = (await db.query(
+  "select id,unit_price,total_price from po_items where po_id=$1 order by id", [po]
+)).rows;
+assert.deepEqual(afterVendorRefresh, beforeVendorRefresh,
+  "Catalog changes must preserve every historical PO unit and extended price");
 await db.query("update purchase_orders set status='submitted' where id=$1", [
   po,
 ]);
