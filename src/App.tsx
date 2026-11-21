@@ -36,6 +36,7 @@ import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
+const DealerLoginRedirect = lazy(() => import('./components/Auth/DealerLoginRedirect').then(m => ({ default: m.DealerLoginRedirect })));
 const MarketingHomepage = lazy(() => import('./components/Marketing/MarketingHomepage'));
 const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
@@ -706,6 +707,14 @@ function AppContent() {
   // existing portal, bridge, and callback routes unchanged.
   if (isPublicMarketingRoot) {
     return <Suspense fallback={<LoadingFallback />}><MarketingHomepage /></Suspense>;
+  }
+
+  // Staff entering from the public homepage keep their existing authentication.
+  // Signed-in staff are routed using their authenticated organization membership.
+  if (isPublicMarketingRoot === false &&
+      (window.location.hostname === 'myjobview.com' || window.location.hostname === 'www.myjobview.com') &&
+      currentPath === '/dealer-login' && user && profile && !isPortalUser) {
+    return <Suspense fallback={<LoadingFallback />}><DealerLoginRedirect userId={user.id} /></Suspense>;
   }
 
   // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
