@@ -77,6 +77,7 @@ interface InvoiceDetail {
   tax_override_reason: string | null;
   tax_jurisdiction_id: string | null;
   tax_calculation_status: string | null;
+  tax_snapshot_id?: string | null;
   bill_to_contact_id: string | null;
   bill_to_contact?: {
     id: string;
@@ -151,6 +152,66 @@ function formatPaymentTerms(terms: string | null): string {
     'due_on_receipt': 'Due on Receipt',
   };
   return map[terms.toLowerCase()] || terms;
+}
+
+function InvoiceTaxVerification({ invoiceId, snapshotId, billedTax }: {
+  invoiceId: string;
+  snapshotId?: string | null;
+  billedTax: number;
+}) {
+  const [evidence, setEvidence] = useState<{
+    state: string | null;
+    taxable_subtotal: number | null;
+    sales_tax: number | null;
+    taxjar_verified_at: string | null;
+    tax_calculation_status: string | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(!!snapshotId);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!snapshotId) return;
+    let active = true;
+    async function loadVerification() {
+      const { data, error } = await supabase.from('tax_snapshots')
+        .select('state, taxable_subtotal, sales_tax, taxjar_verified_at, tax_calculation_status')
+        .eq('id', snapshotId!)
+        .eq('transaction_type', 'invoice')
+        .eq('transaction_id', invoiceId)
+        .maybeSingle();
+      if (!active) return;
+      setEvidence(data);
+      setFailed(!!error);
+      setLoading(false);
+    }
+    void loadVerification();
+    return () => { active = false; };
+  }, [invoiceId, snapshotId]);
+
+  const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+  return (
+    <details className="rounded-md border border-gray-200 p-2 text-xs text-gray-700">
+      <summary className="cursor-pointer font-medium">Saved tax verification</summary>
+      {loading ? <p className="mt-2">Loading…</p> : failed ? (
+        <p className="mt-2">Could not load the tax record.</p>
+      ) : !evidence ? (
+        <p className="mt-2">No tax record is available for this invoice.</p>
+      ) : (
+        <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
+          <dt>Status</dt><dd>{evidence.tax_calculation_status?.replace(/_/g, ' ') || 'Unknown'}</dd>
+          <dt>State</dt><dd>{evidence.state || 'Unknown'}</dd>
+          <dt>Taxable subtotal</dt><dd>{evidence.taxable_subtotal == null ? 'Unavailable' : money.format(evidence.taxable_subtotal)}</dd>
+          <dt>Tax in saved record</dt><dd>{evidence.sales_tax == null ? 'Unavailable' : money.format(evidence.sales_tax)}</dd>
+          <dt>Invoice tax</dt><dd>{money.format(billedTax)}</dd>
+          {evidence.sales_tax != null && Math.abs(evidence.sales_tax - billedTax) >= 0.005 && (
+            <dd className="col-span-2 text-amber-800">Saved tax differs from the invoice amount.</dd>
+          )}
+          <dt>TaxJar verified</dt>
+          <dd>{evidence.taxjar_verified_at ? new Date(evidence.taxjar_verified_at).toLocaleString() : 'Unavailable'}</dd>
+        </dl>
+      )}
+    </details>
+  );
 }
 
 export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVoided, onDeleted, readonly = false, customerView = false }: InvoiceDetailModalProps) {
@@ -336,7 +397,7 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
         notes, payment_terms, contact_id, sales_order_id, source_type,
         billing_name, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip,
         tax_environment, tax_project_type, tax_override, tax_override_reason, tax_jurisdiction_id,
-        tax_calculation_status, portal_visible, customer_visible_on_submit, qbo_invoice_id, qbo_void_pending, security_billing_cycle_id, edit_unlocked_at,
+        tax_calculation_status, tax_snapshot_id, portal_visible, customer_visible_on_submit, qbo_invoice_id, qbo_void_pending, security_billing_cycle_id, edit_unlocked_at,
         bill_to_contact_id,
         contacts:contact_id (
           contact_name, first_name, last_name, full_name, email, phone,
@@ -1176,6 +1237,15 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                       <span className="text-gray-400 italic text-xs self-center">Not applicable</span>
                     </div>
                   ) : null}
+
+                  {!customerView && canManageBilling && (
+                    <InvoiceTaxVerification
+                      key={`${invoice.id}:${invoice.tax_snapshot_id}:${invoice.status}`}
+                      invoiceId={invoice.id}
+                      snapshotId={invoice.tax_snapshot_id}
+                      billedTax={invoice.tax_amount}
+                    />
+                  )}
 
                   {/* Tax Details Toggle Button */}
                   {(invoice.tax_environment || invoice.tax_project_type) && (
