@@ -190,8 +190,8 @@ function InvoiceTaxVerification({ invoiceId, snapshotId, billedTax }: {
 
   const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
   return (
-    <details className="rounded-md border border-gray-200 p-2 text-xs text-gray-700">
-      <summary className="cursor-pointer font-medium">Saved tax verification</summary>
+    <section className="mt-2 rounded-md border border-gray-200 p-2 text-xs text-gray-700">
+      <h3 className="font-medium">Saved tax verification</h3>
       {loading ? <p className="mt-2">Loading…</p> : failed ? (
         <p className="mt-2">Could not load the tax record.</p>
       ) : !evidence ? (
@@ -210,7 +210,7 @@ function InvoiceTaxVerification({ invoiceId, snapshotId, billedTax }: {
           <dd>{evidence.taxjar_verified_at ? new Date(evidence.taxjar_verified_at).toLocaleString() : 'Unavailable'}</dd>
         </dl>
       )}
-    </details>
+    </section>
   );
 }
 
@@ -1238,17 +1238,8 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
                     </div>
                   ) : null}
 
-                  {!customerView && canManageBilling && (
-                    <InvoiceTaxVerification
-                      key={`${invoice.id}:${invoice.tax_snapshot_id}:${invoice.status}`}
-                      invoiceId={invoice.id}
-                      snapshotId={invoice.tax_snapshot_id}
-                      billedTax={invoice.tax_amount}
-                    />
-                  )}
-
                   {/* Tax Details Toggle Button */}
-                  {(invoice.tax_environment || invoice.tax_project_type) && (
+                  {(invoice.tax_environment || invoice.tax_project_type || (!customerView && canManageBilling)) && (
                     <div>
                       <button
                         onClick={() => setShowTaxDetails(v => !v)}
@@ -1282,6 +1273,14 @@ export function InvoiceDetailModal({ invoiceId, onClose, onPaymentRecorded, onVo
               {/* Tax Breakdown Panel */}
               {showTaxDetails && (invoice.tax_environment || invoice.tax_project_type) && (
                 <TaxBreakdownPanel invoice={invoice} fmt={fmt} />
+              )}
+              {showTaxDetails && !customerView && canManageBilling && (
+                <InvoiceTaxVerification
+                  key={`${invoice.id}:${invoice.tax_snapshot_id}:${invoice.status}`}
+                  invoiceId={invoice.id}
+                  snapshotId={invoice.tax_snapshot_id}
+                  billedTax={invoice.tax_amount}
+                />
               )}
             </div>
 
