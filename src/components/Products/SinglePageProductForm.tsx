@@ -342,13 +342,11 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Track the last user-edited field to prevent circular updates
   const [lastEditedField, setLastEditedField] = React.useState<'price' | 'margin' | 'cost' | null>(null);
 
-  // Auto-calculate price when cost or margin changes (but not when user has manually set a custom price)
+  // Dealer cost changes must not silently alter selling price.
+  // Only an explicit margin edit opts into recalculating the selling price here.
+  // Persistent cost-based pricing mode for API updates will be implemented separately.
   useEffect(() => {
-    // Only auto-calculate when:
-    // 1. User is NOT currently editing the price field
-    // 2. User has NOT manually set a custom price
-    // 3. The last field edited was the margin or cost field (NOT the price field)
-    if (!isEditingPrice && !userHasSetCustomPrice && (lastEditedField === 'margin' || lastEditedField === 'cost') && formData.cost > 0 && formData.margin_percent >= 0 && formData.margin_percent < 100) {
+    if (!isEditingPrice && !userHasSetCustomPrice && lastEditedField === 'margin' && formData.cost > 0 && formData.margin_percent >= 0 && formData.margin_percent < 100) {
       // Formula: Price = Cost / (1 - Margin%)
       // Example: $100 cost with 50% margin = $100 / (1 - 0.50) = $100 / 0.50 = $200
       const marginDecimal = formData.margin_percent / 100;
