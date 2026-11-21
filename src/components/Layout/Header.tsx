@@ -1,5 +1,5 @@
 import { DailyLaunchpad, DailyLaunchpadButton } from './DailyLaunchpad';
-import { Plus, Menu, X, ChevronDown, UserPlus, TrendingUp, Wrench, Headset, CheckSquare, Camera, Sparkles, Clock } from 'lucide-react';
+import { Plus, Menu, X, ChevronDown, UserPlus, TrendingUp, Wrench, Headset, CheckSquare, Camera, Sparkles, Clock, Search } from 'lucide-react';
 import { getIcon } from '../../lib/iconMap';
 import { FlowWaveIcon } from '../Flow/FlowWaveIcon';
 import { useState, useEffect, useRef } from 'react';
@@ -35,9 +35,10 @@ interface HeaderProps {
 export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, onCreateSupportRequest, onCreateTask, onCreateJobMedia, onCreateProjectTime, onLeadClick, onTaskClick, onMessageClick, onProposalClick, activeTab, onTabChange, isAdmin: _isAdmin, onMenuToggle, onNavigate, onOpenAIAssistant }: HeaderProps) {
   const { profile } = useAuth();
   const [businessCardPhoto, setBusinessCardPhoto] = useState<string | null>(null);
-  const { mainDepartments: _mainDepartments, footerDepartments: _footerDepartments, getUserModules: _getUserModules, starredModules, loading: deptLoading } = useDepartments();
+  const { mainDepartments, footerDepartments, getUserModules, starredModules, loading: deptLoading } = useDepartments();
   const [commandCenterOpen,setCommandCenterOpen] = useState(()=>new URLSearchParams(window.location.search).get('commandCenter')==='1');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileNavigationQuery, setMobileNavigationQuery] = useState('');
   const [_expandedMobileItems, _setExpandedMobileItems] = useState<Set<string>>(new Set());
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
@@ -51,6 +52,11 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
   ].filter((action): action is typeof action & { open: () => void } => !!action.open);
 
   const loading = deptLoading;
+  const mobileNavigationMatches = [...mainDepartments, ...footerDepartments].flatMap(dept =>
+    getUserModules(dept.id).filter(module =>
+      `${dept.display_name} ${module.display_name} ${module.module_key} ${module.description || ''}`.toLowerCase().includes(mobileNavigationQuery.trim().toLowerCase())
+    ).map(module => ({ ...module, departmentName: dept.display_name }))
+  );
   const initials = profile?.full_name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || '?';
   const avatar = (
     <button
@@ -161,6 +167,12 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
         <div className="relative grid h-14 w-full grid-cols-[minmax(0,1fr)_auto] md:flex items-center justify-between gap-2 sm:gap-4">
           {/* Menu Button and Logo - Left Side */}
           <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-3 md:flex-none">
+            <button
+              type="button"
+              onClick={() => { setMobileNavigationQuery(''); setMobileMenuOpen(true); }}
+              className="md:hidden shrink-0 w-10 h-11 flex items-center justify-center text-secondary hover:text-primary rounded-lg"
+              aria-label="Open menu"
+            ><Menu className="w-6 h-6" /></button>
             {onMenuToggle && (
               <button
                 onClick={onMenuToggle}
@@ -325,14 +337,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
               }}
             />
             {avatar}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="w-11 h-11 shrink-0 flex items-center justify-center text-muted hover:text-primary hover:bg-surface rounded-lg transition-colors"
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+
           </div>
         </div>
 
@@ -356,6 +361,28 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
             </div>
 
             <div className="px-4 py-4 flex flex-col gap-6">
+              <div>
+                <label htmlFor="mobile-navigation-search" className="sr-only">Search menu pages</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" aria-hidden="true" />
+                  <input id="mobile-navigation-search" type="search" autoComplete="off"
+                    placeholder="Search menu pages..." value={mobileNavigationQuery}
+                    onChange={event => setMobileNavigationQuery(event.target.value)}
+                    className="w-full pl-10 pr-3 py-3 bg-surface border border-subtle rounded-lg text-base text-primary focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              {mobileNavigationQuery.trim() ? (
+                <nav aria-label="Matching menu pages" className="space-y-1">
+                  {mobileNavigationMatches.map(module => (
+                    <button key={module.id} type="button" onClick={() => { handleMenuClick(module.module_key); setMobileNavigationQuery(''); }}
+                      className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-left text-secondary hover:bg-surface hover:text-primary">
+                      {renderIcon(module.icon, 'w-4 h-4 shrink-0')}
+                      <span className="min-w-0"><span className="block text-sm font-medium">{module.display_name}</span><span className="block text-xs text-muted">{module.departmentName}</span></span>
+                    </button>
+                  ))}
+                  {mobileNavigationMatches.length === 0 && <p className="text-center text-sm text-muted py-6">No matching pages</p>}
+                </nav>
+              ) : <>
               {onMenuToggle && (
                 <button
                   onClick={() => { setMobileMenuOpen(false); onMenuToggle(); }}
@@ -469,6 +496,7 @@ export function Header({ onCreateContact, onCreateLead, onCreateServiceRequest, 
                   )}
                 </div>
               </div>
+              </>}
             </div>
           </div>, document.body
         )}
