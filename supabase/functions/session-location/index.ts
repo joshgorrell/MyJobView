@@ -35,8 +35,8 @@ Deno.serve(async (req) => {
     // Missing IP must not prevent a valid session from being tracked.
     // Reject malformed values before sending them to the external geo provider.
     const validIp = ip && ip.length <= 45 && /^[0-9a-f:.]+$/i.test(ip) &&
-      (ip.includes(':') || /^(?:\\d{1,3}\\.){3}\\d{1,3}$/.test(ip)) &&
-      (!ip.includes('.') || ip.split('.').every(part => /^\\d+$/.test(part) && Number(part) <= 255));
+      (ip.includes(':') || /^(?:\d{1,3}\.){3}\d{1,3}$/.test(ip)) &&
+      (!ip.includes('.') || ip.split('.').every(part => /^\d+$/.test(part) && Number(part) <= 255));
     const usableIp = validIp ? ip : null;
 
     let location: Record<string, string | null> = { city: null, region: null, country: null, isp: null };
