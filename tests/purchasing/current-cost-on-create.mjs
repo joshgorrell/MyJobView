@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const src=readFileSync('src/components/Inventory/CreatePurchaseOrderModal.tsx','utf8');
+assert.match(src,/cost_manually_edited\?: boolean/);
+assert.match(src,/field === 'unit_cost' \? \{cost_manually_edited: true\}/);
+assert.match(src,/\.eq\('organization_id', profile\.organization_id\)\.in\('id', refreshIds\)/);
+assert.match(src,/lineItems\.filter\(li => li\.product_id && !li\.cost_manually_edited\)/);
+assert.match(src,/if \(!li\.product_id \|\| li\.cost_manually_edited\) return li/);
+assert.match(src,/p_items:submitLines\.map/);
+console.log('New PO current cost and manual override source contract passed');
