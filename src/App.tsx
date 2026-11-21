@@ -36,7 +36,8 @@ import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
-const MarketingHomepage = lazy(() => import('./components/Marketing/MarketingHomepage'));\nconst SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
+const MarketingHomepage = lazy(() => import('./components/Marketing/MarketingHomepage'));
+const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
 
