@@ -61,6 +61,7 @@ const supabase = {
 };
 const feedback = { notify() { throw new Error('Unexpected error feedback'); } };
 const invoice = harness('src/components/Invoices/CreateInvoiceModal.tsx', {
+  '../../lib/documentPriceSnapshot': { snapshotDocumentLine: line => ({ ...line, amount: Math.round(line.unit_price * line.quantity * 100) / 100 }) },
   '../../lib/feedback': feedback, '../../lib/supabase': { supabase },
   '../../contexts/AuthContext': { useAuth: () => ({ companySettings: { id: 'company' } }) },
   '../../lib/utils': { formatCurrency: value => `$${value}` },
