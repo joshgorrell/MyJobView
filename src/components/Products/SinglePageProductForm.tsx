@@ -1772,7 +1772,10 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                 <option value="margin">Target margin — based on dealer cost</option>
               </select>
               <p className="text-xs text-gray-500">{formData.pricing_mode === 'fixed' ? 'Dealer cost updates do not change selling price.' : formData.pricing_mode === 'retail' ? 'Uses verified vendor MSRP when available; otherwise keeps existing price.' : 'Selling price follows dealer cost at the chosen target margin.'}</p>
-              {formData.pricing_mode === 'retail' && <p className="text-xs text-gray-500">Vendor MSRP: {formData.vendor_retail_price == null ? 'Not available yet' : '
+              {formData.pricing_mode === 'retail' && <p className="text-xs text-gray-500">Vendor MSRP: {formData.vendor_retail_price == null ? 'Not available yet' : formData.vendor_retail_price.toFixed(2) + ' USD'}</p>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cost
                 </label>
