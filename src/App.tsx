@@ -36,6 +36,7 @@ import ProductsManagement from './components/Products/ProductsManagement';
 import { isValidReturnHost } from './lib/crossDomainAuth';
 import { getBusinessCardSlugFromLocation } from './lib/businessCardLinks';
 
+const MarketingHomepage = lazy(() => import('./components/Marketing/MarketingHomepage'));
 const SharedProposalPage = lazy(() => import('./components/Portal/SharedProposalPage'));
 const ProposalCheckResponse = lazy(() => import('./components/Reviews/ProposalCheckResponse'));
 const LostOpportunityForm = lazy(() => import('./components/Reviews/LostOpportunityForm'));
@@ -695,6 +696,12 @@ function AppContent() {
         <BusinessCardPage slug={publicCardSlug} isOwnCard={false} />
       </Suspense>
     );
+  }
+
+  // Public marketing homepage is root-domain only. Keep dealer subdomains and all
+  // existing portal, bridge, and callback routes unchanged.
+  if ((window.location.hostname === 'myjobview.com' || window.location.hostname === 'www.myjobview.com') && currentPath === '/') {
+    return <Suspense fallback={<LoadingFallback />}><MarketingHomepage /></Suspense>;
   }
 
   // --- INTERNAL-ONLY ROUTES (portal users never reach below this point) ---
