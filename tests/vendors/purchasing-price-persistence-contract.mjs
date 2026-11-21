@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const sql=readFileSync('supabase/migrations/20261006185842_purchasing_quote_requests.sql','utf8');
+const builder=sql.match(/CREATE FUNCTION public\.create_request_purchase_document\([\s\S]*?\$\$;/i)?.[0];
+assert.ok(builder,'Purchase document builder must exist');
+assert.match(builder,/unit\s*:=\s*coalesce\(\(payload->>'unit_price'\)::numeric,0\)/i,'Manual PO line cost must be captured from the submitted line');
+assert.match(builder,/INSERT INTO public\.po_items\([^)]+unit_price,total_price[^)]*\)\s*VALUES\([^;]+\bunit,round\(unit\*n,2\)/i,'PO line must persist a unit price snapshot');
+const receipt=sql.match(/CREATE (?:OR REPLACE )?FUNCTION public\.[a-z_]*receiv[a-z_]*\([\s\S]*?\$\$;/gi)||[];
+for(const fn of receipt)assert.doesNotMatch(fn,/UPDATE public\.po_items SET[^;]*\bunit_price\s*=/i,'Receiving must not overwrite original PO price');
+const planner=readFileSync('src/lib/vendorPriceSync.ts','utf8');
+assert.doesNotMatch(planner,/\.from\(['"](?:po_items|purchase_orders)['"]\)|UPDATE\s+(?:public\.)?po_items/i,'Vendor catalog planner must not write historical PO lines');
+console.log('Purchasing snapshot SQL contracts passed');
