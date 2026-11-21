@@ -667,7 +667,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
 
       if (action !== 'draft') {
         try {
-          await verifyAndSubmitInvoice(invoiceId);
+          await verifyAndSubmitInvoice(invoiceId, tax);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Tax verification or submission failed.';
           notify(`Invoice saved as a draft. ${message}`, { theme: 'emerald', tone: 'error' });
