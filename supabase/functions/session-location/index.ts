@@ -20,16 +20,28 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
 
-    const { session_id } = await req.json();
-    if (!session_id) throw new Error('Missing session_id');
+    // Reject malformed identifiers before making any privileged database request.
+    const payload = await req.json();
+    const session_id = payload?.session_id;
+    if (typeof session_id !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(session_id)) {
+      throw new Error('Invalid session_id');
+    }
 
+    // Forwarded headers are routing hints, NOT proof of the caller's location.
+    // Never use these values alone for account takeover alerts or access decisions.
     const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-    const ip = forwarded || req.headers.get('cf-connecting-ip') || null;
-    if (!ip) throw new Error('Unable to determine public IP');
+    const ip = forwarded || req.headers.get('cf-connecting-ip')?.trim() || null;
+    // Missing IP must not prevent a valid session from being tracked.
+    // Reject malformed values before sending them to the external geo provider.
+    const validIp = ip && ip.length <= 45 && /^[0-9a-f:.]+$/i.test(ip) &&
+      (ip.includes(':') || /^(?:\\d{1,3}\\.){3}\\d{1,3}$/.test(ip)) &&
+      (!ip.includes('.') || ip.split('.').every(part => /^\\d+$/.test(part) && Number(part) <= 255));
+    const usableIp = validIp ? ip : null;
 
     let location: Record<string, string | null> = { city: null, region: null, country: null, isp: null };
-    try {
-      const geo = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
+    if (usableIp) try {
+      const geo = await fetch(`https://ipwho.is/${encodeURIComponent(usableIp)}`, {
         signal: AbortSignal.timeout(2500),
       }).then(r => r.json());
       if (geo?.success !== false) {
@@ -55,9 +67,7 @@ Deno.serve(async (req) => {
     const { data: updated, error } = await admin
       .from('user_sessions')
       .update({
-        ip_address: ip,
-        ...location,
-        location_updated_at: new Date().toISOString(),
+        ...(usableIp ? { ip_address: usableIp, ...location, location_updated_at: new Date().toISOString() } : {}),
       })
       .eq('id', session_id)
       .eq('user_id', user.id)
