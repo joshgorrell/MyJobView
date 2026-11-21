@@ -185,7 +185,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   const [customLocation, setCustomLocation] = useState({ address: '', city: '', state: '', zip: '' });
   const [locationDraft, setLocationDraft] = useState(customLocation);
   const [locationError, setLocationError] = useState('');
-  const [locationRate, setLocationRate] = useState<{ zip: string; rate: number | null } | null>(null);
+  const [locationRate, setLocationRate] = useState<{ key: string; rate: number | null } | null>(null);
   const [savingLocation, setSavingLocation] = useState(false);
   const locationDialog = useRef<HTMLDialogElement>(null);
 
@@ -527,9 +527,9 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
   }
 
   function getEffectiveTaxRate() {
-    return locationRate?.zip === alternateZip && locationRate?.rate != null
+    return locationRate?.key === locationKey && locationRate?.rate != null
       ? locationRate.rate
-      : selectedContact?.tax_rate ?? 0.0935;
+      : 0;
   }
 
   const isExemptProject = taxProjectType === 'exempt_project';
@@ -576,8 +576,8 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
       return;
     }
 
-    if (awaitingLocationRate) {
-      notify('Confirm the tax rate for this location before saving.', { theme: 'emerald', tone: 'warning' });
+    if (action !== 'draft' && awaitingLocationRate) {
+      notify('Sales tax rate is unavailable for this location. You can save an open draft.', { theme: 'emerald', tone: 'warning' });
       return;
     }
 
@@ -796,24 +796,31 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
     : transactionLocation === 'dealer'
       ? (selectedOffice?.zip || null)
       : (customLocation.zip || null);
-  const alternateZip = transactionLocation !== 'customer' && jobsiteZip !== selectedContact?.zip_code &&
-    validCustomerZip(jobsiteZip) ? jobsiteZip : null;
-  const hasLocationRate = locationRate?.zip === alternateZip && locationRate?.rate != null;
-  const awaitingLocationRate = !!alternateZip && !isExemptProject && !selectedContact?.is_tax_exempt && !hasLocationRate;
+  const locationKey = JSON.stringify([jobsiteAddress, jobsiteCity, jobsiteState, jobsiteZip]);
+  const hasCompleteLocation = !!jobsiteAddress?.trim() && !!jobsiteCity?.trim()
+    && /^[A-Za-z]{2}$/.test(jobsiteState?.trim() ?? '') && validCustomerZip(jobsiteZip);
+  const hasLocationRate = locationRate?.key === locationKey && locationRate?.rate != null;
+  const awaitingLocationRate = !!selectedContact && !isExemptProject && !hasLocationRate;
 
   useEffect(() => {
-    setLocationRate(null);
-    if (!alternateZip || isExemptProject || selectedContact?.is_tax_exempt) return;
+    if (!hasCompleteLocation || isExemptProject || !jobsiteAddress || !jobsiteCity || !jobsiteState || !jobsiteZip) return;
     let current = true;
-    lookupTaxRateByZip(alternateZip)
-      .then(jurisdiction => {
-        if (current) setLocationRate({ zip: alternateZip, rate: jurisdiction?.combined_rate ?? null });
-      })
-      .catch(() => {
-        if (current) setLocationRate({ zip: alternateZip, rate: null });
+    const timer = window.setTimeout(() => {
+      lookupTaxRateByZip(jobsiteZip, {
+        street: jobsiteAddress.trim(),
+        city: jobsiteCity.trim(),
+        state: jobsiteState.trim().toUpperCase(),
+      }).then(jurisdiction => {
+        if (current) setLocationRate({ key: locationKey, rate: jurisdiction?.combined_rate ?? null });
+      }).catch(() => {
+        if (current) setLocationRate({ key: locationKey, rate: null });
       });
-    return () => { current = false; };
-  }, [alternateZip, isExemptProject, selectedContact?.is_tax_exempt]);
+    }, 300);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [hasCompleteLocation, isExemptProject, jobsiteAddress, jobsiteCity, jobsiteState, jobsiteZip, locationKey]);
 
   if (loading) {
     return (
@@ -1522,7 +1529,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </button>
                     </div>
                     <span className="font-medium text-white">
-                      {awaitingLocationRate ? (locationRate?.zip === alternateZip ? 'Rate unavailable' : 'Looking up rate…') : formatCurrency(calculateTax())}
+                      {awaitingLocationRate ? (!hasCompleteLocation ? 'Enter full location' : locationRate?.key === locationKey ? 'Rate unavailable' : 'Looking up rate…') : formatCurrency(calculateTax())}
                     </span>
                   </div>
                   {showTaxExplanation && (
@@ -1548,7 +1555,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                           ? 'Exempt Project is selected. To submit with an exemption, the customer needs an active certificate for the state shown under Location.'
                           : selectedContact?.is_tax_exempt
                             ? 'The customer is marked Tax Exempt. At submission, MyJobView checks for an active certificate for the state shown under Location.'
-                            : awaitingLocationRate ? 'MyJobView needs a rate for the ZIP shown under Location.'
+                            : awaitingLocationRate ? 'MyJobView needs a street-address rate for the invoice Location.'
                             : `This preview applies ${(getEffectiveTaxRate() * 100).toFixed(2)}% to taxable line items based on their tax settings, the environment, and project type. MyJobView recalculates tax at submission.`}
                       </p>
                       {selectedContactId ? (
@@ -1570,7 +1577,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-gray-700">
-                    <span className="font-semibold text-white">Total</span>
+                    <span className="font-semibold text-white">Estimated total</span>
                     <span className="text-xl font-bold text-green-400">{awaitingLocationRate ? '—' : formatCurrency(calculateTotal())}</span>
                   </div>
                 </div>
@@ -1603,7 +1610,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={customerVisible} onChange={e=>setCustomerVisible(e.target.checked)} />Visible to customer</label>
               <button
                 type="submit"
-                disabled={submitting || awaitingLocationRate}
+                disabled={submitting}
                 onClick={(e) => { e.preventDefault(); handleSubmit(e as any, 'draft'); }}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium transition-colors"
               >
