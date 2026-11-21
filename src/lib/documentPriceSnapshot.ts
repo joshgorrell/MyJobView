@@ -16,6 +16,12 @@ export function snapshotDocumentLine<T extends PricedDocumentLine>(line: T): T {
   return { ...line, amount: Math.round((line.unit_price * line.quantity + Number.EPSILON) * 100) / 100 };
 }
 
+/** Explicit user price edits are allowed at any time by the surrounding permissioned UI. */
+export function applyUserDocumentPriceEdit<T extends PricedDocumentLine>(line: T, newUnitPrice: number): T {
+  if (!money(newUnitPrice)) throw new Error('Invalid user selling price');
+  return snapshotDocumentLine({ ...line, unit_price: newUnitPrice });
+}
+
 /** Only updates internal cost; customer-facing unit price and amount stay frozen. */
 export function refreshDocumentLineCost<T extends PricedDocumentLine>(line: T, verifiedCost: number): T {
   if (!money(verifiedCost)) throw new Error('Invalid verified cost');
