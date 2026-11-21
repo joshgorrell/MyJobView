@@ -64,6 +64,7 @@ await db.exec(
   ),
 );
 await db.exec(await readFile("supabase/migrations/20261008222600_catalog_product_lifecycle.sql", "utf8"));
+await db.exec(await readFile("supabase/migrations/20261122000100_lock_issued_purchase_order_line_prices.sql", "utf8"));
 await db.exec(
   "grant usage on schema public,auth to authenticated;grant select on profiles,vendors,warehouses,company_offices,product_requests,product_request_items to authenticated;grant all on purchase_orders,po_items to authenticated;set role authenticated",
 );
@@ -185,6 +186,15 @@ assert.equal(
 const polines = (
   await db.query("select id,job_reference from po_items where po_id=$1", [po])
 ).rows;
+// Issued purchase-order prices must remain immutable, even for a direct DB write.
+await assert.rejects(
+  db.query("update po_items set unit_price=unit_price+1 where id=$1", [polines[0].id]),
+  /historical snapshots/,
+);
+await assert.rejects(
+  db.query("update po_items set total_price=total_price+1 where id=$1", [polines[0].id]),
+  /historical snapshots/,
+);
 const quantities = polines.map((l) => ({
   id: l.id,
   quantity: { Jones: 2, Weller: 5, Wilson: 1 }[l.job_reference],
