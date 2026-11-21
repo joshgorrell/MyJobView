@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, CheckCircle2, ShieldCheck, ChevronRight } from 'lucide-react';
+import { DollarSign, Map, MessageSquare, Save, ExternalLink, Sparkles, Mail, Eye, EyeOff, AlertTriangle, CreditCard, Check, CheckCircle2, ShieldCheck, ChevronRight, PackageSearch } from 'lucide-react';
 import { QuickBooksSettings } from './QuickBooksSettings';
 import { RingCentralSettings } from './RingCentralSettings';
 import { TechsafeSettings } from './TechsafeSettings';
 import { AssistSettings } from './AssistSettings';
+import { VendorIntegrationsSettings } from './VendorIntegrationsSettings';
 import { useAuth } from '../../contexts/AuthContext';
 import { TextMessagingSettings } from './TextMessagingSettings';
 import { SmsTemplateDrafts } from './SmsTemplateDrafts';
@@ -38,7 +39,7 @@ interface OrgPaymentSettings {
   has_bill_com_api_key?: boolean;
 }
 
-const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe', 'assist'] as const;
+const integrationIds = ['payment_processor', 'quickbooks', 'google_maps', 'twilio', 'openai', 'resend', 'ringcentral', 'techsafe', 'assist', 'vendors'] as const;
 type IntegrationId = typeof integrationIds[number];
 function integrationFromUrl(): IntegrationId {
   const params = new URLSearchParams(window.location.search);
@@ -484,6 +485,7 @@ export function IntegrationsSettings() {
             { id: 'quickbooks', label: 'QuickBooks', icon: DollarSign, used: quickbooksConnected, status: 'Connected' },
             { id: 'google_maps', label: 'Google Maps', icon: Map, used: !!originalSettings.google_maps_api_key?.trim(), status: 'API key saved' },
             { id: 'techsafe', label: 'Techsafe', icon: ShieldCheck, used: techsafeConnected, status: 'Active connection registered' },
+            { id: 'vendors', label: 'Vendors', icon: PackageSearch, used: false, status: 'Not connected' },
             { id: 'ringcentral', label: 'RingCentral', icon: MessageSquare, used: ringcentralConnected, status: 'Connected' },
             { id: 'twilio', label: 'Twilio SMS', icon: MessageSquare,
               used: !!(originalSettings.twilio_account_sid?.trim() && originalSettings.twilio_phone_number?.trim() && originalSettings.has_twilio_auth_token), status: 'SMS credentials saved' },
@@ -515,6 +517,7 @@ export function IntegrationsSettings() {
       {activeIntegration === 'ringcentral' && <RingCentralSettings onConnectionChange={setRingcentralConnected} />}
       {activeIntegration === 'techsafe' && <TechsafeSettings onConnectionChange={setTechsafeConnected} />}
       {activeIntegration === 'assist' && <AssistSettings />}
+      {activeIntegration === 'vendors' && <VendorIntegrationsSettings />}
 
       {/* Payment Processor Integration */}
       {activeIntegration === 'payment_processor' && (
