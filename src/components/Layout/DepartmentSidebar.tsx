@@ -157,7 +157,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
 
   const filterModules = (modules: any[]) => {
     if (!searchQuery.trim()) return modules;
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
     return modules.filter(m =>
       m.display_name.toLowerCase().includes(query) ||
       m.module_key.toLowerCase().includes(query) ||
@@ -168,7 +168,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
   const allDepartments = [...mainDepartments, ...footerDepartments];
   const filteredDepartments = allDepartments.map(dept => ({
     ...dept,
-    modules: filterModules(getUserModules(dept.id))
+    modules: dept.display_name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ? getUserModules(dept.id) : filterModules(getUserModules(dept.id))
   })).filter(dept => dept.modules.length > 0 || !searchQuery.trim());
 
   const allExpanded = filteredDepartments.length > 0 && filteredDepartments.every(d => expandedDepartments.has(d.id));
@@ -181,15 +181,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
     }
   };
 
-  // Auto-expand departments with matching modules when searching
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const deptIdsWithMatches = filteredDepartments
-        .filter(dept => dept.modules.length > 0)
-        .map(dept => dept.id);
-      setExpandedDepartments(new Set(deptIdsWithMatches));
-    }
-  }, [searchQuery, filteredDepartments]);
+  // Search results render expanded without modifying the user's saved expansion preferences.
 
   if (loading) {
     return null;
@@ -271,7 +263,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
               <input
                 type="text"
-                placeholder="Search modules..."
+                placeholder="Search menu pages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-surface border border-subtle rounded-lg text-sm text-secondary placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -282,7 +274,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
           <nav className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredDepartments.map((dept) => {
               const modules = dept.modules;
-              const isExpanded = expandedDepartments.has(dept.id);
+              const isExpanded = Boolean(searchQuery.trim()) || expandedDepartments.has(dept.id);
               const hasActiveModule = modules.some(m => (m.module_key === activeModule || m.module_key === workspaceMenuKey(activeModule)));
 
               return (
@@ -383,7 +375,7 @@ export function DepartmentSidebar({ activeModule, onModuleChange, isOpen: extern
             )}
             {searchQuery.trim() && filteredDepartments.length === 0 && !(assistEnabled && 'assist remote support'.includes(searchQuery.trim().toLowerCase())) && (
               <div className="text-center py-8 text-muted text-sm">
-                No modules found
+                No matching pages
               </div>
             )}
           </nav>
