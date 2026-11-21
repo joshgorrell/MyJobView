@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { resolveVendorSellingPrice, type VendorPricingMode } from '../../lib/vendorPricing';
 
 interface Category {
   id: string;
@@ -154,6 +155,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     product_link: '',
 
     // Pricing
+    pricing_mode: 'fixed' as VendorPricingMode,
+    vendor_retail_price: null as number | null,
     cost: 0,
     margin_percent: 50,
     our_price: 0,
@@ -342,24 +345,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Track the last user-edited field to prevent circular updates
   const [lastEditedField, setLastEditedField] = React.useState<'price' | 'margin' | 'cost' | null>(null);
 
-  // Dealer cost changes must not silently alter selling price.
-  // Only an explicit margin edit opts into recalculating the selling price here.
-  // Persistent cost-based pricing mode for API updates will be implemented separately.
+  // Explicit pricing mode controls whether cost or MSRP can affect selling price.
   useEffect(() => {
-    if (!isEditingPrice && !userHasSetCustomPrice && lastEditedField === 'margin' && formData.cost > 0 && formData.margin_percent >= 0 && formData.margin_percent < 100) {
-      // Formula: Price = Cost / (1 - Margin%)
-      // Example: $100 cost with 50% margin = $100 / (1 - 0.50) = $100 / 0.50 = $200
-      const marginDecimal = formData.margin_percent / 100;
-      const calculatedPrice = formData.cost / (1 - marginDecimal);
-      // Use Math.round to avoid floating point precision errors
-      const roundedPrice = Math.round(calculatedPrice * 100) / 100;
-
-      // Only update if the calculated price is different from current price
-      if (Math.abs(formData.our_price - roundedPrice) > 0.005) {
-        setFormData(prev => ({ ...prev, our_price: roundedPrice }));
-      }
-    }
-  }, [formData.cost, formData.margin_percent, isEditingPrice, lastEditedField, userHasSetCustomPrice]);
+    if (isEditingPrice || userHasSetCustomPrice || lastEditedField === null) return;
+    const result = resolveVendorSellingPrice({ mode: formData.pricing_mode,
+      currentSellingPrice: formData.our_price, dealerCost: formData.cost,
+      retailPrice: formData.vendor_retail_price, targetMarginPercent: formData.margin_percent });
+    if (result.changed) setFormData(prev => ({ ...prev, our_price: result.sellingPrice }));
+  }, [formData.pricing_mode, formData.cost, formData.vendor_retail_price, formData.margin_percent, isEditingPrice, lastEditedField, userHasSetCustomPrice]);
 
   // Recalculate margin when price is manually changed
   const handlePriceChange = (newPrice: number) => {
@@ -370,7 +363,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
     // Round to exactly 2 decimal places to match database precision
     const roundedPrice = Math.round(newPrice * 100) / 100;
-    const updates: any = { our_price: roundedPrice };
+    const updates: any = { our_price: roundedPrice, pricing_mode: 'fixed' };
 
     // Recalculate margin based on the new price
     if (formData.cost > 0 && roundedPrice > 0) {
@@ -527,6 +520,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         cost,
         margin_percent,
         our_price,
+        pricing_mode,
+        vendor_retail_price,
         minimum_price,
         minimum_margin,
         inventory_type,
@@ -560,7 +555,9 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           image_url: data.image_url || '',
           product_link: data.product_link || '',
           cost: data.cost || 0,
-          margin_percent: data.margin_percent || 50,
+          pricing_mode: (data.pricing_mode || 'fixed') as VendorPricingMode,
+          vendor_retail_price: data.vendor_retail_price ?? null,
+          margin_percent: data.margin_percent ?? 50,
           our_price: data.our_price || 0,
           minimum_price: data.minimum_price || 0,
           minimum_margin: data.minimum_margin || 0,
@@ -611,6 +608,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         cost,
         margin_percent,
         our_price,
+        pricing_mode,
+        vendor_retail_price,
         minimum_price,
         minimum_margin,
         inventory_type,
@@ -644,7 +643,9 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           image_url: data.image_url || '',
           product_link: data.product_link || '',
           cost: data.cost || 0,
-          margin_percent: data.margin_percent || 50,
+          pricing_mode: (data.pricing_mode || 'fixed') as VendorPricingMode,
+          vendor_retail_price: data.vendor_retail_price ?? null,
+          margin_percent: data.margin_percent ?? 50,
           our_price: data.our_price || 0,
           minimum_price: data.minimum_price || 0,
           minimum_margin: data.minimum_margin || 0,
@@ -965,6 +966,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         image_url: formData.image_url || null,
         product_link: formData.product_link || null,
         cost: formData.cost,
+        pricing_mode: formData.pricing_mode,
         margin_percent: formData.margin_percent,
         our_price: formData.our_price,
         minimum_price: formData.enforce_minimum ? calculatedMinPrice : null,
@@ -1759,6 +1761,783 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               Pricing
             </h3>
 
+            <div className="space-y-2 mb-4">
+              <label htmlFor="product-pricing-mode" className="block text-sm font-medium text-gray-700">Selling price method</label>
+              <select id="product-pricing-mode" value={formData.pricing_mode} disabled={readOnly}
+                onChange={e => { setUserHasSetCustomPrice(false); setLastEditedField('margin');
+                  setFormData(prev => ({ ...prev, pricing_mode: e.target.value as VendorPricingMode })); }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <option value="fixed">Fixed — dealer sets selling price</option>
+                <option value="retail">Retail / MSRP — vendor published price</option>
+                <option value="margin">Target margin — based on dealer cost</option>
+              </select>
+              <p className="text-xs text-gray-500">{formData.pricing_mode === 'fixed' ? 'Dealer cost updates do not change selling price.' : formData.pricing_mode === 'retail' ? 'Uses verified vendor MSRP when available; otherwise keeps existing price.' : 'Selling price follows dealer cost at the chosen target margin.'}</p>
+              {formData.pricing_mode === 'retail' && <p className="text-xs text-gray-500">Vendor MSRP: {formData.vendor_retail_price == null ? 'Not available yet' : '
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cost
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.cost || ''}
+                    onChange={(e) => {
+                      setLastEditedField('cost');
+                      setFormData(prev => ({ ...prev, cost: parseFloat(e.target.value) || 0 }));
+                    }}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Our Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Our Price
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={formData.our_price || ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                      if (!isNaN(value)) {
+                        handlePriceChange(value);
+                      }
+                    }}
+                    onFocus={() => {
+                      setIsEditingPrice(true);
+                    }}
+                    onBlur={() => {
+                      // Ensure the final value is properly rounded to 2 decimal places
+                      const roundedPrice = Math.round(formData.our_price * 100) / 100;
+                      if (roundedPrice !== formData.our_price) {
+                        setFormData(prev => ({ ...prev, our_price: roundedPrice }));
+                      }
+                      // Re-enable auto-calculation after user is done editing
+                      setTimeout(() => {
+                        setIsEditingPrice(false);
+                        setLastEditedField(null);
+                      }, 100);
+                    }}
+                    placeholder="0.00"
+                    className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      errors.price ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                </div>
+                {errors.price && (
+                  <p className="text-sm text-red-600 mt-1">{errors.price}</p>
+                )}
+              </div>
+
+              {/* Margin % */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Margin %
+                  <span className="text-xs text-gray-500 ml-2">(auto-adjusts with price)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.margin_percent ? formData.margin_percent.toFixed(2) : ''}
+                    onChange={(e) => {
+                      setLastEditedField('margin');
+                      setUserHasSetCustomPrice(false);
+                      setFormData(prev => ({ ...prev, pricing_mode: 'margin', margin_percent: parseFloat(e.target.value) || 0 }));
+                    }}
+                    className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                </div>
+              </div>
+
+              {/* Installed Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Installed Price
+                  <span className="text-xs text-gray-500 ml-2">(Material + Labor)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input
+                    type="text"
+                    value={(formData.our_price + formData.labor_cost).toFixed(2)}
+                    disabled
+                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  />
+                </div>
+              </div>
+
+              {/* Minimum Margin (Admin only) */}
+              {profile?.role === 'admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <input
+                      type="checkbox"
+                      checked={formData.enforce_minimum}
+                      onChange={(e) => setFormData(prev => ({ ...prev, enforce_minimum: e.target.checked }))}
+                      className="mr-2"
+                    />
+                    Enforce Minimum Margin %
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={formData.minimum_margin}
+                    onChange={(e) => setFormData(prev => ({ ...prev, minimum_margin: parseFloat(e.target.value) || 0 }))}
+                    disabled={!formData.enforce_minimum}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Minimum Price Display */}
+            {(effectiveMinMargin > 0 || enforceMinPricing) && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-yellow-900">Minimum Pricing Enforced</p>
+                  <p className="text-yellow-700">
+                    Minimum Price: ${calculatedMinPrice.toFixed(2)} ({effectiveMinMargin}% margin)
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* INVENTORY & LABOR */}
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Inventory</h3>
+
+            {/* Inventory Type and Item Type */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Inventory Type
+                </label>
+                <select
+                  value={formData.inventory_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, inventory_type: e.target.value as any }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="inventory">Inventory</option>
+                  <option value="non-inventory">Non-Inventory</option>
+                  <option value="labor">Labor</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Stocked vs ordered per job</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Item Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.item_type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, item_type: e.target.value as any }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="material">Material</option>
+                  <option value="labor">Labor</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">For tax calculation purposes</p>
+              </div>
+            </div>
+
+            {/* Vendor */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Default Vendor
+              </label>
+              {showNewVendor ? (
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter vendor name"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleAddVendor}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowNewVendor(false);
+                      setNewItemName('');
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    value={formData.default_vendor_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, default_vendor_id: e.target.value }))}
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Vendor</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>{v.vendor_name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setShowNewVendor(true)}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+          <div className="space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Labor</h3>
+            {/* Labor Phase */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Labor Phase
+              </label>
+              <select
+                value={formData.labor_phase_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, labor_phase_id: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Labor Phase</option>
+                {laborPhases.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} (${p.default_price}/hr)</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Admin can set up labor phases in Settings
+              </p>
+            </div>
+
+            {/* Labor Hours and Cost */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Default Labor Hours
+                </label>
+                <input
+                  type="number"
+                  step="0.25"
+                  value={formData.default_labor_hours || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, default_labor_hours: e.target.value === '' ? 0 : parseFloat(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Calculated Labor Cost
+                </label>
+                <input
+                  type="text"
+                  value={`$${formData.labor_cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                />
+              </div>
+            </div>
+
+          </div>
+
+          </React.Fragment>)}
+          {editorTab === 'details' && (<React.Fragment>
+          {/* DESCRIPTIONS */}
+          <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3">Descriptions & Instructions</h3>
+
+            {/* Sales Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sales Description (Shown on Proposals)
+              </label>
+              <textarea
+                value={formData.sales_description}
+                onChange={(e) => setFormData(prev => ({ ...prev, sales_description: e.target.value }))}
+                rows={5}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Description that customers will see on proposals"
+              />
+            </div>
+
+            {/* Purchase Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Purchase Description (Shown on POs)
+              </label>
+              <textarea
+                value={formData.purchase_description}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, purchase_description: e.target.value }));
+                  setUserEditedPurchaseDesc(true);
+                }}
+                rows={5}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Auto-copied from sales description, edit if needed"
+              />
+            </div>
+
+            {/* Default Install Instructions */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Install Instructions
+              </label>
+              <input
+                type="text"
+                value={formData.default_install_task}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, default_install_task: e.target.value }));
+                  setUserEditedInstallTask(true);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Auto-filled with 'Install {model}'"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500">Install instructions are a general note. Default Tasks are separate work items created for this product on the project.</p>
+            {/* Default Tasks */}
+            <DefaultTasksSection
+              productId={productId}
+              readOnly={readOnly}
+              defaultTasks={defaultTasks}
+              setDefaultTasks={setDefaultTasks}
+              laborPhases={laborPhases}
+              showAddDefaultTask={showAddDefaultTask}
+              setShowAddDefaultTask={setShowAddDefaultTask}
+              newDefaultTaskTitle={newDefaultTaskTitle}
+              setNewDefaultTaskTitle={setNewDefaultTaskTitle}
+              newDefaultTaskDesc={newDefaultTaskDesc}
+              setNewDefaultTaskDesc={setNewDefaultTaskDesc}
+              newDefaultTaskPhase={newDefaultTaskPhase}
+              setNewDefaultTaskPhase={setNewDefaultTaskPhase}
+            />
+          </div>
+
+          </React.Fragment>)}
+          {editorTab === 'instructions' && (<React.Fragment>
+          {/* RESOURCES */}
+          <div className="lg:col-span-2 space-y-4 bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+            <h3 className="text-base font-semibold text-gray-900 border-b border-gray-100 pb-3 flex items-center gap-2">
+              <Link2 className="w-5 h-5" />
+              Resources & Links
+            </h3>
+
+            <div className="grid grid-cols-1 gap-4">
+              {/* Manufacturer URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-gray-500" />
+                  Manufacturer Product Page
+                </label>
+                <input
+                  type="url"
+                  value={formData.manufacturer_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, manufacturer_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://manufacturer.com/product-page"
+                />
+                <p className="text-xs text-gray-500 mt-1">Official manufacturer product information page</p>
+              </div>
+
+              {/* Supplier URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-gray-500" />
+                  Supplier/Vendor Page
+                </label>
+                <input
+                  type="url"
+                  value={formData.supplier_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, supplier_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://supplier.com/product-page"
+                />
+                <p className="text-xs text-gray-500 mt-1">Where to purchase this product</p>
+              </div>
+
+              {/* Datasheet URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-gray-500" />
+                  Product Datasheet / Spec Sheet
+                </label>
+                <input
+                  type="url"
+                  value={formData.datasheet_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, datasheet_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com/datasheet.pdf"
+                />
+                <p className="text-xs text-gray-500 mt-1">Technical specifications and documentation</p>
+              </div>
+
+              {/* Installation Video URL */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <Video className="w-4 h-4 text-gray-500" />
+                  Installation Video / Tutorial
+                </label>
+                <input
+                  type="url"
+                  value={formData.installation_video_url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, installation_video_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://youtube.com/watch?v=..."
+                />
+                <p className="text-xs text-gray-500 mt-1">Installation guide or tutorial video</p>
+              </div>
+
+              {/* Product Link (General) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-gray-500" />
+                  Additional Product Link
+                </label>
+                <input
+                  type="url"
+                  value={formData.product_link}
+                  onChange={(e) => setFormData(prev => ({ ...prev, product_link: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com/additional-info"
+                />
+                <p className="text-xs text-gray-500 mt-1">Any other relevant product information link</p>
+              </div>
+            </div>
+          </div>
+
+          </React.Fragment>)}
+          {editorTab === 'accessories' && (<React.Fragment>
+          {/* Accessories Section */}
+          {productId && (
+            <ProductAccessories productId={productId} readOnly={readOnly} parentQuantity={Number(formData.default_qty || 1)} baseMaterial={Number(formData.our_price || 0) * Number(formData.default_qty || 1)} baseLabor={Number(formData.default_labor_hours || 0) * Number(formData.default_qty || 1) * Number(laborPhases.find(phase => phase.id === formData.labor_phase_id)?.default_price || laborRate)} />
+          )}
+          </React.Fragment>)}
+          {editorTab === 'details' && !readOnly && <section aria-label="Product status" className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Product status</h3>
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Discontinue item" checked={formData.is_discontinued} onChange={event => setFormData(prev => ({ ...prev, is_discontinued: event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold text-red-600">Discontinue item</span><span className="block text-xs text-gray-500 mt-1">Remaining stock can still be sold. Purchasing may override after confirming vendor availability.</span></span>
+            </label>
+            <label className="flex items-start gap-3 text-sm text-gray-700">
+              <input type="checkbox" aria-label="Archive item" checked={!formData.is_active} onChange={event => setFormData(prev => ({ ...prev, is_active: !event.target.checked }))} className="mt-1" />
+              <span><span className="font-semibold">Archive item</span><span className="block text-xs text-gray-500 mt-1">Hide from the current catalog and discontinued review list. Existing records are preserved; this item cannot be added to new proposals or invoices.</span></span>
+            </label>
+          </section>}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="shrink-0 bg-white border-t border-gray-200 px-4 sm:px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
+            {saveSuccess && (
+              <div className="w-full text-green-600 text-sm font-medium flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Saved successfully!
+              </div>
+            )}
+            {Object.keys(errors).length > 0 && (
+              <div className="w-full text-red-600 text-sm font-medium flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {Object.keys(errors).length} field{Object.keys(errors).length !== 1 ? 's' : ''} require attention
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 sm:px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={requestSave}
+              disabled={saving}
+              className="px-4 sm:px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save Product'}
+            </button>
+          </div>
+        </div>
+      </div>
+      <ConfirmModal isOpen={showMissingImagePrompt} title="Save without a product photo?"
+        message="This item will show a placeholder in the catalog and documents. Add a photo now, or save without one if no useful photo exists."
+        variant="warning" confirmLabel="Save without photo" cancelLabel="Add photo"
+        onConfirm={() => { setShowMissingImagePrompt(false); void handleSave(); }}
+        onCancel={() => { setShowMissingImagePrompt(false); selectEditorTab('overview'); setTimeout(() => imageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); }} />
+    </div>
+  );
+}
+
+interface DefaultTasksSectionProps {
+  productId?: string;
+  readOnly: boolean;
+  defaultTasks: Array<{
+    id: string | null;
+    title: string;
+    description: string;
+    labor_phase_id: string | null;
+    sort_order: number;
+  }>;
+  setDefaultTasks: React.Dispatch<React.SetStateAction<DefaultTasksSectionProps['defaultTasks']>>;
+  laborPhases: LaborPhase[];
+  showAddDefaultTask: boolean;
+  setShowAddDefaultTask: (v: boolean) => void;
+  newDefaultTaskTitle: string;
+  setNewDefaultTaskTitle: (v: string) => void;
+  newDefaultTaskDesc: string;
+  setNewDefaultTaskDesc: (v: string) => void;
+  newDefaultTaskPhase: string;
+  setNewDefaultTaskPhase: (v: string) => void;
+}
+
+function DefaultTasksSection({
+  productId: _productId, readOnly, defaultTasks, setDefaultTasks, laborPhases,
+  showAddDefaultTask, setShowAddDefaultTask,
+  newDefaultTaskTitle, setNewDefaultTaskTitle,
+  newDefaultTaskDesc, setNewDefaultTaskDesc,
+  newDefaultTaskPhase, setNewDefaultTaskPhase,
+}: DefaultTasksSectionProps) {
+  if (readOnly && defaultTasks.length === 0) return null;
+
+  const handleAddTask = () => {
+    if (!newDefaultTaskTitle.trim()) return;
+    setDefaultTasks(prev => [...prev, {
+      id: null,
+      title: newDefaultTaskTitle.trim(),
+      description: newDefaultTaskDesc.trim(),
+      labor_phase_id: newDefaultTaskPhase || null,
+      sort_order: prev.length,
+    }]);
+    setNewDefaultTaskTitle('');
+    setNewDefaultTaskDesc('');
+    setNewDefaultTaskPhase('');
+    setShowAddDefaultTask(false);
+  };
+
+  const handleDeleteTask = (index: number) => {
+    setDefaultTasks(prev => prev.filter((_, i) => i !== index).map((t, i) => ({ ...t, sort_order: i })));
+  };
+
+  const handleEditTitle = (index: number, title: string) => {
+    setDefaultTasks(prev => prev.map((t, i) => i === index ? { ...t, title } : t));
+  };
+
+  const handleEditDescription = (index: number, description: string) => {
+    setDefaultTasks(prev => prev.map((t, i) => i === index ? { ...t, description } : t));
+  };
+
+  const handleEditPhase = (index: number, phaseId: string) => {
+    setDefaultTasks(prev => prev.map((t, i) => i === index ? { ...t, labor_phase_id: phaseId || null } : t));
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    setDefaultTasks(prev => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next.map((t, i) => ({ ...t, sort_order: i }));
+    });
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === defaultTasks.length - 1) return;
+    setDefaultTasks(prev => {
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next.map((t, i) => ({ ...t, sort_order: i }));
+    });
+  };
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ListChecks className="w-4 h-4 text-blue-600" />
+          <label className="text-sm font-medium text-gray-700">Default Tasks</label>
+          {defaultTasks.length > 0 && (
+            <span className="text-xs text-gray-500">({defaultTasks.length})</span>
+          )}
+        </div>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => setShowAddDefaultTask(!showAddDefaultTask)}
+            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs flex items-center gap-1"
+          >
+            <Plus className="w-3 h-3" />
+            Add Task
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-500 mb-3">
+        These tasks are automatically copied to proposals when this product is added.
+        If no default tasks are configured, a single task is generated from the item description when labor is present.
+      </p>
+
+      {showAddDefaultTask && (
+        <div className="bg-white border border-gray-300 rounded-lg p-3 mb-3 space-y-2">
+          <input
+            type="text"
+            value={newDefaultTaskTitle}
+            onChange={e => setNewDefaultTaskTitle(e.target.value)}
+            placeholder="Task title (e.g., 'Install TV', 'Program TV')"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            autoFocus
+          />
+          <textarea
+            value={newDefaultTaskDesc}
+            onChange={e => setNewDefaultTaskDesc(e.target.value)}
+            placeholder="Description (optional)"
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={newDefaultTaskPhase}
+              onChange={e => setNewDefaultTaskPhase(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No labor phase</option>
+              {laborPhases.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAddTask}
+              disabled={!newDefaultTaskTitle.trim()}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-gray-300"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddDefaultTask(false);
+                setNewDefaultTaskTitle('');
+                setNewDefaultTaskDesc('');
+                setNewDefaultTaskPhase('');
+              }}
+              className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {defaultTasks.length === 0 && !showAddDefaultTask ? (
+        <p className="text-xs text-gray-400 text-center py-2">
+          No default tasks configured. A generic task will be generated from the item description when labor is present.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {defaultTasks.map((task, index) => (
+            <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 group">
+              <div className="flex items-start gap-2">
+                <GripVertical className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  {readOnly ? (
+                    <span className="text-sm text-gray-900 font-medium">{task.title}</span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={task.title}
+                      onChange={e => handleEditTitle(index, e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                    />
+                  )}
+                  {!readOnly && (
+                    <>
+                      <textarea
+                        value={task.description}
+                        onChange={e => handleEditDescription(index, e.target.value)}
+                        placeholder="Description (optional)"
+                        rows={1}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={task.labor_phase_id || ''}
+                          onChange={e => handleEditPhase(index, e.target.value)}
+                          className="px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                        >
+                          <option value="">No labor phase</option>
+                          {laborPhases.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                        {task.labor_phase_id && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+                            {laborPhases.find(p => p.id === task.labor_phase_id)?.name}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {readOnly && task.description && (
+                    <p className="text-xs text-gray-500">{task.description}</p>
+                  )}
+                </div>
+                {!readOnly && (
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                      className="text-gray-400 hover:text-gray-600 p-1 disabled:opacity-30"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === defaultTasks.length - 1}
+                      className="text-gray-400 hover:text-gray-600 p-1 disabled:opacity-30"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(index)}
+                      className="text-gray-400 hover:text-red-600 p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+ + formData.vendor_retail_price.toFixed(2)}</p>}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Cost */}
               <div>
