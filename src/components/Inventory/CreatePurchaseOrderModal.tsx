@@ -65,6 +65,7 @@ interface POLineItem {
   quantity: number;
   unit_cost: number;
   update_master_cost: boolean;
+  cost_manually_edited?: boolean;
 }
 
 function formatAddressLines(
@@ -301,8 +302,9 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
         product_name: product.name,
         model_number: product.sku,
         quantity: 1,
-        unit_cost: product.cost || 0,
+        unit_cost: product.cost ?? 0,
         update_master_cost: false,
+        cost_manually_edited: false,
       }]);
     }
     setSearchTerm('');
@@ -318,11 +320,12 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
       quantity: 1,
       unit_cost: 0,
       update_master_cost: false,
+      cost_manually_edited: true,
     }]);
   };
 
   const updateLineItem = (index: number, field: keyof POLineItem, value: any) => {
-    setLineItems(items => items.map((li, i) => i === index ? { ...li, [field]: value } : li));
+    setLineItems(items => items.map((li, i) => i === index ? { ...li, [field]: value, ...(field === 'unit_cost' ? {cost_manually_edited: true} : {}) } : li));
   };
 
   const removeLineItem = (index: number) => {
@@ -345,14 +348,32 @@ export function CreatePurchaseOrderModal({ onClose, onSuccess, presetShipToOffic
     if (lineItems.some(item => item.is_discontinued) && !discontinuedOverride) { setError('Confirm the discontinued item override after verifying vendor stock.'); return; }
     setSaving(true);
     try {
+      // Read the current tenant catalog immediately before creating the PO.
+      // Preserve any cost explicitly entered by purchasing staff.
+      const refreshIds = [...new Set(lineItems.filter(li => li.product_id && !li.cost_manually_edited).map(li => li.product_id!))];
+      let submitLines = lineItems;
+      if (refreshIds.length) {
+        if (!profile?.organization_id) throw new Error('Purchasing organization unavailable');
+        const { data: current, error: costError } = await supabase.from('products')
+          .select('id,cost').eq('organization_id', profile.organization_id).in('id', refreshIds);
+        if (costError) throw costError;
+        const byId = new Map((current || []).map(p => [p.id, p.cost]));
+        if (refreshIds.some(id => !byId.has(id))) throw new Error('Could not verify current product costs');
+        submitLines = lineItems.map(li => {
+          if (!li.product_id || li.cost_manually_edited) return li;
+          const cost = byId.get(li.product_id);
+          return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0
+            ? { ...li, unit_cost: cost } : li;
+        });
+      }
       const {error:poError}=await supabase.rpc('create_request_purchase_document',{
-        p_items:lineItems.map(li=>({product_id:li.product_id,product_name:li.product_name,model_number:li.model_number,quantity:li.quantity,unit_price:li.unit_cost,job_reference:'Stock'})),
+        p_items:submitLines.map(li=>({product_id:li.product_id,product_name:li.product_name,model_number:li.model_number,quantity:li.quantity,unit_price:li.unit_cost,job_reference:'Stock'})),
         p_vendor_ids:[selectedVendor,...additionalVendors.filter(id=>id!==selectedVendor)],p_warehouse_id:selectedWarehouse,p_quote:initialQuote,p_retry:retry.current,
         p_header:{discontinued_override:discontinuedOverride,office_id:billToOfficeId,order_date:orderDate,ship_to_office_id:shipToMode==='office'?shipToOfficeId:null,ship_to_contact_id:shipToMode==='customer'?shipToContactId:null,expected_date:expectedDate,internal_note:internalNote,external_note:externalNote,shipping_cost:shippingCost,tax_amount:taxAmount,
         ship_to_name:shipToSnapshot.name,ship_to_address:shipToSnapshot.address,ship_to_city:shipToSnapshot.city,ship_to_state:shipToSnapshot.state,ship_to_zip:shipToSnapshot.zip}
       });
       if(poError)throw poError;
-      for (const li of lineItems) {
+      for (const li of submitLines) {
         if (!initialQuote && li.update_master_cost && li.product_id) {
           await supabase.from('products').update({ cost: li.unit_cost }).eq('id', li.product_id);
         }
