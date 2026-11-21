@@ -546,7 +546,11 @@ function AppContent() {
     currentPath.startsWith('/portal/proposals/') ||
     currentPath.startsWith('/proposals/');
 
-  if (isPortalUser && user && !isPortalAllowedPath) {
+  const isPublicMarketingRoot =
+    (window.location.hostname === 'myjobview.com' || window.location.hostname === 'www.myjobview.com') &&
+    (currentPath === '/' || currentPath === '');
+
+  if (isPortalUser && user && !isPortalAllowedPath && !isPublicMarketingRoot) {
     // If the user is navigating to the root path (/) they are trying to reach
     // the internal staff login. Sign them out of the portal session so they can
     // access the internal app, then reload to show the login form.
@@ -700,7 +704,7 @@ function AppContent() {
 
   // Public marketing homepage is root-domain only. Keep dealer subdomains and all
   // existing portal, bridge, and callback routes unchanged.
-  if ((window.location.hostname === 'myjobview.com' || window.location.hostname === 'www.myjobview.com') && currentPath === '/') {
+  if (isPublicMarketingRoot) {
     return <Suspense fallback={<LoadingFallback />}><MarketingHomepage /></Suspense>;
   }
 
