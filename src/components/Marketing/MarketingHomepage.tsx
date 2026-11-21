@@ -18,7 +18,7 @@ export default function MarketingHomepage() {
   return <div className="min-h-screen bg-[#070d17] text-white" style={{fontFamily:'Inter, system-ui, sans-serif'}}>
     <header className="border-b border-slate-800/90 bg-[#09111d]">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4">
-        <a href="/" className="flex items-center gap-3 text-xl font-extrabold tracking-tight"><img src="/MJV_icon.PNG" alt="" className="h-11 w-11 object-contain" />MyJob<span className="text-sky-400">View</span></a>
+        <a href="/" className="flex items-center gap-3 text-xl font-extrabold tracking-tight"><img src="/MJV_icon.PNG" alt="" className="h-11 w-11 object-contain" /><span className="whitespace-nowrap">MyJob<span className="text-sky-400">View</span></span></a>
         <nav aria-label="Main navigation" className="hidden items-center gap-7 text-sm text-slate-300 md:flex"><a href="#why" className="hover:text-white">Why MyJobView</a><a href="#platform" className="hover:text-white">Platform</a><a href="#features" className="hover:text-white">Features</a></nav>
         <a href="/dealer-login" className="rounded-lg bg-sky-600 px-5 py-3 text-sm font-bold hover:bg-sky-500">Dealer Login</a>
       </div>
