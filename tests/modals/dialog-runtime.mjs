@@ -15,6 +15,7 @@ function harness(path, imports) {
   const jsx = (type, props) => ({ type, props });
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
+    window: { setTimeout, clearTimeout },
     module, exports: module.exports, crypto: { randomUUID: () => 'fixture-line' },
     console: { error(...args) { errors.push(args); } },
     require(name) {
@@ -63,8 +64,8 @@ const invoice = harness('src/components/Invoices/CreateInvoiceModal.tsx', {
   '../../lib/feedback': feedback, '../../lib/supabase': { supabase },
   '../../contexts/AuthContext': { useAuth: () => ({ companySettings: { id: 'company' } }) },
   '../../lib/utils': { formatCurrency: value => `$${value}` },
-  '../../lib/taxCalculations': { computeInvoiceTax: () => ({ taxAmount: 0 }) },
-  '../../lib/customerZip': { requireCustomerZip: async () => '66603' },
+  '../../lib/taxCalculations': { computeInvoiceTax: () => ({ taxAmount: 0 }), lookupTaxRateByZip: async () => ({ combined_rate: 0.0915 }) },
+  '../../lib/customerZip': { requireCustomerZip: async () => '66603', validCustomerZip: value => /^\d{5}(?:-\d{4})?$/.test(value ?? '') },
   '../Products/ProductStatusNotice': { default: 'ProductStatusNotice' },
   '../Shared/ContactSearchSelect': { ContactSearchSelect: 'ContactSearchSelect' },
   '../Proposals/InlineProductSearch': { default: 'InlineProductSearch' },
