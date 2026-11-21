@@ -115,8 +115,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(true);
           loadProfile(session.user.id, session.user.user_metadata?.is_portal_user === true);
         }
-        if (window.location.hash) {
-          window.history.replaceState(null, '', window.location.pathname);
+        // The dealer auth callback receives its one-time session payload in
+        // the URL fragment. Do not erase it before AuthCallback can consume it.
+        // Other auth flows may still clean up their own fragments.
+        if (window.location.hash && window.location.pathname !== '/auth-callback') {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
       }
     });
