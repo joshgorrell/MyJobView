@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { X, Save, Package, Plus, Search, Upload, DollarSign, AlertCircle, Link2, FileText, Video, Sparkles, Globe, Loader2, ListChecks, Trash2, GripVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { resolveVendorSellingPrice, type VendorPricingMode } from '../../lib/vendorPricing';
 
 interface Category {
   id: string;
@@ -154,6 +155,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
     product_link: '',
 
     // Pricing
+    pricing_mode: 'fixed' as VendorPricingMode,
+    vendor_retail_price: null as number | null,
     cost: 0,
     margin_percent: 50,
     our_price: 0,
@@ -342,24 +345,14 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
   // Track the last user-edited field to prevent circular updates
   const [lastEditedField, setLastEditedField] = React.useState<'price' | 'margin' | 'cost' | null>(null);
 
-  // Dealer cost changes must not silently alter selling price.
-  // Only an explicit margin edit opts into recalculating the selling price here.
-  // Persistent cost-based pricing mode for API updates will be implemented separately.
+  // Explicit pricing mode controls whether cost or MSRP can affect selling price.
   useEffect(() => {
-    if (!isEditingPrice && !userHasSetCustomPrice && lastEditedField === 'margin' && formData.cost > 0 && formData.margin_percent >= 0 && formData.margin_percent < 100) {
-      // Formula: Price = Cost / (1 - Margin%)
-      // Example: $100 cost with 50% margin = $100 / (1 - 0.50) = $100 / 0.50 = $200
-      const marginDecimal = formData.margin_percent / 100;
-      const calculatedPrice = formData.cost / (1 - marginDecimal);
-      // Use Math.round to avoid floating point precision errors
-      const roundedPrice = Math.round(calculatedPrice * 100) / 100;
-
-      // Only update if the calculated price is different from current price
-      if (Math.abs(formData.our_price - roundedPrice) > 0.005) {
-        setFormData(prev => ({ ...prev, our_price: roundedPrice }));
-      }
-    }
-  }, [formData.cost, formData.margin_percent, isEditingPrice, lastEditedField, userHasSetCustomPrice]);
+    if (isEditingPrice || userHasSetCustomPrice || lastEditedField === null) return;
+    const result = resolveVendorSellingPrice({ mode: formData.pricing_mode,
+      currentSellingPrice: formData.our_price, dealerCost: formData.cost,
+      retailPrice: formData.vendor_retail_price, targetMarginPercent: formData.margin_percent });
+    if (result.changed) setFormData(prev => ({ ...prev, our_price: result.sellingPrice }));
+  }, [formData.pricing_mode, formData.cost, formData.vendor_retail_price, formData.margin_percent, isEditingPrice, lastEditedField, userHasSetCustomPrice]);
 
   // Recalculate margin when price is manually changed
   const handlePriceChange = (newPrice: number) => {
@@ -370,7 +363,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
 
     // Round to exactly 2 decimal places to match database precision
     const roundedPrice = Math.round(newPrice * 100) / 100;
-    const updates: any = { our_price: roundedPrice };
+    const updates: any = { our_price: roundedPrice, pricing_mode: 'fixed' };
 
     // Recalculate margin based on the new price
     if (formData.cost > 0 && roundedPrice > 0) {
@@ -527,6 +520,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         cost,
         margin_percent,
         our_price,
+        pricing_mode,
+        vendor_retail_price,
         minimum_price,
         minimum_margin,
         inventory_type,
@@ -560,7 +555,9 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           image_url: data.image_url || '',
           product_link: data.product_link || '',
           cost: data.cost || 0,
-          margin_percent: data.margin_percent || 50,
+          pricing_mode: (data.pricing_mode || 'fixed') as VendorPricingMode,
+          vendor_retail_price: data.vendor_retail_price ?? null,
+          margin_percent: data.margin_percent ?? 50,
           our_price: data.our_price || 0,
           minimum_price: data.minimum_price || 0,
           minimum_margin: data.minimum_margin || 0,
@@ -611,6 +608,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         cost,
         margin_percent,
         our_price,
+        pricing_mode,
+        vendor_retail_price,
         minimum_price,
         minimum_margin,
         inventory_type,
@@ -644,7 +643,9 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
           image_url: data.image_url || '',
           product_link: data.product_link || '',
           cost: data.cost || 0,
-          margin_percent: data.margin_percent || 50,
+          pricing_mode: (data.pricing_mode || 'fixed') as VendorPricingMode,
+          vendor_retail_price: data.vendor_retail_price ?? null,
+          margin_percent: data.margin_percent ?? 50,
           our_price: data.our_price || 0,
           minimum_price: data.minimum_price || 0,
           minimum_margin: data.minimum_margin || 0,
@@ -965,6 +966,7 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
         image_url: formData.image_url || null,
         product_link: formData.product_link || null,
         cost: formData.cost,
+        pricing_mode: formData.pricing_mode,
         margin_percent: formData.margin_percent,
         our_price: formData.our_price,
         minimum_price: formData.enforce_minimum ? calculatedMinPrice : null,
@@ -1759,8 +1761,20 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
               Pricing
             </h3>
 
+            <div className="space-y-2 mb-4">
+              <label htmlFor="product-pricing-mode" className="block text-sm font-medium text-gray-700">Selling price method</label>
+              <select id="product-pricing-mode" value={formData.pricing_mode} disabled={readOnly}
+                onChange={e => { setUserHasSetCustomPrice(false); setLastEditedField('margin');
+                  setFormData(prev => ({ ...prev, pricing_mode: e.target.value as VendorPricingMode })); }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <option value="fixed">Fixed — dealer sets selling price</option>
+                <option value="retail">Retail / MSRP — vendor published price</option>
+                <option value="margin">Target margin — based on dealer cost</option>
+              </select>
+              <p className="text-xs text-gray-500">{formData.pricing_mode === 'fixed' ? 'Dealer cost updates do not change selling price.' : formData.pricing_mode === 'retail' ? 'Uses verified vendor MSRP when available; otherwise keeps existing price.' : 'Selling price follows dealer cost at the chosen target margin.'}</p>
+              {formData.pricing_mode === 'retail' && <p className="text-xs text-gray-500">Vendor MSRP: {formData.vendor_retail_price == null ? 'Not available yet' : formData.vendor_retail_price.toFixed(2) + ' USD'}</p>}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Cost */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cost
@@ -1839,7 +1853,8 @@ export default function SinglePageProductForm({ productId, duplicateFromId, read
                     value={formData.margin_percent ? formData.margin_percent.toFixed(2) : ''}
                     onChange={(e) => {
                       setLastEditedField('margin');
-                      setFormData(prev => ({ ...prev, margin_percent: parseFloat(e.target.value) || 0 }));
+                      setUserHasSetCustomPrice(false);
+                      setFormData(prev => ({ ...prev, pricing_mode: 'margin', margin_percent: parseFloat(e.target.value) || 0 }));
                     }}
                     className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
