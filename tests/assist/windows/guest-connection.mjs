@@ -7,7 +7,6 @@ import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { get } from 'node:https';
 import { connect } from 'node:net';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:tls';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -18,6 +17,7 @@ import { createControlServer } from '../../../services/assist/control-server.mjs
 import { dealerDomain } from '../../../services/assist/control-core.mjs';
 import { createManagedRuntime } from '../../../services/assist/managed-runtime.mjs';
 import { stageAgentCache } from '../../../services/assist/prepare-agent-cache.mjs';
+import { exerciseDesktopSession } from './desktop-session.mjs';
 import { createStateStore } from '../../../services/assist/state-store.mjs';
 
 const loopback = '127.0.0.1';
@@ -91,12 +91,14 @@ if (process.platform !== 'win32' || process.arch !== 'x64' || process.env.GITHUB
   throw new Error('This test is restricted to disposable GitHub-hosted MyJobView Windows x64 runners');
 }
 
-const root = await mkdtemp(join(tmpdir(), 'mjv-windows-guest-'));
+const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'mjv-windows-guest-'));
 const store = createStateStore(join(root, 'runtime'));
 const organizationId = randomUUID();
 const domain = dealerDomain(organizationId);
 const proxySockets = new Set();
 let runtime, backend, proxy, agent, agentExit;
+let testFailed = false;
+const executable = join(root, 'temporary-assist.exe');
 let stage = 'prepare isolated runtime';
 try {
   const version = JSON.parse(await readFile(join(dirname(entry), 'package.json'), 'utf8')).version;
@@ -140,7 +142,6 @@ try {
   assert.equal(download.origin, origin);
   assert.equal(download.searchParams.get('id'), '4');
   assert.equal(download.searchParams.get('installflags'), '1');
-  const executable = join(root, 'temporary-assist.exe');
   const { status, bytes } = await fetchLocal(download, cert);
   assert.equal(status, 200);
   assert.equal(bytes.toString('ascii', 0, 2), 'MZ');
@@ -158,10 +159,23 @@ try {
   assert.ok(device.id.startsWith(`node/${domain}/`));
   assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
 
+  stage = 'reject viewer authorization from a second dealer';
+  const otherDealer = randomUUID();
+  await store.write(otherDealer, { organization_id: otherDealer, generation: 1, desired_enabled: true, phase: 'applying' });
+  await runtime.ensure({ organization_id: otherDealer, generation: 1 }, async () => {});
+  try {
+    assert.deepEqual(await runtime.inventory(otherDealer), []);
+    await assert.rejects(runtime.createViewer(otherDealer, device.id, 'mjv-session-' + randomUUID().replaceAll('-', '')),
+      /device_offline/);
+  } finally {
+    await runtime.stop(otherDealer);
+  }
+
   stage = 'authorize the viewer for the temporary Windows PC';
   const username = 'mjv-session-' + randomUUID().replaceAll('-', '');
   const viewer = await runtime.createViewer(organizationId, device.id, username, guest.meshId);
   assert.equal(viewer.viewer_origin, origin);
+  await exerciseDesktopSession({ viewerUrl: viewer.viewer_url, executable, certPath, root });
   await runtime.revokeViewer(organizationId, username);
 
   stage = 'revoke temporary Windows access';
@@ -170,12 +184,20 @@ try {
   assert.equal(stale.status, 404, 'The old guest download must return HTTP 404');
   assert.deepEqual(await runtime.inventory(organizationId, guest.meshId), []);
   console.log('Real Windows guest helper connected through HTTPS, stayed out of permanent enrollment, and its group was revoked.');
-  console.log('Desktop control and consent require separate verification. No activation evidence was issued.');
+  console.log('Real Windows guest denied one desktop request and then approved screen, mouse and keyboard access. No activation evidence was issued.');
 } catch (error) {
+  testFailed = true;
   console.error(`Windows guest connection failed at: ${stage}`);
   throw error;
 } finally {
-  if (agent?.pid && agent.exitCode === null && agent.signalCode === null) agent.kill();
+  if (agent?.pid) {
+    // The interactive helper starts a second process using the same executable.
+    // Both are owned by this test and can hold the temporary directory open.
+    await run('pwsh', ['-NoProfile', '-Command',
+      "Get-Process -Name temporary-assist -ErrorAction SilentlyContinue | Where-Object Path -eq $env:ASSIST_TEST_GUEST_EXE | Stop-Process -Force -ErrorAction SilentlyContinue"],
+      { env: { ...process.env, ASSIST_TEST_GUEST_EXE: executable }, timeout: 10_000 }).catch(() => {});
+    if (agent.exitCode === null && agent.signalCode === null) agent.kill();
+  }
   if (agentExit) await agentExit;
   for (const socket of proxySockets) socket.destroy();
   if (proxy?.listening) proxy.close();
@@ -184,5 +206,10 @@ try {
     backend.closeAllConnections();
   }
   try { await runtime?.stopAll(); }
-  finally { await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }); }
+  finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 }).catch(error => {
+      if (!testFailed) throw error;
+      console.error('Windows reported a temporary directory cleanup error:', error.code);
+    });
+  }
 }

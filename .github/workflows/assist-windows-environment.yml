@@ -40,7 +40,8 @@ jobs:
       - run: npm ci --ignore-scripts --prefix services/assist
       - run: npm ci --ignore-scripts --prefix tests/assist/windows
       - run: node services/assist/runtime-security.mjs
-      - name: Connect and revoke the real temporary Windows helper
+      - run: npx --prefix tests/assist/windows playwright install chromium
+      - name: Verify Windows guest connection, consent, desktop input and revocation
         shell: pwsh
         run: |
           $env:NODE_PATH = (Resolve-Path tests/assist/windows/node_modules).Path
