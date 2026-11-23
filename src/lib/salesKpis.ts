@@ -67,7 +67,21 @@ export async function fetchSalesKpis(
     // This avoids double-counting rows where both sales_rep_id and created_by point to the same rep.
     ordersQuery = ordersQuery.or(`sales_rep_id.eq.${scope.repId},and(sales_rep_id.is.null,created_by.eq.${scope.repId})`);
   } else if (scope.type === 'office') {
-    ordersQuery = ordersQuery.eq('contact_id', scope.officeId);
+    // Offices are assigned to projects, not customer contacts. Never compare
+    // an office UUID with contact_id: it silently returns incorrect totals.
+    const { data: officeProjects, error: officeError } = await supabase
+      .from('projects')
+      .select('sales_order_id')
+      .eq('office_id', scope.officeId);
+    if (officeError) throw officeError;
+    const orderIds = [...new Set((officeProjects || [])
+      .map(project => project.sales_order_id)
+      .filter((id): id is string => Boolean(id)))];
+    // A scoped office with no matching projects must not fall back to all offices.
+    if (orderIds.length === 0) {
+      return { averageSale: 0, averageMarginPct: 0, salesOrderCount: 0 };
+    }
+    ordersQuery = ordersQuery.in('id', orderIds);
   }
 
   const { data: orders, error } = await ordersQuery;
@@ -379,7 +393,7 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
       .eq('month', curMonth)),
     safe(supabase
       .from('sales_monthly_stats')
-      .select('total_sales')
+      .select('month, total_sales')
       .eq('organization_id', orgId)
       .eq('year', curYear)
       .lte('month', curMonth)),
