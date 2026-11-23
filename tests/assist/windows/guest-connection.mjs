@@ -159,6 +159,18 @@ try {
   assert.ok(device.id.startsWith(`node/${domain}/`));
   assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
 
+  stage = 'reject viewer authorization from a second dealer';
+  const otherDealer = randomUUID();
+  await store.write(otherDealer, { organization_id: otherDealer, generation: 1, desired_enabled: true, phase: 'applying' });
+  await runtime.ensure({ organization_id: otherDealer, generation: 1 }, async () => {});
+  try {
+    assert.deepEqual(await runtime.inventory(otherDealer), []);
+    await assert.rejects(runtime.createViewer(otherDealer, device.id, 'mjv-session-' + randomUUID().replaceAll('-', '')),
+      /device_offline/);
+  } finally {
+    await runtime.stop(otherDealer);
+  }
+
   stage = 'authorize the viewer for the temporary Windows PC';
   const username = 'mjv-session-' + randomUUID().replaceAll('-', '');
   const viewer = await runtime.createViewer(organizationId, device.id, username, guest.meshId);

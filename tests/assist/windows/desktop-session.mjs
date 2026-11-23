@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { randomUUID, X509Certificate } from 'node:crypto';
+import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -55,7 +55,6 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
   const targetExited = once(target, 'exit');
   targetExited.catch(() => {});
   let browser;
-  let trusted = false;
   let stage = 'open the synthetic Windows target';
   try {
     await once(target, 'spawn');
@@ -65,9 +64,10 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
     }, 'The synthetic desktop target did not start');
 
     stage = 'open the authorized viewer';
-    await run('certutil.exe', ['-user', '-addstore', 'Root', certPath], { timeout: 15_000 });
-    trusted = true;
-    browser = await chromium.launch();
+    const key = certificate.publicKey.export({ type: 'spki', format: 'der' });
+    const pin = createHash('sha256').update(key).digest('base64');
+    // Trust only the fresh loopback key in this headless browser. Leave Windows trust untouched.
+    browser = await chromium.launch({ args: ['--ignore-certificate-errors-spki-list=' + pin] });
     const page = await browser.newPage();
     const response = await page.goto(viewerUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 }).catch(() => {
       throw new Error('The browser failed to open the HTTPS viewer');
@@ -85,6 +85,7 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
     stage = 'confirm the guest can refuse desktop access';
     await connectAndWaitForConsent();
     assert.equal(await page.evaluate(findTargetPixel), null, 'A guest screen appeared before consent');
+    await page.keyboard.press('a');
     await respond('Deny');
     await page.locator('#deskstatus').filter({ hasText: /^Disconnected$/ }).waitFor({ timeout: 15_000 });
     assert.equal(await page.evaluate(findTargetPixel), null, 'A refused guest screen was shown');
@@ -112,15 +113,12 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
   } catch (error) {
     console.error(`Windows viewer failed at: ${stage}`);
     // Playwright errors can include the credential-bearing viewer URL.
-    throw new Error(String(error.message).replaceAll(viewerUrl, '[viewer URL]'), { cause: undefined });
+    throw new Error(String(error.message).replaceAll(viewerUrl, '[viewer URL]'),);
   } finally {
     try { await browser?.close(); }
     finally {
       if (target.pid && target.exitCode === null && target.signalCode === null) target.kill();
       await targetExited;
-      if (trusted) {
-        await run('certutil.exe', ['-user', '-delstore', 'Root', certificate.fingerprint.replaceAll(':', '')], { timeout: 15_000 });
-      }
     }
   }
 }
