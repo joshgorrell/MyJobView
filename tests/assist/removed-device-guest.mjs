@@ -36,7 +36,7 @@ try{
  assert.equal((await enrolledBroker.handle({...context,operation:'device_remove',device_id:permanent})).removed,true);
  assert.equal(removed,1);
  assert.equal((await enrolledBroker.handle({...context,operation:'devices'})).devices.length,0);
- const guestBroker=createGuestBroker({rpc,runtime,requeue:async()=>{},exclusive,enabled:true});
+ const guestBroker=createGuestBroker({rpc,runtime,requeue:async()=>{},exclusive,isVerified:()=>true,enabled:true});
  const invite=await guestBroker.staff({...context,operation:'invite_create'});
  assert.ok(guestGroup);
  const claim=await guestBroker.guest({organization_id:org,operation:'redeem',code:invite.code});
