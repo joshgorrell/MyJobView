@@ -12,7 +12,7 @@ import { createServer } from 'node:tls';
 import { fileURLToPath } from 'node:url';
 
 import { createControlServer } from '../../../services/assist/control-server.mjs';
-import { dealerDomain } from '../../../services/assist/control-core.mjs';
+import { createControlPlane, dealerDomain } from '../../../services/assist/control-core.mjs';
 import { createManagedRuntime } from '../../../services/assist/managed-runtime.mjs';
 import { stageAgentCache } from '../../../services/assist/prepare-agent-cache.mjs';
 import { createLiveWindowsVerifier } from '../../../services/assist/windows-live-verifier.mjs';
@@ -37,7 +37,7 @@ async function stageWindowsAgent(root, store, organizationId, version) {
   const bytes = Buffer.from(await response.arrayBuffer());
   assert.equal(bytes.length, asset.size, 'Unexpected Windows agent size');
   assert.equal(createHash('sha384').update(bytes).digest('hex'), asset.sha384, 'Windows agent hash mismatch');
-  const source = join(root, 'download');
+  const source = join(root, 'download-' + organizationId);
   await mkdir(source);
   await writeFile(join(source, filename), bytes);
   const destination = join(store.root, 'instances', organizationId, 'agentbuilds');
@@ -79,8 +79,7 @@ if (process.platform !== 'win32' || process.arch !== 'x64' || process.env.GITHUB
 
 const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'mjv-windows-guest-'));
 const store = createStateStore(join(root, 'runtime'));
-const organizationId = randomUUID();
-const domain = dealerDomain(organizationId);
+const dealers = [randomUUID(), randomUUID()];
 const fixtureToken = randomUUID() + randomUUID();
 const canaryToken = randomUUID() + randomUUID();
 const isolationOrganizationId = randomUUID();
@@ -90,7 +89,7 @@ let testFailed = false;
 let stage = 'prepare isolated runtime';
 try {
   const version = JSON.parse(await readFile(join(dirname(entry), 'package.json'), 'utf8')).version;
-  await stageWindowsAgent(root, store, organizationId, version);
+  for (const id of dealers) await stageWindowsAgent(root, store, id, version);
   const certPath = join(root, 'tls.pem');
   const keyPath = join(root, 'tls-key.pem');
   execFileSync(process.env.ASSIST_TEST_OPENSSL || 'openssl', [
@@ -114,23 +113,21 @@ try {
   });
   const port = await listen(proxy);
   const origin = `https://${loopback}:${port}`;
-  await store.write(organizationId, { organization_id: organizationId, generation: 1, desired_enabled: true, phase: 'applying' });
   runtime = createManagedRuntime({
     store, entry, approvedVersion: version, publicOrigin: origin,
     proxyCertificateUrl: origin,
   });
   await runtime.verifyVersion();
-  const provisioned = await runtime.ensure({ organization_id: organizationId, generation: 1 }, async () => {});
   await store.write(isolationOrganizationId, { organization_id: isolationOrganizationId, generation: 1, desired_enabled: true, phase: 'applying' });
   await runtime.ensure({ organization_id: isolationOrganizationId, generation: 1 }, async () => {});
 
-  let download;
+  const downloads = new Map();
   const verifier = createLiveWindowsVerifier({
     serverOrigin: origin, fixtureOrigin: origin, token: fixtureToken, testDirectory: root, certPath,
     transport: async (url, options) => {
       const response = await fetchLocal(url, cert, options);
       if (url.endsWith('/v1/assist/fixture') && JSON.parse(options.body).operation === 'download' && response.ok) {
-        download = (await response.clone().json()).download_url;
+        downloads.set(JSON.parse(options.body).organization_id, (await response.clone().json()).download_url);
       }
       return response;
     },
@@ -144,7 +141,11 @@ try {
   });
   const canaryPort = await listen(canaryServer);
   const fixture = createWindowsCanaryFixture({
-    runtime, organizationId, isolationOrganizationId, probe: async request => {
+    runtime, isolationOrganizationId, probe: async request => {
+      const unrelated = dealers.find(id => id !== request.organization_id);
+      assert.equal((await fetchLocal(origin + '/' + dealerDomain(unrelated) + '/', cert)).status, 404,
+        'The private listener must reject other dealer domains during a probe');
+      assert.equal(plane.canServe(request.mesh_domain), false, 'Public routing cannot open before verification');
       const result = await fetch(`http://${loopback}:${canaryPort}/v1/assist/probe`, {
         method: 'POST', headers: { authorization: 'Bearer ' + canaryToken, 'content-type': 'application/json' },
         body: JSON.stringify(request), signal: AbortSignal.timeout(50_000),
@@ -153,26 +154,32 @@ try {
       return result.json();
     },
   });
-  backend = createControlServer({ runtime, pilotDomain: domain, canaryFixture: fixture, canaryFixtureToken: fixtureToken });
+  const plane = createControlPlane({ store, runtime, validateLease: async () => true, probe: fixture.probe });
+  backend = createControlServer({ runtime, automaticCanary: true, canaryFixture: fixture, canaryFixtureToken: fixtureToken });
   backendPort = await listen(backend);
-  const probeRequest = {
-    organization_id: organizationId, generation: 1, mesh_domain: domain, mesh_id: provisioned.meshId,
-    server_origin: origin, probe_nonce: randomUUID(), probe_requested_at: Date.now(),
-  };
-  stage = 'exercise the Windows verifier over its private HTTP interface';
-  const evidence = await fixture.probe(probeRequest);
-  assert.equal(evidence.probe_nonce, probeRequest.probe_nonce);
-  assert.equal(evidence.desktop_control, true);
-  assert.equal(evidence.consent_enforced, true);
-  assert.equal(evidence.cross_tenant_denied, true);
-  assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
+  assert.equal((await fetchLocal(origin + '/' + dealerDomain(dealers[0]) + '/', cert)).status, 404);
 
-  stage = 'check revoked temporary Windows access';
-  const stale = await fetchLocal(download, cert);
-  assert.equal(stale.status, 404, 'The old guest download must return HTTP 404');
-  const guestMeshId = `mesh/${domain}/${new URL(download).searchParams.get('meshid')}`;
-  assert.deepEqual(await runtime.inventory(organizationId, guestMeshId), []);
-  console.log('Windows verifier passed real screen/input, consent and dealer isolation. The temporary guest was revoked.');
+  for (const [index, id] of dealers.entries()) {
+    const domain = dealerDomain(id);
+    stage = 'activate ordinary dealer ' + (index + 1) + ' with the shared Windows verifier';
+    const result = await plane.reconcile({
+      organization_id: id, generation: 1, desired_enabled: true, mesh_domain: domain,
+      lease_token: randomUUID(), lease_until: new Date(Date.now() + 120_000).toISOString(),
+    });
+    assert.equal(result.verified, true);
+    assert.equal(result.consent_enforced, true);
+    assert.equal(result.isolation_verified, true);
+    assert.equal(plane.canServe(domain), true);
+    assert.equal((await store.read(id)).phase, 'verified');
+    assert.deepEqual(await runtime.inventory(id), [], 'A guest must not appear as a permanently enrolled device');
+
+    const download = downloads.get(id);
+    assert.equal((await fetchLocal(download, cert)).status, 404, 'The private pilot route must close after each probe');
+    const guestMeshId = `mesh/${domain}/${new URL(download).searchParams.get('meshid')}`;
+    assert.deepEqual(await runtime.inventory(id, guestMeshId), []);
+  }
+  assert.ok(dealers.every(id => plane.canServe(dealerDomain(id))), 'Activating a second dealer must leave the first ready');
+  console.log('Two ordinary dealers activated independently through one verifier and a private listener with no dealer ID configured.');
   console.log('The returned proof is scoped to this disposable CI fixture.');
 } catch (error) {
   testFailed = true;

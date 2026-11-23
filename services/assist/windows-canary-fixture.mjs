@@ -6,17 +6,16 @@ import { dealerDomain } from './control-core.mjs';
  */
 export function createWindowsCanaryFixture({ runtime, organizationId, isolationOrganizationId, probe }) {
   const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
-  if (!uuid.test(organizationId)) throw new Error('invalid_canary_fixture_organization');
+  if (organizationId !== undefined && !uuid.test(organizationId)) throw new Error('invalid_canary_fixture_organization');
   if (isolationOrganizationId !== undefined && (!uuid.test(isolationOrganizationId) || isolationOrganizationId === organizationId)) {
     throw new Error('invalid_canary_isolation_organization');
   }
-  const domain = dealerDomain(organizationId);
   let active;
 
   function match(request) {
     const fixture = active;
     const expected = fixture?.request;
-    if (!expected || fixture.closed || fixture.invalid || request?.organization_id !== organizationId ||
+    if (!expected || fixture.closed || fixture.invalid || request?.organization_id !== expected.organization_id ||
         request.generation !== expected.generation || request.probe_nonce !== expected.probe_nonce) {
       throw new Error('canary_fixture_unavailable');
     }
@@ -24,22 +23,35 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
   }
 
   return {
-    async probe(request) {
-      // Existing verifier implementations can continue handling other dealer runtimes.
-      if (request.organization_id !== organizationId) return probe(request);
-      if (active || request.mesh_domain !== domain || !uuid.test(request.probe_nonce)) {
-        throw new Error('canary_fixture_in_use');
+    trackSocket(domain, socket) {
+      const fixture = active;
+      if (!fixture?.group || fixture.closed || fixture.invalid || fixture.request.mesh_domain !== domain) return false;
+      if (!fixture.sockets.has(socket)) {
+        fixture.sockets.add(socket);
+        socket.once('close', () => fixture.sockets.delete(socket));
       }
+      return true;
+    },
+
+    async probe(request) {
+      // In fixed pilot mode, other dealers continue to use the configured verifier.
+      if (organizationId !== undefined && request.organization_id !== organizationId) return probe(request);
+      const id = request.organization_id;
+      if (!uuid.test(id) || id === isolationOrganizationId ||
+          request.mesh_domain !== dealerDomain(id) || !uuid.test(request.probe_nonce)) {
+        throw new Error('invalid_canary_fixture_request');
+      }
+      if (active) throw Object.assign(new Error('Windows pilot verifier is busy'), { code: 'canary_fixture_busy' });
       const suffix = request.probe_nonce.replaceAll('-', '');
-      const fixture = { request, username: 'mjv-session-' + suffix };
+      const fixture = { request, sockets: new Set(), username: 'mjv-session-' + suffix };
       active = fixture;
       try {
-        fixture.group = await runtime.createGuestGroup(organizationId, suffix);
+        fixture.group = await runtime.createGuestGroup(id, suffix);
         const evidence = await probe(request);
         if (!fixture.nodeId || fixture.invalid || (isolationOrganizationId && !fixture.isolationObserved)) {
           throw new Error('canary_fixture_not_exercised');
         }
-        const devices = await runtime.inventory(organizationId, fixture.group.meshId);
+        const devices = await runtime.inventory(id, fixture.group.meshId);
         // Some Windows helpers remove their temporary node on exit. Accept disappearance
         // only after we observed the exact live node during the final isolation check.
         const sameDevice = devices.length === 1 && devices[0].id === fixture.nodeId &&
@@ -50,13 +62,14 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
         return evidence;
       } finally {
         fixture.closed = true;
+        for (const socket of fixture.sockets) socket.destroy();
         try {
           await fixture.pending?.catch(() => {});
           await fixture.isolationPending?.catch(() => {});
           try {
-            if (fixture.viewerAttempted) await runtime.revokeViewer(organizationId, fixture.username);
+            if (fixture.viewerAttempted) await runtime.revokeViewer(id, fixture.username);
           } finally {
-            if (fixture.group) await runtime.deleteGuestGroup(organizationId, fixture.group.meshId);
+            if (fixture.group) await runtime.deleteGuestGroup(id, fixture.group.meshId);
           }
         } finally { active = undefined; }
       }
@@ -64,13 +77,14 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
 
     async handle(request) {
       const fixture = match(request);
+      const id = fixture.request.organization_id;
       if (!fixture.group) throw new Error('canary_fixture_unavailable');
       if (request.operation === 'download') return { download_url: fixture.group.download_url };
       if (request.operation === 'isolation') {
         fixture.isolationPending ||= (async () => {
           if (!isolationOrganizationId || !fixture.nodeId ||
               !runtime.target(dealerDomain(isolationOrganizationId))) throw new Error('canary_isolation_unavailable');
-          const pilotDevices = await runtime.inventory(organizationId, fixture.group.meshId);
+          const pilotDevices = await runtime.inventory(id, fixture.group.meshId);
           if (pilotDevices.length !== 1 || pilotDevices[0].id !== fixture.nodeId || !pilotDevices[0].online) {
             throw new Error('canary_fixture_device_changed');
           }
@@ -93,7 +107,7 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
       if (request.operation !== 'viewer') throw new Error('invalid_canary_fixture_operation');
       if (!fixture.pending) {
         fixture.pending = (async () => {
-          const online = (await runtime.inventory(organizationId, fixture.group.meshId)).filter(device => device.online);
+          const online = (await runtime.inventory(id, fixture.group.meshId)).filter(device => device.online);
           if (online.length > 1) {
             fixture.invalid = true;
             throw new Error('canary_fixture_ambiguous');
@@ -101,7 +115,7 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
           if (!online.length) return { status: 'waiting' };
           if (fixture.closed || fixture.invalid) throw new Error('canary_fixture_unavailable');
           fixture.viewerAttempted = true;
-          const result = await runtime.createViewer(organizationId, online[0].id, fixture.username, fixture.group.meshId);
+          const result = await runtime.createViewer(id, online[0].id, fixture.username, fixture.group.meshId);
           if (fixture.closed) throw new Error('canary_fixture_unavailable');
           fixture.nodeId = online[0].id;
           return { status: 'ready', ...result };

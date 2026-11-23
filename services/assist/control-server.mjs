@@ -11,16 +11,21 @@ import {createWindowsCanaryFixture} from './windows-canary-fixture.mjs';
 
 async function readBody(request){let text='';for await(const chunk of request){text+=chunk;if(Buffer.byteLength(text)>8192)throw new Error('oversized_request');}return JSON.parse(text);}
 function respond(response,status,value){response.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(value));}
-export function createControlServer({plane,runtime,token,broker,guests,pilotDomain,canaryFixture,canaryFixtureToken}){
+export function createControlServer({plane,runtime,token,broker,guests,pilotDomain,automaticCanary=false,canaryFixture,canaryFixtureToken}){
  if(pilotDomain!==undefined&&!/^mjv-[a-f0-9]{32}$/.test(pilotDomain))throw new Error('invalid_pilot_domain');
- if(!pilotDomain&&(typeof token!=='string'||token.length<32))throw new Error('weak_control_token');
- if(canaryFixture&&(!pilotDomain||typeof canaryFixtureToken!=='string'||canaryFixtureToken.length<32))throw new Error('invalid_canary_fixture_configuration');
+ const privateListener=Boolean(pilotDomain||automaticCanary);
+ if(!privateListener&&(typeof token!=='string'||token.length<32))throw new Error('weak_control_token');
+ if((automaticCanary&&(!canaryFixture||pilotDomain))||
+    (canaryFixture&&(!privateListener||typeof canaryFixtureToken!=='string'||canaryFixtureToken.length<32)))throw new Error('invalid_canary_fixture_configuration');
  const target=request=>{
   if(!request.url.startsWith('/'))return null;
   const raw=request.url.split('?')[0];const path=new URL(request.url,'http://localhost').pathname;
   if(raw!==path||path.includes('\\')||/%2f|%5c|%2e/i.test(raw))return null;
   const match=path.match(/^\/(mjv-[a-f0-9]{32})\//);const domain=match?.[1];
-  if(!domain||(pilotDomain ? pilotDomain!==domain : plane.canServe?.(domain)!==true))return null;
+  if(!domain)return null;
+  if(automaticCanary){
+   if(!canaryFixture.trackSocket(domain,request.socket))return null;
+  }else if(pilotDomain ? pilotDomain!==domain : plane.canServe?.(domain)!==true)return null;
   return runtime.target(domain);
  };
  const server=http.createServer(async(request,response)=>{
@@ -30,13 +35,13 @@ export function createControlServer({plane,runtime,token,broker,guests,pilotDoma
    try{return respond(response,200,await canaryFixture.handle(await readBody(request)));}
    catch{return respond(response,503,{error:'canary_fixture_unavailable'});}
   }
-  if(!pilotDomain&&request.url==='/v1/guest'){
+  if(!privateListener&&request.url==='/v1/guest'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
    try{const body=validateGuestRequest(await readBody(request));if(!guests)throw new Error('unavailable');return respond(response,200,await guests.guest(body));}
    catch{return respond(response,503,{error:'guest_unavailable'});}
   }
-  if(!pilotDomain&&request.url==='/v1/support'){
+  if(!privateListener&&request.url==='/v1/support'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
    if(!broker)return respond(response,503,{error:'unavailable'});
@@ -44,7 +49,7 @@ export function createControlServer({plane,runtime,token,broker,guests,pilotDoma
    try{return respond(response,200,await (inviteOperations.includes(body.operation)?guests.staff(body):broker.handle(body)));}
    catch(error){return respond(response,error.message==='forbidden'?403:503,{error:'support_unavailable'});}
   }
-  if(!pilotDomain&&request.url==='/v1/dealers/reconcile'){
+  if(!privateListener&&request.url==='/v1/dealers/reconcile'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
    let job;try{job=validateControlJob(await readBody(request),request.headers['idempotency-key']);}catch{return respond(response,400,{error:'invalid_request'});}
@@ -93,18 +98,24 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  try{
   const env=process.env;const dependencies=createHttpDependencies(env);
   const isolationId=env.ASSIST_CANARY_ISOLATION_ORGANIZATION_ID;
+  const automaticCanary=env.ASSIST_CANARY_AUTOMATIC_DEALERS==='1';
+  const pilotId=env.ASSIST_PILOT_ORGANIZATION_ID;
+  const fixtureToken=env.ASSIST_CANARY_FIXTURE_TOKEN;
+  if(automaticCanary&&(pilotId||!fixtureToken||!isolationId||!env.ASSIST_PILOT_LOOPBACK_PORT)){
+   throw new Error('invalid_automatic_canary_configuration');
+  }
   const store=createStateStore(env.ASSIST_STATE_DIRECTORY||'/var/lib/mjv-assist');release=await store.lock();
   const requeue=(id,generation)=>dependencies.rpc('requeue_assist_runtime',{p_organization_id:id,p_generation:generation});
   runtime=createManagedRuntime({store,entry:env.ASSIST_MESHCENTRAL_ENTRY||new URL('./node_modules/meshcentral/meshcentral.js',import.meta.url).pathname,
-   approvedVersion:env.ASSIST_APPROVED_MESHCENTRAL_VERSION,publicOrigin:env.ASSIST_PUBLIC_ORIGIN,agentCacheDirectory:env.ASSIST_AGENT_CACHE_DIRECTORY,onExit:async(id,generation)=>id===isolationId?undefined:requeue(id,generation)});
+   approvedVersion:env.ASSIST_APPROVED_MESHCENTRAL_VERSION,publicOrigin:env.ASSIST_PUBLIC_ORIGIN,agentCacheDirectory:env.ASSIST_AGENT_CACHE_DIRECTORY,proxyCertificateUrl:automaticCanary?env.ASSIST_PUBLIC_ORIGIN:undefined,onExit:async(id,generation)=>id===isolationId?undefined:requeue(id,generation)});
   if(!env.ASSIST_AGENT_CACHE_DIRECTORY)throw new Error('approved_agent_cache_required');
   await runtime.verifyVersion();
   const probe=createCanaryProbe(env);
   let fixture;
-  if(env.ASSIST_CANARY_FIXTURE_TOKEN){
-   const {ASSIST_CANARY_FIXTURE_TOKEN:fixtureToken,ASSIST_PILOT_ORGANIZATION_ID:id,ASSIST_PILOT_LOOPBACK_PORT:pilotPort}=env;
-   if(!id||!pilotPort||fixtureToken.length<32||[env.ASSIST_CANARY_TOKEN,env.ASSIST_CONTROL_TOKEN].includes(fixtureToken))throw new Error('invalid_canary_fixture_configuration');
-   fixture=createWindowsCanaryFixture({runtime,organizationId:id,isolationOrganizationId:env.ASSIST_CANARY_ISOLATION_ORGANIZATION_ID,probe});
+  if(fixtureToken){
+   if((!pilotId&&!automaticCanary)||!env.ASSIST_PILOT_LOOPBACK_PORT||fixtureToken.length<32||
+      [env.ASSIST_CANARY_TOKEN,env.ASSIST_CONTROL_TOKEN].includes(fixtureToken))throw new Error('invalid_canary_fixture_configuration');
+   fixture=createWindowsCanaryFixture({runtime,organizationId:pilotId,isolationOrganizationId:isolationId,probe});
   }
   if(isolationId){
    if(!fixture)throw new Error('canary_isolation_requires_fixture');
@@ -123,12 +134,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   sessionMonitor=setInterval(async()=>{if(sweeping)return;sweeping=true;try{await broker.sweep();await guests.sweep();}catch{console.error('Assist session revocation requires attention');}finally{sweeping=false;}},5000);
   const port=Number(env.ASSIST_CONTROL_PORT||8443);if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('invalid_control_port');
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
-  if(env.ASSIST_PILOT_LOOPBACK_PORT || env.ASSIST_PILOT_ORGANIZATION_ID){
+  if(env.ASSIST_PILOT_LOOPBACK_PORT || pilotId){
    const pilotPort=Number(env.ASSIST_PILOT_LOOPBACK_PORT);
-   const id=env.ASSIST_PILOT_ORGANIZATION_ID;
    if(!Number.isInteger(pilotPort)||pilotPort<1024||pilotPort>65535||pilotPort===port||
-    !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id||''))throw new Error('invalid_pilot_listener');
-   pilotServer=createControlServer({runtime,pilotDomain:dealerDomain(id),canaryFixture:fixture,canaryFixtureToken:env.ASSIST_CANARY_FIXTURE_TOKEN});
+    (!automaticCanary&&!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(pilotId||'')))throw new Error('invalid_pilot_listener');
+   pilotServer=createControlServer({runtime,pilotDomain:pilotId?dealerDomain(pilotId):undefined,automaticCanary,canaryFixture:fixture,canaryFixtureToken:fixtureToken});
    await new Promise((resolve,reject)=>{pilotServer.once('error',reject);pilotServer.listen(pilotPort,'127.0.0.1',resolve);});
   }
   // On restart, old 'verified' journals do not imply a running or healthy child process.

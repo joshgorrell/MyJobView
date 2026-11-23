@@ -33,7 +33,9 @@ export function createControlPlane({store,runtime,validateLease,probe}){
     const evidence=await verifiedProbe({organization_id:id,generation:state.generation,mesh_domain:domain,mesh_id:state.mesh_id,server_origin:state.result.server_origin});
     if(evidence?.organization_id!==id||evidence?.generation!==state.generation||evidence?.desktop_control!==true||evidence?.consent_enforced!==true||evidence?.cross_tenant_denied!==true)throw new Error('canary_failed');
     return {healthy:true,organization_id:id,generation:state.generation};
-   }catch{
+   }catch(error){
+    // Another dealer may be using the shared private verifier. Keep this healthy tenant online.
+    if(error?.code==='canary_fixture_busy')return null;
     verifiedDomains.delete(domain);
     await runtime.stop(id).catch(()=>{});await store.write(id,{...state,phase:'failed',result:null}).catch(()=>{});
     return {healthy:false,organization_id:id,generation:state.generation};

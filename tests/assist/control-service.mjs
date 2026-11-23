@@ -36,12 +36,21 @@ const runtime={
  async ensure(j,check){ensureCount++;active++;maxActive=Math.max(maxActive,active);await new Promise(r=>setTimeout(r,5));await check();stopped=false;active--;return {meshId:`mesh/${j.mesh_domain}/${hash}`,server_origin:'https://assist.example.com',windows_download_url:`https://assist.example.com/${j.mesh_domain}/meshagents?meshid=${hash}&id=4`};},
  async stop(){stopped=true;},async isStopped(){return stopped;},
 };
-const probe=async request=>({...request,checked_at:Date.now(),desktop_control:true,consent_enforced:true,cross_tenant_denied:true});
+let verifierBusy=false;
+const probe=async request=>{
+ if(verifierBusy)throw Object.assign(new Error('test verifier in use'),{code:'canary_fixture_busy'});
+ return {...request,checked_at:Date.now(),desktop_control:true,consent_enforced:true,cross_tenant_denied:true};
+};
 runtime.target=()=>({port:22000});
 const plane=createControlPlane({store,runtime,validateLease:async()=>lease,probe});
 try{
  assert.equal(plane.canServe(domain),false);
  const result=await plane.reconcile(job);assert.equal(plane.canServe(domain),true);assert.equal(result.verified,true);assert.equal((await plane.checkHealth(org)).healthy,true);assert.equal((await store.read(org)).phase,'verified');
+ verifierBusy=true;
+ assert.equal(await plane.checkHealth(org),null);
+ assert.equal(plane.canServe(domain),true,'Another dealer using the verifier keeps this dealer online');
+ assert.equal((await store.read(org)).phase,'verified');
+ verifierBusy=false;
  await Promise.all([plane.reconcile(job),plane.reconcile(job)]);assert.equal(maxActive,1,'Same dealer side effects serialize');
  assert.equal((await stat(join(directory,org+'.json'))).mode&0o777,0o600);
  await assert.rejects(store.read('../bad'),/invalid_organization/);
