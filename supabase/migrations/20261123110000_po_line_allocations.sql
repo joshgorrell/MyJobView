@@ -1,0 +1,53 @@
+-- A single vendor PO line can fulfill demand from multiple sales orders.
+-- Allocation is explicit; product-name matching is never authoritative.
+CREATE TABLE IF NOT EXISTS public.po_line_allocations (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ organization_id uuid NOT NULL REFERENCES public.organizations(id),
+ po_item_id uuid NOT NULL REFERENCES public.po_items(id),
+ sales_order_id uuid NOT NULL REFERENCES public.sales_orders(id),
+ proposal_line_item_id uuid NOT NULL REFERENCES public.proposal_line_items(id),
+ product_id uuid NOT NULL REFERENCES public.products(id),
+ quantity numeric NOT NULL CHECK(quantity > 0),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(po_item_id,proposal_line_item_id)
+);
+CREATE INDEX IF NOT EXISTS po_line_allocations_job_idx
+ ON public.po_line_allocations(organization_id,sales_order_id);
+ALTER TABLE public.po_line_allocations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.po_line_allocations FROM PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.po_line_allocations TO service_role;
+-- Enforce tenant and document/line identity for every write, including service-role writes.
+CREATE OR REPLACE FUNCTION public.validate_po_line_allocation()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE po record;
+DECLARE so record;
+DECLARE proposal_line record;
+BEGIN
+ SELECT i.organization_id,i.product_id,i.quantity,o.document_type,o.status
+ INTO po FROM public.po_items i JOIN public.purchase_orders o ON o.id=i.po_id
+ WHERE i.id=NEW.po_item_id AND o.organization_id=NEW.organization_id;
+ SELECT id,organization_id,proposal_id INTO so FROM public.sales_orders
+ WHERE id=NEW.sales_order_id AND organization_id=NEW.organization_id;
+ SELECT id,proposal_id,product_id,quantity INTO proposal_line
+ FROM public.proposal_line_items WHERE id=NEW.proposal_line_item_id;
+ IF po IS NULL OR so IS NULL OR proposal_line IS NULL OR
+    po.document_type <> 'po' OR po.status='cancelled' OR
+    po.organization_id <> NEW.organization_id OR
+    so.proposal_id IS DISTINCT FROM proposal_line.proposal_id OR
+    po.product_id IS DISTINCT FROM NEW.product_id OR
+    proposal_line.product_id IS DISTINCT FROM NEW.product_id THEN
+  RAISE EXCEPTION 'Invalid tenant, PO, or sales order line allocation';
+ END IF;
+ IF (SELECT coalesce(sum(quantity),0) FROM public.po_line_allocations
+     WHERE po_item_id=NEW.po_item_id AND id<>NEW.id)+NEW.quantity>po.quantity THEN
+  RAISE EXCEPTION 'PO line quantity over-allocated';
+ END IF;
+ IF (SELECT coalesce(sum(quantity),0) FROM public.po_line_allocations
+     WHERE proposal_line_item_id=NEW.proposal_line_item_id AND id<>NEW.id)+NEW.quantity>proposal_line.quantity THEN
+  RAISE EXCEPTION 'Sales order line quantity over-allocated';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER validate_po_line_allocation_write
+ BEFORE INSERT OR UPDATE ON public.po_line_allocations
+ FOR EACH ROW EXECUTE FUNCTION public.validate_po_line_allocation();
