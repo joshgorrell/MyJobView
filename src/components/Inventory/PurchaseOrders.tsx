@@ -75,6 +75,44 @@ export function PurchaseOrders() {
   const [demandError,setDemandError]=useState('');
   const [demandLoading,setDemandLoading]=useState(false);
   const [showDemand,setShowDemand]=useState(false);
+  const [chosenDemand,setChosenDemand]=useState<Record<string,number>>({});
+  const [demandVendors,setDemandVendors]=useState<Array<{id:string;vendor_name:string}>>([]);
+  const [demandWarehouses,setDemandWarehouses]=useState<Array<{id:string;name:string}>>([]);
+  const [demandOffices,setDemandOffices]=useState<Array<{id:string;office_name:string}>>([]);
+  const [demandVendor,setDemandVendor]=useState('');
+  const [demandWarehouse,setDemandWarehouse]=useState('');
+  const [demandOffice,setDemandOffice]=useState('');
+  const [demandSaving,setDemandSaving]=useState(false);
+  const demandRetry=useState(()=>crypto.randomUUID())[0];
+  useEffect(()=>{
+    if(!showDemand||!canCreate||!profile?.organization_id)return;
+    void Promise.all([
+      supabase.from('vendors').select('id,vendor_name').eq('organization_id',profile.organization_id).eq('is_active',true),
+      supabase.from('warehouses').select('id,name').eq('organization_id',profile.organization_id),
+      supabase.from('company_offices').select('id,office_name').eq('organization_id',profile.organization_id)
+    ]).then(([v,w,o])=>{
+      if(v.error||w.error||o.error){setDemandError(v.error?.message||w.error?.message||o.error?.message||'Unable to load purchasing setup');return;}
+      setDemandVendors(v.data||[]);setDemandWarehouses(w.data||[]);setDemandOffices(o.data||[]);
+      setDemandVendor(x=>x||v.data?.[0]?.id||'');
+      setDemandWarehouse(x=>x||w.data?.[0]?.id||'');
+      setDemandOffice(x=>x||o.data?.[0]?.id||'');
+    });
+  },[showDemand,canCreate,profile?.organization_id]);
+  async function createDemandPO(){
+    const lines=demand.filter(d=>Number(chosenDemand[d.proposal_line_item_id])>0)
+      .map(d=>({sales_order_id:d.sales_order_id,proposal_line_item_id:d.proposal_line_item_id,quantity:Number(chosenDemand[d.proposal_line_item_id])}));
+    if(!lines.length||!demandVendor||!demandWarehouse||!demandOffice){
+      setDemandError('Select equipment, vendor, warehouse and office.');return;
+    }
+    setDemandSaving(true);setDemandError('');
+    const {error}=await supabase.rpc('create_consolidated_job_purchase_order',{
+      p_lines:lines,p_vendor_id:demandVendor,p_warehouse_id:demandWarehouse,
+      p_office_id:demandOffice,p_retry:demandRetry
+    });
+    if(error)setDemandError(error.message);
+    else{setChosenDemand({});await Promise.all([loadDemand(),loadOrders()]);}
+    setDemandSaving(false);
+  }
   async function loadDemand(){
     if(!canCreate)return;
     setDemandLoading(true);setDemandError('');
@@ -187,8 +225,14 @@ export function PurchaseOrders() {
           {showDemand&&<button className="border rounded px-3 py-2 text-sm" disabled={demandLoading} onClick={()=>void loadDemand()}>Refresh demand</button>}
         </div>
         {showDemand&&(demandLoading?<p className="text-sm text-gray-500">Loading demand…</p>:demandError?<p role="alert" className="text-sm text-red-700">Unable to load demand: {demandError}</p>:demand.length===0?<p className="text-sm text-gray-500">No unallocated equipment demand found.</p>:
-          <div className="overflow-x-auto max-h-72 overflow-y-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Sales order</th><th className="p-2">Product</th><th className="p-2 text-right">Required</th><th className="p-2 text-right">On PO</th><th className="p-2 text-right">Still needed</th></tr></thead>
-          <tbody>{demand.map(d=><tr key={d.proposal_line_item_id} className="border-b"><td className="p-2 font-mono text-xs">{d.sales_order_id.slice(0,8)}</td><td className="p-2 font-mono text-xs">{d.product_id.slice(0,8)}</td><td className="p-2 text-right">{d.required_quantity}</td><td className="p-2 text-right">{d.po_allocated_quantity}</td><td className="p-2 text-right font-semibold">{d.remaining_quantity}</td></tr>)}</tbody></table></div>)}
+          <div className="overflow-x-auto max-h-72 overflow-y-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Order</th><th className="p-2">Sales order</th><th className="p-2">Product</th><th className="p-2 text-right">Required</th><th className="p-2 text-right">On PO</th><th className="p-2 text-right">Still needed</th></tr></thead>
+          <tbody>{demand.map(d=><tr key={d.proposal_line_item_id} className="border-b"><td className="p-2"><input aria-label={'Order equipment '+d.proposal_line_item_id} type="number" min="0" max={d.remaining_quantity} step="1" className="w-20 border rounded p-1" value={chosenDemand[d.proposal_line_item_id]??0} onChange={e=>setChosenDemand(v=>({...v,[d.proposal_line_item_id]:Math.max(0,Math.min(d.remaining_quantity,Math.floor(Number(e.target.value)||0)))}))}/></td><td className="p-2 font-mono text-xs">{d.sales_order_id.slice(0,8)}</td><td className="p-2 font-mono text-xs">{d.product_id.slice(0,8)}</td><td className="p-2 text-right">{d.required_quantity}</td><td className="p-2 text-right">{d.po_allocated_quantity}</td><td className="p-2 text-right font-semibold">{d.remaining_quantity}</td></tr>)}</tbody></table></div>)}
+        {showDemand&&demand.length>0&&<div className="flex flex-wrap gap-2 items-end">
+          <label className="text-xs">Vendor<select className="block border rounded p-2" value={demandVendor} onChange={e=>setDemandVendor(e.target.value)}>{demandVendors.map(v=><option key={v.id} value={v.id}>{v.vendor_name}</option>)}</select></label>
+          <label className="text-xs">Warehouse<select className="block border rounded p-2" value={demandWarehouse} onChange={e=>setDemandWarehouse(e.target.value)}>{demandWarehouses.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
+          <label className="text-xs">Office<select className="block border rounded p-2" value={demandOffice} onChange={e=>setDemandOffice(e.target.value)}>{demandOffices.map(v=><option key={v.id} value={v.id}>{v.office_name}</option>)}</select></label>
+          <button disabled={demandSaving||!Object.values(chosenDemand).some(q=>q>0)} onClick={()=>void createDemandPO()} className="bg-blue-600 disabled:opacity-50 text-white rounded px-4 py-2 text-sm">Create consolidated vendor PO</button>
+        </div>}
       </section>}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SummaryCard label="Open orders" value={openOrders.length.toString()} detail={formatCurrency(openValue)} icon={Truck} tone="blue" />
