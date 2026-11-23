@@ -363,12 +363,17 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
   const yearStartIso = new Date(curYear, 0, 1).toISOString();
   const nowIso = now.toISOString();
 
-  const safe = <T>(q: PromiseLike<{ data: T | null; error: any | null }>) =>
-    Promise.resolve(q).catch(() => ({ data: null, error: null }));
+  // A failed source must not silently become zero revenue on the TV.
+  // Propagate both PostgREST errors and rejected requests to the dashboard's
+  // existing DATA ERROR state; its last successful snapshot stays visible.
+  const safe = async <T>(q: PromiseLike<{ data: T | null; error: any | null }>): Promise<{ data: T | null; error: null }> => {
+    const result = await q;
+    if (result.error) throw result.error;
+    return { data: result.data, error: null };
+  };
 
   const companyKpisPromise = fetchSalesKpis({ type: 'company' }, 'this_month')
-    .then((data): { data: SalesKpis | null; error: any | null } => ({ data, error: null }))
-    .catch((): { data: SalesKpis | null; error: any | null } => ({ data: null, error: null }));
+    .then((data): { data: SalesKpis | null; error: null } => ({ data, error: null }));
 
   const [
     companyKpisResult,
