@@ -6,7 +6,6 @@ import { Award, BarChart3, DollarSign, FileCheck2, ReceiptText, Target, Trending
 
 interface RecentSale {
   id: string;
-  orderNumber: string;
   customer: string;
   rep: string;
   total: number;
@@ -113,7 +112,7 @@ export default function SalesTVDashboard() {
     const [salesResult, billedResult, completedBillableResult, billingLinksResult] = await Promise.all([
       supabase
         .from('sales_orders')
-        .select('id, order_number, contract_total, created_by_name, booked_at, created_at, contacts(full_name)')
+        .select('id, contract_total, created_by_name, booked_at, created_at, contacts(full_name)')
         .eq('organization_id', orgId)
         .not('status', 'in', '("cancelled","voided")')
         .order('booked_at', { ascending: false, nullsFirst: false })
@@ -147,7 +146,6 @@ export default function SalesTVDashboard() {
 
     const recentSales = (salesResult.data || []).map((row: any) => ({
       id: row.id,
-      orderNumber: row.order_number || 'SO',
       customer: row.contacts?.full_name || 'Customer',
       rep: row.created_by_name || 'Sales',
       total: Number(row.contract_total || 0),
@@ -373,8 +371,8 @@ export default function SalesTVDashboard() {
 
           <section className="col-span-4 flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
             <PanelHeader title="Recent Sales" icon={<FileCheck2 />} right="NEWEST FIRST" />
-            <div className="grid h-[3vh] min-h-[30px] shrink-0 grid-cols-[.75fr_1.6fr_1fr_.8fr] items-center border-b border-slate-800 px-[.7vw] text-[clamp(9px,.48vw,18px)] font-black uppercase text-slate-500"><span>SO</span><span>Customer</span><span>Rep</span><span className="text-right">Sale</span></div>
-            <div className="min-h-0 flex-1">{recentSales.length ? recentSales.slice(0, 7).map(s => <div key={s.id} className="grid h-[13.8%] min-h-[42px] grid-cols-[.75fr_1.6fr_1fr_.8fr] items-center border-b border-slate-800/70 px-[.7vw] text-[clamp(11px,.64vw,24px)]"><b className="font-mono text-sky-300">{s.orderNumber}</b><div className="min-w-0"><div className="truncate font-bold">{s.customer}</div><div className="text-[.8em] text-slate-600">{age(s.bookedAt)} ago</div></div><span className="truncate text-slate-400">{s.rep}</span><b className="text-right text-emerald-400">{compact(s.total)}</b></div>) : <Empty text="No recent sales orders" />}</div>
+            <div className="grid h-[3vh] min-h-[30px] shrink-0 grid-cols-[1.9fr_1.1fr_1fr] items-center border-b border-slate-800 px-[.7vw] text-[clamp(9px,.48vw,18px)] font-black uppercase text-slate-500"><span>Customer</span><span>Rep</span><span className="text-right">Sale</span></div>
+            <div className="min-h-0 flex-1">{recentSales.length ? recentSales.slice(0, 7).map(s => <div key={s.id} className="grid h-[13.8%] min-h-[42px] grid-cols-[.75fr_1.6fr_1fr_.8fr] items-center border-b border-slate-800/70 px-[.7vw] text-[clamp(11px,.64vw,24px)]"><div className="min-w-0"><div className="truncate font-bold">{s.customer}</div><div className="text-[.8em] text-slate-600">{age(s.bookedAt)} ago</div></div><span className="truncate text-slate-400">{s.rep}</span><b className="text-right text-emerald-400">{compact(s.total)}</b></div>) : <Empty text="No recent sales orders" />}</div>
           </section>
 
           <section className="col-span-4 flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
