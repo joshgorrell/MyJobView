@@ -264,7 +264,7 @@ CREATE OR REPLACE FUNCTION public.create_consolidated_job_purchase_order(
  p_office_id uuid, p_retry uuid
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE org uuid:=public.get_user_org_id();
-DECLARE entry jsonb; source_line record; product record;
+DECLARE entry jsonb; source_line record; product record; vendor_record record;
 DECLARE payload jsonb:='[]'::jsonb; doc uuid; po_line_id uuid;
 DECLARE qty numeric; marker text;
 BEGIN
@@ -284,6 +284,8 @@ BEGIN
  ) ids GROUP BY id HAVING count(*)>1) THEN
   RAISE EXCEPTION 'Duplicate equipment source line';
  END IF;
+ SELECT vendor_name INTO vendor_record FROM public.vendors WHERE id=p_vendor_id AND organization_id=org AND is_active=true;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Select an active vendor'; END IF;
  -- Lock demand lines in a stable order, avoiding concurrent duplicate POs.
  PERFORM li.id FROM public.proposal_line_items li
  WHERE li.id IN (SELECT (x->>'proposal_line_item_id')::uuid
@@ -308,6 +310,12 @@ BEGIN
   WHERE id=source_line.product_id AND organization_id=org;
   IF NOT FOUND OR product.is_discontinued THEN
    RAISE EXCEPTION 'Unknown or discontinued product cannot be ordered';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.products pr
+    JOIN public.vendors v ON v.id=pr.vendor_id AND v.organization_id=org
+    WHERE pr.id=source_line.product_id AND pr.organization_id=org
+      AND v.id=p_vendor_id) THEN
+   RAISE EXCEPTION 'Selected equipment does not belong to the chosen vendor';
   END IF;
   IF product.cost IS NULL OR product.cost<0 THEN
    RAISE EXCEPTION 'Product cost must be verified before purchasing';
