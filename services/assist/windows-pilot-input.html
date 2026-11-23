@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MJV Assist pilot input test</title>
+<style>
+body { font: 1.125rem system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; }
+input, button { font: inherit; padding: .55rem; }
+label { display: block; margin: 1rem 0 .35rem; }
+output { font: bold 1.5rem monospace; letter-spacing: .15em; }
+</style>
+</head>
+<body>
+<h1>MJV Assist pilot input test</h1>
+<p>Open this file on the Windows test PC. Use only the displayed challenge in this window.</p>
+<p>Current challenge <output id="challenge"></output></p>
+<label for="input">Test input</label>
+<input id="input" type="text" autocomplete="off" spellcheck="false" maxlength="12">
+<button id="reset" type="button">New challenge</button>
+<p id="result" role="status"></p>
+<script>
+const challenge = document.getElementById('challenge');
+const input = document.getElementById('input');
+const result = document.getElementById('result');
+const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function reset() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  challenge.textContent = Array.from(bytes, byte => alphabet[byte % alphabet.length]).join('');
+  input.value = '';
+  result.textContent = 'Waiting for test input.';
+}
+input.addEventListener('input', () => {
+  result.textContent = input.value.toUpperCase() === challenge.textContent
+    ? 'Challenge matched.'
+    : 'Challenge has not matched.';
+});
+document.getElementById('reset').addEventListener('click', reset);
+reset();
+</script>
+</body>
+</html>
