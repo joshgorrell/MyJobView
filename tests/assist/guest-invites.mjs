@@ -17,9 +17,12 @@ const rpc=async(_name,args)=>{
 };
 // Model the same dealer serializer used by the control plane, including simultaneous redemption.
 let queue=Promise.resolve();const exclusive=(_id,fn)=>{const p=queue.then(fn);queue=p.catch(()=>{});return p;};
-const options={rpc,runtime,exclusive,requeue:async()=>{requeues++;},enabled:true,now:()=>clock};
+const options={rpc,runtime,isVerified:()=>true,exclusive,requeue:async()=>{requeues++;},enabled:true,now:()=>clock};
 const broker=createGuestBroker(options),staff=(operation,extra={})=>broker.staff({...context,operation,...extra});
 assert.equal((await staff('invite_capability')).available,true);
+const unverifiedBroker=createGuestBroker({...options,isVerified:()=>false});
+assert.equal((await unverifiedBroker.staff({...context,operation:'invite_capability'})).available,false);
+await assert.rejects(unverifiedBroker.staff({...context,operation:'invite_create'}),/guest_unavailable/);
 const offlineBroker=createGuestBroker({...options,runtime:{...runtime,generation:()=>null}});
 assert.equal((await offlineBroker.staff({...context,operation:'invite_capability'})).available,false);
 await assert.rejects(offlineBroker.staff({...context,operation:'invite_create'}),/guest_unavailable/);

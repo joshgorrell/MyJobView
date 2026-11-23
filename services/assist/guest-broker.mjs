@@ -14,10 +14,10 @@ export function validateGuestRequest(input){
  return input;
 }
 // In-memory capabilities deliberately die on restart. Native guest groups are cleaned before ingress reopens.
-export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,arm64Enabled=false,now=Date.now}){
+export function createGuestBroker({rpc,runtime,requeue,exclusive,isVerified=()=>false,enabled=false,arm64Enabled=false,now=Date.now}){
  const invites=new Map(),rate=new Map();
  const call=(action,c,params={})=>rpc('assist_support_service',{p_action:action,p_organization_id:c.organization_id,p_actor_id:c.actor_id||null,p_auth_session_id:c.auth_session_id||null,p_params:params});
- const live=async row=>enabled&&now()<row.expires&&now()<row.hardDeadline&&now()<row.token_exp*1000&&runtime.generation(row.organization_id)===row.generation&&(await call('access',row))?.allowed===true;
+ const live=async row=>enabled&&isVerified(row.organization_id)===true&&now()<row.expires&&now()<row.hardDeadline&&now()<row.token_exp*1000&&runtime.generation(row.organization_id)===row.generation&&(await call('access',row))?.allowed===true;
  async function close(row,reason){
   row.ended=true; // Immediately rejects every capability, even when provider cleanup needs retry.
   try{
@@ -35,9 +35,10 @@ export function createGuestBroker({rpc,runtime,requeue,exclusive,enabled=false,a
   async staff(c){
    return exclusive(c.organization_id,async()=>{
     if((await call('access',c))?.allowed!==true)throw new Error('forbidden');
-    if(c.operation==='invite_capability')return {available:enabled&&Number.isInteger(runtime.generation(c.organization_id))};
+    if(c.operation==='invite_capability')return {available:enabled&&isVerified(c.organization_id)===true&&Number.isInteger(runtime.generation(c.organization_id))};
     if(!enabled)throw new Error('guest_pilot_required');
     if(c.operation==='invite_create'){
+     if(isVerified(c.organization_id)!==true)throw new Error('guest_unavailable');
      if(invites.size>=200||[...invites.values()].filter(i=>i.organization_id===c.organization_id).length>=10)throw new Error('invite_limit');
      const id=randomUUID(),code=[...randomBytes(12)].map(n=>alphabet[n%32]).join('');
      const generation=runtime.generation(c.organization_id);if(!Number.isInteger(generation))throw new Error('guest_unavailable');
