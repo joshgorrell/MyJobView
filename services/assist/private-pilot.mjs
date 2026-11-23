@@ -30,9 +30,7 @@ async function launch() {
   const domain = dealerDomain(organizationId);
   let runtime, server, release, deadline;
   const controller = new AbortController();
-  let shutdown;
-  let listening = false;
-  const stop = () => shutdown ??= (async () => {
+  async function stop() {
     clearTimeout(deadline);
     if (server) {
       server.close();
@@ -41,11 +39,8 @@ async function launch() {
     if (runtime) await runtime.stopAll();
     if (release) await release();
     await rm(root, { recursive: true, force: true });
-  })();
-  const halt = () => {
-    controller.abort();
-    if (listening) void stop().catch(() => { process.exitCode = 1; });
-  };
+  }
+  const halt = () => controller.abort();
   process.once('SIGINT', halt);
   process.once('SIGTERM', halt);
   deadline = setTimeout(halt, 60 * 60 * 1000);
@@ -71,10 +66,10 @@ async function launch() {
       server.once('error', reject);
       server.listen(config.port, '127.0.0.1', resolve);
     });
-    listening = true;
     controller.signal.throwIfAborted();
     console.log(JSON.stringify({ domain, download: guest.download_url, lifetimeMinutes: 60 }));
     const prompt = createInterface({ input: process.stdin, output: process.stdout });
+    prompt.on('SIGINT', halt);
     try {
       await prompt.question('After the designated PC connects, press Enter to prepare the viewer. ', { signal: controller.signal });
       const online = (await runtime.inventory(organizationId, guest.meshId)).filter(device => device.online);
@@ -85,16 +80,17 @@ async function launch() {
       controller.signal.throwIfAborted();
       const viewerPath = join(root, 'operator-viewer.txt');
       await writeFile(viewerPath, viewer.viewer_url + '\n', { flag: 'wx', mode: 0o600 });
+      controller.signal.throwIfAborted();
       console.log('Operator viewer saved locally at ' + viewerPath);
       await prompt.question('Press Enter to end the pilot and disconnect the test PC. ', { signal: controller.signal });
       await runtime.revokeViewer(organizationId, username);
     } finally {
       prompt.close();
-      await stop();
     }
-  } catch (error) {
+  } finally {
+    process.removeListener('SIGINT', halt);
+    process.removeListener('SIGTERM', halt);
     await stop();
-    throw error;
   }
 }
 
