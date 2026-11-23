@@ -106,3 +106,47 @@ END $$;
 CREATE TRIGGER allocate_request_backed_po_line_insert
  AFTER INSERT ON public.po_items
  FOR EACH ROW EXECUTE FUNCTION public.allocate_request_backed_po_line();
+
+-- Direct catalog ordering and consolidated vendor orders can explicitly allocate
+-- a PO item across multiple sales orders. Never infer by SKU.
+-- Caller must have purchasing permission; allocation validation trigger verifies
+-- tenant, originating proposal, product identity and both quantity ceilings.
+CREATE OR REPLACE FUNCTION public.assign_po_line_allocations(
+ p_po_item_id uuid, p_allocations jsonb
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE org uuid:=public.get_user_org_id(); target record; allocation jsonb;
+BEGIN
+ IF NOT public.can_manage_purchasing() OR org IS NULL THEN
+  RAISE EXCEPTION 'Purchasing permission required';
+ END IF;
+ IF jsonb_typeof(p_allocations) IS DISTINCT FROM 'array' OR
+    jsonb_array_length(p_allocations)=0 THEN
+  RAISE EXCEPTION 'Select at least one allocation';
+ END IF;
+ SELECT i.id,i.organization_id,i.product_id,o.document_type,o.status
+ INTO target FROM public.po_items i
+ JOIN public.purchase_orders o ON o.id=i.po_id
+ WHERE i.id=p_po_item_id AND i.organization_id=org AND o.organization_id=org
+ FOR UPDATE OF i;
+ IF NOT FOUND OR target.document_type <> 'po' OR target.status <> 'draft' THEN
+  RAISE EXCEPTION 'Only draft purchase orders can be allocated';
+ END IF;
+ IF EXISTS(SELECT 1 FROM public.po_line_allocations WHERE po_item_id=p_po_item_id) THEN
+  RAISE EXCEPTION 'PO line already allocated; edit existing allocations through an audited workflow';
+ END IF;
+ IF EXISTS(SELECT 1 FROM jsonb_array_elements(p_allocations) x
+  WHERE nullif(x->>'sales_order_id','') IS NULL
+     OR nullif(x->>'proposal_line_item_id','') IS NULL
+     OR nullif(x->>'quantity','') IS NULL) THEN
+  RAISE EXCEPTION 'Missing required allocation fields';
+ END IF;
+ FOR allocation IN SELECT * FROM jsonb_array_elements(p_allocations) LOOP
+  INSERT INTO public.po_line_allocations
+    (organization_id,po_item_id,sales_order_id,proposal_line_item_id,product_id,quantity)
+  VALUES(org,p_po_item_id,(allocation->>'sales_order_id')::uuid,
+    (allocation->>'proposal_line_item_id')::uuid,target.product_id,
+    (allocation->>'quantity')::numeric);
+ END LOOP;
+END $$;
+REVOKE ALL ON FUNCTION public.assign_po_line_allocations(uuid,jsonb) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.assign_po_line_allocations(uuid,jsonb) TO authenticated;
