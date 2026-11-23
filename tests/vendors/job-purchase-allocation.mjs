@@ -43,4 +43,7 @@ assert.match(sql,/CREATE OR REPLACE FUNCTION public\\.assign_po_line_allocations
 assert.match(sql,/public\\.can_manage_purchasing\\(\\)/);
 assert.match(sql,/target\\.status <> 'draft'/);
 assert.match(sql,/REVOKE ALL ON FUNCTION public\\.assign_po_line_allocations/);
+assert.match(sql,/CREATE OR REPLACE FUNCTION public\\.get_unallocated_sales_order_products/);
+assert.match(sql,/so\\.organization_id=org AND li\\.organization_id=org/);
+assert.match(sql,/po\\.status IS DISTINCT FROM 'cancelled'/);
 console.log('Consolidated multi-job PO allocation tests passed');
