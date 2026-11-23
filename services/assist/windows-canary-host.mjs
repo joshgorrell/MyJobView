@@ -16,14 +16,17 @@ export function createWindowsCanaryServer({verify,token,os=platform(),maxBody=81
  if(os!=='win32')throw new Error('windows_host_required');
  if(typeof token!=='string'||token.length<32)throw new Error('canary_token_required');
  if(typeof verify!=='function')throw new Error('independent_windows_verifier_required');
- if(!Number.isSafeInteger(verifyTimeoutMs)||verifyTimeoutMs<1||verifyTimeoutMs>14000)throw new Error('invalid_canary_timeout');
- let active=false;
+ if(!Number.isSafeInteger(verifyTimeoutMs)||verifyTimeoutMs<1||verifyTimeoutMs>45000)throw new Error('invalid_canary_timeout');
+ let active=false,verifying=false;
  const handle=createWindowsCanaryHandler({verify:async request=>{
   const controller=new AbortController();
+  verifying=true;
+  const execution=Promise.resolve().then(()=>verify(request,{signal:controller.signal}));
+  void execution.then(()=>{verifying=false;},()=>{verifying=false;});
   const timer=setTimeout(()=>controller.abort(),verifyTimeoutMs);
   try{
    return await Promise.race([
-    Promise.resolve().then(()=>verify(request,{signal:controller.signal})),
+    execution,
     new Promise((_,reject)=>controller.signal.addEventListener('abort',()=>reject(new Error('canary_timeout')),{once:true}))
    ]);
   }finally{clearTimeout(timer);controller.abort();}
@@ -34,7 +37,7 @@ export function createWindowsCanaryServer({verify,token,os=platform(),maxBody=81
   if(req.method!=='POST')return reply(405,{error:'method_not_allowed'});
   if(!authorized(req.headers.authorization,token))return reply(401,{error:'unauthorized'});
   if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')return reply(415,{error:'unsupported_media_type'});
-  if(active)return reply(503,{error:'canary_busy'});
+  if(active || verifying)return reply(503,{error:'canary_busy'});
   active=true;
   try{
    let size=0,chunks=[];
@@ -53,7 +56,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   if(!file||!file.startsWith('file:///'))throw new Error('independent_verifier_module_required');
   const module=await import(file);
   if(typeof module.verify!=='function')throw new Error('independent_verifier_export_required');
-  const server=createWindowsCanaryServer({verify:module.verify,token:process.env.ASSIST_CANARY_TOKEN});
+  const server=createWindowsCanaryServer({verify:module.verify,token:process.env.ASSIST_CANARY_TOKEN,verifyTimeoutMs:Number(process.env.ASSIST_WINDOWS_CANARY_VERIFY_TIMEOUT_MS||12000)});
   const port=Number(process.env.ASSIST_WINDOWS_CANARY_PORT||8787);
   if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('invalid_canary_port');
   server.listen(port,'127.0.0.1',()=>console.log('Windows canary host listening on loopback; independent verification required'));

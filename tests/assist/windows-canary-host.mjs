@@ -5,7 +5,7 @@ const token='a'.repeat(48),org='00000000-0000-0000-0000-000000000001',domain=dea
 assert.throws(()=>createWindowsCanaryServer({os:'linux',token,verify:async()=>({})}),/windows_host_required/);
 assert.throws(()=>createWindowsCanaryServer({os:'win32',token:'short',verify:async()=>({})}),/canary_token_required/);
 assert.throws(()=>createWindowsCanaryServer({os:'win32',token}),/independent_windows_verifier_required/);
-assert.throws(()=>createWindowsCanaryServer({os:'win32',token,verify:async()=>({}),verifyTimeoutMs:15000}),/invalid_canary_timeout/);
+assert.throws(()=>createWindowsCanaryServer({os:'win32',token,verify:async()=>({}),verifyTimeoutMs:45001}),/invalid_canary_timeout/);
 let called=0;
 const server=createWindowsCanaryServer({os:'win32',token,verify:async request=>{called++;return {...request,checked_at:Date.now(),desktop_control:true,consent_enforced:true,cross_tenant_denied:true,windows_host_verified:true,actual_input_observed:true,denied_consent_observed:true,second_dealer_denied_observed:true};}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -37,6 +37,8 @@ try{
  assert.equal(second.status,503);
  assert.equal((await second.json()).error,'canary_busy');
  assert.equal((await first).status,503);
+ const duringCleanup=await request();
+ assert.equal((await duringCleanup.json()).error,'canary_busy');
  release({});
 }finally{await new Promise(resolve=>slow.close(resolve));}
 console.log('Windows canary HTTP host requires Windows, strong token, real verifier, bounded time/concurrency and rejects replay');

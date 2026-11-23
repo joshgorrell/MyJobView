@@ -1,8 +1,10 @@
 param([Parameter(Mandatory)][int] $AgentPid)
 
 $ErrorActionPreference = 'Stop'
-if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:GITHUB_REPOSITORY -ne 'joshgorrell/MyJobView') {
-    throw 'This UI test is restricted to disposable GitHub-hosted MyJobView runners.'
+$hostedTest = $env:GITHUB_ACTIONS -eq 'true' -and $env:RUNNER_ENVIRONMENT -eq 'github-hosted' -and $env:GITHUB_REPOSITORY -eq 'joshgorrell/MyJobView'
+$dedicated = $env:ASSIST_WINDOWS_CANARY_DEVICE -and $env:ASSIST_WINDOWS_CANARY_DEVICE -eq $env:COMPUTERNAME
+if ((-not $hostedTest -and -not $dedicated) -or -not [Environment]::UserInteractive -or [Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0) {
+    throw 'This check requires an interactive session on the dedicated Assist test device.'
 }
 
 Add-Type @'

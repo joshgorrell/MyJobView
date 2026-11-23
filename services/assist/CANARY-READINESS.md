@@ -18,8 +18,16 @@ The Linux control service can give the Windows verifier a fresh guest download a
 
 The Windows verifier requests `POST /v1/assist/fixture` using the fixture bearer token, `organization_id`, `generation`, and `probe_nonce` from the live request. Use `operation: "download"` to obtain the dedicated x64 helper and `operation: "viewer"` to wait for or open its viewer. The server revokes the viewer and deletes the temporary guest group after each probe. Cleanup failure blocks a successful probe. The Windows verifier must still independently prove consent, desktop input, and dealer isolation.
 
-## Next engineering milestone
+## Windows verifier deployment
 
-Build a dedicated, isolated Windows canary runner that validates real desktop/control and consent on a disposable test machine, and proves cross-dealer denial using two distinct test organizations. Bind the response to the incoming fresh `probe_nonce`, organization, and generation; supply fresh epoch-millisecond `checked_at` only after all three real checks. Use a trusted HTTPS origin and protected bearer token. Never issue success from inventory, configuration, a health check, or mocked events.
+The bundled verifier is `services/assist/windows-live-verifier.mjs`. On a dedicated Windows x64 test VM, install Node 22+ and PowerShell 7. Install the locked test dependencies with `npm ci --ignore-scripts --prefix tests/assist/windows` and run `npx --prefix tests/assist/windows playwright install chromium`. Run the Windows canary host from an interactive Windows session on that VM. A session-zero Windows service cannot use the desktop test.
+
+Set `ASSIST_WINDOWS_CANARY_VERIFIER` to the file URL of the bundled verifier. Set `ASSIST_WINDOWS_CANARY_DEVICE` to the test VM hostname and configure `ASSIST_WINDOWS_CANARY_SERVER_ORIGIN` and `ASSIST_WINDOWS_CANARY_FIXTURE_ORIGIN` with the exact HTTPS origins. The server origin must reach the private pilot listener from this machine, even while the public listener rejects an unverified runtime. Use normal trusted TLS. Configure the independent fixture token on both sides and the canary bearer token on the Windows host and Linux control side.
+
+For the Windows harness, set `ASSIST_WINDOWS_CANARY_VERIFY_TIMEOUT_MS=45000` on the Windows host and `ASSIST_CANARY_PROBE_TIMEOUT_MS=50000` on the control host. Those settings retain the activation worker's existing lease reserve. The control host also needs `ASSIST_CANARY_ISOLATION_ORGANIZATION_ID` set to a fresh UUID reserved for a synthetic dealer. The control host starts that isolated runtime with no public or pilot ingress. The verifier refuses to report isolation evidence if that runtime is unavailable.
+
+## Before activation
+
+Deploy the runner on the dedicated test VM and exercise it through the private HTTPS path against two synthetic dealer runtimes. Confirm that the real probe returns fresh proof within the deployment timeout and that the guest download stops working after the response. The isolated CI run validates the protocol without changing production state.
 
 Keep `mjv-assist-control` and `mjv-assist-worker` stopped until the Windows runner and actual tests are verified. Do not set pilot approval flags or expose agent downloads prematurely.

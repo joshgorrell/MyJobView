@@ -1,29 +1,26 @@
 // Exercises the real temporary guest agent on an ephemeral Windows runner.
 // This test never issues activation evidence or uses a production endpoint.
 import assert from 'node:assert/strict';
-import { spawn, execFile, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { get } from 'node:https';
+import { request as httpsRequest } from 'node:https';
 import { connect } from 'node:net';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:tls';
-import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
 import { createControlServer } from '../../../services/assist/control-server.mjs';
 import { dealerDomain } from '../../../services/assist/control-core.mjs';
 import { createManagedRuntime } from '../../../services/assist/managed-runtime.mjs';
 import { stageAgentCache } from '../../../services/assist/prepare-agent-cache.mjs';
-import { exerciseDesktopSession } from './desktop-session.mjs';
+import { createLiveWindowsVerifier } from '../../../services/assist/windows-live-verifier.mjs';
+import { createWindowsCanaryServer } from '../../../services/assist/windows-canary-host.mjs';
 import { createWindowsCanaryFixture } from '../../../services/assist/windows-canary-fixture.mjs';
 import { createStateStore } from '../../../services/assist/state-store.mjs';
 
 const loopback = '127.0.0.1';
-const run = promisify(execFile);
-const connectScript = fileURLToPath(new URL('./connect-guest-helper.ps1', import.meta.url));
 const entry = fileURLToPath(new URL('../../../services/assist/node_modules/meshcentral/meshcentral.js', import.meta.url));
 
 async function stageWindowsAgent(root, store, organizationId, version) {
@@ -56,9 +53,9 @@ async function listen(server, port = 0) {
   return server.address().port;
 }
 
-function fetchLocal(url, ca) {
+function fetchLocal(url, ca, options = {}) {
   return new Promise((resolve, reject) => {
-    const request = get(url, { ca, signal: AbortSignal.timeout(10_000) }, async response => {
+    const request = httpsRequest(url, { ca, signal: AbortSignal.timeout(10_000), ...options }, async response => {
       try {
         const chunks = [];
         let size = 0;
@@ -67,24 +64,12 @@ function fetchLocal(url, ca) {
           assert.ok(size <= 16 * 1024 * 1024, 'Native response exceeded the test limit');
           chunks.push(chunk);
         }
-        resolve({ status: response.statusCode, bytes: Buffer.concat(chunks) });
+        resolve(new Response(Buffer.concat(chunks), { status: response.statusCode }));
       } catch (error) { reject(error); }
     });
     request.once('error', reject);
+    request.end(options.body);
   });
-}
-
-async function waitForGuest(runtime, organizationId, groupId, agent) {
-  const deadline = Date.now() + 45_000;
-  while (Date.now() < deadline) {
-    assert.equal(agent.exitCode, null, 'The temporary Windows agent exited before connecting');
-    const devices = await runtime.inventory(organizationId, groupId);
-    const online = devices.filter(device => device.online);
-    assert.ok(online.length < 2, 'More than one guest came online');
-    if (online.length) return online[0];
-    await delay(500);
-  }
-  throw new Error('The Windows agent did not appear in the temporary guest group');
 }
 
 if (process.platform !== 'win32' || process.arch !== 'x64' || process.env.GITHUB_ACTIONS !== 'true' ||
@@ -97,11 +82,11 @@ const store = createStateStore(join(root, 'runtime'));
 const organizationId = randomUUID();
 const domain = dealerDomain(organizationId);
 const fixtureToken = randomUUID() + randomUUID();
-const probeRequest = { organization_id: organizationId, generation: 1, mesh_domain: domain, probe_nonce: randomUUID() };
+const canaryToken = randomUUID() + randomUUID();
+const isolationOrganizationId = randomUUID();
 const proxySockets = new Set();
-let runtime, backend, proxy, agent, agentExit;
+let runtime, backend, proxy, canaryServer;
 let testFailed = false;
-const executable = join(root, 'temporary-assist.exe');
 let stage = 'prepare isolated runtime';
 try {
   const version = JSON.parse(await readFile(join(dirname(entry), 'package.json'), 'utf8')).version;
@@ -135,87 +120,69 @@ try {
     proxyCertificateUrl: origin,
   });
   await runtime.verifyVersion();
-  await runtime.ensure({ organization_id: organizationId, generation: 1 }, async () => {});
-  const askFixture = async operation => {
-    const response = await fetch(`http://${loopback}:${backendPort}/v1/assist/fixture`, {
-      method: 'POST',
-      headers: { authorization: 'Bearer ' + fixtureToken, 'content-type': 'application/json' },
-      body: JSON.stringify({ ...probeRequest, operation }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    assert.equal(response.status, 200, 'Pilot fixture request failed');
-    return response.json();
-  };
+  const provisioned = await runtime.ensure({ organization_id: organizationId, generation: 1 }, async () => {});
+  await store.write(isolationOrganizationId, { organization_id: isolationOrganizationId, generation: 1, desired_enabled: true, phase: 'applying' });
+  await runtime.ensure({ organization_id: isolationOrganizationId, generation: 1 }, async () => {});
+
   let download;
-  const fixture = createWindowsCanaryFixture({
-    runtime, organizationId, probe: async () => {
-      stage = 'download temporary Windows helper';
-      download = new URL((await askFixture('download')).download_url);
-      assert.equal(download.origin, origin);
-      assert.equal(download.searchParams.get('id'), '4');
-      assert.equal(download.searchParams.get('installflags'), '1');
-      const guestMeshId = `mesh/${domain}/${download.searchParams.get('meshid')}`;
-      const { status, bytes } = await fetchLocal(download, cert);
-      assert.equal(status, 200);
-      assert.equal(bytes.toString('ascii', 0, 2), 'MZ');
-      await writeFile(executable, bytes, { flag: 'wx' });
-
-      stage = 'connect temporary Windows helper';
-      agent = spawn(executable, [], { cwd: root, stdio: 'ignore' });
-      agentExit = new Promise(resolve => {
-        agent.once('exit', resolve);
-        agent.once('error', resolve);
-      });
-      await once(agent, 'spawn');
-      await run('pwsh', ['-NoProfile', '-File', connectScript, '-AgentPid', String(agent.pid)], { timeout: 25_000 });
-      const device = await waitForGuest(runtime, organizationId, guestMeshId, agent);
-      assert.ok(device.id.startsWith(`node/${domain}/`));
-      assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
-
-      stage = 'reject viewer authorization from a second dealer';
-      const otherDealer = randomUUID();
-      await store.write(otherDealer, { organization_id: otherDealer, generation: 1, desired_enabled: true, phase: 'applying' });
-      await runtime.ensure({ organization_id: otherDealer, generation: 1 }, async () => {});
-      try {
-        assert.deepEqual(await runtime.inventory(otherDealer), []);
-        await assert.rejects(runtime.createViewer(otherDealer, device.id, 'mjv-session-' + randomUUID().replaceAll('-', '')),
-          /device_offline/);
-      } finally {
-        await runtime.stop(otherDealer);
+  const verifier = createLiveWindowsVerifier({
+    serverOrigin: origin, fixtureOrigin: origin, token: fixtureToken, testDirectory: root, certPath,
+    transport: async (url, options) => {
+      const response = await fetchLocal(url, cert, options);
+      if (url.endsWith('/v1/assist/fixture') && JSON.parse(options.body).operation === 'download' && response.ok) {
+        download = (await response.clone().json()).download_url;
       }
-
-      stage = 'authorize the viewer for the temporary Windows PC';
-      const viewer = await askFixture('viewer');
-      assert.equal(viewer.status, 'ready');
-      assert.equal(viewer.viewer_origin, origin);
-      await exerciseDesktopSession({ viewerUrl: viewer.viewer_url, executable, certPath, root });
+      return response;
+    },
+  });
+  canaryServer = createWindowsCanaryServer({
+    token: canaryToken, verifyTimeoutMs: 45_000,
+    verify: async (request, options) => {
+      try { return await verifier(request, options); }
+      catch (error) { console.error('Windows test verifier failed:', error.message); throw error; }
+    },
+  });
+  const canaryPort = await listen(canaryServer);
+  const fixture = createWindowsCanaryFixture({
+    runtime, organizationId, isolationOrganizationId, probe: async request => {
+      const result = await fetch(`http://${loopback}:${canaryPort}/v1/assist/probe`, {
+        method: 'POST', headers: { authorization: 'Bearer ' + canaryToken, 'content-type': 'application/json' },
+        body: JSON.stringify(request), signal: AbortSignal.timeout(50_000),
+      });
+      assert.equal(result.status, 200, 'Windows canary verification failed');
+      return result.json();
     },
   });
   backend = createControlServer({ runtime, pilotDomain: domain, canaryFixture: fixture, canaryFixtureToken: fixtureToken });
   backendPort = await listen(backend);
-  await fixture.probe(probeRequest);
+  const probeRequest = {
+    organization_id: organizationId, generation: 1, mesh_domain: domain, mesh_id: provisioned.meshId,
+    server_origin: origin, probe_nonce: randomUUID(), probe_requested_at: Date.now(),
+  };
+  stage = 'exercise the Windows verifier over its private HTTP interface';
+  const evidence = await fixture.probe(probeRequest);
+  assert.equal(evidence.probe_nonce, probeRequest.probe_nonce);
+  assert.equal(evidence.desktop_control, true);
+  assert.equal(evidence.consent_enforced, true);
+  assert.equal(evidence.cross_tenant_denied, true);
+  assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
 
   stage = 'check revoked temporary Windows access';
   const stale = await fetchLocal(download, cert);
   assert.equal(stale.status, 404, 'The old guest download must return HTTP 404');
-  const guestMeshId = `mesh/${domain}/${download.searchParams.get('meshid')}`;
+  const guestMeshId = `mesh/${domain}/${new URL(download).searchParams.get('meshid')}`;
   assert.deepEqual(await runtime.inventory(organizationId, guestMeshId), []);
-  console.log('Real Windows guest helper connected through HTTPS, stayed out of permanent enrollment, and its group was revoked.');
-  console.log('Real Windows guest denied one desktop request and then approved screen, mouse and keyboard access. No activation evidence was issued.');
+  console.log('Windows verifier passed real screen/input, consent and dealer isolation. The temporary guest was revoked.');
+  console.log('The returned proof is scoped to this disposable CI fixture.');
 } catch (error) {
   testFailed = true;
   console.error(`Windows guest connection failed at: ${stage}`);
   throw error;
 } finally {
-  if (agent?.pid) {
-    // The interactive helper starts a second process using the same executable.
-    // Both are owned by this test and can hold the temporary directory open.
-    await run('pwsh', ['-NoProfile', '-Command',
-      "Get-Process -Name temporary-assist -ErrorAction SilentlyContinue | Where-Object Path -eq $env:ASSIST_TEST_GUEST_EXE | Stop-Process -Force -ErrorAction SilentlyContinue"],
-      { env: { ...process.env, ASSIST_TEST_GUEST_EXE: executable }, timeout: 10_000 }).catch(() => {});
-    if (agent.exitCode === null && agent.signalCode === null) agent.kill();
+  if (canaryServer?.listening) {
+    canaryServer.close();
+    canaryServer.closeAllConnections();
   }
-  if (agentExit) await agentExit;
   for (const socket of proxySockets) socket.destroy();
   if (proxy?.listening) proxy.close();
   if (backend?.listening) {
