@@ -7,12 +7,12 @@ import {ensureLaptopGroup,meshCommand,viewerCookie,nativeUsers} from './meshcent
 import {dealerDomain} from './control-core.mjs';
 import {verifyRuntimeSecurity} from './runtime-security.mjs';
 
-export function runtimeConfig({domain,port,keyHex},origin){
+export function runtimeConfig({domain,port,keyHex},origin,proxyCertificateUrl){
  const host=new URL(origin);if(host.protocol!=='https:'||host.origin!==origin)throw new Error('invalid_public_origin');
  return {settings:{wanOnly:true,cert:host.hostname,port,portBind:'127.0.0.1',aliasPort:Number(host.port||443),redirPort:0,mpsPort:0,
   exactPorts:true,sessionSecure:true,tlsOffload:'127.0.0.1',allowLoginToken:true,loginCookieEncryptionKey:keyHex,
   selfUpdate:false,noAgentUpdate:0,agentDownloads:{enabled:false}},
-  domains:{'':{newAccounts:false},[domain]:{title:'MJV Remote Support',newAccounts:false,
+  domains:{'':{newAccounts:false},[domain]:{title:'MJV Remote Support',newAccounts:false,...(proxyCertificateUrl?{certUrl:proxyCertificateUrl}:{}),
    userConsentFlags:{desktopnotify:true,desktopprompt:true,terminalnotify:true,terminalprompt:true,filenotify:true,fileprompt:true,desktopprivacybar:true}}}};
 }
 const closedPort=port=>new Promise(resolve=>{
@@ -22,7 +22,7 @@ const closedPort=port=>new Promise(resolve=>{
  socket.once('error',e=>finish(e.code==='ECONNREFUSED'));
 });
 async function freePort(){const server=net.createServer();await new Promise((r,j)=>{server.once('error',j);server.listen(0,'127.0.0.1',r);});const port=server.address().port;await new Promise(r=>server.close(r));return port;}
-export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,command=meshCommand,onExit=async()=>{},diagnostic=()=>{},agentCacheDirectory,startupAttempts=40}){
+export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,command=meshCommand,onExit=async()=>{},diagnostic=()=>{},agentCacheDirectory,startupAttempts=40,proxyCertificateUrl}){
  if(!Number.isInteger(startupAttempts)||startupAttempts<1||startupAttempts>120)throw new Error('invalid_startup_attempts');
  const runtimes=new Map();let shuttingDown=false;let allocator=Promise.resolve();
  const binary=resolve(entry);
@@ -52,7 +52,7 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
    }
    if(!runtimes.has(id)&&state.initialized){state={...state,keyHex:randomBytes(80).toString('hex')};await store.write(id,state);}
    const identity={domain,port:state.port,keyHex:state.keyHex};
-   const config=runtimeConfig(identity,publicOrigin);
+   const config=runtimeConfig(identity,publicOrigin,proxyCertificateUrl);
    if(!runtimes.has(id)){
     if(await closedPort(state.port)!==true)throw new Error('unowned_port_busy');
     const temp=join(dataPath,`config.${randomUUID()}.tmp`);await writeFile(temp,JSON.stringify(config),{mode:0o600});await rename(temp,join(dataPath,'config.json'));
