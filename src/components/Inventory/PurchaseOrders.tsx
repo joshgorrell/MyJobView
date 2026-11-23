@@ -71,6 +71,20 @@ export function PurchaseOrders() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const canCreate = profile?.can_create_purchase_orders === true || profile?.role==='admin';
   const [viewDocument,setViewDocument]=useState<string|null>(null);
+  const [demand, setDemand] = useState<Array<{sales_order_id:string;proposal_line_item_id:string;product_id:string;required_quantity:number;po_allocated_quantity:number;remaining_quantity:number}>>([]);
+  const [demandError,setDemandError]=useState('');
+  const [demandLoading,setDemandLoading]=useState(false);
+  const [showDemand,setShowDemand]=useState(false);
+  async function loadDemand(){
+    if(!canCreate)return;
+    setDemandLoading(true);setDemandError('');
+    const {data,error}=await supabase.rpc('get_unallocated_sales_order_products');
+    if(error){setDemandError(error.message);setDemand([]);}
+    else setDemand(data||[]);
+    setDemandLoading(false);
+  }
+  useEffect(()=>{if(showDemand&&canCreate)void loadDemand();},[showDemand,profile?.organization_id,canCreate]);
+
 
   useEffect(() => {
     void loadOrders();
@@ -165,6 +179,17 @@ export function PurchaseOrders() {
         {canCreate&&<button onClick={()=>{setCreateQuote(true);setShowCreateModal(true);}} className="border border-blue-600 text-blue-700 rounded px-4 py-2">New Quote Request</button>}
       </div>
 
+      {canCreate && <section className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1"><h3 className="font-semibold text-gray-900">Sales order equipment demand</h3>
+          <p className="text-xs text-gray-500">Unordered quantities across open sales orders. Draft PO allocations count as reserved.</p></div>
+          <button className="border rounded px-3 py-2 text-sm" onClick={()=>setShowDemand(v=>!v)}>{showDemand?'Hide':'View demand'}</button>
+          {showDemand&&<button className="border rounded px-3 py-2 text-sm" disabled={demandLoading} onClick={()=>void loadDemand()}>Refresh demand</button>}
+        </div>
+        {showDemand&&(demandLoading?<p className="text-sm text-gray-500">Loading demand…</p>:demandError?<p role="alert" className="text-sm text-red-700">Unable to load demand: {demandError}</p>:demand.length===0?<p className="text-sm text-gray-500">No unallocated equipment demand found.</p>:
+          <div className="overflow-x-auto max-h-72 overflow-y-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Sales order</th><th className="p-2">Product</th><th className="p-2 text-right">Required</th><th className="p-2 text-right">On PO</th><th className="p-2 text-right">Still needed</th></tr></thead>
+          <tbody>{demand.map(d=><tr key={d.proposal_line_item_id} className="border-b"><td className="p-2 font-mono text-xs">{d.sales_order_id.slice(0,8)}</td><td className="p-2 font-mono text-xs">{d.product_id.slice(0,8)}</td><td className="p-2 text-right">{d.required_quantity}</td><td className="p-2 text-right">{d.po_allocated_quantity}</td><td className="p-2 text-right font-semibold">{d.remaining_quantity}</td></tr>)}</tbody></table></div>)}
+      </section>}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SummaryCard label="Open orders" value={openOrders.length.toString()} detail={formatCurrency(openValue)} icon={Truck} tone="blue" />
         <SummaryCard label="Awaiting receipt" value={openOrders.filter((po) => po.units_received < po.units_ordered).length.toString()} detail="Need receiving attention" icon={Package} tone="amber" />
