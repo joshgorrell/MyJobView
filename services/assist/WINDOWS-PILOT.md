@@ -33,6 +33,12 @@
 | P02 | Measure repeat enrolled support | Record click-to-view and click-to-control, including consent latency |
 | A01 | ARM64 temporary guest (separate pilot) | Architecture-specific download works, consent and desktop/input verified; x64 success does not imply ARM64 success |
 
+## Supervised keyboard check
+
+Open `windows-pilot-input.html` from disk in the browser on the supported Windows PC. Keep the test window visible and have the person at that PC leave the keyboard alone during observation. Deny the first consent request and confirm the operator cannot view the challenge or type into the field. Then reset the challenge, approve a fresh session, and have the operator read and type the displayed challenge through the remote viewer. Repeat after ending the session and verify that no further input reaches the field.
+
+The page runs offline and does not record data or produce automated canary evidence. Record the supervised observation in the existing pilot report.
+
 ## Test recording
 For each ID record: PASS / FAIL / BLOCKED, date/time, tester, environment/build, steps, observed result, logs sanitized of credentials, and issue/PR link. **BLOCKED is not PASS.** If a session survives a revoke or crosses dealers, stop the pilot and leave activation off.
 
