@@ -132,16 +132,16 @@ export default function SalesTVDashboard() {
     if (completedBillableResult.error) throw completedBillableResult.error;
     if (billingLinksResult.error) throw billingLinksResult.error;
 
-    setRecentSales((salesResult.data || []).map((row: any) => ({
+    const recentSales = (salesResult.data || []).map((row: any) => ({
       id: row.id,
       orderNumber: row.order_number || 'SO',
       customer: row.contacts?.full_name || 'Customer',
       rep: row.created_by_name || 'Sales',
       total: Number(row.contract_total || 0),
       bookedAt: row.booked_at || row.created_at,
-    })));
+    }));
 
-    setBilledService((billedResult.data || []).map((row: any) => ({
+    const billedService = (billedResult.data || []).map((row: any) => ({
       id: row.id,
       workOrder: row.work_orders?.work_order_number || 'WO',
       title: row.work_orders?.title || 'Service Call',
@@ -149,7 +149,7 @@ export default function SalesTVDashboard() {
       invoiceNumber: row.invoices?.invoice_number || 'Invoice',
       total: Number(row.invoices?.total || 0),
       invoicedAt: row.invoiced_at || row.invoices?.invoice_date || row.completed_at || new Date().toISOString(),
-    })));
+    }));
 
     const billedIds = new Set(
       (billingLinksResult.data || [])
@@ -157,7 +157,7 @@ export default function SalesTVDashboard() {
         .map((row: any) => row.work_order_id)
     );
 
-    setUnbilledService((completedBillableResult.data || [])
+    const unbilledService = (completedBillableResult.data || [])
       .filter((row: any) => !billedIds.has(row.id))
       .slice(0, 12)
       .map((row: any) => ({
@@ -166,7 +166,8 @@ export default function SalesTVDashboard() {
         title: row.title || 'Service Call',
         tech: row.assigned_to_name || 'Unassigned',
         completedAt: row.actual_completion_date || row.updated_at,
-      })));
+      }));
+    return { recentSales, billedService, unbilledService };
   }, []);
 
   const load = useCallback(async () => {
@@ -174,12 +175,18 @@ export default function SalesTVDashboard() {
     loadingRef.current = true;
     try {
       const orgId = profile.organization_id;
-      const [{ data: org }, tv, repData] = await Promise.all([
+      const [{ data: org, error: orgError }, tv, repData, lists] = await Promise.all([
         supabase.from('organizations').select('name, logo_url').eq('id', orgId).maybeSingle(),
         fetchTvDashboardData(orgId),
         fetchAllRepGoalProgress(orgId),
         loadRevenueLists(orgId),
       ]);
+      if (orgError) throw orgError;
+      // Publish one complete refresh only after every source succeeds.
+      // A failed query must not mix fresh lists with stale KPI/leaderboard data.
+      setRecentSales(lists.recentSales);
+      setBilledService(lists.billedService);
+      setUnbilledService(lists.unbilledService);
       setOrgName(org?.name || '');
       setOrgLogo(org?.logo_url || '');
       setData(tv);
