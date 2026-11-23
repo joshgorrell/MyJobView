@@ -53,6 +53,8 @@ async function launch() {
       approvedVersion: config.version,
       publicOrigin: config.origin,
       agentCacheDirectory: config.cache,
+      // A disposable runtime starts with fresh certificates and signs its tools.
+      startupAttempts: 120,
       onExit: async () => halt(),
     });
     await runtime.verifyVersion();
