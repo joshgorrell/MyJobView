@@ -158,6 +158,12 @@ try {
   assert.ok(device.id.startsWith(`node/${domain}/`));
   assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
 
+  stage = 'authorize the viewer for the temporary Windows PC';
+  const username = 'mjv-session-' + randomUUID().replaceAll('-', '');
+  const viewer = await runtime.createViewer(organizationId, device.id, username, guest.meshId);
+  assert.equal(viewer.viewer_origin, origin);
+  await runtime.revokeViewer(organizationId, username);
+
   stage = 'revoke temporary Windows access';
   await runtime.deleteGuestGroup(organizationId, guest.meshId);
   const stale = await fetchLocal(download, cert);
