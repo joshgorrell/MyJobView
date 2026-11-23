@@ -77,7 +77,7 @@ export default function AssistPage() {
           />
         </div>
       </header>
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-2">
       <EngineerConsole organizationId={organizationId!} />
       <section className="min-w-0 rounded-xl border border-subtle bg-surface p-4">
         <h2 className="text-lg font-semibold text-primary">Install Assist on this computer</h2>
@@ -87,11 +87,12 @@ export default function AssistPage() {
           <li>Open the file and choose <strong>Install</strong>.</li>
           <li>Approve the Windows administrator prompt. Ask your administrator for help if credentials are required.</li>
         </ol>
+        {!loading && !ready && !error && <p id="assist-download-status" className="mb-3 text-sm text-muted" role="status">{enabled ? 'The Windows download will unlock when MyJobView finishes activating Assist for your dealer.' : 'Remote Support is off. An administrator can enable it in Integrations.'}</p>}
         <button type="button" onClick={() => void download()} disabled={loading || busy || !ready}
+          aria-describedby={!loading && !ready && !error ? 'assist-download-status' : undefined}
           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
           <Download size={18} />{loading ? 'Checking availability…' : busy ? 'Preparing download…' : 'Download for Windows (64-bit)'}
         </button>
-        {!loading && !ready && !error && <p className="mt-3 text-sm text-muted" role="status">{enabled ? 'Remote support is being set up. Downloads will be available when setup is complete.' : 'Remote Support is off. An administrator can enable it in Integrations.'}</p>}
         <p className="mt-3 text-xs text-muted">Administrator access and a working internet connection are required. First-time setup may take longer if Windows requests additional approval.</p>
         {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
         {message && <p className="mt-3 text-sm text-primary" role="status">{message}</p>}

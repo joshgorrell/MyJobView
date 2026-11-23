@@ -44,8 +44,21 @@ try{
  for(const width of [1280,390]){
   await page.setViewportSize({width,height:900});
   await page.goto(url+'?mode=pending');
-  await page.getByText('Remote support is being set up',{exact:false}).waitFor();
-  assert.equal(await page.getByRole('button',{name:'Download for Windows (64-bit)',exact:true}).isDisabled(),true);
+  const pendingDownload=page.getByRole('button',{name:'Download for Windows (64-bit)',exact:true});
+  await page.getByRole('status').filter({hasText:'The Windows download will unlock'}).waitFor();
+  assert.equal(await pendingDownload.isDisabled(),true);
+  assert.equal(await pendingDownload.getAttribute('aria-describedby'),'assist-download-status');
+  const workspace=await page.locator('section').filter({has:page.getByRole('heading',{name:'Support workspace'})}).boundingBox();
+  const installer=await page.locator('section').filter({has:page.getByRole('heading',{name:'Install Assist on this computer'})}).boundingBox();
+  assert.ok(workspace && installer);
+  assert.equal(workspace.width,installer.width);
+  if(width===1280){
+   assert.equal(workspace.y,installer.y);
+   assert.equal(workspace.height,installer.height);
+  }else{
+   assert.equal(workspace.x,installer.x);
+   assert.ok(installer.y>=workspace.y+workspace.height);
+  }
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.goto(url+'?mode=ready');
   const button=page.getByRole('button',{name:'Download for Windows (64-bit)',exact:true});await button.waitFor();
