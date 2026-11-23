@@ -18,6 +18,7 @@ import { dealerDomain } from '../../../services/assist/control-core.mjs';
 import { createManagedRuntime } from '../../../services/assist/managed-runtime.mjs';
 import { stageAgentCache } from '../../../services/assist/prepare-agent-cache.mjs';
 import { exerciseDesktopSession } from './desktop-session.mjs';
+import { createWindowsCanaryFixture } from '../../../services/assist/windows-canary-fixture.mjs';
 import { createStateStore } from '../../../services/assist/state-store.mjs';
 
 const loopback = '127.0.0.1';
@@ -95,6 +96,8 @@ const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'mjv-windows-guest-'));
 const store = createStateStore(join(root, 'runtime'));
 const organizationId = randomUUID();
 const domain = dealerDomain(organizationId);
+const fixtureToken = randomUUID() + randomUUID();
+const probeRequest = { organization_id: organizationId, generation: 1, mesh_domain: domain, probe_nonce: randomUUID() };
 const proxySockets = new Set();
 let runtime, backend, proxy, agent, agentExit;
 let testFailed = false;
@@ -133,56 +136,70 @@ try {
   });
   await runtime.verifyVersion();
   await runtime.ensure({ organization_id: organizationId, generation: 1 }, async () => {});
-  backend = createControlServer({ runtime, pilotDomain: domain });
-  backendPort = await listen(backend);
+  const askFixture = async operation => {
+    const response = await fetch(`http://${loopback}:${backendPort}/v1/assist/fixture`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + fixtureToken, 'content-type': 'application/json' },
+      body: JSON.stringify({ ...probeRequest, operation }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    assert.equal(response.status, 200, 'Pilot fixture request failed');
+    return response.json();
+  };
+  let download;
+  const fixture = createWindowsCanaryFixture({
+    runtime, organizationId, probe: async () => {
+      stage = 'download temporary Windows helper';
+      download = new URL((await askFixture('download')).download_url);
+      assert.equal(download.origin, origin);
+      assert.equal(download.searchParams.get('id'), '4');
+      assert.equal(download.searchParams.get('installflags'), '1');
+      const guestMeshId = `mesh/${domain}/${download.searchParams.get('meshid')}`;
+      const { status, bytes } = await fetchLocal(download, cert);
+      assert.equal(status, 200);
+      assert.equal(bytes.toString('ascii', 0, 2), 'MZ');
+      await writeFile(executable, bytes, { flag: 'wx' });
 
-  stage = 'download temporary Windows helper';
-  const guest = await runtime.createGuestGroup(organizationId, randomUUID().replaceAll('-', ''));
-  const download = new URL(guest.download_url);
-  assert.equal(download.origin, origin);
-  assert.equal(download.searchParams.get('id'), '4');
-  assert.equal(download.searchParams.get('installflags'), '1');
-  const { status, bytes } = await fetchLocal(download, cert);
-  assert.equal(status, 200);
-  assert.equal(bytes.toString('ascii', 0, 2), 'MZ');
-  await writeFile(executable, bytes, { flag: 'wx' });
+      stage = 'connect temporary Windows helper';
+      agent = spawn(executable, [], { cwd: root, stdio: 'ignore' });
+      agentExit = new Promise(resolve => {
+        agent.once('exit', resolve);
+        agent.once('error', resolve);
+      });
+      await once(agent, 'spawn');
+      await run('pwsh', ['-NoProfile', '-File', connectScript, '-AgentPid', String(agent.pid)], { timeout: 25_000 });
+      const device = await waitForGuest(runtime, organizationId, guestMeshId, agent);
+      assert.ok(device.id.startsWith(`node/${domain}/`));
+      assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
 
-  stage = 'connect temporary Windows helper';
-  agent = spawn(executable, [], { cwd: root, stdio: 'ignore' });
-  agentExit = new Promise(resolve => {
-    agent.once('exit', resolve);
-    agent.once('error', resolve);
+      stage = 'reject viewer authorization from a second dealer';
+      const otherDealer = randomUUID();
+      await store.write(otherDealer, { organization_id: otherDealer, generation: 1, desired_enabled: true, phase: 'applying' });
+      await runtime.ensure({ organization_id: otherDealer, generation: 1 }, async () => {});
+      try {
+        assert.deepEqual(await runtime.inventory(otherDealer), []);
+        await assert.rejects(runtime.createViewer(otherDealer, device.id, 'mjv-session-' + randomUUID().replaceAll('-', '')),
+          /device_offline/);
+      } finally {
+        await runtime.stop(otherDealer);
+      }
+
+      stage = 'authorize the viewer for the temporary Windows PC';
+      const viewer = await askFixture('viewer');
+      assert.equal(viewer.status, 'ready');
+      assert.equal(viewer.viewer_origin, origin);
+      await exerciseDesktopSession({ viewerUrl: viewer.viewer_url, executable, certPath, root });
+    },
   });
-  await once(agent, 'spawn');
-  await run('pwsh', ['-NoProfile', '-File', connectScript, '-AgentPid', String(agent.pid)], { timeout: 25_000 });
-  const device = await waitForGuest(runtime, organizationId, guest.meshId, agent);
-  assert.ok(device.id.startsWith(`node/${domain}/`));
-  assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
+  backend = createControlServer({ runtime, pilotDomain: domain, canaryFixture: fixture, canaryFixtureToken: fixtureToken });
+  backendPort = await listen(backend);
+  await fixture.probe(probeRequest);
 
-  stage = 'reject viewer authorization from a second dealer';
-  const otherDealer = randomUUID();
-  await store.write(otherDealer, { organization_id: otherDealer, generation: 1, desired_enabled: true, phase: 'applying' });
-  await runtime.ensure({ organization_id: otherDealer, generation: 1 }, async () => {});
-  try {
-    assert.deepEqual(await runtime.inventory(otherDealer), []);
-    await assert.rejects(runtime.createViewer(otherDealer, device.id, 'mjv-session-' + randomUUID().replaceAll('-', '')),
-      /device_offline/);
-  } finally {
-    await runtime.stop(otherDealer);
-  }
-
-  stage = 'authorize the viewer for the temporary Windows PC';
-  const username = 'mjv-session-' + randomUUID().replaceAll('-', '');
-  const viewer = await runtime.createViewer(organizationId, device.id, username, guest.meshId);
-  assert.equal(viewer.viewer_origin, origin);
-  await exerciseDesktopSession({ viewerUrl: viewer.viewer_url, executable, certPath, root });
-  await runtime.revokeViewer(organizationId, username);
-
-  stage = 'revoke temporary Windows access';
-  await runtime.deleteGuestGroup(organizationId, guest.meshId);
+  stage = 'check revoked temporary Windows access';
   const stale = await fetchLocal(download, cert);
   assert.equal(stale.status, 404, 'The old guest download must return HTTP 404');
-  assert.deepEqual(await runtime.inventory(organizationId, guest.meshId), []);
+  const guestMeshId = `mesh/${domain}/${download.searchParams.get('meshid')}`;
+  assert.deepEqual(await runtime.inventory(organizationId, guestMeshId), []);
   console.log('Real Windows guest helper connected through HTTPS, stayed out of permanent enrollment, and its group was revoked.');
   console.log('Real Windows guest denied one desktop request and then approved screen, mouse and keyboard access. No activation evidence was issued.');
 } catch (error) {
