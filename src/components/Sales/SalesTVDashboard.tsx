@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchAllRepGoalProgress, fetchTvDashboardData, type RepGoalProgress, type TvDashboardData } from '../../lib/salesKpis';
@@ -70,7 +70,10 @@ export default function SalesTVDashboard() {
   const [unbilledService, setUnbilledService] = useState<UnbilledService[]>([]);
   const [orgName, setOrgName] = useState('');
   const [orgLogo, setOrgLogo] = useState('');
-  const [connected, setConnected] = useState(true);
+  const [connected, setConnected] = useState(false);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const loadingRef = useRef(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [now, setNow] = useState(new Date());
 
@@ -153,7 +156,8 @@ export default function SalesTVDashboard() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!profile?.organization_id) return;
+    if (!profile?.organization_id || loadingRef.current) return;
+    loadingRef.current = true;
     try {
       const orgId = profile.organization_id;
       const [{ data: org }, tv, repData] = await Promise.all([
@@ -167,18 +171,49 @@ export default function SalesTVDashboard() {
       setData(tv);
       setReps(repData);
       setConnected(true);
+      setHasLoaded(true);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Sales TV refresh failed:', error);
       setConnected(false);
+    } finally {
+      loadingRef.current = false;
     }
   }, [loadRevenueLists, profile?.organization_id]);
 
   useEffect(() => {
-    load();
-    const interval = window.setInterval(load, 30000);
-    return () => window.clearInterval(interval);
-  }, [load]);
+    const orgId = profile?.organization_id;
+    if (!orgId) return;
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const refreshSoon = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => { pending = undefined; void load(); }, 500);
+    };
+    void load();
+    const interval = window.setInterval(() => { void load(); }, 30000);
+    const channel = supabase.channel(`sales-tv-${orgId}`);
+    for (const table of ['sales_orders', 'proposals', 'invoices', 'service_billing_queue', 'work_orders', 'sales_monthly_stats', 'profiles']) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `organization_id=eq.${orgId}` }, refreshSoon);
+    }
+    channel.subscribe(status => {
+      const active = status === 'SUBSCRIBED';
+      setRealtimeConnected(active);
+      if (active) refreshSoon();
+    });
+    const onFocus = () => { refreshSoon(); };
+    const onVisibility = () => { if (document.visibilityState === 'visible') refreshSoon(); };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      if (pending) clearTimeout(pending);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      void supabase.removeChannel(channel);
+    };
+  }, [load, profile?.organization_id]);
 
   const totals = useMemo(() => {
     const annualGoal = reps.reduce((s, r) => s + (r.annualQuota || 0), 0);
@@ -215,8 +250,8 @@ export default function SalesTVDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-[2vw]">
-            <div className={`flex items-center gap-2 rounded-full border px-[.65vw] py-[.3vw] text-[clamp(12px,.6vw,23px)] font-bold ${connected ? 'border-emerald-500/30 text-emerald-300' : 'border-red-500/30 text-red-300'}`}>
-              {connected ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}{connected ? 'LIVE' : 'OFFLINE'}
+            <div className={`flex items-center gap-2 rounded-full border px-[.65vw] py-[.3vw] text-[clamp(12px,.6vw,23px)] font-bold ${connected && realtimeConnected ? 'border-emerald-500/30 text-emerald-300' : connected ? 'border-amber-500/30 text-amber-300' : 'border-red-500/30 text-red-300'}`}>
+              {connected ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}{!hasLoaded ? 'LOADING' : !connected ? 'DATA ERROR' : realtimeConnected ? 'LIVE' : 'POLLING'}
               <span className="text-slate-500">· {Math.max(0, Math.floor((Date.now() - lastUpdate.getTime()) / 1000))}s</span>
             </div>
             <div className="text-right">
