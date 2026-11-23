@@ -16,6 +16,21 @@ export function getBusinessCardSlugFromLocation(pathname: string, hostname: stri
   if (legacyMatch) return decodeURIComponent(legacyMatch[1]);
 
   if (!getSubdomainFromHostname(hostname)) return null;
+  // Dedicated application routes must take precedence over short public
+  // business-card URLs on dealer subdomains. App.tsx resolves cards before
+  // these pages, so an unguarded single-segment match hijacks the route.
+  const applicationRoutes = new Set([
+    '/sales-tv-dashboard',
+    '/tv-dashboard',
+    '/sales-order-fullscreen',
+    '/assist',
+    '/kiosk',
+    '/privacy-policy',
+    '/eula',
+    '/auth-bridge',
+    '/dealer-login',
+  ]);
+  if (applicationRoutes.has(pathname.toLowerCase().replace(/\/$/, ''))) return null;
   const publicMatch = pathname.match(/^\/([^/]+)$/);
   return publicMatch ? decodeURIComponent(publicMatch[1]) : null;
 }
