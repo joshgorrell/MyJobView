@@ -1,7 +1,7 @@
 // Exercises the real temporary guest agent on an ephemeral Windows runner.
 // This test never issues activation evidence or uses a production endpoint.
 import assert from 'node:assert/strict';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, execFile, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { createServer } from 'node:tls';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { createControlServer } from '../../../services/assist/control-server.mjs';
 import { dealerDomain } from '../../../services/assist/control-core.mjs';
@@ -20,6 +21,8 @@ import { stageAgentCache } from '../../../services/assist/prepare-agent-cache.mj
 import { createStateStore } from '../../../services/assist/state-store.mjs';
 
 const loopback = '127.0.0.1';
+const run = promisify(execFile);
+const connectScript = fileURLToPath(new URL('./connect-guest-helper.ps1', import.meta.url));
 const entry = fileURLToPath(new URL('../../../services/assist/node_modules/meshcentral/meshcentral.js', import.meta.url));
 
 async function stageWindowsAgent(root, store, organizationId, version) {
@@ -144,12 +147,13 @@ try {
   await writeFile(executable, bytes, { flag: 'wx' });
 
   stage = 'connect temporary Windows helper';
-  agent = spawn(executable, ['-run'], { cwd: root, stdio: 'ignore', windowsHide: true });
+  agent = spawn(executable, [], { cwd: root, stdio: 'ignore' });
   agentExit = new Promise(resolve => {
     agent.once('exit', resolve);
     agent.once('error', resolve);
   });
   await once(agent, 'spawn');
+  await run('pwsh', ['-NoProfile', '-File', connectScript, '-AgentPid', String(agent.pid)], { timeout: 25_000 });
   const device = await waitForGuest(runtime, organizationId, guest.meshId, agent);
   assert.ok(device.id.startsWith(`node/${domain}/`));
   assert.deepEqual(await runtime.inventory(organizationId), [], 'A guest must not appear as a permanently enrolled device');
