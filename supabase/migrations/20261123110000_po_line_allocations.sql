@@ -73,3 +73,36 @@ END $$;
 CREATE TRIGGER prevent_po_allocation_overrun_write
  BEFORE UPDATE OF quantity ON public.po_items
  FOR EACH ROW EXECUTE FUNCTION public.prevent_po_allocation_overrun();
+
+-- Both the Sales Order and Global Product Manager ultimately use PO items.
+-- Auto-allocate request-backed PO lines at creation, preserving original
+-- sales-order-line identity rather than attempting to infer by SKU.
+CREATE OR REPLACE FUNCTION public.allocate_request_backed_po_line()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE request_line record;
+DECLARE parent_request record;
+DECLARE parent_order record;
+BEGIN
+ IF NEW.product_request_item_id IS NULL THEN RETURN NEW; END IF;
+ SELECT * INTO parent_order FROM public.purchase_orders
+ WHERE id=NEW.po_id AND organization_id=NEW.organization_id;
+ IF parent_order.document_type <> 'po' THEN RETURN NEW; END IF;
+ SELECT * INTO request_line FROM public.product_request_items
+ WHERE id=NEW.product_request_item_id AND organization_id=NEW.organization_id;
+ IF request_line.proposal_line_item_id IS NULL THEN RETURN NEW; END IF;
+ SELECT * INTO parent_request FROM public.product_requests
+ WHERE id=request_line.request_id AND organization_id=NEW.organization_id;
+ IF parent_request.sales_order_id IS NULL THEN RETURN NEW; END IF;
+ IF request_line.product_id IS DISTINCT FROM NEW.product_id OR
+    request_line.quantity_requested IS DISTINCT FROM NEW.quantity THEN
+  RAISE EXCEPTION 'PO request line product or quantity does not match source';
+ END IF;
+ INSERT INTO public.po_line_allocations
+ (organization_id,po_item_id,sales_order_id,proposal_line_item_id,product_id,quantity)
+ VALUES(NEW.organization_id,NEW.id,parent_request.sales_order_id,
+        request_line.proposal_line_item_id,NEW.product_id,NEW.quantity);
+ RETURN NEW;
+END $$;
+CREATE TRIGGER allocate_request_backed_po_line_insert
+ AFTER INSERT ON public.po_items
+ FOR EACH ROW EXECUTE FUNCTION public.allocate_request_backed_po_line();
