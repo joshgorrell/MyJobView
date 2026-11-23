@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createInterface } from 'node:readline/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -21,6 +22,7 @@ export function readPrivatePilotConfig(env) {
 }
 
 async function launch() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error('interactive_pilot_required');
   const config = readPrivatePilotConfig(process.env);
   const root = await mkdtemp(join(tmpdir(), 'mjv-assist-private-test-'));
   const store = createStateStore(root);
@@ -72,6 +74,24 @@ async function launch() {
     listening = true;
     controller.signal.throwIfAborted();
     console.log(JSON.stringify({ domain, download: guest.download_url, lifetimeMinutes: 60 }));
+    const prompt = createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      await prompt.question('After the designated PC connects, press Enter to prepare the viewer. ', { signal: controller.signal });
+      const online = (await runtime.inventory(organizationId, guest.meshId)).filter(device => device.online);
+      if (online.length !== 1) throw new Error('expected_one_pilot_device');
+      controller.signal.throwIfAborted();
+      const username = 'mjv-session-' + randomUUID().replaceAll('-', '');
+      const viewer = await runtime.createViewer(organizationId, online[0].id, username, guest.meshId);
+      controller.signal.throwIfAborted();
+      const viewerPath = join(root, 'operator-viewer.txt');
+      await writeFile(viewerPath, viewer.viewer_url + '\n', { flag: 'wx', mode: 0o600 });
+      console.log('Operator viewer saved locally at ' + viewerPath);
+      await prompt.question('Press Enter to end the pilot and disconnect the test PC. ', { signal: controller.signal });
+      await runtime.revokeViewer(organizationId, username);
+    } finally {
+      prompt.close();
+      await stop();
+    }
   } catch (error) {
     await stop();
     throw error;
