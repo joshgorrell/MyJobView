@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchAllRepGoalProgress, fetchTvDashboardData, type RepGoalProgress, type TvDashboardData } from '../../lib/salesKpis';
-import { Award, BarChart3, DollarSign, FileCheck2, ReceiptText, Target, TrendingDown, TrendingUp, Wifi, WifiOff, Wrench } from 'lucide-react';
+import { Award, BarChart3, DollarSign, FileCheck2, ReceiptText, Target, TrendingDown, TrendingUp, Wifi, WifiOff, Wrench, Settings2, X } from 'lucide-react';
 
 interface RecentSale {
   id: string;
@@ -69,6 +69,8 @@ export default function SalesTVDashboard() {
   const [billedService, setBilledService] = useState<BilledService[]>([]);
   const [unbilledService, setUnbilledService] = useState<UnbilledService[]>([]);
   const [orgName, setOrgName] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [officeOptions, setOfficeOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [orgLogo, setOrgLogo] = useState('');
   const [connected, setConnected] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
@@ -76,6 +78,17 @@ export default function SalesTVDashboard() {
   const loadingRef = useRef(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const orgId = profile?.organization_id;
+    if (!orgId) return;
+    let cancelled = false;
+    supabase.from('company_offices').select('id, name').eq('organization_id', orgId).order('name')
+      .then(({ data: offices, error }) => {
+        if (!cancelled && !error) setOfficeOptions(offices || []);
+      });
+    return () => { cancelled = true; };
+  }, [profile?.organization_id]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -250,6 +263,26 @@ export default function SalesTVDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-[2vw]">
+            <div className="relative">
+              <button type="button" aria-label="Sales TV settings" title="Sales TV settings"
+                aria-expanded={settingsOpen} onClick={() => setSettingsOpen(open => !open)}
+                className="rounded-md p-1.5 text-slate-600 transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">
+                <Settings2 className="h-4 w-4" />
+              </button>
+              {settingsOpen && <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm shadow-2xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="font-bold text-slate-100">Scoreboard settings</span>
+                  <button type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)} className="text-slate-400 hover:text-white"><X className="h-4 w-4" /></button>
+                </div>
+                <label htmlFor="sales-tv-office" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Office</label>
+                <select id="sales-tv-office" value="all" onChange={() => {}}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white">
+                  <option value="all">All Offices</option>
+                  {officeOptions.map(office => <option key={office.id} value={office.id} disabled>{office.name} — coming soon</option>)}
+                </select>
+                <p className="mt-2 text-xs leading-relaxed text-amber-300">Office-specific totals are unavailable until all sales and invoice sources can be filtered reliably. Company-wide data is shown.</p>
+              </div>}
+            </div>
             <div className={`flex items-center gap-2 rounded-full border px-[.65vw] py-[.3vw] text-[clamp(12px,.6vw,23px)] font-bold ${connected && realtimeConnected ? 'border-emerald-500/30 text-emerald-300' : connected ? 'border-amber-500/30 text-amber-300' : 'border-red-500/30 text-red-300'}`}>
               {connected ? <Wifi className="h-5 w-5" /> : <WifiOff className="h-5 w-5" />}{!hasLoaded ? 'LOADING' : !connected ? 'DATA ERROR' : realtimeConnected ? 'LIVE' : 'POLLING'}
               <span className="text-slate-500">· {Math.max(0, Math.floor((Date.now() - lastUpdate.getTime()) / 1000))}s</span>
