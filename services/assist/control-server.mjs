@@ -7,12 +7,14 @@ import {createStateStore} from './state-store.mjs';
 import {createManagedRuntime} from './managed-runtime.mjs';
 import {createControlPlane,dealerDomain,validControlToken,validateControlJob} from './control-core.mjs';
 import {createHttpDependencies} from './activation-worker.mjs';
+import {createWindowsCanaryFixture} from './windows-canary-fixture.mjs';
 
 async function readBody(request){let text='';for await(const chunk of request){text+=chunk;if(Buffer.byteLength(text)>8192)throw new Error('oversized_request');}return JSON.parse(text);}
 function respond(response,status,value){response.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(value));}
-export function createControlServer({plane,runtime,token,broker,guests,pilotDomain}){
+export function createControlServer({plane,runtime,token,broker,guests,pilotDomain,canaryFixture,canaryFixtureToken}){
  if(pilotDomain!==undefined&&!/^mjv-[a-f0-9]{32}$/.test(pilotDomain))throw new Error('invalid_pilot_domain');
  if(!pilotDomain&&(typeof token!=='string'||token.length<32))throw new Error('weak_control_token');
+ if(canaryFixture&&(!pilotDomain||typeof canaryFixtureToken!=='string'||canaryFixtureToken.length<32))throw new Error('invalid_canary_fixture_configuration');
  const target=request=>{
   if(!request.url.startsWith('/'))return null;
   const raw=request.url.split('?')[0];const path=new URL(request.url,'http://localhost').pathname;
@@ -22,6 +24,12 @@ export function createControlServer({plane,runtime,token,broker,guests,pilotDoma
   return runtime.target(domain);
  };
  const server=http.createServer(async(request,response)=>{
+  if(canaryFixture&&request.url==='/v1/assist/fixture'){
+   if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
+   if(!validControlToken(request.headers.authorization,canaryFixtureToken))return respond(response,401,{error:'unauthorized'});
+   try{return respond(response,200,await canaryFixture.handle(await readBody(request)));}
+   catch{return respond(response,503,{error:'canary_fixture_unavailable'});}
+  }
   if(!pilotDomain&&request.url==='/v1/guest'){
    if(request.method!=='POST')return respond(response,405,{error:'method_not_allowed'});
    if(!validControlToken(request.headers.authorization,token))return respond(response,401,{error:'unauthorized'});
@@ -88,7 +96,14 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    approvedVersion:env.ASSIST_APPROVED_MESHCENTRAL_VERSION,publicOrigin:env.ASSIST_PUBLIC_ORIGIN,agentCacheDirectory:env.ASSIST_AGENT_CACHE_DIRECTORY,onExit:requeue});
   if(!env.ASSIST_AGENT_CACHE_DIRECTORY)throw new Error('approved_agent_cache_required');
   await runtime.verifyVersion();
-  const plane=createControlPlane({store,runtime,probe:createCanaryProbe(env),validateLease:job=>dependencies.rpc('validate_assist_activation_lease',{
+  const probe=createCanaryProbe(env);
+  let fixture;
+  if(env.ASSIST_CANARY_FIXTURE_TOKEN){
+   const {ASSIST_CANARY_FIXTURE_TOKEN:fixtureToken,ASSIST_PILOT_ORGANIZATION_ID:id,ASSIST_PILOT_LOOPBACK_PORT:pilotPort}=env;
+   if(!id||!pilotPort||fixtureToken.length<32||[env.ASSIST_CANARY_TOKEN,env.ASSIST_CONTROL_TOKEN].includes(fixtureToken))throw new Error('invalid_canary_fixture_configuration');
+   fixture=createWindowsCanaryFixture({runtime,organizationId:id,probe});
+  }
+  const plane=createControlPlane({store,runtime,probe:fixture?.probe||probe,validateLease:job=>dependencies.rpc('validate_assist_activation_lease',{
    p_organization_id:job.organization_id,p_generation:job.generation,p_lease_token:job.lease_token})});
   const broker=createSupportBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,labelDirectory:store.root+'/device-labels'});
   const guests=createGuestBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,isVerified:id=>plane.canServe(dealerDomain(id)),enabled:env.ASSIST_GUEST_PILOT_APPROVED==='1',arm64Enabled:env.ASSIST_ARM64_PILOT_APPROVED==='1'});
@@ -102,7 +117,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    const id=env.ASSIST_PILOT_ORGANIZATION_ID;
    if(!Number.isInteger(pilotPort)||pilotPort<1024||pilotPort>65535||pilotPort===port||
     !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id||''))throw new Error('invalid_pilot_listener');
-   pilotServer=createControlServer({runtime,pilotDomain:dealerDomain(id)});
+   pilotServer=createControlServer({runtime,pilotDomain:dealerDomain(id),canaryFixture:fixture,canaryFixtureToken:env.ASSIST_CANARY_FIXTURE_TOKEN});
    await new Promise((resolve,reject)=>{pilotServer.once('error',reject);pilotServer.listen(pilotPort,'127.0.0.1',resolve);});
   }
   // On restart, old 'verified' journals do not imply a running or healthy child process.
