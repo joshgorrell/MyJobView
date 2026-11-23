@@ -18,6 +18,7 @@ import { createControlServer } from '../../../services/assist/control-server.mjs
 import { dealerDomain } from '../../../services/assist/control-core.mjs';
 import { createManagedRuntime } from '../../../services/assist/managed-runtime.mjs';
 import { stageAgentCache } from '../../../services/assist/prepare-agent-cache.mjs';
+import { exerciseDesktopSession } from './desktop-session.mjs';
 import { createStateStore } from '../../../services/assist/state-store.mjs';
 
 const loopback = '127.0.0.1';
@@ -162,6 +163,7 @@ try {
   const username = 'mjv-session-' + randomUUID().replaceAll('-', '');
   const viewer = await runtime.createViewer(organizationId, device.id, username, guest.meshId);
   assert.equal(viewer.viewer_origin, origin);
+  await exerciseDesktopSession({ viewerUrl: viewer.viewer_url, executable, certPath, root });
   await runtime.revokeViewer(organizationId, username);
 
   stage = 'revoke temporary Windows access';
@@ -170,7 +172,7 @@ try {
   assert.equal(stale.status, 404, 'The old guest download must return HTTP 404');
   assert.deepEqual(await runtime.inventory(organizationId, guest.meshId), []);
   console.log('Real Windows guest helper connected through HTTPS, stayed out of permanent enrollment, and its group was revoked.');
-  console.log('Desktop control and consent require separate verification. No activation evidence was issued.');
+  console.log('Real Windows guest denied one desktop request and then approved screen, mouse and keyboard access. No activation evidence was issued.');
 } catch (error) {
   console.error(`Windows guest connection failed at: ${stage}`);
   throw error;

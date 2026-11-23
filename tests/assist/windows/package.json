@@ -3,6 +3,7 @@
   "private": true,
   "dependencies": {
     "loadavg-windows": "1.1.1",
-    "node-windows": "0.1.14"
+    "node-windows": "0.1.14",
+    "playwright": "1.62.1"
   }
 }
