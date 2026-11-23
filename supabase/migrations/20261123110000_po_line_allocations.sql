@@ -23,6 +23,9 @@ DECLARE po record;
 DECLARE so record;
 DECLARE proposal_line record;
 BEGIN
+ -- Serialize allocations competing for either the same PO item or the same demand line.
+ PERFORM 1 FROM public.po_items WHERE id=NEW.po_item_id FOR UPDATE;
+ PERFORM 1 FROM public.proposal_line_items WHERE id=NEW.proposal_line_item_id FOR UPDATE;
  SELECT i.organization_id,i.product_id,i.quantity,o.document_type,o.status
  INTO po FROM public.po_items i JOIN public.purchase_orders o ON o.id=i.po_id
  WHERE i.id=NEW.po_item_id AND o.organization_id=NEW.organization_id;
@@ -51,3 +54,17 @@ END $$;
 CREATE TRIGGER validate_po_line_allocation_write
  BEFORE INSERT OR UPDATE ON public.po_line_allocations
  FOR EACH ROW EXECUTE FUNCTION public.validate_po_line_allocation();
+
+-- Prevent reducing ordered quantity beneath already allocated units.
+CREATE OR REPLACE FUNCTION public.prevent_po_allocation_overrun()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+ IF NEW.quantity < (SELECT coalesce(sum(a.quantity),0)
+    FROM public.po_line_allocations a WHERE a.po_item_id=NEW.id) THEN
+  RAISE EXCEPTION 'Cannot reduce PO quantity below allocated quantity';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER prevent_po_allocation_overrun_write
+ BEFORE UPDATE OF quantity ON public.po_items
+ FOR EACH ROW EXECUTE FUNCTION public.prevent_po_allocation_overrun();
