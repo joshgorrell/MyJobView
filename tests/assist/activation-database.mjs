@@ -8,7 +8,7 @@ await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_ro
  CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid REFERENCES organizations,role text,is_active boolean DEFAULT true);
  INSERT INTO organizations(id) VALUES('${id(1)}'),('${id(2)}');
  INSERT INTO profiles VALUES('${id(10)}','${id(1)}','admin',true),('${id(11)}','${id(1)}','tech',true),('${id(20)}','${id(2)}','admin',true);`);
-for(const f of ['20261116192118_assist_windows_enrollment.sql','20261116192146_assist_activation_lifecycle.sql','20261116192148_assist_runtime_recovery.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+for(const f of ['20261116192118_assist_windows_enrollment.sql','20261116192146_assist_activation_lifecycle.sql','20261116192148_assist_runtime_recovery.sql','20261123195000_assist_platform_release.sql'])await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
 const actor=async(n,sql)=>{await db.exec(`RESET ROLE;SELECT set_config('test.uid','${id(n)}',false);SET ROLE authenticated;`);return db.query(sql);};
 const service=async(sql,args)=>{await db.exec('RESET ROLE;SET ROLE service_role');return db.query(sql,args);};
 const toggle=(org,value)=>`SELECT set_assist_enabled('${id(org)}',${value}) AS v`;
@@ -18,6 +18,10 @@ const finish=async(job,result)=> (await service('SELECT finish_assist_activation
 const ready=org=>({status:'applied',verified:true,server_origin:'https://assist.example.com',mesh_domain:'mjv-'+id(org).replaceAll('-',''),windows_download_url:'https://assist.example.com/mjv-'+id(org).replaceAll('-','')+'/meshagents?meshid='+org+'&id=4'});
 assert.equal((await actor(10,status(1))).rows[0].v.activation_state,'off');
 await assert.rejects(actor(11,toggle(1,true)),/Dealer administrator/);
+assert.equal((await actor(10,status(1))).rows[0].v.enrollment_open,false);
+await assert.rejects(actor(10,toggle(1,true)),/enrollment is unavailable/);
+assert.equal(await claim(),null,'A blocked enable creates no activation job');
+await service('UPDATE assist_private.platform_release SET enrollment_open=true WHERE singleton');
 await actor(10,toggle(1,true));
 assert.equal((await actor(10,status(1))).rows[0].v.activation_state,'activation_pending');
 const old=await claim();assert.equal(old.desired_enabled,true);
@@ -70,4 +74,12 @@ await db.exec(`RESET ROLE;UPDATE assist_private.activation_jobs SET lease_until=
 assert.equal(await finish(exhausted,ready(2)),false,'Expired completion rejected');
 const recovered=await claim();assert.equal(recovered.attempt,2);assert.notEqual(recovered.lease_token,exhausted.lease_token);
 assert.equal(await finish(recovered,ready(2)),true);
+
+await service('UPDATE assist_private.platform_release SET enrollment_open=false WHERE singleton');
+await assert.rejects(actor(20,'UPDATE assist_private.platform_release SET enrollment_open=true'),/permission denied/);
+assert.equal((await actor(20,toggle(2,true))).rows[0].v.enabled,true,'Existing opt-in is preserved');
+await actor(20,toggle(2,false));
+assert.equal((await actor(20,status(2))).rows[0].v.enabled,false);
+await assert.rejects(actor(20,toggle(2,true)),/enrollment is unavailable/);
+
 await db.close();console.log('Assist activation DB: leases, retries, exhaustion, idempotence, tenant isolation, stale completion, disable and deprovision/delete pass');

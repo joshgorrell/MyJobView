@@ -40,3 +40,7 @@ Keep `mjv-assist-control` and `mjv-assist-worker` stopped until the Windows runn
 After the staged Windows pilot passes, the platform operator can enable automatic dealer routing with `ASSIST_CANARY_AUTOMATIC_DEALERS=1` and remove `ASSIST_PILOT_ORGANIZATION_ID`. Keep the private loopback port, independent fixture token, and reserved isolation organization configured. The verifier uses the same configuration for all dealer activation jobs. Only the dealer being checked has native routes on the private listener, which disconnects its probe sockets at the end. The public gateway continues to require a verified dealer runtime.
 
 Keep the private listener behind access-controlled HTTPS for the dedicated verifier host. For the agent handshake, serve the same TLS certificate key for the configured Assist origin over the public and private ingress paths. The verifier must resolve the Assist origin to the private listener through the approved network route.
+
+## Open dealer enrollment
+
+Dealer enrollment starts closed. After the hosted verifier and worker are running and an existing pilot dealer completes a real guest session, set `assist_private.platform_release.enrollment_open` to true through the platform database. This permits new opt-ins. Existing dealer preferences, queued activations, and deactivation remain available while enrollment is closed.
