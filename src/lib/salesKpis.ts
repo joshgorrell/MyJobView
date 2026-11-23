@@ -222,7 +222,9 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
 
   const { data: creditedProposals, error: creditedProposalsError } = await supabase
     .from('proposals')
-    .select('sales_rep_id, created_by')
+    // Proposals do not have sales_rep_id; use their creator for contributor discovery.
+    // Sales-order credit continues to use sales_rep_id with created_by fallback.
+    .select('created_by')
     .eq('organization_id', orgId);
   if (creditedProposalsError) throw creditedProposalsError;
 
@@ -235,8 +237,7 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     if (id) contributorIds.add(id);
   }
   for (const proposal of creditedProposals || []) {
-    const id = proposal.sales_rep_id || proposal.created_by;
-    if (id) contributorIds.add(id);
+    if (proposal.created_by) contributorIds.add(proposal.created_by);
   }
 
   for (const rep of reps.filter(rep => contributorIds.has(rep.id))) {
