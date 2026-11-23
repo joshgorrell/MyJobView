@@ -95,7 +95,8 @@ Deno.serve(async (req: Request) => {
     // This action accepts ONLY transaction_type and transaction_id from the
     // client. All other data (origin, destination, taxable subtotal, taxability,
     // nexus, exemption) is derived server-side via the calculate_tax RPC.
-    if (action === "taxes") {
+    if (action === "taxes" || action === "preview_taxes") {
+      const preview = action === "preview_taxes";
       const transactionType: string | undefined = payload.transaction_type;
       const transactionId: string | undefined = payload.transaction_id;
 
@@ -209,6 +210,7 @@ Deno.serve(async (req: Request) => {
 
       // Step 3: Status is "ready" -- proceed to call TaxJar /v2/taxes
       if (!apiKey) {
+        if (preview) return jsonResponse({ error: 'TaxJar API key not configured' }, 422);
         const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
@@ -263,6 +265,7 @@ Deno.serve(async (req: Request) => {
         const reason = fetchError instanceof Error
           ? `TaxJar request failed: ${fetchError.message}`
           : "TaxJar request failed: network error";
+        if (preview) return jsonResponse({ error: reason }, 502);
         const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
@@ -291,6 +294,7 @@ Deno.serve(async (req: Request) => {
         }
 
         console.error(`TaxJar /v2/taxes error ${statusCode}: ${errorText}`);
+        if (preview) return jsonResponse({ error: reason }, 502);
         const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
@@ -319,6 +323,7 @@ Deno.serve(async (req: Request) => {
           !tax.jurisdictions?.state ||
           rates.some(rate => typeof rate !== "number" || !Number.isFinite(rate) || rate < 0 || rate > 1)) {
         const reason = "TaxJar did not confirm collection and return a complete jurisdiction breakdown.";
+        if (preview) return jsonResponse({ error: reason }, 502);
         const { data: failResult } = await supabaseAdmin.rpc(
           "mark_tax_review_required",
           {
@@ -328,6 +333,16 @@ Deno.serve(async (req: Request) => {
           }
         );
         return jsonResponse(failResult ?? { error: reason });
+      }
+
+      if (preview) {
+        return jsonResponse({
+          tax_calculation_status: "ready",
+          tax_amount: tax.amount_to_collect,
+          tax_rate: tax.rate,
+          taxable_subtotal: taxableSubtotal,
+          source: "taxjar_preview",
+        });
       }
 
       // Step 8: Persist the authoritative TaxJar result
