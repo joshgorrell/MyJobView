@@ -59,4 +59,7 @@ assert.match(purchasing,/create_consolidated_job_purchase_order/);
 assert.match(purchasing,/Create consolidated vendor PO/);
 assert.match(sql,/Selected equipment does not belong to the chosen vendor/);
 assert.match(purchasing,/demandRetry\.current=crypto\.randomUUID\(\)/);
+assert.match(sql,/CREATE TRIGGER validate_po_reactivation_allocations_write/);
+assert.match(sql,/Cannot reactivate PO: equipment was reordered after cancellation/);
+assert.match(sql,/a\.sales_order_id=NEW\.sales_order_id AND a\.id<>NEW\.id/);
 console.log('Consolidated multi-job PO allocation tests passed');
