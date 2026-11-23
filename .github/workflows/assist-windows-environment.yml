@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'tests/assist/windows/**'
+      - 'services/assist/**'
       - '.github/workflows/assist-windows-environment.yml'
   workflow_dispatch:
     inputs:
@@ -26,3 +27,23 @@ jobs:
       - name: Verify isolated desktop capture and native input
         shell: pwsh
         run: pwsh -NoProfile -STA -File tests/assist/windows/desktop-preflight.ps1
+
+  windows-guest-connection:
+    if: github.event_name != 'workflow_dispatch' || inputs.architecture == 'x64'
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --prefix services/assist
+      - run: node services/assist/runtime-security.mjs
+      - name: Connect and revoke the real temporary Windows helper
+        shell: pwsh
+        run: |
+          $env:ASSIST_TEST_OPENSSL = (Get-Command openssl.exe -ErrorAction SilentlyContinue).Source
+          if (-not $env:ASSIST_TEST_OPENSSL) {
+            $env:ASSIST_TEST_OPENSSL = Join-Path $env:ProgramFiles 'Git/usr/bin/openssl.exe'
+          }
+          node tests/assist/windows/guest-connection.mjs

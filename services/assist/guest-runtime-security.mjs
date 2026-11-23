@@ -15,6 +15,13 @@ const patches = [
     "patched": "8be6b0718a2cdd97034de0f3e5a39c15570254dc45caa29a323fe32abb06a732",
     "before": "                    // Mark the mesh as deleted",
     "after": "                    // MJV guest cleanup also closes connected agents; desktop viewers are revoked first.\n                    if (typeof mesh.name === 'string' && mesh.name.startsWith('MJV guest ')) {\n                        for (const id in parent.wsagents) { const agent = parent.wsagents[id]; if (agent.dbMeshKey === mesh._id) { agent.close(1); } }\n                    }\n                    // Mark the mesh as deleted"
+  },
+  {
+    "file": "webserver.js",
+    "original": "46afba73577aa380cdc3a2edefc7c2ac4c1c3a4c50f020aefb1a3ce0f4c6420c",
+    "patched": "f0811f5f29a43eae6d56e1fc45eb412ce255ef6a030ddf9c384c2db5ae2095b1",
+    "before": "                // First, fetch the mesh object to build the .msh file\r\n                var mesh = obj.meshes['mesh/' + domain.id + '/' + req.query.meshid];\r\n                if (mesh == null) { try { res.sendStatus(401); } catch (ex) { } return; }",
+    "after": "                // First, fetch the mesh object to build the .msh file\n                var mesh = obj.meshes['mesh/' + domain.id + '/' + req.query.meshid];\n                if (mesh == null) { try { res.sendStatus(401); } catch (ex) { } return; }\n                // Do not reissue a temporary MJV agent after its invitation ends.\n                if (mesh.deleted && typeof mesh.name === 'string' && mesh.name.startsWith('MJV guest ')) { return res.sendStatus(404); }"
   }
 ];
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
