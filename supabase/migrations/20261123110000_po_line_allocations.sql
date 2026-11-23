@@ -284,6 +284,11 @@ BEGIN
  END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended(p_retry::text,0));
  IF EXISTS(SELECT 1 FROM public.purchase_orders WHERE id=p_retry AND organization_id=org) THEN
+  -- Retry must refer to the same vendor; never silently return another PO.
+  IF NOT EXISTS(SELECT 1 FROM public.purchase_orders WHERE id=p_retry AND organization_id=org
+    AND vendor_id=p_vendor_id AND warehouse_id=p_warehouse_id AND document_type='po') THEN
+   RAISE EXCEPTION 'Purchase order retry key belongs to a different document';
+  END IF;
   RETURN p_retry;
  END IF;
  IF EXISTS (SELECT 1 FROM (
@@ -314,14 +319,14 @@ BEGIN
    RAISE EXCEPTION 'Invalid or closed sales order equipment line';
   END IF;
   SELECT name,sku,cost,is_discontinued INTO product FROM public.products
-  WHERE id=source_line.product_id AND organization_id=org;
+  WHERE id=source_line.product_id AND organization_id=org FOR UPDATE;
   IF NOT FOUND OR product.is_discontinued THEN
    RAISE EXCEPTION 'Unknown or discontinued product cannot be ordered';
   END IF;
   IF NOT EXISTS(SELECT 1 FROM public.products pr
     JOIN public.vendors v ON v.id=pr.vendor_id AND v.organization_id=org
     WHERE pr.id=source_line.product_id AND pr.organization_id=org
-      AND v.id=p_vendor_id) THEN
+      AND v.id=p_vendor_id AND v.is_active=true) THEN
    RAISE EXCEPTION 'Selected equipment does not belong to the chosen vendor';
   END IF;
   IF product.cost IS NULL OR product.cost<0 THEN
