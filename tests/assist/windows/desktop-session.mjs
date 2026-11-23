@@ -46,8 +46,9 @@ function findTargetPixel() {
   return null;
 }
 
-export async function exerciseDesktopSession({ viewerUrl, executable, certPath, root }) {
-  const certificate = new X509Certificate(await readFile(certPath));
+export async function exerciseDesktopSession({ viewerUrl, executable, certPath, root, signal }) {
+  const certificate = certPath && new X509Certificate(await readFile(certPath));
+  signal?.throwIfAborted();
   const readyFile = join(root, 'target-ready.txt');
   const inputFile = join(root, 'target-input.json');
   const target = spawn('pwsh', ['-NoProfile', '-STA', '-File', script('./desktop-target.ps1'),
@@ -55,6 +56,8 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
   const targetExited = once(target, 'exit');
   targetExited.catch(() => {});
   let browser;
+  const abort = () => { void browser?.close().catch(() => {}); };
+  signal?.addEventListener('abort', abort, { once: true });
   let stage = 'open the synthetic Windows target';
   try {
     await once(target, 'spawn');
@@ -64,10 +67,10 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
     }, 'The synthetic desktop target did not start');
 
     stage = 'open the authorized viewer';
-    const key = certificate.publicKey.export({ type: 'spki', format: 'der' });
-    const pin = createHash('sha256').update(key).digest('base64');
-    // Trust only the fresh loopback key in this headless browser. Leave Windows trust untouched.
-    browser = await chromium.launch({ args: ['--ignore-certificate-errors-spki-list=' + pin] });
+    const key = certificate?.publicKey.export({ type: 'spki', format: 'der' });
+    const args = key ? ['--ignore-certificate-errors-spki-list=' + createHash('sha256').update(key).digest('base64')] : [];
+    browser = await chromium.launch({ args });
+    signal?.throwIfAborted();
     const page = await browser.newPage();
     const response = await page.goto(viewerUrl, { waitUntil: 'domcontentloaded', timeout: 20_000 }).catch(() => {
       throw new Error('The browser failed to open the HTTPS viewer');
@@ -80,7 +83,7 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
       await consoleMessage.filter({ hasText: /waiting for user to grant access/i }).waitFor({ timeout: 15_000 });
     };
     const respond = decision => run('pwsh', ['-NoProfile', '-File', script('./desktop-consent.ps1'),
-      '-Executable', executable, '-Decision', decision], { timeout: 25_000 });
+      '-Executable', executable, '-Decision', decision], { timeout: 25_000, signal });
 
     stage = 'confirm the guest can refuse desktop access';
     await connectAndWaitForConsent();
@@ -117,6 +120,7 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
     console.error(detail);
     throw new Error(detail);
   } finally {
+    signal?.removeEventListener('abort', abort);
     try { await browser?.close(); }
     finally {
       if (target.pid && target.exitCode === null && target.signalCode === null) target.kill();

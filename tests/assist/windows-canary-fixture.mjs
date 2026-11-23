@@ -98,3 +98,27 @@ try {
   await Promise.all([privateServer, publicServer].map(server => new Promise(resolve => server.close(resolve))));
 }
 console.log('Windows canary fixtures: private authorization, probe binding, temporary device scope and cleanup pass');
+
+const isolationId = randomUUID();
+const isolationRuntime = {
+  ...runtime,
+  target: id => id === dealerDomain(isolationId) ? { port: 1 } : null,
+  async inventory(id, group) {
+    return id === isolationId ? [] : runtime.inventory(id, group);
+  },
+  async createViewer(id, ...args) {
+    if (id === isolationId) throw new Error('device_offline');
+    return runtime.createViewer(id, ...args);
+  },
+};
+let didIsolate = false;
+const isolated = createWindowsCanaryFixture({ runtime: isolationRuntime, organizationId, isolationOrganizationId: isolationId, probe: async received => {
+  devices = [{ id: 'node/' + domain + '/first', online: true }];
+  await isolated.handle({ ...received, operation: 'viewer' });
+  if (didIsolate) assert.deepEqual(await isolated.handle({ ...received, operation: 'isolation' }), { denied: true });
+  devices = [];
+  return { checked: true };
+} });
+await assert.rejects(isolated.probe(request), /not_exercised/);
+didIsolate = true;
+assert.deepEqual(await isolated.probe(request), { checked: true });

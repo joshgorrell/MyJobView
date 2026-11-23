@@ -80,9 +80,11 @@ export function createControlServer({plane,runtime,token,broker,guests,pilotDoma
 }
 
 export function createCanaryProbe(env,fetchImpl=fetch){
+ const timeout=Number(env.ASSIST_CANARY_PROBE_TIMEOUT_MS||15000);
+ if(!Number.isSafeInteger(timeout)||timeout<15000||timeout>50000)throw new Error('invalid_canary_probe_timeout');
  const origin=new URL(env.ASSIST_CANARY_ORIGIN);if(origin.protocol!=='https:'||origin.origin!==env.ASSIST_CANARY_ORIGIN||!env.ASSIST_CANARY_TOKEN||env.ASSIST_CANARY_TOKEN.length<32)throw new Error('invalid_canary_configuration');
  return async body=>{
-  const response=await fetchImpl(origin.origin+'/v1/assist/probe',{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'content-type':'application/json',authorization:'Bearer '+env.ASSIST_CANARY_TOKEN},body:JSON.stringify(body)});
+  const response=await fetchImpl(origin.origin+'/v1/assist/probe',{method:'POST',redirect:'error',signal:AbortSignal.timeout(timeout),headers:{'content-type':'application/json',authorization:'Bearer '+env.ASSIST_CANARY_TOKEN},body:JSON.stringify(body)});
   if(!response.ok)throw new Error('canary_unavailable');const text=await response.text();if(text.length>32768)throw new Error('canary_oversized');return JSON.parse(text);
  };
 }
@@ -90,10 +92,11 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  let server,pilotServer,runtime,release,monitor,sessionMonitor;
  try{
   const env=process.env;const dependencies=createHttpDependencies(env);
+  const isolationId=env.ASSIST_CANARY_ISOLATION_ORGANIZATION_ID;
   const store=createStateStore(env.ASSIST_STATE_DIRECTORY||'/var/lib/mjv-assist');release=await store.lock();
   const requeue=(id,generation)=>dependencies.rpc('requeue_assist_runtime',{p_organization_id:id,p_generation:generation});
   runtime=createManagedRuntime({store,entry:env.ASSIST_MESHCENTRAL_ENTRY||new URL('./node_modules/meshcentral/meshcentral.js',import.meta.url).pathname,
-   approvedVersion:env.ASSIST_APPROVED_MESHCENTRAL_VERSION,publicOrigin:env.ASSIST_PUBLIC_ORIGIN,agentCacheDirectory:env.ASSIST_AGENT_CACHE_DIRECTORY,onExit:requeue});
+   approvedVersion:env.ASSIST_APPROVED_MESHCENTRAL_VERSION,publicOrigin:env.ASSIST_PUBLIC_ORIGIN,agentCacheDirectory:env.ASSIST_AGENT_CACHE_DIRECTORY,onExit:async(id,generation)=>id===isolationId?undefined:requeue(id,generation)});
   if(!env.ASSIST_AGENT_CACHE_DIRECTORY)throw new Error('approved_agent_cache_required');
   await runtime.verifyVersion();
   const probe=createCanaryProbe(env);
@@ -101,9 +104,17 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   if(env.ASSIST_CANARY_FIXTURE_TOKEN){
    const {ASSIST_CANARY_FIXTURE_TOKEN:fixtureToken,ASSIST_PILOT_ORGANIZATION_ID:id,ASSIST_PILOT_LOOPBACK_PORT:pilotPort}=env;
    if(!id||!pilotPort||fixtureToken.length<32||[env.ASSIST_CANARY_TOKEN,env.ASSIST_CONTROL_TOKEN].includes(fixtureToken))throw new Error('invalid_canary_fixture_configuration');
-   fixture=createWindowsCanaryFixture({runtime,organizationId:id,probe});
+   fixture=createWindowsCanaryFixture({runtime,organizationId:id,isolationOrganizationId:env.ASSIST_CANARY_ISOLATION_ORGANIZATION_ID,probe});
   }
-  const plane=createControlPlane({store,runtime,probe:fixture?.probe||probe,validateLease:job=>dependencies.rpc('validate_assist_activation_lease',{
+  if(isolationId){
+   if(!fixture)throw new Error('canary_isolation_requires_fixture');
+   // This synthetic runtime has no activation row or ingress. It exists only to exercise native tenant isolation.
+   const existing=await store.read(isolationId);
+   if(existing&&existing.phase!=='canary-isolation')throw new Error('canary_isolation_state_conflict');
+   if(!existing)await store.write(isolationId,{organization_id:isolationId,generation:1,desired_enabled:false,phase:'canary-isolation'});
+   await runtime.ensure({organization_id:isolationId,generation:1},async()=>{});
+  }
+  const plane=createControlPlane({store,runtime,probe:fixture?.probe||probe,validateLease:job=>job.organization_id===isolationId?false:dependencies.rpc('validate_assist_activation_lease',{
    p_organization_id:job.organization_id,p_generation:job.generation,p_lease_token:job.lease_token})});
   const broker=createSupportBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,labelDirectory:store.root+'/device-labels'});
   const guests=createGuestBroker({rpc:dependencies.rpc,runtime,requeue,exclusive:plane.runExclusive,isVerified:id=>plane.canServe(dealerDomain(id)),enabled:env.ASSIST_GUEST_PILOT_APPROVED==='1',arm64Enabled:env.ASSIST_ARM64_PILOT_APPROVED==='1'});
