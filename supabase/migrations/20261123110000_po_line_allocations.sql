@@ -161,6 +161,7 @@ GRANT EXECUTE ON FUNCTION public.assign_po_line_allocations(uuid,jsonb) TO authe
 CREATE OR REPLACE FUNCTION public.get_unallocated_sales_order_products()
 RETURNS TABLE(
  sales_order_id uuid, proposal_line_item_id uuid, product_id uuid,
+ product_name text, model_number text, vendor_id uuid, vendor_name text,
  required_quantity numeric, po_allocated_quantity numeric,
  remaining_quantity numeric
 ) LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -170,12 +171,14 @@ BEGIN
   RAISE EXCEPTION 'Purchasing permission required';
  END IF;
  RETURN QUERY
- SELECT so.id, li.id, li.product_id, li.quantity::numeric,
+ SELECT so.id, li.id, li.product_id, pr.name, pr.sku, pr.vendor_id, v.vendor_name, li.quantity::numeric,
         coalesce(sum(a.quantity) FILTER (WHERE po.status NOT IN ('cancelled','canceled','void')),0)::numeric,
         (li.quantity-coalesce(sum(a.quantity) FILTER
           (WHERE po.status NOT IN ('cancelled','canceled','void')),0))::numeric
  FROM public.sales_orders so
  JOIN public.proposal_line_items li ON li.proposal_id=so.proposal_id
+ JOIN public.products pr ON pr.id=li.product_id AND pr.organization_id=org
+ LEFT JOIN public.vendors v ON v.id=pr.vendor_id AND v.organization_id=org
  LEFT JOIN public.po_line_allocations a
    ON a.proposal_line_item_id=li.id AND a.sales_order_id=so.id
    AND a.organization_id=org
@@ -184,7 +187,7 @@ BEGIN
  WHERE so.organization_id=org AND li.organization_id=org
    AND li.product_id IS NOT NULL AND li.quantity>0
    AND so.status NOT IN ('complete','closed')
- GROUP BY so.id,li.id,li.product_id,li.quantity
+ GROUP BY so.id,li.id,li.product_id,pr.name,pr.sku,pr.vendor_id,v.vendor_name,li.quantity
  HAVING li.quantity>coalesce(sum(a.quantity) FILTER
    (WHERE po.status NOT IN ('cancelled','canceled','void')),0);
 END $$;
