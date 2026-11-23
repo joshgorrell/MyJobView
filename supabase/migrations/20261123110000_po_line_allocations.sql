@@ -150,3 +150,39 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.assign_po_line_allocations(uuid,jsonb) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.assign_po_line_allocations(uuid,jsonb) TO authenticated;
+
+-- One tenant-scoped source of outstanding job demand for both purchasing screens.
+-- Draft PO allocations reserve demand, so it cannot be ordered twice while a
+-- consolidated vendor PO is being assembled. Cancelled POs release demand.
+CREATE OR REPLACE FUNCTION public.get_unallocated_sales_order_products()
+RETURNS TABLE(
+ sales_order_id uuid, proposal_line_item_id uuid, product_id uuid,
+ required_quantity numeric, po_allocated_quantity numeric,
+ remaining_quantity numeric
+) LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE org uuid:=public.get_user_org_id();
+BEGIN
+ IF org IS NULL OR NOT public.can_manage_purchasing() THEN
+  RAISE EXCEPTION 'Purchasing permission required';
+ END IF;
+ RETURN QUERY
+ SELECT so.id, li.id, li.product_id, li.quantity::numeric,
+        coalesce(sum(a.quantity) FILTER (WHERE po.status IS DISTINCT FROM 'cancelled'),0)::numeric,
+        (li.quantity-coalesce(sum(a.quantity) FILTER
+          (WHERE po.status IS DISTINCT FROM 'cancelled'),0))::numeric
+ FROM public.sales_orders so
+ JOIN public.proposal_line_items li ON li.proposal_id=so.proposal_id
+ LEFT JOIN public.po_line_allocations a
+   ON a.proposal_line_item_id=li.id AND a.sales_order_id=so.id
+   AND a.organization_id=org
+ LEFT JOIN public.po_items poi ON poi.id=a.po_item_id AND poi.organization_id=org
+ LEFT JOIN public.purchase_orders po ON po.id=poi.po_id AND po.organization_id=org
+ WHERE so.organization_id=org AND li.organization_id=org
+   AND li.product_id IS NOT NULL AND li.quantity>0
+   AND so.status NOT IN ('complete','closed')
+ GROUP BY so.id,li.id,li.product_id,li.quantity
+ HAVING li.quantity>coalesce(sum(a.quantity) FILTER
+   (WHERE po.status IS DISTINCT FROM 'cancelled'),0);
+END $$;
+REVOKE ALL ON FUNCTION public.get_unallocated_sales_order_products() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.get_unallocated_sales_order_products() TO authenticated;
