@@ -56,6 +56,13 @@ async function launch() {
       onExit: async () => halt(),
     });
     await runtime.verifyVersion();
+    // Production reconciliation writes the initial state before allocating a runtime.
+    await store.write(organizationId, {
+      organization_id: organizationId,
+      generation: 1,
+      desired_enabled: true,
+      phase: 'applying',
+    });
     await runtime.ensure({ organization_id: organizationId, generation: 1 },
       async () => controller.signal.throwIfAborted());
     controller.signal.throwIfAborted();
