@@ -61,6 +61,18 @@ const age = (s: string) => {
   return `${Math.floor(minutes / 1440)}d`;
 };
 
+const formatSalesTvError = (error: unknown): string => {
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, unknown>;
+    const parts = ['code', 'message', 'details', 'hint']
+      .filter(key => typeof e[key] === 'string' && e[key])
+      .map(key => `${key}: ${e[key]}`);
+    if (parts.length) return parts.join(' | ');
+    try { return JSON.stringify(error); } catch { return 'Unknown structured error'; }
+  }
+  return error instanceof Error ? error.message : String(error);
+};
+
 export default function SalesTVDashboard() {
   const { profile } = useAuth();
   const [data, setData] = useState<TvDashboardData>(EMPTY);
@@ -178,11 +190,11 @@ export default function SalesTVDashboard() {
       const orgId = profile.organization_id;
       const [{ data: org, error: orgError }, tv, repData, lists] = await Promise.all([
         supabase.from('organizations').select('name, logo_url').eq('id', orgId).maybeSingle(),
-        fetchTvDashboardData(orgId),
-        fetchAllRepGoalProgress(orgId),
-        loadRevenueLists(orgId),
+        fetchTvDashboardData(orgId).catch(error => { throw new Error(`Dashboard KPI query: ${formatSalesTvError(error)}`); }),
+        fetchAllRepGoalProgress(orgId).catch(error => { throw new Error(`Leaderboard query: ${formatSalesTvError(error)}`); }),
+        loadRevenueLists(orgId).catch(error => { throw new Error(`Recent sales/service query: ${formatSalesTvError(error)}`); }),
       ]);
-      if (orgError) throw orgError;
+      if (orgError) throw new Error(`Organization query: ${formatSalesTvError(orgError)}`);
       // Publish one complete refresh only after every source succeeds.
       // A failed query must not mix fresh lists with stale KPI/leaderboard data.
       setRecentSales(lists.recentSales);
@@ -198,7 +210,7 @@ export default function SalesTVDashboard() {
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Sales TV refresh failed:', error);
-      setLoadError(error instanceof Error ? error.message : String(error));
+      setLoadError(formatSalesTvError(error));
       setConnected(false);
     } finally {
       loadingRef.current = false;
