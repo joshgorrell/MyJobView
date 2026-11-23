@@ -28,7 +28,9 @@ try {
       for(const old of ['Team','Calendar','Time Off','History','Today']) {
         assert.equal(await tabs.getByRole('tab',{name:old,exact:true}).count(),0,'Retired tab '+old);
       }
+      const requestPto = page.getByRole('button', {name: 'Request PTO', exact: true});
       await tabs.getByRole('tab',{name:'Daily Clock'}).click();
+      assert.equal(await requestPto.count(), 0, 'Daily Clock has no PTO shortcut');
       // The production Daily Clock owns its own clock-in UI; this fixture verifies
       // the policy gate and tab rendering, not the child component's button wording.
       if(type==='hourly') {
@@ -39,8 +41,11 @@ try {
       }
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       await page.getByRole('heading',{name:'Job Clock'}).waitFor();
+      assert.equal(await requestPto.count(), 0, 'Job Clock has no PTO shortcut');
       await tabs.getByRole('tab',{name:'My Time'}).click();
       await page.getByText('View your PTO balances and requests below.',{exact:false}).waitFor();
+      assert.equal(await requestPto.count(), 1, 'My Time has one PTO request button');
+      assert.equal(await tabs.getByRole('button', {name: 'Request PTO', exact: true}).count(), 0, 'PTO is outside the tab list');
        assert.equal(await page.getByRole('button',{name:'Open Work Orders',exact:true}).count(),0,'My Time does not link to Work Orders');
       await tabs.getByRole('tab',{name:'Job Clock'}).click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow '+size.width+' '+type);

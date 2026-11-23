@@ -14,7 +14,7 @@ export const RequestInternalTimeModal=()=> <div>Internal request</div>;
 export const MyTimeView=()=> <div>{location.search.includes('salary')?'Recorded Job Time':'Approved Job Time'}</div>;
 export const AppointmentsCalendar=({personalOnly,onWorkOrderSelect}:any)=> <div><p>{personalOnly?'Personal daily calendar':'Wrong view'}</p><button onClick={()=>onWorkOrderSelect('calendar-wo')}>Scheduled Work Order</button></div>;
 
-export const MyTimeOff=()=> <div>My PTO requests</div>;
+export const MyTimeOff=()=> <button type="button">Request PTO</button>;
 export const TeamTimeOffPanel=()=> <div>Approved team absences</div>;
 export const WorkOrderTimeControl=()=> <button>Start Job Time</button>;
 export const TimeClockModal=()=> <button>Start Your Day</button>;
