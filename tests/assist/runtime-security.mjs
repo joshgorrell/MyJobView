@@ -32,7 +32,9 @@ const dir=await mkdtemp(join(tmpdir(),'mjv-runtime-security-'));
 try{
  const agent=await readFile(resolve('services/assist/node_modules/meshcentral/meshagent.js'));
  const user=await readFile(resolve('services/assist/node_modules/meshcentral/meshuser.js'));
- await writeFile(join(dir,'meshagent.js'),agent);await writeFile(join(dir,'meshuser.js'),user);await verifyGuestRuntime(dir);
+ await writeFile(join(dir,'meshagent.js'),agent);await writeFile(join(dir,'meshuser.js'),user);
+ const web=await readFile(resolve('services/assist/node_modules/meshcentral/webserver.js'));
+ await writeFile(join(dir,'webserver.js'),web);await verifyGuestRuntime(dir);
  await writeFile(join(dir,'meshagent.js'),Buffer.concat([agent,Buffer.from('tampered')]));
  await assert.rejects(verifyGuestRuntime(dir),/guest_runtime_preparation_required/);
  await assert.rejects(prepareGuestRuntime(dir),/unexpected_guest_runtime_source/);

@@ -1,0 +1,8 @@
+{
+  "name": "mjv-assist-windows-test",
+  "private": true,
+  "dependencies": {
+    "loadavg-windows": "1.1.1",
+    "node-windows": "0.1.14"
+  }
+}

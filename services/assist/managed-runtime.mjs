@@ -100,7 +100,9 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
     if(!group.startsWith(`mesh/${r.domain}/`)||!Array.isArray(nodes))throw new Error('foreign_device_group');
     if(group!==(guestMeshId||r.meshId))continue;
     for(const node of nodes){
-     if(typeof node._id!=='string'||!node._id.startsWith(`node/${r.domain}/`)||node.meshid!==group)throw new Error('foreign_device');
+     // MeshCentral's nodes reply groups devices by mesh ID and omits the duplicate field.
+     if(typeof node?._id!=='string'||!node._id.startsWith(`node/${r.domain}/`)||
+      (node.meshid!==undefined&&node.meshid!==group))throw new Error('foreign_device');
      devices.push({id:node._id,name:String(node.name||node.rname||'Windows laptop').slice(0,120),online:!!(node.conn&1),os:String(node.osdesc||'').slice(0,160)});
     }
    }
