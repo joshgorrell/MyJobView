@@ -78,6 +78,7 @@ export default function SalesTVDashboard() {
   const loadingRef = useRef(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [now, setNow] = useState(new Date());
+  const [leaderboardPage, setLeaderboardPage] = useState(0);
 
   useEffect(() => {
     const orgId = profile?.organization_id;
@@ -228,6 +229,16 @@ export default function SalesTVDashboard() {
     };
   }, [load, profile?.organization_id]);
 
+  // Rotate leaderboard pages automatically so every qualifying employee appears
+  // on the unattended TV. Keep global ranks across pages.
+  const leaderboardPages = Math.max(1, Math.ceil(reps.length / 7));
+  const visibleLeaderboardPage = leaderboardPage % leaderboardPages;
+  useEffect(() => {
+    const interval = window.setInterval(() => setLeaderboardPage(page => page + 1), 15000);
+    return () => window.clearInterval(interval);
+  }, []);
+  useEffect(() => { setLeaderboardPage(0); }, [profile?.organization_id]);
+
   const totals = useMemo(() => {
     const annualGoal = reps.reduce((s, r) => s + (r.annualQuota || 0), 0);
     const monthlyGoal = reps.reduce((s, r) => s + (r.monthlyQuota || 0), 0);
@@ -303,17 +314,18 @@ export default function SalesTVDashboard() {
 
         <main className="grid min-h-0 flex-1 grid-cols-12 grid-rows-[46%_54%] gap-[.65vw] p-[.65vw]">
           <section className="col-span-8 flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/50">
-            <PanelHeader title="Sales Team Leaderboard" icon={<Award />} right={`${reps.length} REPS`} />
+            <PanelHeader title="Sales Team Leaderboard" icon={<Award />} right={`${reps.length} CONTRIBUTORS${leaderboardPages > 1 ? ` · PAGE ${visibleLeaderboardPage + 1}/${leaderboardPages}` : ""}`} />
             <div className="grid h-[3vh] min-h-[32px] shrink-0 grid-cols-[.35fr_1.7fr_1fr_1fr_.7fr_1fr_.7fr] items-center border-b border-slate-800 px-[.75vw] text-[clamp(10px,.52vw,19px)] font-black uppercase tracking-wider text-slate-500">
               <span>#</span><span>Rep</span><span>MTD Sales</span><span>Monthly Goal</span><span>MTD %</span><span>YTD Sales</span><span>YTD %</span>
             </div>
             <div className="min-h-0 flex-1">
-              {reps.length ? reps.slice(0, 7).map((rep, index) => {
+              {reps.length ? reps.slice(visibleLeaderboardPage * 7, (visibleLeaderboardPage + 1) * 7).map((rep, index) => {
+                const globalRank = visibleLeaderboardPage * 7 + index;
                 const monthPct = rep.monthlyQuota > 0 ? (rep.thisMonthSales / rep.monthlyQuota) * 100 : 0;
                 const onMonthPace = monthPct >= expectedMonthPace;
                 const onAnnualPace = rep.quotaProgress >= expectedAnnualPace;
                 return <div key={rep.repId} className="grid h-[13.8%] min-h-[48px] grid-cols-[.35fr_1.7fr_1fr_1fr_.7fr_1fr_.7fr] items-center border-b border-slate-800/70 px-[.75vw] text-[clamp(12px,.72vw,27px)]">
-                  <span className={`font-black ${index === 0 ? 'text-amber-300' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-orange-300' : 'text-slate-600'}`}>{index + 1}</span>
+                  <span className={`font-black ${globalRank === 0 ? 'text-amber-300' : globalRank === 1 ? 'text-slate-300' : globalRank === 2 ? 'text-orange-300' : 'text-slate-600'}`}>{globalRank + 1}</span>
                   <div className="min-w-0"><div className="truncate font-black">{rep.repName}</div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className={`h-full rounded-full ${onMonthPace ? 'bg-emerald-400' : 'bg-amber-400'}`} style={{ width: `${Math.min(100, monthPct)}%` }} /></div></div>
                   <b className="text-sky-300">{compact(rep.thisMonthSales)}</b><span className="text-slate-400">{compact(rep.monthlyQuota)}</span><b className={onMonthPace ? 'text-emerald-400' : 'text-amber-400'}>{pct(monthPct)}</b><b>{compact(rep.ytdSales)}</b><b className={onAnnualPace ? 'text-emerald-400' : 'text-amber-400'}>{pct(rep.quotaProgress)}</b>
                 </div>;
