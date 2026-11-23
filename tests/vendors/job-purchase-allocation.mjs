@@ -51,4 +51,10 @@ assert.match(sql,/CREATE TRIGGER protect_allocated_sales_order_line_quantity_wri
 assert.match(sql,/a.sales_order_id=NEW.sales_order_id/);
 assert.match(sql,/CREATE TRIGGER prevent_allocated_po_line_delete_write/);
 assert.match(sql,/CREATE TRIGGER prevent_allocated_source_product_change_write/);
+assert.match(sql,/CREATE OR REPLACE FUNCTION public\.create_consolidated_job_purchase_order/);
+assert.match(sql,/public\.create_request_purchase_document\(/);
+assert.match(sql,/INSERT INTO public\.po_line_allocations\(/);
+const purchasing=fs.readFileSync('src/components/Inventory/PurchaseOrders.tsx','utf8');
+assert.match(purchasing,/create_consolidated_job_purchase_order/);
+assert.match(purchasing,/Create consolidated vendor PO/);
 console.log('Consolidated multi-job PO allocation tests passed');
