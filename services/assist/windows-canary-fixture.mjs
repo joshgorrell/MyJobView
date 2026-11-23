@@ -36,14 +36,23 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
       try {
         fixture.group = await runtime.createGuestGroup(organizationId, suffix);
         const evidence = await probe(request);
-        if (!fixture.nodeId || fixture.invalid) throw new Error('canary_fixture_not_exercised');
+        if (!fixture.nodeId || fixture.invalid || (isolationOrganizationId && !fixture.isolationObserved)) {
+          throw new Error('canary_fixture_not_exercised');
+        }
         const devices = await runtime.inventory(organizationId, fixture.group.meshId);
-        if (devices.length !== 1 || devices[0].id !== fixture.nodeId) throw new Error('canary_fixture_device_changed');
+        // Some Windows helpers remove their temporary node on exit. Accept disappearance
+        // only after we observed the exact live node during the final isolation check.
+        const sameDevice = devices.length === 1 && devices[0].id === fixture.nodeId &&
+          (devices[0].online || fixture.isolationObserved);
+        if (!sameDevice && !(devices.length === 0 && fixture.isolationObserved)) {
+          throw new Error('canary_fixture_device_changed');
+        }
         return evidence;
       } finally {
         fixture.closed = true;
         try {
           await fixture.pending?.catch(() => {});
+          await fixture.isolationPending?.catch(() => {});
           try {
             if (fixture.viewerAttempted) await runtime.revokeViewer(organizationId, fixture.username);
           } finally {
@@ -58,18 +67,28 @@ export function createWindowsCanaryFixture({ runtime, organizationId, isolationO
       if (!fixture.group) throw new Error('canary_fixture_unavailable');
       if (request.operation === 'download') return { download_url: fixture.group.download_url };
       if (request.operation === 'isolation') {
-        if (!isolationOrganizationId || !fixture.nodeId ||
-            !runtime.target(dealerDomain(isolationOrganizationId))) throw new Error('canary_isolation_unavailable');
-        const devices = await runtime.inventory(isolationOrganizationId);
-        if (devices.some(device => device.id === fixture.nodeId)) throw new Error('canary_isolation_failed');
-        try {
-          await runtime.createViewer(isolationOrganizationId, fixture.nodeId, fixture.username);
-        } catch (error) {
-          if (error.message === 'device_offline' && !fixture.closed) return { denied: true };
-          throw error;
-        }
-        await runtime.revokeViewer(isolationOrganizationId, fixture.username);
-        throw new Error('canary_isolation_failed');
+        fixture.isolationPending ||= (async () => {
+          if (!isolationOrganizationId || !fixture.nodeId ||
+              !runtime.target(dealerDomain(isolationOrganizationId))) throw new Error('canary_isolation_unavailable');
+          const pilotDevices = await runtime.inventory(organizationId, fixture.group.meshId);
+          if (pilotDevices.length !== 1 || pilotDevices[0].id !== fixture.nodeId || !pilotDevices[0].online) {
+            throw new Error('canary_fixture_device_changed');
+          }
+          const devices = await runtime.inventory(isolationOrganizationId);
+          if (devices.some(device => device.id === fixture.nodeId)) throw new Error('canary_isolation_failed');
+          try {
+            await runtime.createViewer(isolationOrganizationId, fixture.nodeId, fixture.username);
+          } catch (error) {
+            if (error.message === 'device_offline' && !fixture.closed) {
+              fixture.isolationObserved = true;
+              return { denied: true };
+            }
+            throw error;
+          }
+          await runtime.revokeViewer(isolationOrganizationId, fixture.username);
+          throw new Error('canary_isolation_failed');
+        })();
+        return fixture.isolationPending;
       }
       if (request.operation !== 'viewer') throw new Error('invalid_canary_fixture_operation');
       if (!fixture.pending) {
