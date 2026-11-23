@@ -1,7 +1,7 @@
 /** Windows-side verifier for the private, nonce-bound Assist pilot fixture. */
 import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -78,7 +78,8 @@ export function createLiveWindowsVerifier({
       });
       return JSON.parse((await readBounded(response, 8192)).toString('utf8'));
     };
-    const root = await mkdtemp(join(testDirectory, 'mjv-assist-probe-'));
+    const workDirectory = await realpath(testDirectory);
+    const root = await mkdtemp(join(workDirectory, 'mjv-assist-probe-'));
     const executable = join(root, 'temporary-assist.exe');
     let agent, exited, evidence;
     try {
@@ -87,7 +88,7 @@ export function createLiveWindowsVerifier({
       if (bytes.toString('ascii', 0, 2) !== 'MZ') throw new Error('windows_pilot_helper_invalid');
       await writeFile(executable, bytes, { flag: 'wx' });
       signal.throwIfAborted();
-      agent = spawn(executable, [], { cwd: root, stdio: 'ignore' });
+      agent = spawn(executable, [], { cwd: workDirectory, stdio: 'ignore' });
       exited = new Promise(resolve => { agent.once('error', resolve); agent.once('exit', resolve); });
       await once(agent, 'spawn');
       await run('pwsh', ['-NoProfile', '-File', connectScript, '-AgentPid', String(agent.pid)], { signal, timeout: 18_000 });
@@ -110,14 +111,20 @@ export function createLiveWindowsVerifier({
         second_dealer_denied_observed: true,
       };
     } finally {
-      if (agent?.pid) {
-        await run('pwsh', ['-NoProfile', '-Command',
-          'Get-Process -Name temporary-assist -ErrorAction SilentlyContinue | Where-Object Path -eq $env:ASSIST_TEST_GUEST_EXE | Stop-Process -Force -ErrorAction SilentlyContinue'],
-        { env: { ...process.env, ASSIST_TEST_GUEST_EXE: executable }, timeout: 6_000 });
-        if (agent.exitCode === null && agent.signalCode === null) agent.kill();
+      try {
+        if (agent?.pid) {
+          // The Connect button launches a second instance of the same executable.
+          // Wait for all instances of this exact helper before deleting its files.
+          await run('pwsh', ['-NoProfile', '-Command',
+            '$guests = Get-Process -Name temporary-assist -ErrorAction SilentlyContinue | Where-Object Path -eq $env:ASSIST_TEST_GUEST_EXE; ' +
+            'foreach ($guest in $guests) { if (-not $guest.HasExited) { $guest.Kill(); if (-not $guest.WaitForExit(3000)) { throw "Temporary helper did not exit" } } }'],
+          { env: { ...process.env, ASSIST_TEST_GUEST_EXE: executable }, timeout: 8_000 });
+        }
+      } finally {
+        if (agent?.pid && agent.exitCode === null && agent.signalCode === null) agent.kill();
+        if (exited) await exited;
+        await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
       }
-      if (exited) await exited;
-      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
     signal.throwIfAborted();
     return evidence;
