@@ -171,12 +171,13 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
   const results: RepGoalProgress[] = [];
 
   // Batch-fetch all sales_monthly_stats for this org (YTD + current month)
-  const { data: allMonthlyStats } = await supabase
+  const { data: allMonthlyStats, error: monthlyStatsError } = await supabase
     .from('sales_monthly_stats')
     .select('user_id, year, month, total_sales')
     .eq('organization_id', orgId)
     .order('year', { ascending: true })
     .order('month', { ascending: true });
+  if (monthlyStatsError) throw monthlyStatsError;
 
   for (const rep of reps) {
     const annualQuota = parseFloat(String(rep.current_annual_quota || 0));
@@ -201,13 +202,14 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     const monthStatsTotal = repMonthStat ? parseFloat(String(repMonthStat.total_sales || 0)) : 0;
 
     // Fetch YTD sales orders for this rep (live data) — with created_at for per-month grouping
-    const { data: ytdOrders } = await supabase
+    const { data: ytdOrders, error: ytdOrdersError } = await supabase
       .from('sales_orders')
       .select('contract_total, created_at')
       .not('status', 'in', '("cancelled","voided")')
-      .or(`sales_rep_id.eq.${rep.id},created_by.eq.${rep.id}`)
+      .or(`sales_rep_id.eq.${rep.id},and(sales_rep_id.is.null,created_by.eq.${rep.id})`)
       .gte('created_at', yearStartIso)
       .lte('created_at', nowIso);
+    if (ytdOrdersError) throw ytdOrdersError;
 
     // Supplement YTD with sales orders for months not covered by stats
     let ytdSupplement = 0;
@@ -224,13 +226,14 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     const ytdSales = ytdStatsTotal + ytdSupplement;
 
     // Fetch this month's sales orders
-    const { data: monthOrders } = await supabase
+    const { data: monthOrders, error: monthOrdersError } = await supabase
       .from('sales_orders')
       .select('contract_total')
       .not('status', 'in', '("cancelled","voided")')
-      .or(`sales_rep_id.eq.${rep.id},created_by.eq.${rep.id}`)
+      .or(`sales_rep_id.eq.${rep.id},and(sales_rep_id.is.null,created_by.eq.${rep.id})`)
       .gte('created_at', monthStartIso)
       .lte('created_at', nowIso);
+    if (monthOrdersError) throw monthOrdersError;
 
     const monthOrderTotal = (monthOrders || []).reduce(
       (sum, o) => sum + parseFloat(String(o.contract_total || 0)),
@@ -238,15 +241,16 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     );
 
     // 3-tier fallback: sales_monthly_stats → sales_orders → approved proposals
-    let thisMonthSales = monthStatsTotal > 0 ? monthStatsTotal : monthOrderTotal;
-    if (thisMonthSales === 0) {
-      const { data: monthApprovedProposals } = await supabase
+    let thisMonthSales = repMonthStat ? monthStatsTotal : monthOrderTotal;
+    if (!repMonthStat && monthOrderTotal === 0) {
+      const { data: monthApprovedProposals, error: monthApprovedProposalsError } = await supabase
         .from('proposals')
         .select('total')
         .eq('created_by', rep.id)
         .in('status', ['approved', 'approved_pending_action'])
         .gte('created_at', monthStartIso)
         .lte('created_at', nowIso);
+      if (monthApprovedProposalsError) throw monthApprovedProposalsError;
       thisMonthSales = (monthApprovedProposals || []).reduce(
         (sum, p) => sum + parseFloat(String(p.total || 0)), 0
       );
