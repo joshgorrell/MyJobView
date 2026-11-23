@@ -31,3 +31,9 @@ For the Windows harness, set `ASSIST_WINDOWS_CANARY_VERIFY_TIMEOUT_MS=45000` on 
 Deploy the runner on the dedicated test VM and exercise it through the private HTTPS path against two synthetic dealer runtimes. Confirm that the real probe returns fresh proof within the deployment timeout and that the guest download stops working after the response. The isolated CI run validates the protocol without changing production state.
 
 Keep `mjv-assist-control` and `mjv-assist-worker` stopped until the Windows runner and actual tests are verified. Do not set pilot approval flags or expose agent downloads prematurely.
+
+## Automatic activation for dealers
+
+After the staged Windows pilot passes, the platform operator can enable automatic dealer routing with `ASSIST_CANARY_AUTOMATIC_DEALERS=1` and remove `ASSIST_PILOT_ORGANIZATION_ID`. Keep the private loopback port, independent fixture token, and reserved isolation organization configured. The verifier uses the same configuration for all dealer activation jobs. Only the dealer being checked has native routes on the private listener, which disconnects its probe sockets at the end. The public gateway continues to require a verified dealer runtime.
+
+Keep the private listener behind access-controlled HTTPS for the dedicated verifier host. For the agent handshake, serve the same TLS certificate key for the configured Assist origin over the public and private ingress paths. The verifier must resolve the Assist origin to the private listener through the approved network route.
