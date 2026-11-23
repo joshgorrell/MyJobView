@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { randomUUID, X509Certificate } from 'node:crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
@@ -24,6 +24,14 @@ export function readPrivatePilotConfig(env) {
 async function launch() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error('interactive_pilot_required');
   const config = readPrivatePilotConfig(process.env);
+  const certificatePath = process.env.ASSIST_TEST_TLS_CERTIFICATE;
+  if (!certificatePath || !isAbsolute(certificatePath)) throw new Error('pilot_certificate_required');
+  const pem = await readFile(certificatePath);
+  const certificate = new X509Certificate(pem);
+  if (!certificate.checkHost(new URL(config.origin).hostname, { subject: 'never' }) ||
+      Date.parse(certificate.validFrom) > Date.now() || Date.parse(certificate.validTo) <= Date.now()) {
+    throw new Error('invalid_pilot_certificate');
+  }
   const root = await mkdtemp(join(tmpdir(), 'mjv-assist-private-test-'));
   const store = createStateStore(root);
   const organizationId = randomUUID();
@@ -47,6 +55,8 @@ async function launch() {
   try {
     release = await store.lock();
     controller.signal.throwIfAborted();
+    const pilotCertificate = join(root, 'proxy-leaf.pem');
+    await writeFile(pilotCertificate, certificate.toString(), { mode: 0o600 });
     runtime = createManagedRuntime({
       store,
       entry: new URL('./node_modules/meshcentral/meshcentral.js', import.meta.url).pathname,
@@ -55,6 +65,7 @@ async function launch() {
       agentCacheDirectory: config.cache,
       // A disposable runtime starts with fresh certificates and signs its tools.
       startupAttempts: 120,
+      proxyCertificateUrl: pathToFileURL(pilotCertificate).href,
       onExit: async () => halt(),
     });
     await runtime.verifyVersion();
