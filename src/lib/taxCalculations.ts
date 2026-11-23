@@ -290,7 +290,8 @@ export interface TaxJarTaxResult {
 
 export async function calculateTaxJarTax(
   transactionType: string,
-  transactionId: string
+  transactionId: string,
+  options?: { preview?: boolean }
 ): Promise<TaxJarTaxResult> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Sign in to calculate tax.');
@@ -302,7 +303,7 @@ export async function calculateTaxJarTax(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      action: 'taxes',
+      action: options?.preview ? 'preview_taxes' : 'taxes',
       transaction_type: transactionType,
       transaction_id: transactionId,
     }),
