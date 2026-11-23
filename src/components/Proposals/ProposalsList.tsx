@@ -1337,7 +1337,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       )}
 
       {/* Proposals List */}
-      <div className="flex-1 px-3 sm:px-6 py-2">
+      <div className="flex-1 px-3 sm:px-0 py-2">
         {loading ? (
           <LoadingSkeleton />
         ) : totalCount === 0 && pendingDeposits.length === 0 ? (
