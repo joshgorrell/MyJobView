@@ -1,5 +1,5 @@
 import { requestConfirmation } from '../../lib/feedback';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -83,7 +83,7 @@ export function PurchaseOrders() {
   const [demandWarehouse,setDemandWarehouse]=useState('');
   const [demandOffice,setDemandOffice]=useState('');
   const [demandSaving,setDemandSaving]=useState(false);
-  const demandRetry=useState(()=>crypto.randomUUID())[0];
+  const demandRetry=useRef(crypto.randomUUID());
   useEffect(()=>{
     if(!showDemand||!canCreate||!profile?.organization_id)return;
     void Promise.all([
@@ -107,10 +107,10 @@ export function PurchaseOrders() {
     setDemandSaving(true);setDemandError('');
     const {error}=await supabase.rpc('create_consolidated_job_purchase_order',{
       p_lines:lines,p_vendor_id:demandVendor,p_warehouse_id:demandWarehouse,
-      p_office_id:demandOffice,p_retry:demandRetry
+      p_office_id:demandOffice,p_retry:demandRetry.current
     });
     if(error)setDemandError(error.message);
-    else{setChosenDemand({});await Promise.all([loadDemand(),loadOrders()]);}
+    else{demandRetry.current=crypto.randomUUID();setChosenDemand({});await Promise.all([loadDemand(),loadOrders()]);}
     setDemandSaving(false);
   }
   async function loadDemand(){
