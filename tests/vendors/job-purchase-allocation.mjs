@@ -57,4 +57,6 @@ assert.match(sql,/INSERT INTO public\.po_line_allocations\(/);
 const purchasing=fs.readFileSync('src/components/Inventory/PurchaseOrders.tsx','utf8');
 assert.match(purchasing,/create_consolidated_job_purchase_order/);
 assert.match(purchasing,/Create consolidated vendor PO/);
+assert.match(sql,/Selected equipment does not belong to the chosen vendor/);
+assert.match(purchasing,/demandRetry\.current=crypto\.randomUUID\(\)/);
 console.log('Consolidated multi-job PO allocation tests passed');
