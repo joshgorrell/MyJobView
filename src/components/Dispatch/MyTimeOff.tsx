@@ -33,14 +33,14 @@ interface Request {
   leave_days: LeaveDay[] | null;
   policy: { policy_name: string };
 }
-export function MyTimeOff({ compact = false, openRequest = false }: { compact?: boolean; openRequest?: boolean }) {
+export function MyTimeOff({ compact = false }: { compact?: boolean }) {
   const { user, profile } = useAuth();
   const [tab, setTab] = useState<"mine" | "team" | "manage">("mine");
   const [balances, setBalances] = useState<Balance[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(openRequest);
+  const [showForm, setShowForm] = useState(false);
   const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);

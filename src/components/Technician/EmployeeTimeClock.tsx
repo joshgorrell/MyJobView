@@ -16,7 +16,6 @@ type PersonalEntry = { id: string; entry_date: string; clock_in: string; clock_o
 export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: string) => void; onOpenWorkOrder: (workOrderId: string) => void }) {
   const policy = useEmployeeTimePolicy();
   const { profile } = useAuth();
-  const [requestOpen, setRequestOpen] = useState(false);
   const [section, setSection] = useState<TimeSection>('job');
   const [correctionEntry, setCorrectionEntry] = useState<PersonalEntry | null>(null);
   const [historyRevision, setHistoryRevision] = useState(0);
@@ -100,18 +99,12 @@ export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: stri
         <div role="tablist" aria-label="Time Clock" className="flex min-w-0 gap-1 overflow-x-auto p-1">
           {sections.map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" role="tab" aria-selected={current === id}
-              onClick={() => { setRequestOpen(false); setSection(id); }}
+              onClick={() => setSection(id)}
               className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${current === id ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
               <Icon className="h-4 w-4" />{label}
             </button>
           ))}
         </div>
-        {current !== 'mine' && (
-          <button type="button" onClick={() => { setRequestOpen(true); setSection('mine'); }}
-            className="flex shrink-0 items-center rounded-lg px-3 py-2 text-sm font-medium text-white hover:bg-gray-700">
-            Request PTO
-          </button>
-        )}
       </div>
       {current === 'daily' && (policy.dailyClock ? <DailyClock /> : (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-5" role="status">
@@ -155,7 +148,7 @@ export function EmployeeTimeClock({ onOpenWorkOrder }: { onNavigate: (page: stri
         <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 space-y-3">
           <h2 className="font-semibold text-gray-900">My Time</h2>
           <p className="text-sm text-gray-600">View your PTO balances and requests below. Expand Recent Time Entries to review hours and request corrections.</p>
-          <MyTimeOff compact openRequest={requestOpen} />
+          <MyTimeOff compact />
           <details className="rounded-xl border border-gray-200 p-3">
             <summary className="cursor-pointer text-sm font-semibold text-gray-900">Recent Time Entries & Corrections</summary>
             <div className="mt-3 space-y-2">
