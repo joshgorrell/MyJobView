@@ -1,0 +1,12 @@
+# Run as a separate Caddy instance with its own management settings.
+# Reach this listener through authorized SSH forwards from the two test PCs.
+{
+    admin off
+    auto_https disable_redirects
+}
+
+https://assist-pilot.test:9443 {
+    bind 127.0.0.1
+    tls /path/to/pilot-leaf-chain.pem /path/to/pilot-key.pem
+    reverse_proxy 127.0.0.1:9444
+}
