@@ -223,3 +223,32 @@ END $$;
 CREATE TRIGGER protect_allocated_sales_order_line_quantity_write
  BEFORE UPDATE OF quantity ON public.proposal_line_items
  FOR EACH ROW EXECUTE FUNCTION public.protect_allocated_sales_order_line_quantity();
+
+-- A deleted PO line must not erase the job's purchasing history. Cancel the
+-- parent PO to release demand, or use an explicit audited reversal instead.
+CREATE OR REPLACE FUNCTION public.prevent_allocated_po_line_delete()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+ IF EXISTS (SELECT 1 FROM public.po_line_allocations WHERE po_item_id=OLD.id) THEN
+  RAISE EXCEPTION 'Cannot delete allocated PO equipment; cancel the purchase order or reverse allocations explicitly';
+ END IF;
+ RETURN OLD;
+END $$;
+CREATE TRIGGER prevent_allocated_po_line_delete_write
+ BEFORE DELETE ON public.po_items
+ FOR EACH ROW EXECUTE FUNCTION public.prevent_allocated_po_line_delete();
+
+-- Changing the sales-order line product would invalidate every linked PO
+-- allocation even when the requested quantity remains unchanged.
+CREATE OR REPLACE FUNCTION public.prevent_allocated_source_product_change()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+ IF NEW.product_id IS DISTINCT FROM OLD.product_id AND EXISTS
+  (SELECT 1 FROM public.po_line_allocations WHERE proposal_line_item_id=OLD.id) THEN
+  RAISE EXCEPTION 'Cannot change product on an allocated sales order equipment line';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER prevent_allocated_source_product_change_write
+ BEFORE UPDATE OF product_id ON public.proposal_line_items
+ FOR EACH ROW EXECUTE FUNCTION public.prevent_allocated_source_product_change();
