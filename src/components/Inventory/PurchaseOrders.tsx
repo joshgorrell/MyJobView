@@ -71,7 +71,7 @@ export function PurchaseOrders() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const canCreate = profile?.can_create_purchase_orders === true || profile?.role==='admin';
   const [viewDocument,setViewDocument]=useState<string|null>(null);
-  const [demand, setDemand] = useState<Array<{sales_order_id:string;proposal_line_item_id:string;product_id:string;required_quantity:number;po_allocated_quantity:number;remaining_quantity:number}>>([]);
+  const [demand, setDemand] = useState<Array<{sales_order_id:string;proposal_line_item_id:string;product_id:string;product_name:string;model_number:string|null;vendor_id:string|null;vendor_name:string|null;required_quantity:number;po_allocated_quantity:number;remaining_quantity:number}>>([]);
   const [demandError,setDemandError]=useState('');
   const [demandLoading,setDemandLoading]=useState(false);
   const [showDemand,setShowDemand]=useState(false);
@@ -99,8 +99,11 @@ export function PurchaseOrders() {
     });
   },[showDemand,canCreate,profile?.organization_id]);
   async function createDemandPO(){
-    const lines=demand.filter(d=>Number(chosenDemand[d.proposal_line_item_id])>0)
+    const lines=demand.filter(d=>d.vendor_id===demandVendor&&Number(chosenDemand[d.proposal_line_item_id])>0)
       .map(d=>({sales_order_id:d.sales_order_id,proposal_line_item_id:d.proposal_line_item_id,quantity:Number(chosenDemand[d.proposal_line_item_id])}));
+    if(demand.some(d=>d.vendor_id!==demandVendor&&Number(chosenDemand[d.proposal_line_item_id])>0)){
+      setDemandError('Selected items belong to different vendors. Create a separate PO for each vendor.');return;
+    }
     if(!lines.length||!demandVendor||!demandWarehouse||!demandOffice){
       setDemandError('Select equipment, vendor, warehouse and office.');return;
     }
@@ -226,7 +229,7 @@ export function PurchaseOrders() {
         </div>
         {showDemand&&(demandLoading?<p className="text-sm text-gray-500">Loading demand…</p>:demandError?<p role="alert" className="text-sm text-red-700">Unable to load demand: {demandError}</p>:demand.length===0?<p className="text-sm text-gray-500">No unallocated equipment demand found.</p>:
           <div className="overflow-x-auto max-h-72 overflow-y-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Order</th><th className="p-2">Sales order</th><th className="p-2">Product</th><th className="p-2 text-right">Required</th><th className="p-2 text-right">On PO</th><th className="p-2 text-right">Still needed</th></tr></thead>
-          <tbody>{demand.map(d=><tr key={d.proposal_line_item_id} className="border-b"><td className="p-2"><input aria-label={'Order equipment '+d.proposal_line_item_id} type="number" min="0" max={d.remaining_quantity} step="1" className="w-20 border rounded p-1" value={chosenDemand[d.proposal_line_item_id]??0} onChange={e=>setChosenDemand(v=>({...v,[d.proposal_line_item_id]:Math.max(0,Math.min(d.remaining_quantity,Math.floor(Number(e.target.value)||0)))}))}/></td><td className="p-2 font-mono text-xs">{d.sales_order_id.slice(0,8)}</td><td className="p-2 font-mono text-xs">{d.product_id.slice(0,8)}</td><td className="p-2 text-right">{d.required_quantity}</td><td className="p-2 text-right">{d.po_allocated_quantity}</td><td className="p-2 text-right font-semibold">{d.remaining_quantity}</td></tr>)}</tbody></table></div>)}
+          <tbody>{demand.map(d=><tr key={d.proposal_line_item_id} className="border-b"><td className="p-2"><input aria-label={'Order equipment '+d.proposal_line_item_id} type="number" min="0" max={d.remaining_quantity} disabled={!d.vendor_id||d.vendor_id!==demandVendor} step="1" className="w-20 border rounded p-1" value={chosenDemand[d.proposal_line_item_id]??0} onChange={e=>setChosenDemand(v=>({...v,[d.proposal_line_item_id]:Math.max(0,Math.min(d.remaining_quantity,Math.floor(Number(e.target.value)||0)))}))}/></td><td className="p-2 font-mono text-xs">{d.sales_order_id.slice(0,8)}</td><td className="p-2 text-xs"><div className="font-medium">{d.product_name}</div><div className="text-gray-500">{d.model_number||'No model'} · {d.vendor_name||'No vendor assigned'}</div></td><td className="p-2 text-right">{d.required_quantity}</td><td className="p-2 text-right">{d.po_allocated_quantity}</td><td className="p-2 text-right font-semibold">{d.remaining_quantity}</td></tr>)}</tbody></table></div>)}
         {showDemand&&demand.length>0&&<div className="flex flex-wrap gap-2 items-end">
           <label className="text-xs">Vendor<select className="block border rounded p-2" value={demandVendor} onChange={e=>setDemandVendor(e.target.value)}>{demandVendors.map(v=><option key={v.id} value={v.id}>{v.vendor_name}</option>)}</select></label>
           <label className="text-xs">Warehouse<select className="block border rounded p-2" value={demandWarehouse} onChange={e=>setDemandWarehouse(e.target.value)}>{demandWarehouses.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
