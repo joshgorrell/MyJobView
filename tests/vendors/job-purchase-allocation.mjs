@@ -28,4 +28,7 @@ assert.match(sql,/CREATE TABLE IF NOT EXISTS public\.po_line_allocations/);
 assert.match(sql,/ENABLE ROW LEVEL SECURITY/);
 assert.match(sql,/PO line quantity over-allocated/);
 assert.match(sql,/Sales order line quantity over-allocated/);
+assert.match(sql,/FROM public\\.po_items WHERE id=NEW\\.po_item_id FOR UPDATE/);
+assert.match(sql,/FROM public\\.proposal_line_items WHERE id=NEW\\.proposal_line_item_id FOR UPDATE/);
+assert.match(sql,/Cannot reduce PO quantity below allocated quantity/);
 console.log('Consolidated multi-job PO allocation tests passed');
