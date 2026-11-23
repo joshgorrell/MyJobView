@@ -252,3 +252,97 @@ END $$;
 CREATE TRIGGER prevent_allocated_source_product_change_write
  BEFORE UPDATE OF product_id ON public.proposal_line_items
  FOR EACH ROW EXECUTE FUNCTION public.prevent_allocated_source_product_change();
+
+-- Atomic global purchasing: one vendor PO, separate equipment lines for each
+-- source demand line, and a committed allocation ledger in one transaction.
+-- Prices are snapshotted from the current product cost at PO creation time.
+-- The existing document builder handles vendor, office, warehouse, and retry
+-- validation. The unique job_reference token is only used to correlate lines
+-- within this transaction; the authoritative link is po_line_allocations.
+CREATE OR REPLACE FUNCTION public.create_consolidated_job_purchase_order(
+ p_lines jsonb, p_vendor_id uuid, p_warehouse_id uuid,
+ p_office_id uuid, p_retry uuid
+) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE org uuid:=public.get_user_org_id();
+DECLARE entry jsonb; source_line record; product record;
+DECLARE payload jsonb:='[]'::jsonb; doc uuid; po_line_id uuid;
+DECLARE qty numeric; marker text;
+BEGIN
+ IF org IS NULL OR NOT public.can_manage_purchasing() THEN
+  RAISE EXCEPTION 'Purchasing permission required';
+ END IF;
+ IF p_retry IS NULL OR jsonb_typeof(p_lines) IS DISTINCT FROM 'array'
+    OR jsonb_array_length(p_lines)=0 THEN
+  RAISE EXCEPTION 'Select equipment to purchase';
+ END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_retry::text,0));
+ IF EXISTS(SELECT 1 FROM public.purchase_orders WHERE id=p_retry AND organization_id=org) THEN
+  RETURN p_retry;
+ END IF;
+ IF EXISTS (SELECT 1 FROM (
+  SELECT x->>'proposal_line_item_id' AS id FROM jsonb_array_elements(p_lines) x
+ ) ids GROUP BY id HAVING count(*)>1) THEN
+  RAISE EXCEPTION 'Duplicate equipment source line';
+ END IF;
+ -- Lock demand lines in a stable order, avoiding concurrent duplicate POs.
+ PERFORM li.id FROM public.proposal_line_items li
+ WHERE li.id IN (SELECT (x->>'proposal_line_item_id')::uuid
+                 FROM jsonb_array_elements(p_lines) x)
+ ORDER BY li.id FOR UPDATE;
+ FOR entry IN SELECT * FROM jsonb_array_elements(p_lines) LOOP
+  qty:=(entry->>'quantity')::numeric;
+  IF qty IS NULL OR qty<=0 OR qty<>trunc(qty) THEN
+   RAISE EXCEPTION 'Equipment quantity must be a positive whole number';
+  END IF;
+  SELECT so.id AS sales_order_id,li.id AS line_id,li.product_id,li.quantity
+  INTO source_line FROM public.sales_orders so
+  JOIN public.proposal_line_items li ON li.proposal_id=so.proposal_id
+  WHERE so.id=(entry->>'sales_order_id')::uuid
+    AND li.id=(entry->>'proposal_line_item_id')::uuid
+    AND so.organization_id=org AND li.organization_id=org
+    AND so.status NOT IN ('complete','closed');
+  IF NOT FOUND OR source_line.product_id IS NULL THEN
+   RAISE EXCEPTION 'Invalid or closed sales order equipment line';
+  END IF;
+  SELECT name,sku,cost,is_discontinued INTO product FROM public.products
+  WHERE id=source_line.product_id AND organization_id=org;
+  IF NOT FOUND OR product.is_discontinued THEN
+   RAISE EXCEPTION 'Unknown or discontinued product cannot be ordered';
+  END IF;
+  IF product.cost IS NULL OR product.cost<0 THEN
+   RAISE EXCEPTION 'Product cost must be verified before purchasing';
+  END IF;
+  IF qty+(SELECT coalesce(sum(a.quantity),0) FROM public.po_line_allocations a
+   JOIN public.po_items i ON i.id=a.po_item_id
+   JOIN public.purchase_orders p ON p.id=i.po_id
+   WHERE a.sales_order_id=source_line.sales_order_id
+     AND a.proposal_line_item_id=source_line.line_id
+     AND p.status NOT IN ('cancelled','canceled','void'))>source_line.quantity THEN
+   RAISE EXCEPTION 'Equipment demand already allocated to purchasing';
+  END IF;
+  marker:='job-line:'||source_line.line_id::text;
+  payload:=payload||jsonb_build_array(jsonb_build_object(
+   'product_id',source_line.product_id,'product_name',product.name,
+   'model_number',product.sku,'quantity',qty,'unit_price',product.cost,
+   'job_reference',marker));
+ END LOOP;
+ doc:=public.create_request_purchase_document(
+   payload,ARRAY[p_vendor_id],p_warehouse_id,false,
+   jsonb_build_object('office_id',p_office_id),p_retry);
+ FOR entry IN SELECT * FROM jsonb_array_elements(p_lines) LOOP
+  marker:='job-line:'||(entry->>'proposal_line_item_id');
+  SELECT i.id INTO STRICT po_line_id FROM public.po_items i
+  WHERE i.po_id=doc AND i.organization_id=org AND i.job_reference=marker;
+  INSERT INTO public.po_line_allocations(
+   organization_id,po_item_id,sales_order_id,proposal_line_item_id,product_id,quantity)
+  SELECT org,po_line_id,(entry->>'sales_order_id')::uuid,
+   (entry->>'proposal_line_item_id')::uuid,i.product_id,
+   (entry->>'quantity')::numeric
+  FROM public.po_items i WHERE i.id=po_line_id;
+ END LOOP;
+ RETURN doc;
+END $$;
+REVOKE ALL ON FUNCTION public.create_consolidated_job_purchase_order(jsonb,uuid,uuid,uuid,uuid)
+ FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.create_consolidated_job_purchase_order(jsonb,uuid,uuid,uuid,uuid)
+ TO authenticated;
