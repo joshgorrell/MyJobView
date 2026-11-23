@@ -113,7 +113,7 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
   } catch (error) {
     console.error(`Windows viewer failed at: ${stage}`);
     // Playwright errors can include the credential-bearing viewer URL.
-    throw new Error(String(error.message).replaceAll(viewerUrl, '[viewer URL]'),);
+    throw new Error(String(error.message).replaceAll(viewerUrl, '[viewer URL]'));
   } finally {
     try { await browser?.close(); }
     finally {

@@ -7,7 +7,6 @@ import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { get } from 'node:https';
 import { connect } from 'node:net';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:tls';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -92,7 +91,7 @@ if (process.platform !== 'win32' || process.arch !== 'x64' || process.env.GITHUB
   throw new Error('This test is restricted to disposable GitHub-hosted MyJobView Windows x64 runners');
 }
 
-const root = await mkdtemp(join(tmpdir(), 'mjv-windows-guest-'));
+const root = await mkdtemp(join(process.env.RUNNER_TEMP, 'mjv-windows-guest-'));
 const store = createStateStore(join(root, 'runtime'));
 const organizationId = randomUUID();
 const domain = dealerDomain(organizationId);
