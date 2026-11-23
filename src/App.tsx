@@ -1082,7 +1082,7 @@ function AppContent() {
           )}
           {['sales_dashboard', 'sales_performance', 'pipeline_board'].includes(activeTab) && (
             <WorkspaceTabs key={activeTab} title="Sales Dashboard" initial={activeTab === 'sales_performance' ? 'sales_dashboard' : activeTab} onSelect={setActiveTab} tabs={[
-              ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Pipeline', content: <PipelineBoard onNavigate={setActiveTab} onOpenRecord={(kind, id) => {
+              ...(checkModuleAccess('pipeline_board') ? [{ key: 'pipeline_board', label: 'Pipeline', content: (tabList: React.ReactNode) => <PipelineBoard tabList={tabList} onNavigate={setActiveTab} onOpenRecord={(kind, id) => {
                 if (kind === 'lead') setSelectedLeadId(id);
                 else if (kind === 'proposal') { setOpenProposalId(id); setActiveTab('proposals'); }
                 else { setOpenSalesOrderId(id); setActiveTab('sales_orders'); }
