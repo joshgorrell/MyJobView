@@ -65,4 +65,7 @@ assert.match(sql,/a\.sales_order_id=NEW\.sales_order_id AND a\.id<>NEW\.id/);
 assert.match(sql,/product_name text, model_number text, vendor_id uuid, vendor_name text/);
 assert.match(purchasing,/d\.vendor_id===demandVendor/);
 assert.match(purchasing,/d\.product_name/);
+assert.match(sql,/WHERE id=source_line\.product_id AND organization_id=org FOR UPDATE/);
+assert.match(sql,/Purchase order retry key belongs to a different document/);
+assert.match(sql,/v\.id=p_vendor_id AND v\.is_active=true/);
 console.log('Consolidated multi-job PO allocation tests passed');
