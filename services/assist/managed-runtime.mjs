@@ -22,7 +22,8 @@ const closedPort=port=>new Promise(resolve=>{
  socket.once('error',e=>finish(e.code==='ECONNREFUSED'));
 });
 async function freePort(){const server=net.createServer();await new Promise((r,j)=>{server.once('error',j);server.listen(0,'127.0.0.1',r);});const port=server.address().port;await new Promise(r=>server.close(r));return port;}
-export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,command=meshCommand,onExit=async()=>{},diagnostic=()=>{},agentCacheDirectory}){
+export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,command=meshCommand,onExit=async()=>{},diagnostic=()=>{},agentCacheDirectory,startupAttempts=40}){
+ if(!Number.isInteger(startupAttempts)||startupAttempts<1||startupAttempts>120)throw new Error('invalid_startup_attempts');
  const runtimes=new Map();let shuttingDown=false;let allocator=Promise.resolve();
  const binary=resolve(entry);
  async function cli(dataPath,args){
@@ -68,7 +69,7 @@ export function createManagedRuntime({store,entry,approvedVersion,publicOrigin,c
     child.once('exit',()=>{record.serving=false;for(const socket of record.sockets)socket.destroy();runtimes.delete(id);if(!record.stopping)void onExit(id,record.generation).catch(()=>{});});
    }
    let lastError;
-   for(let attempt=0;attempt<40;attempt++){
+   for(let attempt=0;attempt<startupAttempts;attempt++){
     await check();try{
      const group=await ensureLaptopGroup(identity,command);const record=runtimes.get(id);if(!record||record.child.exitCode!==null)throw new Error('runtime_exited');
      if(!record.cleaned){
