@@ -35,4 +35,8 @@ const sales=fs.readFileSync('src/components/Sales/SalesOrderProductsTab.tsx','ut
 assert.match(sales,/proposal_line_item_id: item\\.id/);
 assert.doesNotMatch(sales,/summarized\\.set\\(item\\.product_id/);
 assert.match(sql,/ALTER TABLE public\\.product_request_items/);
+assert.match(sql,/CREATE TRIGGER allocate_request_backed_po_line_insert/);
+assert.match(sql,/request_line\\.proposal_line_item_id/);
+assert.match(sql,/parent_request\\.sales_order_id/);
+assert.match(sql,/product or quantity does not match source/);
 console.log('Consolidated multi-job PO allocation tests passed');
