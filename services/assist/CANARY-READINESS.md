@@ -4,13 +4,16 @@ The Windows x64 CI scenario has passed. The production Windows verifier is not d
 
 ## Read-only preflight on the VPS
 
-The script reads the existing process environment, reports **only presence/validity**, and does not print credentials or start any service. Run from `/opt/myjobview/services/assist` after updating deployed source:
+The script checks configuration without starting Assist or printing credentials. Run it on the VPS after updating the deployed source. Use the same environment file parser as the Assist service.
 
 ```sh
-sudo bash -c 'set -a; . /etc/mjv-assist.env; set +a; cd /opt/myjobview/services/assist; node canary-readiness.mjs'
+sudo -n systemd-run --wait --pipe --collect \
+  --property=EnvironmentFile=/etc/mjv-assist.env \
+  --property=WorkingDirectory=/opt/myjobview/services/assist \
+  /usr/bin/node /opt/myjobview/services/assist/canary-readiness.mjs
 ```
 
-**Important:** this uses shell sourcing; only run if `/etc/mjv-assist.env` is trusted root-managed shell-compatible content. Do not paste the file contents. Exit status 1 is expected until genuine Windows proof exists. A valid version string and cache directory do not establish release approval.
+Check that the configuration rows pass. `WINDOWS_CANARY_REAL_PROOF` stays blocked and exits with status 1 because this command does not execute a live Windows session.
 
 ## Private fixture for the Windows pilot
 

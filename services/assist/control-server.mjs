@@ -7,6 +7,7 @@ import {createStateStore} from './state-store.mjs';
 import {createManagedRuntime} from './managed-runtime.mjs';
 import {createControlPlane,dealerDomain,validControlToken,validateControlJob} from './control-core.mjs';
 import {createHttpDependencies} from './activation-worker.mjs';
+import {readCanaryDeploymentConfig} from './canary-deployment-config.mjs';
 import {createWindowsCanaryFixture} from './windows-canary-fixture.mjs';
 
 async function readBody(request){let text='';for await(const chunk of request){text+=chunk;if(Buffer.byteLength(text)>8192)throw new Error('oversized_request');}return JSON.parse(text);}
@@ -97,13 +98,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  let server,pilotServer,runtime,release,monitor,sessionMonitor;
  try{
   const env=process.env;const dependencies=createHttpDependencies(env);
-  const isolationId=env.ASSIST_CANARY_ISOLATION_ORGANIZATION_ID;
-  const automaticCanary=env.ASSIST_CANARY_AUTOMATIC_DEALERS==='1';
-  const pilotId=env.ASSIST_PILOT_ORGANIZATION_ID;
-  const fixtureToken=env.ASSIST_CANARY_FIXTURE_TOKEN;
-  if(automaticCanary&&(pilotId||!fixtureToken||!isolationId||!env.ASSIST_PILOT_LOOPBACK_PORT)){
-   throw new Error('invalid_automatic_canary_configuration');
-  }
+  const {isolationId,automaticCanary,pilotId,fixtureToken,controlPort,pilotPort}=readCanaryDeploymentConfig(env);
   const store=createStateStore(env.ASSIST_STATE_DIRECTORY||'/var/lib/mjv-assist');release=await store.lock();
   const requeue=(id,generation)=>dependencies.rpc('requeue_assist_runtime',{p_organization_id:id,p_generation:generation});
   runtime=createManagedRuntime({store,entry:env.ASSIST_MESHCENTRAL_ENTRY||new URL('./node_modules/meshcentral/meshcentral.js',import.meta.url).pathname,
@@ -113,8 +108,6 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const probe=createCanaryProbe(env);
   let fixture;
   if(fixtureToken){
-   if((!pilotId&&!automaticCanary)||!env.ASSIST_PILOT_LOOPBACK_PORT||fixtureToken.length<32||
-      [env.ASSIST_CANARY_TOKEN,env.ASSIST_CONTROL_TOKEN].includes(fixtureToken))throw new Error('invalid_canary_fixture_configuration');
    fixture=createWindowsCanaryFixture({runtime,organizationId:pilotId,isolationOrganizationId:isolationId,probe});
   }
   if(isolationId){
@@ -132,12 +125,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   server=createControlServer({plane,runtime,token:env.ASSIST_CONTROL_TOKEN,broker,guests});
   let sweeping=false;
   sessionMonitor=setInterval(async()=>{if(sweeping)return;sweeping=true;try{await broker.sweep();await guests.sweep();}catch{console.error('Assist session revocation requires attention');}finally{sweeping=false;}},5000);
-  const port=Number(env.ASSIST_CONTROL_PORT||8443);if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('invalid_control_port');
-  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
-  if(env.ASSIST_PILOT_LOOPBACK_PORT || pilotId){
-   const pilotPort=Number(env.ASSIST_PILOT_LOOPBACK_PORT);
-   if(!Number.isInteger(pilotPort)||pilotPort<1024||pilotPort>65535||pilotPort===port||
-    (!automaticCanary&&!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(pilotId||'')))throw new Error('invalid_pilot_listener');
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(controlPort,'127.0.0.1',resolve);});
+  if(pilotPort){
    pilotServer=createControlServer({runtime,pilotDomain:pilotId?dealerDomain(pilotId):undefined,automaticCanary,canaryFixture:fixture,canaryFixtureToken:fixtureToken});
    await new Promise((resolve,reject)=>{pilotServer.once('error',reject);pilotServer.listen(pilotPort,'127.0.0.1',resolve);});
   }
