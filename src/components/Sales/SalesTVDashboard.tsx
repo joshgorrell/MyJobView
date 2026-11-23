@@ -75,6 +75,7 @@ export default function SalesTVDashboard() {
   const [connected, setConnected] = useState(false);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const loadingRef = useRef(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [now, setNow] = useState(new Date());
@@ -191,11 +192,13 @@ export default function SalesTVDashboard() {
       setOrgLogo(org?.logo_url || '');
       setData(tv);
       setReps(repData);
+      setLoadError(null);
       setConnected(true);
       setHasLoaded(true);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Sales TV refresh failed:', error);
+      setLoadError(error instanceof Error ? error.message : String(error));
       setConnected(false);
     } finally {
       loadingRef.current = false;
@@ -272,6 +275,12 @@ export default function SalesTVDashboard() {
   return (
     <div data-type-scale="display" className="fixed inset-0 overflow-hidden bg-slate-950 text-white">
       <div className="mx-auto flex h-full w-full max-w-[3840px] flex-col">
+        {loadError && <div role="alert" className="absolute left-1/2 top-[9vh] z-50 w-[min(90vw,900px)] -translate-x-1/2 rounded-xl border border-red-500/60 bg-slate-950/95 px-5 py-4 text-sm shadow-xl">
+          <div className="font-bold text-red-300">Sales TV data could not load — figures may be unavailable or outdated</div>
+          <div className="mt-2 break-words text-slate-200">{loadError}</div>
+          <button type="button" onClick={() => void load()} className="mt-3 rounded-md bg-sky-700 px-4 py-2 font-semibold text-white hover:bg-sky-600">Retry data load</button>
+        </div>}
+
         <header className="flex h-[8vh] min-h-[82px] shrink-0 items-center justify-between border-b border-slate-800 px-[1.3vw]">
           <div className="flex items-center gap-[1vw]">
             {orgLogo ? <img src={orgLogo} alt="" className="h-[4.8vh] max-h-16 max-w-[12vw] object-contain" /> : <div className="rounded-xl bg-sky-500/15 p-3 text-sky-400"><TrendingUp /></div>}
