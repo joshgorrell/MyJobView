@@ -425,17 +425,39 @@ Deno.serve(async (req: Request) => {
 
     // ── TEST ──────────────────────────────────────────────────────────────────
     if (action === "test") {
-      const resp = await fetch("https://api.taxjar.com/v2/categories", {
-        headers: authHeaders,
-      });
-      if (!resp.ok) {
-        const text = await resp.text();
-        return jsonResponse(
-          { error: `TaxJar authentication failed: ${resp.status} ${text}` },
-          resp.status
-        );
+      // Synthetic quote. This endpoint does not create an order in TaxJar.
+      let response: Response;
+      try {
+        response = await fetch("https://api.taxjar.com/v2/taxes", {
+          method: "POST",
+          headers: authHeaders,
+          signal: AbortSignal.timeout(8000),
+          body: JSON.stringify({
+            from_country: "US", from_state: "KS", from_zip: "66603",
+            to_country: "US", to_state: "KS", to_zip: "66603",
+            amount: 100, shipping: 0,
+          }),
+        });
+      } catch {
+        return jsonResponse({ error: "TaxJar calculation service is unreachable." }, 502);
       }
-      return jsonResponse({ ok: true, message: "TaxJar connection verified." });
+
+      if (!response.ok) {
+        const error = response.status === 401 || response.status === 403
+          ? "TaxJar rejected the configured credential."
+          : `TaxJar calculation failed (HTTP ${response.status}).`;
+        return jsonResponse({ error }, response.status);
+      }
+
+      const data = await response.json().catch(() => null) as TaxJarTaxesResponse | null;
+      const tax = data?.tax;
+      if (!tax || typeof tax.has_nexus !== "boolean" ||
+          !Number.isFinite(tax.amount_to_collect) || tax.amount_to_collect < 0 ||
+          !Number.isFinite(tax.rate) || tax.rate < 0 || tax.rate > 1) {
+        return jsonResponse({ error: "TaxJar returned an invalid test calculation." }, 502);
+      }
+
+      return jsonResponse({ ok: true, message: "TaxJar calculation service verified." });
     }
 
     // ── RATES ─────────────────────────────────────────────────────────────────
