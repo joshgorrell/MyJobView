@@ -38,10 +38,12 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts --prefix services/assist
+      - run: npm ci --ignore-scripts --prefix tests/assist/windows
       - run: node services/assist/runtime-security.mjs
       - name: Connect and revoke the real temporary Windows helper
         shell: pwsh
         run: |
+          $env:NODE_PATH = (Resolve-Path tests/assist/windows/node_modules).Path
           $env:ASSIST_TEST_OPENSSL = (Get-Command openssl.exe -ErrorAction SilentlyContinue).Source
           if (-not $env:ASSIST_TEST_OPENSSL) {
             $env:ASSIST_TEST_OPENSSL = Join-Path $env:ProgramFiles 'Git/usr/bin/openssl.exe'
