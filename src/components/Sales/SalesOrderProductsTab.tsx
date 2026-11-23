@@ -289,6 +289,7 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
           model_number: item.products?.sku || null,
           vendor: item.products?.vendors?.vendor_name || item.products?.vendor || null,
           quantity_requested: item.quantity,
+          proposal_line_item_id: item.id,
           estimated_cost: item.cost ? item.cost * item.quantity : null,
         });
       if (itemError) throw itemError;
@@ -326,18 +327,8 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
 
       let createdCount = 0;
       for (const [vendor, vendorItems] of byVendor) {
-        // Summarize duplicates within this vendor group
-        const summarized = new Map<string, ProductLineItem>();
-        vendorItems.forEach(item => {
-          const existing = summarized.get(item.product_id!);
-          if (existing) {
-            existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
-            existing.line_total = (existing.line_total || 0) + (item.line_total || 0);
-          } else {
-            summarized.set(item.product_id!, { ...item });
-          }
-        });
-
+        // Keep source lines distinct. Combining equal SKUs here destroys the
+        // allocation identity needed when a consolidated PO serves many jobs.
         const { data: req, error: reqError } = await supabase
           .from('product_requests')
           .insert({
@@ -346,19 +337,20 @@ export function SalesOrderProductsTab({ order }: SalesOrderProductsTabProps) {
             sales_order_id: order.id,
             priority: 'normal',
             status: 'pending',
-            notes: `Auto-generated from Sales Order ${order.order_number} - ${vendor} (${summarized.size} product${summarized.size !== 1 ? 's' : ''})`,
+            notes: `Auto-generated from Sales Order ${order.order_number} - ${vendor} (${vendorItems.length} product${vendorItems.length !== 1 ? 's' : ''})`,
           })
           .select()
           .single();
         if (reqError) throw reqError;
 
-        const itemsToInsert = Array.from(summarized.values()).map(item => ({
+        const itemsToInsert = vendorItems.map(item => ({
           request_id: req.id,
           product_id: item.product_id,
           product_name: item.description || item.products?.name || '',
           model_number: item.products?.sku || null,
           vendor: vendor,
           quantity_requested: item.quantity,
+          proposal_line_item_id: item.id,
           estimated_cost: item.cost ? item.cost * item.quantity : null,
         }));
 
