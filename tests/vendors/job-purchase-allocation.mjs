@@ -46,4 +46,7 @@ assert.match(sql,/REVOKE ALL ON FUNCTION public\\.assign_po_line_allocations/);
 assert.match(sql,/CREATE OR REPLACE FUNCTION public\\.get_unallocated_sales_order_products/);
 assert.match(sql,/so\\.organization_id=org AND li\\.organization_id=org/);
 assert.match(sql,/po\\.status IS DISTINCT FROM 'cancelled'/);
+assert.match(sql,/CREATE TRIGGER protect_allocated_po_line_identity_write/);
+assert.match(sql,/CREATE TRIGGER protect_allocated_sales_order_line_quantity_write/);
+assert.match(sql,/sales_order_id=NEW.sales_order_id AND id<>NEW.id/);
 console.log('Consolidated multi-job PO allocation tests passed');
