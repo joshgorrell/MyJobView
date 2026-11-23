@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const sql=readFileSync('supabase/migrations/20261123100000_apply_verified_vendor_offer.sql','utf8');
+assert.match(sql,/CREATE OR REPLACE FUNCTION public\.apply_verified_vendor_offer/);
+assert.match(sql,/connection\.status <> 'authorized'/);
+assert.match(sql,/connection\.organization_id <> offer\.organization_id/);
+assert.match(sql,/default_vendor_id = connection\.vendor_id FOR UPDATE/);
+assert.match(sql,/offer\.cost_verified_at > current_product\.vendor_cost_verified_at/);
+assert.match(sql,/offer\.retail_verified_at > current_product\.vendor_retail_verified_at/);
+assert.match(sql,/now\(\) - interval '24 hours'/);
+assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.apply_verified_vendor_offer\(uuid\) TO service_role/);
+const update=sql.match(/UPDATE public\.products SET([\s\S]*?)WHERE id = current_product\.id/);
+assert.ok(update);
+assert.match(update[1],/cost = CASE/);
+assert.match(update[1],/vendor_retail_price = CASE/);
+assert.doesNotMatch(update[1],/our_price\s*=/);
+assert.doesNotMatch(sql,/(?:UPDATE|DELETE FROM) public\.(?:po_items|purchase_orders|invoice_items|proposal_items|sales_order_items)/i);
+console.log('Vendor offer application boundary contract passed');
