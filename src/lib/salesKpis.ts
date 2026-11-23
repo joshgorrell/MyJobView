@@ -69,9 +69,23 @@ export async function fetchSalesKpis(
   } else if (scope.type === 'office') {
     // Offices are assigned to projects, not customer contacts. Never compare
     // an office UUID with contact_id: it silently returns incorrect totals.
+    // Validate the office against the tenant's canonical office record, then
+    // explicitly tenant-scope both the project lookup and the sales orders.
+    // RLS remains mandatory; these filters are additional defense in depth.
+    const { data: office, error: officeLookupError } = await supabase
+      .from('company_offices')
+      .select('id, organization_id')
+      .eq('id', scope.officeId)
+      .maybeSingle();
+    if (officeLookupError) throw officeLookupError;
+    if (!office?.organization_id) {
+      throw new Error('Selected sales office was not found or is not accessible');
+    }
+    ordersQuery = ordersQuery.eq('organization_id', office.organization_id);
     const { data: officeProjects, error: officeError } = await supabase
       .from('projects')
       .select('sales_order_id')
+      .eq('organization_id', office.organization_id)
       .eq('office_id', scope.officeId);
     if (officeError) throw officeError;
     const orderIds = [...new Set((officeProjects || [])
