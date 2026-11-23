@@ -51,7 +51,7 @@ BEGIN
   RAISE EXCEPTION 'PO line quantity over-allocated';
  END IF;
  IF (SELECT coalesce(sum(quantity),0) FROM public.po_line_allocations
-     WHERE proposal_line_item_id=NEW.proposal_line_item_id AND id<>NEW.id)+NEW.quantity>proposal_line.quantity THEN
+     WHERE proposal_line_item_id=NEW.proposal_line_item_id AND sales_order_id=NEW.sales_order_id AND id<>NEW.id)+NEW.quantity>proposal_line.quantity THEN
   RAISE EXCEPTION 'Sales order line quantity over-allocated';
  END IF;
  RETURN NEW;
@@ -186,3 +186,37 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.get_unallocated_sales_order_products() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.get_unallocated_sales_order_products() TO authenticated;
+
+-- Do not allow an existing allocated PO line to silently change product,
+-- owning PO, or tenant. A new PO line must be created and explicitly allocated.
+CREATE OR REPLACE FUNCTION public.protect_allocated_po_line_identity()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+ IF EXISTS(SELECT 1 FROM public.po_line_allocations WHERE po_item_id=OLD.id)
+ AND (NEW.product_id IS DISTINCT FROM OLD.product_id
+   OR NEW.po_id IS DISTINCT FROM OLD.po_id
+   OR NEW.organization_id IS DISTINCT FROM OLD.organization_id) THEN
+  RAISE EXCEPTION 'Cannot change product, PO, or tenant of allocated equipment';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER protect_allocated_po_line_identity_write
+ BEFORE UPDATE OF product_id,po_id,organization_id ON public.po_items
+ FOR EACH ROW EXECUTE FUNCTION public.protect_allocated_po_line_identity();
+
+-- Prevent shrinking a source equipment line below quantities already
+-- reserved/ordered, so later proposal edits cannot corrupt the ledger.
+CREATE OR REPLACE FUNCTION public.protect_allocated_sales_order_line_quantity()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+ IF NEW.quantity < (SELECT coalesce(max(total_qty),0) FROM
+   (SELECT sum(a.quantity) AS total_qty FROM public.po_line_allocations a
+    WHERE a.proposal_line_item_id=OLD.id
+    GROUP BY a.sales_order_id) grouped) THEN
+  RAISE EXCEPTION 'Cannot reduce sales order equipment below allocated quantity';
+ END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER protect_allocated_sales_order_line_quantity_write
+ BEFORE UPDATE OF quantity ON public.proposal_line_items
+ FOR EACH ROW EXECUTE FUNCTION public.protect_allocated_sales_order_line_quantity();
