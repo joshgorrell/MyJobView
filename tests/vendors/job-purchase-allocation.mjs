@@ -49,4 +49,6 @@ assert.match(sql,/po\.status NOT IN \('cancelled','canceled','void'\)/);
 assert.match(sql,/CREATE TRIGGER protect_allocated_po_line_identity_write/);
 assert.match(sql,/CREATE TRIGGER protect_allocated_sales_order_line_quantity_write/);
 assert.match(sql,/a.sales_order_id=NEW.sales_order_id/);
+assert.match(sql,/CREATE TRIGGER prevent_allocated_po_line_delete_write/);
+assert.match(sql,/CREATE TRIGGER prevent_allocated_source_product_change_write/);
 console.log('Consolidated multi-job PO allocation tests passed');
