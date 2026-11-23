@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertCircle, Check, CheckSquare, ChevronDown, ChevronUp, Download, Eye, Globe2, Loader2, Mail, Send, Square, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { checkTaxFinalizationGuard } from '../../lib/taxCalculations';
+import { calculateTaxJarTax, checkTaxFinalizationGuard } from '../../lib/taxCalculations';
 
 interface DeliverProposalModalProps {
   proposalId: string;
@@ -17,6 +17,8 @@ interface ProposalInfo {
   proposal_number: string;
   is_portal_visible: boolean | null;
   sent_at: string | null;
+  status: string;
+  tax_override: boolean | null;
   report_template_id: string | null;
   include_promise_page?: boolean | null;
   portal_customer_message?: string | null;
@@ -83,7 +85,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
       try {
         setLoading(true);
         const [{ data: p, error: pError }, { data: settings }, { data: availableTemplates, error: templateError }] = await Promise.all([
-          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,report_template_id,include_promise_page,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
+          supabase.from('proposals').select('id,proposal_number,is_portal_visible,sent_at,status,tax_override,report_template_id,include_promise_page,portal_customer_message,tax_calculation_status,contacts:contacts!proposals_contact_id_fkey(full_name,email)').eq('id', proposalId).maybeSingle(),
           supabase.from('company_settings').select('company_name').eq('organization_id', profile?.organization_id).maybeSingle(),
           supabase.from('proposal_report_templates').select('id,name,is_default,is_personal').or(`is_personal.eq.false,created_by.eq.${profile?.id}`).order('name'),
         ]);
@@ -140,7 +142,7 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
     if (portal && email && sameMessage) setEmailMessage(value);
   }
 
-  async function makeEmailAttachments() {
+  async function makeEmailAttachments(docs: DocumentAvailability | null) {
     if (!proposal) return [] as Array<{ filename: string; content: string }>;
     const attachments: Array<{ filename: string; content: string }> = [];
     if (includeProposal) {
@@ -192,11 +194,38 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
   async function deliver() {
     if (!proposal || working || !anySelected) return;
     if (email && !toEmail.trim()) { setError('Enter an email address before sending.'); return; }
-    const taxBlock = checkTaxFinalizationGuard(proposal.tax_calculation_status);
-    if (taxBlock) { setError(taxBlock); return; }
     setWorking(true); setError(''); setResult([]);
     const completed: string[] = [];
     try {
+      let deliveryDocs = docs;
+      if (proposal.status === 'draft' && !proposal.tax_override) {
+        const quote = await calculateTaxJarTax('proposal', proposalId);
+        const verified = quote.tax_calculation_status === 'ready' && !!quote.taxjar_verified_at;
+        const zeroTax = ['exempt', 'not_collecting'].includes(quote.tax_calculation_status)
+          && quote.tax_amount === 0;
+        if (!verified && !zeroTax) {
+          throw new Error(quote.taxjar_error || 'Sales tax could not be verified. Check the proposal location and tax settings before delivering.');
+        }
+        const { data: saved, error: savedError } = await supabase.from('proposals')
+          .select('status,tax_amount,tax_override').eq('id', proposalId).single();
+        if (savedError) throw new Error(savedError.message);
+        if (saved?.status !== 'draft' || saved.tax_override || saved.tax_amount !== quote.tax_amount) {
+          throw new Error('Proposal tax changed during verification. Reload the proposal before delivering.');
+        }
+
+        if (email && includePaymentSchedule && docs?.paymentScheduleAvailable) {
+          const { data, error } = await supabase.functions.invoke('generate-proposal-documents', { body: { proposalId } });
+          const refreshed = data as DocumentAvailability | null;
+          if (error || !refreshed?.paymentScheduleBase64) {
+            throw new Error('Could not refresh the payment schedule after confirming sales tax.');
+          }
+          deliveryDocs = refreshed;
+        }
+      } else {
+        const taxBlock = checkTaxFinalizationGuard(proposal.tax_calculation_status);
+        if (taxBlock) throw new Error(taxBlock);
+      }
+
       const now = new Date();
       const expiresAt = new Date(now);
       expiresAt.setDate(expiresAt.getDate() + approvalWindowDays);
@@ -212,12 +241,12 @@ export function DeliverProposalModal({ proposalId, templateId, onClose, onDelive
       }
 
       if (email) {
-        const attachments = await makeEmailAttachments();
+        const attachments = await makeEmailAttachments(deliveryDocs);
         const sentAttachments: Record<string, boolean> = {
           proposal: includeProposal,
-          terms: includeTerms && !!docs?.termsBase64,
-          paymentSchedule: includePaymentSchedule && !!docs?.paymentScheduleBase64,
-          financing: includeFinancing && !!docs?.financingFiles?.length,
+          terms: includeTerms && !!deliveryDocs?.termsBase64,
+          paymentSchedule: includePaymentSchedule && !!deliveryDocs?.paymentScheduleBase64,
+          financing: includeFinancing && !!deliveryDocs?.financingFiles?.length,
         };
         const message = portal && sameMessage ? portalMessage : emailMessage;
         const { error: emailError } = await supabase.functions.invoke('send-proposal-email', { body: {
