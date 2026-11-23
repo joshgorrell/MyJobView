@@ -31,4 +31,8 @@ assert.match(sql,/Sales order line quantity over-allocated/);
 assert.match(sql,/FROM public\\.po_items WHERE id=NEW\\.po_item_id FOR UPDATE/);
 assert.match(sql,/FROM public\\.proposal_line_items WHERE id=NEW\\.proposal_line_item_id FOR UPDATE/);
 assert.match(sql,/Cannot reduce PO quantity below allocated quantity/);
+const sales=fs.readFileSync('src/components/Sales/SalesOrderProductsTab.tsx','utf8');
+assert.match(sales,/proposal_line_item_id: item\\.id/);
+assert.doesNotMatch(sales,/summarized\\.set\\(item\\.product_id/);
+assert.match(sql,/ALTER TABLE public\\.product_request_items/);
 console.log('Consolidated multi-job PO allocation tests passed');
