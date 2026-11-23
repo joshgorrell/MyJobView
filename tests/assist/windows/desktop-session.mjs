@@ -112,8 +112,10 @@ export async function exerciseDesktopSession({ viewerUrl, executable, certPath, 
     assert.equal(observed.keys, challenge);
   } catch (error) {
     console.error(`Windows viewer failed at: ${stage}`);
-    // Playwright errors can include the credential-bearing viewer URL.
-    throw new Error(String(error.message).replaceAll(viewerUrl, '[viewer URL]'));
+    // Keep this diagnostic even if Windows later reports a file cleanup error.
+    const detail = String(error.message).replaceAll(viewerUrl, '[viewer URL]');
+    console.error(detail);
+    throw new Error(detail);
   } finally {
     try { await browser?.close(); }
     finally {

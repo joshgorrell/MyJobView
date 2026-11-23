@@ -97,6 +97,8 @@ const organizationId = randomUUID();
 const domain = dealerDomain(organizationId);
 const proxySockets = new Set();
 let runtime, backend, proxy, agent, agentExit;
+let testFailed = false;
+const executable = join(root, 'temporary-assist.exe');
 let stage = 'prepare isolated runtime';
 try {
   const version = JSON.parse(await readFile(join(dirname(entry), 'package.json'), 'utf8')).version;
@@ -140,7 +142,6 @@ try {
   assert.equal(download.origin, origin);
   assert.equal(download.searchParams.get('id'), '4');
   assert.equal(download.searchParams.get('installflags'), '1');
-  const executable = join(root, 'temporary-assist.exe');
   const { status, bytes } = await fetchLocal(download, cert);
   assert.equal(status, 200);
   assert.equal(bytes.toString('ascii', 0, 2), 'MZ');
@@ -185,10 +186,18 @@ try {
   console.log('Real Windows guest helper connected through HTTPS, stayed out of permanent enrollment, and its group was revoked.');
   console.log('Real Windows guest denied one desktop request and then approved screen, mouse and keyboard access. No activation evidence was issued.');
 } catch (error) {
+  testFailed = true;
   console.error(`Windows guest connection failed at: ${stage}`);
   throw error;
 } finally {
-  if (agent?.pid && agent.exitCode === null && agent.signalCode === null) agent.kill();
+  if (agent?.pid) {
+    // The interactive helper starts a second process using the same executable.
+    // Both are owned by this test and can hold the temporary directory open.
+    await run('pwsh', ['-NoProfile', '-Command',
+      "Get-Process -Name temporary-assist -ErrorAction SilentlyContinue | Where-Object Path -eq $env:ASSIST_TEST_GUEST_EXE | Stop-Process -Force -ErrorAction SilentlyContinue"],
+      { env: { ...process.env, ASSIST_TEST_GUEST_EXE: executable }, timeout: 10_000 }).catch(() => {});
+    if (agent.exitCode === null && agent.signalCode === null) agent.kill();
+  }
   if (agentExit) await agentExit;
   for (const socket of proxySockets) socket.destroy();
   if (proxy?.listening) proxy.close();
@@ -197,5 +206,10 @@ try {
     backend.closeAllConnections();
   }
   try { await runtime?.stopAll(); }
-  finally { await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 }); }
+  finally {
+    await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 }).catch(error => {
+      if (!testFailed) throw error;
+      console.error('Windows reported a temporary directory cleanup error:', error.code);
+    });
+  }
 }
