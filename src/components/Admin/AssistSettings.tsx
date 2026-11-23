@@ -5,7 +5,7 @@ import { useTenant } from '../../contexts/TenantContext';
 import { AssistOperatorAccess } from './AssistOperatorAccess';
 import { supabase } from '../../lib/supabase';
 
-type Status = { enabled: boolean; provisioned: boolean; windows_download_ready: boolean; activation_state?: 'off' | 'activation_pending' | 'deactivation_pending' | 'needs_attention' | 'enrollment_ready' };
+type Status = { enrollment_open?: boolean; enabled: boolean; provisioned: boolean; windows_download_ready: boolean; activation_state?: 'off' | 'activation_pending' | 'deactivation_pending' | 'needs_attention' | 'enrollment_ready' };
 export function AssistSettings() {
   const { profile } = useAuth();
   const { tenant, loading: tenantLoading, error: tenantError } = useTenant();
@@ -35,7 +35,7 @@ export function AssistSettings() {
 
   }, [allowed, organizationId]);
   async function toggle() {
-    if (!allowed || !organizationId || !status || busy) return;
+    if (!allowed || !organizationId || !status || busy || (!status.enabled && status.enrollment_open !== true)) return;
     const request = generation.current;
     saving.current = true; statusRequest.current++;
     setBusy(true); setError('');
@@ -53,11 +53,11 @@ export function AssistSettings() {
     <div className="flex items-center gap-3"><Monitor className="text-info" /><h4 className="text-lg font-semibold text-primary">Remote Support</h4></div>
     <p className="text-sm text-muted">Let authorized staff help customers and coworkers on Windows computers. MyJobView sets up the service for your company.</p>
     <label className="flex min-h-11 items-center gap-3 text-primary">
-      <input type="checkbox" role="switch" checked={status?.enabled === true} disabled={!status || busy} onChange={() => void toggle()} />
+      <input type="checkbox" role="switch" checked={status?.enabled === true} disabled={!status || busy || (!status.enabled && status.enrollment_open !== true)} onChange={() => void toggle()} />
       Enable Remote Support for this dealer
     </label>
     {!status && !error && <p role="status" className="text-sm text-muted">Loading settings…</p>}
-    {status && <p role="status" className="text-sm text-muted">{status.activation_state === 'needs_attention' ? 'Remote Support setup needs attention from MyJobView.' : status.activation_state === 'deactivation_pending' ? 'MyJobView is turning off Remote Support.' : !status.enabled ? 'Remote Support is off.' : status.windows_download_ready ? 'Windows enrollment is ready. Open Remote Support to check invitation availability.' : 'MyJobView is setting up Remote Support. This status updates automatically.'}</p>}
+    {status && <p role="status" className="text-sm text-muted">{status.enrollment_open !== true && !status.windows_download_ready && status.activation_state !== 'deactivation_pending' ? 'Remote Support is unavailable until MyJobView completes setup.' : status.activation_state === 'needs_attention' ? 'Remote Support setup needs attention from MyJobView.' : status.activation_state === 'deactivation_pending' ? 'MyJobView is turning off Remote Support.' : !status.enabled ? 'Remote Support is off.' : status.windows_download_ready ? 'Windows enrollment is ready. Open Remote Support to check invitation availability.' : 'MyJobView is setting up Remote Support. This status updates automatically.'}</p>}
     <a href="/assist" className="inline-flex min-h-11 items-center text-sm font-semibold text-info">Open Remote Support</a>
     <p className="text-xs text-muted">Turning this off blocks new MJV downloads immediately and requests provider access revocation.</p>
     {organizationId && <AssistOperatorAccess organizationId={organizationId} />}

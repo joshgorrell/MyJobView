@@ -55,7 +55,7 @@ export function IntegrationsSettings() {
   const [quickbooksPayments, setQuickbooksPayments] = useState(false);
   const [ringcentralConnected, setRingcentralConnected] = useState(false);
   const [techsafeConnected, setTechsafeConnected] = useState(false);
-  const [assistBadge, setAssistBadge] = useState<'active' | 'pending' | 'attention' | null>(null);
+  const [assistBadge, setAssistBadge] = useState<'active' | 'pending' | 'attention' | 'unavailable' | null>(null);
   useEffect(() => {
     const organizationId = profile?.organization_id;
     setAssistBadge(null);
@@ -66,7 +66,10 @@ export function IntegrationsSettings() {
       try {
         const { data, error } = await supabase.rpc('get_assist_setup', { p_organization_id: organizationId });
         if (request !== generation) return;
-        if (error || !data || !data.enabled) { setAssistBadge(null); return; }
+        if (error || !data) { setAssistBadge('unavailable'); return; }
+        if (!data.windows_download_ready && data.enrollment_open !== true &&
+            data.activation_state !== 'deactivation_pending') { setAssistBadge('unavailable'); return; }
+        if (!data.enabled) { setAssistBadge(null); return; }
         if (data.activation_state === 'needs_attention') { setAssistBadge('attention'); return; }
         if (!data.windows_download_ready) { setAssistBadge('pending'); return; }
         const response = await supabase.functions.invoke('assist-support', { body: { operation: 'invite_capability', organizationId } });
@@ -508,6 +511,7 @@ export function IntegrationsSettings() {
             className={`flex shrink-0 items-center gap-1.5 px-2 lg:px-2.5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeIntegration === 'assist' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}>
             Assist
             {assistBadge === 'active' && <CheckCircle2 className="h-4 w-4 text-green-500" aria-label="Active" />}
+            {assistBadge === 'unavailable' && <span className="text-xs text-muted">Unavailable</span>}
             {assistBadge === 'pending' && <span className="text-xs text-amber-500">Pending</span>}
             {assistBadge === 'attention' && <span className="text-xs text-amber-500">Needs attention</span>}
           </button>
