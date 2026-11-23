@@ -1,5 +1,5 @@
 import { FOLLOW_UP_PRESETS, followUpInMonths, dateInputValue } from '../../lib/followUpDates';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { notify } from '../../lib/feedback';
 import { Plus, UserRound, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -25,6 +25,7 @@ interface StageCounts {
 }
 
 interface Props {
+  tabList?: ReactNode;
   onOpenRecord: (kind: 'lead' | 'proposal' | 'order', id: string) => void;
   canViewLeads: boolean;
   canViewProposals: boolean;
@@ -45,12 +46,16 @@ const STAGE_LABELS: Record<StageKey, string> = {
   prospects: 'Prospects', leads: 'Leads', proposals: 'Proposals', salesOrders: 'Sales Orders',
 };
 
+const STAGE_CARD_CLASS = 'min-w-0 rounded-lg border border-gray-200 bg-surface p-3';
+const STAGE_HEADER_CLASS = 'mb-3 flex min-h-11 items-center gap-2';
+const EMPTY_STAGE_CLASS = 'rounded-md border border-dashed border-gray-200 px-3 py-4 text-center text-sm text-muted';
+
 const PROSPECTS_PER_PAGE = 30;
 const ACTIVE_PROPOSAL_STATUSES = ['designing', 'ready_to_submit', 'sent', 'viewed', 'portal', 'approved_pending_action'];
 const OPEN_ORDER_STATUSES = ['pending_deposit', 'pending_po', 'planning', 'active'];
 
 export function PipelineStageOverview({
-  onOpenRecord, canViewLeads, canViewProposals, prospectRefresh, canViewSalesOrders, onOpenLeads, onOpenProposals,
+  tabList, onOpenRecord, canViewLeads, canViewProposals, prospectRefresh, canViewSalesOrders, onOpenLeads, onOpenProposals,
   onOpenSalesOrders, onOpenProspect, onAddProspect,
 }: Props) {
   const { profile } = useAuth();
@@ -245,10 +250,11 @@ export function PipelineStageOverview({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {tabList && <div className="w-full min-w-0 sm:w-auto">{tabList}</div>}
         {isManager && (
           <select aria-label="Pipeline owner" value={showAll ? 'all' : ownerId === userId ? 'my' : selection}
-            className="min-h-11 min-w-0 max-w-full flex-1 truncate rounded-md border border-gray-300 bg-surface px-3 py-2 text-base text-primary sm:max-w-xs sm:text-sm"
+            className="min-h-11 min-w-0 max-w-full flex-1 truncate rounded-md border border-gray-300 bg-surface px-3 py-2 text-base text-primary sm:max-w-64 sm:text-sm"
             onChange={event => { setSelection(event.target.value); setEditingProspectId(null); }}>
             <option value="my">My Pipeline</option>
             <option value="all">All users</option>
@@ -274,120 +280,124 @@ export function PipelineStageOverview({
           </div>
         </div>
       </div>
-      {loadError && !pending && <p role="status" className="text-xs text-amber-300">Some pipeline records could not be loaded.</p>}
-      <div aria-label="Sales pipeline stages" className={`grid items-start gap-3 ${expanded ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'}`}>
-        {visibleStages.includes('prospects') && (
-          <section className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)} className="text-left hover:underline disabled:opacity-50">
-                <span className="block text-sm font-semibold text-primary">{expanded ? 'Back to Pipeline' : 'Prospects'}</span>
-                <span className="block text-xs text-muted">{!canViewProspects ? 'No access' : pending ? 'Loading…' : counts.prospects === null ? 'Unavailable' : counts.prospects + ' to nurture'}</span>
-              </button>
-              {canViewProspects && <button type="button" onClick={onAddProspect} title="New Prospect" aria-label="New Prospect" className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-gray-200 p-2 text-primary"><Plus className="h-4 w-4" /></button>}
-            </div>
-            {canViewProspects && !pending && counts.prospects !== null && <>
-          {prospects.length === 0 ? (
-            <p className="rounded-md bg-gray-50 px-3 py-5 text-center text-sm text-gray-500">No prospects in this view yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {prospects.map(prospect => (
-                <article key={prospect.id} className="min-w-0 rounded-md border border-gray-200 p-3">
-                  <button type="button" onClick={() => onOpenProspect(prospect.id)}
-                    className="flex w-full items-start gap-2 rounded-md text-left hover:bg-gray-50">
-                    <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-gray-900">{prospect.contact_name || prospect.company_name || 'Unnamed prospect'}</span>
-                      {prospect.company_name && <span className="block truncate text-xs text-gray-500">{prospect.company_name}</span>}
-                      {prospect.email && <span className="block truncate text-xs text-gray-500">{prospect.email}</span>}
-                    </span>
-                  </button>
-                  {prospect.prospect_follow_up_on && (
-                    <p className={`mt-2 text-xs ${prospect.prospect_follow_up_on <= today ? 'font-semibold text-amber-700' : 'text-gray-600'}`}>
-                      {prospect.prospect_follow_up_on < today ? 'Overdue' : prospect.prospect_follow_up_on === today ? 'Due today' : 'Follow-up'}{' · '}
-                      <time dateTime={prospect.prospect_follow_up_on}>
-                        {new Date(prospect.prospect_follow_up_on + 'T12:00:00').toLocaleDateString()}
-                      </time>
-                    </p>
-                  )}
-                  {editingProspectId === prospect.id ? (
-                    <form className="mt-2 space-y-2" onSubmit={event => {
-                      event.preventDefault();
-                      if (followUpDate) void saveFollowUp(prospect.id, followUpDate);
-                    }}>
-                      <fieldset disabled={savingFollowUp} className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
-                          {FOLLOW_UP_PRESETS.map(({ label, months }) => (
-                            <button key={months} type="button" onClick={() => setFollowUpDate(followUpInMonths(months))}>{label}</button>
-                          ))}
-                        </div>
-                        <label className="block text-xs font-medium text-gray-700">
-                          Custom
-                          <input type="date" required value={followUpDate} onChange={event => setFollowUpDate(event.target.value)}
-                            className="mt-1 block min-h-11 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-base text-gray-900 sm:text-sm" />
-                        </label>
-                        <div className="flex flex-wrap items-center gap-3 text-xs">
-                          <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white">Save reminder</button>
-                          <button type="button" onClick={() => setEditingProspectId(null)} className="text-gray-700">Cancel</button>
-                          {prospect.prospect_follow_up_on && (
-                            <button type="button" onClick={() => void saveFollowUp(prospect.id, null)} className="text-gray-700">Clear</button>
-                          )}
-                        </div>
-                      </fieldset>
-                    </form>
-                  ) : (
-                    <button type="button" disabled={savingFollowUp || !organizationId} onClick={() => {
-                      setEditingProspectId(prospect.id);
-                      setFollowUpDate(prospect.prospect_follow_up_on ?? '');
-                    }} className="mt-2 text-xs font-semibold text-blue-700 hover:underline disabled:opacity-50">
-                      {prospect.prospect_follow_up_on ? 'Edit reminder' : 'Set reminder'}
-                    </button>
-                  )}
-                </article>
-              ))}
-            </div>
+      <div className="min-w-0 space-y-3" role={tabList ? 'tabpanel' : undefined}>
+        {loadError && !pending && <p role="status" className="text-xs text-amber-300">Some pipeline records could not be loaded.</p>}
+        <div aria-label="Sales pipeline stages" className={`grid gap-3 ${expanded ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'}`}>
+          {visibleStages.includes('prospects') && (
+            <section className={STAGE_CARD_CLASS}>
+              <div className={STAGE_HEADER_CLASS}>
+                <button type="button" disabled={!canViewProspects} onClick={() => setExpanded(value => !value)} className="min-w-0 flex-1 text-left hover:underline disabled:opacity-50">
+                  <span className="block text-sm font-semibold text-primary">{expanded ? 'Back to Pipeline' : 'Prospects'}</span>
+                  <span className="block text-xs text-muted">{!canViewProspects ? 'No access' : pending ? 'Loading…' : counts.prospects === null ? 'Unavailable' : counts.prospects + ' to nurture'}</span>
+                </button>
+                {canViewProspects && <button type="button" onClick={onAddProspect} title="New Prospect" aria-label="New Prospect" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border border-gray-200 p-2 text-primary"><Plus className="h-4 w-4" /></button>}
+              </div>
+              {canViewProspects && !pending && counts.prospects !== null && <>
+                {prospects.length === 0 ? (
+                  <p className={EMPTY_STAGE_CLASS}>No prospects in this view yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {prospects.map(prospect => (
+                      <article key={prospect.id} className="min-w-0 rounded-md border border-gray-200 p-3">
+                        <button type="button" onClick={() => onOpenProspect(prospect.id)}
+                          className="flex w-full items-start gap-2 rounded-md text-left hover:bg-gray-50">
+                          <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-gray-900">{prospect.contact_name || prospect.company_name || 'Unnamed prospect'}</span>
+                            {prospect.company_name && <span className="block truncate text-xs text-gray-500">{prospect.company_name}</span>}
+                            {prospect.email && <span className="block truncate text-xs text-gray-500">{prospect.email}</span>}
+                          </span>
+                        </button>
+                        {prospect.prospect_follow_up_on && (
+                          <p className={`mt-2 text-xs ${prospect.prospect_follow_up_on <= today ? 'font-semibold text-amber-700' : 'text-gray-600'}`}>
+                            {prospect.prospect_follow_up_on < today ? 'Overdue' : prospect.prospect_follow_up_on === today ? 'Due today' : 'Follow-up'}{' · '}
+                            <time dateTime={prospect.prospect_follow_up_on}>
+                              {new Date(prospect.prospect_follow_up_on + 'T12:00:00').toLocaleDateString()}
+                            </time>
+                          </p>
+                        )}
+                        {editingProspectId === prospect.id ? (
+                          <form className="mt-2 space-y-2" onSubmit={event => {
+                            event.preventDefault();
+                            if (followUpDate) void saveFollowUp(prospect.id, followUpDate);
+                          }}>
+                            <fieldset disabled={savingFollowUp} className="min-w-0 space-y-2">
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-blue-700">
+                                {FOLLOW_UP_PRESETS.map(({ label, months }) => (
+                                  <button key={months} type="button" onClick={() => setFollowUpDate(followUpInMonths(months))}>{label}</button>
+                                ))}
+                              </div>
+                              <label className="block text-xs font-medium text-gray-700">
+                                Custom
+                                <input type="date" required value={followUpDate} onChange={event => setFollowUpDate(event.target.value)}
+                                  className="mt-1 block min-h-11 w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-base text-gray-900 sm:text-sm" />
+                              </label>
+                              <div className="flex flex-wrap items-center gap-3 text-xs">
+                                <button type="submit" className="rounded-md bg-blue-600 px-3 py-1.5 font-medium text-white">Save reminder</button>
+                                <button type="button" onClick={() => setEditingProspectId(null)} className="text-gray-700">Cancel</button>
+                                {prospect.prospect_follow_up_on && (
+                                  <button type="button" onClick={() => void saveFollowUp(prospect.id, null)} className="text-gray-700">Clear</button>
+                                )}
+                              </div>
+                            </fieldset>
+                          </form>
+                        ) : (
+                          <button type="button" disabled={savingFollowUp || !organizationId} onClick={() => {
+                            setEditingProspectId(prospect.id);
+                            setFollowUpDate(prospect.prospect_follow_up_on ?? '');
+                          }} className="mt-2 text-xs font-semibold text-blue-700 hover:underline disabled:opacity-50">
+                            {prospect.prospect_follow_up_on ? 'Edit reminder' : 'Set reminder'}
+                          </button>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {(page > 0 || (counts.prospects ?? 0) > PROSPECTS_PER_PAGE) && (
+                  <nav aria-label="Prospect pages" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted">
+                    <button type="button" disabled={page === 0} className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
+                      onClick={() => setProspectPage({ page: page - 1, scope })}>Previous</button>
+                    <span>Page {page + 1} of {Math.max(1, Math.ceil((counts.prospects ?? 0) / PROSPECTS_PER_PAGE))}</span>
+                    <button type="button" disabled={(page + 1) * PROSPECTS_PER_PAGE >= (counts.prospects ?? 0)}
+                      className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
+                      onClick={() => setProspectPage({ page: page + 1, scope })}>Next</button>
+                  </nav>
+                )}
+              </>}
+            </section>
           )}
-          {(page > 0 || (counts.prospects ?? 0) > PROSPECTS_PER_PAGE) && (
-            <nav aria-label="Prospect pages" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted">
-              <button type="button" disabled={page === 0} className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
-                onClick={() => setProspectPage({ page: page - 1, scope })}>Previous</button>
-              <span>Page {page + 1} of {Math.max(1, Math.ceil((counts.prospects ?? 0) / PROSPECTS_PER_PAGE))}</span>
-              <button type="button" disabled={(page + 1) * PROSPECTS_PER_PAGE >= (counts.prospects ?? 0)}
-                className="rounded-md border border-gray-200 px-3 py-1.5 disabled:opacity-50"
-                onClick={() => setProspectPage({ page: page + 1, scope })}>Next</button>
-            </nav>
-          )}
-            </>}
-          </section>
-        )}
-        {!expanded && ([
-          { key: 'leads', records: leads, count: counts.leads, allowed: canViewLeads, open: onOpenLeads, kind: 'lead' },
-          { key: 'proposals', records: proposals, count: counts.proposals, allowed: canViewProposals, open: onOpenProposals, kind: 'proposal' },
-          { key: 'salesOrders', records: orders, count: counts.salesOrders, allowed: canViewSalesOrders, open: onOpenSalesOrders, kind: 'order' },
-        ] as const).filter(stage => visibleStages.includes(stage.key)).map(stage => (
-          <section key={stage.key} className="min-w-0 rounded-lg border border-gray-200 bg-surface p-3">
-            <button type="button" disabled={!stage.allowed} onClick={stage.open} className="mb-3 w-full text-left hover:underline disabled:opacity-50">
-              <span className="block text-sm font-semibold text-primary">{STAGE_LABELS[stage.key]}</span>
-              <span className="block text-xs text-muted">{!stage.allowed ? 'No access' : pending ? 'Loading…' : stage.count === null ? 'Unavailable' : stage.count + (stage.key === 'salesOrders' ? ' open' : ' active')}</span>
-            </button>
-            {stage.allowed && !pending && stage.count !== null && (
-              stage.records.length ? (
-                <ul className="space-y-1">
-                  {stage.records.map(record => (
-                    <li key={record.id}>
-                      <button type="button" onClick={() => onOpenRecord(stage.kind, record.id)} className="block min-h-11 w-full rounded-md border border-gray-200 px-2.5 py-2 text-left text-sm text-primary hover:border-blue-300">
-                        <span className="block truncate">{record.title}</span>
-                        {record.detail && <span className="block text-xs capitalize text-muted">{record.detail.replace(/_/g, ' ')}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="px-2 py-3 text-xs text-muted">No records in this view.</p>
-            )}
-            {stage.allowed && !pending && (stage.count ?? 0) > STAGE_PREVIEW_LIMIT && (
-              <button type="button" onClick={stage.open} className="mt-3 text-xs font-medium text-primary hover:underline">View all {STAGE_LABELS[stage.key].toLowerCase()}</button>
-            )}
-          </section>
-        ))}
+          {!expanded && ([
+            { key: 'leads', records: leads, count: counts.leads, allowed: canViewLeads, open: onOpenLeads, kind: 'lead' },
+            { key: 'proposals', records: proposals, count: counts.proposals, allowed: canViewProposals, open: onOpenProposals, kind: 'proposal' },
+            { key: 'salesOrders', records: orders, count: counts.salesOrders, allowed: canViewSalesOrders, open: onOpenSalesOrders, kind: 'order' },
+          ] as const).filter(stage => visibleStages.includes(stage.key)).map(stage => (
+            <section key={stage.key} className={STAGE_CARD_CLASS}>
+              <div className={STAGE_HEADER_CLASS}>
+                <button type="button" disabled={!stage.allowed} onClick={stage.open} className="min-w-0 flex-1 text-left hover:underline disabled:opacity-50">
+                  <span className="block text-sm font-semibold text-primary">{STAGE_LABELS[stage.key]}</span>
+                  <span className="block text-xs text-muted">{!stage.allowed ? 'No access' : pending ? 'Loading…' : stage.count === null ? 'Unavailable' : stage.count + (stage.key === 'salesOrders' ? ' open' : ' active')}</span>
+                </button>
+              </div>
+              {stage.allowed && !pending && stage.count !== null && (
+                stage.records.length ? (
+                  <ul className="space-y-1">
+                    {stage.records.map(record => (
+                      <li key={record.id}>
+                        <button type="button" onClick={() => onOpenRecord(stage.kind, record.id)} className="block min-h-11 w-full rounded-md border border-gray-200 px-2.5 py-2 text-left text-sm text-primary hover:border-blue-300">
+                          <span className="block truncate">{record.title}</span>
+                          {record.detail && <span className="block text-xs capitalize text-muted">{record.detail.replace(/_/g, ' ')}</span>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className={EMPTY_STAGE_CLASS}>No records in this view.</p>
+              )}
+              {stage.allowed && !pending && (stage.count ?? 0) > STAGE_PREVIEW_LIMIT && (
+                <button type="button" onClick={stage.open} className="mt-3 text-xs font-medium text-primary hover:underline">View all {STAGE_LABELS[stage.key].toLowerCase()}</button>
+              )}
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

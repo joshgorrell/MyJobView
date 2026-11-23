@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { notify } from '../../lib/feedback';
 import { supabase } from '../../lib/supabase';
@@ -7,6 +7,7 @@ import { ContactForm } from '../Contacts/ContactForm';
 import { PipelineStageOverview } from './PipelineStageOverview';
 
 interface PipelineBoardProps {
+  tabList?: ReactNode;
   onNavigate?: (module: 'proposals' | 'sales_orders' | 'leads') => void;
   onOpenRecord?: (kind: 'lead' | 'proposal' | 'order', id: string) => void;
   canViewLeads?: boolean;
@@ -14,7 +15,7 @@ interface PipelineBoardProps {
   canViewSalesOrders?: boolean;
 }
 
-export function PipelineBoard({ onNavigate, onOpenRecord, canViewLeads = false, canViewProposals = false, canViewSalesOrders = false }: PipelineBoardProps) {
+export function PipelineBoard({ tabList, onNavigate, onOpenRecord, canViewLeads = false, canViewProposals = false, canViewSalesOrders = false }: PipelineBoardProps) {
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [prospectRefresh, setProspectRefresh] = useState(0);
@@ -56,6 +57,7 @@ export function PipelineBoard({ onNavigate, onOpenRecord, canViewLeads = false, 
   return (
     <div className="space-y-3">
       <PipelineStageOverview
+        tabList={tabList}
         onOpenRecord={(kind, id) => onOpenRecord?.(kind, id)}
         canViewLeads={canViewLeads}
         canViewProposals={canViewProposals}
