@@ -150,12 +150,11 @@ export interface RepGoalProgress {
 }
 
 export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalProgress[]> {
-  // Get all sales reps with quota info
+  // Resolve contributors from attributed records, not proposal-creation permissions.
   const { data: reps, error: repError } = await supabase
     .from('profiles')
     .select('id, full_name, first_name, last_name, current_annual_quota, monthly_sales_target')
     .eq('organization_id', orgId)
-    .eq('can_create_proposals', true)
     .order('first_name', { ascending: true });
 
   if (repError) throw repError;
@@ -179,7 +178,36 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     .order('month', { ascending: true });
   if (monthlyStatsError) throw monthlyStatsError;
 
-  for (const rep of reps) {
+  // Monthly historical stats and live sales orders are both valid sources of
+  // sales credit. Include employees without proposal creation permission.
+  // Keep the sales_rep_id -> created_by fallback consistent with fetchSalesKpis.
+  const { data: creditedOrders, error: creditedOrdersError } = await supabase
+    .from('sales_orders')
+    .select('sales_rep_id, created_by')
+    .eq('organization_id', orgId)
+    .not('status', 'in', '("cancelled","voided")');
+  if (creditedOrdersError) throw creditedOrdersError;
+
+  const { data: creditedProposals, error: creditedProposalsError } = await supabase
+    .from('proposals')
+    .select('sales_rep_id, created_by')
+    .eq('organization_id', orgId);
+  if (creditedProposalsError) throw creditedProposalsError;
+
+  const contributorIds = new Set<string>();
+  for (const stat of allMonthlyStats || []) {
+    if (stat.user_id) contributorIds.add(stat.user_id);
+  }
+  for (const order of creditedOrders || []) {
+    const id = order.sales_rep_id || order.created_by;
+    if (id) contributorIds.add(id);
+  }
+  for (const proposal of creditedProposals || []) {
+    const id = proposal.sales_rep_id || proposal.created_by;
+    if (id) contributorIds.add(id);
+  }
+
+  for (const rep of reps.filter(rep => contributorIds.has(rep.id))) {
     const annualQuota = parseFloat(String(rep.current_annual_quota || 0));
     const legacyMonthly = parseFloat(String(rep.monthly_sales_target || 0)) * 12;
     const effectiveQuota = annualQuota > 0 ? annualQuota : legacyMonthly;
