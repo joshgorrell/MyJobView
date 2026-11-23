@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 export type KpiScope =
-  | { type: 'company' }
+  | { type: 'company'; orgId?: string }
   | { type: 'office'; officeId: string }
   | { type: 'rep'; repId: string };
 
@@ -61,6 +61,10 @@ export async function fetchSalesKpis(
     .not('status', 'in', '("cancelled","voided")')
     .gte('created_at', startIso)
     .lte('created_at', endIso);
+
+  if (scope.type === 'company' && scope.orgId) {
+    ordersQuery = ordersQuery.eq('organization_id', scope.orgId);
+  }
 
   if (scope.type === 'rep') {
     // Centralized sales-credit rule: sales_rep_id is primary; created_by is legacy fallback only when sales_rep_id IS NULL.
@@ -261,6 +265,7 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     const { data: ytdOrders, error: ytdOrdersError } = await supabase
       .from('sales_orders')
       .select('contract_total, created_at')
+      .eq('organization_id', orgId)
       .not('status', 'in', '("cancelled","voided")')
       .or(`sales_rep_id.eq.${rep.id},and(sales_rep_id.is.null,created_by.eq.${rep.id})`)
       .gte('created_at', yearStartIso)
@@ -285,6 +290,7 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
     const { data: monthOrders, error: monthOrdersError } = await supabase
       .from('sales_orders')
       .select('contract_total')
+      .eq('organization_id', orgId)
       .not('status', 'in', '("cancelled","voided")')
       .or(`sales_rep_id.eq.${rep.id},and(sales_rep_id.is.null,created_by.eq.${rep.id})`)
       .gte('created_at', monthStartIso)
@@ -336,7 +342,7 @@ export async function fetchAllRepGoalProgress(orgId: string): Promise<RepGoalPro
 }
 
 export async function fetchCompanyKpis(_orgId: string): Promise<SalesKpis> {
-  return fetchSalesKpis({ type: 'company' }, 'this_month');
+  return fetchSalesKpis({ type: 'company', orgId: _orgId }, 'this_month');
 }
 
 // ── TV Dashboard aggregated data ─────────────────────────────────────────────
@@ -386,7 +392,7 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
     return { data: result.data, error: null };
   };
 
-  const companyKpisPromise = fetchSalesKpis({ type: 'company' }, 'this_month')
+  const companyKpisPromise = fetchSalesKpis({ type: 'company', orgId }, 'this_month')
     .then((data): { data: SalesKpis | null; error: null } => ({ data, error: null }));
 
   const [
@@ -459,6 +465,7 @@ export async function fetchTvDashboardData(orgId: string): Promise<TvDashboardDa
     safe(supabase
       .from('sales_orders')
       .select('contract_total, created_at')
+      .eq('organization_id', orgId)
       .not('status', 'in', '("cancelled","voided")')
       .gte('created_at', yearStartIso)
       .lte('created_at', nowIso)),
