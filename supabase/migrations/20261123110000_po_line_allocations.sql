@@ -1,3 +1,8 @@
+-- Retain the originating equipment line when Sales Order Product Manager
+-- creates a parts request, even if the same SKU appears in multiple rooms.
+ALTER TABLE public.product_request_items
+ ADD COLUMN IF NOT EXISTS proposal_line_item_id uuid REFERENCES public.proposal_line_items(id);
+
 -- A single vendor PO line can fulfill demand from multiple sales orders.
 -- Allocation is explicit; product-name matching is never authoritative.
 CREATE TABLE IF NOT EXISTS public.po_line_allocations (
