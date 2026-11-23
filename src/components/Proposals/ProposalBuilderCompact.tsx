@@ -46,7 +46,7 @@ const PortalVersionHistoryModal = lazy(() => import('./PortalVersionHistoryModal
 const PortalProposalDetail = lazy(() => import('../Portal/PortalProposalDetail').then(m => ({ default: m.PortalProposalDetail })));
 const EmailProposalModal = lazy(() => import('./EmailProposalModal').then(m => ({ default: m.EmailProposalModal })));
 import { checkProposalReadiness, type ValidationSection } from '../../lib/proposalValidation';
-import { getTaxApplicability, computeTaxTotals, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
+import { getTaxApplicability, computeTaxTotals, calculateTaxJarTax, type TaxEnvironment, type TaxProjectType } from '../../lib/taxCalculations';
 import type { ProposalRoomPrefill } from '../AIAssistant/AIAssistant';
 
 interface ProposalBuilderCompactProps {
@@ -2853,6 +2853,50 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     };
   }
 
+  const previewEnabled = !isCoMode && proposal?.id === proposalId
+    && proposal?.status === 'draft' && !proposal.tax_override;
+  const [taxPreview, setTaxPreview] = useState<{
+    proposal: typeof proposal;
+    rooms: typeof rooms;
+    settings: typeof proposalSettings;
+    amount: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    setTaxPreview(null);
+    if (!previewEnabled || loading || saving) return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      let amount: number | null = null;
+      try {
+        const quote = await calculateTaxJarTax('proposal', proposalId, { preview: true });
+        if (['ready', 'exempt', 'not_collecting'].includes(quote.tax_calculation_status)
+            && Number.isFinite(quote.tax_amount)) {
+          amount = quote.tax_amount;
+        }
+      } catch {
+        // The preview can fail independently of saving the user's edits.
+      }
+      if (active) setTaxPreview({ proposal, rooms, settings: proposalSettings, amount });
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [previewEnabled, loading, saving, proposalId, proposal, rooms, proposalSettings]);
+
+  const currentPreview = !saving && !loading && taxPreview?.proposal === proposal
+    && taxPreview?.rooms === rooms && taxPreview?.settings === proposalSettings ? taxPreview : null;
+  const previewTax = currentPreview?.amount;
+  const taxPreviewLabel = currentPreview ? 'Tax unavailable' : 'Calculating tax…';
+  const displayedTax = previewEnabled
+    ? previewTax == null ? taxPreviewLabel : formatCurrency(previewTax)
+    : formatCurrency(pricing.taxAmount);
+  const displayedTotal = previewEnabled
+    ? previewTax == null ? '—' : formatCurrency(pricing.total - pricing.taxAmount + previewTax)
+    : formatCurrency(pricing.total);
+
   const containerClass = "min-w-0 w-full flex flex-col bg-canvas";
 
   const containerStyle = {};
@@ -4359,7 +4403,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           >
             <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
               <span className="text-muted">Subtotal: <span className="text-primary font-medium">{formatCurrency(pricing.subtotal)}</span></span>
-              <span className="text-muted hidden sm:inline">Tax: <span className="text-primary font-medium">{formatCurrency(pricing.taxAmount)}</span></span>
+              <span className="text-muted hidden sm:inline">Tax: <span className="text-primary font-medium">{displayedTax}</span></span>
               {isCoMode && (() => {
                 const nonModifierItems = coLineItems.filter(c => c.action_type !== 'modify_modifiers');
                 const coDelta = nonModifierItems.reduce((sum, c) => sum + (c.change_amount || 0), 0);
@@ -4375,7 +4419,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="text-right">
-                <div className="text-cyan-400 text-base sm:text-xl font-bold">{formatCurrency(pricing.total)}</div>
+                <div className="text-cyan-400 text-base sm:text-xl font-bold">{displayedTotal}</div>
               </div>
               <ChevronUp className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
             </div>
@@ -4553,13 +4597,13 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
               })()}
 
               <div className="flex justify-between pt-2 border-t border-subtle">
-                <span className="text-muted">Tax ({pricing.taxRate}%):</span>
-                <span className="text-primary font-medium">{formatCurrency(pricing.taxAmount)}</span>
+                <span className="text-muted">{previewEnabled ? 'Tax:' : `Tax (${pricing.taxRate}%):`}</span>
+                <span className="text-primary font-medium">{displayedTax}</span>
               </div>
               <div className="flex justify-between pt-2 border-t border-subtle">
                 <span className="text-primary font-semibold">Total:</span>
                 <div className="text-right">
-                  <div className="text-cyan-400 text-xl font-bold">{formatCurrency(pricing.total)}</div>
+                  <div className="text-cyan-400 text-xl font-bold">{displayedTotal}</div>
                   {(() => {
                     // Calculate total cost from all line items
                     let lineItemsCost = 0;
