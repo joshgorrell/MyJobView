@@ -50,8 +50,12 @@ BEGIN
      WHERE po_item_id=NEW.po_item_id AND id<>NEW.id)+NEW.quantity>po.quantity THEN
   RAISE EXCEPTION 'PO line quantity over-allocated';
  END IF;
- IF (SELECT coalesce(sum(quantity),0) FROM public.po_line_allocations
-     WHERE proposal_line_item_id=NEW.proposal_line_item_id AND sales_order_id=NEW.sales_order_id AND id<>NEW.id)+NEW.quantity>proposal_line.quantity THEN
+ IF (SELECT coalesce(sum(a.quantity),0) FROM public.po_line_allocations a
+     JOIN public.po_items i ON i.id=a.po_item_id
+     JOIN public.purchase_orders p ON p.id=i.po_id
+     WHERE a.proposal_line_item_id=NEW.proposal_line_item_id
+       AND a.sales_order_id=NEW.sales_order_id AND a.id<>NEW.id
+       AND p.status NOT IN ('cancelled','canceled','void'))+NEW.quantity>proposal_line.quantity THEN
   RAISE EXCEPTION 'Sales order line quantity over-allocated';
  END IF;
  RETURN NEW;
@@ -354,3 +358,37 @@ REVOKE ALL ON FUNCTION public.create_consolidated_job_purchase_order(jsonb,uuid,
  FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.create_consolidated_job_purchase_order(jsonb,uuid,uuid,uuid,uuid)
  TO authenticated;
+
+-- A cancelled PO releases demand. Prevent restoring it if replacement orders
+-- have since consumed the same job quantities.
+CREATE OR REPLACE FUNCTION public.validate_po_reactivation_allocations()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE linked record;
+BEGIN
+ IF OLD.status NOT IN ('cancelled','canceled','void')
+    OR NEW.status IN ('cancelled','canceled','void') THEN RETURN NEW; END IF;
+ FOR linked IN
+  SELECT DISTINCT a.proposal_line_item_id, a.sales_order_id
+  FROM public.po_line_allocations a
+  JOIN public.po_items i ON i.id=a.po_item_id
+  WHERE i.po_id=OLD.id ORDER BY a.proposal_line_item_id,a.sales_order_id
+ LOOP
+  PERFORM 1 FROM public.proposal_line_items
+   WHERE id=linked.proposal_line_item_id FOR UPDATE;
+  IF (SELECT coalesce(sum(a.quantity),0)
+    FROM public.po_line_allocations a
+    JOIN public.po_items i ON i.id=a.po_item_id
+    JOIN public.purchase_orders p ON p.id=i.po_id
+    WHERE a.proposal_line_item_id=linked.proposal_line_item_id
+      AND a.sales_order_id=linked.sales_order_id
+      AND (p.status NOT IN ('cancelled','canceled','void') OR p.id=OLD.id))
+     > (SELECT quantity FROM public.proposal_line_items
+        WHERE id=linked.proposal_line_item_id) THEN
+   RAISE EXCEPTION 'Cannot reactivate PO: equipment was reordered after cancellation';
+  END IF;
+ END LOOP;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER validate_po_reactivation_allocations_write
+ BEFORE UPDATE OF status ON public.purchase_orders
+ FOR EACH ROW EXECUTE FUNCTION public.validate_po_reactivation_allocations();
