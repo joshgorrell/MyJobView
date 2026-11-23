@@ -15,6 +15,14 @@ BEGIN
   EXECUTE replace(definition, success_anchor, $body$    UPDATE proposals SET
       total = CASE WHEN status = 'draft'
         THEN total - coalesce(tax_amount, 0) + v_amount_to_collect ELSE total END,
+      deposit_amount_due = CASE WHEN status = 'draft' THEN coalesce((
+        SELECT CASE WHEN coalesce(settings.deposit_type, 'percentage') = 'percentage'
+          THEN round((proposals.total - coalesce(proposals.tax_amount, 0) + v_amount_to_collect)
+            * coalesce(settings.deposit_percent, 50) / 100, 2)
+          ELSE proposals.deposit_amount_due END
+        FROM public.proposal_settings AS settings
+        WHERE settings.proposal_id = proposals.id
+      ), deposit_amount_due) ELSE deposit_amount_due END,
       tax_amount = v_amount_to_collect,$body$);
 
   definition := pg_get_functiondef('public.mark_tax_review_required(text,uuid,text)'::regprocedure);
