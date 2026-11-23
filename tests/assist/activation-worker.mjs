@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {mock} from 'node:test';
 import {createActivationWorker,createHttpDependencies,validateProviderResult} from '../../services/assist/activation-worker.mjs';
 const org='00000000-0000-0000-0000-000000000001';
 const domain='mjv-'+org.replaceAll('-','');
@@ -38,4 +39,20 @@ assert.equal(requests[0].options.redirect,'error');assert.equal(requests[0].opti
 assert.equal(JSON.parse(requests[0].options.body).mesh_domain,domain);
 assert.throws(()=>createHttpDependencies({...env,ASSIST_CONTROL_ORIGIN:'http://control.example.com'}),/HTTPS/);
 await assert.rejects(createHttpDependencies(env,async()=>new Response('secret',{status:503})).reconcile(job),/request failed/);
+const deadlines = [];
+const timeout = mock.method(AbortSignal, 'timeout', milliseconds => {
+ deadlines.push(milliseconds);
+ return new AbortController().signal;
+});
+const clock = mock.method(Date, 'now', () => 1_000_000);
+try {
+ await deps.rpc('claim_assist_activation', {});
+ await deps.reconcile({...job, lease_until: new Date(Date.now() + 120_000).toISOString()});
+ await deps.reconcile({...job, lease_until: new Date(Date.now() + 100_000).toISOString()});
+ assert.throws(() => deps.reconcile({...job, lease_until: new Date(Date.now() + 30_000).toISOString()}), /lease_too_short/);
+ assert.deepEqual(deadlines, [30_000, 90_000, 70_000]);
+} finally {
+ clock.mock.restore();
+ timeout.mock.restore();
+}
 console.log('Assist activation worker: provider ownership, verification, revocation attestations, retries, stale leases, HTTPS and secret-safe failures pass');

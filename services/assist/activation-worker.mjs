@@ -80,8 +80,8 @@ export function createHttpDependencies(env, fetchImpl = fetch) {
       control.username || control.password || database.origin !== env.SUPABASE_URL || control.origin !== env.ASSIST_CONTROL_ORIGIN) {
     throw new Error('Assist host endpoints must be HTTPS origins');
   }
-  async function request(url, body, headers) {
-    const response = await fetchImpl(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),
+  async function request(url, body, headers, timeoutMs = 30_000) {
+    const response = await fetchImpl(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
       headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
     if (!response.ok) throw new Error('Assist host request failed');
     const text = await response.text();
@@ -94,10 +94,17 @@ export function createHttpDependencies(env, fetchImpl = fetch) {
       return request(`${database.origin}/rest/v1/rpc/${name}`, body,
         { apikey: env.SUPABASE_SERVICE_ROLE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` });
     },
-    reconcile: job => request(`${control.origin}/v1/dealers/reconcile`, {
-      organization_id: job.organization_id, generation: job.generation, desired_enabled: job.desired_enabled,
-      mesh_domain: `mjv-${job.organization_id.replaceAll('-', '')}`, lease_token: job.lease_token, lease_until: job.lease_until,
-    }, { authorization: `Bearer ${env.ASSIST_CONTROL_TOKEN}`, 'idempotency-key': `${job.organization_id}:${job.generation}` }),
+    reconcile: job => {
+      // Cold provisioning runs native setup and the Windows probe before replying.
+      // Reserve a full RPC timeout to finish within the database lease.
+      const remainingMs = Date.parse(job.lease_until) - Date.now();
+      const timeoutMs = Math.min(90_000, remainingMs - 30_000);
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('lease_too_short');
+      return request(`${control.origin}/v1/dealers/reconcile`, {
+        organization_id: job.organization_id, generation: job.generation, desired_enabled: job.desired_enabled,
+        mesh_domain: `mjv-${job.organization_id.replaceAll('-', '')}`, lease_token: job.lease_token, lease_until: job.lease_until,
+      }, { authorization: `Bearer ${env.ASSIST_CONTROL_TOKEN}`, 'idempotency-key': `${job.organization_id}:${job.generation}` }, timeoutMs);
+    },
   };
 }
 
