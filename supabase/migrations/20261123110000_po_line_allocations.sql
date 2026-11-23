@@ -39,7 +39,7 @@ BEGIN
  SELECT id,proposal_id,product_id,quantity INTO proposal_line
  FROM public.proposal_line_items WHERE id=NEW.proposal_line_item_id;
  IF po IS NULL OR so IS NULL OR proposal_line IS NULL OR
-    po.document_type <> 'po' OR po.status='cancelled' OR
+    po.document_type <> 'po' OR po.status IN ('cancelled','canceled','void') OR
     po.organization_id <> NEW.organization_id OR
     so.proposal_id IS DISTINCT FROM proposal_line.proposal_id OR
     po.product_id IS DISTINCT FROM NEW.product_id OR
@@ -167,9 +167,9 @@ BEGIN
  END IF;
  RETURN QUERY
  SELECT so.id, li.id, li.product_id, li.quantity::numeric,
-        coalesce(sum(a.quantity) FILTER (WHERE po.status IS DISTINCT FROM 'cancelled'),0)::numeric,
+        coalesce(sum(a.quantity) FILTER (WHERE po.status NOT IN ('cancelled','canceled','void')),0)::numeric,
         (li.quantity-coalesce(sum(a.quantity) FILTER
-          (WHERE po.status IS DISTINCT FROM 'cancelled'),0))::numeric
+          (WHERE po.status NOT IN ('cancelled','canceled','void')),0))::numeric
  FROM public.sales_orders so
  JOIN public.proposal_line_items li ON li.proposal_id=so.proposal_id
  LEFT JOIN public.po_line_allocations a
@@ -182,7 +182,7 @@ BEGIN
    AND so.status NOT IN ('complete','closed')
  GROUP BY so.id,li.id,li.product_id,li.quantity
  HAVING li.quantity>coalesce(sum(a.quantity) FILTER
-   (WHERE po.status IS DISTINCT FROM 'cancelled'),0);
+   (WHERE po.status NOT IN ('cancelled','canceled','void')),0);
 END $$;
 REVOKE ALL ON FUNCTION public.get_unallocated_sales_order_products() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.get_unallocated_sales_order_products() TO authenticated;
@@ -211,7 +211,10 @@ RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 BEGIN
  IF NEW.quantity < (SELECT coalesce(max(total_qty),0) FROM
    (SELECT sum(a.quantity) AS total_qty FROM public.po_line_allocations a
+    JOIN public.po_items i ON i.id=a.po_item_id
+    JOIN public.purchase_orders p ON p.id=i.po_id
     WHERE a.proposal_line_item_id=OLD.id
+      AND p.status NOT IN ('cancelled','canceled','void')
     GROUP BY a.sales_order_id) grouped) THEN
   RAISE EXCEPTION 'Cannot reduce sales order equipment below allocated quantity';
  END IF;
