@@ -39,4 +39,8 @@ assert.match(sql,/CREATE TRIGGER allocate_request_backed_po_line_insert/);
 assert.match(sql,/request_line\\.proposal_line_item_id/);
 assert.match(sql,/parent_request\\.sales_order_id/);
 assert.match(sql,/product or quantity does not match source/);
+assert.match(sql,/CREATE OR REPLACE FUNCTION public\\.assign_po_line_allocations/);
+assert.match(sql,/public\\.can_manage_purchasing\\(\\)/);
+assert.match(sql,/target\\.status <> 'draft'/);
+assert.match(sql,/REVOKE ALL ON FUNCTION public\\.assign_po_line_allocations/);
 console.log('Consolidated multi-job PO allocation tests passed');
