@@ -93,7 +93,7 @@ export default function ConfirmModal({
         @media (prefers-reduced-motion: reduce) { .confirm-backdrop, .confirm-panel { animation: none; } }
       `}</style>
       <div
-        className="confirm-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+        className="confirm-backdrop fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60"
         style={{ zIndex }}
         onClick={(e) => { if (e.target === e.currentTarget && !pending) onCancel(); }}
       >
@@ -106,15 +106,15 @@ export default function ConfirmModal({
             if (!first) { event.preventDefault(); return; }
             if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
             else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-          }} className="confirm-panel bg-surface border border-subtle rounded-xl shadow-2xl w-full max-w-sm">
-          <div className="flex items-start justify-between p-5 pb-4">
-            <div className="flex items-start gap-3">
+          }} className="confirm-panel bg-surface border border-subtle rounded-xl shadow-2xl w-full max-w-sm max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain">
+          <div className="flex items-start justify-between p-3 sm:p-5 pb-3 sm:pb-4">
+            <div className="flex min-w-0 items-start gap-2 sm:gap-3">
               <div className={`flex-shrink-0 p-2 rounded-lg ${styles.iconBg}`}>
                 <Icon className={`w-5 h-5 ${styles.iconClass}`} />
               </div>
               <div>
                 <h3 id={titleId} className="text-base font-semibold text-primary">{title}</h3>
-                <p id={messageId} className="text-sm text-muted mt-1">{message}</p>
+                <p id={messageId} className="text-sm text-muted mt-1 break-words">{message}</p>
               </div>
             </div>
             <button
@@ -128,7 +128,7 @@ export default function ConfirmModal({
             </button>
           </div>
           {error && <p role="alert" className="px-5 pb-3 text-sm text-danger">{error}</p>}
-          <div className="flex gap-2 px-5 pb-5 justify-end">
+          <div className="flex flex-wrap gap-2 px-3 sm:px-5 pb-3 sm:pb-5 justify-end">
             <button
               ref={cancel} type="button"
               onClick={onCancel}
