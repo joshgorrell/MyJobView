@@ -15,16 +15,24 @@ function ProductImage({ src, alt }: { src: string; alt: string }) {
 }
 
 export default function MarketingHomepage() {
-  return <div className="min-h-screen bg-[#070d17] text-white" style={{fontFamily:'Inter, system-ui, sans-serif'}}>
-    <header className="border-b border-slate-800/90 bg-[#09111d]">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4">
-        <a href="/" className="flex items-center gap-3 text-xl font-extrabold tracking-tight"><img src="/MJV_icon.PNG" alt="" className="h-11 w-11 object-contain" /><span className="whitespace-nowrap"><span className="text-white">My</span><span className="text-red-500">Job</span><span className="text-sky-400">View</span></span></a>
+  const [scrolled, setScrolled] = React.useState(false);
+  React.useEffect(() => {
+    const update = () => setScrolled(previous => window.scrollY > 64 ? true : window.scrollY < 16 ? false : previous);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+  return <div id="top" className="min-h-screen bg-[#070d17] text-white" style={{fontFamily:'Inter, system-ui, sans-serif'}}>
+    <header className="sticky top-0 z-50 h-0">
+      <div className="border-b border-slate-800/90 bg-[#09111d]"><div className={`mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-5 motion-safe:transition-[height] motion-safe:duration-200 ${scrolled ? 'h-[56px] md:h-[64px]' : 'h-[71px] md:h-[79px]'}`}>
+        <a href="#top" aria-label="MyJobView home" className="flex min-w-0 items-center gap-2 text-lg font-extrabold tracking-tight sm:gap-3 sm:text-xl"><img src="/MJV_icon.PNG" alt="" className={`shrink-0 object-contain motion-safe:transition-[width,height] ${scrolled ? 'h-8 w-8' : 'h-10 w-10'}`} /><span className="whitespace-nowrap"><span className="text-white">My</span><span className="text-red-500">Job</span><span className="text-sky-400">View</span></span></a>
         <nav aria-label="Main navigation" className="hidden items-center gap-7 text-sm text-slate-300 md:flex"><a href="#why" className="hover:text-white">Why MyJobView</a><a href="#platform" className="hover:text-white">Platform</a><a href="#features" className="hover:text-white">Features</a></nav>
-        <a href="/dealer-login" className="rounded-lg bg-sky-600 px-5 py-3 text-sm font-bold hover:bg-sky-500">Dealer Login</a>
-      </div>
+        <a href="/dealer-login" className="shrink-0 whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-bold hover:bg-sky-500 sm:px-5">Dealer Login</a>
+      </div></div>
     </header>
+    <div aria-hidden="true" className="h-[72px] md:h-[80px]" />
     <main>
-      <section className="bg-[radial-gradient(ellipse_at_75%_35%,#123f67_0%,#091a2d_40%,#070d17_75%)] px-5 py-20 lg:py-28">
+      <section className="bg-[radial-gradient(ellipse_at_75%_35%,#123f67_0%,#091a2d_40%,#070d17_75%)] px-5 pb-20 pt-10 sm:pt-16 lg:py-28">
         <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
           <div><p className="mb-5 text-xs font-bold uppercase tracking-[.24em] text-sky-400">Built for AV, security & technology integrators</p>
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl xl:text-6xl">Stop managing software. <span className="text-sky-400">Start running your business.</span></h1>
@@ -36,10 +44,10 @@ export default function MarketingHomepage() {
         </div>
       </section>
       <div className="border-y border-sky-900 bg-[#0c1829] px-5 py-6"><div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4 text-sm font-bold text-slate-200">{['Pipeline','Production','Dispatch','Finance','Admin','Customer Portal','Assist'].map(x=><span key={x}>{x}</span>)}</div></div>
-      <section id="why" className="mx-auto max-w-7xl px-5 py-20"><p className="text-xs font-bold uppercase tracking-widest text-sky-400">Not another generic job management tool</p><h2 className="mt-4 text-3xl font-extrabold sm:text-5xl">Designed around how integrators <span className="text-sky-400">actually work.</span></h2><p className="mt-4 max-w-3xl text-slate-300">From room-by-room equipment proposals to labor performance, change orders, customer approvals, and ongoing service.</p>
-        <div id="platform" className="mt-16 space-y-24">{screenshots.map((s,i)=><article key={s.src} className="grid items-center gap-10 lg:grid-cols-2"><div className={i%2 ? 'lg:order-2' : ''}><p className="text-xs font-bold tracking-widest text-sky-400">{s.eyebrow}</p><h3 className="mt-3 text-3xl font-bold">{s.title}</h3><p className="mt-4 text-lg leading-relaxed text-slate-300">{s.body}</p></div><div className={i%2 ? 'lg:order-1' : ''}><ProductImage src={s.src} alt={s.alt}/></div></article>)}</div>
+      <section id="why" className="scroll-mt-24 mx-auto max-w-7xl px-5 py-20"><p className="text-xs font-bold uppercase tracking-widest text-sky-400">Not another generic job management tool</p><h2 className="mt-4 text-3xl font-extrabold sm:text-5xl">Designed around how integrators <span className="text-sky-400">actually work.</span></h2><p className="mt-4 max-w-3xl text-slate-300">From room-by-room equipment proposals to labor performance, change orders, customer approvals, and ongoing service.</p>
+        <div id="platform" className="scroll-mt-24 mt-16 space-y-24">{screenshots.map((s,i)=><article key={s.src} className="grid items-center gap-10 lg:grid-cols-2"><div className={i%2 ? 'lg:order-2' : ''}><p className="text-xs font-bold tracking-widest text-sky-400">{s.eyebrow}</p><h3 className="mt-3 text-3xl font-bold">{s.title}</h3><p className="mt-4 text-lg leading-relaxed text-slate-300">{s.body}</p></div><div className={i%2 ? 'lg:order-1' : ''}><ProductImage src={s.src} alt={s.alt}/></div></article>)}</div>
       </section>
-      <section id="features" className="border-t border-slate-800 bg-[#0a1423] px-5 py-20"><div className="mx-auto max-w-7xl"><p className="text-xs font-bold uppercase tracking-widest text-sky-400">One connected platform</p><h2 className="mt-3 text-3xl font-extrabold sm:text-5xl">Every department. One view.</h2><div className="mt-10 grid gap-5 md:grid-cols-3">{[
+      <section id="features" className="scroll-mt-24 border-t border-slate-800 bg-[#0a1423] px-5 py-20"><div className="mx-auto max-w-7xl"><p className="text-xs font-bold uppercase tracking-widest text-sky-400">One connected platform</p><h2 className="mt-3 text-3xl font-extrabold sm:text-5xl">Every department. One view.</h2><div className="mt-10 grid gap-5 md:grid-cols-3">{[
         ['Labor & profitability','Track time, labor targets, project statistics and team performance.'],
         ['Sales-tax intelligence','Location-based tax rates, classifications, verification and reporting workflows.'],
         ['Service & customer lifecycle','Service requests, customer portal, security monitoring and VIP programs.'],
