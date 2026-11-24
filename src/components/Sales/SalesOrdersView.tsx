@@ -193,7 +193,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
   }
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="min-w-0 space-y-2 sm:space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -241,7 +241,7 @@ export function SalesOrdersView({ openOrderId, onOrderOpened, onRevertToProposal
             className="w-full pl-9 pr-4 py-2.5 bg-surface border border-subtle rounded-lg text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm min-h-[44px]"
           />
         </div>
-        <button type="button" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters} className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-subtle text-sm ${showFilters || statusFilter !== 'all' || selectedRepId ? 'bg-infoSoft text-info' : 'bg-surface text-secondary'}`}>
+        <button type="button" onClick={() => setShowFilters(v => !v)} aria-expanded={showFilters} className={`flex items-center gap-2 shrink-0 px-3 py-2.5 min-h-[44px] rounded-lg border border-subtle text-sm ${showFilters || statusFilter !== 'all' || selectedRepId ? 'bg-infoSoft text-info' : 'bg-surface text-secondary'}`}>
           <SlidersHorizontal className="w-4 h-4" /> Filters{statusFilter !== 'all' || selectedRepId ? ' •' : ''}
         </button>
       </div>
