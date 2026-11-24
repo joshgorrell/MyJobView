@@ -342,10 +342,10 @@ export default function LaborDashboard({ controlsOnly = false }: { controlsOnly?
     {controls}
   </section>;
   return (
-    <section className="space-y-6 p-4 sm:p-6">
-      <header className="flex flex-wrap justify-between items-start gap-4">
+    <section className="min-w-0 space-y-3 sm:space-y-6 p-2 sm:p-6">
+      <header className="flex flex-wrap justify-between items-start gap-2 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-primary flex items-center gap-2">
+          <h1 className="text-lg sm:text-2xl font-semibold text-primary flex items-center gap-2">
             <BarChart3 />
             Tech Stats
           </h1>
@@ -365,7 +365,7 @@ export default function LaborDashboard({ controlsOnly = false }: { controlsOnly?
           Data sources
         </button>
       </header>
-      <div className="flex flex-wrap gap-3 items-center bg-surface border border-subtle p-3 rounded-xl">
+      <div className="flex min-w-0 flex-wrap gap-2 sm:gap-3 items-center bg-surface border border-subtle p-2 sm:p-3 rounded-xl">
         <select
           aria-label="Report period"
           className="bg-surface border border-subtle rounded-lg p-2 text-primary"

@@ -2979,9 +2979,9 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
       {/* Header */}
       <div className="sticky top-0 bg-surface border-b border-subtle flex-shrink-0 z-30">
         {/* Compact Header — single row */}
-        <div className="px-3 sm:px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="px-2 sm:px-4 py-2 flex flex-col xl:flex-row xl:items-center justify-between gap-2">
           {/* Left: Back + Title + Customer */}
-          <div className="flex items-center gap-2.5 min-w-0 w-full sm:w-auto flex-1">
+          <div className="flex items-center gap-2.5 min-w-0 w-full xl:w-auto flex-1">
               <button
                 type="button"
                 onClick={(e) => {
@@ -2990,7 +2990,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
                   onBack();
                 }}
                 className="text-muted hover:text-primary transition-colors flex-shrink-0"
-                title="Back to Proposals"
+                title="Back to Proposals" aria-label="Back to Proposals"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -3011,7 +3011,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
           </div>
 
           {/* Right: Badges + All Actions */}
-          <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end min-w-0 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 flex-wrap justify-start xl:justify-end min-w-0 w-full xl:w-auto">
 
               {/* Expiration Badge — countdown only for sent/portal; expired status is shown in the status control */}
               {(proposal?.status === 'sent' || proposal?.status === 'portal') && proposal?.sent_at && !presentation.expired && (() => {
