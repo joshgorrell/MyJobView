@@ -35,11 +35,11 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | improvements | Pending |
 | individual_dashboard | Pending |
 | inventory | Pending |
-| invoices | Layout merged #1260; modal #1264 open |
+| invoices | Layout merged #1260; modal #1264 merged |
 | job_acceptance | Pending |
 | job_photos | Pending |
 | job_status | Pending |
-| leads | Detail #1262 open; verification pending |
+| leads | Detail #1262 merged; verification pending |
 | maintenance_agreements | Pending |
 | materials | Pending |
 | my_mileage | Pending |
@@ -56,8 +56,8 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | products | Pending |
 | products_catalog | Layout merged #1257; catalog browser review passed on that PR; full audit pending |
 | project_work_orders | Layout merged #1261; verification pending |
-| projects | Detail #1263 open; verification pending |
-| proposals | Layout merged #1259; builder #1263 open |
+| projects | Detail #1263 merged; verification pending |
+| proposals | Layout merged #1259; builder #1263 merged |
 | pto_management | Pending |
 | punchlist | Pending |
 | purchase_orders | Pending |
@@ -67,14 +67,14 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | rewards_dashboard | Pending |
 | sales | Shared proposals layout #1259; verification pending |
 | sales_dashboard | Pending |
-| sales_orders | List merged #1259; detail #1262 open |
+| sales_orders | List merged #1259; detail #1262 merged |
 | sales_performance | Pending |
 | sales_service_requests | Pending |
 | security_onboarding | Pending |
 | service_billing | Pending |
 | service_request_analytics | Pending |
 | service_requests | Pending |
-| settings | Layout merged #1260; integration dialogs #1264 open |
+| settings | Layout merged #1260; integration dialogs #1264 merged |
 | sticky-notes | Pending |
 | tasks | Pending |
 | tax_filing_guide | Pending |
@@ -89,12 +89,12 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | time | Pending |
 | time_approval | Pending |
 | time_clock_management | Pending |
-| labor_dashboard | Layout #1263 open; verification pending |
+| labor_dashboard | Layout #1263 merged; verification pending |
 | travel_bonus | Layout merged #1261; verification pending |
 | travel_bonus_settings | Shared travel bonus layout #1261; verification pending |
 | vehicle-tracking | Pending |
 | vip-plans | Pending |
-| work_orders | List merged #1260; detail #1262 open |
+| work_orders | List merged #1260; detail #1262 merged |
 
 ## Admin settings subsections
 
@@ -172,3 +172,12 @@ Derived from App.tsx path branches; grouped aliases still require individual che
 ## Verification evidence
 
 Existing browser suites include tests/catalog/browser.mjs, tests/navigation/responsive-browser.mjs, tests/navigation/integrations-responsive-browser.mjs and tests/modals/responsive-browser.mjs. PR #1265 expands viewport coverage. A test existing is not proof of a passing current build. Record run links and tested states before changing any route to verified. Detail and dialog inventory remains incomplete.
+
+### CI evidence (2026-11-24)
+
+- PRs #1262–#1266 merged.
+- Expanded catalog suite passed: https://github.com/joshgorrell/MyJobView/actions/runs/45317897411
+- Themed modal feedback passed on #1264: https://github.com/joshgorrell/MyJobView/actions/runs/45317746714
+- Mobile Feedback layout on #1265 cancelled: https://github.com/joshgorrell/MyJobView/actions/runs/45317897473
+- Labor dashboard review on #1263 cancelled: https://github.com/joshgorrell/MyJobView/actions/runs/45317596808
+- Cancelled runs require fresh verification; no full route is certified by these component checks alone.

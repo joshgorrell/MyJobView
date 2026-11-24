@@ -15,6 +15,7 @@ on:
       - 'supabase/migrations/*tech_production*.sql'
       - 'tests/labor-dashboard/**'
       - '.github/workflows/labor-dashboard-review.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

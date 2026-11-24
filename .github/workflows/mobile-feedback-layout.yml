@@ -18,6 +18,7 @@ on:
       - 'tests/navigation/**'
       - 'tests/reviews/feedback-layout-browser.mjs'
       - '.github/workflows/mobile-feedback-layout.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
