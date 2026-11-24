@@ -436,14 +436,14 @@ export function ProductionManagerDashboard() {
   const hasAlerts = stats.pendingParts > 0 || stats.pendingQA > 0 || stats.jobsPastDue > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Production Dashboard</h1>
         <p className="text-gray-300">Real-time overview of all production activity</p>
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
         <StatCard
           icon={<Activity className="w-4 h-4 text-blue-500" />}
           label="Active Jobs"
@@ -529,9 +529,9 @@ export function ProductionManagerDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-6">
         {/* Left: Active Jobs + Parts */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="xl:col-span-2 min-w-0 space-y-3 sm:space-y-6">
 
           {/* Active Jobs Board */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -717,7 +717,7 @@ export function ProductionManagerDashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm truncate">{performer.full_name}</p>
-                      <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 text-xs text-gray-500">
                         <span className="flex items-center gap-0.5">
                           <CheckCircle className="w-3 h-3 text-green-500" />
                           {performer.completions} jobs
