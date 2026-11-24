@@ -43,21 +43,23 @@ export default function ProductCatalogView(props: Props) {
 
   if (groupBy === 'none') return content(groups.flatMap(group => group.products));
   return <div className="min-w-0 space-y-2">
-    <div className="flex justify-end gap-3 text-xs">
-      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set()) : setCollapsed(new Set())}>Expand all</button>
-      <button type="button" className="min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set(groups.map(group => group.key))) : setCollapsed(new Set(groups.map(group => group.key)))}>Collapse all</button>
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <span className="text-gray-400 lg:hidden">Grouped by {groupBy}</span>
+      <button type="button" className="ml-auto min-h-9 text-blue-400 lg:hidden" onClick={() => { const next = groups.some(group => isOpen(group.key)) ? new Set(groups.map(group => group.key)) : new Set<string>(); (revealMatches ? setClosedMatches : setCollapsed)(next); }}>{groups.some(group => isOpen(group.key)) ? 'Collapse all' : 'Expand all'}</button>
+      <button type="button" className="hidden lg:inline-block min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set()) : setCollapsed(new Set())}>Expand all</button>
+      <button type="button" className="hidden lg:inline-block min-h-9 text-blue-400" onClick={() => revealMatches ? setClosedMatches(new Set(groups.map(group => group.key))) : setCollapsed(new Set(groups.map(group => group.key)))}>Collapse all</button>
     </div>
     {groups.map((group, index) => {
       const open = isOpen(group.key);
       const panelId = `${id}-group-${index}`;
-      return <section key={group.key} className="min-w-0 rounded-lg border border-gray-700 overflow-hidden">
+      return <section key={group.key} className="min-w-0 rounded-lg lg:border border-gray-700 overflow-hidden">
         <h3><button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => toggle(group.key)}
           className="flex w-full min-w-0 items-center gap-2 bg-gray-800 px-3 py-2 text-left text-white hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400">
           {open ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
           <span className="min-w-0 flex-1 break-words text-sm font-medium">{group.label}</span>
           <span className="shrink-0 rounded-full bg-gray-700 px-2 py-0.5 text-xs text-gray-300">{group.products.length} {group.products.length === 1 ? 'product' : 'products'}</span>
         </button></h3>
-        <div id={panelId} hidden={!open}>{open && <div className="p-2">{content(group.products)}</div>}</div>
+        <div id={panelId} hidden={!open}>{open && <div className="lg:p-2">{content(group.products)}</div>}</div>
       </section>;
     })}
   </div>;
