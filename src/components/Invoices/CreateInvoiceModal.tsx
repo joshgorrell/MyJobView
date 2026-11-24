@@ -856,7 +856,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
             <div className="min-h-0 overflow-y-auto p-3 sm:px-4 space-y-2.5 max-lg:[&_input]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base">
 
             {/* All header fields on one desktop row, 2-col grid on mobile */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:flex lg:flex-wrap lg:items-end">
+            <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 lg:flex lg:flex-wrap lg:items-end">
               {/* Customer — takes available space */}
               <div className="col-span-2 lg:flex-[2] lg:min-w-[200px]">
                 <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1413,7 +1413,7 @@ export function CreateInvoiceModal({ projectId, contactId, salesOrderId, proposa
                       </div>
 
                       {/* Qty / Price / Tax / Amount */}
-                      <div className="grid grid-cols-4 items-end gap-2 md:col-span-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 items-end gap-2 md:col-span-2">
                         <div>
                           <label className="block text-[11px] text-gray-400 mb-1">Qty</label>
                           <input
