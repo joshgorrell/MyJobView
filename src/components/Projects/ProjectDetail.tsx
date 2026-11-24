@@ -130,10 +130,10 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
           Back to Projects
         </button>
 
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">{project.name}</h1>
-            <div className="flex items-center gap-4 text-sm text-gray-400 flex-wrap">
+        <div className="flex min-w-0 items-start justify-between flex-wrap gap-2 sm:gap-3">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-white mb-1 break-words">{project.name}</h1>
+            <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-400 flex-wrap">
               <span>{project.project_number}</span>
               <span>•</span>
               <span>{project.contacts?.contact_name}</span>
@@ -162,14 +162,14 @@ export default function ProjectDetail({ projectId, onBack }: ProjectDetailProps)
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mt-4 border-b border-gray-700 overflow-x-auto">
+        <div className="flex min-w-0 gap-1 mt-2 sm:mt-4 border-b border-gray-700 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                className={`flex shrink-0 items-center gap-2 min-h-[44px] px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-gray-900 text-white border-t border-l border-r border-gray-700'
                     : 'text-gray-400 hover:text-white'
