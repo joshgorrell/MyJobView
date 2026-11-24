@@ -556,10 +556,10 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70">
       <div className="bg-surface text-primary shadow-2xl max-w-4xl w-full mx-auto min-h-screen sm:min-h-0 sm:my-6 sm:rounded-2xl border border-subtle flex flex-col">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-subtle">
+        <div className="flex items-center justify-between gap-1 px-2 sm:px-6 py-2 sm:py-3 border-b border-subtle">
           <div className="min-w-0 flex-1 pr-2">
-            <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{lead.contact_name}</h2>
-            {lead.company_name && <p className="text-sm sm:text-base text-gray-600 truncate">{lead.company_name}</p>}
+            <h2 className="text-lg sm:text-2xl font-bold text-primary truncate">{lead.contact_name}</h2>
+            {lead.company_name && <p className="text-sm sm:text-base text-secondary truncate">{lead.company_name}</p>}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isEditing && (
@@ -567,14 +567,14 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
                 <button
                   onClick={() => setIsEditing(true)}
                   className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Edit lead"
+                  title="Edit lead" aria-label="Edit lead"
                 >
                   <Edit2 className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete lead"
+                  title="Delete lead" aria-label="Delete lead"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -582,6 +582,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
             )}
             <button
               onClick={onClose}
+              aria-label="Close lead details"
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
@@ -589,7 +590,7 @@ export function LeadDetail({ leadId, onClose }: LeadDetailProps) {
           </div>
         </div>
 
-        <div className="p-4 sm:p-6 space-y-4">
+        <div className="min-w-0 p-2 sm:p-6 space-y-3 sm:space-y-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-secondary">
             {creatorProfile && <span className="inline-flex items-center gap-1.5"><UserCircle className="w-4 h-4" /> Created by {creatorProfile.full_name}</span>}
             <span className="inline-flex items-center gap-1.5"><Calendar className="w-4 h-4" /> {new Date(lead.created_at).toLocaleDateString()} · {formatDistanceToNow(lead.created_at)}</span>

@@ -336,9 +336,9 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
 
   return (
     <div className="space-y-0">
-      <div className="bg-surface rounded-t-lg border border-subtle border-b-0 px-4 sm:px-5 pt-3 pb-3">
+      <div className="bg-surface rounded-t-lg border border-subtle border-b-0 px-2 sm:px-5 pt-2 sm:pt-3 pb-2 sm:pb-3">
         {/* Phone layout: stacked rows */}
-        <div className="sm:hidden space-y-2">
+        <div className="lg:hidden space-y-2">
           <div className="flex items-center gap-2">
             <button
               onClick={isStandalone ? () => window.close() : onBack}
@@ -418,7 +418,7 @@ export function SalesOrderDetail({ orderId, onBack, onRevertToProposal, isStanda
         </div>
 
         {/* Desktop/tablet layout: single compact row */}
-        <div className="hidden sm:flex items-center gap-3 min-w-0">
+        <div className="hidden lg:flex items-center gap-3 min-w-0">
           <button
             onClick={isStandalone ? () => window.close() : onBack}
             className="flex items-center gap-1 text-xs text-muted hover:text-secondary transition-colors flex-shrink-0"
