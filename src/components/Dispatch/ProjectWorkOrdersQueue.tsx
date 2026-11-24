@@ -209,9 +209,9 @@ export function ProjectWorkOrdersQueue() {
   if (loadError) return <div role="alert" className="p-4 space-y-3"><p>{loadError}</p><button type="button" onClick={loadData} className="min-h-11 px-4 rounded-lg border border-subtle">Retry project work orders</button></div>;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-w-0 space-y-2 sm:space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-bold text-white">Project Work Orders</h2>
           <p className="text-gray-400 text-sm mt-1">
             {workOrders.length} project-based work {workOrders.length === 1 ? 'order' : 'orders'}
@@ -220,7 +220,8 @@ export function ProjectWorkOrdersQueue() {
 
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          aria-expanded={showFilters}
+          className="flex shrink-0 items-center gap-2 min-h-[44px] px-3 sm:px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
         >
           <Filter className="w-4 h-4" />
           Filters
