@@ -363,7 +363,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
     <div className="w-full">
       <div className="mb-3 space-y-2">
         {/* Row 1: View toggle, Search, Column settings, Action button */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
           <div className="inline-flex rounded-md border border-strong bg-canvas p-0.5 flex-shrink-0">
             <button
               onClick={() => setViewFilter('my')}
@@ -383,7 +383,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
             </button>
           </div>
 
-          <div className="relative flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0 basis-full order-first sm:basis-auto sm:order-none">
             {searchLoading ? (
               <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
             ) : (
@@ -398,7 +398,7 @@ export function ContactsView({ onNavigateToProposal, onNavigateToInvoices }: Con
                 typeFilter === 'customer' ? 'Search customers...' :
                 typeFilter === 'prospect' ? 'Search prospects...' : 'Search leads...'
               }
-              className="w-full pl-9 pr-3 py-1.5 text-sm bg-surface text-primary placeholder:text-muted border border-strong rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full min-h-[44px] sm:min-h-0 pl-9 pr-3 py-1.5 text-sm bg-surface text-primary placeholder:text-muted border border-strong rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
 

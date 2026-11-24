@@ -768,10 +768,10 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
       <div className="flex-shrink-0 border-b border-subtle bg-surface">
         <div className="px-3 sm:px-6 py-2 sm:py-4">
           {/* Mobile: one compact toolbar and search row */}
-          <div className="sm:hidden space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
+          <div className="lg:hidden space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h1 className="text-lg font-bold text-primary">Proposals</h1>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1">
                 <button
                   onClick={() => onNavigateToSalesOrders?.()}
                   aria-label="Sales Orders"
@@ -810,7 +810,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted" size={16} />
                 <input
                   type="text"
@@ -1008,7 +1008,7 @@ export default function ProposalsList({ onSelectProposal, onCreateNew, onSelectS
           </div>
 
           {/* Desktop: Everything on one row */}
-          <div className="hidden sm:flex items-center justify-between gap-3">
+          <div className="hidden lg:flex items-center justify-between gap-3">
             <h1 className="text-xl font-bold text-primary whitespace-nowrap">Proposals</h1>
 
             <div className="flex items-center gap-2 flex-1 max-w-md">
