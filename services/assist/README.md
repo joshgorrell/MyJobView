@@ -55,6 +55,16 @@ Still required: real Windows canary implementation/host; host startup and monito
 
 ## Private pilot routing
 
+### Testing the MJV invitation flow over trusted HTTPS
+
+The disposable `private-pilot.mjs` launcher uses a `.test` hostname, a local certificate and an SSH forward. It exercises native agent connectivity. The private listener does not serve `/v1/support` or `/v1/guest`, and the disposable dealer is outside the MJV database. For the full invitation flow, use an isolated staging deployment of the MJV frontend, Supabase Edge Functions, and Assist host with a staging test dealer and a second isolation test dealer.
+
+1. Allocate distinct staging web, agent and control hostnames. Serve the web and agent hostnames with publicly trusted certificates. Keep the control service backend loopback-only and expose only the control API paths on its authenticated HTTPS ingress. Keep the fixture listener on access-controlled HTTPS ingress for the test machines. Use dedicated staging state, credentials and recipient accounts.
+2. Deploy the normal MJV staff and guest functions against the staging control and agent origins. Use only approved test recipients. Keep production settings unchanged.
+3. Run the independent Windows canary against the staging fixture and record actual desktop input, consent and cross-dealer denial. The verifier bridge needs a real Windows harness. A successful HTTPS or WebSocket probe is transport evidence only. Enable guest invitations in staging only after the applicable Windows and guest lifecycle evidence is recorded.
+4. In staging MJV, email a test invite to the designated recipient, redeem it on Windows x64, run the temporary agent, approve desktop control, exercise input and end the session. Repeat with a copied code and test expired or used codes, denied consent, reconnect after End, and access from the second dealer. Record Windows prompts and time to connect. Verify ARM64 separately before enabling it.
+
+
 Native HTTP and WebSocket requests on the public control listener require a successful canary and a durably verified runtime. To make a single dedicated test dealer reachable during verification, configure both `ASSIST_PILOT_ORGANIZATION_ID` and `ASSIST_PILOT_LOOPBACK_PORT` on the control service. The optional listener binds to `127.0.0.1`, forwards only the configured dealer domain, and has no platform API endpoints. Keep it behind private, access-controlled HTTPS ingress for the pilot machines. Never add it to the public Caddy configuration. The real Windows verifier, least-privilege test identities, and independent consent and isolation checks are still required.
 
 ## Enrolled device management and fast repeat support (product requirements)
