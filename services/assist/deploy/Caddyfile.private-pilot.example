@@ -2,6 +2,7 @@
 # Reach this listener through authorized SSH forwards from the two test PCs.
 {
     admin off
+    default_sni assist-pilot.test
     auto_https disable_redirects
 }
 
