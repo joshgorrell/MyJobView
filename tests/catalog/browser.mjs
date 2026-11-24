@@ -15,7 +15,7 @@ async function expandAll(page) {
   if(await button.isVisible()) await button.click();
 }
 try {
-  for(const width of [320,390,768,1440]) {
+  for(const width of [320,375,390,430,768,1024,1440]) {
     const page=await browser.newPage({viewport:{width,height:900}});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:5198');
