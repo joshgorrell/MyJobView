@@ -220,7 +220,7 @@ export function TravelBonusQueue() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-white">Travel Bonus Management</h2>
         <p className="text-gray-300">Estimate trips and review technician travel bonuses</p>
@@ -233,14 +233,14 @@ export function TravelBonusQueue() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Pending Approval</p>
               <p className="text-3xl font-bold text-orange-600">{statusCounts.pending}</p>
             </div>
-            <DollarSign className="w-12 h-12 text-orange-600 opacity-20" />
+            <DollarSign className="w-8 h-8 md:w-12 md:h-12 shrink-0 text-orange-600 opacity-20" />
           </div>
           <p className="text-sm text-gray-600 mt-2">
             Total: {formatCurrency(totalPending)}
@@ -253,7 +253,7 @@ export function TravelBonusQueue() {
               <p className="text-sm text-gray-600">Approved</p>
               <p className="text-3xl font-bold text-green-600">{statusCounts.approved + statusCounts.adjusted}</p>
             </div>
-            <Check className="w-12 h-12 text-green-600 opacity-20" />
+            <Check className="w-8 h-8 md:w-12 md:h-12 shrink-0 text-green-600 opacity-20" />
           </div>
           <p className="text-sm text-gray-600 mt-2">
             Total: {formatCurrency(totalApproved)}
@@ -266,7 +266,7 @@ export function TravelBonusQueue() {
               <p className="text-sm text-gray-600">Denied</p>
               <p className="text-3xl font-bold text-red-600">{statusCounts.denied}</p>
             </div>
-            <X className="w-12 h-12 text-red-600 opacity-20" />
+            <X className="w-8 h-8 md:w-12 md:h-12 shrink-0 text-red-600 opacity-20" />
           </div>
         </div>
       </div>
