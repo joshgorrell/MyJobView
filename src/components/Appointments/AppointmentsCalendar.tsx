@@ -1306,10 +1306,10 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
     <CalendarWorkspace embedded={embedded} loading={loading} className="space-y-6" tabHref={'/calendar?' + new URLSearchParams({ popup: 'true', view: calendarView, viewMode, date: calendarDateKey(currentDate), calendarId: selectedCalendarId || '', technicianIds: calendarTechnicianIds.join(',') }).toString()}>
       {loadError && <p role="alert" className="text-red-600 text-sm">{loadError}</p>}
       {/* Header: two rows */}
-      <div className="space-y-3 bg-slate-800 rounded-xl p-3">
+      <div className="min-w-0 space-y-2 sm:space-y-3 bg-slate-800 rounded-xl p-2 sm:p-3">
         {/* Row 1: title, date nav, and action controls */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             <h2 className="text-xl sm:text-2xl font-bold text-white">
               {calendarView === 'my'
                 ? 'Calendar'
@@ -1336,6 +1336,7 @@ export function AppointmentsCalendar({ personalOnly = false, technicianOnly = fa
                 onClick={() => setShowCalendarManagement(true)}
                 className="p-2 bg-white/10 text-white hover:bg-white/20 rounded-lg transition-colors"
                 title="Manage Calendars"
+                aria-label="Manage Calendars"
               >
                 <Settings className="w-4 h-4" />
               </button>
