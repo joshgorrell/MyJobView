@@ -948,8 +948,9 @@ function AppContent() {
           </div>
         )}
         <main
-          className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-3 sm:px-4 lg:px-5 py-3 sm:py-4'}`}
-          style={{ scrollbarGutter: 'stable' }}
+          className={`min-h-0 min-w-0 flex-1 overflow-y-auto ${isStandalone ? 'w-full' : 'w-full px-2 sm:px-4 lg:px-5 py-2 sm:py-4'}`}
+          data-workspace-page={activeTab}
+          style={{ scrollbarGutter: 'auto' }}
         >
         <Suspense fallback={<LoadingFallback />}>
           {activeTab === 'time' && <EmployeeTimeClock key={activeTab} onNavigate={setActiveTab} onOpenWorkOrder={(id) => { setWorkOrderOpenedFromTime(true); setSelectedWorkOrderId(id); setActiveTab('work_orders'); }} />}
