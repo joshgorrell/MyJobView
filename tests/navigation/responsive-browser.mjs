@@ -42,7 +42,7 @@ try {
   browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const url='http://127.0.0.1:'+server.address().port;
-  for(const theme of ['dark','light','mjv']) for(const [width,height] of [[320,640],[390,760],[430,932],[667,375],[768,900],[1024,768],[1440,900]]){
+  for(const theme of ['dark','light','mjv']) for(const [width,height] of [[320,640],[375,667],[390,760],[430,932],[667,375],[768,900],[1024,768],[1440,900]]){
     await page.setViewportSize({width,height});await page.goto(url+'?theme='+theme);await page.waitForFunction(()=>document.querySelector('img')?.complete);
     const buttons=await page.locator('header button').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().toJSON()).filter(r=>r.width&&r.height));
     for(const [i,a] of buttons.entries()){

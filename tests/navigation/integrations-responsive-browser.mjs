@@ -18,7 +18,7 @@ try {
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
  const page=await browser.newPage({hasTouch:true});const errors=[];page.on('pageerror',e=>errors.push(e.message));
- for(const [width,height] of [[320,640],[390,844],[430,932],[844,390],[768,1024],[820,1180],[1024,768],[1194,834],[1366,1024],[1440,900]]){
+ for(const [width,height] of [[320,640],[375,667],[390,844],[430,932],[844,390],[768,1024],[820,1180],[1024,768],[1194,834],[1366,1024],[1440,900]]){
   await page.setViewportSize({width,height});await page.goto('http://127.0.0.1:'+server.address().port+'/?integration=openai');
   const nav=page.getByRole('navigation',{name:'Third-party integrations'});await nav.getByRole('button',{name:/ChatGPT/}).waitFor();
   await page.waitForFunction(()=>document.querySelector('nav [aria-current="page"]')?.getBoundingClientRect().right<=innerWidth+1);
