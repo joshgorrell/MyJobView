@@ -4,6 +4,16 @@ import { createServer } from 'vite';
 const server=await createServer({configFile:'tests/catalog/browser/vite.config.mjs'});
 await server.listen();
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH || undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
+async function selectCatalog(page,label,value) {
+  const mobile=page.viewportSize().width<1024;
+  if(mobile) await page.getByRole('button',{name:/^Filters/}).click();
+  await page.locator('select[aria-label="'+label+'"]:visible').selectOption(value);
+  if(mobile) await page.getByRole('button',{name:'Apply',exact:true}).click();
+}
+async function expandAll(page) {
+  const button=page.getByRole('button',{name:'Expand all',exact:true});
+  if(await button.isVisible()) await button.click();
+}
 try {
   for(const width of [320,390,768,1440]) {
     const page=await browser.newPage({viewport:{width,height:900}});
@@ -30,7 +40,7 @@ try {
     await page.getByPlaceholder('Search products...').fill('Episode');
     await group('Episode').waitFor();assert.equal(await group('Episode').getAttribute('aria-expanded'),'true');
     await page.getByPlaceholder('Search products...').fill('');
-    await page.getByRole('button',{name:'Filters',exact:true}).click();
+    await page.getByRole('button',{name:/^Filters/}).click();
     const vendor=page.locator('select').filter({has:page.locator('option[value="amazon"]')});
     assert.equal(await vendor.locator('option[value="amazon"]').textContent(),'Amazon');
     await vendor.selectOption('amazon');await page.getByRole('button',{name:'Apply',exact:true}).click();
@@ -38,20 +48,20 @@ try {
     await page.getByRole('button',{name:'Filters',exact:false}).first().click();
     await page.getByRole('button',{name:'Clear All',exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
     await page.getByText('3 of 4 products',{exact:true}).waitFor();
-    await page.getByRole('button',{name:'Filters',exact:true}).click();
+    await page.getByRole('button',{name:/^Filters/}).click();
     const brandFilter=page.locator('select').filter({has:page.locator('option[value="sony"]')});
     await brandFilter.selectOption('sony');await page.getByRole('button',{name:'Apply',exact:true}).click();
     await page.getByText('1 of 4 products',{exact:true}).waitFor();
     assert.equal(await group('Sony').getAttribute('aria-expanded'),'true');
     await page.getByRole('button',{name:/^Filters/}).click();await page.getByRole('button',{name:'Clear All',exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
     await page.getByText('3 of 4 products',{exact:true}).waitFor();
-    await page.getByLabel('Group products by').selectOption('category');await group('Speakers').waitFor();
-    await page.getByLabel('Group products by').selectOption('vendor');await group('Amazon').waitFor();
-    await page.getByRole('button',{name:'Expand all'}).click();
+    await selectCatalog(page,'Group products by','category');await group('Speakers').waitFor();
+    await selectCatalog(page,'Group products by','vendor');await group('Amazon').waitFor();
+    await expandAll(page);
     await page.getByTitle('Grid view').click();
     await page.getByText('Sony',{exact:true}).first().waitFor();
-    await page.getByLabel('Group products by').selectOption('none');
-    assert.equal(await page.locator('button[aria-expanded]').count(),0);
+    await selectCatalog(page,'Group products by','none');
+    assert.equal(await page.locator('section button[aria-expanded]').count(),0);
     await page.getByTitle('List view').click();
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
     assert.equal(overflow,false,`Catalog overflow at ${width}px`);
@@ -59,8 +69,8 @@ try {
     await viewButton.click();await page.getByTestId('stub-product-id').filter({hasText:'a'}).waitFor();
     await page.getByRole('button',{name:'Close test details'}).click();
     if(width>=768){
-      await page.getByLabel('Group products by').selectOption('brand');
-      await page.getByRole('button',{name:'Expand all'}).click();
+      await selectCatalog(page,'Group products by','brand');
+      await expandAll(page);
       const checkAlignment=async()=>{
         const columns=await page.locator('section table:visible').evaluateAll(tables=>tables.map(table=>[...table.querySelectorAll('thead th')].map(cell=>({x:cell.getBoundingClientRect().x,width:cell.getBoundingClientRect().width}))));
         assert.ok(columns.length>=3);
@@ -71,12 +81,12 @@ try {
       };
       await checkAlignment();
       assert.equal(await group('Sony').locator('span').first().evaluate(el=>getComputedStyle(el).fontSize),'14px');
-      await page.getByRole('button',{name:'Filters',exact:true}).click();
+      await page.getByRole('button',{name:/^Filters/}).click();
       await page.getByText('Hide cost column',{exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
       await checkAlignment();
       if(width===1440)await page.screenshot({path:'/tmp/mjv-catalog-aligned.png',fullPage:true});
     }
-    if(width===390){await page.getByLabel('Group products by').selectOption('brand');await page.getByRole('button',{name:'Expand all'}).click();await page.screenshot({path:'/tmp/mjv-catalog-mobile.png',fullPage:true});}
+    if(width===390){await selectCatalog(page,'Group products by','brand');await expandAll(page);await page.screenshot({path:'/tmp/mjv-catalog-mobile.png',fullPage:true});}
     assert.deepEqual(errors,[]);console.log(`Catalog interactions and layout passed at ${width}px`);
     await page.close();
   }
@@ -86,7 +96,7 @@ try {
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto('http://127.0.0.1:5198/?lifecycle=1');
     await page.getByText('3 of 5 products',{exact:true}).waitFor();
-    await page.getByLabel('Group products by').selectOption('none');
+    await selectCatalog(page,'Group products by','none');
     for (const view of ['List view','Grid view']) {
       await page.getByTitle(view,{exact:true}).click();
       for (const [status,visible,hidden] of [
@@ -95,7 +105,7 @@ try {
         ['archived',['OLD-TV'],['TV-1','TV-2','ES-1','MISC-ITEM']],
         ['all',['TV-1','TV-2','ES-1','MISC-ITEM','OLD-TV'],[]],
       ]) {
-        await page.getByLabel('Catalog status').selectOption(status);
+        await selectCatalog(page,'Catalog status',status);
         await page.getByText(`${visible.length} of 5 products`,{exact:true}).waitFor();
         for (const sku of visible) await page.getByRole('button',{name:`Open ${sku}`,exact:true}).waitFor();
         for (const sku of hidden) await page.getByRole('button',{name:`Open ${sku}`,exact:true}).waitFor({state:'hidden'});
@@ -106,8 +116,8 @@ try {
         await page.getByText(`${visible.length} of 5 products`,{exact:true}).waitFor();
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${view}/${status} overflow at ${width}`);
       }
-      await page.getByLabel('Catalog status').selectOption('current');
-      await page.getByRole('button',{name:'Filters',exact:true}).click();
+      await selectCatalog(page,'Catalog status','current');
+      await page.getByRole('button',{name:/^Filters/}).click();
       const category=page.locator('select').filter({has:page.locator('option', {hasText:'All Categories'})});
       await category.selectOption('Speakers');
       const subcategory=page.locator('select').filter({has:page.locator('option', {hasText:'All Subcategories'})});
@@ -118,12 +128,19 @@ try {
       await page.getByRole('button',{name:'Open ES-1',exact:true}).click();
       await page.getByTestId('stub-product-id').filter({hasText:'c'}).waitFor();
       await page.getByRole('button',{name:'Close test details'}).click();
-      await page.getByLabel('Catalog status').selectOption('discontinued');
+      await selectCatalog(page,'Catalog status','discontinued');
       await page.getByText('0 of 5 products',{exact:true}).waitFor();
-      assert.ok(await page.getByRole('button',{name:'In-ceiling',exact:false}).isVisible(),'Category filters persist across status');
-      await page.getByLabel('Active product filters').getByRole('button',{name:'Clear filters',exact:true}).click();
+      if(width<1024){
+        await page.getByRole('button',{name:/^Filters/}).click();
+        assert.equal(await page.locator('select').filter({has:page.locator('option',{hasText:'All Subcategories'})}).inputValue(),'In-ceiling');
+        await page.getByRole('button',{name:'Clear All',exact:true}).click();
+        await page.getByRole('button',{name:'Apply',exact:true}).click();
+      }else{
+        assert.ok(await page.getByRole('button',{name:'In-ceiling',exact:false}).isVisible(),'Category filters persist across status');
+        await page.getByLabel('Active product filters').getByRole('button',{name:'Clear filters',exact:true}).click();
+      }
       await page.getByText('1 of 5 products',{exact:true}).waitFor();
-      await page.getByLabel('Catalog status').selectOption('current');
+      await selectCatalog(page,'Catalog status','current');
     }
     assert.deepEqual(errors,[]);await page.close();
     console.log(`Status, search, in-ceiling browsing and detail interactions passed in list/grid at ${width}px`);
@@ -131,7 +148,7 @@ try {
   const page=await browser.newPage({viewport:{width:1440,height:900}});
   await page.goto('http://127.0.0.1:5198/?lifecycle=1');
   await page.getByText('3 of 5 products',{exact:true}).waitFor();
-  await page.getByLabel('Group products by').selectOption('none');
+  await selectCatalog(page,'Group products by','none');
   assert.equal(await page.getByRole('button',{name:/^View /}).count(),0);
   assert.equal(await page.getByRole('button',{name:'Open TV-2',exact:true}).count(),0,'Discontinued products hidden by default');
   assert.equal(await page.getByRole('button',{name:'Open OLD-TV',exact:true}).count(),0);
@@ -139,19 +156,19 @@ try {
   await row.getByRole('button',{name:'Archive TV-1',exact:true}).click();
   await page.getByRole('button',{name:'Archive',exact:true}).click();
   await page.getByText('2 of 5 products',{exact:true}).waitFor();
-  await page.getByLabel('Catalog status').selectOption('archived');
+  await selectCatalog(page,'Catalog status','archived');
   await page.getByRole('button',{name:'Open OLD-TV',exact:true}).waitFor();
   await page.locator('tbody tr').filter({hasText:'TV-1'}).getByRole('button',{name:'Restore TV-1',exact:true}).click();
   await page.getByRole('button',{name:'Restore',exact:true}).click();
   await page.getByText('1 of 5 products',{exact:true}).waitFor();
-  await page.getByLabel('Catalog status').selectOption('current');
+  await selectCatalog(page,'Catalog status','current');
   await page.getByText('3 of 5 products',{exact:true}).waitFor();
   await page.locator('tbody tr').filter({hasText:'TV-1'}).getByRole('button',{name:'Delete TV-1',exact:true}).click();
   await page.getByRole('button',{name:'Delete',exact:true}).click();
   await page.getByText('Product is in use',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByPlaceholder('Search products...').fill('Bedroom');
-  await page.getByLabel('Catalog status').selectOption('discontinued');
+  await selectCatalog(page,'Catalog status','discontinued');
   assert.equal(await page.getByPlaceholder('Search products...').inputValue(),'Bedroom','Status changes preserve search');
   assert.ok((await page.getByLabel('Catalog status').textContent()).includes('Discontinued — to archive (1)'));
   assert.equal(await page.getByRole('button',{name:'Open TV-2',exact:true}).count(),0,'Search continues to narrow discontinued results');

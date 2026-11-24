@@ -317,11 +317,11 @@ export default function ProductsManagement() {
     .map(p => p.subcategoryName).filter(Boolean))).sort();
 
   return (
-    <div className="min-w-0 space-y-4 sm:space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Product Catalog</h2>
-          <p className="text-gray-400 mt-1">
+    <div className="min-w-0 space-y-2 sm:space-y-6">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold text-white">Product Catalog</h2>
+          <p className="text-xs sm:text-base text-gray-400 sm:mt-1">
             {activeTab === 'products'
               ? `${filteredProducts.length} of ${products.length} products`
               : activeTab === 'packages'
@@ -341,10 +341,11 @@ export default function ProductsManagement() {
                   setShowPackageForm(true);
                 }
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"
+              aria-label={activeTab === 'products' ? 'Add Product' : 'Add Package'}
+              className="shrink-0 min-h-11 min-w-11 justify-center px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"
             >
               <Plus size={20} />
-              {activeTab === 'products' ? 'Add Product' : 'Add Package'}
+              <span className="hidden sm:inline">{activeTab === 'products' ? 'Add Product' : 'Add Package'}</span>
             </button>
           ) : (
             <div className="flex items-center gap-2 text-gray-400 text-sm">
@@ -390,7 +391,7 @@ export default function ProductsManagement() {
       </div>
 
       {/* Search and Filter Bar - Consistent across all tabs */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
         {/* Search Bar */}
         <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -409,6 +410,7 @@ export default function ProductsManagement() {
           />
         </div>
 
+        <div className="hidden lg:contents">
         {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => setFilterStatus(event.target.value as typeof filterStatus)} className="max-w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
           <option value="current">Current products</option><option value="discontinued">Discontinued — to archive ({discontinuedCount})</option><option value="archived">Archived</option><option value="all">All products</option>
         </select>}
@@ -429,8 +431,9 @@ export default function ProductsManagement() {
             <option value="vendor">Group: Vendor</option><option value="none">No grouping</option>
           </select>
         )}
+        </div>
         {/* View Toggle - Always visible */}
-        <div className="flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
+        <div className="order-2 ml-auto lg:order-none lg:ml-0 flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-1">
           <button
             onClick={() => activeTab === 'products' ? setProductsViewMode('list') : setPackagesViewMode('list')}
             disabled={activeTab === 'monitoring'}
@@ -464,18 +467,19 @@ export default function ProductsManagement() {
         {/* Filters Button - Same style for both Products and Packages */}
         {activeTab === 'products' && (
           <button
+            aria-expanded={showFilterPanel}
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 text-sm transition-colors ${
-              filterType !== 'all' || filterCategory !== 'all' || filterSubcategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all'
+              filterStatus !== 'current' || showMissingPhotos || filterType !== 'all' || filterCategory !== 'all' || filterSubcategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all'
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-750'
             }`}
           >
             <Filter size={16} />
             Filters
-            {(filterType !== 'all' || filterCategory !== 'all' || filterSubcategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all') && (
+            {(filterStatus !== 'current' || showMissingPhotos || filterType !== 'all' || filterCategory !== 'all' || filterSubcategory !== 'all' || filterManufacturer !== 'all' || filterVendor !== 'all' || filterPhase !== 'all') && (
               <span className="bg-white text-blue-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {[filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].filter(f => f !== 'all').length}
+                {[filterType, filterCategory, filterSubcategory, filterManufacturer, filterVendor, filterPhase].filter(f => f !== 'all').length + Number(filterStatus !== 'current') + Number(showMissingPhotos)}
               </span>
             )}
           </button>
@@ -500,7 +504,7 @@ export default function ProductsManagement() {
       </div>
 
       {activeTab === 'products' && (activeFilterCount > 0 || showMissingPhotos) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Active product filters">
+        <div className="hidden lg:flex flex-wrap items-center gap-2 text-xs" aria-label="Active product filters">
           {[
             { label: filterCategory, clear: () => { setFilterCategory('all'); setFilterSubcategory('all'); } },
             { label: filterSubcategory, clear: () => setFilterSubcategory('all') },
@@ -536,6 +540,29 @@ export default function ProductsManagement() {
             >
               <X size={18} />
             </button>
+          </div>
+
+          <div className="grid gap-2 lg:hidden">
+        {activeTab === 'products' && <select aria-label="Catalog status" value={filterStatus} onChange={event => setFilterStatus(event.target.value as typeof filterStatus)} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
+          <option value="current">Current products</option><option value="discontinued">Discontinued — to archive ({discontinuedCount})</option><option value="archived">Archived</option><option value="all">All products</option>
+        </select>}
+        {activeTab === 'products' && missingPhotoCount > 0 && (
+          <button type="button" onClick={() => setShowMissingPhotos(value => !value)}
+            aria-pressed={showMissingPhotos}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${showMissingPhotos
+              ? 'border-amber-400 bg-amber-500 text-gray-950'
+              : 'border-amber-600/50 bg-gray-800 text-amber-300 hover:bg-gray-700'}`}>
+            Missing photos ({missingPhotoCount})
+          </button>
+        )}
+
+        {activeTab === 'products' && (
+          <select aria-label="Group products by" value={groupBy} onChange={e => setGroupBy(e.target.value as CatalogGrouping)}
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">
+            <option value="brand">Group: Brand</option><option value="category">Group: Category</option>
+            <option value="vendor">Group: Vendor</option><option value="none">No grouping</option>
+          </select>
+        )}
           </div>
 
           <div>
