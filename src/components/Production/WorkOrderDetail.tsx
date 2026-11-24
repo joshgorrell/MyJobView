@@ -757,10 +757,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 min-w-0">
+      <div className="flex flex-col lg:flex-row items-start justify-between gap-2 lg:gap-4">
+        <div className="flex items-start gap-2 sm:gap-3 min-w-0 max-w-full">
           <button
             onClick={onBack}
+            aria-label="Back to work orders"
             className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg shrink-0 mt-0.5"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -829,7 +830,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full lg:shrink-0">
           {workOrder.type==='service' && workOrder.status!=='cancelled' && ['admin','manager','service_manager','finance'].includes(profile?.role || '') && <button onClick={async()=>{
             const {data:link,error}=await supabase.from('work_order_invoice_links').select('invoice_id').eq('work_order_id',workOrderId).maybeSingle();
             if(error){notify(error.message, { theme: 'blue', tone: 'error' });return;}
