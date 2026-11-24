@@ -177,7 +177,7 @@ export function FinanceDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
@@ -193,7 +193,7 @@ export function FinanceDashboard() {
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-6">
         {/* Monthly Revenue */}
         <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center justify-between mb-4">
@@ -249,7 +249,7 @@ export function FinanceDashboard() {
       </div>
 
       {/* Secondary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
         <div className="bg-canvas rounded-xl shadow-sm border border-subtle p-6">
           <div className="flex items-center gap-3 mb-2">
             <DollarSign className="w-5 h-5 text-muted" />
