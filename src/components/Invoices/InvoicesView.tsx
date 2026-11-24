@@ -210,13 +210,13 @@ export function InvoicesView({ onNavigateToContact, contactIdFilter, onClearCont
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-primary">Invoices</h2>
           <p className="text-sm sm:text-base text-muted">Manage customer invoices and payments</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowSelectCustomer(true)}
             className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-2 bg-green-600 text-primary rounded-lg hover:bg-green-700 active:bg-green-800 flex items-center justify-center gap-2 text-sm sm:text-base transition-colors touch-manipulation"

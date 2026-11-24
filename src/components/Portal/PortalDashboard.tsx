@@ -369,8 +369,8 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
       )}
       <header className="bg-[#0f2347] text-white shadow-lg sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center justify-between gap-2 h-14 sm:h-20">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-4">
               {showBack && (
                 <button
                   onClick={() => setCurrentView('dashboard')}
@@ -384,10 +384,10 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
                 <img
                   src={dealerLogo}
                   alt={dealerName}
-                  className="h-8 sm:h-10 object-contain"
+                  className="h-8 sm:h-10 max-w-[140px] sm:max-w-[240px] object-contain"
                 />
               ) : (
-                <span className="text-white font-bold text-lg">{dealerName}</span>
+                <span className="min-w-0 truncate text-white font-bold text-lg">{dealerName}</span>
               )}
               <div className="hidden sm:block border-l border-white/20 pl-4">
                 <p className="text-white font-semibold text-sm leading-tight">Customer Portal</p>
@@ -396,6 +396,7 @@ export function PortalDashboard({ defaultModule = 'dashboard' }: PortalDashboard
             </div>
             <button
               onClick={handleSignOut}
+              aria-label={isImpersonating ? 'Exit Preview' : 'Sign Out'}
               className="flex items-center gap-2 px-3 sm:px-4 py-2 text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-sm font-medium min-h-[44px]"
             >
               <LogOut className="w-4 h-4" />

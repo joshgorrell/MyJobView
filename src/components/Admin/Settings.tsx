@@ -116,7 +116,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
   }, [initialTab]);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-primary mb-1 flex items-center gap-2">
           <SettingsIcon className="w-6 h-6" />
@@ -126,7 +126,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
       </div>
 
       <div className="bg-canvas rounded-lg shadow-sm border-2 border-subtle">
-        <div className="border-b border-subtle bg-canvas p-3 sm:p-5 space-y-4">
+        <div className="border-b border-subtle bg-canvas p-2 sm:p-5 space-y-2 sm:space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <label className="block w-full sm:max-w-sm">
               <span className="sr-only">Search admin settings</span>
@@ -139,9 +139,9 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
             {adminGroups.map(group => (
               <button key={group.id} type="button" onClick={() => { setSettingsSearch(''); const firstPage = adminItems.find(item => item.group === group.id && item.visible !== false); if (firstPage) setActiveTab(firstPage.id); else setSelectedGroup(group.id); }}
                 aria-pressed={selectedGroup === group.id}
-                className={`rounded-xl border px-3 py-3 text-left transition-colors ${selectedGroup === group.id ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary hover:bg-surface-secondary hover:text-primary'}`}>
+                className={`rounded-xl border px-2 py-2 sm:px-3 sm:py-3 text-left transition-colors ${selectedGroup === group.id ? 'border-blue-500 bg-blue-500/10 text-primary' : 'border-subtle text-secondary hover:bg-surface-secondary hover:text-primary'}`}>
                 <span className="block text-sm font-semibold">{group.label}</span>
-                <span className="mt-1 block text-xs opacity-75">{group.description}</span>
+                <span className="mt-1 hidden sm:block text-xs opacity-75">{group.description}</span>
               </button>
             ))}
           </nav>
@@ -157,7 +157,7 @@ export function Settings({ initialTab, onNavigate }: { initialTab?: string; onNa
           </nav>
         </div>
 
-        <div className="p-4 sm:p-6 bg-canvas">
+        <div className="min-w-0 p-2 sm:p-6 bg-canvas">
           <Suspense fallback={<SettingsLoadingFallback />}>
             {activeTab === 'work_orders' && <WorkOrderSettings />}
             {activeTab === 'users' && <UserManagement onNavigate={onNavigate} />}
