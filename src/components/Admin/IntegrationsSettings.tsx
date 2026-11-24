@@ -402,8 +402,8 @@ export function IntegrationsSettings() {
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain p-3 sm:p-6">
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -421,7 +421,7 @@ export function IntegrationsSettings() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 justify-end">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-end">
               <button
                 onClick={() => setShowConfirmDialog(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
@@ -442,8 +442,8 @@ export function IntegrationsSettings() {
 
       {/* Payment Processor Confirm Dialog */}
       {showPaymentConfirmDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain p-3 sm:p-6">
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -457,7 +457,7 @@ export function IntegrationsSettings() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 justify-end">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-end">
               <button
                 onClick={() => setShowPaymentConfirmDialog(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
