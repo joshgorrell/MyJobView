@@ -9,13 +9,13 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | assist | Pending |
 | bonus_approvals | Pending |
 | bug_management | Pending |
-| calendar | Pending |
+| calendar | Layout merged #1261; verification pending |
 | change_orders | Pending |
 | commission_management | Pending |
 | company_directory | Pending |
 | commissions | Pending |
 | contact_import | Pending |
-| contacts | Pending |
+| contacts | Layout merged #1259; verification pending |
 | contract_import | Pending |
 | contract_management | Pending |
 | customer_comms | Pending |
@@ -35,11 +35,11 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | improvements | Pending |
 | individual_dashboard | Pending |
 | inventory | Pending |
-| invoices | Pending |
+| invoices | Layout merged #1260; modal #1264 open |
 | job_acceptance | Pending |
 | job_photos | Pending |
 | job_status | Pending |
-| leads | Pending |
+| leads | Detail #1262 open; verification pending |
 | maintenance_agreements | Pending |
 | materials | Pending |
 | my_mileage | Pending |
@@ -54,10 +54,10 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | production_dashboard | Pending |
 | production_manager | Pending |
 | products | Pending |
-| products_catalog | Pending |
-| project_work_orders | Pending |
-| projects | Pending |
-| proposals | Pending |
+| products_catalog | Layout merged #1257; catalog browser review passed on that PR; full audit pending |
+| project_work_orders | Layout merged #1261; verification pending |
+| projects | Detail #1263 open; verification pending |
+| proposals | Layout merged #1259; builder #1263 open |
 | pto_management | Pending |
 | punchlist | Pending |
 | purchase_orders | Pending |
@@ -65,16 +65,16 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | report_templates | Pending |
 | reviews | Pending |
 | rewards_dashboard | Pending |
-| sales | Pending |
+| sales | Shared proposals layout #1259; verification pending |
 | sales_dashboard | Pending |
-| sales_orders | Pending |
+| sales_orders | List merged #1259; detail #1262 open |
 | sales_performance | Pending |
 | sales_service_requests | Pending |
 | security_onboarding | Pending |
 | service_billing | Pending |
 | service_request_analytics | Pending |
 | service_requests | Pending |
-| settings | Pending |
+| settings | Layout merged #1260; integration dialogs #1264 open |
 | sticky-notes | Pending |
 | tasks | Pending |
 | tax_filing_guide | Pending |
@@ -89,9 +89,86 @@ Widths: 320, 375, 390, 430, 768, 1024, 1440. Check body and workspace overflow, 
 | time | Pending |
 | time_approval | Pending |
 | time_clock_management | Pending |
-| labor_dashboard | Pending |
-| travel_bonus | Pending |
-| travel_bonus_settings | Pending |
+| labor_dashboard | Layout #1263 open; verification pending |
+| travel_bonus | Layout merged #1261; verification pending |
+| travel_bonus_settings | Shared travel bonus layout #1261; verification pending |
 | vehicle-tracking | Pending |
 | vip-plans | Pending |
+| work_orders | List merged #1260; detail #1262 open |
+
+## Admin settings subsections
+
+Derived from Settings.tsx adminItems. All require separate verification, including permissions and deep links.
+
+| Section | Status |
+|---|---|
+| company | Pending |
+| cards | Pending |
+| portal | Pending |
+| billing | Pending |
+| automation | Pending |
+| users | Pending |
+| sessions | Pending |
+| roles | Pending |
+| permissions | Pending |
+| departments | Pending |
+| rewards | Pending |
+| kiosk | Pending |
+| proposals | Pending |
+| salestax | Pending |
+| salestargets | Pending |
+| contracts | Pending |
 | work_orders | Pending |
+| labor | Pending |
+| timeclock | Pending |
+| travel | Pending |
+| priorities | Pending |
+| emails | Pending |
+| email_config | Pending |
+| messages | Pending |
+| integrations | Pending |
+| products | Pending |
+| catalog | Pending |
+| contact_import | Pending |
+| orphaned | Pending |
+
+## Public, portal and standalone routes
+
+Derived from App.tsx path branches; grouped aliases still require individual checks.
+
+| Path or route family | Status |
+|---|---|
+| / | Pending |
+| /assist (guest) | Pending |
+| /shared/proposal | Pending |
+| /portal/proposals and /portal/proposals/* | Pending |
+| /proposals/* | Pending |
+| /proposal-check-response | Pending |
+| /lost-opportunity-review | Pending |
+| /portal/security, /security-onboarding, /onboarding | Pending |
+| /portal/service-approval | Pending |
+| /portal/dashboard | Pending |
+| /auth-bridge | Pending |
+| /auth-callback | Pending |
+| /login, /portal | Pending |
+| /dealer-login | Pending |
+| /punchlist, /portal/punchlist | Pending |
+| /vip-membership, /portal/vip-membership | Pending |
+| /contact, /portal/contact | Pending |
+| /membership, /portal/membership | Pending |
+| /signup, /portal/signup | Pending |
+| /portal/vip-benefits | Pending |
+| /calendar | Pending |
+| /feedback | Pending |
+| /eula | Pending |
+| /privacy-policy | Pending |
+| /kiosk | Pending |
+| /tv-dashboard | Pending |
+| /sales-tv-dashboard | Pending |
+| /sales-order-fullscreen | Pending |
+| /proposals-fullscreen | Pending |
+| /project-punchlist (legacy workspace alias) | Pending |
+
+## Verification evidence
+
+Existing browser suites include tests/catalog/browser.mjs, tests/navigation/responsive-browser.mjs, tests/navigation/integrations-responsive-browser.mjs and tests/modals/responsive-browser.mjs. PR #1265 expands viewport coverage. A test existing is not proof of a passing current build. Record run links and tested states before changing any route to verified. Detail and dialog inventory remains incomplete.
