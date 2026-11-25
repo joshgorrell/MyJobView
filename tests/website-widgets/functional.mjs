@@ -25,3 +25,19 @@ for(const endpoint of ['website-widget-config','submit-website-lead','submit-web
  for(const method of ['GET','POST','OPTIONS'])assert.equal((await handler(new Request('https://api.example.com',{method}))).status,404,endpoint);
 }
 console.log('Functional session and disabled endpoint tests passed');
+
+const {validateWebsiteLead}=await load('supabase/functions/_shared/website-lead-validation.ts');
+const {validateWebsiteService}=await load('supabase/functions/_shared/website-service-validation.ts');
+const contact={name:' Test Visitor ',email:' TEST@example.com ',phone:'785-555-0100',zip:'66601',requestId,consent:true};
+const lead={...contact,projectType:'residential',timeline:'Soon',interests:['Audio',' Audio ','Security']};
+const service={...contact,address:'123 Test Street',city:'Topeka',state:'KS',description:'Synthetic service request'};
+assert.deepEqual(validateWebsiteLead(lead).interests,['Audio','Security']);
+assert.equal(validateWebsiteLead(lead).email,'test@example.com');
+assert.equal(validateWebsiteService(service).name,'Test Visitor');
+for(const [validator,valid] of [[validateWebsiteLead,lead],[validateWebsiteService,service]]){
+ for(const patch of [{consent:false},{consent:'true'},{email:'bad'},{phone:'-------'},{zip:'bad'},{requestId:'bad'},{name:' '},{description:'x'.repeat(4001)}])assert.throws(()=>validator({...valid,...patch}));
+ for(const bad of [null,[],42,'test'])assert.throws(()=>validator(bad));
+}
+for(const patch of [{projectType:'unknown'},{interests:[]},{interests:[123]},{interests:Array(13).fill('Audio')}])assert.throws(()=>validateWebsiteLead({...lead,...patch}));
+for(const patch of [{address:''},{city:''},{state:''}])assert.throws(()=>validateWebsiteService({...service,...patch}));
+console.log('Lead and service validation tests passed');
