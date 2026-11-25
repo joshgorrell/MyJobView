@@ -1,3 +1,14 @@
+create table public.website_lead_notification_outbox (
+  lead_id uuid primary key references public.leads(id) on delete cascade,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  state text not null default 'pending' check (state in ('pending','sending','sent','review')),
+  attempted_at timestamptz
+);
+alter table public.website_lead_notification_outbox enable row level security;
+revoke all on public.website_lead_notification_outbox from public, anon, authenticated;
+grant select, insert, update on public.website_lead_notification_outbox to service_role;
+
 -- Service-role only; the public edge handler must validate origin, consent and abuse controls.
 create or replace function public.create_website_lead(p_widget uuid, p_origin text, p_request uuid, p_name text, p_email text, p_phone text, p_description text)
 returns uuid language plpgsql security invoker set search_path = public as $$
@@ -28,6 +39,8 @@ begin
   end if;
   insert into public.leads(contact_name, username, email, phone, opportunity_description, priority, status, is_fishbowl, lead_source, converted_from_contact_id, organization_id, office_id, assigned_to)
   values(p_name,v_username,lower(p_email),p_phone,p_description,'low',case when v_rep is null then 'unclaimed' else 'claimed' end,v_rep is null,'website',v_contact,w.organization_id,v_office,v_rep) returning id into v_lead;
+  insert into public.website_lead_notification_outbox(lead_id, organization_id)
+  values(v_lead,w.organization_id) on conflict (lead_id) do nothing;
   return v_lead;
 end;
 $$;
