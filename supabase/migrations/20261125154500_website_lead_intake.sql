@@ -15,14 +15,18 @@ begin
   if found then return v_lead; end if;
   select id into v_office from public.company_offices where organization_id = w.organization_id and (w.options->>'office_id' is null or id::text = w.options->>'office_id') order by display_order, id limit 1;
   if not found then raise exception 'Office unavailable'; end if;
+ if nullif(w.options->>'rep_id','') is not null then
+ select id into v_rep from public.profiles where organization_id = w.organization_id and id::text = w.options->>'rep_id' and is_active = true;
+ if not found then raise exception 'Representative unavailable'; end if;
+ end if;
   perform pg_advisory_xact_lock(hashtextextended(w.organization_id::text || ':email:' || lower(p_email), 1));
   select id into v_contact from public.contacts where organization_id = w.organization_id and lower(email) = lower(p_email) order by id limit 1;
   if not found then
     insert into public.contacts(contact_name, first_name, last_name, username, email, phone, notes, contact_type, portal_access_enabled, organization_id, office_id)
     values(p_name, split_part(p_name,' ',1), trim(substr(p_name,length(split_part(p_name,' ',1))+1)), v_username, lower(p_email), p_phone, 'Created from website inquiry', 'person', false, w.organization_id, v_office) returning id into v_contact;
   end if;
-  insert into public.leads(contact_name, username, email, phone, opportunity_description, priority, status, is_fishbowl, lead_source, converted_from_contact_id, organization_id, office_id)
-  values(p_name,v_username,lower(p_email),p_phone,p_description,'low','unclaimed',true,'website',v_contact,w.organization_id,v_office) returning id into v_lead;
+  insert into public.leads(contact_name, username, email, phone, opportunity_description, priority, status, is_fishbowl, lead_source, converted_from_contact_id, organization_id, office_id, assigned_to)
+  values(p_name,v_username,lower(p_email),p_phone,p_description,'low',case when v_rep is null then 'unclaimed' else 'claimed' end,v_rep is null,'website',v_contact,w.organization_id,v_office,v_rep) returning id into v_lead;
   return v_lead;
 end;
 $$;
