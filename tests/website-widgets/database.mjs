@@ -41,5 +41,27 @@ assert.deepEqual((await db.query('select website_analytics_sales($1) as result',
 await assert.rejects(db.query('select website_analytics_sales($1)',[b]));
 await db.exec('reset role;set role anon');
 await assert.rejects(db.query('select website_analytics_sales($1)',[a]));
+await db.exec(`reset role;
+create table service_requests(id uuid primary key default gen_random_uuid(),organization_id uuid,customer_name text,customer_email text,customer_phone text,job_location_address text,job_location_city text,job_location_state text,job_location_zip text,job_description text,billable_type text,billable_by text,status text,source_type text,customer_contact_instruction text,notes text);
+create table customer_satisfaction(id uuid primary key default gen_random_uuid(),organization_id uuid,customer_name text,customer_email text,rating text,comment text,responded_at timestamptz);
+grant select,insert on service_requests,customer_satisfaction to service_role;`);
+for(const name of ['20261125161500_website_service_intake.sql','20261125163000_website_feedback_intake.sql'])await db.exec(await readFile(new URL('../../supabase/migrations/'+name,import.meta.url),'utf8'));
+const service=crypto.randomUUID(),feedback=crypto.randomUUID(),request=crypto.randomUUID();
+await db.query("insert into website_widget_settings(organization_id,kind,public_id,enabled,allowed_origins) values ($1,'service',$2,true,array['https://a.example']),($1,'feedback',$3,true,array['https://a.example'])",[a,service,feedback]);
+await db.exec('set role service_role');
+const sArgs=[service,'https://a.example',request,'Test','test@example.com','5550100','123 Test','Topeka','KS','66601','Test request'];
+const sSql='select create_website_service($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) as id';
+const s1=(await db.query(sSql,sArgs)).rows[0].id;
+assert.equal((await db.query(sSql,sArgs)).rows[0].id,s1);
+await assert.rejects(db.query(sSql,[service,'https://b.example',...sArgs.slice(2)]));
+const fArgs=[feedback,'https://a.example',request,'Test','test@example.com','good','Test feedback'];
+const fSql='select create_website_feedback($1,$2,$3,$4,$5,$6,$7) as id';
+const f1=(await db.query(fSql,fArgs)).rows[0].id;
+assert.equal((await db.query(fSql,fArgs)).rows[0].id,f1);
+await assert.rejects(db.query(fSql,[feedback,'https://b.example',...fArgs.slice(2)]));
+assert.equal((await db.query('select * from service_requests')).rows.length,1);
+assert.equal((await db.query('select * from customer_satisfaction')).rows.length,1);
+await db.exec('reset role;set role authenticated');
+await assert.rejects(db.query(sSql,sArgs));await assert.rejects(db.query(fSql,fArgs));
 }finally{await db.close();}
 console.log('Widget database isolation and rate-limit checks passed');
