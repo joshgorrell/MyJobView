@@ -481,6 +481,12 @@ function FilterModal({
   );
 }
 
+// TaxJar writes decimal rates; older proposal rows can contain percentages.
+function proposalTaxRateDecimal(rate: number | null | undefined): number {
+  const value = Number(rate ?? 0);
+  return value > 1 ? value / 100 : value;
+}
+
 export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateToSalesOrder, targetRoomIds: _externalTargetRoomIds, onTargetRoomsChange: _onTargetRoomsChange, isStandalone = false, onProposalIdChange, aiPrefillRooms, changeOrderId, onCORefresh, autoOpenQA = false, autoThreadId = null }: ProposalBuilderCompactProps) {
   const isCoMode = !!changeOrderId;
   const { profile } = useAuth();
@@ -497,7 +503,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
 
   // Helper function to calculate parts and labor tax for a single line item
   function calculateItemTax(item: any, proposal: any) {
-    const taxRate = proposal?.tax_rate || 0;
+    const taxRate = proposalTaxRateDecimal(proposal?.tax_rate);
     const priceTotal = parseFloat(String(item.price_total || 0));
     const laborTotal = parseFloat(String(item.labor_total || 0));
 
@@ -2722,7 +2728,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
         custom2Percent: proposalSettings?.custom_modifier_2_percent || 0,
         custom2Amount: parseFloat(String(proposal.custom_modifier_2_amount || 0)),
         adjustedSubtotal: parseFloat(String(proposal.subtotal || 0)) - parseFloat(String(proposal.discount_amount || 0)) + parseFloat(String(proposal.project_management_amount || 0)) + parseFloat(String(proposal.project_design_amount || 0)) + parseFloat(String(proposal.system_design_amount || 0)) + parseFloat(String(proposal.credit_card_fee_amount || 0)) + parseFloat(String(proposal.misc_parts_amount || 0)) + parseFloat(String(proposal.custom_modifier_1_amount || 0)) + parseFloat(String(proposal.custom_modifier_2_amount || 0)),
-        taxRate: proposal?.tax_rate || 0,
+        taxRate: proposalTaxRateDecimal(proposal?.tax_rate) * 100,
         taxAmount: parseFloat(String(proposal.tax_amount || 0)),
         total: parseFloat(String(proposal.total || 0)),
         depositPercent: proposal?.deposit_percent || 0,
@@ -2769,7 +2775,7 @@ export default function ProposalBuilderCompact({ proposalId, onBack, onNavigateT
     const adjustedSubtotal = modifiedMaterials + modifiedLabor;
 
     // Calculate tax based on proposal tax settings and sales tax matrix
-    const taxRateDecimal = (proposal?.tax_rate || 0) / 100;
+    const taxRateDecimal = proposalTaxRateDecimal(proposal?.tax_rate);
 
     let taxAmount = 0;
     if (proposal?.tax_override) {
