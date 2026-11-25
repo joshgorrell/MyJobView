@@ -6,21 +6,25 @@ const labels: Record<WebsiteWidgetKind, string> = {
   'sales-lead': 'Sales Leads', chat: 'Live Chat', service: 'Service Requests',
   feedback: 'Customer Feedback', portal: 'Customer Portal', analytics: 'Conversion Analytics',
 };
-type Settings = { kind: WebsiteWidgetKind; public_id: string; enabled: boolean; allowed_origins: string[]; branding: { name?: string; color?: string } };
+type Settings = { kind: WebsiteWidgetKind; public_id: string; enabled: boolean; allowed_origins: string[]; branding: { name?: string; color?: string }; options?: { interests?: string[]; [key: string]: unknown } };
 function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKind; organizationId: string; initial?: Settings }) {
   const [saved, setSaved] = useState(initial);
   const [origins, setOrigins] = useState(initial?.allowed_origins.join('\n') ?? '');
   const [name, setName] = useState(initial?.branding.name ?? '');
   const [color, setColor] = useState(initial?.branding.color ?? '#2563eb');
+  const [interests, setInterests] = useState(initial?.options?.interests?.join('\n') ?? '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function save() {
     setBusy(true); setMessage('');
     try {
       const allowed_origins = [...new Set(origins.split(/\s+/).filter(Boolean).map(normalizeWebsiteOrigin))];
+      const choices = [...new Set(interests.split('\n').map(v => v.trim()).filter(Boolean))];
+      if (kind === 'sales-lead' && (choices.length > 30 || choices.some(v => v.length > 100))) { setMessage('Use up to 30 service choices, each at most 100 characters.'); return; }
+      const options = { ...saved?.options, ...(kind === 'sales-lead' ? { interests: choices } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
-        organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, enabled: false,
-      }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding').single();
+        organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, options, enabled: false,
+      }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
       if (error) throw error;
       setSaved(data as Settings); setMessage('Configuration saved. Activation is not available yet.');
     } catch { setMessage('Unable to save. Check the HTTPS origins and try again.'); }
@@ -34,6 +38,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     </label>
     <label className="block text-sm">Display name<input className="block w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} maxLength={100} /></label>
     <label className="block text-sm">Brand color <input type="color" value={color} onChange={e => setColor(e.target.value)} /></label>
+    {kind === 'sales-lead' && <label className="block text-sm">Services offered (one per line)<textarea className="block w-full border rounded p-2" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Home Theater" /><span className="text-xs">Customers can select multiple services. Leave blank to allow free text.</span></label>}
     <div className="border rounded p-3" aria-label="Branding preview"><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
@@ -49,7 +54,7 @@ export function WebsiteWidgetSettings({ organizationId }: { organizationId: stri
   useEffect(() => {
     let cancelled = false;
     setRows(null); setError(false);
-    void supabase.from('website_widget_settings').select('kind,public_id,enabled,allowed_origins,branding').eq('organization_id', organizationId).then(({ data, error }) => {
+    void supabase.from('website_widget_settings').select('kind,public_id,enabled,allowed_origins,branding,options').eq('organization_id', organizationId).then(({ data, error }) => {
       if (!cancelled) { setError(!!error); if (!error) setRows(data as Settings[]); }
     });
     return () => { cancelled = true; };
