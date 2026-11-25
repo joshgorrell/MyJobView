@@ -13,6 +13,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [name, setName] = useState(initial?.branding.name ?? '');
   const [color, setColor] = useState(initial?.branding.color ?? '#2563eb');
   const [interests, setInterests] = useState(initial?.options?.interests?.join('\n') ?? '');
+  const [portalUrl, setPortalUrl] = useState(typeof initial?.options?.portal_url === 'string' ? initial.options.portal_url : '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function save() {
@@ -21,7 +22,13 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       const allowed_origins = [...new Set(origins.split(/\s+/).filter(Boolean).map(normalizeWebsiteOrigin))];
       const choices = [...new Set(interests.split('\n').map(v => v.trim()).filter(Boolean))];
       if (kind === 'sales-lead' && (choices.length > 30 || choices.some(v => v.length > 100))) { setMessage('Use up to 30 service choices, each at most 100 characters.'); return; }
-      const options = { ...saved?.options, ...(kind === 'sales-lead' ? { interests: choices } : {}) };
+      let portalDestination = '';
+      if (kind === 'portal' && portalUrl.trim()) {
+        const url = new URL(portalUrl.trim());
+        if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) { setMessage('Enter a secure portal URL without credentials or query parameters.'); return; }
+        portalDestination = url.href;
+      }
+      const options = { ...saved?.options, ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
         organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, options, enabled: false,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
@@ -39,6 +46,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     <label className="block text-sm">Display name<input className="block w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} maxLength={100} /></label>
     <label className="block text-sm">Brand color <input type="color" value={color} onChange={e => setColor(e.target.value)} /></label>
     {kind === 'sales-lead' && <label className="block text-sm">Services offered (one per line)<textarea className="block w-full border rounded p-2" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Home Theater" /><span className="text-xs">Customers can select multiple services. Leave blank to allow free text.</span></label>}
+    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder="https://portal.example.com/login" /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
     <div className="border rounded p-3" aria-label="Branding preview"><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
