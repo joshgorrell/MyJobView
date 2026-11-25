@@ -20,10 +20,14 @@ Deno.serve(async (req: Request) => {
     const kind = url.searchParams.get("kind") ?? "";
     if (!uuid.test(id) || !kinds.has(kind)) return reply(404, { error: "Unavailable" });
     const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data, error } = await db.from("website_widget_settings").select("enabled,allowed_origins,branding").eq("public_id", id).eq("kind", kind).maybeSingle();
+    const { data, error } = await db.from("website_widget_settings").select("enabled,allowed_origins,branding,options").eq("public_id", id).eq("kind", kind).maybeSingle();
     if (error || !data?.enabled || !Array.isArray(data.allowed_origins) || !data.allowed_origins.includes(origin)) return reply(404, { error: "Unavailable" });
     const branding = data.branding ?? {};
-    return reply(200, { kind, branding: {
+    const options = data.options ?? {};
+    const siteKey = Deno.env.get("WEBSITE_TURNSTILE_SITE_KEY") ?? "";
+    if (kind === "sales-lead" && (!siteKey || !Deno.env.get("WEBSITE_TURNSTILE_SECRET"))) return reply(503, { error: "Unavailable" }, origin);
+    const interests = Array.isArray(options.interests) ? [...new Set(options.interests.filter((v: unknown): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= 100).map((v: string) => v.trim()))].slice(0, 30) : [];
+    return reply(200, { kind, ...(kind === "sales-lead" ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
       name: typeof branding.name === "string" ? branding.name.slice(0, 100) : "",
       color: typeof branding.color === "string" && /^#[0-9a-f]{6}$/i.test(branding.color) ? branding.color : "#2563eb",
     } }, origin);
