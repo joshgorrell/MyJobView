@@ -1,5 +1,6 @@
 import { mountLeadForm } from './lead-form.js';
 import { mountServiceForm } from './service-form.js';
+import { mountFeedbackForm } from './feedback-form.js';
 const mounted = new Set();
 let turnstileLoader;
 function loadTurnstile() {
@@ -48,13 +49,13 @@ export async function mountWidget({ kind, id, endpoint, script }) {
       link.style.cssText='display:inline-block;padding:12px 18px;border-radius:8px;background:#172033;color:white;font:600 16px system-ui,sans-serif;text-decoration:underline';
       root.append(link);script.after(host);return;
     }
-    if(!['sales-lead','service'].includes(kind) || typeof config.turnstileSiteKey !== 'string' || !config.turnstileSiteKey) return;
+    if(!['sales-lead','service','feedback'].includes(kind) || typeof config.turnstileSiteKey !== 'string' || !config.turnstileSiteKey) return;
     const host = document.createElement('div');
     const root = host.attachShadow({ mode: 'open' });
     const style=document.createElement('style');
     style.textContent=':host{display:block;color:#172033;font:16px system-ui,sans-serif}form{box-sizing:border-box;max-width:560px;margin:auto;padding:20px;background:white;border:1px solid #d7dce4;border-radius:12px;display:grid;gap:14px}h2{margin:0;font-size:1.4rem}label{display:grid;gap:5px}input,select,textarea,button{box-sizing:border-box;font:inherit;padding:10px;border:1px solid #aab3c0;border-radius:6px;width:100%;min-width:0}input[type=checkbox]{width:auto;justify-self:start}button{background:#172033;color:white;cursor:pointer}button:disabled{opacity:.6}p{margin:0;overflow-wrap:anywhere}';
     root.append(style);
-    (kind==='service'?mountServiceForm:mountLeadForm)(root,{...config,getBotToken:container=>botToken(container,config.turnstileSiteKey,kind==='service'?'website_service':'website_lead')},endpoint,id);
+    (kind==='feedback'?mountFeedbackForm:kind==='service'?mountServiceForm:mountLeadForm)(root,{...config,getBotToken:container=>botToken(container,config.turnstileSiteKey,kind==='feedback'?'website_feedback':kind==='service'?'website_service':'website_lead')},endpoint,id);
     script.after(host);
   } catch { mounted.delete(key); }
 }

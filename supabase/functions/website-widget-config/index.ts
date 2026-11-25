@@ -25,8 +25,12 @@ Deno.serve(async (req: Request) => {
     const branding = data.branding ?? {};
     const options = data.options ?? {};
     const siteKey = Deno.env.get("WEBSITE_TURNSTILE_SITE_KEY") ?? "";
-    if (["sales-lead","service"].includes(kind) && (!siteKey || !Deno.env.get("WEBSITE_TURNSTILE_SECRET"))) return reply(503, { error: "Unavailable" }, origin);
+    if (["sales-lead","service","feedback"].includes(kind) && (!siteKey || !Deno.env.get("WEBSITE_TURNSTILE_SECRET"))) return reply(503, { error: "Unavailable" }, origin);
     const interests = Array.isArray(options.interests) ? [...new Set(options.interests.filter((v: unknown): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= 100).map((v: string) => v.trim()))].slice(0, 30) : [];
+    let reviewUrl: string | undefined;
+    if(kind==="feedback" && typeof options.review_url==="string") {
+      try { const u=new URL(options.review_url); if(u.protocol==="https:" && !u.username && !u.password && ["g.page","search.google.com","maps.google.com","www.google.com"].includes(u.hostname)) reviewUrl=u.href; } catch {}
+    }
     let portalUrl: string | undefined;
     if (kind === "portal") {
       const base = Deno.env.get("WEBSITE_PORTAL_ORIGIN") ?? "";
@@ -34,7 +38,7 @@ Deno.serve(async (req: Request) => {
       if (!base || candidate.protocol !== "https:" || candidate.origin !== new URL(base).origin || candidate.username || candidate.password || candidate.search || candidate.hash) return reply(503, { error: "Unavailable" }, origin);
       portalUrl = candidate.href;
     }
-    return reply(200, { kind, ...(portalUrl ? { portalUrl } : {}), ...(["sales-lead","service"].includes(kind) ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
+    return reply(200, { kind, ...(reviewUrl ? {reviewUrl} : {}), ...(portalUrl ? { portalUrl } : {}), ...(["sales-lead","service","feedback"].includes(kind) ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
       name: typeof branding.name === "string" ? branding.name.slice(0, 100) : "",
       color: typeof branding.color === "string" && /^#[0-9a-f]{6}$/i.test(branding.color) ? branding.color : "#2563eb",
     } }, origin);

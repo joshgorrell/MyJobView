@@ -371,3 +371,6 @@ verify_jwt = false
 
 [functions.submit-website-service]
 verify_jwt = false
+
+[functions.submit-website-feedback]
+verify_jwt = false
