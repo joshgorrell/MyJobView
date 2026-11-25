@@ -1,0 +1,1 @@
+(() => { const script = document.currentScript; if (!script || !script.dataset.widget || !script.dataset.config) return; import(new URL('./runtime.js', script.src).href).then(({ mountWidget }) => mountWidget({kind: 'analytics', id: script.dataset.widget, endpoint: script.dataset.config, script})).catch(() => {}); })();
