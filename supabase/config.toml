@@ -360,3 +360,7 @@ verify_jwt = false
 
 [functions.send-tax-exemption-request]
 verify_jwt = false
+
+# Public branding only; handler checks widget ID, kind, enablement and exact origin.
+[functions.website-widget-config]
+verify_jwt = false
