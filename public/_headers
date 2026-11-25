@@ -13,3 +13,9 @@
 # Don't cache the manifest
 /manifest.json
   Cache-Control: no-cache, no-store, must-revalidate
+
+# Public widget modules are loaded by independently hosted dealer websites.
+/website-widgets/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300, must-revalidate
+  X-Content-Type-Options: nosniff

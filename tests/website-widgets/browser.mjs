@@ -8,6 +8,10 @@ try{
  for(const width of [375,1280]){
  const page=await browser.newPage({viewport:{width,height:900}});
  let views=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('https://assets.example/website-widgets/**',async route=>{
+ const file=new URL(route.request().url()).pathname.split('/').pop();
+ return route.fulfill({contentType:'application/javascript',headers:{'Access-Control-Allow-Origin':'*'},body:await readFile(new URL('../../public/website-widgets/'+file,import.meta.url),'utf8')});
+ });
  await page.route('https://dealer.example/**',async route=>{
  const u=new URL(route.request().url());
  if(u.pathname.startsWith('/website-widgets/')){
@@ -15,7 +19,7 @@ try{
  return route.fulfill({contentType:'application/javascript',body:await readFile(new URL('../../public/website-widgets/'+file,import.meta.url),'utf8')});
  }
  const selected=u.pathname==='/combined'?kinds:[u.pathname.slice(1)];
- return route.fulfill({contentType:'text/html',body:'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><main>'+selected.map(k=>'<script async src="/website-widgets/'+k+'.js" data-widget="'+ids[k]+'" data-config="https://api.example/functions/v1/website-widget-config"></script>').join('')+'</main>'});
+ return route.fulfill({contentType:'text/html',body:'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><main>'+selected.map(k=>'<script async src="https://assets.example/website-widgets/'+k+'.js" data-widget="'+ids[k]+'" data-config="https://api.example/functions/v1/website-widget-config"></script>').join('')+'</main>'});
  });
  await page.route('https://api.example/**',async route=>{
  const u=new URL(route.request().url());const kind=u.searchParams.get('kind');
