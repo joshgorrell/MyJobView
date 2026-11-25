@@ -377,3 +377,6 @@ verify_jwt = false
 
 [functions.website-chat]
 verify_jwt = false
+
+[functions.website-analytics]
+verify_jwt = false

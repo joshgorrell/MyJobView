@@ -40,6 +40,11 @@ export async function mountWidget({ kind, id, endpoint, script }) {
     if (!response.ok) throw new Error('Unavailable');
     const config = await response.json();
     if (config.kind !== kind) throw new Error('Invalid configuration');
+    if(kind === 'analytics') {
+      if(navigator.globalPrivacyControl===true || navigator.doNotTrack==='1') return;
+      const target=new URL(endpoint);target.pathname=target.pathname.replace(/website-widget-config$/,'website-analytics');target.searchParams.set('id',id);
+      await fetch(target,{method:'POST',credentials:'omit',redirect:'error',keepalive:true});return;
+    }
     if(kind === 'portal') {
       const destination = new URL(config.portalUrl);
       if(destination.protocol !== 'https:' || destination.username || destination.password) return;
