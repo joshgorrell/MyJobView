@@ -39,12 +39,15 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     });
     return () => { cancelled = true; };
   }, [kind, organizationId]);
+  const releaseEnabled = import.meta.env.VITE_WEBSITE_WIDGET_ACTIVATION === 'true';
+  const [enabled,setEnabled]=useState(initial?.enabled??false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function save() {
     setBusy(true); setMessage('');
     try {
       const allowed_origins = [...new Set(origins.split(/\s+/).filter(Boolean).map(normalizeWebsiteOrigin))];
+      if(releaseEnabled&&enabled&&!allowed_origins.length){setMessage('Add an approved website origin before enabling.');return;}
       const choices = [...new Set(interests.split('\n').map(v => v.trim()).filter(Boolean))];
       if (kind === 'sales-lead' && (choices.length > 30 || choices.some(v => v.length > 100))) { setMessage('Use up to 30 service choices, each at most 100 characters.'); return; }
       let portalDestination = '';
@@ -63,16 +66,16 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       if(kind==='chat'){try{new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();}catch{setMessage('Invalid time zone.');return;}if(!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(opens)||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(closes)||opens>=closes||!routingReady||recipients.some(id=>!reps.some(r=>r.id===id))){setMessage('Check business hours and notification recipients.');return;}}
       const options = { ...saved?.options, ...(kind === 'chat' ? {offline_message:offlineMessage.trim().slice(0,300),timezone,opens,closes,weekdays,notification_recipients:recipients} : {}), ...(kind === 'feedback' ? { review_url: reviewDestination } : {}), ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
-        organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, options, enabled: false,
+        organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, options, enabled: releaseEnabled && enabled,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
       if (error) throw error;
-      setSaved(data as Settings); setMessage('Configuration saved. Activation is not available yet.');
+      setSaved(data as Settings); setMessage(releaseEnabled?'Configuration saved.':'Configuration saved. Activation is not available yet.');
     } catch { setMessage('Unable to save. Check the HTTPS origins and try again.'); }
     finally { setBusy(false); }
   }
   return <section className="border rounded-lg p-4 space-y-3 min-w-0">
     <h4 className="font-semibold">{labels[kind]}</h4>
-    <p className="text-sm">Disabled · Runtime pending</p>
+    <p className="text-sm">{saved?.enabled?'Enabled':'Disabled'}</p>{releaseEnabled&&<label className="block"><input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/> Enable this widget</label>}
     <label className="block text-sm">Approved website origins (one per line)
       <textarea className="block w-full border rounded p-2" value={origins} onChange={e => setOrigins(e.target.value)} placeholder="https://example.com" />
     </label>
@@ -92,9 +95,9 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     <div className="border rounded p-3" aria-label="Branding preview"><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
-      try { await navigator.clipboard.writeText(websiteWidgetEmbed(kind, saved.public_id, window.location.origin, import.meta.env.VITE_SUPABASE_URL)); setMessage('Preview code copied. Do not install until runtime is released.'); }
+      try { await navigator.clipboard.writeText(websiteWidgetEmbed(kind, saved.public_id, window.location.origin, import.meta.env.VITE_SUPABASE_URL)); setMessage(releaseEnabled&&saved.enabled?'Installation code copied.':'Preview code copied. Do not install until runtime is released.'); }
       catch { setMessage('Unable to copy preview code.'); }
-    }}>Copy preview code</button>}
+    }}>{releaseEnabled&&saved.enabled?'Copy installation code':'Copy preview code'}</button>}
     <p role="status" className="text-sm">{message}</p>
   </section>;
 }
