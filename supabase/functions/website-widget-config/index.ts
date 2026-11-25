@@ -27,7 +27,14 @@ Deno.serve(async (req: Request) => {
     const siteKey = Deno.env.get("WEBSITE_TURNSTILE_SITE_KEY") ?? "";
     if (kind === "sales-lead" && (!siteKey || !Deno.env.get("WEBSITE_TURNSTILE_SECRET"))) return reply(503, { error: "Unavailable" }, origin);
     const interests = Array.isArray(options.interests) ? [...new Set(options.interests.filter((v: unknown): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= 100).map((v: string) => v.trim()))].slice(0, 30) : [];
-    return reply(200, { kind, ...(kind === "sales-lead" ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
+    let portalUrl: string | undefined;
+    if (kind === "portal") {
+      const base = Deno.env.get("WEBSITE_PORTAL_ORIGIN") ?? "";
+      const candidate = new URL(typeof options.portal_url === "string" ? options.portal_url : "");
+      if (!base || candidate.protocol !== "https:" || candidate.origin !== new URL(base).origin || candidate.username || candidate.password || candidate.search || candidate.hash) return reply(503, { error: "Unavailable" }, origin);
+      portalUrl = candidate.href;
+    }
+    return reply(200, { kind, ...(portalUrl ? { portalUrl } : {}), ...(kind === "sales-lead" ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
       name: typeof branding.name === "string" ? branding.name.slice(0, 100) : "",
       color: typeof branding.color === "string" && /^#[0-9a-f]{6}$/i.test(branding.color) ? branding.color : "#2563eb",
     } }, origin);
