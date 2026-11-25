@@ -33,3 +33,5 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
       - run: node tests/website-widgets/browser.mjs
+
+      - run: node tests/website-widgets/database.mjs
