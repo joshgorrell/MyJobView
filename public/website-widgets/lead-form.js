@@ -30,7 +30,6 @@ export function mountLeadForm(root, config, endpoint, id) {
   field('I agree to be contacted about this inquiry','consent','checkbox');
   const status=document.createElement('p'); status.setAttribute('role','status');
   const submit=document.createElement('button'); submit.type='submit'; submit.textContent='Request consultation';
-  if(/^#[0-9a-f]{6}$/i.test(config.branding?.color ?? '')) submit.style.backgroundColor=config.branding.color;
   const challenge=document.createElement('div'); form.append(challenge,submit,status);
   const requestId=crypto.randomUUID();
   form.addEventListener('submit',async event=>{
