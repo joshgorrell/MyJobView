@@ -6,6 +6,7 @@ declare
   v_office uuid;
   v_contact uuid;
   v_lead uuid;
+  v_rep uuid;
   v_username text := 'web_' || replace(p_request::text, '-', '');
 begin
   select * into w from public.website_widget_settings where public_id = p_widget and kind = 'sales-lead' and enabled and p_origin = any(allowed_origins) for share;
