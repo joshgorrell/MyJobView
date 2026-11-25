@@ -1,3 +1,4 @@
+import { WebsiteAnalyticsSummary } from './WebsiteAnalyticsSummary';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { normalizeWebsiteOrigin, websiteWidgetKinds, websiteWidgetEmbed, type WebsiteWidgetKind } from '../../lib/websiteWidgets';
@@ -78,6 +79,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       <label className="block text-sm">Receiving office<select className="block w-full border rounded p-2" disabled={!routingReady} value={officeId} onChange={e => setOfficeId(e.target.value)}><option value="">Default office</option>{offices.map(o => <option key={o.id} value={o.id}>{o.office_name}</option>)}</select></label>
       <label className="block text-sm">Assigned representative<select className="block w-full border rounded p-2" disabled={!routingReady} value={repId} onChange={e => setRepId(e.target.value)}><option value="">Unassigned — shared Pipeline</option>{reps.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</select></label>
     </div>}
+    {kind === 'analytics' && saved && <WebsiteAnalyticsSummary publicId={saved.public_id} organizationId={organizationId} />}
     <div className="border rounded p-3" aria-label="Branding preview"><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
