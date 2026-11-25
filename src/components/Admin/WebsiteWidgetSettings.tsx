@@ -48,6 +48,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [enabled,setEnabled]=useState(initial?.enabled??false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [code,setCode]=useState('');
   async function save() {
     setBusy(true); setMessage('');
     try {
@@ -105,9 +106,10 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     <div className="border rounded p-3" aria-label="Branding preview" style={{background:theme==='dark'?'#171b23':'#ffffff',color:theme==='dark'?'#ffffff':'#172033'}}><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
-      try { await navigator.clipboard.writeText(websiteWidgetEmbed(kind, saved.public_id, window.location.origin, import.meta.env.VITE_SUPABASE_URL)); setMessage(releaseEnabled&&saved.enabled?'Installation code copied.':'Preview code copied. Do not install until runtime is released.'); }
+      try { const snippet=websiteWidgetEmbed(kind, saved.public_id, import.meta.env.VITE_WEBSITE_WIDGET_ASSET_ORIGIN || window.location.origin, import.meta.env.VITE_SUPABASE_URL);setCode(snippet);await navigator.clipboard.writeText(snippet); setMessage(releaseEnabled&&saved.enabled?'Installation code copied.':'Preview code copied. Do not install until runtime is released.'); }
       catch { setMessage('Unable to copy preview code.'); }
     }}>{releaseEnabled&&saved.enabled?'Copy installation code':'Copy preview code'}</button>}
+    {code&&<label className="block text-sm">Installation HTML<textarea readOnly className="block w-full border rounded p-2 font-mono text-xs" value={code} onFocus={e=>e.target.select()}/></label>}
     <p role="status" className="text-sm">{message}</p>
   </section>;
 }
