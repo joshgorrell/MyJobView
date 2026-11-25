@@ -25,6 +25,9 @@ Deno.serve(async (req: Request) => {
     const { data, error } = await db.from("website_widget_settings").select("organization_id,enabled,allowed_origins,branding,options").eq("public_id", id).eq("kind", kind).maybeSingle();
     if (error || !data?.enabled || !Array.isArray(data.allowed_origins) || !data.allowed_origins.includes(origin)) return reply(404, { error: "Unavailable" });
     const branding = data.branding ?? {};
+    const {data:identity}=await db.from('company_settings').select('company_name,company_logo_url,print_accent_color').eq('organization_id',data.organization_id).maybeSingle();
+    let logoUrl:string|undefined;
+    if(branding.showLogo!==false && identity?.company_logo_url){try{const logo=new URL(identity.company_logo_url);const base=new URL(Deno.env.get('SUPABASE_URL')??'');if(logo.origin===base.origin&&logo.pathname.startsWith('/storage/v1/object/public/company_logo/')&&!logo.search&&!logo.hash&&!logo.username&&!logo.password)logoUrl=logo.href;}catch{}}
     const options = data.options ?? {};
     const siteKey = Deno.env.get("WEBSITE_TURNSTILE_SITE_KEY") ?? "";
     if (["sales-lead","service","feedback","chat"].includes(kind) && (!siteKey || !Deno.env.get("WEBSITE_TURNSTILE_SECRET"))) return reply(503, { error: "Unavailable" }, origin);
@@ -46,8 +49,9 @@ Deno.serve(async (req: Request) => {
     if(kind==='chat'){try{const parts=new Intl.DateTimeFormat('en-US',{timeZone:options.timezone??'America/Chicago',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const part=(type:string)=>parts.find(p=>p.type===type)?.value??'';const day=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday'));const time=part('hour')+':'+part('minute');businessHours=(Array.isArray(options.weekdays)?options.weekdays:[1,2,3,4,5]).includes(day)&&time>=(options.opens??'08:00')&&time<(options.closes??'17:00');}catch{}}
     return reply(200, { kind, ...(kind==='chat'?{businessHours}:{}), ...(kind==='chat'?{offlineMessage:typeof options.offline_message==='string'?options.offline_message.slice(0,300):'Our team will reply when available.'}:{}), ...(reviewUrl ? {reviewUrl} : {}), ...(portalUrl ? { portalUrl } : {}), ...(["sales-lead","service","feedback","chat"].includes(kind) ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
       theme: ["light","dark","auto"].includes(branding.theme) ? branding.theme : "light",
-      name: typeof branding.name === "string" ? branding.name.slice(0, 100) : "",
-      color: typeof branding.color === "string" && /^#[0-9a-f]{6}$/i.test(branding.color) ? branding.color : "#2563eb",
+      name: (typeof branding.name === "string" && branding.name.trim() ? branding.name : identity?.company_name ?? "").slice(0,100),
+      ...(logoUrl?{logoUrl}:{}),
+      color: /^#[0-9a-f]{6}$/i.test(branding.color??"") ? branding.color : /^#[0-9a-f]{6}$/i.test(identity?.print_accent_color??"") ? identity.print_accent_color : "#2563eb",
     } }, origin);
   } catch { return reply(404, { error: "Unavailable" }); }
 });

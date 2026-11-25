@@ -71,6 +71,8 @@ export async function mountWidget({ kind, id, endpoint, script }) {
     style.textContent+=`:host{color:${theme.dark?'#f1f5f9':'#172033'}}form{background:${theme.dark?'#171b23':'#ffffff'};border-color:${theme.dark?'#475569':'#d7dce4'}}input,select,textarea{background:${theme.dark?'#252b36':'#ffffff'};color:inherit}button{background:${theme.color};color:${theme.ink}}:focus-visible{outline:2px solid ${theme.color};outline-offset:2px}`;
     root.append(style);
     (kind==='chat'?mountChat:kind==='feedback'?mountFeedbackForm:kind==='service'?mountServiceForm:mountLeadForm)(root,{...config,getBotToken:container=>botToken(container,config.turnstileSiteKey,kind==='chat'?'website_chat':kind==='feedback'?'website_feedback':kind==='service'?'website_service':'website_lead')},endpoint,id);
+    const form=root.querySelector('form');
+    if(form&&config.branding?.logoUrl){try{const u=new URL(config.branding.logoUrl);if(u.protocol==='https:'&&!u.username&&!u.password){const img=document.createElement('img');img.src=u.href;img.alt=config.branding.name||'Dealer logo';img.referrerPolicy='no-referrer';img.style.cssText='max-width:160px;max-height:64px;object-fit:contain;justify-self:start';img.onerror=()=>img.remove();form.prepend(img);}}catch{}}
     script.after(host);
   } catch { mounted.delete(key); }
 }

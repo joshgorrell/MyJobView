@@ -7,12 +7,14 @@ const labels: Record<WebsiteWidgetKind, string> = {
   'sales-lead': 'Sales Leads', chat: 'Live Chat', service: 'Service Requests',
   feedback: 'Customer Feedback', portal: 'Customer Portal', analytics: 'Conversion Analytics',
 };
-type Settings = { kind: WebsiteWidgetKind; public_id: string; enabled: boolean; allowed_origins: string[]; branding: { name?: string; color?: string; theme?: string }; options?: { interests?: string[]; [key: string]: unknown } };
+type Settings = { kind: WebsiteWidgetKind; public_id: string; enabled: boolean; allowed_origins: string[]; branding: { name?: string; color?: string; theme?: string; showLogo?: boolean }; options?: { interests?: string[]; [key: string]: unknown } };
 function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKind; organizationId: string; initial?: Settings }) {
   const [saved, setSaved] = useState(initial);
   const [origins, setOrigins] = useState(initial?.allowed_origins.join('\n') ?? '');
   const [name, setName] = useState(initial?.branding.name ?? '');
   const [color, setColor] = useState(initial?.branding.color ?? '#2563eb');
+  const [inheritColor,setInheritColor]=useState(!initial?.branding.color);
+  const [showLogo,setShowLogo]=useState(initial?.branding.showLogo!==false);
   const [theme,setTheme]=useState(initial?.branding.theme??'light');
   const [interests, setInterests] = useState(initial?.options?.interests?.join('\n') ?? '');
   const [portalUrl, setPortalUrl] = useState(typeof initial?.options?.portal_url === 'string' ? initial.options.portal_url : '');
@@ -67,7 +69,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       if(kind==='chat'){try{new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();}catch{setMessage('Invalid time zone.');return;}if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(opens)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(closes)||opens>=closes||!routingReady||recipients.some(id=>!reps.some(r=>r.id===id))){setMessage('Check business hours and notification recipients.');return;}}
       const options = { ...saved?.options, ...(kind === 'chat' ? {offline_message:offlineMessage.trim().slice(0,300),timezone,opens,closes,weekdays,notification_recipients:recipients} : {}), ...(kind === 'feedback' ? { review_url: reviewDestination } : {}), ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
-        organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color, theme }, options, enabled: releaseEnabled && enabled,
+        organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), ...(inheritColor?{}:{color}), theme, showLogo }, options, enabled: releaseEnabled && enabled,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
       if (error) throw error;
       setSaved(data as Settings); setMessage(releaseEnabled?'Configuration saved.':'Configuration saved. Activation is not available yet.');
@@ -81,7 +83,9 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       <textarea className="block w-full border rounded p-2" value={origins} onChange={e => setOrigins(e.target.value)} placeholder="https://example.com" />
     </label>
     <label className="block text-sm">Display name<input className="block w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} maxLength={100} /></label>
-    <label className="block text-sm">Brand color <input type="color" value={color} onChange={e => setColor(e.target.value)} /></label>
+    <label className="block text-sm">Brand color <input type="color" disabled={inheritColor} value={color} onChange={e => setColor(e.target.value)} /></label>
+    <label className="block text-sm"><input type="checkbox" checked={inheritColor} onChange={e=>setInheritColor(e.target.checked)}/> Use dealer brand color</label>
+    <label className="block text-sm"><input type="checkbox" checked={showLogo} onChange={e=>setShowLogo(e.target.checked)}/> Show dealer logo on forms</label>
     <label className="block text-sm">Appearance<select className="block w-full border rounded p-2" value={theme} onChange={e=>setTheme(e.target.value)}><option value="light">Light</option><option value="dark">Dark</option><option value="auto">Match visitor preference</option></select></label>
     {kind === 'sales-lead' && <label className="block text-sm">Services offered (one per line)<textarea className="block w-full border rounded p-2" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Home Theater" /><span className="text-xs">Customers can select multiple services. Leave blank to allow free text.</span></label>}
     {kind === 'chat' && <label className="block text-sm">Response expectation<textarea className="block w-full border rounded p-2" maxLength={300} value={offlineMessage} onChange={e=>setOfflineMessage(e.target.value)} /><span className="text-xs">Shown to visitors without promising an immediate response.</span></label>}
@@ -94,7 +98,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       <label className="block text-sm">Assigned representative<select className="block w-full border rounded p-2" disabled={!routingReady} value={repId} onChange={e => setRepId(e.target.value)}><option value="">Unassigned — shared Pipeline</option>{reps.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</select></label>
     </div>}
     {kind === 'analytics' && saved && <WebsiteAnalyticsSummary publicId={saved.public_id} organizationId={organizationId} />}
-    <div className="border rounded p-3" aria-label="Branding preview"><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
+    <div className="border rounded p-3" aria-label="Branding preview" style={{background:theme==='dark'?'#171b23':'#ffffff',color:theme==='dark'?'#ffffff':'#172033'}}><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
       try { await navigator.clipboard.writeText(websiteWidgetEmbed(kind, saved.public_id, window.location.origin, import.meta.env.VITE_SUPABASE_URL)); setMessage(releaseEnabled&&saved.enabled?'Installation code copied.':'Preview code copied. Do not install until runtime is released.'); }
