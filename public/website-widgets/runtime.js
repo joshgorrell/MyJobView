@@ -37,6 +37,16 @@ export async function mountWidget({ kind, id, endpoint, script }) {
     if (!response.ok) throw new Error('Unavailable');
     const config = await response.json();
     if (config.kind !== kind) throw new Error('Invalid configuration');
+    if(kind === 'portal') {
+      const destination = new URL(config.portalUrl);
+      if(destination.protocol !== 'https:' || destination.username || destination.password) return;
+      const host=document.createElement('div');
+      const root=host.attachShadow({mode:'open'});
+      const link=document.createElement('a');
+      link.href=destination.href; link.textContent='Customer portal';
+      link.style.cssText='display:inline-block;padding:12px 18px;border-radius:8px;background:#172033;color:white;font:600 16px system-ui,sans-serif;text-decoration:underline';
+      root.append(link);script.after(host);return;
+    }
     if(kind !== 'sales-lead' || typeof config.turnstileSiteKey !== 'string' || !config.turnstileSiteKey) return;
     const host = document.createElement('div');
     const root = host.attachShadow({ mode: 'open' });
