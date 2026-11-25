@@ -24,7 +24,7 @@ begin
  select id into v_contact from public.contacts where organization_id=c.organization_id and lower(email)=lower(c.visitor_email) order by id limit 1;
  if not found then
  insert into public.contacts(contact_name,first_name,last_name,username,email,notes,contact_type,portal_access_enabled,organization_id,office_id)
- values(c.visitor_name,split_part(c.visitor_name,' ',1),trim(substr(c.visitor_name,length(split_part(c.visitor_name,' ',1))+1)),v_username,lower(c.visitor_email),'Unverified website chat contact','person',false,c.organization_id,v_office) returning id into v_contact;
+ values(c.visitor_name,split_part(c.visitor_name,' ',1),trim(substr(c.visitor_name,length(split_part(c.visitor_name,' ',1))+1)),v_username,lower(c.visitor_email),'Unverified website chat contact','lead',false,c.organization_id,v_office) returning id into v_contact;
  end if;
  insert into public.leads(contact_name,username,email,opportunity_description,priority,status,is_fishbowl,lead_source,converted_from_contact_id,organization_id,office_id)
  values(c.visitor_name,v_username,lower(c.visitor_email),left(v_description,12000),'low','unclaimed',true,'website',v_contact,c.organization_id,v_office) returning id into v_lead;
