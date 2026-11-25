@@ -4,9 +4,9 @@ import {readFile} from 'node:fs/promises';
 const db=new PGlite(),a=crypto.randomUUID(),b=crypto.randomUUID(),office=crypto.randomUUID(),rep=crypto.randomUUID(),lead=crypto.randomUUID(),chat=crypto.randomUUID(),request=crypto.randomUUID(),conversation=crypto.randomUUID(),hash='a'.repeat(64);
 try{
 await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;
-create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$;
+create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
 create function get_user_org_id() returns uuid language sql as $$select null::uuid$$;
-create function flow_has_module_access(text) returns boolean language sql as $select true$;
+create function flow_has_module_access(text) returns boolean language sql as $$select true$$;
 create table service_requests(id uuid primary key default gen_random_uuid(),organization_id uuid,customer_name text,customer_email text,job_location_address text,job_description text not null,billable_type text,billable_by text,status text,source_type text,customer_contact_instruction text,notes text);
 create table organizations(id uuid primary key);
 create table profiles(id uuid primary key,organization_id uuid,role text,is_active boolean,contact_id uuid);
