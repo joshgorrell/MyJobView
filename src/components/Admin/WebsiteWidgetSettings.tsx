@@ -14,6 +14,23 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [color, setColor] = useState(initial?.branding.color ?? '#2563eb');
   const [interests, setInterests] = useState(initial?.options?.interests?.join('\n') ?? '');
   const [portalUrl, setPortalUrl] = useState(typeof initial?.options?.portal_url === 'string' ? initial.options.portal_url : '');
+  const [officeId, setOfficeId] = useState(String(initial?.options?.office_id ?? ''));
+  const [repId, setRepId] = useState(String(initial?.options?.rep_id ?? ''));
+  const [offices, setOffices] = useState<{id:string;office_name:string}[]>([]);
+  const [reps, setReps] = useState<{id:string;full_name:string}[]>([]);
+  const [routingReady, setRoutingReady] = useState(false);
+  useEffect(() => {
+    if (kind !== 'sales-lead') return;
+    let cancelled = false;
+    void Promise.all([
+      supabase.from('company_offices').select('id,office_name').eq('organization_id', organizationId).order('display_order'),
+      supabase.from('profiles').select('id,full_name').eq('organization_id', organizationId).eq('is_active', true).order('full_name'),
+    ]).then(([o,r]) => {
+      if (cancelled || o.error || r.error) return;
+      setOffices(o.data ?? []); setReps(r.data ?? []); setRoutingReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [kind, organizationId]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function save() {
@@ -28,7 +45,8 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) { setMessage('Enter a secure portal URL without credentials or query parameters.'); return; }
         portalDestination = url.href;
       }
-      const options = { ...saved?.options, ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices } : {}) };
+      if (kind === 'sales-lead' && (!routingReady || (officeId && !offices.some(o => o.id === officeId)) || (repId && !reps.some(r => r.id === repId)))) { setMessage('Check office and representative routing before saving.'); return; }
+      const options = { ...saved?.options, ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
         organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, options, enabled: false,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
@@ -47,6 +65,11 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     <label className="block text-sm">Brand color <input type="color" value={color} onChange={e => setColor(e.target.value)} /></label>
     {kind === 'sales-lead' && <label className="block text-sm">Services offered (one per line)<textarea className="block w-full border rounded p-2" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Home Theater" /><span className="text-xs">Customers can select multiple services. Leave blank to allow free text.</span></label>}
     {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder="https://portal.example.com/login" /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
+    {kind === 'sales-lead' && <div className="space-y-2">
+      {!routingReady && <p role="status">Routing options unavailable or loading.</p>}
+      <label className="block text-sm">Receiving office<select className="block w-full border rounded p-2" disabled={!routingReady} value={officeId} onChange={e => setOfficeId(e.target.value)}><option value="">Default office</option>{offices.map(o => <option key={o.id} value={o.id}>{o.office_name}</option>)}</select></label>
+      <label className="block text-sm">Assigned representative<select className="block w-full border rounded p-2" disabled={!routingReady} value={repId} onChange={e => setRepId(e.target.value)}><option value="">Fishbowl (unclaimed)</option>{reps.map(r => <option key={r.id} value={r.id}>{r.full_name}</option>)}</select></label>
+    </div>}
     <div className="border rounded p-3" aria-label="Branding preview"><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
