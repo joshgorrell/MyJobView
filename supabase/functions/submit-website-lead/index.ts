@@ -13,7 +13,32 @@ Deno.serve(async (req) => {
     if(error || !w?.enabled || !w.allowed_origins.includes(origin)) return reply(404,{error:"Unavailable"});
     if(req.method === "OPTIONS") return reply(200,{},true);
     if(req.method !== "POST") return reply(405,{error:"Method not allowed"},true);
-    // Fail closed until durable rate limiting and bot verification are installed.
-    return reply(503,{error:"Website intake is not yet available"},true);
+    const secret = Deno.env.get("WEBSITE_TURNSTILE_SECRET");
+    if (!secret) return reply(503,{error:"Website intake is not yet available"},true);
+    const {data: permitted,error: limitError} = await db.rpc("consume_website_widget_limit",{p_widget:id});
+    if(limitError) return reply(503,{error:"Temporarily unavailable"},true);
+    if(!permitted) return reply(429,{error:"Please try again later"},true);
+    const reader = req.body?.getReader();
+    if(!reader) return reply(400,{error:"Missing submission"},true);
+    const decoder = new TextDecoder();
+    let raw = "", bytes = 0;
+    while(true) {
+      const {done,value} = await reader.read();
+      if(done) break;
+      bytes += value.byteLength;
+      if(bytes > 16384) { await reader.cancel(); return reply(413,{error:"Submission too large"},true); }
+      raw += decoder.decode(value,{stream:true});
+    }
+    const body = JSON.parse(raw + decoder.decode());
+    const lead = validateWebsiteLead(body);
+    if(typeof body.botToken !== "string" || body.botToken.length > 2048 || !body.botToken) return reply(400,{error:"Verification required"},true);
+    const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",body:new URLSearchParams({secret,response:body.botToken}),signal:AbortSignal.timeout(8000)});
+    if(!verification.ok) return reply(503,{error:"Verification unavailable"},true);
+    const proof = await verification.json();
+    if(!proof.success || proof.hostname !== new URL(origin).hostname || proof.action !== "website_lead") return reply(400,{error:"Verification failed"},true);
+    const description = ["Project: "+lead.projectType,"ZIP: "+lead.zip,"Timeline: "+lead.timeline,"Budget: "+lead.budget,"Interests: "+lead.interests.join(", "),lead.description,"Website: "+origin,"Contact consent: granted"].join("\n");
+    const {error: intakeError} = await db.rpc("create_website_lead",{p_widget:id,p_origin:origin,p_request:lead.requestId,p_name:lead.name,p_email:lead.email,p_phone:lead.phone,p_description:description});
+    if(intakeError) return reply(503,{error:"Unable to submit. Please retry."},true);
+    return reply(200,{success:true},true);
   } catch { return reply(400,{error:"Invalid request"}); }
 });
