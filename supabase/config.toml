@@ -364,3 +364,7 @@ verify_jwt = false
 # Public branding only; handler checks widget ID, kind, enablement and exact origin.
 [functions.website-widget-config]
 verify_jwt = false
+
+# Public website intake; handler verifies widget origin, rate limit and bot proof.
+[functions.submit-website-lead]
+verify_jwt = false
