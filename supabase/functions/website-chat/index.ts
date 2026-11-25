@@ -27,20 +27,23 @@ Deno.serve(async req=>{
  const verification=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",body:new URLSearchParams({secret,response:body.botToken}),signal:AbortSignal.timeout(8000)});
  if(!verification.ok)return reply(503,{error:"Verification unavailable"});
  const proof=await verification.json();if(!proof.success||proof.hostname!==new URL(origin).hostname||proof.action!=="website_chat")return reply(400,{error:"Verification failed"});
+ const name=typeof body.name==="string"?body.name.trim():"";
+ const email=typeof body.email==="string"?body.email.trim().toLowerCase():"";
+ if(name.length>120||email.length>254||(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))||(email&&body.consent!==true))return reply(400,{error:"Invalid contact details"});
  const token=newVisitorToken();
- const {error}=await db.from("website_chat_conversations").insert({widget_id:w.id,organization_id:w.organization_id,origin,visitor_token_hash:await hashVisitorToken(token)});
+ const {error}=await db.from("website_chat_conversations").insert({widget_id:w.id,organization_id:w.organization_id,origin,visitor_name:name,visitor_email:email,visitor_token_hash:await hashVisitorToken(token)});
  if(error)return reply(503,{error:"Unable to start chat"});
  return reply(200,{token});
  }
  const hash=await hashVisitorToken(body.token);
- const {data:conversation,error:sessionError}=await db.from("website_chat_conversations").select("id,status").eq("visitor_token_hash",hash).eq("widget_id",w.id).eq("organization_id",w.organization_id).eq("origin",origin).maybeSingle();
+ const {data:conversation,error:sessionError}=await db.from("website_chat_conversations").select("id,status").eq("visitor_token_hash",hash).eq("widget_id",w.id).eq("organization_id",w.organization_id).eq("origin",origin).gt("created_at",new Date(Date.now()-86400000).toISOString()).maybeSingle();
  if(sessionError||!conversation)return reply(404,{error:"Session unavailable"});
  const {data:permit,error:limitError}=await db.rpc("consume_website_chat_session_limit",{p_conversation:conversation.id});
  if(limitError||!permit)return reply(limitError?503:429,{error:"Try again later"});
  if(body.action==="send"){
  if(conversation.status!=="open")return reply(409,{error:"Conversation closed"});
  const message=validateChatMessage(body);
- const {error}=await db.from("website_chat_messages").upsert({conversation_id:conversation.id,organization_id:w.organization_id,request_id:message.requestId,sender:"visitor",body:message.body},{onConflict:"conversation_id,request_id",ignoreDuplicates:true});
+ const {error}=await db.rpc("send_website_chat_visitor",{p_conversation:conversation.id,p_hash:hash,p_request:message.requestId,p_body:message.body});
  if(error)return reply(503,{error:"Unable to send"});
  return reply(200,{success:true});
  }
