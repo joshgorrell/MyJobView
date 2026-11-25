@@ -11,6 +11,7 @@ on:
       - 'supabase/functions/*website*/**'
       - 'supabase/migrations/*website*.sql'
       - 'supabase/config.toml'
+      - 'public/_headers'
       - 'tests/website-widgets/**'
       - '.github/workflows/website-widget-foundation.yml'
 permissions:
@@ -25,6 +26,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm run build
       - run: node tests/website-widgets/foundation.mjs
 
       - run: node tests/website-widgets/runtime-contract.mjs
