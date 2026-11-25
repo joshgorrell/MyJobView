@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { notifyWebsiteLead } from "../_shared/website-lead-notify.ts";
 import { validateWebsiteLead } from "../_shared/website-lead-validation.ts";
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin") ?? "";
@@ -37,8 +38,9 @@ Deno.serve(async (req) => {
     const proof = await verification.json();
     if(!proof.success || proof.hostname !== new URL(origin).hostname || proof.action !== "website_lead") return reply(400,{error:"Verification failed"},true);
     const description = ["Project: "+lead.projectType,"ZIP: "+lead.zip,"Timeline: "+lead.timeline,"Budget: "+lead.budget,"Interests: "+lead.interests.join(", "),lead.description,"Website: "+origin,"Contact consent: granted"].join("\n");
-    const {error: intakeError} = await db.rpc("create_website_lead",{p_widget:id,p_origin:origin,p_request:lead.requestId,p_name:lead.name,p_email:lead.email,p_phone:lead.phone,p_description:description});
+    const {data: leadId,error: intakeError} = await db.rpc("create_website_lead",{p_widget:id,p_origin:origin,p_request:lead.requestId,p_name:lead.name,p_email:lead.email,p_phone:lead.phone,p_description:description});
     if(intakeError) return reply(503,{error:"Unable to submit. Please retry."},true);
+    if(typeof leadId === "string") EdgeRuntime.waitUntil(notifyWebsiteLead(db,leadId).catch(()=>console.error("Website lead notification processing failed")));
     return reply(200,{success:true},true);
   } catch { return reply(400,{error:"Invalid request"}); }
 });
