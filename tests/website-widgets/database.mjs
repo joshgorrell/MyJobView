@@ -61,7 +61,27 @@ assert.equal((await db.query(fSql,fArgs)).rows[0].id,f1);
 await assert.rejects(db.query(fSql,[feedback,'https://b.example',...fArgs.slice(2)]));
 assert.equal((await db.query('select * from service_requests')).rows.length,1);
 assert.equal((await db.query('select * from customer_satisfaction')).rows.length,1);
-await db.exec('reset role;set role authenticated');
+await db.exec('reset role');
+await db.exec(`create table notifications(organization_id uuid,user_id uuid,type text,title text,body text,related_id uuid,is_read boolean);
+insert into profiles values ('00000000-0000-4000-8000-000000000004','${b}','admin',true,null);`);
+await db.exec(await readFile(new URL('../../supabase/migrations/20261125232000_website_intake_notifications.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../../supabase/migrations/20261125231000_website_widget_analytics_capacity.sql',import.meta.url),'utf8'));
+await db.exec('set role service_role;begin');
+for(let i=0;i<601;i++){const ok=(await db.query('select consume_website_widget_limit($1) as ok',[b])).rows[0].ok;assert.equal(ok,i<600);}
+for(let i=0;i<21;i++)assert.equal((await db.query('select consume_website_widget_limit($1) as ok',[service])).rows[0].ok,i<20);
+await db.exec('commit');
+const newService=[...sArgs];newService[2]=crypto.randomUUID();
+const newFeedback=[...fArgs];newFeedback[2]=crypto.randomUUID();newFeedback[5]='needs_attention';
+const serviceId=(await db.query(sSql,newService)).rows[0].id;
+const feedbackId=(await db.query(fSql,newFeedback)).rows[0].id;
+await db.query(sSql,newService);await db.query(fSql,newFeedback);
+await db.exec('reset role');
+const notices=(await db.query('select * from notifications')).rows;
+assert.equal(notices.length,2);assert.ok(notices.every(n=>n.organization_id===a&&n.user_id===u));
+assert.ok(notices.some(n=>n.related_id===serviceId&&n.type==='service_request'));
+assert.ok(notices.some(n=>n.related_id===feedbackId&&n.type==='system'));
+await db.exec('set role authenticated');
+await assert.rejects(db.query('select notify_website_intake($1,$2,$3)',[service,serviceId,'service']));
 await assert.rejects(db.query(sSql,sArgs));await assert.rejects(db.query(fSql,fArgs));
 }finally{await db.close();}
 console.log('Widget database isolation and rate-limit checks passed');
