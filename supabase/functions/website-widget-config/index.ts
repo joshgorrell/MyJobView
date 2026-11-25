@@ -40,7 +40,9 @@ Deno.serve(async (req: Request) => {
       if (!base || candidate.protocol !== "https:" || candidate.origin !== new URL(base).origin || new URL(base).protocol !== "https:" || new URL(base).pathname !== "/" || candidate.username || candidate.password || candidate.search || candidate.hash) return reply(503, { error: "Unavailable" }, origin);
       portalUrl = candidate.href;
     }
-    return reply(200, { kind, ...(kind==='chat'?{offlineMessage:typeof options.offline_message==='string'?options.offline_message.slice(0,300):'Our team will reply when available.'}:{}), ...(reviewUrl ? {reviewUrl} : {}), ...(portalUrl ? { portalUrl } : {}), ...(["sales-lead","service","feedback","chat"].includes(kind) ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
+    let businessHours=false;
+    if(kind==='chat'){try{const parts=new Intl.DateTimeFormat('en-US',{timeZone:options.timezone??'America/Chicago',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const part=(type:string)=>parts.find(p=>p.type===type)?.value??'';const day=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday'));const time=part('hour')+':'+part('minute');businessHours=(Array.isArray(options.weekdays)?options.weekdays:[1,2,3,4,5]).includes(day)&&time>=(options.opens??'08:00')&&time<(options.closes??'17:00');}catch{}}
+    return reply(200, { kind, ...(kind==='chat'?{businessHours}:{}), ...(kind==='chat'?{offlineMessage:typeof options.offline_message==='string'?options.offline_message.slice(0,300):'Our team will reply when available.'}:{}), ...(reviewUrl ? {reviewUrl} : {}), ...(portalUrl ? { portalUrl } : {}), ...(["sales-lead","service","feedback","chat"].includes(kind) ? { turnstileSiteKey: siteKey, interests } : {}), branding: {
       name: typeof branding.name === "string" ? branding.name.slice(0, 100) : "",
       color: typeof branding.color === "string" && /^#[0-9a-f]{6}$/i.test(branding.color) ? branding.color : "#2563eb",
     } }, origin);
