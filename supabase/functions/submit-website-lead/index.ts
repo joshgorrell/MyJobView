@@ -7,6 +7,7 @@ Deno.serve(async (req) => {
 
   const origin = req.headers.get("Origin") ?? "";
   const reply = (status: number, body: unknown, allowed = false) => new Response(JSON.stringify(body), {status, headers: {"Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin", ...(allowed ? {"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type"} : {})}});
+  let originApproved = false;
   try {
     if (!origin.startsWith("https://") || new URL(origin).origin !== origin) return reply(404,{error:"Unavailable"});
     const id = new URL(req.url).searchParams.get("id") ?? "";
@@ -14,6 +15,7 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false}});
     const {data:w,error} = await db.from("website_widget_settings").select("enabled,allowed_origins").eq("public_id",id).eq("kind","sales-lead").maybeSingle();
     if(error || !w?.enabled || !w.allowed_origins.includes(origin)) return reply(404,{error:"Unavailable"});
+    originApproved = true;
     if(req.method === "OPTIONS") return reply(200,{},true);
     if(req.method !== "POST") return reply(405,{error:"Method not allowed"},true);
     const secret = Deno.env.get("WEBSITE_TURNSTILE_SECRET");
@@ -44,5 +46,5 @@ Deno.serve(async (req) => {
     if(intakeError) return reply(503,{error:"Unable to submit. Please retry."},true);
     if(typeof leadId === "string") EdgeRuntime.waitUntil(notifyWebsiteLead(db,leadId).catch(()=>console.error("Website lead notification processing failed")));
     return reply(200,{success:true},true);
-  } catch { return reply(400,{error:"Invalid request"}); }
+  } catch { return reply(400,{error:"Invalid request"},originApproved); }
 });

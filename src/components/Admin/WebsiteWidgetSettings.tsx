@@ -30,8 +30,10 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [offices, setOffices] = useState<{id:string;office_name:string}[]>([]);
   const [reps, setReps] = useState<{id:string;full_name:string}[]>([]);
   const [routingReady, setRoutingReady] = useState(false);
+  const [dealerAppUrl,setDealerAppUrl]=useState('');
+  useEffect(()=>{if(kind!=='portal')return;let cancelled=false;void supabase.from('company_settings').select('app_url').eq('organization_id',organizationId).maybeSingle().then(({data,error})=>{if(!cancelled&&!error)setDealerAppUrl(data?.app_url??'');});return()=>{cancelled=true;};},[kind,organizationId]);
   useEffect(() => {
-    if (kind !== 'sales-lead' && kind !== 'chat') return;
+    if (!['sales-lead','chat','service','feedback'].includes(kind)) return;
     let cancelled = false;
     void Promise.all([
       supabase.from('company_offices').select('id,office_name').eq('organization_id', organizationId).order('display_order'),
@@ -46,6 +48,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [enabled,setEnabled]=useState(initial?.enabled??false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [code,setCode]=useState('');
   async function save() {
     setBusy(true); setMessage('');
     try {
@@ -54,11 +57,13 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       const choices = [...new Set(interests.split('\n').map(v => v.trim()).filter(Boolean))];
       if (kind === 'sales-lead' && (choices.length > 30 || choices.some(v => v.length > 100))) { setMessage('Use up to 30 service choices, each at most 100 characters.'); return; }
       let portalDestination = '';
-      if (kind === 'portal' && portalUrl.trim()) {
-        const url = new URL(portalUrl.trim());
+      if (kind === 'portal' && (portalUrl.trim() || dealerAppUrl)) {
+        const url = new URL(portalUrl.trim() || dealerAppUrl);
+        if (!dealerAppUrl || url.origin !== new URL(dealerAppUrl).origin) {setMessage('Use your dealer application domain for the portal.');return;}
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) { setMessage('Enter a secure portal URL without credentials or query parameters.'); return; }
         portalDestination = url.href;
       }
+      if(kind==='portal' && releaseEnabled && enabled && !portalDestination){setMessage('Configure your dealer application URL before enabling the portal.');return;}
       if (kind === 'sales-lead' && (!routingReady || (officeId && !offices.some(o => o.id === officeId)) || (repId && !reps.some(r => r.id === repId)))) { setMessage('Check office and representative routing before saving.'); return; }
       let reviewDestination = '';
       if (kind === 'feedback' && reviewUrl.trim()) {
@@ -67,7 +72,8 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
         reviewDestination = url.href;
       }
       if(kind==='chat'){try{new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();}catch{setMessage('Invalid time zone.');return;}if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(opens)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(closes)||opens>=closes||!routingReady||recipients.some(id=>!reps.some(r=>r.id===id))){setMessage('Check business hours and notification recipients.');return;}}
-      const options = { ...saved?.options, ...(kind === 'chat' ? {offline_message:offlineMessage.trim().slice(0,300),timezone,opens,closes,weekdays,notification_recipients:recipients} : {}), ...(kind === 'feedback' ? { review_url: reviewDestination } : {}), ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
+      if(['service','feedback'].includes(kind)&&(!routingReady||recipients.some(id=>!reps.some(r=>r.id===id)))){setMessage('Check notification recipients before saving.');return;}
+      const options = { ...saved?.options, ...(['service','feedback'].includes(kind)?{notification_recipients:recipients}:{}), ...(kind === 'chat' ? {offline_message:offlineMessage.trim().slice(0,300),timezone,opens,closes,weekdays,notification_recipients:recipients} : {}), ...(kind === 'feedback' ? { review_url: reviewDestination } : {}), ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
         organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), ...(inheritColor?{}:{color}), theme, showLogo }, options, enabled: releaseEnabled && enabled,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
@@ -90,8 +96,9 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     {kind === 'sales-lead' && <label className="block text-sm">Services offered (one per line)<textarea className="block w-full border rounded p-2" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Home Theater" /><span className="text-xs">Customers can select multiple services. Leave blank to allow free text.</span></label>}
     {kind === 'chat' && <label className="block text-sm">Response expectation<textarea className="block w-full border rounded p-2" maxLength={300} value={offlineMessage} onChange={e=>setOfflineMessage(e.target.value)} /><span className="text-xs">Shown to visitors without promising an immediate response.</span></label>}
     {kind==='chat'&&<div className="space-y-2"><label>Time zone<input className="block w-full border rounded p-2" value={timezone} onChange={e=>setTimezone(e.target.value)}/></label><div className="flex flex-wrap gap-2">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=><label key={d}><input type="checkbox" checked={weekdays.includes(i)} onChange={e=>setWeekdays(old=>e.target.checked?[...old,i]:old.filter(v=>v!==i))}/>{d}</label>)}</div><label>Opens <input type="time" value={opens} onChange={e=>setOpens(e.target.value)}/></label><label>Closes <input type="time" value={closes} onChange={e=>setCloses(e.target.value)}/></label><fieldset><legend>New chat notifications (default: administrators)</legend>{reps.map(r=><label key={r.id} className="block"><input type="checkbox" checked={recipients.includes(r.id)} onChange={e=>setRecipients(old=>e.target.checked?[...old,r.id]:old.filter(v=>v!==r.id))}/>{r.full_name}</label>)}</fieldset></div>}
+    {['service','feedback'].includes(kind)&&<fieldset><legend>{kind==='service'?'New service request notifications':'Feedback needing attention notifications'} (default: administrators)</legend>{!routingReady&&<p role="status">Loading staff…</p>}{reps.map(r=><label key={r.id} className="block"><input type="checkbox" checked={recipients.includes(r.id)} onChange={e=>setRecipients(old=>e.target.checked?[...old,r.id]:old.filter(v=>v!==r.id))}/>{r.full_name}</label>)}</fieldset>}
     {kind === 'feedback' && <label className="block text-sm">Google review link (optional)<input type="url" className="block w-full border rounded p-2" value={reviewUrl} onChange={e => setReviewUrl(e.target.value)} placeholder="https://g.page/..." /><span className="text-xs">Available to every visitor, regardless of feedback rating.</span></label>}
-    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder="https://portal.example.com/login" /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
+    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder={dealerAppUrl || "https://portal.example.com/login"} /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
     {kind === 'sales-lead' && <div className="space-y-2">
       {!routingReady && <p role="status">Routing options unavailable or loading.</p>}
       <label className="block text-sm">Receiving office<select className="block w-full border rounded p-2" disabled={!routingReady} value={officeId} onChange={e => setOfficeId(e.target.value)}><option value="">Default office</option>{offices.map(o => <option key={o.id} value={o.id}>{o.office_name}</option>)}</select></label>
@@ -101,9 +108,10 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     <div className="border rounded p-3" aria-label="Branding preview" style={{background:theme==='dark'?'#171b23':'#ffffff',color:theme==='dark'?'#ffffff':'#172033'}}><strong>{name || 'Your company'}</strong><div className="mt-2 inline-block rounded px-3 py-2 text-white" style={{ backgroundColor: color }}>{labels[kind]}</div></div>
     <button type="button" disabled={busy} onClick={() => void save()} className="border rounded px-3 py-2">Save configuration</button>
     {saved && <button type="button" className="border rounded px-3 py-2 ml-2" onClick={async () => {
-      try { await navigator.clipboard.writeText(websiteWidgetEmbed(kind, saved.public_id, window.location.origin, import.meta.env.VITE_SUPABASE_URL)); setMessage(releaseEnabled&&saved.enabled?'Installation code copied.':'Preview code copied. Do not install until runtime is released.'); }
+      try { const snippet=websiteWidgetEmbed(kind, saved.public_id, import.meta.env.VITE_WEBSITE_WIDGET_ASSET_ORIGIN || window.location.origin, import.meta.env.VITE_SUPABASE_URL);setCode(snippet);await navigator.clipboard.writeText(snippet); setMessage(releaseEnabled&&saved.enabled?'Installation code copied.':'Preview code copied. Do not install until runtime is released.'); }
       catch { setMessage('Unable to copy preview code.'); }
     }}>{releaseEnabled&&saved.enabled?'Copy installation code':'Copy preview code'}</button>}
+    {code&&<label className="block text-sm">Installation HTML<textarea readOnly className="block w-full border rounded p-2 font-mono text-xs" value={code} onFocus={e=>e.target.select()}/></label>}
     <p role="status" className="text-sm">{message}</p>
   </section>;
 }
@@ -121,7 +129,7 @@ export function WebsiteWidgetSettings({ organizationId }: { organizationId: stri
   if (error) return <p role="alert">Website widget settings are unavailable.</p>;
   if (!rows) return <p role="status">Loading website widgets…</p>;
   return <div className="space-y-4"><h3 className="text-lg font-semibold">Website Widgets</h3>
-    <p className="text-sm">Configure each widget independently. Installation and activation are pending runtime release.</p>
+    <p className="text-sm">Configure each widget independently. Save your approved website origins and configure each widget before installation.</p>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{websiteWidgetKinds.map(kind => <WidgetEditor key={organizationId + kind} kind={kind} organizationId={organizationId} initial={rows.find(row => row.kind === kind)} />)}</div>
   </div>;
 }
