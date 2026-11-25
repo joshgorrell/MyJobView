@@ -374,3 +374,6 @@ verify_jwt = false
 
 [functions.submit-website-feedback]
 verify_jwt = false
+
+[functions.website-chat]
+verify_jwt = false
