@@ -14,13 +14,14 @@ Deno.serve(async req=>{
  allowed=true;
  if(req.method==="OPTIONS")return reply(200,{});
  if(req.method!=="POST")return reply(405,{error:"Method not allowed"});
- const {data:permit,error:limitError}=await db.rpc("consume_website_widget_limit",{p_widget:id});
- if(limitError||!permit)return reply(limitError?503:429,{error:"Try again later"});
+
  const reader=req.body?.getReader();if(!reader)return reply(400,{error:"Missing request"});
  const decoder=new TextDecoder();let raw="",size=0;
  while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>16384){await reader.cancel();return reply(413,{error:"Too large"});}raw+=decoder.decode(value,{stream:true});}
  const body=JSON.parse(raw+decoder.decode());
  if(body.action==="start"){
+ const {data:permit,error:limitError}=await db.rpc("consume_website_widget_limit",{p_widget:id});
+ if(limitError||!permit)return reply(limitError?503:429,{error:"Try again later"});
  const secret=Deno.env.get("WEBSITE_TURNSTILE_SECRET");
  if(!secret||typeof body.botToken!=="string"||body.botToken.length>2048)return reply(400,{error:"Verification required"});
  const verification=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",body:new URLSearchParams({secret,response:body.botToken}),signal:AbortSignal.timeout(8000)});
@@ -34,6 +35,8 @@ Deno.serve(async req=>{
  const hash=await hashVisitorToken(body.token);
  const {data:conversation,error:sessionError}=await db.from("website_chat_conversations").select("id,status").eq("visitor_token_hash",hash).eq("widget_id",w.id).eq("organization_id",w.organization_id).eq("origin",origin).maybeSingle();
  if(sessionError||!conversation)return reply(404,{error:"Session unavailable"});
+ const {data:permit,error:limitError}=await db.rpc("consume_website_chat_session_limit",{p_conversation:conversation.id});
+ if(limitError||!permit)return reply(limitError?503:429,{error:"Try again later"});
  if(body.action==="send"){
  if(conversation.status!=="open")return reply(409,{error:"Conversation closed"});
  const message=validateChatMessage(body);
