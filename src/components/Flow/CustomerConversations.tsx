@@ -1,3 +1,4 @@
+import { WebsiteChatInbox } from './WebsiteChatInbox';
 import { NewTeamMessage } from './NewTeamMessage';
 import { notify } from '../../lib/feedback';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -94,6 +95,7 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
   const loadHistoryVersion = useRef(0);
   const showCustomers = includeCustomers && conversationType !== 'coworkers';
   const showCoworkers = includeCoworkers && conversationType !== 'customer';
+  const [websiteChatOpen, setWebsiteChatOpen] = useState(false);
   const [threads, setThreads] = useState<EnrichedThread[]>([]);
   const [selectedThread, setSelectedThread] = useState<EnrichedThread | null>(null);
   const activeThreadId = useRef<string | null>(null);
@@ -683,6 +685,8 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
   return (
     <div className={`customer-conversations w-full min-w-0 px-1 sm:px-3 py-1 sm:py-2 ${fitScreen ? 'customer-conversations--fit' : ''}`}>
       {loadError && <div role="alert" className="p-2 text-sm text-red-600">{loadError} <button onClick={() => { void loadThreads(); if (selectedThread) void loadMessages(selectedThread.id, selectedThread.source); }} className="underline">Retry</button></div>}
+      {showCustomers && !contactId && !projectId && !workOrderId && !openThreadId && !unreadOnly && <div className="mb-2"><button type="button" className="border border-subtle rounded-lg px-3 py-2" aria-expanded={websiteChatOpen} onClick={()=>setWebsiteChatOpen(v=>!v)}>{websiteChatOpen?'Back to conversations':'Website Chat'}</button></div>}
+      {websiteChatOpen && showCustomers && !contactId && !projectId && !workOrderId && !openThreadId && !unreadOnly ? <WebsiteChatInbox key={profile?.organization_id} organizationId={profile?.organization_id || ''} /> : <>
       {openThreadId && showCustomers && !loading && !threads.some(t => t.id === openThreadId || t.root_ids?.includes(openThreadId)) && <p role="alert" className="p-2 text-sm text-secondary">This conversation is unavailable or you do not have access.</p>}
       {/* Stats bar — compact inline strip */}
       {!hideFilters && <div className={`${selectedThread ? 'hidden sm:flex' : 'flex'} items-center gap-3 sm:gap-4 mb-1.5 px-0.5`}>
@@ -1240,6 +1244,7 @@ export function CustomerConversations({ fitScreen = false, newMessageRequested =
             </div>
         </QuickActionModal>
       )}
+      </>}
     </div>
   );
 }

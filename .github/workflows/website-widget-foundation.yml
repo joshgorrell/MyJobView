@@ -1,0 +1,44 @@
+name: Website widget foundation
+on:
+  pull_request:
+    paths:
+      - 'src/lib/websiteWidgets.ts'
+      - 'src/components/Admin/Website*.tsx'
+      - 'src/components/Flow/WebsiteChatInbox.tsx'
+      - 'src/components/Flow/CustomerConversations.tsx'
+      - 'public/website-widgets/**'
+      - 'supabase/functions/**/website*'
+      - 'supabase/functions/*website*/**'
+      - 'supabase/migrations/*website*.sql'
+      - 'supabase/config.toml'
+      - 'public/_headers'
+      - 'tests/website-widgets/**'
+      - '.github/workflows/website-widget-foundation.yml'
+concurrency:
+  group: website-widgets-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node tests/website-widgets/foundation.mjs
+
+      - run: node tests/website-widgets/runtime-contract.mjs
+
+      - run: node tests/website-widgets/functional.mjs
+
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/website-widgets/browser.mjs
+
+      - run: node tests/website-widgets/database.mjs
+
+      - run: node tests/website-widgets/transactions.mjs
