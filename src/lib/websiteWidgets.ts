@@ -9,12 +9,13 @@ export function normalizeWebsiteOrigin(value: string): string {
   return url.origin;
 }
 
-export function websiteWidgetEmbed(kind: WebsiteWidgetKind, publicId: string, assetOrigin: string): string {
+export function websiteWidgetEmbed(kind: WebsiteWidgetKind, publicId: string, assetOrigin: string, configOrigin: string): string {
   if (!websiteWidgetKinds.includes(kind) || !/^[a-zA-Z0-9_-]{16,128}$/.test(publicId)) {
     throw new Error('Invalid widget identifier');
   }
   const origin = normalizeWebsiteOrigin(assetOrigin);
-  return '<script async src="' + origin + '/website-widgets/' + kind + '.js" data-widget="' + publicId + '"></script>';
+  const config = normalizeWebsiteOrigin(configOrigin) + '/functions/v1/website-widget-config';
+  return '<script async src="' + origin + '/website-widgets/' + kind + '.js" data-widget="' + publicId + '" data-config="' + config + '"></script>';
 }
 
 export function websiteWidgetAllowed(config: { enabled: boolean; allowedOrigins: readonly string[] }, origin: string): boolean {
