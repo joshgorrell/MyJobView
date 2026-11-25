@@ -43,7 +43,7 @@ Deno.serve(async req=>{
  const {data:permit,error:limitError}=await db.rpc("consume_website_chat_session_limit",{p_conversation:conversation.id});
  if(limitError||!permit)return reply(limitError?503:429,{error:"Try again later"});
  if(body.action==="send"){
- if(conversation.status!=="open")return reply(409,{error:"Conversation closed"});
+ // The atomic RPC checks closure after looking up an existing request, allowing safe retries.
  const message=validateChatMessage(body);
  const {error}=await db.rpc("send_website_chat_visitor",{p_conversation:conversation.id,p_hash:hash,p_request:message.requestId,p_body:message.body});
  if(error)return reply(503,{error:"Unable to send"});
