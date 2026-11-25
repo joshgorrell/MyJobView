@@ -49,6 +49,28 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [code,setCode]=useState('');
+  const [checking,setChecking]=useState(false);
+  const [health,setHealth]=useState<string[]>([]);
+  async function checkConnection(){
+    setChecking(true);setHealth([]);
+    const results:string[]=[];
+    try{
+      const asset=normalizeWebsiteOrigin(import.meta.env.VITE_WEBSITE_WIDGET_ASSET_ORIGIN||window.location.origin);
+      const api=normalizeWebsiteOrigin(import.meta.env.VITE_SUPABASE_URL);
+      const checks=await Promise.allSettled(['runtime',kind].map(async file=>{
+        const response=await fetch(asset+'/website-widgets/'+file+'.js',{mode:'cors',credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(10000)});
+        if(!response.ok||!/javascript|ecmascript/i.test(response.headers.get('content-type')||''))throw Error('Asset unavailable');
+        return file;
+      }));
+      checks.forEach((check,i)=>results.push((i===0?'Shared runtime':'Widget script')+': '+(check.status==='fulfilled'?'reachable':'unavailable or incorrect MIME type')));
+      results.push('Configuration: '+(saved?'saved':'not saved'));
+      results.push('Approved origins: '+(saved?.allowed_origins.length||0));
+      results.push('Activation: '+(releaseEnabled&&saved?.enabled?'enabled in settings':'disabled'));
+      results.push('API endpoint: '+api);
+      results.push('Public origin, bot verification and actual submission must be tested on the approved website.');
+    }catch{results.push('Invalid hosting configuration or connection unavailable.');}
+    finally{setHealth(results);setChecking(false);}
+  }
   async function save() {
     setBusy(true); setMessage('');
     try {
@@ -112,6 +134,8 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       catch { setMessage('Unable to copy preview code.'); }
     }}>{releaseEnabled&&saved.enabled?'Copy installation code':'Copy preview code'}</button>}
     {code&&<label className="block text-sm">Installation HTML<textarea readOnly className="block w-full border rounded p-2 font-mono text-xs" value={code} onFocus={e=>e.target.select()}/></label>}
+    <button type="button" disabled={checking} onClick={()=>void checkConnection()} className="border rounded px-3 py-2">{checking?'Checking…':'Check connection'}</button>
+    {health.length>0&&<ul aria-live="polite" className="text-sm space-y-1">{health.map((item,i)=><li key={i}>{item}</li>)}</ul>}
     <p role="status" className="text-sm">{message}</p>
   </section>;
 }
