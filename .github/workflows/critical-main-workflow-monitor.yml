@@ -1,31 +1,33 @@
 name: Critical main workflow monitor
 on:
-  workflow_run:
-    workflows: ['*']
-    types: [completed]
-    branches: [main]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
 permissions:
-  contents: read
+  actions: read
   issues: write
 concurrency:
-  group: critical-monitor-${{ github.event.workflow_run.id }}
+  group: critical-main-workflow-monitor
   cancel-in-progress: false
 jobs:
   report:
-    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.name != 'Critical main workflow monitor'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Report failed main workflow
+      - name: Check recent failed main workflows
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
-          title="[Main workflow failure] Run $RUN_ID"
-          existing="$(gh api --paginate "repos/$GH_REPO/issues?state=all&per_page=100" --jq '.[] | select(.pull_request == null) | .title' | grep -Fx "$title" || true)"
-          if [[ -n "$existing" ]]; then exit 0; fi
-          gh issue create --repo "$GH_REPO" --title "$title" --body "A push-triggered main workflow failed. Review https://github.com/$GH_REPO/actions/runs/$RUN_ID to determine deployment impact and recovery. This is a monitoring signal, not proof of a production outage."
+          since="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          runs="$(gh api --paginate --method GET "repos/$GH_REPO/actions/runs" -f branch=main -f event=push -f status=failure -f "created=>=$since" -F per_page=100 --jq '.workflow_runs[] | .id')"
+          while IFS= read -r id; do
+            [[ -n "$id" ]] || continue
+            [[ "$id" =~ ^[0-9]+$ ]]
+            title="[Main workflow failure] Run $id"
+            matches="$(gh api --paginate --method GET "repos/$GH_REPO/issues" -f state=all -F per_page=100 --jq '.[] | select(.pull_request == null) | .title')"
+            if grep -Fxq "$title" <<< "$matches"; then continue; fi
+            gh issue create --repo "$GH_REPO" --title "$title" --body "A push-triggered main workflow failed. Review https://github.com/$GH_REPO/actions/runs/$id to determine deployment impact and recovery. This signal is not proof of a production outage."
+          done <<< "$runs"
