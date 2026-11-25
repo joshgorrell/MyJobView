@@ -30,6 +30,8 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [offices, setOffices] = useState<{id:string;office_name:string}[]>([]);
   const [reps, setReps] = useState<{id:string;full_name:string}[]>([]);
   const [routingReady, setRoutingReady] = useState(false);
+  const [dealerAppUrl,setDealerAppUrl]=useState('');
+  useEffect(()=>{if(kind!=='portal')return;let cancelled=false;void supabase.from('company_settings').select('app_url').eq('organization_id',organizationId).maybeSingle().then(({data,error})=>{if(!cancelled&&!error)setDealerAppUrl(data?.app_url??'');});return()=>{cancelled=true;};},[kind,organizationId]);
   useEffect(() => {
     if (kind !== 'sales-lead' && kind !== 'chat') return;
     let cancelled = false;
@@ -54,11 +56,13 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       const choices = [...new Set(interests.split('\n').map(v => v.trim()).filter(Boolean))];
       if (kind === 'sales-lead' && (choices.length > 30 || choices.some(v => v.length > 100))) { setMessage('Use up to 30 service choices, each at most 100 characters.'); return; }
       let portalDestination = '';
-      if (kind === 'portal' && portalUrl.trim()) {
-        const url = new URL(portalUrl.trim());
+      if (kind === 'portal' && (portalUrl.trim() || dealerAppUrl)) {
+        const url = new URL(portalUrl.trim() || dealerAppUrl);
+        if (!dealerAppUrl || url.origin !== new URL(dealerAppUrl).origin) {setMessage('Use your dealer application domain for the portal.');return;}
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) { setMessage('Enter a secure portal URL without credentials or query parameters.'); return; }
         portalDestination = url.href;
       }
+      if(kind==='portal' && releaseEnabled && enabled && !portalDestination){setMessage('Configure your dealer application URL before enabling the portal.');return;}
       if (kind === 'sales-lead' && (!routingReady || (officeId && !offices.some(o => o.id === officeId)) || (repId && !reps.some(r => r.id === repId)))) { setMessage('Check office and representative routing before saving.'); return; }
       let reviewDestination = '';
       if (kind === 'feedback' && reviewUrl.trim()) {
@@ -91,7 +95,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     {kind === 'chat' && <label className="block text-sm">Response expectation<textarea className="block w-full border rounded p-2" maxLength={300} value={offlineMessage} onChange={e=>setOfflineMessage(e.target.value)} /><span className="text-xs">Shown to visitors without promising an immediate response.</span></label>}
     {kind==='chat'&&<div className="space-y-2"><label>Time zone<input className="block w-full border rounded p-2" value={timezone} onChange={e=>setTimezone(e.target.value)}/></label><div className="flex flex-wrap gap-2">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=><label key={d}><input type="checkbox" checked={weekdays.includes(i)} onChange={e=>setWeekdays(old=>e.target.checked?[...old,i]:old.filter(v=>v!==i))}/>{d}</label>)}</div><label>Opens <input type="time" value={opens} onChange={e=>setOpens(e.target.value)}/></label><label>Closes <input type="time" value={closes} onChange={e=>setCloses(e.target.value)}/></label><fieldset><legend>New chat notifications (default: administrators)</legend>{reps.map(r=><label key={r.id} className="block"><input type="checkbox" checked={recipients.includes(r.id)} onChange={e=>setRecipients(old=>e.target.checked?[...old,r.id]:old.filter(v=>v!==r.id))}/>{r.full_name}</label>)}</fieldset></div>}
     {kind === 'feedback' && <label className="block text-sm">Google review link (optional)<input type="url" className="block w-full border rounded p-2" value={reviewUrl} onChange={e => setReviewUrl(e.target.value)} placeholder="https://g.page/..." /><span className="text-xs">Available to every visitor, regardless of feedback rating.</span></label>}
-    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder="https://portal.example.com/login" /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
+    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder={dealerAppUrl || "https://portal.example.com/login"} /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
     {kind === 'sales-lead' && <div className="space-y-2">
       {!routingReady && <p role="status">Routing options unavailable or loading.</p>}
       <label className="block text-sm">Receiving office<select className="block w-full border rounded p-2" disabled={!routingReady} value={officeId} onChange={e => setOfficeId(e.target.value)}><option value="">Default office</option>{offices.map(o => <option key={o.id} value={o.id}>{o.office_name}</option>)}</select></label>
@@ -121,7 +125,7 @@ export function WebsiteWidgetSettings({ organizationId }: { organizationId: stri
   if (error) return <p role="alert">Website widget settings are unavailable.</p>;
   if (!rows) return <p role="status">Loading website widgets…</p>;
   return <div className="space-y-4"><h3 className="text-lg font-semibold">Website Widgets</h3>
-    <p className="text-sm">Configure each widget independently. Installation and activation are pending runtime release.</p>
+    <p className="text-sm">Configure each widget independently. Save your approved website origins and configure each widget before installation.</p>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{websiteWidgetKinds.map(kind => <WidgetEditor key={organizationId + kind} kind={kind} organizationId={organizationId} initial={rows.find(row => row.kind === kind)} />)}</div>
   </div>;
 }
