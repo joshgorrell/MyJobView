@@ -19,7 +19,7 @@ begin
  select service_request_id into v_id from public.website_service_receipts where widget_id=w.id and request_id=p_request;
  if found then return v_id; end if;
  insert into public.service_requests(organization_id,customer_name,customer_email,customer_phone,job_location_address,job_location_city,job_location_state,job_location_zip,job_description,billable_type,billable_by,status,source_type,customer_contact_instruction,notes)
- values(w.organization_id,p_name,p_email,p_phone,p_address,p_city,p_state,p_zip,p_description,'billable','dispatch','pending','website','dispatch','Unverified website submission; verify identity and billing before scheduling.')
+ values(w.organization_id,p_name,p_email,p_phone,p_address,p_city,p_state,p_zip,p_description,'billable','dispatch','open','website','dispatch','Unverified website submission; verify identity and billing before scheduling.')
  returning id into v_id;
  insert into public.website_service_receipts values(w.id,p_request,v_id);
  return v_id;
