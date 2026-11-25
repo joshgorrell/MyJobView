@@ -3,6 +3,14 @@ on:
   pull_request:
     paths:
       - 'src/lib/websiteWidgets.ts'
+      - 'src/components/Admin/Website*.tsx'
+      - 'src/components/Flow/WebsiteChatInbox.tsx'
+      - 'src/components/Flow/CustomerConversations.tsx'
+      - 'public/website-widgets/**'
+      - 'supabase/functions/**/website*'
+      - 'supabase/functions/*website*/**'
+      - 'supabase/migrations/*website*.sql'
+      - 'supabase/config.toml'
       - 'tests/website-widgets/**'
       - '.github/workflows/website-widget-foundation.yml'
 permissions:
@@ -18,3 +26,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node tests/website-widgets/foundation.mjs
+
+      - run: node tests/website-widgets/runtime-contract.mjs
