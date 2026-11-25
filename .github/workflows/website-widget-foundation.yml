@@ -30,3 +30,6 @@ jobs:
       - run: node tests/website-widgets/runtime-contract.mjs
 
       - run: node tests/website-widgets/functional.mjs
+
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/website-widgets/browser.mjs
