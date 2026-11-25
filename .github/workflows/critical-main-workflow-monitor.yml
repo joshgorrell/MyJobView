@@ -23,11 +23,17 @@ jobs:
           set -euo pipefail
           since="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
           runs="$(gh api --paginate --method GET "repos/$GH_REPO/actions/runs" -f branch=main -f event=push -f status=failure -f "created=>=$since" -F per_page=100 --jq '.workflow_runs[] | .id')"
+          [[ -n "$runs" ]] || exit 0
+          # Fetch once, not once per failure. Include closed issues to avoid duplicates.
+          matches="$(gh api --paginate --method GET "repos/$GH_REPO/issues" -f state=all -F per_page=100 --jq '.[] | select(.pull_request == null) | .title')"
           while IFS= read -r id; do
             [[ -n "$id" ]] || continue
             [[ "$id" =~ ^[0-9]+$ ]]
             title="[Main workflow failure] Run $id"
-            matches="$(gh api --paginate --method GET "repos/$GH_REPO/issues" -f state=all -F per_page=100 --jq '.[] | select(.pull_request == null) | .title')"
             if grep -Fxq "$title" <<< "$matches"; then continue; fi
+            # Recheck current conclusion in case the run recovered during polling.
+            conclusion="$(gh api "repos/$GH_REPO/actions/runs/$id" --jq '.conclusion')"
+            [[ "$conclusion" == failure ]] || continue
             gh issue create --repo "$GH_REPO" --title "$title" --body "A push-triggered main workflow failed. Review https://github.com/$GH_REPO/actions/runs/$id to determine deployment impact and recovery. This signal is not proof of a production outage."
+            matches="$(printf '%s\n%s' "$matches" "$title")"
           done <<< "$runs"
