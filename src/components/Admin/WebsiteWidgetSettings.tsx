@@ -16,6 +16,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [interests, setInterests] = useState(initial?.options?.interests?.join('\n') ?? '');
   const [portalUrl, setPortalUrl] = useState(typeof initial?.options?.portal_url === 'string' ? initial.options.portal_url : '');
   const [reviewUrl, setReviewUrl] = useState(typeof initial?.options?.review_url === 'string' ? initial.options.review_url : '');
+  const [offlineMessage,setOfflineMessage]=useState(String(initial?.options?.offline_message??'Our team will reply when available.'));
   const [officeId, setOfficeId] = useState(String(initial?.options?.office_id ?? ''));
   const [repId, setRepId] = useState(String(initial?.options?.rep_id ?? ''));
   const [offices, setOffices] = useState<{id:string;office_name:string}[]>([]);
@@ -54,7 +55,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
         if (url.protocol !== 'https:' || url.username || url.password || !['g.page','search.google.com','maps.google.com','www.google.com'].includes(url.hostname)) { setMessage('Enter a valid HTTPS Google review link.'); return; }
         reviewDestination = url.href;
       }
-      const options = { ...saved?.options, ...(kind === 'feedback' ? { review_url: reviewDestination } : {}), ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
+      const options = { ...saved?.options, ...(kind === 'chat' ? {offline_message:offlineMessage.trim().slice(0,300)} : {}), ...(kind === 'feedback' ? { review_url: reviewDestination } : {}), ...(kind === 'portal' ? { portal_url: portalDestination } : {}), ...(kind === 'sales-lead' ? { interests: choices, office_id: officeId || null, rep_id: repId || null } : {}) };
       const { data, error } = await supabase.from('website_widget_settings').upsert({
         organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), color }, options, enabled: false,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
@@ -72,6 +73,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     <label className="block text-sm">Display name<input className="block w-full border rounded p-2" value={name} onChange={e => setName(e.target.value)} maxLength={100} /></label>
     <label className="block text-sm">Brand color <input type="color" value={color} onChange={e => setColor(e.target.value)} /></label>
     {kind === 'sales-lead' && <label className="block text-sm">Services offered (one per line)<textarea className="block w-full border rounded p-2" value={interests} onChange={e => setInterests(e.target.value)} placeholder="Home Theater" /><span className="text-xs">Customers can select multiple services. Leave blank to allow free text.</span></label>}
+    {kind === 'chat' && <label className="block text-sm">Response expectation<textarea className="block w-full border rounded p-2" maxLength={300} value={offlineMessage} onChange={e=>setOfflineMessage(e.target.value)} /><span className="text-xs">Shown to visitors without promising an immediate response.</span></label>}
     {kind === 'feedback' && <label className="block text-sm">Google review link (optional)<input type="url" className="block w-full border rounded p-2" value={reviewUrl} onChange={e => setReviewUrl(e.target.value)} placeholder="https://g.page/..." /><span className="text-xs">Available to every visitor, regardless of feedback rating.</span></label>}
     {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder="https://portal.example.com/login" /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
     {kind === 'sales-lead' && <div className="space-y-2">
