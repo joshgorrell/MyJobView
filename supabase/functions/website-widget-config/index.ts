@@ -10,6 +10,8 @@ function reply(status: number, body: unknown, origin?: string) {
   } });
 }
 Deno.serve(async (req: Request) => {
+ if(Deno.env.get("WEBSITE_WIDGET_RUNTIME_ENABLED")!=="true")return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
+
   // GET is a simple CORS request; no credentials or custom headers are needed.
   if (req.method !== "GET") return reply(405, { error: "Method not allowed" });
   const origin = req.headers.get("Origin");

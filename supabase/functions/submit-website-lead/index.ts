@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { notifyWebsiteLead } from "../_shared/website-lead-notify.ts";
 import { validateWebsiteLead } from "../_shared/website-lead-validation.ts";
 Deno.serve(async (req) => {
+ if(Deno.env.get("WEBSITE_WIDGET_RUNTIME_ENABLED")!=="true")return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
+
   const origin = req.headers.get("Origin") ?? "";
   const reply = (status: number, body: unknown, allowed = false) => new Response(JSON.stringify(body), {status, headers: {"Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin", ...(allowed ? {"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type"} : {})}});
   try {

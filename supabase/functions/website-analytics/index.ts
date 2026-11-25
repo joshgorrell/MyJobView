@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2";
 Deno.serve(async req=>{
+ if(Deno.env.get("WEBSITE_WIDGET_RUNTIME_ENABLED")!=="true")return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
+
  const origin=req.headers.get("Origin")??"";
  const reply=(status:number,allowed=false)=>new Response(null,{status,headers:{"Cache-Control":"no-store","Vary":"Origin",...(allowed?{"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Methods":"POST, OPTIONS"}:{})}});
  try{

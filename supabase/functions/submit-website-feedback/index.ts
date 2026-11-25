@@ -10,6 +10,8 @@ function validateWebsiteFeedback(body: Record<string, unknown>) {
  return {rating,requestId,name,email,comment};
 }
 Deno.serve(async (req) => {
+ if(Deno.env.get("WEBSITE_WIDGET_RUNTIME_ENABLED")!=="true")return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
+
   const origin = req.headers.get("Origin") ?? "";
   const reply = (status: number, body: unknown, allowed = false) => new Response(JSON.stringify(body), {status, headers: {"Content-Type":"application/json","Cache-Control":"no-store","Vary":"Origin", ...(allowed ? {"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type"} : {})}});
   try {
