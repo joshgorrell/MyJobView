@@ -287,7 +287,7 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
           Service Billing Queue
@@ -349,8 +349,8 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
       </div>
 
       {/* Filters */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -534,7 +534,7 @@ export function ServiceBillingQueue({ onSelectItem }: ServiceBillingQueueProps) 
                   )}
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
+                <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm text-gray-600">
                     Billable by: <span className="font-medium text-gray-900">
                       {item.billable_by.replace('_', ' ')}

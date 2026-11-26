@@ -135,13 +135,13 @@ export function InventoryDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-3 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Inventory Management</h1>
         <p className="text-gray-300">Track stock levels, manage warehouses, and process orders</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-4">
         <StatCard
           title="Total Products"
           value={stats.total_products.toLocaleString()}
@@ -178,7 +178,7 @@ export function InventoryDashboard() {
 
       <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700">
         <div className="border-b border-gray-700">
-          <div className="flex overflow-x-auto scrollbar-hide">
+          <div className="flex min-w-0 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
