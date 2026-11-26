@@ -17,7 +17,6 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [showLogo,setShowLogo]=useState(initial?.branding.showLogo!==false);
   const [theme,setTheme]=useState(initial?.branding.theme??'light');
   const [interests, setInterests] = useState(initial?.options?.interests?.join('\n') ?? '');
-  const [portalUrl, setPortalUrl] = useState(typeof initial?.options?.portal_url === 'string' ? initial.options.portal_url : '');
   const [reviewUrl, setReviewUrl] = useState(typeof initial?.options?.review_url === 'string' ? initial.options.review_url : '');
   const [offlineMessage,setOfflineMessage]=useState(String(initial?.options?.offline_message??'Our team will reply when available.'));
   const [timezone,setTimezone]=useState(String(initial?.options?.timezone??'America/Chicago'));
@@ -31,7 +30,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
   const [reps, setReps] = useState<{id:string;full_name:string}[]>([]);
   const [routingReady, setRoutingReady] = useState(false);
   const [dealerAppUrl,setDealerAppUrl]=useState('');
-  useEffect(()=>{if(kind!=='portal')return;let cancelled=false;void supabase.from('company_settings').select('app_url').eq('organization_id',organizationId).maybeSingle().then(({data,error})=>{if(!cancelled&&!error)setDealerAppUrl(data?.app_url??'');});return()=>{cancelled=true;};},[kind,organizationId]);
+  useEffect(()=>{if(kind!=='portal')return;let cancelled=false;void supabase.from('organizations').select('subdomain').eq('id',organizationId).maybeSingle().then(({data,error})=>{if(!cancelled&&!error)setDealerAppUrl(data?.subdomain && /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(data.subdomain) ? 'https://'+data.subdomain+'.myjobview.com/portal' : '');});return()=>{cancelled=true;};},[kind,organizationId]);
   useEffect(() => {
     if (!['sales-lead','chat','service','feedback'].includes(kind)) return;
     let cancelled = false;
@@ -79,8 +78,8 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
       const choices = [...new Set(interests.split('\n').map(v => v.trim()).filter(Boolean))];
       if (kind === 'sales-lead' && (choices.length > 30 || choices.some(v => v.length > 100))) { setMessage('Use up to 30 service choices, each at most 100 characters.'); return; }
       let portalDestination = '';
-      if (kind === 'portal' && (portalUrl.trim() || dealerAppUrl)) {
-        const url = new URL(portalUrl.trim() || dealerAppUrl);
+      if (kind === 'portal' && dealerAppUrl) {
+        const url = new URL(dealerAppUrl);
         if (!dealerAppUrl || url.origin !== new URL(dealerAppUrl).origin) {setMessage('Use your dealer application domain for the portal.');return;}
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) { setMessage('Enter a secure portal URL without credentials or query parameters.'); return; }
         portalDestination = url.href;
@@ -120,7 +119,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
     {kind==='chat'&&<div className="space-y-2"><label>Time zone<input className="block w-full border rounded p-2" value={timezone} onChange={e=>setTimezone(e.target.value)}/></label><div className="flex flex-wrap gap-2">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d,i)=><label key={d}><input type="checkbox" checked={weekdays.includes(i)} onChange={e=>setWeekdays(old=>e.target.checked?[...old,i]:old.filter(v=>v!==i))}/>{d}</label>)}</div><label>Opens <input type="time" value={opens} onChange={e=>setOpens(e.target.value)}/></label><label>Closes <input type="time" value={closes} onChange={e=>setCloses(e.target.value)}/></label><fieldset><legend>New chat notifications (default: administrators)</legend>{reps.map(r=><label key={r.id} className="block"><input type="checkbox" checked={recipients.includes(r.id)} onChange={e=>setRecipients(old=>e.target.checked?[...old,r.id]:old.filter(v=>v!==r.id))}/>{r.full_name}</label>)}</fieldset></div>}
     {['service','feedback'].includes(kind)&&<fieldset><legend>{kind==='service'?'New service request notifications':'Feedback needing attention notifications'} (default: administrators)</legend>{!routingReady&&<p role="status">Loading staff…</p>}{reps.map(r=><label key={r.id} className="block"><input type="checkbox" checked={recipients.includes(r.id)} onChange={e=>setRecipients(old=>e.target.checked?[...old,r.id]:old.filter(v=>v!==r.id))}/>{r.full_name}</label>)}</fieldset>}
     {kind === 'feedback' && <label className="block text-sm">Google review link (optional)<input type="url" className="block w-full border rounded p-2" value={reviewUrl} onChange={e => setReviewUrl(e.target.value)} placeholder="https://g.page/..." /><span className="text-xs">Available to every visitor, regardless of feedback rating.</span></label>}
-    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={portalUrl} onChange={e => setPortalUrl(e.target.value)} placeholder={dealerAppUrl || "https://portal.example.com/login"} /><span className="text-xs">The destination must also pass server-side dealer and origin verification before activation.</span></label>}
+    {kind === 'portal' && <label className="block text-sm">Customer portal URL<input type="url" className="block w-full border rounded p-2" value={dealerAppUrl} readOnly placeholder={dealerAppUrl || "https://portal.example.com/login"} /><span className="text-xs">Automatically uses your registered dealer subdomain.</span></label>}
     {kind === 'sales-lead' && <div className="space-y-2">
       {!routingReady && <p role="status">Routing options unavailable or loading.</p>}
       <label className="block text-sm">Receiving office<select className="block w-full border rounded p-2" disabled={!routingReady} value={officeId} onChange={e => setOfficeId(e.target.value)}><option value="">Default office</option>{offices.map(o => <option key={o.id} value={o.id}>{o.office_name}</option>)}</select></label>
