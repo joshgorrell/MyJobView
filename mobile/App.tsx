@@ -1,5 +1,5 @@
 import { ThemeProvider, useTheme, themeColor } from './src/theme/ThemeContext';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -10,6 +10,8 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { OfflineProvider } from './src/contexts/OfflineContext';
 
+import * as Notifications from 'expo-notifications';
+import WebsiteChatScreen from './src/screens/WebsiteChatScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import CalendarScreen from './src/screens/CalendarScreen';
@@ -33,7 +35,7 @@ function MobileTabBar({ activeRoute }: { activeRoute: string }) {
   const insets = useSafeAreaInsets();
   const { dark } = useTheme();
   const selectedRoute = activeRoute === 'WorkOrderDetail' ? 'WorkOrders'
-    : activeRoute === 'TimeHistory' ? 'TimeClock'
+    : activeRoute === 'WebsiteChat' ? 'Settings' : activeRoute === 'TimeHistory' ? 'TimeClock'
     : activeRoute;
   return (
     <View style={[tabStyles.bar, { paddingBottom: Math.max(insets.bottom, 8), backgroundColor: themeColor(Colors.white, dark), borderTopColor: themeColor(Colors.gray[200], dark) }]}>
@@ -69,6 +71,19 @@ function AppNavigation() {
   const { session, loading } = useAuth();
   const { dark } = useTheme();
   const [activeRoute, setActiveRoute] = useState('Dashboard');
+  const [pendingChat,setPendingChat]=useState<string|null>(null);
+  useEffect(()=>{
+    if(!session){setPendingChat(null);return;}
+    let active=true;
+    const handle=(response:Notifications.NotificationResponse|null)=>{
+      const data=response?.notification.request.content.data;
+      if(active&&data?.type==='website_chat'&&typeof data.conversationId==='string'&&/^[0-9a-f-]{36}$/i.test(data.conversationId))setPendingChat(data.conversationId);
+    };
+    const sub=Notifications.addNotificationResponseReceivedListener(handle);
+    void Notifications.getLastNotificationResponseAsync().then(handle).catch(()=>{});
+    return()=>{active=false;sub.remove();};
+  },[session?.user.id]);
+  useEffect(()=>{if(session&&pendingChat&&navigationRef.isReady()){navigationRef.navigate('WebsiteChat',{conversationId:pendingChat});setPendingChat(null);void Notifications.clearLastNotificationResponseAsync().catch(()=>{});}},[session,pendingChat,activeRoute]);
   if (loading) return null;
   return (
     <NavigationContainer ref={navigationRef} onReady={() => setActiveRoute(navigationRef.getCurrentRoute()?.name || 'Dashboard')}
@@ -83,6 +98,7 @@ function AppNavigation() {
           <Stack.Screen name="WorkOrders" component={WorkOrdersScreen} options={{ headerShown: false }} />
           <Stack.Screen name="WorkOrderDetail" component={WorkOrderDetailScreen} />
           <Stack.Screen name="TimeHistory" component={TimeHistoryScreen} />
+          <Stack.Screen name="WebsiteChat" component={WebsiteChatScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
         </>}
       </Stack.Navigator>

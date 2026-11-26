@@ -85,6 +85,7 @@ export default function SettingsScreen({ navigation }: any) {
       {/* Profile Section */}
       <View style={themedStyles.section}>
         <Text style={themedStyles.sectionTitle}>Profile</Text>
+        <TouchableOpacity accessibilityRole="button" onPress={()=>navigation.navigate('WebsiteChat')} style={{padding:16}}><Text style={{color:'#2563eb',fontWeight:'600'}}>Website Chat</Text></TouchableOpacity>
         <View style={themedStyles.profileCard}>
           <View style={themedStyles.avatar}>
             <Text style={themedStyles.avatarText}>{initials}</Text>
