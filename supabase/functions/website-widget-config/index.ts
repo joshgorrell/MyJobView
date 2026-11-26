@@ -38,12 +38,10 @@ Deno.serve(async (req: Request) => {
     }
     let portalUrl: string | undefined;
     if (kind === "portal") {
-      const {data:company,error:companyError}=await db.from("company_settings").select("app_url").eq("organization_id",data.organization_id).maybeSingle();
-      if(companyError||!company?.app_url) return reply(503,{error:"Unavailable"},origin);
-      const base=company.app_url;
-      const candidate = new URL(typeof options.portal_url === "string" ? options.portal_url : "");
-      if (!base || candidate.protocol !== "https:" || candidate.origin !== new URL(base).origin || new URL(base).protocol !== "https:" || new URL(base).pathname !== "/" || candidate.username || candidate.password || candidate.search || candidate.hash) return reply(503, { error: "Unavailable" }, origin);
-      portalUrl = candidate.href;
+      const {data:organization,error:organizationError}=await db.from("organizations").select("subdomain").eq("id",data.organization_id).maybeSingle();
+      const subdomain=organization?.subdomain;
+      if(organizationError||typeof subdomain!=="string"||!/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(subdomain)||subdomain.includes("--"))return reply(503,{error:"Unavailable"},origin);
+      portalUrl = "https://"+subdomain+".myjobview.com/portal";
     }
     let businessHours=false;
     if(kind==='chat'){try{const parts=new Intl.DateTimeFormat('en-US',{timeZone:options.timezone??'America/Chicago',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const part=(type:string)=>parts.find(p=>p.type===type)?.value??'';const day=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(part('weekday'));const time=part('hour')+':'+part('minute');businessHours=(Array.isArray(options.weekdays)?options.weekdays:[1,2,3,4,5]).includes(day)&&time>=(options.opens??'08:00')&&time<(options.closes??'17:00');}catch{}}
