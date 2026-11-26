@@ -1,3 +1,4 @@
+import { WebsiteInstallationGuide } from './WebsiteInstallationGuide';
 import { WebsiteAnalyticsSummary } from './WebsiteAnalyticsSummary';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -8,7 +9,7 @@ const labels: Record<WebsiteWidgetKind, string> = {
   feedback: 'Customer Feedback', portal: 'Customer Portal', analytics: 'Conversion Analytics',
 };
 type Settings = { kind: WebsiteWidgetKind; public_id: string; enabled: boolean; allowed_origins: string[]; branding: { name?: string; color?: string; theme?: string; showLogo?: boolean }; options?: { interests?: string[]; [key: string]: unknown } };
-function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKind; organizationId: string; initial?: Settings }) {
+function WidgetEditor({ kind, organizationId, initial, onSaved }: { kind: WebsiteWidgetKind; organizationId: string; initial?: Settings; onSaved: (row: Settings) => void }) {
   const [saved, setSaved] = useState(initial);
   const [origins, setOrigins] = useState(initial?.allowed_origins.join('\n') ?? '');
   const [name, setName] = useState(initial?.branding.name ?? '');
@@ -99,7 +100,7 @@ function WidgetEditor({ kind, organizationId, initial }: { kind: WebsiteWidgetKi
         organization_id: organizationId, kind, allowed_origins, branding: { name: name.trim(), ...(inheritColor?{}:{color}), theme, showLogo }, options, enabled: releaseEnabled && enabled,
       }, { onConflict: 'organization_id,kind' }).select('kind,public_id,enabled,allowed_origins,branding,options').single();
       if (error) throw error;
-      setSaved(data as Settings); setMessage(releaseEnabled?'Configuration saved.':'Configuration saved. Activation is not available yet.');
+      setSaved(data as Settings); onSaved(data as Settings); setMessage(releaseEnabled?'Configuration saved.':'Configuration saved. Activation is not available yet.');
     } catch { setMessage('Unable to save. Check the HTTPS origins and try again.'); }
     finally { setBusy(false); }
   }
@@ -153,6 +154,7 @@ export function WebsiteWidgetSettings({ organizationId }: { organizationId: stri
   if (!rows) return <p role="status">Loading website widgets…</p>;
   return <div className="space-y-4"><h3 className="text-lg font-semibold">Website Widgets</h3>
     <p className="text-sm">Configure each widget independently. Save your approved website origins and configure each widget before installation.</p>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{websiteWidgetKinds.map(kind => <WidgetEditor key={organizationId + kind} kind={kind} organizationId={organizationId} initial={rows.find(row => row.kind === kind)} />)}</div>
+    <WebsiteInstallationGuide organizationId={organizationId} rows={rows}/>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{websiteWidgetKinds.map(kind => <WidgetEditor key={organizationId + kind} kind={kind} organizationId={organizationId} initial={rows.find(row => row.kind === kind)} onSaved={row=>setRows(old=>[...(old??[]).filter(r=>r.kind!==row.kind),row])} />)}</div>
   </div>;
 }
