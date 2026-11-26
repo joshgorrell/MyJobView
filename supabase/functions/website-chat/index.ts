@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2";
 import {hashVisitorToken,newVisitorToken,validateChatMessage,validateChatOrigin} from "../_shared/website-chat-session.ts";
+import {dispatchWebsiteChatPush} from "../_shared/website-chat-push.ts";
 Deno.serve(async req=>{
  if(Deno.env.get("WEBSITE_WIDGET_RUNTIME_ENABLED")!=="true")return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
 
@@ -47,6 +48,7 @@ Deno.serve(async req=>{
  const message=validateChatMessage(body);
  const {error}=await db.rpc("send_website_chat_visitor",{p_conversation:conversation.id,p_hash:hash,p_request:message.requestId,p_body:message.body});
  if(error)return reply(503,{error:"Unable to send"});
+ EdgeRuntime.waitUntil(dispatchWebsiteChatPush(db,w.organization_id,conversation.id).catch(()=>console.error("Website chat push dispatch failed")));
  return reply(200,{success:true});
  }
  if(body.action==="read"){
