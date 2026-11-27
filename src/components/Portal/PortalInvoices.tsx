@@ -53,6 +53,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [recurringSubscriptions, setRecurringSubscriptions] = useState<RecurringSubscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invoiceLoadError, setInvoiceLoadError] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('outstanding');
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<RecurringSubscription | null>(null);
@@ -96,9 +97,11 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   }
 
   async function loadInvoices() {
+    setLoading(true);
+    setInvoiceLoadError(false);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) throw new Error('Please sign in again to view billing.');
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -106,7 +109,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!profile?.contact_id) return;
+      if (!profile?.contact_id) throw new Error('Customer billing profile unavailable.');
 
       const [invoicesRes, subscriptionsRes] = await Promise.all([
         supabase
@@ -180,6 +183,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       recordInvoiceOpens(unpaidIds);
     } catch (error) {
       console.error('Error loading invoices:', error);
+      setInvoiceLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -381,6 +385,12 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
 
   const outstandingInvoices = invoices.filter(inv => inv.status !== 'paid' && inv.status !== 'void' && inv.status !== 'draft' && (inv.amount_due ?? 0) > 0);
   const paidInvoices = invoices.filter(inv => inv.status === 'paid');
+  // Compare date-only due dates without UTC parsing shifting the calendar day.
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const outstandingCents = outstandingInvoices.reduce((sum, inv) => sum + Math.round(Number(inv.amount_due) * 100), 0);
+  const overdueCents = outstandingInvoices.filter(inv => inv.due_date && inv.due_date.slice(0, 10) < today)
+    .reduce((sum, inv) => sum + Math.round(Number(inv.amount_due) * 100), 0);
   const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
   const selectedTotal = selectedInvoices.reduce((sum, inv) => sum + inv.amount_due, 0);
 
@@ -395,8 +405,30 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     );
   }
 
+  if (invoiceLoadError) {
+    return (
+      <div role="alert" className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+        <p className="font-semibold text-gray-900">Billing information is unavailable.</p>
+        <p className="mt-1 text-sm text-gray-600">Please try again before making a payment.</p>
+        <button onClick={() => void loadInvoices()} className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white">Try again</button>
+      </div>
+    );
+  }
+
   const mainContent = (
     <>
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Invoice balance summary">
+          {[
+            { label: 'Outstanding balance', cents: outstandingCents, color: 'text-gray-900' },
+            { label: 'Past due', cents: overdueCents, color: overdueCents > 0 ? 'text-red-700' : 'text-gray-900' },
+            { label: 'Other outstanding', cents: outstandingCents - overdueCents, color: 'text-gray-900' },
+          ].map(item => (
+            <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <p className="text-sm font-medium text-gray-600">{item.label}</p>
+              <p className={`mt-1 text-2xl font-bold tabular-nums ${item.color}`}>{formatCurrency(item.cents / 100)}</p>
+            </div>
+          ))}
+        </div>
         {/* Tab Navigation */}
         <div className="mb-6 border-b border-gray-200">
           <nav className="flex gap-1 -mb-px overflow-x-auto scrollbar-none" style={{WebkitOverflowScrolling: 'touch'}}>
