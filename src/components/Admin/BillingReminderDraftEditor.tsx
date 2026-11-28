@@ -9,8 +9,9 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
   const [days,setDays]=useState(7);
   const [accountPreview,setAccountPreview]=useState<ReturnType<typeof composeBillingDraftPreview>|null>(null);
   const [previewBusy,setPreviewBusy]=useState(false);
+  const [pendingContacts,setPendingContacts]=useState<string[]>([]);
   async function previewAccounts(){
-    setAccountPreview(null);setError('');setPreviewBusy(true);
+    setAccountPreview(null);setPendingContacts([]);setError('');setPreviewBusy(true);
     try{
       validateBillingTemplates(templates);
       const {data,error}=await supabase.from('invoices').select('id,organization_id,contact_id,due_date,status,amount_due,portal_visible,security_billing_cycle_id').eq('organization_id',organizationId).eq('portal_visible',true).in('status',['submitted','sent','partial','overdue']).gt('amount_due',0).is('security_billing_cycle_id',null).order('id').limit(101);
@@ -21,6 +22,14 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
       const asOf=formatDateInTimezone(new Date().toISOString(),dealer.timezone);
       if(!asOf)throw new Error('Invalid dealer timezone.');
 
+      const contacts=[...new Set((data??[]).map(i=>i.contact_id).filter((id):id is string=>Boolean(id)))];
+      if(contacts.length){
+        const {data:pending,error:pendingError}=await supabase.from('pending_payments')
+          .select('contact_id').eq('organization_id',organizationId).eq('payment_type','invoice')
+          .eq('status','awaiting_payment').in('contact_id',contacts).limit(1001);
+        if(pendingError||(pending??[]).length>1000)throw new Error('Pending payment information unavailable. Cannot preview accounts.');
+        setPendingContacts([...new Set((pending??[]).map(p=>p.contact_id).filter((id):id is string=>Boolean(id)))]);
+      }
       setAccountPreview(composeBillingDraftPreview({organizationId,minimumDays:days,templates},(data??[]).filter(i=>i.contact_id).map(i=>({id:i.id,organizationId:i.organization_id,contactId:i.contact_id,dueDate:i.due_date,balanceCents:Math.round(Number(i.amount_due)*100),eligible:true,lastReminderOffset:null})),[],asOf));
     }catch(e){setError(e instanceof Error?e.message:'Unable to preview accounts.');}
     finally{setPreviewBusy(false);}
@@ -81,8 +90,8 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
       <button type="button" onClick={()=>void previewAccounts()} className="block border rounded px-4 py-2">{previewBusy?'Loading preview…':'Preview invoice candidates'}</button>
       {accountPreview&&<div className="rounded border p-3 space-y-2">
         <p className="font-medium">Illustrative candidates: {accountPreview.length} accounts</p>
-        <p className="text-sm text-gray-600">All candidates are held. Payment settlement, disputes, prior reminders are not yet verified. Results are not payable statements or a delivery queue. Run again after editing settings.</p>
-        {accountPreview.map(a=><div key={a.contactId} className="border-t py-2 text-sm">{a.invoices.length} invoice(s) · {new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(a.balanceCents/100)} · Stage {a.stage} · History unavailable</div>)}
+        <p className="text-sm text-gray-600">All candidates are held. Pending payment records are flagged when available; absence of a record does not prove settlement. Payment settlement, disputes, prior reminders are not yet verified. Results are not payable statements or a delivery queue. Run again after editing settings.</p>
+        {accountPreview.map(a=><div key={a.contactId} className="border-t py-2 text-sm">{a.invoices.length} invoice(s) · {new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(a.balanceCents/100)} · Stage {a.stage} · {pendingContacts.includes(a.contactId)?'Pending payment — hold':'History unavailable — hold'}</div>)}
       </div>}
       {message&&<p role="status" className="text-green-700">{message}</p>}
     </fieldset>}
