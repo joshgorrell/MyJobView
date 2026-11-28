@@ -25,3 +25,29 @@ export function previewBillingReminder(invoice: BillingPreviewInvoice, asOf: str
   if (stage === undefined || (invoice.lastReminderOffset !== null && stage <= invoice.lastReminderOffset)) return null;
   return stage;
 }
+
+export interface AccountPreviewInvoice extends BillingPreviewInvoice {
+  organizationId: string;
+  contactId: string;
+}
+
+export function previewAccountReminders(invoices: readonly AccountPreviewInvoice[], asOf: string, offsets: readonly number[] = DEFAULT_BILLING_TIMELINE) {
+  const groups = new Map<string, {organizationId: string; contactId: string; stage: number; balanceCents: number; invoices: {id: string; stage: number; balanceCents: number}[]}>();
+  const seen = new Set<string>();
+  for (const invoice of invoices) {
+    if (!invoice.organizationId || !invoice.contactId || !invoice.id) throw new Error('Missing invoice scope');
+    const identity = JSON.stringify([invoice.organizationId, invoice.id]);
+    if (seen.has(identity)) throw new Error('Duplicate invoice');
+    seen.add(identity);
+    const stage = previewBillingReminder(invoice, asOf, offsets);
+    if (stage === null) continue;
+    const key = JSON.stringify([invoice.organizationId, invoice.contactId]);
+    const group = groups.get(key) ?? {organizationId: invoice.organizationId, contactId: invoice.contactId, stage, balanceCents: 0, invoices: []};
+    group.stage = Math.max(group.stage, stage);
+    group.balanceCents += invoice.balanceCents;
+    if (!Number.isSafeInteger(group.balanceCents)) throw new Error('Invalid account total');
+    group.invoices.push({id: invoice.id, stage, balanceCents: invoice.balanceCents});
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
