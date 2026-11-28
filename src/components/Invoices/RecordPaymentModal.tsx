@@ -24,7 +24,7 @@ const METHOD_OPTIONS = [
   { value: 'cash', label: 'Cash', icon: Banknote },
   { value: 'check', label: 'Check', icon: FileText },
   { value: 'credit_card', label: 'Credit Card', icon: CreditCard },
-  { value: 'ach', label: 'ACH / Bank Transfer', icon: Building2 },
+  { value: 'bank_transfer', label: 'ACH / Bank Transfer', icon: Building2 },
 ];
 
 export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymentModalProps) {
@@ -122,7 +122,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
         ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
         : notes || null;
 
-      const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'ach') && paymentProcessor;
+      const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
 
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
@@ -290,7 +290,7 @@ export function RecordPaymentModal({ invoice, onClose, onSuccess }: RecordPaymen
             </div>
 
             {/* Processor info note for CC/ACH */}
-            {(paymentMethod === 'credit_card' || paymentMethod === 'ach') && (
+            {(paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && (
               <div className={`flex items-start gap-2.5 p-3 rounded-xl text-sm ${
                 paymentProcessor
                   ? 'bg-blue-50 border border-blue-200 text-blue-800'
