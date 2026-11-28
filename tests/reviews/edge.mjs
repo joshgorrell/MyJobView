@@ -179,3 +179,16 @@ moduleAccess=false;assert.equal((await call({action:'resend',request_id:'request
 console.log('In-person feedback, manual resend history, failures, original age, response and permission guards passed.');
 globalThis.fetch=realFetch;
 delete globalThis.__lostDeps; delete globalThis.__lostHandler;
+
+// Dedicated timeline renderer is pure and rejects malformed or unsafe input.
+{
+ const {renderFeedbackTemplate}=await import('../../supabase/functions/_shared/feedback-template-render.mjs');
+ const template={is_active:true,subject:'Hi {{customer_name}}',body:'Hello {{customer_name}}\n{{company_name}}\n{{feedback_url}}'};
+ const values={customer_name:'<Alice>',company_name:'A & B',feedback_url:'https://example.com/feedback?a=1&b=2'};
+ const rendered=renderFeedbackTemplate(template,values);
+ if(rendered.subject!=='Hi <Alice>' || !rendered.html.includes('&lt;Alice&gt;') || !rendered.html.includes('a=1&amp;b=2')) throw new Error('Feedback escaping failed');
+ for(const bad of [{...template,is_active:false},{...template,body:'{{unknown}} {{feedback_url}}'},{...template,body:'No link'},{...template,subject:'Bad\nsubject'}]) {
+ let rejected=false;try{renderFeedbackTemplate(bad,values)}catch{rejected=true}if(!rejected)throw new Error('Unsafe feedback template accepted');
+ }
+ let rejected=false;try{renderFeedbackTemplate(template,{...values,feedback_url:'javascript:alert(1)'})}catch{rejected=true}if(!rejected)throw new Error('Unsafe feedback URL accepted');
+}
