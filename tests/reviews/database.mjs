@@ -339,5 +339,16 @@ console.log(
  }
  await ledgerDb.exec('RESET ROLE; SET ROLE anon');
  await assert.rejects(ledgerDb.query('SELECT * FROM feedback_timeline_events'));
+ await ledgerDb.exec('RESET ROLE');
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128141500_feedback_service_resolution_transition.sql', import.meta.url),'utf8'));
+ for (const [before, after, expected] of [
+   ['in_progress','closed','record'], ['scheduled','closed','record'],
+   ['closed','closed',null], ['closed','open','cancel'],
+   ['closed','cancelled','cancel'], ['cancelled','closed',null],
+   ['open','in_progress',null], [null,'closed',null]
+ ]) {
+   const result = await ledgerDb.query('SELECT public.feedback_service_resolution_transition($1,$2) AS action',[before,after]);
+   assert.equal(result.rows[0].action,expected);
+ }
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
