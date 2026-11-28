@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { composeBillingDraftPreview as compose } from '../../src/lib/billingDraftPreview.ts';
+const settings={organizationId:'d',minimumDays:7,templates:[{offset:7,subject:'Reminder',body:'Hello {{customer_name}}, balance {{reminder_balance}}'}]};
+const invoice={organizationId:'d',contactId:'c',id:'i',dueDate:'2026-11-01',balanceCents:12345,eligible:true,lastReminderOffset:null};
+const history=[{organizationId:'d',contactId:'c',lastSentDate:null}];
+const run=(rows=[invoice],h=history)=>compose(settings,rows,h,'2026-11-28');
+assert.equal(run()[0].reason,'preview-ready');
+assert.equal(run()[0].deliveryAuthorized,false);
+assert.match(run()[0].messagePreview.body,/Sample Customer, balance \$123\.45/);
+assert.equal(run([invoice],[])[0].reason,'history-unavailable');
+assert.throws(()=>run([{...invoice,organizationId:'other'}]));
+assert.throws(()=>run([invoice],[{...history[0],organizationId:'other'}]));
+assert.deepEqual(run([{...invoice,balanceCents:0}]),[]);
+console.log('Composed draft preview tests passed');
