@@ -555,5 +555,22 @@ console.log(
  assert.equal(await legacyGuard('one_year'),null);
  assert.equal(await legacyGuard('one_year',id(2)),'missing_source');
  assert.equal(await legacyGuard('support_completion'),'invalid_candidate');
+ await ledgerDb.exec(`
+ ALTER TABLE service_requests ADD COLUMN request_type text DEFAULT 'service', ADD COLUMN contact_id uuid;
+ UPDATE service_requests SET contact_id='${id(80)}';
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128153000_feedback_service_scope.sql', import.meta.url),'utf8'));
+ await ledgerDb.exec(`
+ INSERT INTO service_requests(id,organization_id,status,request_type,contact_id) VALUES
+ ('${id(140)}','${id(1)}','open','project','${id(80)}'),
+ ('${id(141)}','${id(1)}','open','service',NULL),
+ ('${id(142)}','${id(1)}','open','service','${id(80)}');
+ UPDATE service_requests SET status='closed' WHERE id IN ('${id(140)}','${id(141)}','${id(142)}');
+ `);
+ const scopedService=()=>ledgerDb.query("SELECT source_id,cancelled_at FROM feedback_timeline_events WHERE source_id IN ($1,$2,$3)",[id(140),id(141),id(142)]);
+ assert.equal((await scopedService()).rows.length,1);
+ assert.equal((await scopedService()).rows[0].source_id,id(142));
+ await ledgerDb.exec(`UPDATE service_requests SET request_type='project' WHERE id='${id(142)}'`);
+ assert.ok((await scopedService()).rows[0].cancelled_at);
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
