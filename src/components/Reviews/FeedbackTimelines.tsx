@@ -23,6 +23,7 @@ export default function FeedbackTimelines({ organizationId }: { organizationId: 
   useEffect(() => {
     let current = true;
     setReady(false);
+    setMessage('');
     setDrafts({});
     setError('');
     void (async () => {
@@ -44,6 +45,7 @@ export default function FeedbackTimelines({ organizationId }: { organizationId: 
     setError('');
   };
   const save = async (key: string) => {
+    if (!ready || saving) return;
     const steps = drafts[key] || [];
     if (steps.length > 12 || steps.some((step, i) => !Number.isInteger(step.delay_days) || step.delay_days < 0 || step.delay_days > 365 || (i > 0 && step.delay_days <= steps[i - 1].delay_days) || !/^[a-zA-Z0-9_-]{1,100}$/.test(step.template_key))) {
       setError('Use increasing whole-number days from 0 to 365 and a valid template identifier for every step.');
@@ -73,7 +75,7 @@ export default function FeedbackTimelines({ organizationId }: { organizationId: 
           <button type="button" onClick={() => change(key, steps.filter((_, n) => n !== i))} className="min-h-11 rounded border border-gray-600 px-3 text-sm text-gray-200">Remove</button>
         </div>)}
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={steps.length >= 12 || (steps.at(-1)?.delay_days ?? -1) >= 365} onClick={() => change(key, [...steps, {delay_days: (steps.at(-1)?.delay_days ?? -1) + 1, template_key: ''}])} className="min-h-11 rounded border border-gray-600 px-3 text-sm text-white disabled:opacity-50">Add step</button>
+          <button type="button" disabled={steps.length >= 12 || (steps[steps.length - 1]?.delay_days ?? -1) >= 365} onClick={() => change(key, [...steps, {delay_days: (steps.at(-1)?.delay_days ?? -1) + 1, template_key: ''}])} className="min-h-11 rounded border border-gray-600 px-3 text-sm text-white disabled:opacity-50">Add step</button>
           <button type="button" onClick={() => void save(key)} className="min-h-11 rounded bg-cyan-700 px-3 text-sm font-semibold text-white">Save draft</button>
         </div>
       </fieldset>;
