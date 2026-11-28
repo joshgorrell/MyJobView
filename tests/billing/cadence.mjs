@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { previewAccountReminders, applyAccountReminderCadence } from '../../src/lib/billingReminderPreview.ts';
+const row={id:'a',organizationId:'d1',contactId:'c1',dueDate:'2026-11-01',balanceCents:100,eligible:true,lastReminderOffset:null};
+const candidates=previewAccountReminders([row,{...row,organizationId:'d2'}],'2026-11-27');
+const history=[{organizationId:'d1',contactId:'c1',lastSentDate:'2026-11-24'}];
+const run=(h=history)=>applyAccountReminderCadence(candidates,h,'2026-11-27',7).map(x=>x.reason);
+assert.deepEqual(run(),['cadence-hold','history-unavailable']);
+assert.deepEqual(run([{...history[0],lastSentDate:'2026-11-20'},{...history[0],organizationId:'d2',lastSentDate:null}]),['preview-ready','preview-ready']);
+assert.deepEqual(run([{...history[0],lastSentDate:'2026-11-28'}]),['cadence-hold','history-unavailable']);
+assert.throws(()=>run([...history,...history]));
+assert.throws(()=>applyAccountReminderCadence(candidates,history,'2026-11-27',0));
+console.log('Account reminder cadence checks passed');
