@@ -655,7 +655,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                 Payment Information
               </h3>
               <p className="text-blue-700 text-sm mb-2">
-                Click "Pay" on any invoice to be taken to QuickBooks Payments where you can pay by credit card or ACH transfer.
+                Click "Pay" to open the secure QuickBooks invoice payment page. Available payment methods and any applicable fees will be shown there before you authorize payment.
               </p>
               <p className="text-blue-700 text-sm">
                 Recurring subscriptions are charged automatically on your billing date. Invoices will appear in your invoice list once generated.
