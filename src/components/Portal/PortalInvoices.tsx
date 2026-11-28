@@ -270,7 +270,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
           .order('sort_order'),
         supabase
           .from('payments')
-          .select('payment_date, payment_method, amount',{count:'exact'})
+          .select('payment_date, payment_method, amount, convenience_fee_amount',{count:'exact'})
           .eq('invoice_id', invoice.id)
           .order('payment_date'),
         supabase

@@ -35,6 +35,7 @@ export interface PrintablePayment {
   payment_date: string;
   payment_method: string;
   amount: number;
+  convenience_fee_amount?: number | null;
 }
 
 export interface PrintableCompanyInfo {
@@ -113,7 +114,7 @@ export function buildPortalInvoicePrintHTML(
             <tr>
               <td style="padding:6px 8px;font-size:12px;color:#166534;">${new Date(p.payment_date).toLocaleDateString()}</td>
               <td style="padding:6px 8px;font-size:12px;color:#166534;text-transform:capitalize;">${p.payment_method}</td>
-              <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:600;color:#166534;">$${fmt(p.amount)}</td>
+              <td style="padding:6px 8px;text-align:right;font-size:12px;font-weight:600;color:#166534;">${fmt(p.amount)}${Number(p.convenience_fee_amount)>0 ? `<div style="font-size:11px;font-weight:400;">Includes fee: ${fmt(Number(p.convenience_fee_amount))}</div><div style="font-size:11px;font-weight:400;">Applied to invoice: ${fmt(Number(p.amount)-Number(p.convenience_fee_amount))}</div>` : ''}</td>
             </tr>
           `).join('')}
         </tbody>
