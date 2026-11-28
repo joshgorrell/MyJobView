@@ -1,0 +1,17 @@
+name: Billing draft settings review
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261128133500_billing_reminder_draft_settings.sql'
+      - 'tests/billing/draft-settings-database.mjs'
+      - '.github/workflows/billing-draft-settings-review.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node tests/billing/draft-settings-database.mjs
