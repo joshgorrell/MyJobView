@@ -265,12 +265,12 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
       const [itemsRes, paymentsRes, settingsRes, officeRes, contactRes] = await Promise.all([
         supabase
           .from('invoice_line_items')
-          .select('description, quantity, unit_price, amount, notes, notes_visible_on_invoice')
+          .select('description, quantity, unit_price, amount, notes, notes_visible_on_invoice',{count:'exact'})
           .eq('invoice_id', invoice.id)
           .order('sort_order'),
         supabase
-          .from('invoice_payments')
-          .select('payment_date, payment_method, amount')
+          .from('payments')
+          .select('payment_date, payment_method, amount',{count:'exact'})
           .eq('invoice_id', invoice.id)
           .order('payment_date'),
         supabase
@@ -293,6 +293,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
           .maybeSingle(),
       ]);
 
+      if(itemsRes.error || paymentsRes.error || contactRes.error || !contactRes.data || itemsRes.count !== (itemsRes.data ?? []).length || paymentsRes.count !== (paymentsRes.data ?? []).length) throw new Error('Invoice details or payment history unavailable');
       const extra = contactRes.data as any;
       const contact = extra?.contacts;
       const contactName = contact?.full_name || contact?.contact_name ||
