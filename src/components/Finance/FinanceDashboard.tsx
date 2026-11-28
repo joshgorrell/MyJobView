@@ -8,6 +8,7 @@ interface FinancialMetrics {
   monthlySalesInvoiced: number;
   cashCollected: number;
   accountsReceivable: number;
+  aging: { asOf: string; rows: { label: string; amount: number }[] } | null;
   paidInvoices: number;
   partialInvoices: number;
   overdueInvoices: number;
@@ -32,6 +33,7 @@ export function FinanceDashboard() {
     monthlySalesInvoiced: 0,
     cashCollected: 0,
     accountsReceivable: 0,
+    aging: null,
     paidInvoices: 0,
     partialInvoices: 0,
     overdueInvoices: 0,
@@ -108,11 +110,23 @@ export function FinanceDashboard() {
 
       const activeSubscriptions = subscriptions?.length || 0;
 
+      const agingRows = [
+        ['Current', m.aging_current], ['1–30 days', m.aging_1_30],
+        ['31–60 days', m.aging_31_60], ['61–90 days', m.aging_61_90],
+        ['Over 90 days', m.aging_over_90], ['Missing due date', m.aging_unknown_date],
+        ['Credits / negative balances', m.aging_credits],
+      ].map(([label, value]) => ({ label: String(label), amount: Number(value ?? 0) }));
+      const agingTotal = agingRows.reduce((sum, row) => sum + row.amount, 0);
+      const aging = typeof m.aging_as_of === 'string' && agingRows.every(row => Number.isFinite(row.amount))
+        && Math.abs(agingTotal - Number(m.accounts_receivable ?? 0)) < 0.005
+        ? { asOf: m.aging_as_of, rows: agingRows } : null;
+
       setMetrics({
         salesInvoiced: Number(m.sales_invoiced || 0),
         monthlySalesInvoiced: Number(m.monthly_sales_invoiced || 0),
         cashCollected,
         accountsReceivable: Number(m.accounts_receivable || 0),
+        aging,
         paidInvoices: Number(m.paid_invoices || 0),
         partialInvoices: Number(m.partial_invoices || 0),
         overdueInvoices: Number(m.overdue_invoices || 0),
@@ -217,6 +231,12 @@ export function FinanceDashboard() {
           <div className="space-y-1">
             <p className="text-sm text-muted">Accounts Receivable</p>
             <p className="text-2xl font-bold text-primary">{formatCurrency(metrics.accountsReceivable)}</p>
+            {metrics.aging ? <details className="mt-3 text-sm">
+              <summary className="cursor-pointer text-muted">Aging breakdown · {metrics.aging.asOf}</summary>
+              <dl className="mt-2 space-y-1">
+                {metrics.aging.rows.map(row => <div key={row.label} className="flex flex-wrap justify-between gap-1"><dt>{row.label}</dt><dd className="tabular-nums font-medium">{formatCurrency(row.amount)}</dd></div>)}
+              </dl>
+            </details> : <p className="text-xs text-muted">Aging breakdown unavailable.</p>}
           </div>
         </div>
 
