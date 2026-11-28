@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, DollarSign, Mail, FileText, Check, CreditCard, Banknote, Building2, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatCurrency } from '../../lib/utils';
-import { allocateRecordedFee } from '../../lib/bulkPaymentFeeAllocation';
+import { allocateRecordedFee, parsePaymentCents, confirmRecordedFee } from '../../lib/bulkPaymentFeeAllocation';
 import { calculateConvenienceFee, ConvenienceFeeSettings } from '../../lib/convenienceFee';
 
 interface OpenInvoice {
@@ -118,11 +118,10 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   const feeResult = calculateConvenienceFee(totalEntered, paymentMethod, feeSettings);
   // A configured fee is only a quote, not evidence of a collected fee.
   const quotedFee = feeResult.feeAmount;
-  const principalCentsEntered = Math.round(totalEntered * 100);
-  const grossCentsEntered = Math.round(Number(recordedGross) * 100);
-  const validGross = /^\d+(?:\.\d{1,2})?$/.test(recordedGross.trim()) && Number.isSafeInteger(grossCentsEntered)
-    && (grossCentsEntered === principalCentsEntered || grossCentsEntered === principalCentsEntered + Math.round(quotedFee * 100));
-  const convenienceFee = quotedFee > 0 && validGross ? (grossCentsEntered - principalCentsEntered) / 100 : 0;
+  const principalCentsEntered = parsePaymentCents(totalAmount);
+  const confirmedFeeCents = confirmRecordedFee(principalCentsEntered, Math.round(quotedFee * 100), recordedGross);
+  const validGross = confirmedFeeCents !== null;
+  const convenienceFee = quotedFee > 0 ? (confirmedFeeCents ?? 0) / 100 : 0;
 
   const autoDistribute = useCallback((amount: string) => {
     const total = parseFloat(amount) || 0;
@@ -169,9 +168,13 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
     return alloc < 0 || alloc > row.amount_due;
   });
 
-  const allocationExceedsTotal = totalAllocated > totalEntered + 0.005;
-  const feeAllocationIncomplete = quotedFee > 0 && Math.round(totalEntered * 100) !== Math.round(totalAllocated * 100);
-  const canSubmit = (quotedFee <= 0 || validGross) && !feeAllocationIncomplete && totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
+  const allocationCents = allocations.map(row => row.allocation.trim() === '' ? 0 : parsePaymentCents(row.allocation));
+  const totalAllocationCents = allocationCents.reduce<number>((sum, cents) => sum + (cents ?? 0), 0);
+  const invalidCurrency = principalCentsEntered === null || allocationCents.some(cents => cents === null)
+    || !Number.isSafeInteger(totalAllocationCents);
+  const allocationExceedsTotal = principalCentsEntered !== null && totalAllocationCents > principalCentsEntered;
+  const feeAllocationIncomplete = quotedFee > 0 && principalCentsEntered !== totalAllocationCents;
+  const canSubmit = !invalidCurrency && (quotedFee <= 0 || validGross) && !feeAllocationIncomplete && totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -189,7 +192,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
       // One insert statement: either all payment rows are recorded or none are.
       // Existing database triggers own invoice balances.
-      const principalCents=rows.map(row=>Math.round(parseFloat(row.allocation)*100));
+      const principalCents=rows.map(row=>parsePaymentCents(row.allocation)!);
       const feeCents=allocateRecordedFee(principalCents,Math.round(convenienceFee*100));
       const {data: recorded, error: paymentError} = await supabase.from('payments').insert(rows.map((row,index)=>({
         invoice_id: row.id,
@@ -655,10 +658,10 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
               </div>
             </div>
             {/* Validation messages */}
-            {(hasOverAllocation || allocationExceedsTotal) && (
+            {((invalidCurrency && totalAmount.trim() !== '') || hasOverAllocation || allocationExceedsTotal) && (
               <div className="px-5 py-2 flex items-center gap-2 text-xs text-red-600 bg-red-50 border-b border-red-100">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {hasOverAllocation ? 'One or more allocations are negative or exceed the invoice amount due.' : 'Total allocations exceed the payment amount entered.'}
+                {invalidCurrency ? 'Enter valid currency amounts with no more than two decimal places.' : hasOverAllocation ? 'One or more allocations are negative or exceed the invoice amount due.' : 'Total allocations exceed the payment amount entered.'}
               </div>
             )}
             {/* Action buttons */}
