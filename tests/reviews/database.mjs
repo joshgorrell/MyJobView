@@ -544,5 +544,16 @@ console.log(
  await ledgerDb.exec('SET ROLE service_role');
  await assert.rejects(quarantine(id(1),100));
  await ledgerDb.exec('RESET ROLE');
+ await ledgerDb.exec(`
+ CREATE TABLE customer_satisfaction(organization_id uuid,project_id uuid,survey_type text,rating text);
+ INSERT INTO customer_satisfaction VALUES('${id(1)}','${id(51)}','job_completion',NULL),('${id(1)}','${id(51)}','post_test_tune','good');
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128152500_feedback_lifecycle_suppression.sql', import.meta.url),'utf8'));
+ const legacyGuard=async(key,org=id(1))=>(await ledgerDb.query('SELECT public.feedback_project_legacy_suppression($1,$2,$3) AS reason',[org,id(51),key])).rows[0].reason;
+ assert.equal(await legacyGuard('job_completion'),'legacy_survey_exists');
+ assert.equal(await legacyGuard('test_tune'),'customer_responded');
+ assert.equal(await legacyGuard('one_year'),null);
+ assert.equal(await legacyGuard('one_year',id(2)),'missing_source');
+ assert.equal(await legacyGuard('support_completion'),'invalid_candidate');
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
