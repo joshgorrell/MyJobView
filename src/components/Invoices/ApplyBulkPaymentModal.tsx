@@ -53,6 +53,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   const [customMessage, setCustomMessage] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
 
+  const [recordedGross, setRecordedGross] = useState('');
   const [feeSettings, setFeeSettings] = useState<ConvenienceFeeSettings | null>(null);
   const [paymentProcessor, setPaymentProcessor] = useState<string | null>(null);
 
@@ -115,7 +116,13 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   const remaining = totalEntered - totalAllocated;
 
   const feeResult = calculateConvenienceFee(totalEntered, paymentMethod, feeSettings);
-  const convenienceFee = feeResult.feeAmount;
+  // A configured fee is only a quote, not evidence of a collected fee.
+  const quotedFee = feeResult.feeAmount;
+  const principalCentsEntered = Math.round(totalEntered * 100);
+  const grossCentsEntered = Math.round(Number(recordedGross) * 100);
+  const validGross = recordedGross.trim() !== '' && Number.isFinite(Number(recordedGross))
+    && (grossCentsEntered === principalCentsEntered || grossCentsEntered === principalCentsEntered + Math.round(quotedFee * 100));
+  const convenienceFee = quotedFee > 0 && validGross ? (grossCentsEntered - principalCentsEntered) / 100 : 0;
 
   const autoDistribute = useCallback((amount: string) => {
     const total = parseFloat(amount) || 0;
@@ -135,12 +142,14 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
   }, []);
 
   function handleTotalAmountChange(val: string) {
+    setRecordedGross('');
     setTotalAmount(val);
     autoDistribute(val);
   }
 
   function handleFillAll() {
     const val = totalOutstanding.toFixed(2);
+    setRecordedGross('');
     setTotalAmount(val);
     autoDistribute(val);
   }
@@ -162,7 +171,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
 
   const allocationExceedsTotal = totalAllocated > totalEntered + 0.005;
   const feeAllocationIncomplete = convenienceFee > 0 && Math.round(totalEntered * 100) !== Math.round(totalAllocated * 100);
-  const canSubmit = !feeAllocationIncomplete && totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
+  const canSubmit = (quotedFee <= 0 || validGross) && !feeAllocationIncomplete && totalEntered > 0 && totalAllocated > 0 && !hasOverAllocation && !allocationExceedsTotal && !submitting && (paymentMethod !== 'check' || referenceNumber.trim() !== '');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -308,7 +317,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
               {/* Total payment amount */}
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Total Payment Received <span className="text-red-500">*</span>
+                  Amount to Apply to Invoices <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-lg">$</span>
@@ -334,7 +343,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
               </div>
 
               {/* Convenience fee */}
-              {convenienceFee > 0 && (
+              {quotedFee > 0 && (
                 <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm space-y-1.5">
                   <p className="font-semibold text-amber-900">{feeResult.label}</p>
                   <div className="flex justify-between text-amber-800">
@@ -343,12 +352,18 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                   </div>
                   <div className="flex justify-between text-amber-800">
                     <span>Fee ({feeSettings?.cc_convenience_fee_type === 'percentage' ? `${((feeSettings?.cc_convenience_fee_percentage || 0) * 100).toFixed(2)}%` : 'Flat'})</span>
-                    <span>{formatCurrency(convenienceFee)}</span>
+                    <span>{formatCurrency(quotedFee)}</span>
                   </div>
                   <div className="flex justify-between font-bold pt-1.5 border-t border-amber-300 text-amber-900 text-base">
-                    <span>Total collected (record only)</span>
-                    <span>{formatCurrency(totalEntered + convenienceFee)}</span>
+                    <span>Estimated total with fee</span>
+                    <span>{formatCurrency(totalEntered + quotedFee)}</span>
                   </div>
+                  <label className="block font-medium mt-3" htmlFor="bulk-recorded-gross">Actual total collected, including any fee</label>
+                  <input id="bulk-recorded-gross" type="number" min="0.01" step="0.01" required
+                    value={recordedGross} onChange={e => setRecordedGross(e.target.value)}
+                    className="w-full rounded-lg border border-amber-300 px-3 py-2" />
+                  <p>Enter the actual transaction total. Record a fee only if it was collected on an eligible payment. This form does not charge the customer.</p>
+                  {recordedGross !== '' && !validGross && <p role="alert">The total must match the invoice amount or the invoice amount plus the configured fee.</p>}
                 </div>
               )}
 
@@ -376,7 +391,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => { setPaymentMethod(opt.value); setShowMethodPicker(false); }}
+                          onClick={() => { setRecordedGross(''); setPaymentMethod(opt.value); setShowMethodPicker(false); }}
                           className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border-2 text-sm font-medium transition-all touch-manipulation ${
                             selected
                               ? 'border-green-500 bg-green-50 text-green-700'
@@ -661,7 +676,7 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
                 >
                   {submitting
                     ? 'Saving...'
-                    : `Record ${formatCurrency(totalAllocated)}`
+                    : `Record ${formatCurrency(totalAllocated + convenienceFee)}`
                   }
                 </button>
               </div>
