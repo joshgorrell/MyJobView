@@ -309,3 +309,35 @@ await db.close();
 console.log(
   "Lost opportunity review privacy, sharing, completion, owner notification, external proposal and tenant tests passed.",
 );
+
+ // Isolated feedback timeline ledger regression: no live producers or email.
+ const ledgerDb = new PGlite();
+ await ledgerDb.exec(`
+ CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+ CREATE SCHEMA auth;
+ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('test.uid',true),'')::uuid $$;
+ CREATE TABLE organizations(id uuid PRIMARY KEY);
+ CREATE TABLE profiles(id uuid PRIMARY KEY, organization_id uuid, role text);
+ GRANT USAGE ON SCHEMA auth,public TO authenticated,service_role,anon;
+ GRANT SELECT ON profiles TO authenticated;
+ INSERT INTO organizations VALUES('${id(1)}'),('${id(2)}');
+ INSERT INTO profiles VALUES('${id(10)}','${id(1)}','admin'),('${id(11)}','${id(1)}','sales'),('${id(20)}','${id(2)}','owner');
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128135000_feedback_timeline_event_foundation.sql', import.meta.url),'utf8'));
+ const insertEvent = `INSERT INTO feedback_timeline_events(organization_id,timeline_key,source_id,occurrence_key,occurred_at) VALUES('${id(1)}','service_completion','${id(30)}','resolution-1',now())`;
+ await ledgerDb.exec('SET ROLE service_role');
+ await ledgerDb.exec(insertEvent);
+ await assert.rejects(ledgerDb.exec(insertEvent), 'Duplicate occurrence rejected');
+ await ledgerDb.exec(insertEvent.replace('resolution-1','resolution-2'));
+ await assert.rejects(ledgerDb.exec("UPDATE feedback_timeline_events SET cancelled_at=now()"), 'Cancellation reason required');
+ await ledgerDb.exec("UPDATE feedback_timeline_events SET cancelled_at=now(), cancellation_reason='reopened' WHERE occurrence_key='resolution-1'");
+ for (const [user, expected] of [[10,2],[11,0],[20,0]]) {
+   await ledgerDb.exec(`RESET ROLE; SET test.uid='${id(user)}'; SET ROLE authenticated;`);
+   assert.equal((await ledgerDb.query('SELECT * FROM feedback_timeline_events')).rows.length, expected);
+   await assert.rejects(ledgerDb.exec(insertEvent), 'Staff cannot forge events');
+   await assert.rejects(ledgerDb.exec('DELETE FROM feedback_timeline_events'), 'Staff cannot erase audit history');
+ }
+ await ledgerDb.exec('RESET ROLE; SET ROLE anon');
+ await assert.rejects(ledgerDb.query('SELECT * FROM feedback_timeline_events'));
+ await ledgerDb.close();
+ console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
