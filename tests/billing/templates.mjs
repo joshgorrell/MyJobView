@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { BILLING_TEMPLATE_DEFAULTS as defaults, validateBillingTemplates as validate, renderBillingTemplatePreview as render } from '../../src/lib/billingReminderTemplates.ts';
+validate(defaults);
+assert.equal(defaults.length,7);
+assert.match(render(defaults[0],'Volland Foundation',250000).body,/Volland Foundation/);
+assert.match(render(defaults[0],'Customer',250000).body,/\$2,500\.00/);
+assert.throws(()=>validate([defaults[1],defaults[0]]));
+assert.throws(()=>validate([{...defaults[0],subject:'Hi {{unknown}}'}]));
+assert.throws(()=>validate([{...defaults[0],subject:'Hi\nthere'}]));
+assert.throws(()=>render(defaults[0],'Customer',0));
+assert.throws(()=>render(defaults[0],'A\nB',100));
+assert.match(render(defaults[0],'{{reminder_balance}}',100).body,/\{\{reminder_balance\}\}/);
+console.log('Billing template preview tests passed');
