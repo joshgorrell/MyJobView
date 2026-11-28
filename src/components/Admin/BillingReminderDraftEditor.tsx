@@ -1,3 +1,4 @@
+import { composeBillingDraftPreview } from '../../lib/billingDraftPreview';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { BILLING_TEMPLATE_DEFAULTS, validateBillingTemplates, renderBillingTemplatePreview, type BillingTemplate } from '../../lib/billingReminderTemplates';
@@ -5,6 +6,21 @@ import { BILLING_TEMPLATE_DEFAULTS, validateBillingTemplates, renderBillingTempl
 export function BillingReminderDraftEditor({ organizationId }: { organizationId: string }) {
   const [templates,setTemplates]=useState<BillingTemplate[]>([]);
   const [days,setDays]=useState(7);
+  const [accountPreview,setAccountPreview]=useState<ReturnType<typeof composeBillingDraftPreview>|null>(null);
+  const [previewBusy,setPreviewBusy]=useState(false);
+  async function previewAccounts(){
+    setAccountPreview(null);setError('');setPreviewBusy(true);
+    try{
+      validateBillingTemplates(templates);
+      const {data,error}=await supabase.from('invoices').select('id,organization_id,contact_id,due_date,status,amount_due,portal_visible,security_billing_cycle_id').eq('organization_id',organizationId).eq('portal_visible',true).in('status',['submitted','sent','partial','overdue']).gt('amount_due',0).is('security_billing_cycle_id',null).order('id').limit(101);
+      if(error)throw error;
+      if((data??[]).length>100)throw new Error('More than 100 invoices match. A paginated preview is required before displaying account totals.');
+      const now=new Date();
+      const asOf=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+      setAccountPreview(composeBillingDraftPreview({organizationId,minimumDays:days,templates},(data??[]).filter(i=>i.contact_id).map(i=>({id:i.id,organizationId:i.organization_id,contactId:i.contact_id,dueDate:i.due_date,balanceCents:Math.round(Number(i.amount_due)*100),eligible:true,lastReminderOffset:null})),[],asOf));
+    }catch(e){setError(e instanceof Error?e.message:'Unable to preview accounts.');}
+    finally{setPreviewBusy(false);}
+  }
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
@@ -45,7 +61,7 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
     <p className="text-sm text-gray-600">Draft only — no automatic emails are active. Negative days are before the invoice due date.</p>
     {error&&<p role="alert" className="text-red-700">{error}</p>}
     {loading&&<p>Loading reminder settings…</p>}
-    {loaded&&<fieldset disabled={saving} className="space-y-4">
+    {loaded&&<fieldset disabled={saving||previewBusy} className="space-y-4">
       <label className="block text-sm font-medium">Minimum days between account reminders<input type="number" min={1} max={365} value={days} onChange={e=>{setDays(Number(e.target.value));setMessage('');}} className="block border rounded p-2 w-28"/></label>
       <p className="text-sm text-gray-600">Variables: {'{{customer_name}}'} and {'{{reminder_balance}}'}</p>
       {templates.map((t,i)=><div key={i} className="border rounded-lg p-3 space-y-2">
@@ -58,6 +74,12 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
       <button type="button" disabled={templates.length>=32} className="text-blue-700" onClick={()=>{setTemplates(old=>[...old,{offset:Math.min(365,(old[old.length - 1]?.offset??-1)+7),subject:'Payment reminder',body:'Hello {{customer_name}}, please review your outstanding invoices.'}]);setMessage('');}}>Add stage</button>
       {preview&&<div className="bg-gray-50 rounded p-3"><strong>{preview.subject}</strong><p className="whitespace-pre-wrap">{preview.body}</p></div>}
       <button type="button" onClick={()=>void save()} className="block bg-blue-600 text-white rounded px-4 py-2">{saving?'Saving…':'Save reminder draft'}</button>
+      <button type="button" onClick={()=>void previewAccounts()} className="block border rounded px-4 py-2">{previewBusy?'Loading preview…':'Preview invoice candidates'}</button>
+      {accountPreview&&<div className="rounded border p-3 space-y-2">
+        <p className="font-medium">Illustrative candidates: {accountPreview.length} accounts</p>
+        <p className="text-sm text-gray-600">All candidates are held. Payment settlement, disputes, prior reminders and dealer timezone are not yet verified. Results are not payable statements or a delivery queue. Run again after editing settings.</p>
+        {accountPreview.map(a=><div key={a.contactId} className="border-t py-2 text-sm">{a.invoices.length} invoice(s) · {new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(a.balanceCents/100)} · Stage {a.stage} · History unavailable</div>)}
+      </div>}
       {message&&<p role="status" className="text-green-700">{message}</p>}
     </fieldset>}
   </section>;
