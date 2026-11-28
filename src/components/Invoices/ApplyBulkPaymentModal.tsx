@@ -175,45 +175,26 @@ export function ApplyBulkPaymentModal({ contactId, contactName, onClose, onSucce
         ? `${notes ? notes + '\n\n' : ''}${feeResult.label}: ${formatCurrency(convenienceFee)}`
         : notes || null;
 
-      const insertedPaymentIds: string[] = [];
       const usesProcessor = (paymentMethod === 'credit_card' || paymentMethod === 'bank_transfer') && paymentProcessor;
+      // One insert statement: either all payment rows are recorded or none are.
+      // Existing database triggers own invoice balances.
+      const {data: recorded, error: paymentError} = await supabase.from('payments').insert(rows.map(row=>({
+        invoice_id: row.id,
+        contact_id: contactId,
+        amount: parseFloat(row.allocation),
+        payment_date: paymentDate,
+        payment_method: paymentMethod,
+        reference_number: referenceNumber || null,
+        notes: paymentNotes,
+        payment_processor: usesProcessor ? paymentProcessor : null,
+      }))).select('id,invoice_id');
+      if(paymentError)throw paymentError;
+      const insertedPaymentIds = (recorded??[]).map(p=>p.id);
+      const paymentByInvoice = new Map((recorded??[]).map(p=>[p.invoice_id,p.id]));
 
-      for (const row of rows) {
-        const alloc = parseFloat(row.allocation);
-
-        const { data: paymentData, error: paymentError } = await supabase
-          .from('payments')
-          .insert({
-            invoice_id: row.id,
-            contact_id: contactId,
-            amount: alloc,
-            payment_date: paymentDate,
-            payment_method: paymentMethod,
-            reference_number: referenceNumber || null,
-            notes: paymentNotes,
-            payment_processor: usesProcessor ? paymentProcessor : null,
-          })
-          .select('id')
-          .single();
-
-        if (paymentError) throw paymentError;
-        insertedPaymentIds.push(paymentData.id);
-
-        const newAmountPaid = row.amount_paid + alloc;
-        const newAmountDue = row.total - newAmountPaid;
-        const newStatus = newAmountDue <= 0.005 ? 'paid' : 'partial';
-
-        const { error: invoiceError } = await supabase
-          .from('invoices')
-          .update({ amount_paid: newAmountPaid, amount_due: Math.max(0, newAmountDue), status: newStatus })
-          .eq('id', row.id);
-
-        if (invoiceError) throw invoiceError;
-      }
-
-      if (sendReceipt && contactEmail && insertedPaymentIds.length > 0) {
-        const bulkSummary = rows.map((row, i) => ({
-          paymentId: insertedPaymentIds[i],
+      if (sendReceipt && contactEmail && insertedPaymentIds.length === rows.length && rows.every(row=>paymentByInvoice.has(row.id))) {
+        const bulkSummary = rows.map(row => ({
+          paymentId: paymentByInvoice.get(row.id),
           invoiceId: row.id,
           invoiceNumber: row.invoice_number,
           amountApplied: parseFloat(row.allocation),
