@@ -1,3 +1,4 @@
+import { recordedPaymentBreakdown } from '../_shared/recorded-payment-breakdown.ts';
 import { sendSystemEmail } from '../_shared/system-email.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import { getCompanySettings, wrapInEmailLayout } from '../_shared/emailTemplates.ts';
@@ -265,10 +266,7 @@ Deno.serve(async (req: Request) => {
     const customerName = contact.full_name || contact.contact_name ||
       `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Valued Customer';
 
-    const grossAmount = Number(payment.amount);
-    const recordedFee = Number(payment.convenience_fee_amount ?? 0);
-    if (!Number.isFinite(grossAmount) || !Number.isFinite(recordedFee) || grossAmount < 0 || recordedFee < 0 || recordedFee > grossAmount) throw new Error('Invalid recorded payment amount');
-    const appliedAmount = Math.round((grossAmount-recordedFee)*100)/100;
+    const {grossAmount,recordedFee,appliedAmount} = recordedPaymentBreakdown(payment.amount,payment.convenience_fee_amount);
     const newBalance = Number(payment.invoice.amount_due);
     const isPaidInFull = newBalance <= 0;
 
