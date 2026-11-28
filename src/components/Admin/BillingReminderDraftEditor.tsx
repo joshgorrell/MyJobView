@@ -14,9 +14,9 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
     setAccountPreview(null);setPendingContacts([]);setError('');setPreviewBusy(true);
     try{
       validateBillingTemplates(templates);
-      const {data,error}=await supabase.from('invoices').select('id,organization_id,contact_id,due_date,status,amount_due,portal_visible,security_billing_cycle_id').eq('organization_id',organizationId).eq('portal_visible',true).in('status',['submitted','sent','partial','overdue']).gt('amount_due',0).is('security_billing_cycle_id',null).order('id').limit(101);
+      const {data,error,count}=await supabase.from('invoices').select('id,organization_id,contact_id,due_date,status,amount_due,portal_visible,security_billing_cycle_id',{count:'exact'}).eq('organization_id',organizationId).eq('portal_visible',true).in('status',['submitted','sent','partial','overdue']).gt('amount_due',0).is('security_billing_cycle_id',null).order('id').limit(101);
       if(error)throw error;
-      if((data??[]).length>100)throw new Error('More than 100 invoices match. A paginated preview is required before displaying account totals.');
+      if(count===null||count!==(data??[]).length||count>100)throw new Error('Invoice preview is incomplete or exceeds 100 invoices. No account totals will be displayed.');
       const {data:dealer,error:timezoneError}=await supabase.from('organizations').select('timezone').eq('id',organizationId).single();
       if(timezoneError||!dealer?.timezone)throw new Error('Dealer timezone unavailable. Cannot calculate reminder stages.');
       const asOf=formatDateInTimezone(new Date().toISOString(),dealer.timezone);
@@ -24,10 +24,10 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
 
       const contacts=[...new Set((data??[]).map(i=>i.contact_id).filter((id):id is string=>Boolean(id)))];
       if(contacts.length){
-        const {data:pending,error:pendingError}=await supabase.from('pending_payments')
-          .select('contact_id').eq('organization_id',organizationId).eq('payment_type','invoice')
+        const {data:pending,error:pendingError,count:pendingCount}=await supabase.from('pending_payments')
+          .select('contact_id',{count:'exact'}).eq('organization_id',organizationId).eq('payment_type','invoice')
           .eq('status','awaiting_payment').in('contact_id',contacts).limit(1001);
-        if(pendingError||(pending??[]).length>1000)throw new Error('Pending payment information unavailable. Cannot preview accounts.');
+        if(pendingError||pendingCount===null||pendingCount!==(pending??[]).length||pendingCount>1000)throw new Error('Pending payment information unavailable. Cannot preview accounts.');
         setPendingContacts([...new Set((pending??[]).map(p=>p.contact_id).filter((id):id is string=>Boolean(id)))]);
       }
       setAccountPreview(composeBillingDraftPreview({organizationId,minimumDays:days,templates},(data??[]).filter(i=>i.contact_id).map(i=>({id:i.id,organizationId:i.organization_id,contactId:i.contact_id,dueDate:i.due_date,balanceCents:Math.round(Number(i.amount_due)*100),eligible:true,lastReminderOffset:null})),[],asOf));
