@@ -572,5 +572,26 @@ console.log(
  assert.equal((await scopedService()).rows[0].source_id,id(142));
  await ledgerDb.exec(`UPDATE service_requests SET request_type='project' WHERE id='${id(142)}'`);
  assert.ok((await scopedService()).rows[0].cancelled_at);
+ await ledgerDb.exec(`
+ ALTER TABLE service_requests ADD COLUMN work_order_id uuid;
+ CREATE TABLE work_orders(id uuid PRIMARY KEY,organization_id uuid,feedback_email_sent boolean);
+ INSERT INTO work_orders VALUES('${id(143)}','${id(1)}',true);
+ INSERT INTO service_requests(id,organization_id,status,request_type,contact_id,work_order_id) VALUES
+ ('${id(144)}','${id(1)}','closed','service','${id(80)}','${id(143)}'),
+ ('${id(145)}','${id(1)}','closed','service','${id(80)}',NULL);
+ INSERT INTO tasks(id,organization_id,status,is_support_request,contact_id,completed_at) VALUES
+ ('${id(146)}','${id(1)}','completed',true,'${id(80)}',now()),
+ ('${id(147)}','${id(1)}','completed',false,'${id(80)}',now());
+ `);
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128153500_feedback_resolution_eligibility.sql', import.meta.url),'utf8'));
+ const resolutionGuard=async(source,key,org=id(1))=>(await ledgerDb.query('SELECT public.feedback_resolution_suppression($1,$2,$3) AS reason',[org,id(source),key])).rows[0].reason;
+ assert.equal(await resolutionGuard(144,'service_completion'),'legacy_work_order_feedback_exists');
+ assert.equal(await resolutionGuard(145,'service_completion'),null);
+ assert.equal(await resolutionGuard(142,'service_completion'),'service_ineligible');
+ assert.equal(await resolutionGuard(146,'support_completion'),null);
+ assert.equal(await resolutionGuard(147,'support_completion'),'support_ineligible');
+ assert.equal(await resolutionGuard(146,'support_completion',id(2)),'missing_source');
+ await ledgerDb.exec(`UPDATE tasks SET status='pending',completed_at=NULL WHERE id='${id(146)}'`);
+ assert.equal(await resolutionGuard(146,'support_completion'),'support_ineligible');
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
