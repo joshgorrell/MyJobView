@@ -593,5 +593,12 @@ console.log(
  assert.equal(await resolutionGuard(146,'support_completion',id(2)),'missing_source');
  await ledgerDb.exec(`UPDATE tasks SET status='pending',completed_at=NULL WHERE id='${id(146)}'`);
  assert.equal(await resolutionGuard(146,'support_completion'),'support_ineligible');
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128154000_feedback_template_contract.sql', import.meta.url),'utf8'));
+ for (const key of ['proposal_check','lost_opportunity','job_completion','service_completion','support_completion','test_tune','one_year']) {
+ const compatible=async(template)=>(await ledgerDb.query('SELECT public.feedback_template_compatible($1,$2) AS ok',[key,template])).rows[0].ok;
+ assert.equal(await compatible('feedback_'+key),true);
+ assert.equal(await compatible('invoice_sent'),false);
+ assert.equal(await compatible(null),false);
+ }
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
