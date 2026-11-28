@@ -55,7 +55,7 @@ export function BillingReminderDraftEditor({ organizationId }: { organizationId:
         <button type="button" className="text-blue-700 mr-4" onClick={()=>{try{setPreview(renderBillingTemplatePreview(t,'Sample Customer',250000));setError('');}catch(e){setError(e instanceof Error?e.message:'Invalid template');setPreview(null);}}}>Preview example</button>
         <button type="button" className="text-red-700" onClick={()=>{setTemplates(old=>old.filter((_,j)=>j!==i));setPreview(null);setMessage('');}}>Remove stage</button>
       </div>)}
-      <button type="button" disabled={templates.length>=32} className="text-blue-700" onClick={()=>{setTemplates(old=>[...old,{offset:Math.min(365,(old.at(-1)?.offset??-1)+7),subject:'Payment reminder',body:'Hello {{customer_name}}, please review your outstanding invoices.'}]);setMessage('');}}>Add stage</button>
+      <button type="button" disabled={templates.length>=32} className="text-blue-700" onClick={()=>{setTemplates(old=>[...old,{offset:Math.min(365,(old[old.length - 1]?.offset??-1)+7),subject:'Payment reminder',body:'Hello {{customer_name}}, please review your outstanding invoices.'}]);setMessage('');}}>Add stage</button>
       {preview&&<div className="bg-gray-50 rounded p-3"><strong>{preview.subject}</strong><p className="whitespace-pre-wrap">{preview.body}</p></div>}
       <button type="button" onClick={()=>void save()} className="block bg-blue-600 text-white rounded px-4 py-2">{saving?'Saving…':'Save reminder draft'}</button>
       {message&&<p role="status" className="text-green-700">{message}</p>}
