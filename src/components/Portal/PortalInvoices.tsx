@@ -198,7 +198,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   }
 
   function selectAllUnpaidInvoices() {
-    const unpaidInvoices = outstandingInvoices.filter(inv => !inv.security_billing_cycle_id);
+    const unpaidInvoices = outstandingInvoices.filter(inv => !inv.security_billing_cycle_id && inv.qbo_invoice_id && inv.qbo_payment_url?.startsWith('https://'));
     setSelectedInvoiceIds(unpaidInvoices.map(inv => inv.id));
   }
 
@@ -208,7 +208,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   }
 
   async function handlePayment(invoice: Invoice) {
-    if (invoice.security_billing_cycle_id) return;
+    if (invoice.security_billing_cycle_id || invoice.amount_due <= 0 || ['paid','void','draft'].includes(invoice.status)) return;
     try {
       if (!invoice.qbo_invoice_id) {
         setPaymentUnavailableInvoice(invoice);
@@ -227,7 +227,11 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
     setPayingAll(true);
     setConfirmPayAll(false);
     try {
-      const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
+      const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && inv.amount_due > 0 && !['paid','void','draft'].includes(inv.status) && selectedInvoiceIds.includes(inv.id));
+      if (!selectedInvoices.length || selectedInvoices.length !== selectedInvoiceIds.length || selectedInvoices.some(inv => !inv.qbo_invoice_id || !inv.qbo_payment_url?.startsWith('https://'))) {
+        notify('The selected invoices are no longer available for online payment. Refresh and try again.', { theme: 'blue', tone: 'warning' });
+        return;
+      }
       for (const invoice of selectedInvoices) {
         if (invoice.qbo_payment_url?.startsWith('https://')) window.open(invoice.qbo_payment_url, '_blank', 'noopener,noreferrer');
       }
@@ -244,8 +248,8 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   async function handlePayAll() {
     if (selectedInvoiceIds.length === 0) return;
 
-    const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
-    const unsyncedInvoices = selectedInvoices.filter(inv => !inv.qbo_payment_url);
+    const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && inv.amount_due > 0 && !['paid','void','draft'].includes(inv.status) && selectedInvoiceIds.includes(inv.id));
+    const unsyncedInvoices = selectedInvoices.filter(inv => !inv.qbo_invoice_id || !inv.qbo_payment_url?.startsWith('https://'));
 
     if (unsyncedInvoices.length > 0) {
       notify(`${unsyncedInvoices.length} invoice(s) are not yet synced with QuickBooks. Please contact support.`, { theme: 'blue', tone: 'warning' });
@@ -391,7 +395,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
   const outstandingCents = outstandingInvoices.reduce((sum, inv) => sum + Math.round(Number(inv.amount_due) * 100), 0);
   const overdueCents = outstandingInvoices.filter(inv => inv.due_date && inv.due_date.slice(0, 10) < today)
     .reduce((sum, inv) => sum + Math.round(Number(inv.amount_due) * 100), 0);
-  const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && selectedInvoiceIds.includes(inv.id));
+  const selectedInvoices = invoices.filter(inv => !inv.security_billing_cycle_id && inv.amount_due > 0 && !['paid','void','draft'].includes(inv.status) && selectedInvoiceIds.includes(inv.id));
   const selectedTotal = selectedInvoices.reduce((sum, inv) => sum + inv.amount_due, 0);
 
   if (loading) {
@@ -569,7 +573,7 @@ export function PortalInvoices({ isEmbedded = false }: { isEmbedded?: boolean } 
                       <div className="flex-1 flex items-start gap-3 min-w-0">
                         <input
                           type="checkbox"
-                          disabled={Boolean(invoice.security_billing_cycle_id)}
+                          disabled={Boolean(invoice.security_billing_cycle_id) || !invoice.qbo_invoice_id || !invoice.qbo_payment_url?.startsWith('https://')}
                           checked={selectedInvoiceIds.includes(invoice.id)}
                           onChange={() => toggleInvoiceSelection(invoice.id)}
                           className="mt-1.5 w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
