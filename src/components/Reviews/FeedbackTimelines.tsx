@@ -6,7 +6,6 @@ const programs = [
   ['lost_opportunity', 'Lost Opportunity'],
   ['job_completion', 'Job Completion'],
   ['service_completion', 'Service Resolution'],
-  ['security_onboarding', 'Security Onboarding'],
   ['support_completion', 'Support Resolution'],
   ['test_tune', 'Test & Tune'],
   ['one_year', 'Annual Check-In'],
