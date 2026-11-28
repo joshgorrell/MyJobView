@@ -497,5 +497,21 @@ console.log(
  assert.equal(await suppression('lost_opportunity'),null);
  await ledgerDb.exec(`INSERT INTO proposal_loss_feedback VALUES('${id(1)}','${id(98)}','phone')`);
  assert.equal(await suppression('lost_opportunity'),'customer_responded');
+ await ledgerDb.exec(await readFile(new URL('../../supabase/migrations/20261128151000_feedback_delivery_ledger.sql', import.meta.url),'utf8'));
+ const deliveryEvent=(await ledgerDb.query("SELECT id FROM feedback_timeline_events WHERE organization_id=$1 AND source_id=$2 LIMIT 1",[id(1),id(95)])).rows[0].id;
+ const deliveryInsert=`INSERT INTO feedback_timeline_deliveries(organization_id,event_id,step_number,template_key,due_at) VALUES('${id(1)}','${deliveryEvent}',1,'example',now())`;
+ await ledgerDb.exec(deliveryInsert);
+ await assert.rejects(ledgerDb.exec(deliveryInsert),'Duplicate step rejected');
+ await assert.rejects(ledgerDb.exec(deliveryInsert.replace(id(1),id(2))),'Cross-tenant event rejected');
+ await assert.rejects(ledgerDb.exec("UPDATE feedback_timeline_deliveries SET status='sent'"),'Sent requires provider receipt');
+ await assert.rejects(ledgerDb.exec("UPDATE feedback_timeline_deliveries SET status='uncertain'"),'Uncertain requires reason');
+ for (const [user,expected] of [[10,1],[11,0],[20,0]]) {
+ await ledgerDb.exec(`RESET ROLE; SET test.uid='${id(user)}'; SET ROLE authenticated;`);
+ assert.equal((await ledgerDb.query('SELECT * FROM feedback_timeline_deliveries')).rows.length,expected);
+ await assert.rejects(ledgerDb.exec(deliveryInsert));
+ }
+ await ledgerDb.exec('RESET ROLE; SET ROLE service_role');
+ await assert.rejects(ledgerDb.exec(deliveryInsert.replace(",1,'example'",",2,'example'")),'Runtime cannot enroll');
+ await ledgerDb.exec('RESET ROLE');
  await ledgerDb.close();
  console.log('Feedback event ledger isolation, duplicate and cancellation checks passed.');
