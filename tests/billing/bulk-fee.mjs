@@ -8,3 +8,24 @@ assert.throws(()=>allocate([0,100],5));
 assert.throws(()=>allocate([100],-1));
 assert.throws(()=>allocate([],1));
 console.log('Bulk payment fee allocation checks passed');
+
+import { recordedBulkPaymentBreakdown as breakdown } from '../../supabase/functions/_shared/recorded-payment-breakdown.ts';
+assert.deepEqual(breakdown([{amount:103,convenience_fee_amount:3},{amount:206,convenience_fee_amount:6}]),{grossAmount:309,recordedFee:9,appliedAmount:300});
+assert.deepEqual(breakdown([{amount:'0.10'},{amount:'0.20',convenience_fee_amount:0}]),{grossAmount:0.3,recordedFee:0,appliedAmount:0.3});
+assert.deepEqual(breakdown([{amount:1.01,convenience_fee_amount:0.01},{amount:1}]),{grossAmount:2.01,recordedFee:0.01,appliedAmount:2});
+for(const rows of [[],[{amount:0}],[{amount:1,convenience_fee_amount:1}],[{amount:1,convenience_fee_amount:2}],[{amount:1.001}],[{amount:Infinity}],[{amount:1,convenience_fee_amount:-1}]]) assert.throws(()=>breakdown(rows));
+console.log('Persisted bulk receipt totals checks passed');
+
+import { parsePaymentCents as cents, confirmRecordedFee as confirm } from '../../src/lib/bulkPaymentFeeAllocation.ts';
+assert.equal(cents('0.29'),29);
+assert.equal(cents(' 1.2 '),120);
+assert.equal(cents('90071992547409.91'),Number.MAX_SAFE_INTEGER);
+for(const input of ['', '1e2', '1.001', '-1', 'Infinity', '90071992547409.92']) assert.equal(cents(input),null);
+assert.equal(confirm(10000,300,'103.00'),300);
+assert.equal(confirm(10000,300,'100'),0);
+assert.equal(confirm(10000,300,'102.99'),null);
+assert.equal(confirm(10000,300,''),null);
+assert.equal(confirm(10000,300,'103.001'),null);
+assert.equal(confirm(null,300,'103'),null);
+assert.equal(confirm(Number.MAX_SAFE_INTEGER,1,'1'),null);
+console.log('Actual collected gross confirmation checks passed');

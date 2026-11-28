@@ -13,3 +13,22 @@ export function allocateRecordedFee(principalCents: readonly number[], feeCents:
   for(let i=0;i<remaining;i++)ranked[i].fee++;
   return parts.map(p=>p.fee);
 }
+
+/** Parse ordinary decimal currency input without rounding or exponent notation. */
+export function parsePaymentCents(input: string): number | null {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.trim());
+  if (!match) return null;
+  const cents = BigInt(match[1]) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'));
+  return cents <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(cents) : null;
+}
+
+/** A configured quote is not a collected fee. Only a matching actual gross can confirm it. */
+export function confirmRecordedFee(principalCents: number | null, quotedFeeCents: number, grossInput: string): number | null {
+  if (principalCents === null || !Number.isSafeInteger(principalCents) || principalCents <= 0
+    || !Number.isSafeInteger(quotedFeeCents) || quotedFeeCents < 0
+    || !Number.isSafeInteger(principalCents + quotedFeeCents)) return null;
+  const gross = parsePaymentCents(grossInput);
+  if (gross === principalCents) return 0;
+  if (gross === principalCents + quotedFeeCents) return quotedFeeCents;
+  return null;
+}
